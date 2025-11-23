@@ -1,0 +1,246 @@
+'use client'
+
+import { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { MdDashboard, MdInventory, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight } from 'react-icons/md'
+import { 
+  MdInventory2, 
+  MdShoppingBag, 
+  MdPeople, 
+  MdPerson, 
+  MdGroup, 
+  MdPrint, 
+  MdPayment,
+  MdCategory,
+  MdAddCircle
+} from 'react-icons/md'
+
+/**
+ * Navegação superior minimalista e clean
+ * Design inspirado em sistemas POS modernos
+ */
+export function TopNav() {
+  const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set())
+  const pathname = usePathname()
+  const { logout } = useAuthStore()
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Fechar dropdown ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setExpandedMenus(new Set())
+      }
+    }
+
+    if (expandedMenus.size > 0) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [expandedMenus])
+
+  // Fechar dropdown ao mudar de rota
+  useEffect(() => {
+    setExpandedMenus(new Set())
+  }, [pathname])
+
+  const toggleMenu = (menuName: string) => {
+    const newExpanded = new Set(expandedMenus)
+    if (newExpanded.has(menuName)) {
+      newExpanded.delete(menuName)
+    } else {
+      // Fechar outros menus ao abrir um novo
+      newExpanded.clear()
+      newExpanded.add(menuName)
+    }
+    setExpandedMenus(newExpanded)
+  }
+
+  const menuItems = [
+    { 
+      name: 'Dashboard', 
+      path: '/dashboard', 
+      icon: MdDashboard 
+    },
+    {
+      name: 'Cadastros',
+      path: '#',
+      icon: MdInventory2,
+      children: [
+        { name: 'Grupo Produtos', path: '/cadastros/grupos-produtos', icon: MdCategory },
+        { name: 'Produtos', path: '/produtos', icon: MdShoppingBag },
+        { name: 'Grupo Complementos', path: '/cadastros/grupos-complementos', icon: MdCategory },
+        { name: 'Complementos', path: '/cadastros/complementos', icon: MdAddCircle },
+        { name: 'Usuários', path: '/cadastros/usuarios', icon: MdPerson },
+        { name: 'Perfis de Usuários', path: '/cadastros/perfis-usuarios-pdv', icon: MdGroup },
+        { name: 'Clientes', path: '/cadastros/clientes', icon: MdPeople },
+        { name: 'Impressoras', path: '/cadastros/impressoras', icon: MdPrint },
+        { name: 'Meios de Pagamentos', path: '/cadastros/meios-pagamentos', icon: MdPayment },
+      ],
+    },
+    { name: 'Estoque', path: '/estoque', icon: MdInventory },
+    { name: 'Meu Caixa', path: '/meu-caixa', icon: MdPointOfSale },
+    { name: 'Relatórios', path: '/relatorios', icon: MdAssessment },
+    { name: 'Configurações', path: '/configuracoes', icon: MdSettings },
+  ]
+
+  const isMenuActive = (item: typeof menuItems[0]) => {
+    if (item.path !== '#') {
+      return pathname === item.path || pathname?.startsWith(item.path + '/')
+    }
+    if (item.children) {
+      return item.children.some((child) => pathname === child.path || pathname?.startsWith(child.path + '/'))
+    }
+    return false
+  }
+
+  const isChildActive = (childPath: string) => {
+    return pathname === childPath || pathname?.startsWith(childPath + '/')
+  }
+
+  return (
+    <nav className="h-16 bg-white border-b border-gray-200 shadow-sm">
+      <div className="h-full flex items-center justify-between px-6">
+        {/* Logo e Nome */}
+        <div className="flex items-center gap-4">
+          <Link href="/dashboard" className="flex items-center gap-3">
+            <div className="relative w-10 h-10">
+              <Image
+                src="/images/logo-branco.png"
+                alt="Jiffy Gestor"
+                fill
+                sizes="40px"
+                className="object-contain"
+                priority
+              />
+            </div>
+            <span className="text-xl font-bold text-gray-900 hidden sm:block">Jiffy Gestor</span>
+          </Link>
+        </div>
+
+        {/* Menu Items */}
+        <div ref={menuRef} className="flex-1 flex items-center justify-center gap-1 px-8">
+          {menuItems.map((item) => {
+            const isActive = isMenuActive(item)
+            const isExpanded = expandedMenus.has(item.name)
+            const Icon = item.icon
+
+            if (item.children) {
+              return (
+                <div key={item.name} className="relative group">
+                  <button
+                    onClick={() => toggleMenu(item.name)}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      isActive
+                        ? 'bg-gray-100 text-gray-900'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                  >
+                    <Icon className="w-5 h-5" />
+                    <span>{item.name}</span>
+                    <MdExpandMore 
+                      className={`w-4 h-4 transition-transform duration-200 ${
+                        isExpanded ? 'rotate-180' : ''
+                      }`} 
+                    />
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {isExpanded && (
+                    <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                      {item.children.map((child) => {
+                        const ChildIcon = child.icon
+                        const childIsActive = isChildActive(child.path)
+                        return (
+                          <Link
+                            key={child.path}
+                            href={child.path}
+                            onClick={() => setExpandedMenus(new Set())}
+                            className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                              childIsActive
+                                ? 'bg-gray-50 text-gray-900 font-medium'
+                                : 'text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            <ChildIcon className="w-4 h-4" />
+                            <span>{child.name}</span>
+                            {childIsActive && (
+                              <MdChevronRight className="w-4 h-4 ml-auto text-gray-400" />
+                            )}
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            }
+
+            return (
+              <Link
+                key={item.path}
+                href={item.path}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  isActive
+                    ? 'bg-gray-100 text-gray-900'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }`}
+              >
+                <Icon className="w-5 h-5" />
+                <span>{item.name}</span>
+              </Link>
+            )
+          })}
+        </div>
+
+        {/* User Actions */}
+        <div className="flex items-center gap-3">
+          {/* Search Icon */}
+          <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </button>
+
+          {/* Notifications */}
+          <button className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
+          </button>
+
+          {/* User Profile */}
+          <div className="flex items-center gap-2 pl-3 border-l border-gray-200">
+            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+              <span className="text-xs font-semibold text-gray-700">U</span>
+            </div>
+            <div className="hidden md:block">
+              <p className="text-sm font-medium text-gray-900">Usuário</p>
+              <p className="text-xs text-gray-500">Admin</p>
+            </div>
+          </div>
+
+          {/* Logout */}
+          <button
+            onClick={() => {
+              logout()
+              window.location.href = '/login'
+            }}
+            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Logout"
+          >
+            <MdLogout className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+    </nav>
+  )
+}
+

@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Scrollbar personalizada */
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/**
+ * NOTA: Warnings de CSS - NÃO SÃO ERROS CRÍTICOS
+ * 
+ * Os seguintes warnings são normais e não afetam a funcionalidade:
+ * 
+ * 1. Warnings do normalize.css (dependência do Tailwind):
+ *    - "Erro ao analisar o valor de '-webkit-text-size-adjust'"
+ *    - "O seletor :host em ':host:not(button)' não é desprovido de recursos"
+ *    - "Pseudo-classe ou pseudo-elemento '-moz-focus-inner' desconhecido"
+ *    - "Pseudo-classe ou pseudo-elemento 'global' desconhecido"
+ *    Esses são relacionados a compatibilidade com navegadores antigos.
+ * 
+ * 2. Warnings do recharts (biblioteca de gráficos):
+ *    - "Erro ao analisar o valor de 'font-size'"
+ *    - "Erro ao analisar o valor de 'letter-spacing'"
+ *    Esses ocorrem quando o recharts aplica estilos inline dinamicamente.
+ *    São warnings do navegador ao tentar parsear valores CSS e não afetam
+ *    a renderização dos gráficos.
+ * 
+ * TODOS ESSES WARNINGS PODEM SER IGNORADOS SEGURAMENTE.
+ * Eles não impactam a funcionalidade da aplicação.
+ */
+
+/**
+ * Variáveis CSS para cores do sistema
+ * Replica exatamente as cores do Flutter FlutterFlowTheme
+ * 
+ * Cores extraídas de: jiffy-admin/lib/flutter_flow/flutter_flow_theme.dart
+ */
+:root {
+  /* Cores principais */
+  --color-primary: #003366;
+  --color-secondary: #530CA3;
+  --color-tertiary: #006699;
+  --color-alternate: #8338EC;
+
+  /* Textos */
+  --color-primary-text: #171A1C;
+  --color-secondary-text: #57636C;
+  --color-terciary-text: #97A1A9;
+
+  /* Backgrounds */
+  --color-primary-background: #EEEEF5;
+  --color-secondary-background: #91B4C6;
+
+  /* Accents */
+  --color-accent1: #B4DD2B;
+  --color-accent2: #C34848;
+  --color-accent3: #61BBE8;
+  --color-accent4: #057CB8;
+
+  /* Estados */
+  --color-success: #14AE5C;
+  --color-warning: #DBA02F;
+  --color-error: #C34848;
+  --color-info: #FFFFFF;
+
+  /* Cores customizadas */
+  --color-custom-1: #91B4C6;
+  --color-custom-1-alpha: rgba(145, 180, 198, 0.34);
+  --color-custom-2: #DAE5EE;
+  --color-custom-3: #8AFAC9;
+
+  /* Shadcn/ui variables - adaptadas para o tema do projeto */
+  --background: 238 238 245; /* #EEEEF5 */
+  --foreground: 23 26 28; /* #171A1C */
+  
+  --card: 255 255 255;
+  --card-foreground: 23 26 28;
+  
+  --popover: 255 255 255;
+  --popover-foreground: 23 26 28;
+  
+  --primary: 0 51 102; /* #003366 */
+  --primary-foreground: 255 255 255;
+  
+  --secondary: 83 12 163; /* #530CA3 */
+  --secondary-foreground: 255 255 255;
+  
+  --muted: 238 238 245;
+  --muted-foreground: 87 99 108; /* #57636C */
+  
+  --accent: 218 229 238; /* #DAE5EE */
+  --accent-foreground: 23 26 28;
+  
+  --destructive: 195 72 72; /* #C34848 */
+  --destructive-foreground: 255 255 255;
+  
+  --border: 218 229 238;
+  --input: 218 229 238;
+  --ring: 0 51 102;
+  
+  --radius: 0.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Por enquanto, mantemos as mesmas cores do light mode */
+    /* Pode ser expandido no futuro para suportar dark mode */
+  }
+}
+
+body {
+  color: var(--color-primary-text);
+  background: var(--color-primary-background);
+  font-family: 'Nunito', Arial, Helvetica, sans-serif;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Remover warnings do normalize.css - não são erros críticos */
+/* Os warnings sobre -webkit-text-size-adjust, :host, -moz-focus-inner são do normalize.css */
+/* e não afetam a funcionalidade da aplicação */
