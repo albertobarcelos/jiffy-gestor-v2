@@ -1,111 +1,113 @@
+'use client'
+
 import * as React from 'react'
-import * as DialogPrimitive from '@radix-ui/react-dialog'
-import { X } from 'lucide-react'
-import { cn } from '@/src/shared/utils/cn'
+import {
+  Dialog as MuiDialog,
+  DialogProps as MuiDialogProps,
+  DialogTitle as MuiDialogTitle,
+  DialogContent as MuiDialogContent,
+  DialogActions as MuiDialogActions,
+  Typography,
+  Box,
+} from '@mui/material'
 
-const Dialog = DialogPrimitive.Root
+export interface DialogProps extends Omit<MuiDialogProps, 'open'> {
+  open: boolean
+  onOpenChange?: (open: boolean) => void
+}
 
-const DialogTrigger = DialogPrimitive.Trigger
+export const Dialog = React.forwardRef<HTMLDivElement, DialogProps>(
+  ({ open, onOpenChange, children, ...props }, ref) => {
+    return (
+      <MuiDialog
+        ref={ref}
+        open={open}
+        onClose={() => onOpenChange?.(false)}
+        {...props}
+      >
+        {children}
+      </MuiDialog>
+    )
+  }
+)
 
-const DialogPortal = DialogPrimitive.Portal
+Dialog.displayName = 'Dialog'
 
-const DialogClose = DialogPrimitive.Close
+export const DialogHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, children, ...props }, ref) => {
+    return (
+      <Box ref={ref} sx={{ p: 3, pb: 2 }} {...props}>
+        {children}
+      </Box>
+    )
+  }
+)
 
-const DialogOverlay = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Overlay>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
->(({ className, ...props }, ref) => (
-  <DialogPrimitive.Overlay
-    ref={ref}
-    className={cn(
-      'fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
-      className
-    )}
-    {...props}
-  />
-))
-DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
+DialogHeader.displayName = 'DialogHeader'
 
-const DialogContent = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-  <DialogPortal>
-    <DialogOverlay />
-    <DialogPrimitive.Content
+export interface DialogTitleProps extends React.HTMLAttributes<HTMLHeadingElement> {
+  sx?: any
+}
+
+export const DialogTitle = React.forwardRef<HTMLHeadingElement, DialogTitleProps>(
+  ({ className, children, sx, ...props }, ref) => {
+    return (
+      <MuiDialogTitle
+        ref={ref}
+        sx={{ p: 0, fontFamily: 'Exo, sans-serif', fontWeight: 600, ...sx }}
+        {...props}
+      >
+        {children}
+      </MuiDialogTitle>
+    )
+  }
+)
+
+DialogTitle.displayName = 'DialogTitle'
+
+export const DialogDescription = React.forwardRef<
+  HTMLParagraphElement,
+  React.HTMLAttributes<HTMLParagraphElement>
+>(({ className, children, ...props }, ref) => {
+  return (
+    <Typography
       ref={ref}
-      className={cn(
-        'fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] rounded-xl',
-        className
-      )}
+      variant="body2"
+      color="text.secondary"
+      sx={{ mt: 1, fontFamily: 'Nunito, sans-serif' }}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
-    </DialogPrimitive.Content>
-  </DialogPortal>
-))
-DialogContent.displayName = DialogPrimitive.Content.displayName
+    </Typography>
+  )
+})
 
-const DialogHeader = ({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    className={cn('flex flex-col space-y-1.5 text-center sm:text-left', className)}
-    {...props}
-  />
-)
-DialogHeader.displayName = 'DialogHeader'
+DialogDescription.displayName = 'DialogDescription'
 
-const DialogFooter = ({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    className={cn('flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2', className)}
-    {...props}
-  />
-)
-DialogFooter.displayName = 'DialogFooter'
-
-const DialogTitle = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Title>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
->(({ className, ...props }, ref) => (
-  <DialogPrimitive.Title
-    ref={ref}
-    className={cn('text-lg font-semibold leading-none tracking-tight font-exo', className)}
-    {...props}
-  />
-))
-DialogTitle.displayName = DialogPrimitive.Title.displayName
-
-const DialogDescription = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Description>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
->(({ className, ...props }, ref) => (
-  <DialogPrimitive.Description
-    ref={ref}
-    className={cn('text-sm text-muted-foreground font-nunito', className)}
-    {...props}
-  />
-))
-DialogDescription.displayName = DialogPrimitive.Description.displayName
-
-export {
-  Dialog,
-  DialogPortal,
-  DialogOverlay,
-  DialogClose,
-  DialogTrigger,
-  DialogContent,
-  DialogHeader,
-  DialogFooter,
-  DialogTitle,
-  DialogDescription,
+export interface DialogContentProps extends React.HTMLAttributes<HTMLDivElement> {
+  sx?: any
 }
 
+export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
+  ({ className, children, sx, ...props }, ref) => {
+    return (
+      <MuiDialogContent ref={ref} sx={{ p: 3, ...sx }} {...props}>
+        {children}
+      </MuiDialogContent>
+    )
+  }
+)
+
+DialogContent.displayName = 'DialogContent'
+
+export const DialogFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, children, ...props }, ref) => {
+    return (
+      <MuiDialogActions ref={ref} sx={{ p: 3, pt: 2 }} {...props}>
+        {children}
+      </MuiDialogActions>
+    )
+  }
+)
+
+DialogFooter.displayName = 'DialogFooter'
