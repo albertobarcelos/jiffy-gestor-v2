@@ -15,7 +15,8 @@ import {
   MdPrint, 
   MdPayment,
   MdCategory,
-  MdAddCircle
+  MdAddCircle,
+  MdReceipt
 } from 'react-icons/md'
 
 /**
@@ -86,6 +87,7 @@ export function TopNav() {
     },
     { name: 'Estoque', path: '/estoque', icon: MdInventory },
     { name: 'Meu Caixa', path: '/meu-caixa', icon: MdPointOfSale },
+    { name: 'Fiscal Flow', path: '/fiscal-flow', icon: MdReceipt },
     { name: 'Relatórios', path: '/relatorios', icon: MdAssessment },
     { name: 'Configurações', path: '/configuracoes', icon: MdSettings },
   ]

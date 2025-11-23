@@ -1,24 +1,15 @@
+'use client'
+
 import * as React from 'react'
-import * as LabelPrimitive from '@radix-ui/react-label'
-import { cva, type VariantProps } from 'class-variance-authority'
-import { cn } from '@/src/shared/utils/cn'
+import { InputLabel, InputLabelProps } from '@mui/material'
 
-const labelVariants = cva(
-  'text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 font-nunito'
-)
+export interface LabelProps extends InputLabelProps {}
 
-const Label = React.forwardRef<
-  React.ElementRef<typeof LabelPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof LabelPrimitive.Root> &
-    VariantProps<typeof labelVariants>
->(({ className, ...props }, ref) => (
-  <LabelPrimitive.Root
-    ref={ref}
-    className={cn(labelVariants(), className)}
-    {...props}
-  />
-))
-Label.displayName = LabelPrimitive.Root.displayName
+/**
+ * Componente Label usando Material UI InputLabel
+ */
+export const Label = React.forwardRef<HTMLLabelElement, LabelProps>((props, ref) => {
+  return <InputLabel ref={ref} {...props} />
+})
 
-export { Label }
-
+Label.displayName = 'Label'
