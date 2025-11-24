@@ -6,6 +6,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Usuario } from '@/src/domain/entities/Usuario'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
+import { usePerfisPDV } from '@/src/presentation/hooks/usePerfisPDV'
 
 interface NovoUsuarioProps {
   usuarioId?: string
@@ -37,51 +38,20 @@ export function NovoUsuario({ usuarioId }: NovoUsuarioProps) {
   // Estados de loading e dados
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingUsuario, setIsLoadingUsuario] = useState(false)
-  const [isLoadingPerfis, setIsLoadingPerfis] = useState(false)
-  const [perfisPDV, setPerfisPDV] = useState<PerfilPDV[]>([])
   const hasLoadedUsuarioRef = useRef(false)
-  const hasLoadedPerfisRef = useRef(false)
 
-  // Carregar lista de perfis PDV
+  // Carregar lista de perfis PDV usando React Query (com cache)
+  const {
+    data: perfisPDV = [],
+    isLoading: isLoadingPerfis,
+  } = usePerfisPDV()
+
+  // Definir primeiro perfil como padrão quando perfis carregarem
   useEffect(() => {
-    if (hasLoadedPerfisRef.current) return
-
-    const loadPerfis = async () => {
-      const token = auth?.getAccessToken()
-      if (!token) return
-
-      setIsLoadingPerfis(true)
-      hasLoadedPerfisRef.current = true
-
-      try {
-        const response = await fetch('/api/perfis-pdv', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          const perfis = (data.items || []).map((item: any) => ({
-            id: item.id?.toString() || '',
-            role: item.role?.toString() || '',
-          }))
-          setPerfisPDV(perfis)
-          if (perfis.length > 0 && !isEditing) {
-            setPerfilPdvId(perfis[0].id)
-          }
-        }
-      } catch (error) {
-        console.error('Erro ao carregar perfis PDV:', error)
-      } finally {
-        setIsLoadingPerfis(false)
-      }
+    if (perfisPDV.length > 0 && !isEditing && !perfilPdvId) {
+      setPerfilPdvId(perfisPDV[0].id)
     }
-
-    loadPerfis()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [perfisPDV, isEditing, perfilPdvId])
 
   // Carregar dados do usuário se estiver editando
   useEffect(() => {

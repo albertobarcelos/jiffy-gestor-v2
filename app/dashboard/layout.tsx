@@ -3,6 +3,7 @@ import { TopNav } from '@/src/presentation/components/layouts/TopNav'
 /**
  * Layout do dashboard com navegação superior
  * Design minimalista e clean
+ * Proteção feita pelo middleware
  */
 export default function DashboardLayout({
   children,

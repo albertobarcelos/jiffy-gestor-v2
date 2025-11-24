@@ -8,6 +8,7 @@ import { Complemento } from '@/src/domain/entities/Complemento'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
+import { useComplementos } from '@/src/presentation/hooks/useComplementos'
 
 interface NovoGrupoComplementoProps {
   grupoId?: string
@@ -32,49 +33,17 @@ export function NovoGrupoComplemento({ grupoId }: NovoGrupoComplementoProps) {
   // Estados de loading e dados
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingGrupo, setIsLoadingGrupo] = useState(false)
-  const [isLoadingComplementos, setIsLoadingComplementos] = useState(false)
-  const [complementos, setComplementos] = useState<Complemento[]>([])
   const [showComplementosModal, setShowComplementosModal] = useState(false)
   const hasLoadedGrupoRef = useRef(false)
-  const hasLoadedComplementosRef = useRef(false)
 
-  // Carregar lista de complementos disponíveis
-  useEffect(() => {
-    if (hasLoadedComplementosRef.current) return
-
-    const loadComplementos = async () => {
-      const token = auth?.getAccessToken()
-      if (!token) return
-
-      setIsLoadingComplementos(true)
-      hasLoadedComplementosRef.current = true
-
-      try {
-        // Buscar todos os complementos (sem limite para ter a lista completa)
-        const response = await fetch(`/api/complementos?limit=1000&offset=0&ativo=true`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          const complementosList = (data.items || []).map((item: any) =>
-            Complemento.fromJSON(item)
-          )
-          setComplementos(complementosList)
-        }
-      } catch (error) {
-        console.error('Erro ao carregar complementos:', error)
-      } finally {
-        setIsLoadingComplementos(false)
-      }
-    }
-
-    loadComplementos()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  // Carregar lista de complementos disponíveis usando React Query (com cache)
+  const {
+    data: complementos = [],
+    isLoading: isLoadingComplementos,
+  } = useComplementos({
+    ativo: true,
+    limit: 1000,
+  })
 
   // Carregar dados do grupo se estiver editando
   useEffect(() => {

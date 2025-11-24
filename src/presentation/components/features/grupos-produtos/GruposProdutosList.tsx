@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -18,31 +18,31 @@ import {
 } from '@dnd-kit/sortable'
 import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { GrupoItem } from './GrupoItem'
+import { useGruposProdutosInfinite } from '@/src/presentation/hooks/useGruposProdutos'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useQueryClient } from '@tanstack/react-query'
+import { Skeleton } from '@/src/presentation/components/ui/skeleton'
+import { showToast } from '@/src/shared/utils/toast'
 
 interface GruposProdutosListProps {
   onReload?: () => void
 }
 
 /**
- * Lista de grupos de produtos com scroll infinito
- * Replica exatamente o design e lógica do Flutter
+ * Lista de grupos de produtos com scroll infinito e drag and drop
+ * Usa React Query para cache automático e deduplicação de requisições
  */
 export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
-  const [grupos, setGrupos] = useState<GrupoProduto[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [hasNextPage, setHasNextPage] = useState(true)
-  const [offset, setOffset] = useState(0)
   const [searchText, setSearchText] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
-  const [totalGrupos, setTotalGrupos] = useState(0)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const debounceTimerRef = useRef<NodeJS.Timeout>()
-  const hasLoadedInitialRef = useRef(false)
-  const { auth, isAuthenticated } = useAuthStore()
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const { auth } = useAuthStore()
+  const queryClient = useQueryClient()
 
   // Sensores para drag and drop
-  // ActivationConstraint: só ativa o drag quando clica especificamente no handle
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -54,128 +54,14 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     })
   )
 
-  // Refs para evitar dependências desnecessárias no useCallback
-  const isLoadingRef = useRef(false)
-  const hasNextPageRef = useRef(true)
-  const offsetRef = useRef(0)
-  const searchTextRef = useRef('')
-  const filterStatusRef = useRef<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
-
-  // Atualiza refs quando os valores mudam
+  // Debounce da busca (500ms)
   useEffect(() => {
-    isLoadingRef.current = isLoading
-  }, [isLoading])
-
-  useEffect(() => {
-    hasNextPageRef.current = hasNextPage
-  }, [hasNextPage])
-
-  useEffect(() => {
-    offsetRef.current = offset
-  }, [offset])
-
-  useEffect(() => {
-    searchTextRef.current = searchText
-  }, [searchText])
-
-  useEffect(() => {
-    filterStatusRef.current = filterStatus
-  }, [filterStatus])
-
-  const loadGrupos = useCallback(
-    async (reset: boolean = false) => {
-      const token = auth?.getAccessToken()
-      if (!token) {
-        return
-      }
-
-      if (isLoadingRef.current || (!hasNextPageRef.current && !reset)) return
-
-      setIsLoading(true)
-      isLoadingRef.current = true
-
-      if (reset) {
-        setOffset(0)
-        offsetRef.current = 0
-        setGrupos([])
-        setHasNextPage(true)
-        hasNextPageRef.current = true
-      }
-
-      const currentOffset = reset ? 0 : offsetRef.current
-
-      // Determina o filtro ativo
-      let ativoFilter: boolean | null = null
-      if (filterStatusRef.current === 'Ativo') {
-        ativoFilter = true
-      } else if (filterStatusRef.current === 'Desativado') {
-        ativoFilter = false
-      }
-
-      try {
-        const params = new URLSearchParams({
-          q: searchTextRef.current,
-          limit: '10',
-          offset: currentOffset.toString(),
-        })
-
-        if (ativoFilter !== null) {
-          params.append('ativo', ativoFilter.toString())
-        }
-
-        const response = await fetch(`/api/grupos-produtos?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          const errorMessage = errorData.message || `Erro ${response.status}: ${response.statusText}`
-          throw new Error(errorMessage)
-        }
-
-        const data = await response.json()
-
-        if (data.success) {
-          const newGrupos = (data.items || []).map((item: any) =>
-            GrupoProduto.fromJSON(item)
-          )
-
-          setGrupos((prev) => (reset ? newGrupos : [...prev, ...newGrupos]))
-          const newOffset = reset ? newGrupos.length : offsetRef.current + newGrupos.length
-          setOffset(newOffset)
-          offsetRef.current = newOffset
-          setHasNextPage(newGrupos.length === 10)
-          hasNextPageRef.current = newGrupos.length === 10
-          setTotalGrupos(data.count || 0)
-        } else {
-          throw new Error(data.message || 'Erro ao processar resposta da API')
-        }
-      } catch (error) {
-        console.error('Erro ao carregar grupos:', error)
-        setHasNextPage(false)
-        hasNextPageRef.current = false
-      } finally {
-        setIsLoading(false)
-        isLoadingRef.current = false
-      }
-    },
-    [auth]
-  )
-
-  // Debounce da busca
-  useEffect(() => {
-    const token = auth?.getAccessToken()
-    if (!token) return
-
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current)
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      loadGrupos(true)
+      setDebouncedSearch(searchText)
     }, 500)
 
     return () => {
@@ -183,71 +69,126 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
         clearTimeout(debounceTimerRef.current)
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchText])
 
-  // Carrega grupos quando o filtro muda
-  useEffect(() => {
-    const token = auth?.getAccessToken()
-    if (!token) return
-    loadGrupos(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Determina o filtro ativo (memoizado)
+  const ativoFilter = useMemo<boolean | null>(() => {
+    return filterStatus === 'Ativo' ? true : filterStatus === 'Desativado' ? false : null
   }, [filterStatus])
 
-  // Scroll infinito
+  // Hook otimizado com React Query
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetching,
+    isFetchingNextPage,
+    isLoading,
+    error,
+  } = useGruposProdutosInfinite({
+    name: debouncedSearch || undefined,
+    ativo: ativoFilter,
+    limit: 10,
+  })
+
+  // Achatando todas as páginas em uma única lista (memoizado)
+  const grupos = useMemo(() => {
+    return data?.pages.flatMap((page) => page.grupos) || []
+  }, [data])
+
+  const totalGrupos = useMemo(() => {
+    return data?.pages[0]?.count || 0
+  }, [data])
+
+  // Handler de scroll com throttle para melhor performance
+  const handleScroll = useCallback(() => {
+    if (scrollTimeoutRef.current) {
+      return // Ignora se já há um timeout pendente
+    }
+
+    scrollTimeoutRef.current = setTimeout(() => {
+      const container = scrollContainerRef.current
+      if (!container) return
+
+      const { scrollTop, scrollHeight, clientHeight } = container
+      const distanceFromBottom = scrollHeight - (scrollTop + clientHeight)
+      
+      // Carregar próxima página quando estiver a 400px do final (prefetch mais agressivo)
+      if (distanceFromBottom < 400) {
+        if (hasNextPage && !isFetchingNextPage) {
+          fetchNextPage()
+        }
+      }
+
+      scrollTimeoutRef.current = null
+    }, 100) // Throttle de 100ms
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  // Scroll infinito com prefetching inteligente e throttle
   useEffect(() => {
     const container = scrollContainerRef.current
     if (!container) return
 
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = container
-      if (scrollTop + clientHeight >= scrollHeight - 200) {
-        if (!isLoading && hasNextPage) {
-          loadGrupos()
-        }
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      container.removeEventListener('scroll', handleScroll)
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current)
       }
     }
+  }, [handleScroll])
 
-    container.addEventListener('scroll', handleScroll)
-    return () => container.removeEventListener('scroll', handleScroll)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, hasNextPage])
-
-  // Carrega grupos iniciais apenas quando o token estiver disponível
+  // Notificar erro
   useEffect(() => {
-    if (!isAuthenticated || hasLoadedInitialRef.current) return
+    if (error) {
+      console.error('Erro ao carregar grupos de produtos:', error)
+    }
+  }, [error])
 
-    const token = auth?.getAccessToken()
-    if (!token) return
-
-    hasLoadedInitialRef.current = true
-    loadGrupos(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated])
-
-  const handleStatusChange = () => {
-    loadGrupos(true)
+  const handleStatusChange = useCallback(() => {
+    // Invalidar cache para forçar refetch
+    queryClient.invalidateQueries({ queryKey: ['grupos-produtos'] })
     onReload?.()
-  }
+  }, [queryClient, onReload])
 
   // Handler para quando o drag termina
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     const { active, over } = event
 
     if (!over || active.id === over.id) {
       return
     }
 
-    const oldIndex = grupos.findIndex((g) => g.getId() === active.id)
-    const newIndex = grupos.findIndex((g) => g.getId() === over.id)
+    // Obtém o estado atual dos grupos do cache
+    const currentData = queryClient.getQueryData(['grupos-produtos', 'infinite', { name: debouncedSearch || undefined, ativo: ativoFilter, limit: 10 }]) as any
+    const currentGrupos = currentData?.pages?.[0]?.grupos || grupos
+
+    const oldIndex = currentGrupos.findIndex((g: GrupoProduto) => g.getId() === active.id)
+    const newIndex = currentGrupos.findIndex((g: GrupoProduto) => g.getId() === over.id)
 
     if (oldIndex === -1 || newIndex === -1) {
       return
     }
 
-    // Atualiza a ordem localmente
-    const newGrupos = arrayMove(grupos, oldIndex, newIndex)
-    setGrupos(newGrupos)
+    // Atualiza a ordem localmente (otimistic update)
+    const newGrupos = arrayMove([...currentGrupos], oldIndex, newIndex)
+    
+    // Atualiza o cache do React Query otimisticamente
+    queryClient.setQueryData(['grupos-produtos', 'infinite', { name: debouncedSearch || undefined, ativo: ativoFilter, limit: 10 }], (old: any) => {
+      if (!old) return old
+      return {
+        ...old,
+        pages: old.pages.map((page: any, pageIndex: number) => {
+          if (pageIndex === 0) {
+            return {
+              ...page,
+              grupos: newGrupos,
+            }
+          }
+          return page
+        }),
+      }
+    })
 
     // Calcula a nova posição (1-based)
     const newOrder = newIndex + 1
@@ -274,21 +215,21 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
 
       if (!response.ok) {
         // Reverte a mudança local se falhar
-        setGrupos(grupos)
+        queryClient.invalidateQueries({ queryKey: ['grupos-produtos'] })
         const error = await response.json()
         throw new Error(error.message || 'Erro ao reordenar grupo')
       }
 
-      // Sucesso - pode mostrar notificação se necessário
-      console.log('Ordem atualizada com sucesso')
+      // Sucesso - invalidar cache para garantir sincronização
+      queryClient.invalidateQueries({ queryKey: ['grupos-produtos'] })
+      showToast.success('Ordem atualizada com sucesso!')
     } catch (error: any) {
       console.error('Erro ao reordenar grupo:', error)
       // Reverte a mudança local
-      setGrupos(grupos)
-      alert(error.message || 'Erro ao atualizar ordem do grupo')
+      queryClient.invalidateQueries({ queryKey: ['grupos-produtos'] })
+      showToast.error(error.message || 'Erro ao atualizar ordem do grupo')
     }
-  }
-
+  }, [grupos, auth, queryClient, debouncedSearch, ativoFilter])
 
   return (
     <div className="flex flex-col h-full">
@@ -332,12 +273,6 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
                 🔍
               </span>
-              <button
-                onClick={() => loadGrupos(true)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 h-[40px] px-[30px] bg-info text-secondary rounded-[40px] border-[0.6px] border-secondary font-exo text-sm hover:bg-info/90 transition-colors"
-              >
-                Buscar
-              </button>
             </div>
           </div>
 
@@ -388,6 +323,24 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto px-[30px] mt-2"
       >
+        {/* Skeleton loaders para carregamento inicial - sempre mostra durante loading */}
+        {(isLoading || (grupos.length === 0 && isFetching)) && (
+          <div className="space-y-2">
+            {[...Array(8)].map((_, i) => (
+              <div
+                key={i}
+                className="h-[50px] bg-info rounded-xl px-4 flex items-center gap-[10px] animate-pulse"
+              >
+                <Skeleton className="flex-[1] h-4" />
+                <Skeleton className="flex-[2] h-10 w-10" />
+                <Skeleton className="flex-[4] h-4" />
+                <Skeleton className="flex-[2] h-6 w-20 mx-auto" />
+                <Skeleton className="flex-[2] h-10 w-10 ml-auto" />
+              </div>
+            ))}
+          </div>
+        )}
+
         {grupos.length === 0 && !isLoading && (
           <div className="flex items-center justify-center py-12">
             <p className="text-secondary-text">Nenhum grupo encontrado.</p>
@@ -414,7 +367,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
           </SortableContext>
         </DndContext>
 
-        {isLoading && (
+        {isFetchingNextPage && (
           <div className="flex justify-center py-4">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
@@ -423,4 +376,3 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     </div>
   )
 }
-

@@ -34,10 +34,15 @@ export async function GET(request: NextRequest) {
       ativo,
     })
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       items: result.grupos.map((g) => g.toJSON()),
       count: result.total,
     })
+
+    // Cache headers para melhor performance
+    response.headers.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=120')
+    
+    return response
   } catch (error) {
     console.error('Erro ao buscar grupos de complementos:', error)
     return NextResponse.json(

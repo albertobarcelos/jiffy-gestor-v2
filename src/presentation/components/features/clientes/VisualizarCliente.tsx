@@ -1,9 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { Cliente } from '@/src/domain/entities/Cliente'
+import { useCliente } from '@/src/presentation/hooks/useClientes'
 import { Button } from '@/src/presentation/components/ui/button'
 
 interface VisualizarClienteProps {
@@ -16,44 +14,7 @@ interface VisualizarClienteProps {
  */
 export function VisualizarCliente({ clienteId }: VisualizarClienteProps) {
   const router = useRouter()
-  const { auth } = useAuthStore()
-  const [cliente, setCliente] = useState<Cliente | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    const loadCliente = async () => {
-      const token = auth?.getAccessToken()
-      if (!token) {
-        setIsLoading(false)
-        return
-      }
-
-      try {
-        const response = await fetch(`/api/clientes/${clienteId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          setCliente(Cliente.fromJSON(data))
-        } else {
-          alert('Cliente não encontrado')
-          router.push('/cadastros/clientes')
-        }
-      } catch (error) {
-        console.error('Erro ao carregar cliente:', error)
-        alert('Erro ao carregar dados do cliente')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadCliente()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clienteId])
+  const { data: cliente, isLoading, error } = useCliente(clienteId)
 
   if (isLoading) {
     return (
@@ -63,7 +24,7 @@ export function VisualizarCliente({ clienteId }: VisualizarClienteProps) {
     )
   }
 
-  if (!cliente) {
+  if (error || !cliente) {
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-secondary-text">Cliente não encontrado</p>

@@ -6,6 +6,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { PerfilUsuario } from '@/src/domain/entities/PerfilUsuario'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
+import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
 
 interface NovoPerfilUsuarioProps {
   perfilId?: string
@@ -38,49 +39,24 @@ export function NovoPerfilUsuario({ perfilId }: NovoPerfilUsuarioProps) {
   // Estados de loading e dados
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingPerfil, setIsLoadingPerfil] = useState(false)
-  const [isLoadingMeiosPagamento, setIsLoadingMeiosPagamento] = useState(false)
-  const [meiosPagamento, setMeiosPagamento] = useState<MeioPagamento[]>([])
   const [showMeiosPagamentoModal, setShowMeiosPagamentoModal] = useState(false)
   const hasLoadedPerfilRef = useRef(false)
-  const hasLoadedMeiosPagamentoRef = useRef(false)
 
-  // Carregar lista de meios de pagamento
-  useEffect(() => {
-    if (hasLoadedMeiosPagamentoRef.current) return
+  // Carregar lista de meios de pagamento usando React Query (com cache)
+  const {
+    data,
+    isLoading: isLoadingMeiosPagamento,
+  } = useMeiosPagamentoInfinite({
+    limit: 100,
+  })
 
-    const loadMeiosPagamento = async () => {
-      const token = auth?.getAccessToken()
-      if (!token) return
-
-      setIsLoadingMeiosPagamento(true)
-      hasLoadedMeiosPagamentoRef.current = true
-
-      try {
-        const response = await fetch('/api/meios-pagamentos?limit=100&offset=0', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          const meios = (data.items || []).map((item: any) => ({
-            id: item.id?.toString() || '',
-            nome: item.nome?.toString() || '',
-          }))
-          setMeiosPagamento(meios)
-        }
-      } catch (error) {
-        console.error('Erro ao carregar meios de pagamento:', error)
-      } finally {
-        setIsLoadingMeiosPagamento(false)
-      }
-    }
-
-    loadMeiosPagamento()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  // Achatando todas as páginas em uma única lista
+  const meiosPagamento: MeioPagamento[] = data?.pages.flatMap((page) =>
+    page.meiosPagamento.map((meio) => ({
+      id: meio.getId(),
+      nome: meio.getNome(),
+    }))
+  ) || []
 
   // Carregar dados do perfil se estiver editando
   useEffect(() => {

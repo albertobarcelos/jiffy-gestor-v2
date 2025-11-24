@@ -11,7 +11,7 @@ interface AuthState {
   isLoading: boolean
   error: string | null
   login: (auth: Auth) => void
-  logout: () => void
+  logout: () => Promise<void>
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
   getUser: () => User | null
@@ -56,12 +56,30 @@ export const useAuthStore = create<AuthState>()(
         })
       },
 
-      logout: () => {
+      logout: async () => {
+        try {
+          // Chamar API de logout para remover cookie httpOnly
+          await fetch('/api/auth/logout', {
+            method: 'POST',
+            credentials: 'include',
+          })
+        } catch (error) {
+          console.error('Erro ao chamar API de logout:', error)
+        }
+
+        // Limpar estado do store
         set({
           auth: null,
           isAuthenticated: false,
           error: null,
         })
+
+        // Limpar localStorage (Zustand persist faz isso automaticamente, mas garantimos)
+        try {
+          localStorage.removeItem('auth-storage')
+        } catch (error) {
+          console.error('Erro ao limpar localStorage:', error)
+        }
       },
 
       setLoading: (loading: boolean) => {
@@ -81,13 +99,13 @@ export const useAuthStore = create<AuthState>()(
       name: 'auth-storage',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        auth: state.auth ? state.auth.toJSON() : null,
+        auth: state.auth ? (state.auth.toJSON() as unknown as AuthStorage['auth']) : null,
         isAuthenticated: state.isAuthenticated,
       }),
       onRehydrateStorage: () => (state) => {
         // Reconstrói Auth a partir do JSON salvo
         if (state?.auth && typeof state.auth === 'object' && 'accessToken' in state.auth) {
-          const authData = state.auth as AuthStorage['auth']
+          const authData = state.auth as unknown as AuthStorage['auth']
           if (authData) {
             const user = User.create(
               authData.user.id,

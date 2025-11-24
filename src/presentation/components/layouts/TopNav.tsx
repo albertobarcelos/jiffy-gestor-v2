@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useQueryClient } from '@tanstack/react-query'
 import { MdDashboard, MdInventory, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight } from 'react-icons/md'
 import { 
   MdInventory2, 
@@ -26,8 +27,17 @@ import {
 export function TopNav() {
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set())
   const pathname = usePathname()
+  const router = useRouter()
   const { logout } = useAuthStore()
+  const queryClient = useQueryClient()
   const menuRef = useRef<HTMLDivElement>(null)
+
+  // Prefetch de rota ao hover
+  const handleLinkHover = (path: string) => {
+    if (path && path !== '#') {
+      router.prefetch(path)
+    }
+  }
 
   // Fechar dropdown ao clicar fora
   useEffect(() => {
@@ -163,7 +173,9 @@ export function TopNav() {
                           <Link
                             key={child.path}
                             href={child.path}
+                            onMouseEnter={() => handleLinkHover(child.path)}
                             onClick={() => setExpandedMenus(new Set())}
+                            prefetch={true}
                             className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
                               childIsActive
                                 ? 'bg-gray-50 text-gray-900 font-medium'
@@ -188,6 +200,8 @@ export function TopNav() {
               <Link
                 key={item.path}
                 href={item.path}
+                onMouseEnter={() => handleLinkHover(item.path)}
+                prefetch={true}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                   isActive
                     ? 'bg-gray-100 text-gray-900'
@@ -231,9 +245,21 @@ export function TopNav() {
 
           {/* Logout */}
           <button
-            onClick={() => {
-              logout()
-              window.location.href = '/login'
+            onClick={async () => {
+              try {
+                // Limpar cache do React Query
+                queryClient.clear()
+                
+                // Fazer logout (limpa store, localStorage e chama API para remover cookie)
+                await logout()
+                
+                // Forçar redirecionamento com reload completo para garantir limpeza
+                window.location.href = '/login'
+              } catch (error) {
+                console.error('Erro ao fazer logout:', error)
+                // Mesmo com erro, força redirecionamento
+                window.location.href = '/login'
+              }
             }}
             className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             title="Logout"

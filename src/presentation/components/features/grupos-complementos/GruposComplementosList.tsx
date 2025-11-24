@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { GrupoComplementoActionsMenu } from './GrupoComplementoActionsMenu'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { showToast, handleApiError } from '@/src/shared/utils/toast'
+import { useGruposComplementosInfinite } from '@/src/presentation/hooks/useGruposComplementos'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 
 interface GruposComplementosListProps {
@@ -12,174 +11,116 @@ interface GruposComplementosListProps {
 }
 
 /**
- * Lista de grupos de complementos com scroll infinito
- * Replica exatamente o design e lógica do Flutter
+ * Item individual da lista de grupos (memoizado para evitar re-renders desnecessários)
  */
-export function GruposComplementosList({ onReload }: GruposComplementosListProps) {
-  const [grupos, setGrupos] = useState<GrupoComplemento[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [hasNextPage, setHasNextPage] = useState(true)
-  const [offset, setOffset] = useState(0)
-  const [searchText, setSearchText] = useState('')
-  const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
-  const [totalGrupos, setTotalGrupos] = useState(0)
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const debounceTimerRef = useRef<NodeJS.Timeout>()
-  const hasLoadedInitialRef = useRef(false)
-  const { auth, isAuthenticated } = useAuthStore()
-
-  // Refs para evitar dependências desnecessárias no useCallback
-  const isLoadingRef = useRef(false)
-  const hasNextPageRef = useRef(true)
-  const offsetRef = useRef(0)
-  const searchTextRef = useRef('')
-  const filterStatusRef = useRef<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
-
-  // Atualiza refs quando os valores mudam
-  useEffect(() => {
-    isLoadingRef.current = isLoading
-  }, [isLoading])
-
-  useEffect(() => {
-    hasNextPageRef.current = hasNextPage
-  }, [hasNextPage])
-
-  useEffect(() => {
-    offsetRef.current = offset
-  }, [offset])
-
-  useEffect(() => {
-    searchTextRef.current = searchText
-  }, [searchText])
-
-  useEffect(() => {
-    filterStatusRef.current = filterStatus
-  }, [filterStatus])
-
-  const loadGrupos = useCallback(
-    async (reset: boolean = false) => {
-      const token = auth?.getAccessToken()
-      if (!token) {
-        return
-      }
-
-      if (isLoadingRef.current || (!hasNextPageRef.current && !reset)) return
-
-      setIsLoading(true)
-      isLoadingRef.current = true
-
-      if (reset) {
-        setOffset(0)
-        offsetRef.current = 0
-        setGrupos([])
-        setHasNextPage(true)
-        hasNextPageRef.current = true
-      }
-
-      const currentOffset = reset ? 0 : offsetRef.current
-
-      // Determina o filtro ativo
-      let ativoFilter: boolean | null = null
-      if (filterStatusRef.current === 'Ativo') {
-        ativoFilter = true
-      } else if (filterStatusRef.current === 'Desativado') {
-        ativoFilter = false
-      }
-
-      try {
-        const params = new URLSearchParams({
-          limit: '10',
-          offset: currentOffset.toString(),
-        })
-
-        if (searchTextRef.current) {
-          params.append('q', searchTextRef.current)
-        }
-
-        if (ativoFilter !== null) {
-          params.append('ativo', ativoFilter.toString())
-        }
-
-        const response = await fetch(`/api/grupos-complementos?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          const errorMessage = errorData.error || `Erro ${response.status}: ${response.statusText}`
-          throw new Error(errorMessage)
-        }
-
-        const data = await response.json()
-
-        // Filtrar grupos inválidos (com qtdMinima > qtdMaxima)
-        const validGrupos: GrupoComplemento[] = []
-        const invalidGrupos: string[] = []
-
-        for (const item of data.items || []) {
-          try {
-            const grupo = GrupoComplemento.fromJSON(item)
-            validGrupos.push(grupo)
-          } catch (error) {
-            // Se o erro for sobre quantidade mínima > máxima, registra mas não quebra
-            if (error instanceof Error && error.message.includes('Quantidade mínima não pode ser maior que máxima')) {
-              invalidGrupos.push(item.nome || item.id || 'Grupo sem nome')
-              console.warn(`Grupo de complementos inválido ignorado:`, item)
-            } else {
-              // Outros erros são re-lançados
-              throw error
-            }
-          }
-        }
-
-        // Notificar sobre grupos inválidos, se houver
-        if (invalidGrupos.length > 0) {
-          showToast.warning(
-            `${invalidGrupos.length} grupo(s) com dados inválidos foram ignorados. Verifique as quantidades mínima/máxima.`
-          )
-        }
-
-        setGrupos((prev) => (reset ? validGrupos : [...prev, ...validGrupos]))
-        const newOffset = reset ? validGrupos.length : offsetRef.current + validGrupos.length
-        setOffset(newOffset)
-        offsetRef.current = newOffset
-        setHasNextPage(validGrupos.length === 10)
-        hasNextPageRef.current = validGrupos.length === 10
-        setTotalGrupos(data.count || 0)
-      } catch (error) {
-        console.error('Erro ao carregar grupos de complementos:', error)
-        setHasNextPage(false)
-        hasNextPageRef.current = false
-        // Só mostra erro se não for o carregamento inicial
-        if (hasLoadedInitialRef.current) {
-          const errorMessage = handleApiError(error)
-          showToast.error(errorMessage)
-        }
-      } finally {
-        setIsLoading(false)
-        isLoadingRef.current = false
-      }
-    },
-    [auth]
+const GrupoItem = memo(function GrupoItem({
+  grupo,
+  isExpanded,
+  onToggleExpand,
+  onStatusChanged,
+}: {
+  grupo: GrupoComplemento
+  isExpanded: boolean
+  onToggleExpand: () => void
+  onStatusChanged?: () => void
+}) {
+  const complementos = useMemo(() => grupo.getComplementos() || [], [grupo])
+  const complementosIds = useMemo(() => grupo.getComplementosIds() || [], [grupo])
+  const isAtivo = useMemo(() => grupo.isAtivo(), [grupo])
+  const statusClass = useMemo(
+    () =>
+      isAtivo
+        ? 'bg-success/20 text-success'
+        : 'bg-error/20 text-secondary-text',
+    [isAtivo]
   )
 
-  // Debounce da busca
-  useEffect(() => {
-    const token = auth?.getAccessToken()
-    if (!token) return
+  return (
+    <div className="bg-info rounded-xl mb-2 overflow-hidden">
+      {/* Linha principal do grupo */}
+      <div className="h-[50px] px-4 flex items-center gap-[10px]">
+        <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text">
+          {grupo.getNome()}
+        </div>
+        <div className="flex-[2] font-nunito text-sm text-secondary-text">
+          {grupo.getQtdMinima()} / {grupo.getQtdMaxima()}
+        </div>
+        <div className="flex-[2] font-nunito text-sm text-secondary-text">
+          {complementosIds.length} complemento(s)
+        </div>
+        <div className="flex-[2] flex justify-center">
+          <div
+            className={`w-20 px-3 py-1 rounded-[24px] text-center text-sm font-nunito font-medium ${statusClass}`}
+          >
+            {isAtivo ? 'Ativo' : 'Desativado'}
+          </div>
+        </div>
+        <div className="flex-[2] flex justify-end items-center gap-2">
+          {complementos.length > 0 && (
+            <button
+              onClick={onToggleExpand}
+              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-secondary-bg/20 transition-colors"
+            >
+              <span className={`text-lg transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                ▼
+              </span>
+            </button>
+          )}
+          <GrupoComplementoActionsMenu
+            grupoId={grupo.getId()}
+            grupoAtivo={isAtivo}
+            onStatusChanged={onStatusChanged}
+          />
+        </div>
+      </div>
 
+      {/* Lista de complementos expandida */}
+      {isExpanded && complementos.length > 0 && (
+        <div className="px-4 pb-4 border-t border-alternate/30">
+          <div className="pt-3 space-y-2">
+            {complementos.map((complemento: any, index: number) => (
+              <div
+                key={complemento.id || index}
+                className="px-3 py-2 bg-primary-bg rounded-lg"
+              >
+                <p className="text-sm font-medium text-primary-text">
+                  {complemento.nome || 'Complemento sem nome'}
+                </p>
+                {complemento.valor && (
+                  <p className="text-xs text-secondary-text">
+                    R$ {parseFloat(complemento.valor).toFixed(2)}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+})
+
+/**
+ * Lista de grupos de complementos com scroll infinito
+ * Usa React Query para cache automático e deduplicação de requisições
+ */
+export function GruposComplementosList({ onReload }: GruposComplementosListProps) {
+  const [searchText, setSearchText] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Debounce da busca (500ms)
+  useEffect(() => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current)
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      if (searchTextRef.current !== searchText) {
-        loadGrupos(true)
-      }
+      setDebouncedSearch(searchText)
     }, 500)
 
     return () => {
@@ -187,56 +128,87 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
         clearTimeout(debounceTimerRef.current)
       }
     }
-  }, [searchText, auth, loadGrupos])
+  }, [searchText])
 
-  // Filtro de status
-  useEffect(() => {
-    const token = auth?.getAccessToken()
-    if (!token) return
-
-    loadGrupos(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Determina o filtro ativo (memoizado)
+  const ativoFilter = useMemo<boolean | null>(() => {
+    return filterStatus === 'Ativo' ? true : filterStatus === 'Desativado' ? false : null
   }, [filterStatus])
 
-  // Scroll infinito
+  // Hook otimizado com React Query
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetching,
+    isFetchingNextPage,
+    isLoading,
+    error,
+  } = useGruposComplementosInfinite({
+    q: debouncedSearch || undefined,
+    ativo: ativoFilter,
+    limit: 10,
+  })
+
+  // Achatando todas as páginas em uma única lista (memoizado)
+  const grupos = useMemo(() => {
+    return data?.pages.flatMap((page) => page.grupos) || []
+  }, [data])
+
+  const totalGrupos = useMemo(() => {
+    return data?.pages[0]?.count || 0
+  }, [data])
+
+  // Handler de scroll com throttle para melhor performance
+  const handleScroll = useCallback(() => {
+    if (scrollTimeoutRef.current) {
+      return // Ignora se já há um timeout pendente
+    }
+
+    scrollTimeoutRef.current = setTimeout(() => {
+      const container = scrollContainerRef.current
+      if (!container) return
+
+      const { scrollTop, scrollHeight, clientHeight } = container
+      const distanceFromBottom = scrollHeight - (scrollTop + clientHeight)
+      
+      // Carregar próxima página quando estiver a 400px do final (prefetch mais agressivo)
+      if (distanceFromBottom < 400) {
+        if (hasNextPage && !isFetchingNextPage) {
+          fetchNextPage()
+        }
+      }
+
+      scrollTimeoutRef.current = null
+    }, 100) // Throttle de 100ms
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  // Scroll infinito com prefetching inteligente e throttle
   useEffect(() => {
     const container = scrollContainerRef.current
     if (!container) return
 
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = container
-      if (
-        scrollTop + clientHeight >= scrollHeight - 200 &&
-        !isLoadingRef.current &&
-        hasNextPageRef.current
-      ) {
-        loadGrupos()
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      container.removeEventListener('scroll', handleScroll)
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current)
       }
     }
+  }, [handleScroll])
 
-    container.addEventListener('scroll', handleScroll)
-    return () => container.removeEventListener('scroll', handleScroll)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, hasNextPage])
-
-  // Carrega grupos iniciais apenas quando o token estiver disponível
+  // Notificar erro
   useEffect(() => {
-    if (!isAuthenticated || hasLoadedInitialRef.current) return
+    if (error) {
+      console.error('Erro ao carregar grupos de complementos:', error)
+    }
+  }, [error])
 
-    const token = auth?.getAccessToken()
-    if (!token) return
-
-    hasLoadedInitialRef.current = true
-    loadGrupos(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated])
-
-  const handleStatusChange = () => {
-    loadGrupos(true)
+  const handleStatusChange = useCallback(() => {
     onReload?.()
-  }
+  }, [onReload])
 
-  const toggleExpand = (groupId: string) => {
+  const toggleExpand = useCallback((groupId: string) => {
     setExpandedGroups((prev) => {
       const newSet = new Set(prev)
       if (newSet.has(groupId)) {
@@ -246,7 +218,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
       }
       return newSet
     })
-  }
+  }, [])
 
   return (
     <div className="flex flex-col h-full">
@@ -340,13 +312,13 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto px-[30px] mt-2"
       >
-        {/* Skeleton loaders para carregamento inicial */}
-        {grupos.length === 0 && isLoading && (
+        {/* Skeleton loaders para carregamento inicial - sempre mostra durante loading */}
+        {(isLoading || (grupos.length === 0 && isFetching)) && (
           <div className="space-y-2">
-            {[...Array(5)].map((_, i) => (
+            {[...Array(8)].map((_, i) => (
               <div
                 key={i}
-                className="h-[50px] bg-info rounded-xl px-4 flex items-center gap-[10px]"
+                className="h-[50px] bg-info rounded-xl px-4 flex items-center gap-[10px] animate-pulse"
               >
                 <Skeleton className="flex-[3] h-4" />
                 <Skeleton className="flex-[2] h-4" />
@@ -364,84 +336,17 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
           </div>
         )}
 
-        {grupos.map((grupo) => {
-          const isExpanded = expandedGroups.has(grupo.getId())
-          const complementos = grupo.getComplementos() || []
-          const complementosIds = grupo.getComplementosIds() || []
+        {grupos.map((grupo) => (
+          <GrupoItem
+            key={grupo.getId()}
+            grupo={grupo}
+            isExpanded={expandedGroups.has(grupo.getId())}
+            onToggleExpand={() => toggleExpand(grupo.getId())}
+            onStatusChanged={handleStatusChange}
+          />
+        ))}
 
-          return (
-            <div
-              key={grupo.getId()}
-              className="bg-info rounded-xl mb-2 overflow-hidden"
-            >
-              {/* Linha principal do grupo */}
-              <div className="h-[50px] px-4 flex items-center gap-[10px]">
-                <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text">
-                  {grupo.getNome()}
-                </div>
-                <div className="flex-[2] font-nunito text-sm text-secondary-text">
-                  {grupo.getQtdMinima()} / {grupo.getQtdMaxima()}
-                </div>
-                <div className="flex-[2] font-nunito text-sm text-secondary-text">
-                  {complementosIds.length} complemento(s)
-                </div>
-                <div className="flex-[2] flex justify-center">
-                  <div
-                    className={`w-20 px-3 py-1 rounded-[24px] text-center text-sm font-nunito font-medium ${
-                      grupo.isAtivo()
-                        ? 'bg-success/20 text-success'
-                        : 'bg-error/20 text-secondary-text'
-                    }`}
-                  >
-                    {grupo.isAtivo() ? 'Ativo' : 'Desativado'}
-                  </div>
-                </div>
-                <div className="flex-[2] flex justify-end items-center gap-2">
-                  {complementos.length > 0 && (
-                    <button
-                      onClick={() => toggleExpand(grupo.getId())}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-secondary-bg/20 transition-colors"
-                    >
-                      <span className={`text-lg transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
-                        ▼
-                      </span>
-                    </button>
-                  )}
-                  <GrupoComplementoActionsMenu
-                    grupoId={grupo.getId()}
-                    grupoAtivo={grupo.isAtivo()}
-                    onStatusChanged={handleStatusChange}
-                  />
-                </div>
-              </div>
-
-              {/* Lista de complementos expandida */}
-              {isExpanded && complementos.length > 0 && (
-                <div className="px-4 pb-4 border-t border-alternate/30">
-                  <div className="pt-3 space-y-2">
-                    {complementos.map((complemento: any, index: number) => (
-                      <div
-                        key={complemento.id || index}
-                        className="px-3 py-2 bg-primary-bg rounded-lg"
-                      >
-                        <p className="text-sm font-medium text-primary-text">
-                          {complemento.nome || 'Complemento sem nome'}
-                        </p>
-                        {complemento.valor && (
-                          <p className="text-xs text-secondary-text">
-                            R$ {parseFloat(complemento.valor).toFixed(2)}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )
-        })}
-
-        {isLoading && (
+        {isFetchingNextPage && (
           <div className="flex justify-center py-4">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
@@ -450,4 +355,3 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
     </div>
   )
 }
-

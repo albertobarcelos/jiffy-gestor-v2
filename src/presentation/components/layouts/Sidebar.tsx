@@ -3,8 +3,9 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useQueryClient } from '@tanstack/react-query'
 
 /**
  * Sidebar do dashboard
@@ -14,7 +15,16 @@ export function Sidebar() {
   const [isCompact, setIsCompact] = useState(false)
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set())
   const pathname = usePathname()
+  const router = useRouter()
   const { logout } = useAuthStore()
+  const queryClient = useQueryClient()
+
+  // Prefetch de rota ao hover
+  const handleLinkHover = (path: string) => {
+    if (path && path !== '#') {
+      router.prefetch(path)
+    }
+  }
 
   const toggleMenu = (menuName: string) => {
     const newExpanded = new Set(expandedMenus)
@@ -138,6 +148,8 @@ export function Sidebar() {
                               <li key={child.path}>
                                 <Link
                                   href={child.path}
+                                  onMouseEnter={() => handleLinkHover(child.path)}
+                                  prefetch={true}
                                   className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
                                     isChildActive
                                       ? 'bg-info/20 text-info font-semibold'
@@ -162,6 +174,8 @@ export function Sidebar() {
                 <li key={item.path}>
                   <Link
                     href={item.path}
+                    onMouseEnter={() => handleLinkHover(item.path)}
+                    prefetch={true}
                     className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                       isActive
                         ? 'bg-info/20 text-info font-semibold'
@@ -180,9 +194,21 @@ export function Sidebar() {
         {/* Logout */}
         <div className="p-4 border-t border-info/20">
           <button
-            onClick={() => {
-              logout()
-              window.location.href = '/login'
+            onClick={async () => {
+              try {
+                // Limpar cache do React Query
+                queryClient.clear()
+                
+                // Fazer logout (limpa store, localStorage e chama API para remover cookie)
+                await logout()
+                
+                // Forçar redirecionamento com reload completo para garantir limpeza
+                window.location.href = '/login'
+              } catch (error) {
+                console.error('Erro ao fazer logout:', error)
+                // Mesmo com erro, força redirecionamento
+                window.location.href = '/login'
+              }
             }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-info/80 hover:bg-info/10 transition-colors ${
               isCompact ? 'justify-center' : ''

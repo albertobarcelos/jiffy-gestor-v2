@@ -1,8 +1,10 @@
 'use client'
 
+import { Suspense } from 'react'
 import { usePathname } from 'next/navigation'
 import { TopNav } from '@/src/presentation/components/layouts/TopNav'
 import { Header } from '@/src/presentation/components/layouts/Header'
+import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
 
 export default function ClientesLayout({
   children,
@@ -17,7 +19,9 @@ export default function ClientesLayout({
       <TopNav />
       {!hideHeader && <Header nomePagina="Clientes" />}
       <main className={`${hideHeader ? '' : 'p-6'}`}>
-        {children}
+        <Suspense fallback={<PageLoading />}>
+          {children}
+        </Suspense>
       </main>
     </div>
   )

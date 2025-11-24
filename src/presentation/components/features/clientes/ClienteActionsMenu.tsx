@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useQueryClient } from '@tanstack/react-query'
 
 interface ClienteActionsMenuProps {
   clienteId: string
@@ -23,6 +24,48 @@ export function ClienteActionsMenu({
   const buttonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const { auth } = useAuthStore()
+  const queryClient = useQueryClient()
+
+  // Prefetch ao hover nos botões de ação
+  const handleMouseEnterEdit = () => {
+    queryClient.prefetchQuery({
+      queryKey: ['cliente', clienteId],
+      queryFn: async () => {
+        const token = auth?.getAccessToken()
+        if (!token) throw new Error('Token não encontrado')
+        const response = await fetch(`/api/clientes/${clienteId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+        if (!response.ok) throw new Error('Erro ao buscar cliente')
+        const data = await response.json()
+        return data
+      },
+      staleTime: 1000 * 60 * 5,
+    })
+  }
+
+  const handleMouseEnterView = () => {
+    queryClient.prefetchQuery({
+      queryKey: ['cliente', clienteId],
+      queryFn: async () => {
+        const token = auth?.getAccessToken()
+        if (!token) throw new Error('Token não encontrado')
+        const response = await fetch(`/api/clientes/${clienteId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+        if (!response.ok) throw new Error('Erro ao buscar cliente')
+        const data = await response.json()
+        return data
+      },
+      staleTime: 1000 * 60 * 5,
+    })
+  }
 
   useEffect(() => {
     if (isOpen && buttonRef.current) {
@@ -126,6 +169,7 @@ export function ClienteActionsMenu({
           {/* Visualizar */}
           <button
             onClick={handleView}
+            onMouseEnter={handleMouseEnterView}
             className="w-full h-10 px-6 flex items-center gap-2 text-primary-text hover:bg-primary hover:text-info transition-colors rounded-t-[10px]"
           >
             <span>👁️</span>
@@ -137,6 +181,7 @@ export function ClienteActionsMenu({
           {/* Editar */}
           <button
             onClick={handleEdit}
+            onMouseEnter={handleMouseEnterEdit}
             className="w-full h-10 px-6 flex items-center gap-2 text-primary-text hover:bg-primary hover:text-info transition-colors"
           >
             <span>✏️</span>
