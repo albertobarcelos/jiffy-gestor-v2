@@ -12,7 +12,7 @@ export interface TextareaProps extends Omit<TextFieldProps, 'multiline' | 'rows'
  */
 export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ rows = 4, ...props }, ref) => {
-    return <TextField ref={ref} multiline rows={rows} fullWidth {...props} />
+    return <TextField ref={ref as any} multiline rows={rows} fullWidth {...props} />
   }
 )
 

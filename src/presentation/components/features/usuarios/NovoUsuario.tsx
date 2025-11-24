@@ -6,6 +6,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Usuario } from '@/src/domain/entities/Usuario'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
+import { usePerfisPDV } from '@/src/presentation/hooks/usePerfisPDV'
 
 interface NovoUsuarioProps {
   usuarioId?: string
@@ -37,51 +38,20 @@ export function NovoUsuario({ usuarioId }: NovoUsuarioProps) {
   // Estados de loading e dados
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingUsuario, setIsLoadingUsuario] = useState(false)
-  const [isLoadingPerfis, setIsLoadingPerfis] = useState(false)
-  const [perfisPDV, setPerfisPDV] = useState<PerfilPDV[]>([])
   const hasLoadedUsuarioRef = useRef(false)
-  const hasLoadedPerfisRef = useRef(false)
 
-  // Carregar lista de perfis PDV
+  // Carregar lista de perfis PDV usando React Query (com cache)
+  const {
+    data: perfisPDV = [],
+    isLoading: isLoadingPerfis,
+  } = usePerfisPDV()
+
+  // Definir primeiro perfil como padrão quando perfis carregarem
   useEffect(() => {
-    if (hasLoadedPerfisRef.current) return
-
-    const loadPerfis = async () => {
-      const token = auth?.getAccessToken()
-      if (!token) return
-
-      setIsLoadingPerfis(true)
-      hasLoadedPerfisRef.current = true
-
-      try {
-        const response = await fetch('/api/perfis-pdv', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          const perfis = (data.items || []).map((item: any) => ({
-            id: item.id?.toString() || '',
-            role: item.role?.toString() || '',
-          }))
-          setPerfisPDV(perfis)
-          if (perfis.length > 0 && !isEditing) {
-            setPerfilPdvId(perfis[0].id)
-          }
-        }
-      } catch (error) {
-        console.error('Erro ao carregar perfis PDV:', error)
-      } finally {
-        setIsLoadingPerfis(false)
-      }
+    if (Array.isArray(perfisPDV) && perfisPDV.length > 0 && !isEditing && !perfilPdvId) {
+      setPerfilPdvId((perfisPDV as any[])[0].id)
     }
-
-    loadPerfis()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [perfisPDV, isEditing, perfilPdvId])
 
   // Carregar dados do usuário se estiver editando
   useEffect(() => {
@@ -214,7 +184,7 @@ export function NovoUsuario({ usuarioId }: NovoUsuarioProps) {
           </div>
           <Button
             onClick={handleCancel}
-            variant="outline"
+            variant="outlined"
             className="h-9 px-[26px] rounded-[30px] border-primary/15 text-primary bg-primary/10 hover:bg-primary/20"
           >
             Cancelar
@@ -277,7 +247,7 @@ export function NovoUsuario({ usuarioId }: NovoUsuarioProps) {
                     className="w-full px-4 py-3 rounded-lg border border-gray-400 bg-info text-gray-900 focus:outline-none focus:border-2 focus:border-primary"
                   >
                     <option value="">Selecione um perfil...</option>
-                    {perfisPDV.map((perfil) => (
+                    {(Array.isArray(perfisPDV) ? perfisPDV : []).map((perfil: any) => (
                       <option key={perfil.id} value={perfil.id}>
                         {perfil.role}
                       </option>
@@ -355,7 +325,7 @@ export function NovoUsuario({ usuarioId }: NovoUsuarioProps) {
             <Button
               type="button"
               onClick={handleCancel}
-              variant="outline"
+              variant="outlined"
               className="px-8"
             >
               Cancelar

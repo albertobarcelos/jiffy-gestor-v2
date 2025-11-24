@@ -1,131 +1,81 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Produto } from '@/src/domain/entities/Produto'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useProdutosInfinite } from '@/src/presentation/hooks/useProdutos'
+import { Skeleton } from '@mui/material'
+import React from 'react'
 
 /**
  * Lista de produtos com estoque
- * Replica exatamente o design e lógica do Flutter
+ * Otimizada com React Query e memoização
  */
-export function EstoqueProdutosList() {
-  const [produtos, setProdutos] = useState<Produto[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [hasNextPage, setHasNextPage] = useState(true)
-  const [offset, setOffset] = useState(0)
-  const [searchText, setSearchText] = useState('')
-  const [totalProdutos, setTotalProdutos] = useState(0)
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const debounceTimerRef = useRef<NodeJS.Timeout>()
-  const hasLoadedInitialRef = useRef(false)
-  const { auth, isAuthenticated } = useAuthStore()
 
-  // Refs para evitar dependências desnecessárias no useCallback
-  const isLoadingRef = useRef(false)
-  const hasNextPageRef = useRef(true)
-  const offsetRef = useRef(0)
-  const searchTextRef = useRef('')
-
-  // Atualiza refs quando os valores mudam
-  useEffect(() => {
-    isLoadingRef.current = isLoading
-  }, [isLoading])
-
-  useEffect(() => {
-    hasNextPageRef.current = hasNextPage
-  }, [hasNextPage])
-
-  useEffect(() => {
-    offsetRef.current = offset
-  }, [offset])
-
-  useEffect(() => {
-    searchTextRef.current = searchText
-  }, [searchText])
-
-  const loadProdutos = useCallback(
-    async (reset: boolean = false) => {
-      const token = auth?.getAccessToken()
-      if (!token) {
-        return
-      }
-
-      if (isLoadingRef.current || (!hasNextPageRef.current && !reset)) return
-
-      setIsLoading(true)
-      isLoadingRef.current = true
-
-      if (reset) {
-        setOffset(0)
-        offsetRef.current = 0
-        setProdutos([])
-        setHasNextPage(true)
-        hasNextPageRef.current = true
-      }
-
-      const currentOffset = reset ? 0 : offsetRef.current
-
-      try {
-        const params = new URLSearchParams({
-          limit: '10',
-          offset: currentOffset.toString(),
-        })
-
-        if (searchTextRef.current) {
-          params.append('name', searchTextRef.current)
-        }
-
-        const response = await fetch(`/api/produtos?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          const errorMessage = errorData.error || `Erro ${response.status}: ${response.statusText}`
-          throw new Error(errorMessage)
-        }
-
-        const data = await response.json()
-
-        const newProdutos = (data.items || []).map((item: any) =>
-          Produto.fromJSON(item)
-        )
-
-        setProdutos((prev) => (reset ? newProdutos : [...prev, ...newProdutos]))
-        const newOffset = reset ? newProdutos.length : offsetRef.current + newProdutos.length
-        setOffset(newOffset)
-        offsetRef.current = newOffset
-        setHasNextPage(newProdutos.length === 10)
-        hasNextPageRef.current = newProdutos.length === 10
-        setTotalProdutos(data.count || 0)
-      } catch (error) {
-        console.error('Erro ao carregar produtos:', error)
-        setHasNextPage(false)
-        hasNextPageRef.current = false
-      } finally {
-        setIsLoading(false)
-        isLoadingRef.current = false
-      }
-    },
-    [auth]
+// Componente memoizado para cada item da lista
+const ProdutoEstoqueItem = React.memo(({ produto }: { produto: Produto }) => {
+  return (
+    <div
+      className="h-[50px] px-4 flex items-center gap-[10px] border-t border-alternate/20"
+    >
+      <div className="w-[10%] font-nunito text-sm text-primary-text">
+        {produto.getCodigoProduto() || '-'}
+      </div>
+      <div className="w-[30%] font-nunito font-semibold text-sm text-primary-text">
+        {produto.getNome()}
+      </div>
+      <div className="w-[16%] font-nunito text-sm text-secondary-text">
+        {produto.getNomeGrupo() || '-'}
+      </div>
+      <div className="w-[16%] font-nunito text-sm text-secondary-text">
+        {typeof produto.getEstoque() === 'number'
+          ? produto.getEstoque()
+          : typeof produto.getEstoque() === 'string'
+            ? parseInt(produto.getEstoque() as string) || 0
+            : 0}
+      </div>
+      <div className="w-[16%]">
+        <div
+          className={`w-[80px] px-3 py-1 rounded-[24px] text-center text-sm font-nunito font-medium ${
+            produto.isAtivo()
+              ? 'bg-success/20 text-success'
+              : 'bg-error/20 text-secondary-text'
+          }`}
+        >
+          {produto.isAtivo() ? 'Ativo' : 'Desativado'}
+        </div>
+      </div>
+      <div className="w-[16%] font-nunito font-semibold text-sm text-primary-text">
+        {new Intl.NumberFormat('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+        }).format(produto.getValor() || 0)}
+      </div>
+      <div className="w-[10%] flex justify-end">
+        <button className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-secondary-bg/20 transition-colors">
+          <span className="text-xl text-primary-text">⋮</span>
+        </button>
+      </div>
+    </div>
   )
+})
 
-  // Debounce da busca
+ProdutoEstoqueItem.displayName = 'ProdutoEstoqueItem'
+
+export function EstoqueProdutosList() {
+  const [searchText, setSearchText] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Debounce da busca (500ms)
   useEffect(() => {
-    const token = auth?.getAccessToken()
-    if (!token) return
-
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current)
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      if (searchTextRef.current !== searchText) {
-        loadProdutos(true)
-      }
+      setDebouncedSearch(searchText)
     }, 500)
 
     return () => {
@@ -133,40 +83,66 @@ export function EstoqueProdutosList() {
         clearTimeout(debounceTimerRef.current)
       }
     }
-  }, [searchText, auth, loadProdutos])
+  }, [searchText])
+
+  // Hook otimizado com React Query
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetching,
+    isFetchingNextPage,
+    isLoading,
+  } = useProdutosInfinite({
+    name: debouncedSearch || undefined,
+    limit: 10,
+  })
+
+  // Achatando todas as páginas em uma única lista (memoizado)
+  const produtos = useMemo(() => {
+    return data?.pages.flatMap((page) => page.produtos) || []
+  }, [data?.pages])
+
+  const totalProdutos = useMemo(() => {
+    return data?.pages[0]?.count || 0
+  }, [data?.pages])
+
+  // Handler de scroll com throttle para melhor performance
+  const handleScroll = useCallback(() => {
+    if (scrollTimeoutRef.current) {
+      return
+    }
+
+    scrollTimeoutRef.current = setTimeout(() => {
+      const container = scrollContainerRef.current
+      if (!container) return
+
+      const { scrollTop, scrollHeight, clientHeight } = container
+      const distanceFromBottom = scrollHeight - (scrollTop + clientHeight)
+
+      if (distanceFromBottom < 400) {
+        if (hasNextPage && !isFetchingNextPage) {
+          fetchNextPage()
+        }
+      }
+
+      scrollTimeoutRef.current = null
+    }, 100)
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
   // Scroll infinito
   useEffect(() => {
     const container = scrollContainerRef.current
     if (!container) return
 
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = container
-      if (
-        scrollTop + clientHeight >= scrollHeight - 200 &&
-        !isLoadingRef.current &&
-        hasNextPageRef.current
-      ) {
-        loadProdutos()
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      container.removeEventListener('scroll', handleScroll)
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current)
       }
     }
-
-    container.addEventListener('scroll', handleScroll)
-    return () => container.removeEventListener('scroll', handleScroll)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, hasNextPage])
-
-  // Carrega produtos iniciais apenas quando o token estiver disponível
-  useEffect(() => {
-    if (!isAuthenticated || hasLoadedInitialRef.current) return
-
-    const token = auth?.getAccessToken()
-    if (!token) return
-
-    hasLoadedInitialRef.current = true
-    loadProdutos(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated])
+  }, [handleScroll])
 
   return (
     <div className="flex flex-col h-full">
@@ -311,59 +287,37 @@ export function EstoqueProdutosList() {
               ref={scrollContainerRef}
               className="max-h-[600px] overflow-y-auto"
             >
-              {produtos.length === 0 && !isLoading && (
+              {/* Skeleton loaders para carregamento inicial */}
+              {(isLoading || (produtos.length === 0 && isFetching)) && (
+                <div className="space-y-1">
+                  {[...Array(8)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-[50px] px-4 flex items-center gap-[10px] border-t border-alternate/20"
+                    >
+                      <Skeleton className="w-[10%] h-4" />
+                      <Skeleton className="w-[30%] h-4" />
+                      <Skeleton className="w-[16%] h-4" />
+                      <Skeleton className="w-[16%] h-4" />
+                      <Skeleton className="w-[80px] h-6" />
+                      <Skeleton className="w-[16%] h-4" />
+                      <Skeleton className="w-10 h-10 ml-auto" />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {produtos.length === 0 && !isLoading && !isFetching && (
                 <div className="flex items-center justify-center py-12">
                   <p className="text-secondary-text">Nenhum produto encontrado.</p>
                 </div>
               )}
 
               {produtos.map((produto) => (
-                <div
-                  key={produto.getId()}
-                  className="h-[50px] px-4 flex items-center gap-[10px] border-t border-alternate/20"
-                >
-                  <div className="w-[10%] font-nunito text-sm text-primary-text">
-                    {produto.getCodigoProduto() || '-'}
-                  </div>
-                  <div className="w-[30%] font-nunito font-semibold text-sm text-primary-text">
-                    {produto.getNome()}
-                  </div>
-                  <div className="w-[16%] font-nunito text-sm text-secondary-text">
-                    {produto.getNomeGrupo() || '-'}
-                  </div>
-                  <div className="w-[16%] font-nunito text-sm text-secondary-text">
-                    {typeof produto.getEstoque() === 'number' 
-                      ? produto.getEstoque() 
-                      : typeof produto.getEstoque() === 'string' 
-                        ? parseInt(produto.getEstoque() as string) || 0
-                        : 0}
-                  </div>
-                  <div className="w-[16%]">
-                    <div
-                      className={`w-[80px] px-3 py-1 rounded-[24px] text-center text-sm font-nunito font-medium ${
-                        produto.isAtivo()
-                          ? 'bg-success/20 text-success'
-                          : 'bg-error/20 text-secondary-text'
-                      }`}
-                    >
-                      {produto.isAtivo() ? 'Ativo' : 'Desativado'}
-                    </div>
-                  </div>
-                  <div className="w-[16%] font-nunito font-semibold text-sm text-primary-text">
-                    {new Intl.NumberFormat('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    }).format(produto.getValor() || 0)}
-                  </div>
-                  <div className="w-[10%] flex justify-end">
-                    <button className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-secondary-bg/20 transition-colors">
-                      <span className="text-xl text-primary-text">⋮</span>
-                    </button>
-                  </div>
-                </div>
+                <ProdutoEstoqueItem key={produto.getId()} produto={produto} />
               ))}
 
-              {isLoading && (
+              {isFetchingNextPage && (
                 <div className="flex justify-center py-4">
                   <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
                 </div>

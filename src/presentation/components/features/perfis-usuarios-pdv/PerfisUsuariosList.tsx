@@ -23,7 +23,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
   const [expandedPerfis, setExpandedPerfis] = useState<Set<string>>(new Set())
   const [usuariosPorPerfil, setUsuariosPorPerfil] = useState<Record<string, any[]>>({})
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const debounceTimerRef = useRef<NodeJS.Timeout>()
+  const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
   const { auth, isAuthenticated } = useAuthStore()
 
@@ -364,4 +364,5 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
     </div>
   )
 }
+
 

@@ -6,6 +6,7 @@ import { InformacoesProdutoStep } from './NovoProduto/InformacoesProdutoStep'
 import { ConfiguracoesGeraisStep } from './NovoProduto/ConfiguracoesGeraisStep'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
+import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 
 interface NovoProdutoProps {
   produtoId?: string
@@ -40,8 +41,6 @@ function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps)
 
   // Estados de loading
   const [isLoadingProduto, setIsLoadingProduto] = useState(false)
-  const [isLoadingGrupos, setIsLoadingGrupos] = useState(false)
-  const [grupos, setGrupos] = useState<any[]>([])
 
   // Verificar se é modo cópia via query param
   // Extrair o valor uma vez e usar como string estável
@@ -51,47 +50,19 @@ function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps)
   const effectiveIsCopyMode = useMemo(() => isCopyMode || !!copyFromId, [isCopyMode, copyFromId])
 
   // Refs para evitar loops infinitos
-  const hasLoadedGruposRef = useRef(false)
   const hasLoadedProdutoRef = useRef(false)
   const loadedProdutoIdRef = useRef<string | null>(null)
   const lastProdutoIdRef = useRef<string | null | undefined>(null)
   const lastIsCopyModeRef = useRef<boolean>(false)
 
-  // Carregar grupos de produtos (apenas uma vez)
-  useEffect(() => {
-    if (hasLoadedGruposRef.current) return
-
-    const loadGrupos = async () => {
-      const token = auth?.getAccessToken()
-      if (!token) return
-
-      setIsLoadingGrupos(true)
-      try {
-        const response = await fetch(
-          `/api/grupos-produtos?ativo=true&limit=100&offset=0`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        )
-
-        if (response.ok) {
-          const data = await response.json()
-          setGrupos(data.items || [])
-          hasLoadedGruposRef.current = true
-        }
-      } catch (error) {
-        console.error('Erro ao carregar grupos:', error)
-      } finally {
-        setIsLoadingGrupos(false)
-      }
-    }
-
-    loadGrupos()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Executa apenas uma vez na montagem
+  // Carregar grupos de produtos usando React Query (com cache)
+  const {
+    data: grupos = [],
+    isLoading: isLoadingGrupos,
+  } = useGruposProdutos({
+    ativo: true,
+    limit: 100,
+  })
 
   // Carregar dados do produto se estiver editando ou copiando (apenas uma vez por produtoId)
   useEffect(() => {
@@ -250,7 +221,7 @@ function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps)
         abreComplementos,
         permiteAcrescimo,
         permiteDesconto,
-        gruposComplementosIds,
+        grupoComplementosIds,
         impressorasIds,
         ...(effectiveProdutoId && !effectiveIsCopyMode ? { ativo } : {}),
       }

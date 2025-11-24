@@ -65,7 +65,7 @@ export function TabelaTopProdutos({ periodo = 'mes' }: TabelaTopProdutosProps) {
       <div className="h-64 flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-600 mb-4">{error}</p>
-          <Button onClick={() => window.location.reload()} variant="default">
+          <Button onClick={() => window.location.reload()} variant="contained">
             Tentar novamente
           </Button>
         </div>

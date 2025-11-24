@@ -99,8 +99,8 @@ export function ModalMetodosPagamento({
           ) : (
             <>
               {/* Gráfico de pizza */}
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-64 w-full min-w-0">
+                <ResponsiveContainer width="100%" height="100%" minHeight={256}>
                   <PieChart>
                     <Pie
                       data={data.map((item, index) => ({
@@ -113,7 +113,7 @@ export function ModalMetodosPagamento({
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ percentual }) => `${percentual.toFixed(1)}%`}
+                      label={(props: any) => `${props.percent?.toFixed(1) || 0}%`}
                       outerRadius={100}
                       fill="#8884d8"
                       dataKey="value"

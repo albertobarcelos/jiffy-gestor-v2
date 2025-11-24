@@ -80,7 +80,7 @@ export class ImpressoraRepository implements IImpressoraRepository {
       return Impressora.fromJSON(response.data)
     } catch (error) {
       if (error instanceof ApiError) {
-        if (error.statusCode === 404) {
+        if (error.status === 404) {
           return null
         }
         throw new Error(`Erro ao buscar impressora: ${error.message}`)

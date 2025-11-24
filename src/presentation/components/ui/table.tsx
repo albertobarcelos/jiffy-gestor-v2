@@ -52,7 +52,8 @@ TableRow.displayName = 'TableRow'
 
 export const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<HTMLTableCellElement>>(
   (props, ref) => {
-    return <MuiTableCell ref={ref} component="th" {...props} />
+    const { align, ...rest } = props
+    return <MuiTableCell ref={ref} component="th" align={align === 'char' ? 'left' : (align as any)} {...rest} />
   }
 )
 
@@ -60,7 +61,8 @@ TableHead.displayName = 'TableHead'
 
 export const TableCell = React.forwardRef<HTMLTableCellElement, React.TdHTMLAttributes<HTMLTableCellElement>>(
   (props, ref) => {
-    return <MuiTableCell ref={ref} {...props} />
+    const { align, ...rest } = props
+    return <MuiTableCell ref={ref} align={align === 'char' ? 'left' : (align as any)} {...rest} />
   }
 )
 

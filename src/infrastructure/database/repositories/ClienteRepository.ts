@@ -84,7 +84,7 @@ export class ClienteRepository implements IClienteRepository {
       return Cliente.fromJSON(response.data)
     } catch (error) {
       if (error instanceof ApiError) {
-        if (error.statusCode === 404) {
+        if (error.status === 404) {
           return null
         }
         throw new Error(`Erro ao buscar cliente: ${error.message}`)

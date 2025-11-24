@@ -1,96 +1,38 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { validateToken, isTokenExpired } from '@/src/shared/utils/validateToken'
 
 /**
- * Middleware para proteção de rotas
- * Verifica autenticação antes de acessar rotas protegidas
- * Replica a lógica do Flutter com validação de token JWT
+ * Middleware para proteção de rotas - OTIMIZADO
+ * Validação mínima de token para máxima performance
+ * Não usa jsonwebtoken para ser compatível com Edge Runtime
  */
 export function middleware(request: NextRequest) {
-  const token = request.cookies.get('auth-token')?.value
   const { pathname } = request.nextUrl
-
-  // Rotas públicas (não requerem autenticação)
-  const publicRoutes = ['/login', '/api/auth/login']
-  const isPublicRoute = publicRoutes.some((route) => pathname === route || pathname.startsWith(route))
-
-  // Rotas protegidas
-  const protectedRoutes = [
-    '/dashboard',
-    '/vendas',
-    '/estoque',
-    '/produtos',
-    '/clientes',
-    '/cadastros',
-    '/meu-caixa',
-    '/relatorios',
-    '/configuracoes',
-    '/hub',
-  ]
-  const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
-
-  // Rotas de API protegidas (exceto login)
-  const isProtectedApiRoute = pathname.startsWith('/api/') && !pathname.startsWith('/api/auth/login')
-
-  // Se é rota pública, permite acesso
-  if (isPublicRoute) {
-    // Se tem token válido e está tentando acessar login, redireciona para dashboard
-    if (token && pathname === '/login') {
-      const validation = validateToken(token)
-      if (validation.valid && !validation.expired) {
-        return NextResponse.redirect(new URL('/dashboard', request.url))
-      }
-    }
+  
+  // Rotas públicas - bypass rápido
+  if (pathname === '/login' || pathname.startsWith('/api/auth/login')) {
     return NextResponse.next()
   }
 
-  // Para rotas protegidas, verifica token
-  if (isProtectedRoute || isProtectedApiRoute) {
-    if (!token) {
-      // Se é rota de API, retorna 401
-      if (isProtectedApiRoute) {
-        return NextResponse.json({ error: 'Token não encontrado' }, { status: 401 })
-      }
-      // Se é rota de página, redireciona para login
-      return NextResponse.redirect(new URL('/login', request.url))
-    }
-
-    // Valida token
-    const validation = validateToken(token)
-    
-    if (!validation.valid || validation.expired) {
-      // Token inválido ou expirado
-      if (isProtectedApiRoute) {
-        return NextResponse.json(
-          { error: validation.expired ? 'Token expirado' : 'Token inválido' },
-          { status: 401 }
-        )
-      }
-      
-      // Para rotas de página, redireciona para login
-      // Remove cookie inválido
-      const response = NextResponse.redirect(new URL('/login', request.url))
-      response.cookies.delete('auth-token')
-      return response
-    }
-
-    // Token válido - permite acesso
-    // As rotas API validarão o token novamente e extrairão informações
-    return NextResponse.next()
-  }
-
-  // Se está na raiz, redireciona baseado no estado de autenticação
+  // Se está na raiz, redireciona para dashboard
   if (pathname === '/') {
-    if (token) {
-      const validation = validateToken(token)
-      if (validation.valid && !validation.expired) {
-        return NextResponse.redirect(new URL('/dashboard', request.url))
-      }
+    return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+
+  const token = request.cookies.get('auth-token')?.value
+  const isApiRoute = pathname.startsWith('/api/')
+  
+  // Rotas protegidas - verificação mínima
+  if (!token) {
+    if (isApiRoute) {
+      return NextResponse.json({ error: 'Token não encontrado' }, { status: 401 })
     }
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
+  // Para rotas de página e API, apenas verifica se token existe
+  // A validação completa JWT será feita na camada de aplicação (Node.js runtime)
+  // Isso evita usar APIs Node.js no Edge Runtime
   return NextResponse.next()
 }
 

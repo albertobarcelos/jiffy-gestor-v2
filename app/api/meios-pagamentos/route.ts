@@ -40,8 +40,18 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Erro ao buscar meios de pagamento:', error)
+    
+    // Log detalhado do erro para debug
+    if (error instanceof Error) {
+      console.error('Error message:', error.message)
+      console.error('Error stack:', error.stack)
+    }
+    
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Erro ao buscar meios de pagamento' },
+      { 
+        error: error instanceof Error ? error.message : 'Erro ao buscar meios de pagamento',
+        details: error instanceof Error ? error.stack : undefined
+      },
       { status: 500 }
     )
   }

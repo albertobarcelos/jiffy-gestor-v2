@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { Cliente } from '@/src/domain/entities/Cliente'
+import { useState, useEffect, useRef } from 'react'
+import { useClientesInfinite } from '@/src/presentation/hooks/useClientes'
 import { ClienteActionsMenu } from './ClienteActionsMenu'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 
 interface ClientesListProps {
   onReload?: () => void
@@ -11,144 +11,23 @@ interface ClientesListProps {
 
 /**
  * Lista de clientes com scroll infinito
- * Replica exatamente o design e lógica do Flutter
+ * Usa React Query para cache automático e deduplicação de requisições
  */
 export function ClientesList({ onReload }: ClientesListProps) {
-  const [clientes, setClientes] = useState<Cliente[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [hasNextPage, setHasNextPage] = useState(true)
-  const [offset, setOffset] = useState(0)
   const [searchText, setSearchText] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
-  const [totalClientes, setTotalClientes] = useState(0)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const debounceTimerRef = useRef<NodeJS.Timeout>()
-  const hasLoadedInitialRef = useRef(false)
-  const { auth, isAuthenticated } = useAuthStore()
+  const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
 
-  // Refs para evitar dependências desnecessárias no useCallback
-  const isLoadingRef = useRef(false)
-  const hasNextPageRef = useRef(true)
-  const offsetRef = useRef(0)
-  const searchTextRef = useRef('')
-  const filterStatusRef = useRef<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
-
-  // Atualiza refs quando os valores mudam
+  // Debounce da busca (500ms)
   useEffect(() => {
-    isLoadingRef.current = isLoading
-  }, [isLoading])
-
-  useEffect(() => {
-    hasNextPageRef.current = hasNextPage
-  }, [hasNextPage])
-
-  useEffect(() => {
-    offsetRef.current = offset
-  }, [offset])
-
-  useEffect(() => {
-    searchTextRef.current = searchText
-  }, [searchText])
-
-  useEffect(() => {
-    filterStatusRef.current = filterStatus
-  }, [filterStatus])
-
-  const loadClientes = useCallback(
-    async (reset: boolean = false) => {
-      const token = auth?.getAccessToken()
-      if (!token) {
-        return
-      }
-
-      if (isLoadingRef.current || (!hasNextPageRef.current && !reset)) return
-
-      setIsLoading(true)
-      isLoadingRef.current = true
-
-      if (reset) {
-        setOffset(0)
-        offsetRef.current = 0
-        setClientes([])
-        setHasNextPage(true)
-        hasNextPageRef.current = true
-      }
-
-      const currentOffset = reset ? 0 : offsetRef.current
-
-      // Determina o filtro ativo
-      let ativoFilter: boolean | null = null
-      if (filterStatusRef.current === 'Ativo') {
-        ativoFilter = true
-      } else if (filterStatusRef.current === 'Desativado') {
-        ativoFilter = false
-      }
-
-      try {
-        const params = new URLSearchParams({
-          limit: '10',
-          offset: currentOffset.toString(),
-        })
-
-        if (searchTextRef.current) {
-          params.append('q', searchTextRef.current)
-        }
-
-        if (ativoFilter !== null) {
-          params.append('ativo', ativoFilter.toString())
-        }
-
-        const response = await fetch(`/api/clientes?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          const errorMessage = errorData.error || `Erro ${response.status}: ${response.statusText}`
-          throw new Error(errorMessage)
-        }
-
-        const data = await response.json()
-
-        const newClientes = (data.items || []).map((item: any) =>
-          Cliente.fromJSON(item)
-        )
-
-        setClientes((prev) => (reset ? newClientes : [...prev, ...newClientes]))
-        const newOffset = reset ? newClientes.length : offsetRef.current + newClientes.length
-        setOffset(newOffset)
-        offsetRef.current = newOffset
-        setHasNextPage(newClientes.length === 10)
-        hasNextPageRef.current = newClientes.length === 10
-        setTotalClientes(data.count || 0)
-      } catch (error) {
-        console.error('Erro ao carregar clientes:', error)
-        setHasNextPage(false)
-        hasNextPageRef.current = false
-      } finally {
-        setIsLoading(false)
-        isLoadingRef.current = false
-      }
-    },
-    [auth]
-  )
-
-  // Debounce da busca
-  useEffect(() => {
-    const token = auth?.getAccessToken()
-    if (!token) return
-
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current)
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      if (searchTextRef.current !== searchText) {
-        loadClientes(true)
-      }
+      setDebouncedSearch(searchText)
     }, 500)
 
     return () => {
@@ -156,16 +35,29 @@ export function ClientesList({ onReload }: ClientesListProps) {
         clearTimeout(debounceTimerRef.current)
       }
     }
-  }, [searchText, auth, loadClientes])
+  }, [searchText])
 
-  // Filtro de status
-  useEffect(() => {
-    const token = auth?.getAccessToken()
-    if (!token) return
+  // Determina o filtro ativo
+  const ativoFilter: boolean | null =
+    filterStatus === 'Ativo' ? true : filterStatus === 'Desativado' ? false : null
 
-    loadClientes(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterStatus])
+  // Hook otimizado com React Query
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    error,
+  } = useClientesInfinite({
+    q: debouncedSearch || undefined,
+    ativo: ativoFilter,
+    limit: 10,
+  })
+
+  // Achatando todas as páginas em uma única lista
+  const clientes = data?.pages.flatMap((page) => page.clientes) || []
+  const totalClientes = data?.pages[0]?.count || 0
 
   // Scroll infinito
   useEffect(() => {
@@ -174,34 +66,25 @@ export function ClientesList({ onReload }: ClientesListProps) {
 
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = container
-      if (
-        scrollTop + clientHeight >= scrollHeight - 200 &&
-        !isLoadingRef.current &&
-        hasNextPageRef.current
-      ) {
-        loadClientes()
+      if (scrollTop + clientHeight >= scrollHeight - 200) {
+        if (hasNextPage && !isFetchingNextPage) {
+          fetchNextPage()
+        }
       }
     }
 
     container.addEventListener('scroll', handleScroll)
     return () => container.removeEventListener('scroll', handleScroll)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, hasNextPage])
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
-  // Carrega clientes iniciais apenas quando o token estiver disponível
+  // Notificar erro
   useEffect(() => {
-    if (!isAuthenticated || hasLoadedInitialRef.current) return
-
-    const token = auth?.getAccessToken()
-    if (!token) return
-
-    hasLoadedInitialRef.current = true
-    loadClientes(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated])
+    if (error) {
+      console.error('Erro ao carregar clientes:', error)
+    }
+  }, [error])
 
   const handleStatusChange = () => {
-    loadClientes(true)
     onReload?.()
   }
 
@@ -218,15 +101,17 @@ export function ClientesList({ onReload }: ClientesListProps) {
               Total {clientes.length} de {totalClientes}
             </p>
           </div>
-          <button
-            onClick={() => {
-              window.location.href = '/cadastros/clientes/novo'
-            }}
-            className="h-10 px-[30px] bg-primary text-info rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
-          >
-            Novo
-            <span className="text-lg">+</span>
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                window.location.href = '/clientes/novo'
+              }}
+              className="h-10 px-[30px] bg-primary text-info rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+            >
+              Novo
+              <span className="text-lg">+</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -256,9 +141,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
               <select
                 value={filterStatus}
                 onChange={(e) =>
-                  setFilterStatus(
-                    e.target.value as 'Todos' | 'Ativo' | 'Desativado'
-                  )
+                  setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
                 }
                 className="w-[175px] h-full px-5 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text focus:outline-none focus:border-secondary font-nunito text-sm"
               >
@@ -274,7 +157,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
       {/* Cabeçalho da tabela */}
       <div className="px-[30px] mt-0">
         <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px]">
-          <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text">
+          <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
             Nome
           </div>
           <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
@@ -300,6 +183,25 @@ export function ClientesList({ onReload }: ClientesListProps) {
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto px-[30px] mt-2"
       >
+        {/* Skeleton loaders para carregamento inicial */}
+        {clientes.length === 0 && isLoading && (
+          <div className="space-y-2">
+            {[...Array(5)].map((_, i) => (
+              <div
+                key={i}
+                className="h-[50px] bg-info rounded-xl px-4 flex items-center gap-[10px]"
+              >
+                <Skeleton className="flex-[2] h-4" />
+                <Skeleton className="flex-[2] h-4" />
+                <Skeleton className="flex-[2] h-4" />
+                <Skeleton className="flex-[2] h-4" />
+                <Skeleton className="flex-[2] h-6 w-20 mx-auto" />
+                <Skeleton className="flex-[2] h-10 w-10 ml-auto" />
+              </div>
+            ))}
+          </div>
+        )}
+
         {clientes.length === 0 && !isLoading && (
           <div className="flex items-center justify-center py-12">
             <p className="text-secondary-text">Nenhum cliente encontrado.</p>
@@ -311,11 +213,11 @@ export function ClientesList({ onReload }: ClientesListProps) {
             key={cliente.getId()}
             className="h-[50px] bg-info rounded-xl px-4 mb-2 flex items-center gap-[10px]"
           >
-            <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text">
+            <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
               {cliente.getNome()}
             </div>
             <div className="flex-[2] font-nunito text-sm text-secondary-text">
-              {cliente.getCpf() || cliente.getCnpj() || '-'}
+              {cliente.getCnpj() || cliente.getCpf() || '-'}
             </div>
             <div className="flex-[2] font-nunito text-sm text-secondary-text">
               {cliente.getTelefone() || '-'}
@@ -344,7 +246,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
           </div>
         ))}
 
-        {isLoading && (
+        {isFetchingNextPage && (
           <div className="flex justify-center py-4">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
           </div>

@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { Badge as MuiBadge, Chip, ChipProps } from '@mui/material'
 
-export interface BadgeProps extends ChipProps {
+export interface BadgeProps extends Omit<ChipProps, 'variant'> {
   variant?: 'default' | 'outline' | 'secondary' | 'destructive'
 }
 

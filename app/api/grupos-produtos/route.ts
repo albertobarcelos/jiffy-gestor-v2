@@ -29,10 +29,15 @@ export async function GET(req: NextRequest) {
 
     const result = await useCase.execute({ name, limit, offset, ativo })
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       ...result,
     })
+
+    // Cache headers para melhor performance
+    response.headers.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=120')
+    
+    return response
   } catch (error: any) {
     console.error('Erro na API de buscar grupos:', error)
     return NextResponse.json(

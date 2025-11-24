@@ -1,30 +1,79 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useQueryClient } from '@tanstack/react-query'
+import { usePrefetch } from '@/src/presentation/hooks/usePrefetch'
 
 /**
  * Sidebar do dashboard
- * Replica exatamente o design e nomes do Flutter JiffySidebarWidget
+ * Otimizado com prefetching agressivo de dados
  */
 export function Sidebar() {
   const [isCompact, setIsCompact] = useState(false)
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set())
   const pathname = usePathname()
+  const router = useRouter()
   const { logout } = useAuthStore()
+  const queryClient = useQueryClient()
+  // const { prefetchRoute } = usePrefetch() // prefetchRoute não existe mais
 
-  const toggleMenu = (menuName: string) => {
-    const newExpanded = new Set(expandedMenus)
-    if (newExpanded.has(menuName)) {
-      newExpanded.delete(menuName)
-    } else {
-      newExpanded.add(menuName)
-    }
-    setExpandedMenus(newExpanded)
-  }
+  // Prefetch agressivo das rotas mais acessadas na inicialização
+  useEffect(() => {
+    const routesToPrefetch = [
+      '/cadastros/grupos-complementos',
+      '/cadastros/complementos',
+      '/produtos',
+      '/cadastros/grupos-produtos',
+      '/estoque',
+    ]
+    
+    // Prefetch com delay para não bloquear a renderização inicial
+    const timer = setTimeout(() => {
+      routesToPrefetch.forEach((route) => {
+        router.prefetch(route)
+        // prefetchRoute(route)
+      })
+    }, 100)
+
+    return () => clearTimeout(timer)
+  }, [router])
+
+  // Prefetch de rota E dados ao hover
+  const handleLinkHover = useCallback(
+    (path: string) => {
+      if (path && path !== '#') {
+        // Prefetch da rota do Next.js
+        router.prefetch(path)
+        // Prefetch dos dados do React Query
+        // prefetchRoute(path)
+      }
+    },
+    [router]
+  )
+
+  const toggleMenu = useCallback(
+    (menuName: string) => {
+      const newExpanded = new Set(expandedMenus)
+      if (newExpanded.has(menuName)) {
+        newExpanded.delete(menuName)
+      } else {
+        newExpanded.add(menuName)
+        // Quando expandir "Cadastros", prefetch das rotas mais acessadas
+        if (menuName === 'Cadastros') {
+          // prefetchRoute('/cadastros/grupos-complementos')
+          // prefetchRoute('/cadastros/complementos')
+          // prefetchRoute('/produtos')
+          // prefetchRoute('/cadastros/grupos-produtos')
+        }
+      }
+      setExpandedMenus(newExpanded)
+    },
+    [expandedMenus]
+  )
 
   const menuItems = [
     { name: 'Dashboard', path: '/dashboard', icon: '🏠' },
@@ -46,6 +95,7 @@ export function Sidebar() {
     },
     { name: 'Estoque', path: '/estoque', icon: '📦' },
     { name: 'Meu Caixa', path: '/meu-caixa', icon: '💼' },
+    { name: 'Fiscal Flow', path: '/fiscal-flow', icon: '📄' },
     { name: 'Relatórios', path: '/relatorios', icon: '📊' },
     { name: 'Configurações', path: '/configuracoes', icon: '⚙️' },
   ]
@@ -138,6 +188,8 @@ export function Sidebar() {
                               <li key={child.path}>
                                 <Link
                                   href={child.path}
+                                  onMouseEnter={() => handleLinkHover(child.path)}
+                                  prefetch={true}
                                   className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
                                     isChildActive
                                       ? 'bg-info/20 text-info font-semibold'
@@ -162,6 +214,8 @@ export function Sidebar() {
                 <li key={item.path}>
                   <Link
                     href={item.path}
+                    onMouseEnter={() => handleLinkHover(item.path)}
+                    prefetch={true}
                     className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                       isActive
                         ? 'bg-info/20 text-info font-semibold'
@@ -180,9 +234,21 @@ export function Sidebar() {
         {/* Logout */}
         <div className="p-4 border-t border-info/20">
           <button
-            onClick={() => {
-              logout()
-              window.location.href = '/login'
+            onClick={async () => {
+              try {
+                // Limpar cache do React Query
+                queryClient.clear()
+                
+                // Fazer logout (limpa store, localStorage e chama API para remover cookie)
+                await logout()
+                
+                // Forçar redirecionamento com reload completo para garantir limpeza
+                window.location.href = '/login'
+              } catch (error) {
+                console.error('Erro ao fazer logout:', error)
+                // Mesmo com erro, força redirecionamento
+                window.location.href = '/login'
+              }
             }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-info/80 hover:bg-info/10 transition-colors ${
               isCompact ? 'justify-center' : ''
@@ -196,3 +262,4 @@ export function Sidebar() {
     </div>
   )
 }
+

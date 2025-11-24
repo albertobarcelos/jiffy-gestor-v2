@@ -12,7 +12,7 @@ import {
   Fade,
 } from '@mui/material'
 import { Receipt as ReceiptIcon } from '@mui/icons-material'
-import { NFeKanbanCard } from './NFeKanbanCard'
+// import { NFeKanbanCard } from './NFeKanbanCard' // Componente não encontrado
 
 interface DroppableColumnProps {
   id: NFeStatus
@@ -205,12 +205,9 @@ export function DroppableColumn({
             </Fade>
           ) : (
             nfes.map((nfe) => (
-              <NFeKanbanCard
-                key={nfe.getId()}
-                nfe={nfe}
-                onVerDetalhes={onVerDetalhes}
-                getStatusBadge={getStatusBadge}
-              />
+              <Box key={nfe.getId()} sx={{ p: 2, bgcolor: 'white', borderRadius: 2, mb: 1 }}>
+                <Typography variant="body2">{nfe.getNumero()}</Typography>
+              </Box>
             ))
           )}
         </Box>

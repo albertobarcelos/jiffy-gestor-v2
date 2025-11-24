@@ -1,8 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { ConfiguracaoGeral } from '@/src/domain/entities/ConfiguracaoGeral'
-import { ConfiguracaoImpressoes } from '@/src/domain/entities/ConfiguracaoImpressoes'
 
 /**
  * Tab de Outras Configurações - Configurações gerais de vendas PDV e impressões
@@ -15,23 +13,11 @@ export function OutrasConfiguracoesTab() {
   const [identificaComandaMesa, setIdentificaComandaMesa] = useState(false)
   const [observacaoBalcao, setObservacaoBalcao] = useState(true)
   const [valorAcrescimo, setValorAcrescimo] = useState('8.0')
-  const [acrescimoBalcao, setAcrescimoBalcao] = useState(false)
-  const [acrescimoMesa, setAcrescimoMesa] = useState(true)
-  const [acrescimoDelivery, setAcrescimoDelivery] = useState(false)
   const [valorDesconto, setValorDesconto] = useState('0.0')
-  const [descontoBalcao, setDescontoBalcao] = useState(false)
-  const [descontoMesa, setDescontoMesa] = useState(false)
-  const [descontoDelivery, setDescontoDelivery] = useState(false)
-  const [identificacaoAcrescimoCupom, setIdentificacaoAcrescimoCupom] = useState('Acréscimos')
-  const [tipoAcrescimo, setTipoAcrescimo] = useState('Geral')
-  const [tipoRelatorioFechamento, setTipoRelatorioFechamento] = useState('Resumido')
 
   // Configurações de Impressões
   const [cabecalho, setCabecalho] = useState('')
   const [rodape, setRodape] = useState('')
-  const [impressaoDetalhada, setImpressaoDetalhada] = useState(false)
-  const [ticketVenda, setTicketVenda] = useState(false)
-  const [parcialEntrega, setParcialEntrega] = useState(false)
 
   return (
     <div className="p-6 space-y-6">

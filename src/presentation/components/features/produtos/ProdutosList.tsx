@@ -1,166 +1,96 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { Produto } from '@/src/domain/entities/Produto'
+import { useState, useEffect, useRef, useMemo, useCallback, memo, lazy, Suspense } from 'react'
+import { useProdutosInfinite } from '@/src/presentation/hooks/useProdutos'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
-import { ProdutoActionsMenu } from './ProdutoActionsMenu'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { showToast, handleApiError } from '@/src/shared/utils/toast'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
-import { Button } from '@/src/presentation/components/ui/button'
 import Link from 'next/link'
+import { Produto } from '@/src/domain/entities/Produto'
+
+// Lazy load do menu de ações para reduzir bundle inicial
+const ProdutoActionsMenu = lazy(() => import('./ProdutoActionsMenu').then(module => ({ default: module.ProdutoActionsMenu })))
 
 interface ProdutosListProps {
   onReload?: () => void
 }
 
 /**
- * Lista de produtos com scroll infinito
- * Replica exatamente o design e lógica do Flutter
+ * Item individual da lista de produtos (memoizado para evitar re-renders desnecessários)
  */
-export function ProdutosList({ onReload }: ProdutosListProps) {
-  const [produtos, setProdutos] = useState<Produto[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [hasNextPage, setHasNextPage] = useState(true)
-  const [offset, setOffset] = useState(0)
-  const [searchText, setSearchText] = useState('')
-  const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
-  const [totalProdutos, setTotalProdutos] = useState(0)
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const debounceTimerRef = useRef<NodeJS.Timeout>()
-  const hasLoadedInitialRef = useRef(false)
-  const { auth, isAuthenticated } = useAuthStore()
-
-  // Refs para evitar dependências desnecessárias no useCallback
-  const isLoadingRef = useRef(false)
-  const hasNextPageRef = useRef(true)
-  const offsetRef = useRef(0)
-  const searchTextRef = useRef('')
-  const filterStatusRef = useRef<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
-
-  // Atualiza refs quando os valores mudam
-  useEffect(() => {
-    isLoadingRef.current = isLoading
-  }, [isLoading])
-
-  useEffect(() => {
-    hasNextPageRef.current = hasNextPage
-  }, [hasNextPage])
-
-  useEffect(() => {
-    offsetRef.current = offset
-  }, [offset])
-
-  useEffect(() => {
-    searchTextRef.current = searchText
-  }, [searchText])
-
-  useEffect(() => {
-    filterStatusRef.current = filterStatus
-  }, [filterStatus])
-
-  const loadProdutos = useCallback(
-    async (reset: boolean = false) => {
-      // Verifica se o token está disponível antes de continuar
-      const token = auth?.getAccessToken()
-      if (!token) {
-        // Token ainda não está disponível, aguarda sem lançar erro
-        return
-      }
-
-      if (isLoadingRef.current || (!hasNextPageRef.current && !reset)) return
-
-      setIsLoading(true)
-      isLoadingRef.current = true
-
-      if (reset) {
-        setOffset(0)
-        offsetRef.current = 0
-        setProdutos([])
-        setHasNextPage(true)
-        hasNextPageRef.current = true
-      }
-
-      const currentOffset = reset ? 0 : offsetRef.current
-
-      // Determina o filtro ativo
-      let ativoFilter: boolean | null = null
-      if (filterStatusRef.current === 'Ativo') {
-        ativoFilter = true
-      } else if (filterStatusRef.current === 'Desativado') {
-        ativoFilter = false
-      }
-
-      try {
-        const params = new URLSearchParams({
-          name: searchTextRef.current,
-          limit: '10',
-          offset: currentOffset.toString(),
-        })
-
-        if (ativoFilter !== null) {
-          params.append('ativo', ativoFilter.toString())
-        }
-
-        const response = await fetch(`/api/produtos?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          const errorMessage = errorData.message || `Erro ${response.status}: ${response.statusText}`
-          throw new Error(errorMessage)
-        }
-
-        const data = await response.json()
-
-        if (data.success) {
-          const newProdutos = (data.items || []).map((item: any) =>
-            Produto.fromJSON(item)
-          )
-
-          setProdutos((prev) => (reset ? newProdutos : [...prev, ...newProdutos]))
-          const newOffset = reset ? newProdutos.length : offsetRef.current + newProdutos.length
-          setOffset(newOffset)
-          offsetRef.current = newOffset
-          setHasNextPage(newProdutos.length === 10)
-          hasNextPageRef.current = newProdutos.length === 10
-          setTotalProdutos(data.count || 0)
-        } else {
-          throw new Error(data.message || 'Erro ao processar resposta da API')
-        }
-      } catch (error) {
-        console.error('Erro ao carregar produtos:', error)
-        setHasNextPage(false)
-        hasNextPageRef.current = false
-        // Só mostra erro se não for o carregamento inicial
-        if (hasLoadedInitialRef.current) {
-          const errorMessage = handleApiError(error)
-          showToast.error(errorMessage)
-        }
-      } finally {
-        setIsLoading(false)
-        isLoadingRef.current = false
-      }
-    },
-    // Apenas auth como dependência, os outros valores vêm de refs
-    [auth]
+const ProdutoListItem = memo(function ProdutoListItem({
+  produto,
+  onStatusChanged,
+}: {
+  produto: Produto
+  onStatusChanged?: () => void
+}) {
+  const valorFormatado = useMemo(() => transformarParaReal(produto.getValor()), [produto])
+  const isAtivo = useMemo(() => produto.isAtivo(), [produto])
+  const statusClass = useMemo(
+    () =>
+      isAtivo
+        ? 'bg-success/20 text-success'
+        : 'bg-error/20 text-secondary-text',
+    [isAtivo]
   )
 
-  // Debounce da busca
-  useEffect(() => {
-    const token = auth?.getAccessToken()
-    if (!token) return
+  return (
+    <div className="h-[50px] bg-info rounded-xl px-4 mb-2 flex items-center gap-[10px]">
+      <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
+        {produto.getCodigoProduto()}
+      </div>
+      <div className="flex-[4] font-nunito font-semibold text-sm text-primary-text">
+        {produto.getNome()}
+      </div>
+      <div className="flex-[2] font-nunito text-sm text-secondary-text">
+        {produto.getNomeGrupo() || 'Sem grupo'}
+      </div>
+      <div className="flex-[2] font-nunito text-sm text-secondary-text">
+        {produto.getEstoque()?.toString() || 'Sem estoque'}
+      </div>
+      <div className="flex-[2] flex justify-center">
+        <div
+          className={`w-20 px-3 py-1 rounded-[24px] text-center text-sm font-nunito font-medium ${statusClass}`}
+        >
+          {isAtivo ? 'Ativo' : 'Desativado'}
+        </div>
+      </div>
+      <div className="flex-[2] font-nunito text-sm text-secondary-text">
+        {valorFormatado}
+      </div>
+      <div className="flex-[2] flex justify-end">
+        <Suspense fallback={<div className="h-10 w-10" />}>
+          <ProdutoActionsMenu
+            produtoId={produto.getId()}
+            produtoAtivo={isAtivo}
+            onStatusChanged={onStatusChanged}
+          />
+        </Suspense>
+      </div>
+    </div>
+  )
+})
 
+/**
+ * Lista de produtos com scroll infinito
+ * Usa React Query para cache automático e deduplicação de requisições
+ */
+export function ProdutosList({ onReload }: ProdutosListProps) {
+  const [searchText, setSearchText] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Debounce da busca (500ms)
+  useEffect(() => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current)
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      loadProdutos(true)
+      setDebouncedSearch(searchText)
     }, 500)
 
     return () => {
@@ -168,52 +98,85 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
         clearTimeout(debounceTimerRef.current)
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchText])
 
-  // Carrega produtos quando o filtro muda
-  useEffect(() => {
-    const token = auth?.getAccessToken()
-    if (!token) return
-    loadProdutos(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Determina o filtro ativo (memoizado)
+  const ativoFilter = useMemo<boolean | null>(() => {
+    return filterStatus === 'Ativo' ? true : filterStatus === 'Desativado' ? false : null
   }, [filterStatus])
 
-  // Scroll infinito
+  // Hook otimizado com React Query
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetching,
+    isFetchingNextPage,
+    isLoading,
+    error,
+  } = useProdutosInfinite({
+    name: debouncedSearch || undefined,
+    ativo: ativoFilter,
+    limit: 10,
+  })
+
+  // Achatando todas as páginas em uma única lista (memoizado)
+  const produtos = useMemo(() => {
+    return data?.pages.flatMap((page) => page.produtos) || []
+  }, [data])
+
+  const totalProdutos = useMemo(() => {
+    return data?.pages[0]?.count || 0
+  }, [data])
+
+  // Handler de scroll com throttle para melhor performance
+  const handleScroll = useCallback(() => {
+    if (scrollTimeoutRef.current) {
+      return // Ignora se já há um timeout pendente
+    }
+
+    scrollTimeoutRef.current = setTimeout(() => {
+      const container = scrollContainerRef.current
+      if (!container) return
+
+      const { scrollTop, scrollHeight, clientHeight } = container
+      const distanceFromBottom = scrollHeight - (scrollTop + clientHeight)
+      
+      // Carregar próxima página quando estiver a 400px do final (prefetch mais agressivo)
+      if (distanceFromBottom < 400) {
+        if (hasNextPage && !isFetchingNextPage) {
+          fetchNextPage()
+        }
+      }
+
+      scrollTimeoutRef.current = null
+    }, 100) // Throttle de 100ms
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  // Scroll infinito com prefetching inteligente e throttle
   useEffect(() => {
     const container = scrollContainerRef.current
     if (!container) return
 
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = container
-      if (scrollTop + clientHeight >= scrollHeight - 200) {
-        if (!isLoading && hasNextPage) {
-          loadProdutos()
-        }
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      container.removeEventListener('scroll', handleScroll)
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current)
       }
     }
+  }, [handleScroll])
 
-    container.addEventListener('scroll', handleScroll)
-    return () => container.removeEventListener('scroll', handleScroll)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, hasNextPage])
-
-  // Carrega produtos iniciais apenas quando o token estiver disponível
+  // Notificar erro
   useEffect(() => {
-    if (!isAuthenticated || hasLoadedInitialRef.current) return
-    
-    const token = auth?.getAccessToken()
-    if (!token) return
-    
-    hasLoadedInitialRef.current = true
-    loadProdutos(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated]) // Executa apenas quando isAuthenticated muda para true
+    if (error) {
+      console.error('Erro ao carregar produtos:', error)
+    }
+  }, [error])
 
-  const handleStatusChange = () => {
-    loadProdutos(true)
+  const handleStatusChange = useCallback(() => {
     onReload?.()
-  }
+  }, [onReload])
 
   return (
     <div className="flex flex-col h-full">
@@ -274,9 +237,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
               <select
                 value={filterStatus}
                 onChange={(e) =>
-                  setFilterStatus(
-                    e.target.value as 'Todos' | 'Ativo' | 'Desativado'
-                  )
+                  setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
                 }
                 className="w-[175px] h-full px-5 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text focus:outline-none focus:border-secondary font-nunito text-sm"
               >
@@ -321,13 +282,13 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto px-[30px] mt-2"
       >
-        {/* Skeleton loaders para carregamento inicial */}
-        {produtos.length === 0 && isLoading && (
+        {/* Skeleton loaders para carregamento inicial - sempre mostra durante loading */}
+        {(isLoading || (produtos.length === 0 && isFetching)) && (
           <div className="space-y-2">
-            {[...Array(5)].map((_, i) => (
+            {[...Array(8)].map((_, i) => (
               <div
                 key={i}
-                className="h-[50px] bg-info rounded-xl px-4 flex items-center gap-[10px]"
+                className="h-[50px] bg-info rounded-xl px-4 flex items-center gap-[10px] animate-pulse"
               >
                 <Skeleton className="flex-[2] h-4" />
                 <Skeleton className="flex-[4] h-4" />
@@ -348,47 +309,14 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
         )}
 
         {produtos.map((produto) => (
-          <div
+          <ProdutoListItem
             key={produto.getId()}
-            className="h-[50px] bg-info rounded-xl px-4 mb-2 flex items-center gap-[10px]"
-          >
-            <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
-              {produto.getCodigoProduto()}
-            </div>
-            <div className="flex-[4] font-nunito font-semibold text-sm text-primary-text">
-              {produto.getNome()}
-            </div>
-            <div className="flex-[2] font-nunito text-sm text-secondary-text">
-              {produto.getNomeGrupo() || 'Sem grupo'}
-            </div>
-            <div className="flex-[2] font-nunito text-sm text-secondary-text">
-              {produto.getEstoque()?.toString() || 'Sem estoque'}
-            </div>
-            <div className="flex-[2] flex justify-center">
-              <div
-                className={`w-20 px-3 py-1 rounded-[24px] text-center text-sm font-nunito font-medium ${
-                  produto.isAtivo()
-                    ? 'bg-success/20 text-success'
-                    : 'bg-error/20 text-secondary-text'
-                }`}
-              >
-                {produto.isAtivo() ? 'Ativo' : 'Desativado'}
-              </div>
-            </div>
-            <div className="flex-[2] font-nunito text-sm text-secondary-text">
-              {transformarParaReal(produto.getValor())}
-            </div>
-            <div className="flex-[2] flex justify-end">
-              <ProdutoActionsMenu
-                produtoId={produto.getId()}
-                produtoAtivo={produto.isAtivo()}
-                onStatusChanged={handleStatusChange}
-              />
-            </div>
-          </div>
+            produto={produto}
+            onStatusChanged={handleStatusChange}
+          />
         ))}
 
-        {isLoading && (
+        {isFetchingNextPage && (
           <div className="flex justify-center py-4">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
@@ -397,4 +325,3 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     </div>
   )
 }
-
