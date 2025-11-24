@@ -21,7 +21,7 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
   const [searchText, setSearchText] = useState('')
   const [totalImpressoras, setTotalImpressoras] = useState(0)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const debounceTimerRef = useRef<NodeJS.Timeout>()
+  const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
   const { auth, isAuthenticated } = useAuthStore()
 
@@ -311,4 +311,5 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
     </div>
   )
 }
+
 

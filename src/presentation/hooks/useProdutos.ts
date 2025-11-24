@@ -179,9 +179,6 @@ export function useProduto(id: string) {
     },
     enabled: isAuthenticated && !!token && !!id,
     staleTime: 1000 * 60 * 5, // 5 minutos
-    onError: (error) => {
-      showToast.error(error.message || `Erro ao carregar produto ${id}.`)
-    },
   })
 }
 
@@ -238,14 +235,6 @@ export function useProdutoMutation() {
       // Retornar contexto com snapshot para rollback
       return { previousProdutos }
     },
-    onError: (error, variables, context) => {
-      // Rollback em caso de erro
-      if (context?.previousProdutos) {
-        queryClient.setQueryData(['produtos', 'infinite'], context.previousProdutos)
-      }
-      const errorMessage = handleApiError(error)
-      showToast.error(errorMessage || 'Erro ao salvar produto')
-    },
     onSuccess: (_, variables) => {
       // Invalidar cache de produtos para forçar refetch com dados atualizados
       queryClient.invalidateQueries({ queryKey: ['produtos'] })
@@ -256,4 +245,8 @@ export function useProdutoMutation() {
     },
   })
 }
+
+
+
+
 

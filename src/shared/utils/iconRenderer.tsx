@@ -30,7 +30,7 @@ const CUSTOM_ICON_MAP: Record<string, keyof typeof MdiIcons> = {
  */
 function normalizeIconName(iconName: string): string {
   // Remove prefixos comuns
-  let cleanName = iconName
+  const cleanName = iconName
     .toLowerCase()
     .trim()
     .replace(/^mdi:/, '')

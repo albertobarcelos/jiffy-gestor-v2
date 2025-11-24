@@ -113,7 +113,7 @@ export function ModalMetodosPagamento({
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ percentual }) => `${percentual.toFixed(1)}%`}
+                      label={(props: any) => `${props.percent?.toFixed(1) || 0}%`}
                       outerRadius={100}
                       fill="#8884d8"
                       dataKey="value"

@@ -48,8 +48,8 @@ export function NovoUsuario({ usuarioId }: NovoUsuarioProps) {
 
   // Definir primeiro perfil como padrão quando perfis carregarem
   useEffect(() => {
-    if (perfisPDV.length > 0 && !isEditing && !perfilPdvId) {
-      setPerfilPdvId(perfisPDV[0].id)
+    if (Array.isArray(perfisPDV) && perfisPDV.length > 0 && !isEditing && !perfilPdvId) {
+      setPerfilPdvId((perfisPDV as any[])[0].id)
     }
   }, [perfisPDV, isEditing, perfilPdvId])
 
@@ -184,7 +184,7 @@ export function NovoUsuario({ usuarioId }: NovoUsuarioProps) {
           </div>
           <Button
             onClick={handleCancel}
-            variant="outline"
+            variant="outlined"
             className="h-9 px-[26px] rounded-[30px] border-primary/15 text-primary bg-primary/10 hover:bg-primary/20"
           >
             Cancelar
@@ -247,7 +247,7 @@ export function NovoUsuario({ usuarioId }: NovoUsuarioProps) {
                     className="w-full px-4 py-3 rounded-lg border border-gray-400 bg-info text-gray-900 focus:outline-none focus:border-2 focus:border-primary"
                   >
                     <option value="">Selecione um perfil...</option>
-                    {perfisPDV.map((perfil) => (
+                    {(Array.isArray(perfisPDV) ? perfisPDV : []).map((perfil: any) => (
                       <option key={perfil.id} value={perfil.id}>
                         {perfil.role}
                       </option>
@@ -325,7 +325,7 @@ export function NovoUsuario({ usuarioId }: NovoUsuarioProps) {
             <Button
               type="button"
               onClick={handleCancel}
-              variant="outline"
+              variant="outlined"
               className="px-8"
             >
               Cancelar

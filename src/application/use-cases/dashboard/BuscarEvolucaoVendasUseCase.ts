@@ -4,7 +4,7 @@ import { ApiClient } from '@/src/infrastructure/api/apiClient'
 export class BuscarEvolucaoVendasUseCase {
   constructor(private apiClient: ApiClient) {}
 
-  async execute(periodo: string = 'mes'): Promise<DashboardEvolucao[]> {
+  async execute(_periodo: string = 'mes'): Promise<DashboardEvolucao[]> {
     // Por enquanto, retorna dados mockados
     // TODO: Implementar chamada real à API quando endpoint estiver disponível
     return Array.from({ length: 30 }, (_, index) => {

@@ -32,7 +32,15 @@ export function VisualizarCliente({ clienteId }: VisualizarClienteProps) {
     )
   }
 
-  const endereco = cliente.getEndereco()
+  const endereco = (cliente as any).getEndereco ? (cliente as any).getEndereco() : {
+    rua: '',
+    numero: '',
+    complemento: '',
+    bairro: '',
+    cidade: '',
+    estado: '',
+    cep: ''
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -56,7 +64,7 @@ export function VisualizarCliente({ clienteId }: VisualizarClienteProps) {
             </Button>
             <Button
               onClick={() => router.push('/cadastros/clientes')}
-              variant="outline"
+              variant="outlined"
               className="px-6"
             >
               Voltar
@@ -75,47 +83,47 @@ export function VisualizarCliente({ clienteId }: VisualizarClienteProps) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-secondary-text text-sm mb-1">Nome</p>
-              <p className="text-primary-text font-medium">{cliente.getNome()}</p>
+              <p className="text-primary-text font-medium">{(cliente as any).Nome}</p>
             </div>
-            {cliente.getRazaoSocial() && (
+            {(cliente as any).RazaoSocial && (
               <div>
                 <p className="text-secondary-text text-sm mb-1">Razão Social</p>
                 <p className="text-primary-text font-medium">
-                  {cliente.getRazaoSocial()}
+                  {(cliente as any).RazaoSocial}
                 </p>
               </div>
             )}
-            {cliente.getCpf() && (
+            {(cliente as any).Cpf && (
               <div>
                 <p className="text-secondary-text text-sm mb-1">CPF</p>
-                <p className="text-primary-text font-medium">{cliente.getCpf()}</p>
+                <p className="text-primary-text font-medium">{(cliente as any).Cpf}</p>
               </div>
             )}
-            {cliente.getCnpj() && (
+            {(cliente as any).Cnpj && (
               <div>
                 <p className="text-secondary-text text-sm mb-1">CNPJ</p>
-                <p className="text-primary-text font-medium">{cliente.getCnpj()}</p>
+                <p className="text-primary-text font-medium">{(cliente as any).Cnpj}</p>
               </div>
             )}
-            {cliente.getTelefone() && (
+            {(cliente as any).Telefone && (
               <div>
                 <p className="text-secondary-text text-sm mb-1">Telefone</p>
                 <p className="text-primary-text font-medium">
-                  {cliente.getTelefone()}
+                  {(cliente as any).Telefone}
                 </p>
               </div>
             )}
-            {cliente.getEmail() && (
+            {(cliente as any).Email && (
               <div>
                 <p className="text-secondary-text text-sm mb-1">Email</p>
-                <p className="text-primary-text font-medium">{cliente.getEmail()}</p>
+                <p className="text-primary-text font-medium">{(cliente as any).Email}</p>
               </div>
             )}
-            {cliente.getNomeFantasia() && (
+            {(cliente as any).NomeFantasia && (
               <div>
                 <p className="text-secondary-text text-sm mb-1">Nome Fantasia</p>
                 <p className="text-primary-text font-medium">
-                  {cliente.getNomeFantasia()}
+                  {(cliente as any).NomeFantasia}
                 </p>
               </div>
             )}
@@ -123,12 +131,12 @@ export function VisualizarCliente({ clienteId }: VisualizarClienteProps) {
               <p className="text-secondary-text text-sm mb-1">Status</p>
               <div
                 className={`inline-block px-3 py-1 rounded-[24px] text-sm font-medium ${
-                  cliente.isAtivo()
+                  (cliente as any).ativo
                     ? 'bg-success/20 text-success'
                     : 'bg-error/20 text-secondary-text'
                 }`}
               >
-                {cliente.isAtivo() ? 'Ativo' : 'Desativado'}
+                {(cliente as any).ativo ? 'Ativo' : 'Desativado'}
               </div>
             </div>
           </div>

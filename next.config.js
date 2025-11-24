@@ -3,10 +3,26 @@ const path = require('path')
 
 const nextConfig = {
   reactStrictMode: true,
+  // Desabilitar ESLint durante build (apenas durante desenvolvimento)
+  eslint: {
+    ignoreDuringBuilds: false, // Manter ativo mas não bloquear por warnings
+  },
+  // Desabilitar TypeScript errors durante build (apenas warnings)
+  typescript: {
+    ignoreBuildErrors: false,
+  },
   images: {
     domains: [],
   },
   transpilePackages: ['recharts', '@radix-ui/react-slot'],
+  // Otimizações de performance
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production',
+  },
+  experimental: {
+    optimizeCss: true,
+    optimizePackageImports: ['@mui/material', '@mui/icons-material'],
+  },
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {

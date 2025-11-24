@@ -158,9 +158,6 @@ export function useCliente(id: string) {
     },
     enabled: isAuthenticated && !!token && !!id,
     staleTime: 1000 * 60 * 5, // 5 minutos
-    onError: (error) => {
-      showToast.error(error.message || `Erro ao carregar cliente ${id}.`)
-    },
   })
 }
 
@@ -213,13 +210,6 @@ export function useClienteMutation() {
 
       return { previousClientes }
     },
-    onError: (error, variables, context) => {
-      if (context?.previousClientes) {
-        queryClient.setQueryData(['clientes', 'infinite'], context.previousClientes)
-      }
-      const errorMessage = handleApiError(error)
-      showToast.error(errorMessage || 'Erro ao salvar cliente')
-    },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['clientes'] })
       if (variables.clienteId) {
@@ -229,4 +219,6 @@ export function useClienteMutation() {
     },
   })
 }
+
+
 

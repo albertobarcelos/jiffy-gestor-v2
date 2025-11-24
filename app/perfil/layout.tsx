@@ -1,13 +1,10 @@
-'use client'
-
 import { TopNav } from '@/src/presentation/components/layouts/TopNav'
 
 /**
- * Layout do dashboard com navegação superior
- * Design minimalista e clean
- * Proteção feita pelo middleware
+ * Layout da página de perfil
+ * Mantém a navegação superior e estrutura do dashboard
  */
-export default function DashboardLayout({
+export default function PerfilLayout({
   children,
 }: {
   children: React.ReactNode
@@ -18,9 +15,10 @@ export default function DashboardLayout({
       <TopNav />
 
       {/* Conteúdo principal */}
-      <main className="p-6">
+      <main>
         {children}
       </main>
     </div>
   )
 }
+

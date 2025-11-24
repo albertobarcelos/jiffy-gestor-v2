@@ -107,9 +107,6 @@ export function useMeioPagamento(id: string) {
     },
     enabled: isAuthenticated && !!token && !!id,
     staleTime: 1000 * 60 * 5, // 5 minutos
-    onError: (error) => {
-      showToast.error(error.message || `Erro ao carregar meio de pagamento ${id}.`)
-    },
   })
 }
 
@@ -151,10 +148,10 @@ export function useMeioPagamentoMutation() {
       queryClient.invalidateQueries({ queryKey: ['meios-pagamentos'] })
       showToast.success(variables.isUpdate ? 'Meio de pagamento atualizado com sucesso!' : 'Meio de pagamento criado com sucesso!')
     },
-    onError: (error) => {
-      const errorMessage = handleApiError(error)
-      showToast.error(errorMessage || 'Erro ao salvar meio de pagamento')
-    },
   })
 }
+
+
+
+
 

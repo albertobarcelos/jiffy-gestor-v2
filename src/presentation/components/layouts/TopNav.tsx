@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useQueryClient } from '@tanstack/react-query'
+import { usePrefetch } from '@/src/presentation/hooks/usePrefetch'
 import { MdDashboard, MdInventory, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight } from 'react-icons/md'
 import { 
   MdInventory2, 
@@ -28,16 +29,56 @@ export function TopNav() {
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set())
   const pathname = usePathname()
   const router = useRouter()
-  const { logout } = useAuthStore()
+  const { logout, getUser } = useAuthStore()
   const queryClient = useQueryClient()
+  // const { prefetchRoute } = usePrefetch() // prefetchRoute não existe mais
   const menuRef = useRef<HTMLDivElement>(null)
+  
+  // Estado para controlar hidratação (evita hydration mismatch)
+  const [isHydrated, setIsHydrated] = useState(false)
+  
+  // Obter dados do usuário
+  const user = getUser()
 
-  // Prefetch de rota ao hover
-  const handleLinkHover = (path: string) => {
-    if (path && path !== '#') {
-      router.prefetch(path)
-    }
-  }
+  // Marcar como hidratado apenas no cliente
+  useEffect(() => {
+    setIsHydrated(true)
+  }, [])
+
+  // Prefetch agressivo das rotas mais acessadas na inicialização
+  useEffect(() => {
+    const routesToPrefetch = [
+      '/cadastros/grupos-complementos',
+      '/cadastros/complementos',
+      '/produtos',
+      '/cadastros/grupos-produtos',
+      '/estoque',
+      '/fiscal-flow',
+    ]
+    
+    // Prefetch com delay para não bloquear a renderização inicial
+    const timer = setTimeout(() => {
+      routesToPrefetch.forEach((route) => {
+        router.prefetch(route)
+        // prefetchRoute(route)
+      })
+    }, 100)
+
+    return () => clearTimeout(timer)
+  }, [router])
+
+  // Prefetch de rota E dados ao hover
+  const handleLinkHover = useCallback(
+    (path: string) => {
+      if (path && path !== '#') {
+        // Prefetch da rota do Next.js
+        router.prefetch(path)
+        // Prefetch dos dados do React Query
+        // prefetchRoute(path)
+      }
+    },
+    [router]
+  )
 
   // Fechar dropdown ao clicar fora
   useEffect(() => {
@@ -61,17 +102,27 @@ export function TopNav() {
     setExpandedMenus(new Set())
   }, [pathname])
 
-  const toggleMenu = (menuName: string) => {
-    const newExpanded = new Set(expandedMenus)
-    if (newExpanded.has(menuName)) {
-      newExpanded.delete(menuName)
-    } else {
-      // Fechar outros menus ao abrir um novo
-      newExpanded.clear()
-      newExpanded.add(menuName)
-    }
-    setExpandedMenus(newExpanded)
-  }
+  const toggleMenu = useCallback(
+    (menuName: string) => {
+      const newExpanded = new Set(expandedMenus)
+      if (newExpanded.has(menuName)) {
+        newExpanded.delete(menuName)
+      } else {
+        // Fechar outros menus ao abrir um novo
+        newExpanded.clear()
+        newExpanded.add(menuName)
+        // Quando expandir "Cadastros", prefetch das rotas mais acessadas
+        if (menuName === 'Cadastros') {
+          // prefetchRoute('/cadastros/grupos-complementos')
+          // prefetchRoute('/cadastros/complementos')
+          // prefetchRoute('/produtos')
+          // prefetchRoute('/cadastros/grupos-produtos')
+        }
+      }
+      setExpandedMenus(newExpanded)
+    },
+    [expandedMenus]
+  )
 
   const menuItems = [
     { 
@@ -232,16 +283,28 @@ export function TopNav() {
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
           </button>
 
-          {/* User Profile */}
-          <div className="flex items-center gap-2 pl-3 border-l border-gray-200">
-            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-              <span className="text-xs font-semibold text-gray-700">U</span>
+          {/* User Profile - Agora clicável */}
+          <Link
+            href="/perfil"
+            onMouseEnter={() => handleLinkHover('/perfil')}
+            className="flex items-center gap-2 pl-3 border-l border-gray-200 hover:bg-gray-50 rounded-lg px-2 py-1 transition-colors cursor-pointer"
+          >
+            <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center">
+              <span className="text-xs font-semibold text-white">
+                {isHydrated
+                  ? user?.getName()?.charAt(0).toUpperCase() || user?.getEmail()?.charAt(0).toUpperCase() || 'U'
+                  : 'U'}
+              </span>
             </div>
             <div className="hidden md:block">
-              <p className="text-sm font-medium text-gray-900">Usuário</p>
-              <p className="text-xs text-gray-500">Admin</p>
+              <p className="text-sm font-medium text-gray-900">
+                {isHydrated ? user?.getName() || user?.getEmail() || 'Usuário' : 'Usuário'}
+              </p>
+              <p className="text-xs text-gray-500">
+                {isHydrated && user?.getEmail() ? user.getEmail() : 'Admin'}
+              </p>
             </div>
-          </div>
+          </Link>
 
           {/* Logout */}
           <button
@@ -271,4 +334,5 @@ export function TopNav() {
     </nav>
   )
 }
+
 

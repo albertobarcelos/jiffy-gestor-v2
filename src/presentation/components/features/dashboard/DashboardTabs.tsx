@@ -30,16 +30,12 @@ export function DashboardTabs() {
         <div className="bg-primary-bg/50 border-b border-secondary/10 px-6">
           <TabsList className="bg-transparent h-auto p-0">
             {tabs.map((tab) => {
-              const Icon = tab.icon
               return (
                 <TabsTrigger
                   key={tab.id}
                   value={tab.id}
                   className="flex items-center gap-2 px-6 py-4 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:rounded-none"
-                >
-                  <Icon className="w-5 h-5" />
-                  <span>{tab.name}</span>
-                </TabsTrigger>
+                />
               )
             })}
           </TabsList>

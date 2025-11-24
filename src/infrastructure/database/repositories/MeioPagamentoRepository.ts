@@ -55,7 +55,13 @@ export class MeioPagamentoRepository implements IMeioPagamentoRepository {
         total: response.data.count || 0,
       }
     } catch (error) {
+      console.error('MeioPagamentoRepository.buscarMeiosPagamentos error:', error)
       if (error instanceof ApiError) {
+        console.error('ApiError details:', {
+          message: error.message,
+          status: error.status,
+          data: error.data
+        })
         throw new Error(`Erro ao buscar meios de pagamento: ${error.message}`)
       }
       throw error
@@ -83,7 +89,7 @@ export class MeioPagamentoRepository implements IMeioPagamentoRepository {
       return MeioPagamento.fromJSON(response.data)
     } catch (error) {
       if (error instanceof ApiError) {
-        if (error.statusCode === 404) {
+        if (error.status === 404) {
           return null
         }
         throw new Error(`Erro ao buscar meio de pagamento: ${error.message}`)

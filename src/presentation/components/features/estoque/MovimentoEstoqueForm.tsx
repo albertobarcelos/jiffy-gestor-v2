@@ -70,7 +70,6 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
   // Estados de valores
   const [desconto, setDesconto] = useState('')
   const [acrescimo, setAcrescimo] = useState('')
-  const [valorFinal, setValorFinal] = useState('')
   
   // Estados de UI
   const [isLoading, setIsLoading] = useState(false)
@@ -78,7 +77,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
   const [mostrarModalConfirmacao, setMostrarModalConfirmacao] = useState(false)
   const [produtoEditandoIndex, setProdutoEditandoIndex] = useState<number | null>(null)
   
-  const debounceTimerRef = useRef<NodeJS.Timeout>()
+  const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
 
   // Opções de classificação de movimento
   const opcoesClassificacao = [
@@ -157,8 +156,9 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
     const totalProdutos = produtos.reduce((sum, p) => sum + p.valorTotal, 0)
     const descontoNum = parseFloat(desconto.replace(',', '.')) || 0
     const acrescimoNum = parseFloat(acrescimo.replace(',', '.')) || 0
+    // Cálculo do valor final (apenas para referência, não armazenado em estado)
     const valorFinalCalc = totalProdutos - descontoNum + acrescimoNum
-    setValorFinal(valorFinalCalc.toFixed(2).replace('.', ','))
+    console.log('Valor final calculado:', valorFinalCalc.toFixed(2))
   }, [produtos, desconto, acrescimo])
 
   // Adicionar produto à lista
@@ -189,21 +189,22 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
 
     // Verificar se é saída e se há estoque suficiente
     if (tipo === 'SAIDA') {
-      const estoqueAtual = typeof produto.getEstoque() === 'number' ? produto.getEstoque() : 0
-      if (quantidade > estoqueAtual) {
+      const estoqueAtual = Number(produto.getEstoque()) || 0
+      const qtd = parseFloat(quantidadeProduto) || 0
+      if (qtd > estoqueAtual) {
         showToast.error(`Estoque insuficiente. Disponível: ${estoqueAtual}`)
         return
       }
     }
 
-    const estoqueAnterior = typeof produto.getEstoque() === 'number' ? produto.getEstoque() : 0
+    const estoqueAnterior = (Number(produto.getEstoque()) || 0) as number
     // Para inventário, a quantidade é o estoque contado (novo estoque)
     const estoqueNovo =
       tipo === 'ENTRADA'
         ? estoqueAnterior + quantidade
         : tipo === 'SAIDA'
         ? Math.max(0, estoqueAnterior - quantidade)
-        : quantidade // Inventário: quantidade = estoque contado
+        : (parseFloat(quantidadeProduto) || 0) // Inventário: quantidade = estoque contado
 
     const novoProduto: ProdutoMovimento = {
       produtoId: produto.getId(),
@@ -260,14 +261,14 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
       return
     }
 
-    const estoqueAnterior = typeof produto.getEstoque() === 'number' ? produto.getEstoque() : 0
+    const estoqueAnterior = (Number(produto.getEstoque()) || 0) as number
     // Para inventário, a quantidade é o estoque contado (novo estoque)
     const estoqueNovo =
       tipo === 'ENTRADA'
         ? estoqueAnterior + quantidade
         : tipo === 'SAIDA'
         ? Math.max(0, estoqueAnterior - quantidade)
-        : quantidade // Inventário: quantidade = estoque contado
+        : (parseFloat(quantidadeProduto) || 0) // Inventário: quantidade = estoque contado
 
     const produtosAtualizados = [...produtos]
     produtosAtualizados[produtoEditandoIndex] = {
@@ -389,7 +390,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
               </div>
               <Button
                 onClick={() => router.push('/estoque')}
-                variant="outline"
+                variant="outlined"
                 className="h-9 px-[26px] bg-primary/10 text-primary rounded-[30px] font-medium font-exo text-sm hover:bg-primary/20"
               >
                 Cancelar
@@ -557,7 +558,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
                       </Button>
                       <Button
                         onClick={cancelarEdicao}
-                        variant="outline"
+                        variant="outlined"
                         className="h-12 px-4 bg-secondary-bg text-primary-text rounded-lg font-medium hover:bg-secondary-bg/80"
                       >
                         Cancelar
@@ -630,7 +631,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
                               <Button
                                 onClick={() => editarProduto(index)}
                                 variant="ghost"
-                                size="sm"
+                                size="small"
                                 className="h-8 w-8 p-0"
                               >
                                 ✏️
@@ -638,7 +639,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
                               <Button
                                 onClick={() => removerProduto(index)}
                                 variant="ghost"
-                                size="sm"
+                                size="small"
                                 className="h-8 w-8 p-0 text-error hover:text-error"
                               >
                                 🗑️
@@ -834,7 +835,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
 
           <DialogFooter>
             <Button
-              variant="outline"
+              variant="outlined"
               onClick={() => setMostrarModalConfirmacao(false)}
               disabled={isLoading}
             >
@@ -849,3 +850,4 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
     </div>
   )
 }
+

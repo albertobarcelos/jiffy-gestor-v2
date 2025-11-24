@@ -221,7 +221,7 @@ function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps)
         abreComplementos,
         permiteAcrescimo,
         permiteDesconto,
-        gruposComplementosIds,
+        grupoComplementosIds,
         impressorasIds,
         ...(effectiveProdutoId && !effectiveIsCopyMode ? { ativo } : {}),
       }

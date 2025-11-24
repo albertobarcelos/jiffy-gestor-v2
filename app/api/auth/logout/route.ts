@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
  * POST /api/auth/logout
  * Remove o cookie de autenticação do servidor
  */
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     // Cria resposta de sucesso
     const response = NextResponse.json(

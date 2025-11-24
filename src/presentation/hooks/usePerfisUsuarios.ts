@@ -107,9 +107,6 @@ export function usePerfilUsuario(id: string) {
     },
     enabled: isAuthenticated && !!token && !!id,
     staleTime: 1000 * 60 * 5, // 5 minutos
-    onError: (error) => {
-      showToast.error(error.message || `Erro ao carregar perfil de usuário ${id}.`)
-    },
   })
 }
 
@@ -151,10 +148,10 @@ export function usePerfilUsuarioMutation() {
       queryClient.invalidateQueries({ queryKey: ['perfis-usuarios-pdv'] })
       showToast.success(variables.isUpdate ? 'Perfil atualizado com sucesso!' : 'Perfil criado com sucesso!')
     },
-    onError: (error) => {
-      const errorMessage = handleApiError(error)
-      showToast.error(errorMessage || 'Erro ao salvar perfil')
-    },
   })
 }
+
+
+
+
 
