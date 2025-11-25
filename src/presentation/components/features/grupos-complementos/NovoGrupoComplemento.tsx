@@ -182,7 +182,7 @@ export function NovoGrupoComplemento({ grupoId }: NovoGrupoComplementoProps) {
     )
   }
 
-  const selectedComplementos = complementos.filter((c) =>
+  const selectedComplementos = (Array.isArray(complementos) ? complementos : []).filter((c: any) =>
     selectedComplementosIds.includes(c.getId())
   )
 
@@ -201,7 +201,7 @@ export function NovoGrupoComplemento({ grupoId }: NovoGrupoComplementoProps) {
           </div>
           <Button
             onClick={handleCancel}
-            variant="outline"
+            variant="outlined"
             className="h-9 px-[26px] rounded-[30px] border-primary/15 text-primary bg-primary/10 hover:bg-primary/20"
           >
             Cancelar
@@ -277,7 +277,7 @@ export function NovoGrupoComplemento({ grupoId }: NovoGrupoComplementoProps) {
                 </button>
                 {selectedComplementos.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {selectedComplementos.map((comp) => (
+                    {selectedComplementos.map((comp: any) => (
                       <span
                         key={comp.getId()}
                         className="px-3 py-1 bg-primary/20 text-primary rounded-lg text-sm"
@@ -317,7 +317,7 @@ export function NovoGrupoComplemento({ grupoId }: NovoGrupoComplementoProps) {
             <Button
               type="button"
               onClick={handleCancel}
-              variant="outline"
+              variant="outlined"
               className="px-8"
             >
               Cancelar
@@ -351,7 +351,7 @@ export function NovoGrupoComplemento({ grupoId }: NovoGrupoComplementoProps) {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {complementos.map((comp) => {
+                  {(Array.isArray(complementos) ? complementos : []).map((comp: any) => {
                     const isSelected = selectedComplementosIds.includes(comp.getId())
                     return (
                       <label
@@ -389,7 +389,7 @@ export function NovoGrupoComplemento({ grupoId }: NovoGrupoComplementoProps) {
               <Button
                 type="button"
                 onClick={() => setShowComplementosModal(false)}
-                variant="outline"
+                variant="outlined"
               >
                 Fechar
               </Button>

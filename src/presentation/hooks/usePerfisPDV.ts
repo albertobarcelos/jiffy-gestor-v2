@@ -51,9 +51,10 @@ export function usePerfisPDV() {
     },
     enabled: isAuthenticated && !!token,
     staleTime: 1000 * 60 * 10, // 10 minutos (perfis mudam pouco)
-    onError: (error) => {
-      showToast.error(error.message || 'Erro ao carregar perfis PDV.')
-    },
   })
 }
+
+
+
+
 

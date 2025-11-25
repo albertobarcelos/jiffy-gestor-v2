@@ -70,7 +70,7 @@ export function IconPickerModal({
         const uniqueGroups = Array.from(
           new Set(iconsList.map((icon: IconData) => icon.group))
         )
-        setGroups(['Todos os Ícones', ...uniqueGroups])
+        setGroups(['Todos os Ícones', ...(Array.from(uniqueGroups) as string[])])
       } catch (error) {
         console.error('Erro ao carregar ícones:', error)
       } finally {

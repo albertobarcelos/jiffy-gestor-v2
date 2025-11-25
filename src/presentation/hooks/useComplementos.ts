@@ -111,9 +111,6 @@ export function useComplementos(params: { ativo?: boolean; limit?: number } = {}
     },
     enabled: isAuthenticated && !!token,
     staleTime: 1000 * 60 * 10, // 10 minutos (complementos mudam pouco)
-    onError: (error) => {
-      showToast.error(error.message || 'Erro ao carregar complementos.')
-    },
   })
 }
 
@@ -149,9 +146,6 @@ export function useComplemento(id: string) {
     },
     enabled: isAuthenticated && !!token && !!id,
     staleTime: 1000 * 60 * 5, // 5 minutos
-    onError: (error) => {
-      showToast.error(error.message || `Erro ao carregar complemento ${id}.`)
-    },
   })
 }
 
@@ -193,10 +187,9 @@ export function useComplementoMutation() {
       queryClient.invalidateQueries({ queryKey: ['complementos'] })
       showToast.success(variables.isUpdate ? 'Complemento atualizado com sucesso!' : 'Complemento criado com sucesso!')
     },
-    onError: (error) => {
-      const errorMessage = handleApiError(error)
-      showToast.error(errorMessage || 'Erro ao salvar complemento')
-    },
   })
 }
+
+
+
 

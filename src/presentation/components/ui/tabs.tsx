@@ -55,8 +55,8 @@ export interface TabsTriggerProps extends TabProps {
   value: string
 }
 
-export const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>((props, ref) => {
-  return <Tab ref={ref} {...props} />
+export const TabsTrigger = React.forwardRef<HTMLDivElement, TabsTriggerProps>((props, ref) => {
+  return <Tab ref={ref as any} {...props} />
 })
 
 TabsTrigger.displayName = 'TabsTrigger'

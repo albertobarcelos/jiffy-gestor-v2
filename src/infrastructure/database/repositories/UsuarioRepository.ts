@@ -89,7 +89,7 @@ export class UsuarioRepository implements IUsuarioRepository {
       return Usuario.fromJSON(response.data)
     } catch (error) {
       if (error instanceof ApiError) {
-        if (error.statusCode === 404) {
+        if (error.status === 404) {
           return null
         }
         throw new Error(`Erro ao buscar usuário: ${error.message}`)

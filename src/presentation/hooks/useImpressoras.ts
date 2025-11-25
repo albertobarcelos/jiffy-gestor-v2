@@ -107,9 +107,6 @@ export function useImpressora(id: string) {
     },
     enabled: isAuthenticated && !!token && !!id,
     staleTime: 1000 * 60 * 5, // 5 minutos
-    onError: (error) => {
-      showToast.error(error.message || `Erro ao carregar impressora ${id}.`)
-    },
   })
 }
 
@@ -151,10 +148,10 @@ export function useImpressoraMutation() {
       queryClient.invalidateQueries({ queryKey: ['impressoras'] })
       showToast.success(variables.isUpdate ? 'Impressora atualizada com sucesso!' : 'Impressora criada com sucesso!')
     },
-    onError: (error) => {
-      const errorMessage = handleApiError(error)
-      showToast.error(errorMessage || 'Erro ao salvar impressora')
-    },
   })
 }
+
+
+
+
 

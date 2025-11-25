@@ -18,7 +18,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const debounceTimerRef = useRef<NodeJS.Timeout>()
+  const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
 
   // Debounce da busca (500ms)
   useEffect(() => {
@@ -255,3 +255,4 @@ export function ClientesList({ onReload }: ClientesListProps) {
     </div>
   )
 }
+

@@ -1,27 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import {
-  DndContext,
-  DragOverlay,
-  closestCorners,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragStartEvent,
-  DragEndEvent,
-  DragOverEvent,
-} from '@dnd-kit/core'
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
+import { useState, useMemo, useCallback, lazy, Suspense } from 'react'
 import { NFe, NFeStatus } from '@/src/domain/entities/NFe'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useNfes, useNfeMutation } from '@/src/presentation/hooks/useNfes'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
-import { showToast, handleApiError } from '@/src/shared/utils/toast'
+import { showToast } from '@/src/shared/utils/toast'
 import {
   Box,
   Typography,
@@ -30,8 +13,8 @@ import {
   Chip,
   IconButton,
   Tooltip,
-  Fade,
   Container,
+  CircularProgress,
 } from '@mui/material'
 import {
   Receipt as ReceiptIcon,
@@ -41,40 +24,26 @@ import {
   Cancel,
   Refresh,
   Add,
-  Send,
-  Download,
-  Close,
 } from '@mui/icons-material'
-import { DroppableColumn } from './DroppableColumn'
-import { NFeKanbanCard } from './NFeKanbanCard'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/src/presentation/components/ui/dialog'
+
+// Lazy load de componentes pesados
+const DndComponents = lazy(() => import('./NFeKanbanDnd'))
+const NFeDetailsDialog = lazy(() => import('./NFeDetailsDialog'))
 
 /**
  * Componente Kanban para gerenciamento de NFes
  * Design moderno e profissional usando Material UI
+ * Otimizado com React Query e memoização
  */
 export function NFeKanban() {
-  const { auth } = useAuthStore()
-  const [nfes, setNfes] = useState<Record<NFeStatus, NFe[]>>({
-    PENDENTE: [],
-    EM_PROCESSAMENTO: [],
-    AUTORIZADA: [],
-    REJEITADA: [],
-    CANCELADA: [],
-  })
-  const [isLoading, setIsLoading] = useState(false)
+  // Hook React Query para buscar NFes (com cache)
+  const { data: nfes, isLoading, refetch } = useNfes()
+  
   const [nfeSelecionada, setNfeSelecionada] = useState<NFe | null>(null)
   const [mostrarDetalhes, setMostrarDetalhes] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(null)
 
-  // Sensores para drag and drop
+  // Sensores para drag and drop (memoizados)
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -86,244 +55,145 @@ export function NFeKanban() {
     })
   )
 
-  // Configuração das colunas do Kanban com cores Material UI
-  const colunas: Array<{
-    id: NFeStatus
-    titulo: string
-    cor: string
-    bgColor: string
-    borderColor: string
-    textColor: string
-    icone: React.ReactNode
-  }> = [
-    {
-      id: 'PENDENTE',
-      titulo: 'Pendente',
-      cor: 'warning',
-      bgColor: '#FEF3C7',
-      borderColor: '#F59E0B',
-      textColor: '#92400E',
-      icone: <Schedule sx={{ fontSize: 20 }} />,
-    },
-    {
-      id: 'EM_PROCESSAMENTO',
-      titulo: 'Em Processamento',
-      cor: 'info',
-      bgColor: '#DBEAFE',
-      borderColor: '#3B82F6',
-      textColor: '#1E40AF',
-      icone: <Refresh sx={{ fontSize: 20, animation: 'spin 2s linear infinite' }} />,
-    },
-    {
-      id: 'AUTORIZADA',
-      titulo: 'Autorizada',
-      cor: 'success',
-      bgColor: '#D1FAE5',
-      borderColor: '#10B981',
-      textColor: '#065F46',
-      icone: <CheckCircle sx={{ fontSize: 20 }} />,
-    },
-    {
-      id: 'REJEITADA',
-      titulo: 'Rejeitada',
-      cor: 'error',
-      bgColor: '#FEE2E2',
-      borderColor: '#EF4444',
-      textColor: '#991B1B',
-      icone: <ErrorIcon sx={{ fontSize: 20 }} />,
-    },
-    {
-      id: 'CANCELADA',
-      titulo: 'Cancelada',
-      cor: 'default',
-      bgColor: '#F3F4F6',
-      borderColor: '#9CA3AF',
-      textColor: '#374151',
-      icone: <Cancel sx={{ fontSize: 20 }} />,
-    },
-  ]
+  // Configuração das colunas do Kanban com cores Material UI (memoizada)
+  const colunas = useMemo(
+    () => [
+      {
+        id: 'PENDENTE' as NFeStatus,
+        titulo: 'Pendente',
+        cor: 'warning',
+        bgColor: '#FEF3C7',
+        borderColor: '#F59E0B',
+        textColor: '#92400E',
+        icone: <Schedule sx={{ fontSize: 20 }} />,
+      },
+      {
+        id: 'EM_PROCESSAMENTO' as NFeStatus,
+        titulo: 'Em Processamento',
+        cor: 'info',
+        bgColor: '#DBEAFE',
+        borderColor: '#3B82F6',
+        textColor: '#1E40AF',
+        icone: <Refresh sx={{ fontSize: 20, animation: 'spin 2s linear infinite' }} />,
+      },
+      {
+        id: 'AUTORIZADA' as NFeStatus,
+        titulo: 'Autorizada',
+        cor: 'success',
+        bgColor: '#D1FAE5',
+        borderColor: '#10B981',
+        textColor: '#065F46',
+        icone: <CheckCircle sx={{ fontSize: 20 }} />,
+      },
+      {
+        id: 'REJEITADA' as NFeStatus,
+        titulo: 'Rejeitada',
+        cor: 'error',
+        bgColor: '#FEE2E2',
+        borderColor: '#EF4444',
+        textColor: '#991B1B',
+        icone: <ErrorIcon sx={{ fontSize: 20 }} />,
+      },
+      {
+        id: 'CANCELADA' as NFeStatus,
+        titulo: 'Cancelada',
+        cor: 'default',
+        bgColor: '#F3F4F6',
+        borderColor: '#9CA3AF',
+        textColor: '#374151',
+        icone: <Cancel sx={{ fontSize: 20 }} />,
+      },
+    ],
+    []
+  )
 
-  // Buscar NFes
-  const buscarNfes = async () => {
-    const token = auth?.getAccessToken()
-    if (!token) return
-
-    setIsLoading(true)
-
-    try {
-      // TODO: Implementar chamada à API quando disponível
-      const mockNfes: NFe[] = [
-        NFe.fromJSON({
-          id: '1',
-          numero: '000001',
-          serie: '1',
-          clienteId: '1',
-          clienteNome: 'Cliente Exemplo 1',
-          clienteCpfCnpj: '123.456.789-00',
-          dataEmissao: new Date().toISOString(),
-          status: 'PENDENTE',
-          valorTotal: 1500.00,
-          itens: [
-            {
-              produtoId: '1',
-              produtoNome: 'Produto A',
-              quantidade: 2,
-              valorUnitario: 750.00,
-              valorTotal: 1500.00,
-            },
-          ],
-        }),
-        NFe.fromJSON({
-          id: '2',
-          numero: '000002',
-          serie: '1',
-          clienteId: '2',
-          clienteNome: 'Cliente Exemplo 2',
-          clienteCpfCnpj: '987.654.321-00',
-          dataEmissao: new Date().toISOString(),
-          status: 'EM_PROCESSAMENTO',
-          valorTotal: 2300.50,
-          itens: [
-            {
-              produtoId: '2',
-              produtoNome: 'Produto B',
-              quantidade: 5,
-              valorUnitario: 460.10,
-              valorTotal: 2300.50,
-            },
-          ],
-        }),
-        NFe.fromJSON({
-          id: '3',
-          numero: '000003',
-          serie: '1',
-          clienteId: '3',
-          clienteNome: 'Cliente Exemplo 3',
-          clienteCpfCnpj: '111.222.333-44',
-          dataEmissao: new Date().toISOString(),
-          status: 'AUTORIZADA',
-          valorTotal: 890.00,
-          chaveAcesso: '35210712345678901234567890123456789012345678',
-          protocolo: '123456789012345',
-          dataAutorizacao: new Date().toISOString(),
-          itens: [
-            {
-              produtoId: '3',
-              produtoNome: 'Produto C',
-              quantidade: 1,
-              valorUnitario: 890.00,
-              valorTotal: 890.00,
-            },
-          ],
-        }),
-      ]
-
-      // Agrupar por status
-      const nfesAgrupadas: Record<NFeStatus, NFe[]> = {
-        PENDENTE: [],
-        EM_PROCESSAMENTO: [],
-        AUTORIZADA: [],
-        REJEITADA: [],
-        CANCELADA: [],
-      }
-
-      mockNfes.forEach((nfe) => {
-        nfesAgrupadas[nfe.getStatus()].push(nfe)
-      })
-
-      setNfes(nfesAgrupadas)
-    } catch (error) {
-      console.error('Erro ao buscar NFes:', error)
-      const errorMessage = handleApiError(error)
-      showToast.error(errorMessage || 'Erro ao carregar NFes')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    buscarNfes()
-  }, [auth])
-
-  const handleEmitirNFe = () => {
+  // Handlers memoizados
+  const handleEmitirNFe = useCallback(() => {
     showToast.info('Funcionalidade de emissão será implementada em breve')
-  }
+  }, [])
 
-  const handleVerDetalhes = (nfe: NFe) => {
+  const handleVerDetalhes = useCallback((nfe: NFe) => {
     setNfeSelecionada(nfe)
     setMostrarDetalhes(true)
-  }
+  }, [])
 
-  const getStatusBadge = (status: NFeStatus) => {
-    const coluna = colunas.find((c) => c.id === status)
-    if (!coluna) return null
+  const getStatusBadge = useCallback(
+    (status: NFeStatus) => {
+      const coluna = colunas.find((c) => c.id === status)
+      if (!coluna) return null
 
-    return (
-      <Chip
-        icon={coluna.icone as React.ReactElement}
-        label={coluna.titulo}
-        size="small"
-        color={coluna.cor as 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning'}
-        sx={{
-          fontWeight: 600,
-          fontSize: '0.75rem',
-        }}
-      />
-    )
-  }
+      return (
+        <Chip
+          icon={coluna.icone as React.ReactElement}
+          label={coluna.titulo}
+          size="small"
+          color={coluna.cor as 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning'}
+          sx={{
+            fontWeight: 600,
+            fontSize: '0.75rem',
+          }}
+        />
+      )
+    },
+    [colunas]
+  )
 
-  // Handlers de drag and drop
-  const handleDragStart = (event: DragStartEvent) => {
+  // Handlers de drag and drop (memoizados)
+  const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id as string)
-  }
+  }, [])
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event
 
-    if (!over) {
-      setActiveId(null)
-      return
-    }
+      if (!over || !nfes) {
+        setActiveId(null)
+        return
+      }
 
-    const activeId = active.id as string
-    const overId = over.id as string
+      const activeId = active.id as string
+      const overId = over.id as string
 
-    const colunaDestino = colunas.find((c) => c.id === (overId as NFeStatus))
-    if (colunaDestino) {
-      let nfeArrastada: NFe | null = null
-      let statusOrigem: NFeStatus | null = null
+      const colunaDestino = colunas.find((c) => c.id === (overId as NFeStatus))
+      if (colunaDestino) {
+        let statusOrigem: NFeStatus | null = null
 
-      for (const [status, nfesList] of Object.entries(nfes)) {
-        const nfe = nfesList.find((n) => n.getId() === activeId)
-        if (nfe) {
-          nfeArrastada = nfe
-          statusOrigem = status as NFeStatus
-          break
+        for (const [status, nfesList] of Object.entries(nfes)) {
+          const nfe = nfesList.find((n) => n.getId() === activeId)
+          if (nfe) {
+            statusOrigem = status as NFeStatus
+            break
+          }
+        }
+
+        if (statusOrigem && statusOrigem !== colunaDestino.id) {
+          // TODO: Implementar mutação via React Query quando API estiver disponível
+          showToast.success(`NFe movida para ${colunaDestino.titulo}`)
+          // Forçar refetch para atualizar estado
+          refetch()
         }
       }
 
-      if (nfeArrastada && statusOrigem && statusOrigem !== colunaDestino.id) {
-        const novasNfes = { ...nfes }
-        novasNfes[statusOrigem] = novasNfes[statusOrigem].filter((n) => n.getId() !== activeId)
-        novasNfes[colunaDestino.id].push(nfeArrastada)
+      setActiveId(null)
+    },
+    [nfes, colunas, refetch]
+  )
 
-        setNfes(novasNfes)
-        showToast.success(`NFe movida para ${colunaDestino.titulo}`)
-      }
-    }
-
-    setActiveId(null)
-  }
-
-  const handleDragOver = (event: DragOverEvent) => {
+  const handleDragOver = useCallback((event: DragOverEvent) => {
     // Lógica adicional se necessário
-  }
+  }, [])
 
-  const activeNfe = activeId
-    ? Object.values(nfes)
-        .flat()
-        .find((nfe) => nfe.getId() === activeId)
-    : null
+  // NFe ativa no drag (memoizada)
+  const activeNfe = useMemo(
+    () =>
+      activeId && nfes
+        ? Object.values(nfes)
+            .flat()
+            .find((nfe) => nfe.getId() === activeId)
+        : null,
+    [activeId, nfes]
+  )
 
   return (
     <Box
@@ -396,7 +266,7 @@ export function NFeKanban() {
             <Box sx={{ display: 'flex', gap: 1.5 }}>
               <Tooltip title="Atualizar lista">
                 <IconButton
-                  onClick={buscarNfes}
+                  onClick={() => refetch()}
                   disabled={isLoading}
                   sx={{
                     border: 1,
@@ -475,7 +345,7 @@ export function NFeKanban() {
                   borderColor={coluna.borderColor}
                   textColor={coluna.textColor}
                   icone={coluna.icone}
-                  nfes={nfes[coluna.id]}
+                  nfes={nfes?.[coluna.id] || []}
                   onVerDetalhes={handleVerDetalhes}
                   getStatusBadge={getStatusBadge}
                 />

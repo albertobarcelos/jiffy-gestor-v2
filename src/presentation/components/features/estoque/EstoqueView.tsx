@@ -1,16 +1,34 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import React from 'react'
 
 /**
  * Componente principal de Estoque
- * Replica o design e funcionalidades do Flutter
+ * Otimizado com memoização
  */
-export function EstoqueView() {
+export const EstoqueView = React.memo(function EstoqueView() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'entrada' | 'saida' | 'inventario'>('entrada')
   const [searchText, setSearchText] = useState('')
+
+  // Handlers memoizados
+  const handleNavigateEntrada = useCallback(() => {
+    router.push('/estoque/entrada')
+  }, [router])
+
+  const handleNavigateInventario = useCallback(() => {
+    router.push('/estoque/inventario')
+  }, [router])
+
+  const handleNavigateSaida = useCallback(() => {
+    router.push('/estoque/saida')
+  }, [router])
+
+  const handleNavigateProdutos = useCallback(() => {
+    router.push('/estoque/produtos')
+  }, [router])
 
   return (
     <div className="flex flex-col h-full">
@@ -24,21 +42,21 @@ export function EstoqueView() {
             </p>
             <div className="flex gap-3">
               <button
-                onClick={() => router.push('/estoque/entrada')}
+                onClick={handleNavigateEntrada}
                 className="h-[38px] px-[26px] bg-primary text-info rounded-[40px] font-medium font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
               >
                 <span className="text-lg">📥</span>
                 Entrada
               </button>
               <button
-                onClick={() => router.push('/estoque/inventario')}
+                onClick={handleNavigateInventario}
                 className="h-[38px] px-[26px] bg-primary text-info rounded-[40px] font-medium font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
               >
                 <span className="text-base">📦</span>
                 Inventário
               </button>
               <button
-                onClick={() => router.push('/estoque/saida')}
+                onClick={handleNavigateSaida}
                 className="h-[38px] px-[26px] bg-primary text-info rounded-[40px] font-medium font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
               >
                 <span className="text-base">📤</span>
@@ -53,7 +71,7 @@ export function EstoqueView() {
               Produtos
             </p>
             <button
-              onClick={() => router.push('/estoque/produtos')}
+              onClick={handleNavigateProdutos}
               className="h-[38px] px-[26px] bg-primary text-info rounded-[40px] font-medium font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
             >
               <span className="text-lg">📊</span>
@@ -177,5 +195,5 @@ export function EstoqueView() {
       </div>
     </div>
   )
-}
+})
 

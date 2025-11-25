@@ -37,12 +37,14 @@ export async function GET(request: NextRequest) {
 
     // Adaptar resposta para o formato esperado
     const data = response.data
+    const items = data.items || (Array.isArray(data) ? data : [])
+    const itemsArray = Array.isArray(items) ? items : []
+    const total = data.total || data.count || itemsArray.length
+    
     return NextResponse.json({
-      items: data.items || (Array.isArray(data) ? data : []),
-      total: data.total || data.count || (Array.isArray(data) ? data.length : 0),
-      hasNextPage: Array.isArray(data.items || data)
-        ? (data.items || data).length > parseInt(offset) + parseInt(limit)
-        : false,
+      items: itemsArray,
+      total,
+      hasNextPage: itemsArray.length > parseInt(offset) + parseInt(limit),
     })
   } catch (error) {
     console.error('Erro ao buscar terminais:', error)

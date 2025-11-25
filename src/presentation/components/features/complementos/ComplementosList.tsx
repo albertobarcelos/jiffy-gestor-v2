@@ -23,7 +23,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
   const [totalComplementos, setTotalComplementos] = useState(0)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const debounceTimerRef = useRef<NodeJS.Timeout>()
+  const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
   const { auth, isAuthenticated } = useAuthStore()
 
@@ -354,4 +354,5 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
     </div>
   )
 }
+
 

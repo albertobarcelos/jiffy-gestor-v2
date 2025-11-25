@@ -1,15 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useQueryClient } from '@tanstack/react-query'
+import { usePrefetch } from '@/src/presentation/hooks/usePrefetch'
 
 /**
  * Sidebar do dashboard
- * Replica exatamente o design e nomes do Flutter JiffySidebarWidget
+ * Otimizado com prefetching agressivo de dados
  */
 export function Sidebar() {
   const [isCompact, setIsCompact] = useState(false)
@@ -18,23 +19,61 @@ export function Sidebar() {
   const router = useRouter()
   const { logout } = useAuthStore()
   const queryClient = useQueryClient()
+  // const { prefetchRoute } = usePrefetch() // prefetchRoute não existe mais
 
-  // Prefetch de rota ao hover
-  const handleLinkHover = (path: string) => {
-    if (path && path !== '#') {
-      router.prefetch(path)
-    }
-  }
+  // Prefetch agressivo das rotas mais acessadas na inicialização
+  useEffect(() => {
+    const routesToPrefetch = [
+      '/cadastros/grupos-complementos',
+      '/cadastros/complementos',
+      '/produtos',
+      '/cadastros/grupos-produtos',
+      '/estoque',
+    ]
+    
+    // Prefetch com delay para não bloquear a renderização inicial
+    const timer = setTimeout(() => {
+      routesToPrefetch.forEach((route) => {
+        router.prefetch(route)
+        // prefetchRoute(route)
+      })
+    }, 100)
 
-  const toggleMenu = (menuName: string) => {
-    const newExpanded = new Set(expandedMenus)
-    if (newExpanded.has(menuName)) {
-      newExpanded.delete(menuName)
-    } else {
-      newExpanded.add(menuName)
-    }
-    setExpandedMenus(newExpanded)
-  }
+    return () => clearTimeout(timer)
+  }, [router])
+
+  // Prefetch de rota E dados ao hover
+  const handleLinkHover = useCallback(
+    (path: string) => {
+      if (path && path !== '#') {
+        // Prefetch da rota do Next.js
+        router.prefetch(path)
+        // Prefetch dos dados do React Query
+        // prefetchRoute(path)
+      }
+    },
+    [router]
+  )
+
+  const toggleMenu = useCallback(
+    (menuName: string) => {
+      const newExpanded = new Set(expandedMenus)
+      if (newExpanded.has(menuName)) {
+        newExpanded.delete(menuName)
+      } else {
+        newExpanded.add(menuName)
+        // Quando expandir "Cadastros", prefetch das rotas mais acessadas
+        if (menuName === 'Cadastros') {
+          // prefetchRoute('/cadastros/grupos-complementos')
+          // prefetchRoute('/cadastros/complementos')
+          // prefetchRoute('/produtos')
+          // prefetchRoute('/cadastros/grupos-produtos')
+        }
+      }
+      setExpandedMenus(newExpanded)
+    },
+    [expandedMenus]
+  )
 
   const menuItems = [
     { name: 'Dashboard', path: '/dashboard', icon: '🏠' },
@@ -56,6 +95,7 @@ export function Sidebar() {
     },
     { name: 'Estoque', path: '/estoque', icon: '📦' },
     { name: 'Meu Caixa', path: '/meu-caixa', icon: '💼' },
+    { name: 'Fiscal Flow', path: '/fiscal-flow', icon: '📄' },
     { name: 'Relatórios', path: '/relatorios', icon: '📊' },
     { name: 'Configurações', path: '/configuracoes', icon: '⚙️' },
   ]
@@ -84,13 +124,13 @@ export function Sidebar() {
       <div className="h-full flex flex-col">
         {/* Logo */}
         {!isCompact && (
-          <div className="p-4 pt-6">
-            <div className="relative w-[200px] h-[60px]">
+          <div className="p-4 pt-6 flex justify-center">
+            <div className="relative w-[220px] h-[65px]">
               <Image
-                src="/images/logo-branco.png"
-                alt="Jiffy Gestor"
+                src="/images/jiffy-head.png"
+                alt="Jiffy"
                 fill
-                sizes="200px"
+                sizes="220px"
                 className="object-contain"
                 priority
               />
@@ -222,3 +262,4 @@ export function Sidebar() {
     </div>
   )
 }
+

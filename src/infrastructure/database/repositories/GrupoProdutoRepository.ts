@@ -24,7 +24,7 @@ export class GrupoProdutoRepository implements IGrupoProdutoRepository {
       queryParams.append('ativo', params.ativo.toString())
     }
 
-    const { data } = await this.apiClient.request(
+    const { data } = await this.apiClient.request<any>(
       `/api/v1/cardapio/grupos-produtos/?${queryParams.toString()}`,
       {
         headers: {

@@ -205,7 +205,7 @@ export function NovoPerfilUsuario({ perfilId }: NovoPerfilUsuarioProps) {
           </div>
           <Button
             onClick={handleCancel}
-            variant="outline"
+            variant="outlined"
             className="h-9 px-[26px] rounded-[30px] border-primary/15 text-primary bg-primary/10 hover:bg-primary/20"
           >
             Cancelar
@@ -377,7 +377,7 @@ export function NovoPerfilUsuario({ perfilId }: NovoPerfilUsuarioProps) {
             <Button
               type="button"
               onClick={handleCancel}
-              variant="outline"
+              variant="outlined"
               className="px-8"
             >
               Cancelar

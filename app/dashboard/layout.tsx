@@ -1,3 +1,5 @@
+'use client'
+
 import { TopNav } from '@/src/presentation/components/layouts/TopNav'
 
 /**

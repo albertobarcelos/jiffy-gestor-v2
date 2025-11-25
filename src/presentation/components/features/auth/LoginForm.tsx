@@ -93,7 +93,7 @@ export function LoginForm() {
         placeholder="seu@email.com"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        error={errors.email}
+        error={!!errors.email}
         disabled={isLoading}
         autoComplete="email"
       />
@@ -105,7 +105,7 @@ export function LoginForm() {
           placeholder="••••••••"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          error={errors.password}
+          error={!!errors.password}
           disabled={isLoading}
           autoComplete="current-password"
         />

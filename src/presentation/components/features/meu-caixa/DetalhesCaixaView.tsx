@@ -107,7 +107,7 @@ export function DetalhesCaixaView({ caixaRef, conferenciaCaixaRef }: DetalhesCai
             </p>
             {caixa.getDataFechamento() && (
               <p className="text-secondary-text text-base font-bold font-nunito ml-4">
-                | Fechamento: {formatarData(caixa.getDataFechamento())}
+                | Fechamento: {formatarData(caixa.getDataFechamento() || new Date())}
               </p>
             )}
           </div>

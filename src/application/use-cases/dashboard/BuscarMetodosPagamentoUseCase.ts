@@ -4,10 +4,9 @@ import { ApiClient } from '@/src/infrastructure/api/apiClient'
 export class BuscarMetodosPagamentoUseCase {
   constructor(private apiClient: ApiClient) {}
 
-  async execute(periodo: string = 'mes'): Promise<DashboardMetodoPagamento[]> {
+  async execute(_periodo: string = 'mes'): Promise<DashboardMetodoPagamento[]> {
     // Por enquanto, retorna dados mockados
     // TODO: Implementar chamada real à API quando endpoint estiver disponível
-    const total = 45000.0
     return [
       DashboardMetodoPagamento.create({
         metodo: 'Dinheiro',

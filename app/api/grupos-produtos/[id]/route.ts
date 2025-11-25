@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { AtualizarGrupoProdutoUseCase } from '@/src/application/use-cases/grupos-produtos/AtualizarGrupoProdutoUseCase'
-import { ReordenarGrupoProdutoUseCase } from '@/src/application/use-cases/grupos-produtos/ReordenarGrupoProdutoUseCase'
 import { GrupoProdutoRepository } from '@/src/infrastructure/database/repositories/GrupoProdutoRepository'
 import { ApiClient } from '@/src/infrastructure/api/apiClient'
 import { validateRequest } from '@/src/shared/utils/validateRequest'

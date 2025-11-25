@@ -237,7 +237,7 @@ export function NovoCliente({ clienteId }: NovoClienteProps) {
           </div>
           <Button
             onClick={handleCancel}
-            variant="outline"
+            variant="outlined"
             className="h-9 px-[26px] rounded-[30px] border-primary/15 text-primary bg-primary/10 hover:bg-primary/20"
           >
             Cancelar
@@ -307,7 +307,7 @@ export function NovoCliente({ clienteId }: NovoClienteProps) {
                 value={cpf}
                 onChange={(e) => setCpf(formatCPF(e.target.value))}
                 placeholder="000.000.000-00"
-                maxLength={14}
+                inputProps={{ maxLength: 14 }}
                 className="bg-primary-bg"
               />
               <Input
@@ -315,7 +315,7 @@ export function NovoCliente({ clienteId }: NovoClienteProps) {
                 value={cnpj}
                 onChange={(e) => setCnpj(formatCNPJ(e.target.value))}
                 placeholder="00.000.000/0000-00"
-                maxLength={18}
+                inputProps={{ maxLength: 18 }}
                 className="bg-primary-bg"
               />
             </div>
@@ -326,7 +326,7 @@ export function NovoCliente({ clienteId }: NovoClienteProps) {
                 value={telefone}
                 onChange={(e) => setTelefone(formatTelefone(e.target.value))}
                 placeholder="(00) 00000-0000"
-                maxLength={15}
+                inputProps={{ maxLength: 15 }}
                 className="bg-primary-bg"
               />
               <Input
@@ -380,7 +380,7 @@ export function NovoCliente({ clienteId }: NovoClienteProps) {
                   value={cep}
                   onChange={(e) => setCep(formatCEP(e.target.value))}
                   placeholder="00000-000"
-                  maxLength={9}
+                  inputProps={{ maxLength: 9 }}
                   className="bg-primary-bg"
                 />
                 <Input
@@ -422,7 +422,7 @@ export function NovoCliente({ clienteId }: NovoClienteProps) {
                   value={estado}
                   onChange={(e) => setEstado(e.target.value)}
                   placeholder="UF"
-                  maxLength={2}
+                  inputProps={{ maxLength: 2 }}
                   className="bg-primary-bg"
                 />
                 <Input
@@ -441,7 +441,7 @@ export function NovoCliente({ clienteId }: NovoClienteProps) {
             <Button
               type="button"
               onClick={handleCancel}
-              variant="outline"
+              variant="outlined"
               className="px-8"
             >
               Cancelar

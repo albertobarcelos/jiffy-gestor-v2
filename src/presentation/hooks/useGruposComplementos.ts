@@ -125,9 +125,6 @@ export function useGrupoComplemento(id: string) {
     },
     enabled: isAuthenticated && !!token && !!id,
     staleTime: 1000 * 60 * 5, // 5 minutos
-    onError: (error) => {
-      showToast.error(error.message || `Erro ao carregar grupo de complemento ${id}.`)
-    },
   })
 }
 
@@ -169,10 +166,9 @@ export function useGrupoComplementoMutation() {
       queryClient.invalidateQueries({ queryKey: ['grupos-complementos'] })
       showToast.success(variables.isUpdate ? 'Grupo atualizado com sucesso!' : 'Grupo criado com sucesso!')
     },
-    onError: (error) => {
-      const errorMessage = handleApiError(error)
-      showToast.error(errorMessage || 'Erro ao salvar grupo')
-    },
   })
 }
+
+
+
 

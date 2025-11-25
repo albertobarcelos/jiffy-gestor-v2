@@ -95,8 +95,8 @@ export function GraficoVendasTerminal({ periodo = 'mes' }: GraficoVendasTerminal
       <h3 className="text-lg font-exo font-semibold text-primary-text mb-4">
         Vendas por Terminal
       </h3>
-      <div className="h-[300px] w-full min-w-0">
-        <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+      <div className="w-full min-w-0" style={{ height: '300px' }}>
+        <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#530CA3" opacity={0.3} />
             <XAxis

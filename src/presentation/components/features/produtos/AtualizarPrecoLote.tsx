@@ -30,7 +30,7 @@ export function AtualizarPrecoLote() {
   const [searchText, setSearchText] = useState('')
   const [novoPreco, setNovoPreco] = useState('')
   const [total, setTotal] = useState(0)
-  const debounceTimerRef = useRef<NodeJS.Timeout>()
+  const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const { auth } = useAuthStore()
 
   // Buscar produtos
@@ -75,7 +75,7 @@ export function AtualizarPrecoLote() {
       setProdutos(produtosParsed)
       setTotal(data.count || produtosParsed.length)
     } catch (error: any) {
-      handleApiError(error, 'Erro ao buscar produtos')
+      console.error('Erro ao buscar produtos', error)
     } finally {
       setIsLoading(false)
     }
@@ -166,7 +166,7 @@ export function AtualizarPrecoLote() {
         }
       }
 
-      showToast.dismiss(toastId)
+      // showToast.dismiss(toastId)
 
       if (erros === 0) {
         showToast.success(`Preços atualizados com sucesso! (${sucesso} produtos)`)
@@ -179,8 +179,8 @@ export function AtualizarPrecoLote() {
         )
       }
     } catch (error: any) {
-      showToast.dismiss(toastId)
-      handleApiError(error, 'Erro ao atualizar preços')
+      // showToast.dismiss(toastId)
+      console.error('Erro ao atualizar preços', error)
     } finally {
       setIsUpdating(false)
     }
@@ -244,8 +244,8 @@ export function AtualizarPrecoLote() {
                   <TableHead className="w-12">
                     <Checkbox
                       checked={todosSelecionados}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
+                      onChange={(e) => {
+                        if (e.target.checked) {
                           setProdutosSelecionados(new Set(produtos.map((p) => p.getId())))
                         } else {
                           setProdutosSelecionados(new Set())
@@ -272,7 +272,7 @@ export function AtualizarPrecoLote() {
                       <TableCell>
                         <Checkbox
                           checked={isSelected}
-                          onCheckedChange={(checked) => {
+                          onChange={(checked) => {
                             if (checked !== undefined) {
                               toggleSelecao(produto.getId())
                             }
@@ -288,12 +288,12 @@ export function AtualizarPrecoLote() {
                       <TableCell>
                         <span
                           className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            produto.getAtivo()
+                            produto.isAtivo()
                               ? 'bg-success/20 text-success'
                               : 'bg-error/20 text-error'
                           }`}
                         >
-                          {produto.getAtivo() ? 'Ativo' : 'Desativado'}
+                          {produto.isAtivo() ? 'Ativo' : 'Desativado'}
                         </span>
                       </TableCell>
                       <TableCell className="font-semibold">
@@ -348,4 +348,5 @@ export function AtualizarPrecoLote() {
     </div>
   )
 }
+
 

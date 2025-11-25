@@ -111,9 +111,6 @@ export function useUsuario(id: string) {
     },
     enabled: isAuthenticated && !!token && !!id,
     staleTime: 1000 * 60 * 5, // 5 minutos
-    onError: (error) => {
-      showToast.error(error.message || `Erro ao carregar usuário ${id}.`)
-    },
   })
 }
 
@@ -166,13 +163,6 @@ export function useUsuarioMutation() {
 
       return { previousUsuarios }
     },
-    onError: (error, variables, context) => {
-      if (context?.previousUsuarios) {
-        queryClient.setQueryData(['usuarios', 'infinite'], context.previousUsuarios)
-      }
-      const errorMessage = handleApiError(error)
-      showToast.error(errorMessage || 'Erro ao salvar usuário')
-    },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['usuarios'] })
       if (variables.usuarioId) {
@@ -182,4 +172,8 @@ export function useUsuarioMutation() {
     },
   })
 }
+
+
+
+
 
