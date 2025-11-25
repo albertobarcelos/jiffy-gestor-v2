@@ -169,26 +169,25 @@ export function TopNav() {
 
   return (
     <nav className="h-16 bg-white border-b border-gray-200 shadow-sm">
-      <div className="h-full flex items-center justify-between px-6">
-        {/* Logo e Nome */}
-        <div className="flex items-center gap-4">
-          <Link href="/dashboard" className="flex items-center gap-3">
-            <div className="relative w-10 h-10">
+      <div className="h-full flex items-center justify-between px-4">
+        {/* Logo */}
+        <div className="flex items-center">
+          <Link href="/dashboard" className="flex items-center">
+            <div className="relative w-44 h-12 sm:w-52 sm:h-14">
               <Image
-                src="/images/logo-branco.png"
-                alt="Jiffy Gestor"
+                src="/images/jiffy-head.png"
+                alt="Jiffy"
                 fill
-                sizes="40px"
+                sizes="(max-width: 640px) 176px, 208px"
                 className="object-contain"
                 priority
               />
             </div>
-            <span className="text-xl font-bold text-gray-900 hidden sm:block">Jiffy Gestor</span>
           </Link>
         </div>
 
         {/* Menu Items */}
-        <div ref={menuRef} className="flex-1 flex items-center justify-center gap-1 px-8">
+        <div ref={menuRef} className="flex-1 flex items-center justify-start gap-1 pl-2">
           {menuItems.map((item) => {
             const isActive = isMenuActive(item)
             const isExpanded = expandedMenus.has(item.name)

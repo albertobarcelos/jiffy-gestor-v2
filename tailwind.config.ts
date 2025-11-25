@@ -18,9 +18,12 @@ const config: Config = {
         foreground: 'var(--foreground)',
       },
       fontFamily: {
-        // Fontes do sistema (replicando Flutter)
-        exo: ['Exo', 'sans-serif'],
-        nunito: ['Nunito', 'sans-serif'],
+        // Fontes do sistema
+        sans: ['var(--font-exo2)', 'sans-serif'], // Exo 2 como fonte padrão
+        heading: ['var(--font-manrope)', 'sans-serif'], // Manrope para títulos
+        // Aliases para retrocompatibilidade
+        exo: ['var(--font-exo2)', 'sans-serif'],
+        manrope: ['var(--font-manrope)', 'sans-serif'],
       },
     },
   },

@@ -99,8 +99,8 @@ export function ModalMetodosPagamento({
           ) : (
             <>
               {/* Gráfico de pizza */}
-              <div className="h-64 w-full min-w-0">
-                <ResponsiveContainer width="100%" height="100%" minHeight={256}>
+              <div className="w-full min-w-0" style={{ height: '256px' }}>
+                <ResponsiveContainer width="100%" height={256}>
                   <PieChart>
                     <Pie
                       data={data.map((item, index) => ({

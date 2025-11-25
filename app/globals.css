@@ -118,7 +118,13 @@
 body {
   color: var(--color-primary-text);
   background: var(--color-primary-background);
-  font-family: 'Nunito', Arial, Helvetica, sans-serif;
+  /* Exo 2 aplicada automaticamente via Next.js font optimization */
+}
+
+/* Títulos usam Manrope */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-manrope), sans-serif;
+  font-weight: 600;
 }
 
 @layer utilities {
