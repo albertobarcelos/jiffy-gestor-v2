@@ -1,0 +1,324 @@
+'use client'
+
+import {
+  DndContext,
+  DragEndEvent,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { useInfiniteQuery } from '@tanstack/react-query'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { showToast } from '@/src/shared/utils/toast'
+
+interface ProdutoGrupo {
+  id: string
+  nome: string
+  valor: number
+  ativo?: boolean
+  ordem?: number
+}
+
+interface ProdutosResponse {
+  items: ProdutoGrupo[]
+  count: number
+  hasMore: boolean
+  nextOffset: number | null
+}
+
+interface ProdutosPorGrupoListProps {
+  grupoProdutoId: string
+}
+
+const PAGE_SIZE = 10
+
+export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListProps) {
+  const [localProdutos, setLocalProdutos] = useState<ProdutoGrupo[]>([])
+  const listRef = useRef<HTMLDivElement>(null)
+  const loadMoreRef = useRef<HTMLDivElement>(null)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetching,
+    isFetchingNextPage,
+    isLoading,
+    error,
+    refetch,
+  } = useInfiniteQuery<ProdutosResponse>({
+    queryKey: ['produtos-por-grupo', grupoProdutoId],
+    initialPageParam: 0,
+    enabled: !!grupoProdutoId,
+    queryFn: async ({ pageParam }) => {
+      const res = await fetch(
+        `/api/grupos-produtos/${grupoProdutoId}/produtos?limit=${PAGE_SIZE}&offset=${pageParam}`
+      )
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.message || 'Erro ao carregar produtos do grupo')
+      }
+
+      return res.json()
+    },
+    getNextPageParam: (lastPage) =>
+      lastPage.hasMore && typeof lastPage.nextOffset === 'number'
+        ? lastPage.nextOffset
+        : undefined,
+  })
+
+  const serverProdutos = useMemo(() => {
+    return data?.pages.flatMap((page) => page.items || []) ?? []
+  }, [data])
+
+  useEffect(() => {
+    setLocalProdutos(serverProdutos)
+  }, [serverProdutos])
+
+  useEffect(() => {
+    const sentinel = loadMoreRef.current
+    if (!sentinel || !hasNextPage || isFetchingNextPage || isFetching) {
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && hasNextPage && !isFetchingNextPage && !isFetching) {
+            fetchNextPage()
+          }
+        })
+      },
+      {
+        root: listRef.current,
+        rootMargin: '50px',
+        threshold: 0.1,
+      }
+    )
+
+    observer.observe(sentinel)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [hasNextPage, isFetchingNextPage, isFetching, fetchNextPage, localProdutos.length])
+
+  const formatCurrency = useCallback((value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value ?? 0)
+  }, [])
+
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      const { active, over } = event
+
+      if (!over || active.id === over.id) {
+        return
+      }
+
+      const oldIndex = localProdutos.findIndex((produto) => produto.id === active.id)
+      const newIndex = localProdutos.findIndex((produto) => produto.id === over.id)
+
+      if (oldIndex === -1 || newIndex === -1) {
+        return
+      }
+
+      const previousState = [...localProdutos]
+      const updatedState = arrayMove([...localProdutos], oldIndex, newIndex)
+      setLocalProdutos(updatedState)
+
+      const novaPosicao = newIndex + 1
+      try {
+        const response = await fetch(`/api/produtos/${active.id}/reordena-produto`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ novaPosicao }),
+        })
+
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}))
+          throw new Error(body.message || 'Erro ao reordenar produto')
+        }
+
+        showToast.success('Ordem do produto atualizada com sucesso!')
+        refetch()
+      } catch (err: any) {
+        console.error('Erro ao reordenar produto:', err)
+        setLocalProdutos(previousState)
+        showToast.error(err?.message || 'Erro ao reordenar produto')
+      }
+    },
+    [localProdutos, refetch]
+  )
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-10 gap-4">
+        <p className="text-secondary-text text-sm text-center">
+          Não foi possível carregar os produtos deste grupo.
+        </p>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          className="px-4 py-2 bg-primary text-white rounded-full text-sm font-semibold hover:bg-primary/90 transition-colors"
+        >
+          Tentar novamente
+        </button>
+      </div>
+    )
+  }
+
+  if (!isLoading && localProdutos.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-secondary-text text-sm font-nunito">
+          Nenhum produto associado a este grupo.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col h-full border border-secondary/20 rounded-2xl bg-white shadow-sm">
+      <div className="px-6 pt-6 pb-4 border-b border-secondary/10">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-primary-text">
+              Produtos atrelados ao grupo
+            </h3>
+            <p className="text-sm text-secondary-text">
+              Arraste para reordenar a posição dos produtos
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="text-sm text-primary underline-offset-4 hover:underline"
+          >
+            Atualizar
+          </button>
+        </div>
+      </div>
+
+      <div className="px-6 py-3 bg-custom-2 grid grid-cols-12 text-xs font-semibold text-primary-text">
+        <div className="col-span-1">Ordem</div>
+        <div className="col-span-6">Produto</div>
+        <div className="col-span-3">Valor</div>
+        <div className="col-span-2 text-right pr-5">Reordenar</div>
+      </div>
+
+      <div ref={listRef} className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
+        {isLoading && localProdutos.length === 0 && (
+          <div className="space-y-2">
+            {[...Array(5)].map((_, index) => (
+              <div
+                key={`produto-skeleton-${index}`}
+                className="h-14 rounded-xl bg-secondary/10 animate-pulse"
+              />
+            ))}
+          </div>
+        )}
+
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={localProdutos.map((produto) => produto.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            {localProdutos.map((produto, index) => (
+              <ProdutoItem
+                key={produto.id}
+                produto={produto}
+                index={index}
+                formatCurrency={formatCurrency}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
+
+        {hasNextPage && (
+          <div ref={loadMoreRef} className="py-4">
+            {isFetchingNextPage && (
+              <div className="flex justify-center">
+                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ProdutoItem({
+  produto,
+  index,
+  formatCurrency,
+}: {
+  produto: ProdutoGrupo
+  index: number
+  formatCurrency: (value: number) => string
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: produto.id,
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`grid grid-cols-12 gap-3 items-center rounded-xl border border-secondary/10 px-4 py-3 bg-white shadow-sm transition ${
+        isDragging ? 'opacity-50 ring-2 ring-primary/40' : ''
+      }`}
+    >
+      <div className="col-span-1 text-sm font-semibold text-primary-text">{index + 1}</div>
+      <div className="col-span-6 text-sm text-primary-text truncate">{produto.nome}</div>
+      <div className="col-span-3 text-sm text-primary-text">{formatCurrency(produto.valor)}</div>
+      <div
+        className="col-span-2 flex justify-end pr-2 cursor-grab active:cursor-grabbing text-secondary-text hover:text-primary transition"
+        {...attributes}
+        {...listeners}
+      >
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 9h16M4 15h16" />
+        </svg>
+      </div>
+    </div>
+  )
+}
+

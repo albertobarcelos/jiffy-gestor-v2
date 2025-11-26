@@ -7,6 +7,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { IconPickerModal } from './IconPickerModal'
 import { ColorPickerModal } from './ColorPickerModal'
+import { ProdutosPorGrupoList } from './ProdutosPorGrupoList'
 
 interface NovoGrupoProps {
   grupoId?: string
@@ -458,10 +459,16 @@ export function NovoGrupo({ grupoId }: NovoGrupoProps) {
           )}
 
           {activeTab === 1 && (
-            <div className="text-center py-12">
-              <p className="text-secondary-text font-nunito">
-                Lista de produtos atrelados ao grupo será exibida aqui
-              </p>
+            <div className="py-6">
+              {isEditMode && effectiveGrupoId ? (
+                <ProdutosPorGrupoList grupoProdutoId={effectiveGrupoId} />
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-secondary-text font-nunito">
+                    A lista de produtos atrelados aparece no modo de edição.
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
