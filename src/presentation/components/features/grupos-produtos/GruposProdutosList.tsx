@@ -38,7 +38,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const loadMoreRef = useRef<HTMLDivElement>(null)
   const { auth } = useAuthStore()
   const queryClient = useQueryClient()
 
@@ -91,10 +91,19 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     limit: 10,
   })
 
-  // Achatando todas as páginas em uma única lista (memoizado)
-  const grupos = useMemo(() => {
+
+  // Lista vinda do servidor (React Query)
+  const serverGrupos = useMemo(() => {
     return data?.pages.flatMap((page) => page.grupos) || []
   }, [data])
+
+  // Estado local para feedback imediato (optimistic UI)
+  const [localGrupos, setLocalGrupos] = useState<GrupoProduto[]>([])
+
+  // Sempre que a lista do servidor mudar, sincroniza o estado local
+  useEffect(() => {
+    setLocalGrupos(serverGrupos)
+  }, [serverGrupos])
 
   const totalGrupos = useMemo(() => {
     return data?.pages[0]?.count || 0
@@ -102,39 +111,59 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
 
   // Handler de scroll com throttle para melhor performance
   const handleScroll = useCallback(() => {
-    if (scrollTimeoutRef.current) {
-      return // Ignora se já há um timeout pendente
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    const { scrollTop, scrollHeight, clientHeight } = container
+    const distanceFromBottom = scrollHeight - (scrollTop + clientHeight)
+    
+    // Carregar próxima página quando estiver a 10px do final
+    if (distanceFromBottom <= 10) {
+      if (hasNextPage && !isFetchingNextPage && !isFetching) {
+        fetchNextPage()
+      }
     }
+  }, [hasNextPage, isFetchingNextPage, isFetching, fetchNextPage])
 
-    scrollTimeoutRef.current = setTimeout(() => {
-      const container = scrollContainerRef.current
-      if (!container) return
+  // Scroll infinito usando Intersection Observer (mais confiável)
+  useEffect(() => {
+    const loadMoreElement = loadMoreRef.current
+    if (!loadMoreElement || !hasNextPage || isFetchingNextPage || isFetching) return
 
-      const { scrollTop, scrollHeight, clientHeight } = container
-      const distanceFromBottom = scrollHeight - (scrollTop + clientHeight)
-      
-      // Carregar próxima página quando estiver a 400px do final (prefetch mais agressivo)
-      if (distanceFromBottom < 400) {
-        if (hasNextPage && !isFetchingNextPage) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries
+        if (entry.isIntersecting && hasNextPage && !isFetchingNextPage && !isFetching) {
           fetchNextPage()
         }
+      },
+      {
+        root: scrollContainerRef.current,
+        rootMargin: '10px', // Carrega quando está a 10px de ficar visível
+        threshold: 0.1,
       }
+    )
 
-      scrollTimeoutRef.current = null
-    }, 100) // Throttle de 100ms
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+    observer.observe(loadMoreElement)
 
-  // Scroll infinito com prefetching inteligente e throttle
+    return () => {
+      observer.disconnect()
+    }
+  }, [hasNextPage, isFetchingNextPage, isFetching, fetchNextPage, localGrupos.length])
+
+  // Também manter o listener de scroll como fallback
   useEffect(() => {
     const container = scrollContainerRef.current
     if (!container) return
 
-    container.addEventListener('scroll', handleScroll, { passive: true })
+    const onScroll = () => {
+      handleScroll()
+    }
+
+    container.addEventListener('scroll', onScroll, { passive: true })
+    
     return () => {
-      container.removeEventListener('scroll', handleScroll)
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current)
-      }
+      container.removeEventListener('scroll', onScroll)
     }
   }, [handleScroll])
 
@@ -151,7 +180,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     onReload?.()
   }, [queryClient, onReload])
 
-  // Handler para quando o drag termina
+  // Handler para quando o drag termina - versão simples: envia para API e recarrega a página
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     const { active, over } = event
 
@@ -159,42 +188,24 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       return
     }
 
-    // Obtém o estado atual dos grupos do cache
-    const currentData = queryClient.getQueryData(['grupos-produtos', 'infinite', { name: debouncedSearch || undefined, ativo: ativoFilter, limit: 10 }]) as any
-    const currentGrupos = currentData?.pages?.[0]?.grupos || grupos
-
-    const oldIndex = currentGrupos.findIndex((g: GrupoProduto) => g.getId() === active.id)
-    const newIndex = currentGrupos.findIndex((g: GrupoProduto) => g.getId() === over.id)
-
+    // Calcula a nova posição baseada na lista atual
+    const oldIndex = localGrupos.findIndex((g: GrupoProduto) => g.getId() === active.id)
+    const newIndex = localGrupos.findIndex((g: GrupoProduto) => g.getId() === over.id)
+    
     if (oldIndex === -1 || newIndex === -1) {
       return
     }
 
-    // Atualiza a ordem localmente (otimistic update)
-    const newGrupos = arrayMove([...currentGrupos], oldIndex, newIndex)
-    
-    // Atualiza o cache do React Query otimisticamente
-    queryClient.setQueryData(['grupos-produtos', 'infinite', { name: debouncedSearch || undefined, ativo: ativoFilter, limit: 10 }], (old: any) => {
-      if (!old) return old
-      return {
-        ...old,
-        pages: old.pages.map((page: any, pageIndex: number) => {
-          if (pageIndex === 0) {
-            return {
-              ...page,
-              grupos: newGrupos,
-            }
-          }
-          return page
-        }),
-      }
-    })
+    // Feedback visual imediato: reordena lista local
+    const previousState = [...localGrupos]
+    const updatedState = arrayMove([...localGrupos], oldIndex, newIndex)
+    setLocalGrupos(updatedState)
 
-    // Calcula a nova posição (1-based)
+    // Nova posição (1-based, como a API espera)
     const newOrder = newIndex + 1
     const grupoId = active.id as string
 
-    // Atualiza no backend
+    // Envia requisição para o backend
     try {
       const token = auth?.getAccessToken()
       if (!token) {
@@ -214,34 +225,34 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       )
 
       if (!response.ok) {
-        // Reverte a mudança local se falhar
-        queryClient.invalidateQueries({ queryKey: ['grupos-produtos'] })
         const error = await response.json()
         throw new Error(error.message || 'Erro ao reordenar grupo')
       }
 
-      // Sucesso - invalidar cache para garantir sincronização
-      queryClient.invalidateQueries({ queryKey: ['grupos-produtos'] })
       showToast.success('Ordem atualizada com sucesso!')
+      // Recarrega a página por completo para buscar a nova ordem direto do backend
+      setTimeout(() => {
+        window.location.reload()
+      }, 800)
     } catch (error: any) {
       console.error('Erro ao reordenar grupo:', error)
-      // Reverte a mudança local
-      queryClient.invalidateQueries({ queryKey: ['grupos-produtos'] })
+      // Reverte feedback otimista
+      setLocalGrupos(previousState)
       showToast.error(error.message || 'Erro ao atualizar ordem do grupo')
     }
-  }, [grupos, auth, queryClient, debouncedSearch, ativoFilter])
+  }, [localGrupos, auth])
 
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px] pt-[30px] pb-[10px]">
+      <div className="px-[30px] pb-[4px]">
         <div className="flex items-start justify-between">
           <div className="w-1/2 pl-5">
-            <p className="text-primary text-sm font-semibold font-nunito mb-2">
+            <h1 className="text-primary text-xl font-semibold mb-1">
               Grupos Cadastrados
-            </p>
-            <p className="text-tertiary text-[26px] font-medium font-nunito">
-              Total {grupos.length} de {totalGrupos}
+            </h1>
+            <p className="text-tertiary text-lg font-medium font-nunito">
+              Total {localGrupos.length} de {totalGrupos}
             </p>
           </div>
           <button
@@ -256,10 +267,9 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
         </div>
       </div>
 
-      {/* Divisor amarelo */}
       <div className="relative">
         <div className="h-[63px] border-t-2 border-alternate"></div>
-        <div className="absolute top-3 left-[30px] right-[30px] flex gap-[10px]">
+        <div className="absolute top-3 left-[30px] right-[30px] flex gap-[10px] ">
           {/* Barra de pesquisa */}
           <div className="flex-[3]">
             <div className="h-[50px] relative">
@@ -286,7 +296,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
                     e.target.value as 'Todos' | 'Ativo' | 'Desativado'
                   )
                 }
-                className="w-[175px] h-full px-5 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text focus:outline-none focus:border-secondary font-nunito text-sm"
+                className="w-[175px] h-full px-5 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text focus:outline-none focus:border-secondary text-sm"
               >
                 <option value="Todos">Todos</option>
                 <option value="Ativo">Ativo</option>
@@ -298,7 +308,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       </div>
 
       {/* Cabeçalho da tabela */}
-      <div className="px-[30px] mt-0">
+      <div className="px-[30px] mt-2">
         <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px]">
           <div className="flex-[1] font-nunito font-semibold text-sm text-primary-text">
             Ordem
@@ -321,10 +331,11 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       {/* Lista de grupos com scroll e drag and drop */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-[30px] mt-2"
+        className="flex-1 overflow-y-auto px-[30px] mt-2 scrollbar-hide"
+        style={{ maxHeight: 'calc(100vh - 300px)' }}
       >
         {/* Skeleton loaders para carregamento inicial - sempre mostra durante loading */}
-        {(isLoading || (grupos.length === 0 && isFetching)) && (
+        {(isLoading || (localGrupos.length === 0 && isFetching)) && (
           <div className="space-y-2">
             {[...Array(8)].map((_, i) => (
               <div
@@ -341,7 +352,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
           </div>
         )}
 
-        {grupos.length === 0 && !isLoading && (
+        {localGrupos.length === 0 && !isLoading && (
           <div className="flex items-center justify-center py-12">
             <p className="text-secondary-text">Nenhum grupo encontrado.</p>
           </div>
@@ -353,10 +364,10 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
           onDragEnd={handleDragEnd}
         >
           <SortableContext
-            items={grupos.map((g) => g.getId())}
+            items={localGrupos.map((g) => g.getId())}
             strategy={verticalListSortingStrategy}
           >
-            {grupos.map((grupo, index) => (
+            {localGrupos.map((grupo: GrupoProduto, index: number) => (
               <GrupoItem
                 key={grupo.getId()}
                 grupo={grupo}
@@ -367,6 +378,13 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
           </SortableContext>
         </DndContext>
 
+        {/* Elemento sentinela para Intersection Observer - posicionado após todos os grupos */}
+        {hasNextPage && !isFetchingNextPage && (
+          <div ref={loadMoreRef} className="h-20 flex items-center justify-center">
+            {/* Espaço para trigger do observer */}
+          </div>
+        )}
+        
         {isFetchingNextPage && (
           <div className="flex justify-center py-4">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />

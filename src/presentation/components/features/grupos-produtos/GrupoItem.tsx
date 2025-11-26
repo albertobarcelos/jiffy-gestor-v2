@@ -67,7 +67,7 @@ export const GrupoItem = memo(function GrupoItem({ grupo, index, onStatusChanged
     <div
       ref={setNodeRef}
       style={style}
-      className="h-[50px] bg-info rounded-xl px-4 mb-2 flex items-center gap-[10px]"
+      className="h-[50px] bg-info rounded-xl px-4 mb-2 flex items-center gap-[10px] hover:bg-[var(--color-primary-background)] transition-colors cursor-default"
     >
       {/* Handle de arrastar - apenas esta área é arrastável */}
       <div
@@ -91,7 +91,7 @@ export const GrupoItem = memo(function GrupoItem({ grupo, index, onStatusChanged
       {/* Status */}
       <div className="flex-[2] flex justify-center cursor-default">
         <div
-          className={`w-20 px-3 py-1 rounded-[24px] text-center text-sm font-nunito font-medium ${statusClass}`}
+          className={`min-w-[100px] px-4 py-1 rounded-[24px] text-center text-sm font-nunito font-medium ${statusClass}`}
         >
           {isAtivo ? 'Ativo' : 'Desativado'}
         </div>

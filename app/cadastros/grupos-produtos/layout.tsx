@@ -2,7 +2,6 @@
 
 import { usePathname } from 'next/navigation'
 import { TopNav } from '@/src/presentation/components/layouts/TopNav'
-import { Header } from '@/src/presentation/components/layouts/Header'
 
 export default function GruposProdutosLayout({
   children,
@@ -13,10 +12,9 @@ export default function GruposProdutosLayout({
   const hideHeader = pathname?.includes('/novo') || pathname?.includes('/editar')
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopNav />
-      {!hideHeader && <Header nomePagina="Grupos de Produtos" />}
-      <main className={`${hideHeader ? '' : 'p-6'}`}>
+      <main className={`flex-1 flex flex-col ${hideHeader ? '' : 'p-6'}`}>
         {children}
       </main>
     </div>
