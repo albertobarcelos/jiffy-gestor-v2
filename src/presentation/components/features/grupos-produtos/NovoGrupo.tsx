@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { IconPickerModal } from './IconPickerModal'
+import { ColorPickerModal } from './ColorPickerModal'
 
 interface NovoGrupoProps {
   grupoId?: string
@@ -30,6 +31,7 @@ export function NovoGrupo({ grupoId }: NovoGrupoProps) {
   const [isLoadingData, setIsLoadingData] = useState(false)
   const [activeTab, setActiveTab] = useState(0)
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false)
+  const [isColorPickerOpen, setIsColorPickerOpen] = useState(false)
 
   const hasLoadedGrupoRef = useRef(false)
   const loadedGrupoIdRef = useRef<string | null>(null)
@@ -37,6 +39,35 @@ export function NovoGrupo({ grupoId }: NovoGrupoProps) {
   // Determina se está editando ou criando
   const effectiveGrupoId = grupoId || searchParams.get('id') || null
   const isEditMode = !!effectiveGrupoId
+
+  const normalizeColor = useCallback((value: string) => {
+    if (!value) return '#CCCCCC'
+    let hex = value.trim().replace('#', '')
+
+    if (hex.length === 3) {
+      hex = hex
+        .split('')
+        .map((char) => char + char)
+        .join('')
+    }
+
+    if (hex.length === 8) {
+      hex = hex.slice(2)
+    }
+
+    if (hex.length !== 6) {
+      return '#CCCCCC'
+    }
+
+    return `#${hex.toUpperCase()}`
+  }, [])
+
+  const handleColorSelect = useCallback(
+    (color: string) => {
+      setCorHex(normalizeColor(color))
+    },
+    [normalizeColor]
+  )
 
   // Carrega dados do grupo para edição
   useEffect(() => {
@@ -72,7 +103,7 @@ export function NovoGrupo({ grupoId }: NovoGrupoProps) {
 
         setNome(grupo.getNome())
         setAtivo(grupo.isAtivo())
-        setCorHex(grupo.getCorHex())
+        setCorHex(normalizeColor(grupo.getCorHex()))
         setIconName(grupo.getIconName())
         setAtivoDelivery(grupo.isAtivoDelivery())
         setAtivoLocal(grupo.isAtivoLocal())
@@ -231,15 +262,22 @@ export function NovoGrupo({ grupoId }: NovoGrupoProps) {
                 <div className="px-5 py-4 border-b border-secondary/10">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-custom-1 flex items-center justify-center">
-                        <span className="text-tertiary text-2xl">📦</span>
+                      <div
+                        className="w-12 h-12 rounded-[10px] bg-white border-2 flex items-center justify-center"
+                        style={{ borderColor: corHex || '#000000' }}
+                      >
+                        {iconName ? (
+                          <DinamicIcon iconName={iconName} color={corHex || '#000000'} size={28} />
+                        ) : (
+                          <span className="text-tertiary text-2xl">📦</span>
+                        )}
                       </div>
                       <div>
                         <h2 className="text-primary-text text-lg font-nunito font-semibold">
-                          Nome do Grupo
+                          {nome.trim() ? nome : 'Nome do Grupo'}
                         </h2>
                         <p className="text-secondary-text text-sm font-nunito">
-                          Definição do Ícone do Grupo
+                          {iconName ? `Ícone selecionado: ${iconName}` : 'Definição do Ícone do Grupo'}
                         </p>
                       </div>
                     </div>
@@ -285,20 +323,25 @@ export function NovoGrupo({ grupoId }: NovoGrupoProps) {
                         <label className="block text-primary-text text-sm font-nunito font-semibold mb-2">
                           Cor do Grupo
                         </label>
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="color"
-                            value={corHex}
-                            onChange={(e) => setCorHex(e.target.value)}
-                            className="w-16 h-12 rounded-lg border border-secondary/20 cursor-pointer"
-                          />
-                          <input
-                            type="text"
-                            value={corHex}
-                            onChange={(e) => setCorHex(e.target.value)}
-                            placeholder="#CCCCCC"
-                            className="flex-1 px-4 py-3 bg-primary-bg border border-secondary/20 rounded-lg text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary font-nunito"
-                          />
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => setIsColorPickerOpen(true)}
+                              className="w-16 h-12 rounded-lg border border-secondary/20 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                              style={{ backgroundColor: corHex || '#CCCCCC' }}
+                              aria-label="Selecionar cor do grupo"
+                            />
+                            
+                            <button
+                              type="button"
+                              onClick={() => setIsColorPickerOpen(true)}
+                              className="px-4 py-3 bg-primary text-info rounded-lg font-nunito text-sm font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
+                            >
+                              Escolher cor
+                            </button>
+                          </div>
+                          
                         </div>
                       </div>
 
@@ -307,14 +350,19 @@ export function NovoGrupo({ grupoId }: NovoGrupoProps) {
                         <label className="block text-primary-text text-sm font-nunito font-semibold mb-2">
                           Ícone do Grupo
                         </label>
-                        <div className="flex gap-3">
-                          <input
-                            type="text"
-                            value={iconName}
-                            onChange={(e) => setIconName(e.target.value)}
-                            placeholder="Nome do ícone"
-                            className="flex-1 px-4 py-3 bg-primary-bg border border-secondary/20 rounded-lg text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary font-nunito"
-                          />
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setIsIconPickerOpen(true)}
+                            className="w-12 h-12 rounded-lg border border-secondary/30 bg-white flex items-center justify-center hover:shadow-lg transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                            aria-label="Selecionar ícone"
+                          >
+                            {iconName ? (
+                              <DinamicIcon iconName={iconName} color="#000000" size={28} />
+                            ) : (
+                              <span className="text-xs text-secondary-text">Sem ícone</span>
+                            )}
+                          </button>
                           <button
                             type="button"
                             onClick={() => setIsIconPickerOpen(true)}
@@ -331,32 +379,47 @@ export function NovoGrupo({ grupoId }: NovoGrupoProps) {
                       <label className="block text-primary-text text-sm font-nunito font-semibold mb-2">
                         Preview do Ícone
                       </label>
-                      <button
-                        type="button"
-                        onClick={() => setIsIconPickerOpen(true)}
-                        className="group"
-                      >
-                        <div
-                          className="w-[45px] h-[45px] rounded-lg border-2 flex items-center justify-center transition-all hover:scale-110 hover:shadow-lg cursor-pointer"
-                          style={{
-                            backgroundColor: '#FFFFFF',
-                            borderColor: corHex,
-                          }}
+                      <div className="flex items-center gap-4">
+                        <button
+                          type="button"
+                          
+                          className="group cursor-default"
                         >
-                          {iconName ? (
-                            <DinamicIcon
-                              iconName={iconName}
-                              color={corHex}
-                              size={24}
-                            />
-                          ) : (
-                            <span className="text-lg">📦</span>
-                          )}
-                        </div>
-                        <p className="text-xs text-tertiary font-nunito mt-1">
-                          Clique para escolher ícone
-                        </p>
-                      </button>
+                          <div
+                            className="w-[45px] h-[45px] rounded-lg border-2 flex items-center justify-center transition-all hover:scale-110 hover:shadow-lg cursor-default"
+                            style={{
+                              backgroundColor: '#FFFFFF',
+                              borderColor: corHex,
+                            }}
+                          >
+                            {iconName ? (
+                              <DinamicIcon iconName={iconName} color={corHex} size={24} />
+                            ) : (
+                              <span className="text-lg">📦</span>
+                            )}
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          
+                          className="group cursor-default"
+                        >
+                          <div
+                            className="w-[45px] h-[45px] rounded-lg border-2 flex items-center justify-center transition-all hover:scale-110 hover:shadow-lg cursor-default"
+                            style={{
+                              backgroundColor: corHex || '#000000',
+                              borderColor: corHex,
+                            }}
+                          >
+                            {iconName ? (
+                              <DinamicIcon iconName={iconName} color="#FFFFFF" size={24} />
+                            ) : (
+                              <span className="text-lg text-white">📦</span>
+                            )}
+                          </div>
+                        </button>
+                      </div>
                     </div>
 
                     {/* Ativo Delivery e Local */}
@@ -413,6 +476,11 @@ export function NovoGrupo({ grupoId }: NovoGrupoProps) {
           setIsIconPickerOpen(false)
         }}
         selectedColor={corHex}
+      />
+      <ColorPickerModal
+        open={isColorPickerOpen}
+        onClose={() => setIsColorPickerOpen(false)}
+        onSelect={handleColorSelect}
       />
     </div>
   )
