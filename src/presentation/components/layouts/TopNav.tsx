@@ -173,7 +173,7 @@ export function TopNav() {
         {/* Logo */}
         <div className="flex items-center">
           <Link href="/dashboard" className="flex items-center">
-            <div className="relative w-44 h-12 sm:w-52 sm:h-14">
+            <div className="relative w-12 h-12 sm:w-20 sm:h-14">
               <Image
                 src="/images/jiffy-head.png"
                 alt="Jiffy"
