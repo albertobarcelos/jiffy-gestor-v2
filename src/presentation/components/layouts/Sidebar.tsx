@@ -95,7 +95,8 @@ export function Sidebar() {
     },
     { name: 'Estoque', path: '/estoque', icon: '📦' },
     { name: 'Meu Caixa', path: '/meu-caixa', icon: '💼' },
-    { name: 'Fiscal Flow', path: '/fiscal-flow', icon: '📄' },
+    { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: '📄' },
+    { name: 'Painel do Contador', path: '/painel-contador', icon: '📊' },
     { name: 'Relatórios', path: '/relatorios', icon: '📊' },
     { name: 'Configurações', path: '/configuracoes', icon: '⚙️' },
   ]
@@ -221,9 +222,10 @@ export function Sidebar() {
                         ? 'bg-info/20 text-info font-semibold'
                         : 'text-info/80 hover:bg-info/10'
                     }`}
+                    title={item.name === 'Configurações' ? item.name : undefined}
                   >
                     <span className="text-xl">{item.icon}</span>
-                    {!isCompact && <span>{item.name}</span>}
+                    {!isCompact && item.name !== 'Configurações' && <span>{item.name}</span>}
                   </Link>
                 </li>
               )

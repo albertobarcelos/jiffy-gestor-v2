@@ -158,7 +158,7 @@ export function NFeKanbanSimple() {
                     color: 'text.primary',
                   }}
                 >
-                  Fiscal Flow
+                  Pedidos e Clientes
                 </Typography>
               </Box>
               <Typography

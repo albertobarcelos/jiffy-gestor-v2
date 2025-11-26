@@ -2,7 +2,7 @@
 
 import { TopNav } from '@/src/presentation/components/layouts/TopNav'
 
-export default function FiscalFlowLayout({
+export default function PedidosClientesLayout({
   children,
 }: {
   children: React.ReactNode

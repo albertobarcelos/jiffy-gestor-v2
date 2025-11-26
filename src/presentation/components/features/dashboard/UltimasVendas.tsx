@@ -28,20 +28,10 @@ export function UltimasVendas() {
         // Buscar últimas vendas da API
         const baseUrl = process.env.NEXT_PUBLIC_EXTERNAL_API_BASE_URL || ''
         
-        // Calcular data de 7 dias atrás para buscar últimas vendas
-        const hoje = new Date()
-        const seteDiasAtras = new Date(hoje)
-        seteDiasAtras.setDate(hoje.getDate() - 7)
-        
-        // Formatar datas no formato ISO (YYYY-MM-DD)
-        const periodoInicial = seteDiasAtras.toISOString().split('T')[0]
-        const periodoFinal = hoje.toISOString().split('T')[0]
-
-        // Buscar vendas finalizadas dos últimos 7 dias, ordenadas por data (mais recentes primeiro)
+        // Buscar as últimas vendas (sem filtro de status fixo, apenas excluindo canceladas)
+        // A API deve retornar ordenadas por data (mais recentes primeiro)
         const params = new URLSearchParams({
-          status: 'FINALIZADA',
-          periodoInicial,
-          periodoFinal,
+          cancelado: 'false', // Excluir apenas vendas canceladas
           limit: '10',
           offset: '0',
         })
@@ -59,50 +49,67 @@ export function UltimasVendas() {
 
         const data = await response.json()
         
+        // A API retorna apenas abertoPorId (ID), não o nome do usuário
+        // Precisamos buscar os nomes dos usuários usando os IDs
+        const vendas = data.items || []
+        
+        // Coletar todos os IDs únicos de usuários
+        const usuariosIds = Array.from(
+          new Set(
+            vendas
+              .map((venda: any) => venda.abertoPorId)
+              .filter((id: any): id is string => Boolean(id)) // Remove undefined/null e garante tipo string
+          )
+        ) as string[]
+        
+        // Buscar nomes dos usuários em paralelo
+        const usuariosMap = new Map<string, string>()
+        
+        if (usuariosIds.length > 0) {
+          const usuariosPromises = usuariosIds.map(async (usuarioId: string) => {
+            try {
+              const usuarioResponse = await fetch(
+                `${baseUrl}/api/v1/pessoas/usuarios-pdv/${usuarioId}`,
+                {
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                }
+              )
+              
+              if (usuarioResponse.ok) {
+                const usuarioData = await usuarioResponse.json()
+                return { id: usuarioId, nome: usuarioData.nome || 'Usuário Desconhecido' }
+              }
+              return { id: usuarioId, nome: 'Usuário Desconhecido' }
+            } catch (error) {
+              console.error(`Erro ao buscar usuário ${usuarioId}:`, error)
+              return { id: usuarioId, nome: 'Usuário Desconhecido' }
+            }
+          })
+          
+          const usuarios = await Promise.all(usuariosPromises)
+          usuarios.forEach(({ id, nome }) => {
+            usuariosMap.set(id, nome)
+          })
+        }
+        
         // Mapear dados da API para entidade Venda
-        const vendasMapeadas: Venda[] = (data.items || []).map((item: any) => {
-          // Debug: Log apenas da primeira venda para verificar estrutura
-          if (data.items.indexOf(item) === 0) {
-            console.log('🔍 Estrutura da primeira venda da API:', {
-              id: item.id,
-              numeroVenda: item.numeroVenda,
-              abertoPor: item.abertoPor,
-              usuarioPdv: item.usuarioPdv,
-              usuario: item.usuario,
-              todasAsChaves: Object.keys(item)
-            })
-          }
+        const vendasMapeadas: Venda[] = vendas.map((item: any) => {
+          // Buscar nome do usuário usando o mapa
+          const usuario = item.abertoPorId 
+            ? usuariosMap.get(item.abertoPorId) || 'Usuário Desconhecido'
+            : 'Usuário Desconhecido'
           
-          // Mapear campos da API para a entidade Venda
-          // Tentar diferentes caminhos possíveis para o nome do usuário
-          let usuario = 'Usuário'
-          
-          // Tentar diferentes estruturas possíveis
-          if (item.abertoPor?.nome) {
-            usuario = item.abertoPor.nome
-          } else if (item.usuarioPdv?.nome) {
-            usuario = item.usuarioPdv.nome
-          } else if (item.usuario?.nome) {
-            usuario = item.usuario.nome
-          } else if (item.abertoPorNome) {
-            usuario = item.abertoPorNome
-          } else if (item.usuarioNome) {
-            usuario = item.usuarioNome
-          } else if (item.nomeUsuario) {
-            usuario = item.nomeUsuario
-          } else if (typeof item.abertoPor === 'string') {
-            usuario = item.abertoPor
-          } else if (typeof item.usuario === 'string') {
-            usuario = item.usuario
-          } else if (item.abertoPor?.usuario?.nome) {
-            usuario = item.abertoPor.usuario.nome
-          }
-          
-          const dataVenda = item.dataCriacao ? new Date(item.dataCriacao) : 
+          // Mapear data da venda (priorizar dataFinalizacao, depois dataCriacao)
+          const dataVenda = item.dataFinalizacao ? new Date(item.dataFinalizacao) :
+                           item.dataCriacao ? new Date(item.dataCriacao) : 
                            item.data ? new Date(item.data) : 
                            item.createdAt ? new Date(item.createdAt) : 
                            item.dataAbertura ? new Date(item.dataAbertura) :
                            new Date()
+          
           const valorFaturado = item.valorFinal || item.valorTotal || item.valor || 0
           const numeroVenda = item.numeroVenda || item.numero || item.id || ''
           const tipoVenda = item.tipoVenda || item.tipo || 'Balcão'
@@ -131,7 +138,15 @@ export function UltimasVendas() {
           )
         })
 
-        setVendas(vendasMapeadas)
+        // Ordenar vendas por data (mais recentes primeiro) caso a API não retorne ordenado
+        vendasMapeadas.sort((a, b) => {
+          const dataA = a.getData().getTime()
+          const dataB = b.getData().getTime()
+          return dataB - dataA // Ordem decrescente (mais recente primeiro)
+        })
+
+        // Limitar a 10 vendas mais recentes
+        setVendas(vendasMapeadas.slice(0, 10))
       } catch (error) {
         console.error('Erro ao carregar vendas:', error)
         // Em caso de erro, manter array vazio ao invés de dados mockados
@@ -178,7 +193,7 @@ export function UltimasVendas() {
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-gray-900">Últimas Vendas</h3>
-        <span className="text-sm text-gray-500">Última semana</span>
+        <span className="text-sm text-gray-500">Mais recentes</span>
       </div>
 
       <div className="space-y-4">
