@@ -80,8 +80,8 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const loadMoreRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Debounce da busca (500ms)
   useEffect(() => {
@@ -129,43 +129,32 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     return data?.pages[0]?.count || 0
   }, [data])
 
-  // Handler de scroll com throttle para melhor performance
-  const handleScroll = useCallback(() => {
-    if (scrollTimeoutRef.current) {
-      return // Ignora se já há um timeout pendente
-    }
-
-    scrollTimeoutRef.current = setTimeout(() => {
-      const container = scrollContainerRef.current
-      if (!container) return
-
-      const { scrollTop, scrollHeight, clientHeight } = container
-      const distanceFromBottom = scrollHeight - (scrollTop + clientHeight)
-      
-      // Carregar próxima página quando estiver a 400px do final (prefetch mais agressivo)
-      if (distanceFromBottom < 400) {
-        if (hasNextPage && !isFetchingNextPage) {
-          fetchNextPage()
-        }
-      }
-
-      scrollTimeoutRef.current = null
-    }, 100) // Throttle de 100ms
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
-
-  // Scroll infinito com prefetching inteligente e throttle
+  // Intersection Observer para carregar 10 em 10
   useEffect(() => {
-    const container = scrollContainerRef.current
-    if (!container) return
+    const sentinel = loadMoreRef.current
+    if (!sentinel || !hasNextPage || isFetchingNextPage || isFetching) return
 
-    container.addEventListener('scroll', handleScroll, { passive: true })
-    return () => {
-      container.removeEventListener('scroll', handleScroll)
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current)
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && hasNextPage && !isFetchingNextPage && !isFetching) {
+            fetchNextPage()
+          }
+        })
+      },
+      {
+        root: scrollContainerRef.current,
+        rootMargin: '10px',
+        threshold: 0.1,
       }
+    )
+
+    observer.observe(sentinel)
+
+    return () => {
+      observer.disconnect()
     }
-  }, [handleScroll])
+  }, [hasNextPage, isFetchingNextPage, isFetching, fetchNextPage, produtos.length])
 
   // Notificar erro
   useEffect(() => {
@@ -315,6 +304,10 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
             onStatusChanged={handleStatusChange}
           />
         ))}
+
+        {hasNextPage && !isFetchingNextPage && (
+          <div ref={loadMoreRef} className="h-10" />
+        )}
 
         {isFetchingNextPage && (
           <div className="flex justify-center py-4">
