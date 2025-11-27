@@ -70,7 +70,7 @@ export function ProdutoActionsMenu({
       }
 
       const response = await fetch(`/api/produtos/${produtoId}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,

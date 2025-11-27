@@ -9,7 +9,11 @@ export class Produto {
     private readonly valor: number,
     private readonly ativo: boolean,
     private readonly nomeGrupo?: string,
-    private readonly estoque?: number | string
+    private readonly estoque?: number | string,
+    private readonly favorito?: boolean,
+    private readonly abreComplementos?: boolean,
+    private readonly permiteAcrescimo?: boolean,
+    private readonly permiteDesconto?: boolean
   ) {}
 
   static create(
@@ -19,13 +23,29 @@ export class Produto {
     valor: number,
     ativo: boolean,
     nomeGrupo?: string,
-    estoque?: number | string
+    estoque?: number | string,
+    favorito?: boolean,
+    abreComplementos?: boolean,
+    permiteAcrescimo?: boolean,
+    permiteDesconto?: boolean
   ): Produto {
     if (!id || !nome) {
       throw new Error('ID e nome são obrigatórios')
     }
 
-    return new Produto(id, codigoProduto, nome, valor, ativo, nomeGrupo, estoque)
+    return new Produto(
+      id,
+      codigoProduto,
+      nome,
+      valor,
+      ativo,
+      nomeGrupo,
+      estoque,
+      favorito,
+      abreComplementos,
+      permiteAcrescimo,
+      permiteDesconto
+    )
   }
 
   static fromJSON(data: any): Produto {
@@ -36,7 +56,11 @@ export class Produto {
       typeof data.valor === 'number' ? data.valor : parseFloat(data.valor) || 0,
       data.ativo === true || data.ativo === 'true',
       data.nomeGrupo?.toString(),
-      data.estoque
+      data.estoque,
+      data.favorito === true || data.favorito === 'true',
+      data.abreComplementos === true || data.abreComplementos === 'true',
+      data.permiteAcrescimo === true || data.permiteAcrescimo === 'true',
+      data.permiteDesconto === true || data.permiteDesconto === 'true'
     )
   }
 
@@ -68,6 +92,22 @@ export class Produto {
     return this.estoque
   }
 
+  isFavorito(): boolean {
+    return this.favorito === true
+  }
+
+  abreComplementosAtivo(): boolean {
+    return this.abreComplementos === true
+  }
+
+  permiteAcrescimoAtivo(): boolean {
+    return this.permiteAcrescimo === true
+  }
+
+  permiteDescontoAtivo(): boolean {
+    return this.permiteDesconto === true
+  }
+
   toJSON() {
     return {
       id: this.id,
@@ -77,6 +117,10 @@ export class Produto {
       ativo: this.ativo,
       nomeGrupo: this.nomeGrupo,
       estoque: this.estoque,
+      favorito: this.favorito,
+      abreComplementos: this.abreComplementos,
+      permiteAcrescimo: this.permiteAcrescimo,
+      permiteDesconto: this.permiteDesconto,
     }
   }
 }

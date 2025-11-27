@@ -9,6 +9,18 @@ import Link from 'next/link'
 import { Produto } from '@/src/domain/entities/Produto'
 import { showToast } from '@/src/shared/utils/toast'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import {
+  MdKeyboardArrowDown,
+  MdImage,
+  MdModeEdit,
+  MdContentCopy,
+  MdStarBorder,
+  MdPrint,
+  MdExtension,
+  MdAddCircleOutline,
+  MdRemoveCircleOutline,
+  MdLaunch,
+} from 'react-icons/md'
 
 // Lazy load do menu de ações para reduzir bundle inicial
 const ProdutoActionsMenu = lazy(() => import('./ProdutoActionsMenu').then(module => ({ default: module.ProdutoActionsMenu })))
@@ -17,7 +29,60 @@ interface ProdutosListProps {
   onReload?: () => void
 }
 
-const cloneProdutoWithChanges = (produto: Produto, changes: { valor?: number; ativo?: boolean }) => {
+type ToggleField = 'favorito' | 'permiteAcrescimo' | 'permiteDesconto' | 'abreComplementos'
+
+const toggleFieldConfig: Record<
+  ToggleField,
+  { bodyKey: string; successTrue: string; successFalse: string }
+> = {
+  favorito: {
+    bodyKey: 'favorito',
+    successTrue: 'Produto marcado como favorito!',
+    successFalse: 'Produto removido dos favoritos!',
+  },
+  permiteAcrescimo: {
+    bodyKey: 'permiteAcrescimo',
+    successTrue: 'Acréscimo habilitado para o produto!',
+    successFalse: 'Acréscimo desabilitado para o produto!',
+  },
+  permiteDesconto: {
+    bodyKey: 'permiteDesconto',
+    successTrue: 'Desconto habilitado para o produto!',
+    successFalse: 'Desconto desabilitado para o produto!',
+  },
+  abreComplementos: {
+    bodyKey: 'abreComplementos',
+    successTrue: 'Complementos habilitados!',
+    successFalse: 'Complementos desabilitados!',
+  },
+}
+
+const buildToggleChange = (field: ToggleField, value: boolean) => {
+  switch (field) {
+    case 'favorito':
+      return { favorito: value }
+    case 'permiteAcrescimo':
+      return { permiteAcrescimo: value }
+    case 'permiteDesconto':
+      return { permiteDesconto: value }
+    case 'abreComplementos':
+      return { abreComplementos: value }
+    default:
+      return {}
+  }
+}
+
+const cloneProdutoWithChanges = (
+  produto: Produto,
+  changes: {
+    valor?: number
+    ativo?: boolean
+    favorito?: boolean
+    permiteAcrescimo?: boolean
+    permiteDesconto?: boolean
+    abreComplementos?: boolean
+  }
+) => {
   return Produto.create(
     produto.getId(),
     produto.getCodigoProduto(),
@@ -25,8 +90,29 @@ const cloneProdutoWithChanges = (produto: Produto, changes: { valor?: number; at
     changes.valor ?? produto.getValor(),
     changes.ativo ?? produto.isAtivo(),
     produto.getNomeGrupo(),
-    produto.getEstoque()
+    produto.getEstoque(),
+    changes.favorito ?? produto.isFavorito(),
+    changes.abreComplementos ?? produto.abreComplementosAtivo(),
+    changes.permiteAcrescimo ?? produto.permiteAcrescimoAtivo(),
+    changes.permiteDesconto ?? produto.permiteDescontoAtivo()
   )
+}
+
+const collator = new Intl.Collator('pt-BR', { sensitivity: 'accent', numeric: false })
+
+const normalizeGroupName = (nome?: string) => (nome && nome.trim().length > 0 ? nome : 'Sem grupo')
+
+const sortProdutosAlphabetically = (lista: Produto[]): Produto[] => {
+  return [...lista].sort((a, b) => {
+    const grupoCompare = collator.compare(
+      normalizeGroupName(a.getNomeGrupo()),
+      normalizeGroupName(b.getNomeGrupo())
+    )
+    if (grupoCompare !== 0) {
+      return grupoCompare
+    }
+    return collator.compare(a.getNome(), b.getNome())
+  })
 }
 
 /**
@@ -37,6 +123,8 @@ const ProdutoListItem = memo(function ProdutoListItem({
   onValorChange,
   onSwitchToggle,
   onMenuStatusChanged,
+  onToggleBoolean,
+  savingToggleState,
   isSavingValor,
   isSavingStatus,
 }: {
@@ -44,11 +132,22 @@ const ProdutoListItem = memo(function ProdutoListItem({
   onValorChange?: (valor: number) => void
   onSwitchToggle?: (status: boolean) => void
   onMenuStatusChanged?: () => void
+  onToggleBoolean?: (field: ToggleField, value: boolean) => void
+  savingToggleState?: Partial<Record<ToggleField, boolean>>
   isSavingValor?: boolean
   isSavingStatus?: boolean
 }) {
   const valorFormatado = useMemo(() => transformarParaReal(produto.getValor()), [produto])
   const isAtivo = useMemo(() => produto.isAtivo(), [produto])
+  const toggleStates = useMemo(
+    () => ({
+      favorito: produto.isFavorito(),
+      permiteAcrescimo: produto.permiteAcrescimoAtivo(),
+      permiteDesconto: produto.permiteDescontoAtivo(),
+      abreComplementos: produto.abreComplementosAtivo(),
+    }),
+    [produto]
+  )
   const [valorInput, setValorInput] = useState(produto.getValor().toFixed(2))
 
   useEffect(() => {
@@ -77,15 +176,44 @@ const ProdutoListItem = memo(function ProdutoListItem({
     onValorChange(parsed)
   }, [onValorChange, normalizeValor, valorInput, produto])
 
+  const actionIcons = useMemo(
+    () => [
+      { key: 'copiar', label: 'Copiar', Icon: MdContentCopy },
+      { key: 'favorito', label: 'Favorito', Icon: MdStarBorder, field: 'favorito' as ToggleField },
+      { key: 'impressora', label: 'Impressora', Icon: MdPrint },
+      { key: 'complementos', label: 'Complementos', Icon: MdExtension },
+      {
+        key: 'acrescentar',
+        label: 'Permitir acréscimo',
+        Icon: MdAddCircleOutline,
+        field: 'permiteAcrescimo' as ToggleField,
+      },
+      {
+        key: 'diminuir',
+        label: 'Permitir desconto',
+        Icon: MdRemoveCircleOutline,
+        field: 'permiteDesconto' as ToggleField,
+      },
+      {
+        key: 'abrir',
+        label: 'Abrir complementos',
+        Icon: MdLaunch,
+        field: 'abreComplementos' as ToggleField,
+      },
+    ],
+    []
+  )
+
   return (
     <div className="bg-white border border-gray-100 rounded-2xl px-4 py-4 mb-3 shadow-sm flex items-center gap-4">
-      <div className="w-14 h-14 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400 text-xl">
-        <span>📦</span>
+      <div className="w-14 h-14 rounded-xl bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-2xl">
+        <MdImage />
       </div>
 
       <div className="flex-1">
         <div className="flex items-center gap-3 flex-wrap">
-          <p className="text-primary-text font-semibold font-nunito text-base">
+          <p className="text-primary-text font-semibold font-nunito text-base flex items-center gap-2">
+            <MdModeEdit className="text-[var(--color-primary)] text-xl" aria-label="Editar" />
             {produto.getNome()}
             <span className="text-sm text-secondary-text ml-2 inline-flex items-center gap-1">
               <span className="text-xs">Cód. </span>
@@ -94,15 +222,43 @@ const ProdutoListItem = memo(function ProdutoListItem({
           </p>
         </div>
         <div className="flex items-center gap-2 mt-2">
-          {['📷', '📄', '⭐', '🏁', '🔗', '💾'].map((icon, index) => (
-            <span
-              key={`${produto.getId()}-${index}`}
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-xs 
-                ${index === 1 ? 'bg-primary text-white' : 'bg-gray-100 text-gray-400'}`}
-            >
-              {icon}
-            </span>
-          ))}
+          {actionIcons.map(({ key, label, Icon, field }) => {
+            if (field) {
+              const isActive = toggleStates[field]
+              const isLoading = Boolean(savingToggleState?.[field])
+              const iconColor = isActive ? 'text-primary' : 'text-white'
+              const bgColor = isActive
+                ? 'bg-primary/5 border border-primary'
+                : 'bg-gray-300 border border-transparent'
+
+              return (
+                <button
+                  key={`${produto.getId()}-${key}`}
+                  type="button"
+                  title={label}
+                  disabled={isLoading}
+                  onClick={() => onToggleBoolean?.(field, !isActive)}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-lg transition-all ${bgColor} ${iconColor} ${
+                    isLoading
+                      ? 'opacity-60 cursor-not-allowed'
+                      : 'hover:bg-primary/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+                  }`}
+                >
+                  <Icon />
+                </button>
+              )
+            }
+
+            return (
+              <span
+                key={`${produto.getId()}-${key}`}
+                title={label}
+                className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-lg"
+              >
+                <Icon />
+              </span>
+            )
+          })}
         </div>
       </div>
 
@@ -131,7 +287,7 @@ const ProdutoListItem = memo(function ProdutoListItem({
         </div>
         <div className="flex items-center">
           <label
-            className={`relative inline-flex items-center ${isSavingStatus ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+            className={`relative inline-flex h-7 w-12 items-center ${isSavingStatus ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
           >
             <input
               type="checkbox"
@@ -140,11 +296,12 @@ const ProdutoListItem = memo(function ProdutoListItem({
               onChange={(event) => onSwitchToggle?.(event.target.checked)}
               disabled={isSavingStatus}
             />
-            <div className="w-12 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:bg-green-500 transition relative">
-              <div
-                className="absolute w-5 h-5 bg-white rounded-full mt-0.5 ml-0.5 transition-all peer-checked:translate-x-6"
-              />
-            </div>
+            <div
+              className="h-full w-full rounded-full bg-gray-300 transition-colors peer-focus:ring-2 peer-focus:ring-primary peer-checked:bg-accent1"
+            />
+            <span
+              className="absolute left-1 top-1/2 block h-5 w-5 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-5"
+            />
           </label>
         </div>
         <Suspense fallback={<div className="h-10 w-10" />}>
@@ -175,7 +332,23 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
   const [localProdutos, setLocalProdutos] = useState<Produto[]>([])
   const [savingValorMap, setSavingValorMap] = useState<Record<string, boolean>>({})
   const [savingStatusMap, setSavingStatusMap] = useState<Record<string, boolean>>({})
-  const pendingUpdatesRef = useRef(new Map<string, { valor?: number; ativo?: boolean }>())
+  const [savingToggleMap, setSavingToggleMap] = useState<
+    Record<string, Partial<Record<ToggleField, boolean>>>
+  >({})
+  const pendingUpdatesRef = useRef<
+    Map<
+      string,
+      {
+        valor?: number
+        ativo?: boolean
+        favorito?: boolean
+        permiteAcrescimo?: boolean
+        permiteDesconto?: boolean
+        abreComplementos?: boolean
+      }
+    >
+  >(new Map())
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
   const token = auth?.getAccessToken()
   const invalidateProdutosQueries = useCallback(async () => {
     await queryClient.invalidateQueries({
@@ -183,20 +356,67 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
       exact: false,
     })
   }, [queryClient])
-  const setPendingUpdate = useCallback((produtoId: string, changes: { valor?: number; ativo?: boolean }) => {
-    const current = pendingUpdatesRef.current.get(produtoId) || {}
-    pendingUpdatesRef.current.set(produtoId, { ...current, ...changes })
-  }, [])
-  const clearPendingUpdateField = useCallback((produtoId: string, field: 'valor' | 'ativo') => {
-    const current = pendingUpdatesRef.current.get(produtoId)
-    if (!current) return
-    const updated = { ...current }
-    delete updated[field]
-    if (Object.keys(updated).length === 0) {
-      pendingUpdatesRef.current.delete(produtoId)
-    } else {
-      pendingUpdatesRef.current.set(produtoId, updated)
-    }
+  const setPendingUpdate = useCallback(
+    (
+      produtoId: string,
+      changes: {
+        valor?: number
+        ativo?: boolean
+        favorito?: boolean
+        permiteAcrescimo?: boolean
+        permiteDesconto?: boolean
+        abreComplementos?: boolean
+      }
+    ) => {
+      const current = pendingUpdatesRef.current.get(produtoId) || {}
+      pendingUpdatesRef.current.set(produtoId, { ...current, ...changes })
+    },
+    []
+  )
+  const clearPendingUpdateField = useCallback(
+    (
+      produtoId: string,
+      field:
+        | 'valor'
+        | 'ativo'
+        | 'favorito'
+        | 'permiteAcrescimo'
+        | 'permiteDesconto'
+        | 'abreComplementos'
+    ) => {
+      const current = pendingUpdatesRef.current.get(produtoId)
+      if (!current) return
+      const updated = { ...current }
+      delete updated[field]
+      if (Object.keys(updated).length === 0) {
+        pendingUpdatesRef.current.delete(produtoId)
+      } else {
+        pendingUpdatesRef.current.set(produtoId, updated)
+      }
+    },
+    []
+  )
+  const setSavingToggleState = useCallback((produtoId: string, field: ToggleField, value: boolean) => {
+    setSavingToggleMap((prev) => {
+      const current = prev[produtoId] || {}
+      if (value) {
+        return {
+          ...prev,
+          [produtoId]: { ...current, [field]: true },
+        }
+      }
+
+      const { [field]: _, ...restFields } = current
+      if (Object.keys(restFields).length === 0) {
+        const { [produtoId]: __, ...restProducts } = prev
+        return restProducts
+      }
+
+      return {
+        ...prev,
+        [produtoId]: restFields,
+      }
+    })
   }, [])
 
   // Debounce da busca (500ms)
@@ -260,17 +480,28 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
       return cloneProdutoWithChanges(produto, pending)
     })
 
-    setLocalProdutos(merged)
+    const sorted = sortProdutosAlphabetically(merged)
+    setLocalProdutos(sorted)
 
     produtos.forEach((produto) => {
       const pending = pendingUpdatesRef.current.get(produto.getId())
       if (!pending) return
       const valorOk =
         pending.valor === undefined || produto.getValor() === Number(pending.valor)
-      const ativoOk =
-        pending.ativo === undefined || produto.isAtivo() === pending.ativo
+      const ativoOk = pending.ativo === undefined || produto.isAtivo() === pending.ativo
+      const favoritoOk =
+        pending.favorito === undefined || produto.isFavorito() === pending.favorito
+      const acrescimoOk =
+        pending.permiteAcrescimo === undefined ||
+        produto.permiteAcrescimoAtivo() === pending.permiteAcrescimo
+      const descontoOk =
+        pending.permiteDesconto === undefined ||
+        produto.permiteDescontoAtivo() === pending.permiteDesconto
+      const abreComplementosOk =
+        pending.abreComplementos === undefined ||
+        produto.abreComplementosAtivo() === pending.abreComplementos
 
-      if (valorOk && ativoOk) {
+      if (valorOk && ativoOk && favoritoOk && acrescimoOk && descontoOk && abreComplementosOk) {
         pendingUpdatesRef.current.delete(produto.getId())
       }
     })
@@ -279,7 +510,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
   const produtosAgrupados = useMemo(() => {
     const gruposMap = new Map<string, Produto[]>()
     localProdutos.forEach((produto) => {
-      const grupo = produto.getNomeGrupo() || 'Sem grupo'
+      const grupo = normalizeGroupName(produto.getNomeGrupo())
       if (!gruposMap.has(grupo)) {
         gruposMap.set(grupo, [])
       }
@@ -287,6 +518,31 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     })
     return Array.from(gruposMap.entries())
   }, [localProdutos])
+
+  useEffect(() => {
+    setExpandedGroups((prev) => {
+      const gruposAtuais = new Set(produtosAgrupados.map(([grupo]) => grupo))
+      let changed = false
+      const novoEstado: Record<string, boolean> = {}
+
+      produtosAgrupados.forEach(([grupo]) => {
+        if (typeof prev[grupo] === 'undefined') {
+          changed = true
+          novoEstado[grupo] = true
+        } else {
+          novoEstado[grupo] = prev[grupo]
+        }
+      })
+
+      Object.keys(prev).forEach((grupo) => {
+        if (!gruposAtuais.has(grupo)) {
+          changed = true
+        }
+      })
+
+      return changed ? novoEstado : prev
+    })
+  }, [produtosAgrupados])
 
   // Intersection Observer para carregar 10 em 10
   useEffect(() => {
@@ -353,7 +609,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
         const updated = cloneProdutoWithChanges(prev[index], { valor: novoValor })
         const clone = [...prev]
         clone[index] = updated
-        return clone
+        return sortProdutosAlphabetically(clone)
       })
 
       try {
@@ -389,7 +645,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
           } else {
             clone[index] = previousProduto
           }
-          return clone
+          return sortProdutosAlphabetically(clone)
         })
         clearPendingUpdateField(produtoId, 'valor')
         showToast.error(error.message || 'Erro ao atualizar valor do produto')
@@ -437,12 +693,12 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
           clone.splice(index, 1)
         }
 
-        return clone
+        return sortProdutosAlphabetically(clone)
       })
 
       try {
         const response = await fetch(`/api/produtos/${produtoId}`, {
-          method: 'PUT',
+          method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
@@ -475,7 +731,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
               previousIndex >= 0 ? Math.min(previousIndex, clone.length) : clone.length
             clone.splice(insertIndex, 0, previousProduto)
           }
-          return clone
+          return sortProdutosAlphabetically(clone)
         })
         clearPendingUpdateField(produtoId, 'ativo')
         showToast.error(error.message || 'Erro ao atualizar status do produto')
@@ -489,10 +745,101 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     [token, filterStatus, onReload, localProdutos, setPendingUpdate, clearPendingUpdateField, invalidateProdutosQueries]
   )
 
+  const handleToggleBooleanField = useCallback(
+    async (produtoId: string, field: ToggleField, novoValor: boolean) => {
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      const currentIndex = localProdutos.findIndex((produto) => produto.getId() === produtoId)
+      if (currentIndex === -1) {
+        showToast.error('Produto não encontrado na lista.')
+        return
+      }
+
+      const previousProduto = localProdutos[currentIndex]
+      let previousIndex = currentIndex
+
+      const config = toggleFieldConfig[field]
+      const change = buildToggleChange(field, novoValor)
+
+      setSavingToggleState(produtoId, field, true)
+      setPendingUpdate(produtoId, change)
+      setLocalProdutos((prev) => {
+        const index = prev.findIndex((produto) => produto.getId() === produtoId)
+        if (index === -1) {
+          return prev
+        }
+        const updated = cloneProdutoWithChanges(prev[index], change)
+        const clone = [...prev]
+        clone[index] = updated
+        return sortProdutosAlphabetically(clone)
+      })
+
+      try {
+        const response = await fetch(`/api/produtos/${produtoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ [config.bodyKey]: novoValor }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || 'Erro ao atualizar produto')
+        }
+
+        showToast.success(novoValor ? config.successTrue : config.successFalse)
+        onReload?.()
+        await invalidateProdutosQueries()
+      } catch (error: any) {
+        console.error('Erro ao atualizar produto:', error)
+        setLocalProdutos((prev) => {
+          if (!previousProduto) {
+            return prev
+          }
+          const clone = [...prev]
+          const index = clone.findIndex((produto) => produto.getId() === produtoId)
+          if (index === -1) {
+            const insertIndex =
+              previousIndex >= 0 ? Math.min(previousIndex, clone.length) : clone.length
+            clone.splice(insertIndex, 0, previousProduto)
+          } else {
+            clone[index] = previousProduto
+          }
+          return sortProdutosAlphabetically(clone)
+        })
+        clearPendingUpdateField(produtoId, field)
+        showToast.error(error.message || 'Erro ao atualizar produto')
+      } finally {
+        setSavingToggleState(produtoId, field, false)
+      }
+    },
+    [
+      token,
+      onReload,
+      localProdutos,
+      setPendingUpdate,
+      clearPendingUpdateField,
+      invalidateProdutosQueries,
+      setSavingToggleState,
+    ]
+  )
+
   const handleMenuStatusChanged = useCallback(() => {
     onReload?.()
     invalidateProdutosQueries()
   }, [invalidateProdutosQueries, onReload])
+
+  const handleToggleGroup = useCallback((grupo: string) => {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [grupo]: !prev[grupo],
+    }))
+  }, [])
 
   return (
     <div className="flex flex-col h-full">
@@ -599,21 +946,40 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
                 </p>
                 <p className="text-xs text-secondary-text">{items.length} produtos</p>
               </div>
+              <button
+                type="button"
+                onClick={() => handleToggleGroup(grupo)}
+                className="flex items-center gap-1 text-primary text-sm font-semibold hover:text-primary/80 transition-colors"
+                aria-expanded={expandedGroups[grupo] !== false}
+              >
+                <span>{expandedGroups[grupo] === false ? 'Exibir' : 'Ocultar'}</span>
+                <MdKeyboardArrowDown
+                  className={`text-lg transition-transform ${expandedGroups[grupo] === false ? '-rotate-90' : 'rotate-0'}`}
+                />
+              </button>
             </div>
 
-            <div className="space-y-3">
-              {items.map((produto) => (
-                <ProdutoListItem
-                  key={produto.getId()}
-                  produto={produto}
-                  onValorChange={(valor) => handleValorUpdate(produto.getId(), valor)}
-                  onSwitchToggle={(status) => handleStatusToggle(produto.getId(), status)}
-                  onMenuStatusChanged={handleMenuStatusChanged}
-                  isSavingValor={Boolean(savingValorMap[produto.getId()])}
-                  isSavingStatus={Boolean(savingStatusMap[produto.getId()])}
-                />
-              ))}
-            </div>
+            {expandedGroups[grupo] === false ? (
+              <div className="rounded-xl border border-dashed border-secondary/40 px-4 py-3 text-sm text-secondary-text">
+                Produtos ocultos. Clique em "Exibir" para visualizar.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {items.map((produto) => (
+                  <ProdutoListItem
+                    key={produto.getId()}
+                    produto={produto}
+                    onValorChange={(valor) => handleValorUpdate(produto.getId(), valor)}
+                    onSwitchToggle={(status) => handleStatusToggle(produto.getId(), status)}
+                    onMenuStatusChanged={handleMenuStatusChanged}
+                    onToggleBoolean={(field, value) => handleToggleBooleanField(produto.getId(), field, value)}
+                    savingToggleState={savingToggleMap[produto.getId()]}
+                    isSavingValor={Boolean(savingValorMap[produto.getId()])}
+                    isSavingStatus={Boolean(savingStatusMap[produto.getId()])}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         ))}
 
