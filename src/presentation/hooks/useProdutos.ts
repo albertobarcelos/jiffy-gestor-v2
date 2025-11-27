@@ -53,6 +53,8 @@ export function useProdutos(params: ProdutosQueryParams = {}) {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        cache: 'no-store',
+        next: { revalidate: 0 },
       })
 
       if (!response.ok) {
@@ -75,7 +77,11 @@ export function useProdutos(params: ProdutosQueryParams = {}) {
       }
     },
     enabled: !!token, // Só executa se tiver token
-    staleTime: 1000 * 60 * 5, // 5 minutos
+    staleTime: 0,
+    gcTime: 1000 * 60 * 1,
+    refetchOnReconnect: true,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   })
 }
 
@@ -107,6 +113,8 @@ export function useProdutosInfinite(params: Omit<ProdutosQueryParams, 'offset'> 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        cache: 'no-store',
+        next: { revalidate: 0 },
       })
 
       if (!response.ok) {
@@ -134,12 +142,13 @@ export function useProdutosInfinite(params: Omit<ProdutosQueryParams, 'offset'> 
     enabled: !!token,
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextOffset,
-    staleTime: 1000 * 60 * 5, // 5 minutos
-    gcTime: 1000 * 60 * 10, // 10 minutos
-    refetchOnWindowFocus: false, // Não refetch ao focar na janela
-    refetchOnMount: false, // Não refetch ao montar se já tiver dados em cache
-    // Prefetch automático da próxima página quando estiver próxima
-    placeholderData: (previousData) => previousData,
+    staleTime: 0, // sempre considerado “stale” para refetch imediato
+    gcTime: 1000 * 60 * 1, // descarta cache rápido (1 min)
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    refetchOnMount: 'always',
+    // Não reutiliza dados anteriores para evitar exibir valores antigos
+    placeholderData: undefined,
   })
 }
 

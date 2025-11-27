@@ -44,16 +44,18 @@ export async function GET(req: NextRequest) {
       ativo,
     })
 
-    const response = NextResponse.json({ 
-      success: true, 
-      items: produtos.map(p => p.toJSON()), 
-      count: total 
-    })
-
-    // Cache headers para melhor performance
-    response.headers.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=120')
-    
-    return response
+    return NextResponse.json(
+      {
+        success: true,
+        items: produtos.map((p) => p.toJSON()),
+        count: total,
+      },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        },
+      }
+    )
   } catch (error: any) {
     console.error('Erro na API de produtos:', error)
     return NextResponse.json(
