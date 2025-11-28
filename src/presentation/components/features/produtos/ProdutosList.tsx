@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { Produto } from '@/src/domain/entities/Produto'
 import { showToast } from '@/src/shared/utils/toast'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { ComplementosMultiSelectDialog } from './ComplementosMultiSelectDialog'
 import {
   MdKeyboardArrowDown,
   MdImage,
@@ -125,6 +126,7 @@ const ProdutoListItem = memo(function ProdutoListItem({
   onMenuStatusChanged,
   onToggleBoolean,
   savingToggleState,
+  onOpenComplementosModal,
   isSavingValor,
   isSavingStatus,
 }: {
@@ -134,6 +136,7 @@ const ProdutoListItem = memo(function ProdutoListItem({
   onMenuStatusChanged?: () => void
   onToggleBoolean?: (field: ToggleField, value: boolean) => void
   savingToggleState?: Partial<Record<ToggleField, boolean>>
+  onOpenComplementosModal?: () => void
   isSavingValor?: boolean
   isSavingStatus?: boolean
 }) {
@@ -179,9 +182,19 @@ const ProdutoListItem = memo(function ProdutoListItem({
   const actionIcons = useMemo(
     () => [
       { key: 'copiar', label: 'Copiar', Icon: MdContentCopy },
-      { key: 'favorito', label: 'Favorito', Icon: MdStarBorder, field: 'favorito' as ToggleField },
+      {
+        key: 'complementos',
+        label: 'Selecionar complementos',
+        Icon: MdExtension,
+        modal: true,
+      },
+      {
+        key: 'favorito',
+        label: 'Favorito',
+        Icon: MdStarBorder,
+        field: 'favorito' as ToggleField,
+      },
       { key: 'impressora', label: 'Impressora', Icon: MdPrint },
-      { key: 'complementos', label: 'Complementos', Icon: MdExtension },
       {
         key: 'acrescentar',
         label: 'Permitir acréscimo',
@@ -196,7 +209,7 @@ const ProdutoListItem = memo(function ProdutoListItem({
       },
       {
         key: 'abrir',
-        label: 'Abrir complementos',
+        label: 'Abrir complementos automaticamente',
         Icon: MdLaunch,
         field: 'abreComplementos' as ToggleField,
       },
@@ -222,7 +235,7 @@ const ProdutoListItem = memo(function ProdutoListItem({
           </p>
         </div>
         <div className="flex items-center gap-2 mt-2">
-          {actionIcons.map(({ key, label, Icon, field }) => {
+          {actionIcons.map(({ key, label, Icon, field, modal }) => {
             if (field) {
               const isActive = toggleStates[field]
               const isLoading = Boolean(savingToggleState?.[field])
@@ -243,6 +256,20 @@ const ProdutoListItem = memo(function ProdutoListItem({
                       ? 'opacity-60 cursor-not-allowed'
                       : 'hover:bg-primary/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary'
                   }`}
+                >
+                  <Icon />
+                </button>
+              )
+            }
+
+            if (modal) {
+              return (
+                <button
+                  key={`${produto.getId()}-${key}`}
+                  type="button"
+                  title={label}
+                  onClick={onOpenComplementosModal}
+                  className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-lg hover:bg-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <Icon />
                 </button>
@@ -349,6 +376,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     >
   >(new Map())
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
+  const [produtoComplementosModal, setProdutoComplementosModal] = useState<Produto | null>(null)
   const token = auth?.getAccessToken()
   const invalidateProdutosQueries = useCallback(async () => {
     await queryClient.invalidateQueries({
@@ -834,6 +862,36 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     invalidateProdutosQueries()
   }, [invalidateProdutosQueries, onReload])
 
+  const handleOpenComplementosModal = useCallback((produto: Produto) => {
+    setProdutoComplementosModal(produto)
+  }, [])
+
+  const closeComplementosModal = useCallback(() => {
+    setProdutoComplementosModal(null)
+  }, [])
+
+  const handleAddGrupoComplemento = useCallback((produtoId?: string) => {
+    showToast.info(
+      produtoId
+        ? `Adicionar novo grupo ao produto ${produtoId} ainda não está disponível.`
+        : 'Selecione um produto para adicionar grupos.'
+    )
+  }, [])
+
+  const handleRemoveGrupoComplemento = useCallback(
+    async (produtoId: string, grupoId: string) => {
+      try {
+        showToast.info(
+          `Remoção do grupo ${grupoId} do produto ${produtoId} ainda está em desenvolvimento.`
+        )
+      } catch (error) {
+        console.error(error)
+        showToast.error('Não foi possível remover o grupo. Tente novamente.')
+      }
+    },
+    []
+  )
+
   const handleToggleGroup = useCallback((grupo: string) => {
     setExpandedGroups((prev) => ({
       ...prev,
@@ -974,6 +1032,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
                     onMenuStatusChanged={handleMenuStatusChanged}
                     onToggleBoolean={(field, value) => handleToggleBooleanField(produto.getId(), field, value)}
                     savingToggleState={savingToggleMap[produto.getId()]}
+                    onOpenComplementosModal={() => handleOpenComplementosModal(produto)}
                     isSavingValor={Boolean(savingValorMap[produto.getId()])}
                     isSavingStatus={Boolean(savingStatusMap[produto.getId()])}
                   />
@@ -993,6 +1052,19 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
           </div>
         )}
       </div>
+
+      <ComplementosMultiSelectDialog
+        open={Boolean(produtoComplementosModal)}
+        produtoId={produtoComplementosModal?.getId()}
+        produtoNome={produtoComplementosModal?.getNome()}
+        onClose={closeComplementosModal}
+        onAddGroup={(id) => handleAddGrupoComplemento(id)}
+        onRemoveGroup={(grupoId) =>
+          produtoComplementosModal
+            ? handleRemoveGrupoComplemento(produtoComplementosModal.getId(), grupoId)
+            : undefined
+        }
+      />
     </div>
   )
 }
