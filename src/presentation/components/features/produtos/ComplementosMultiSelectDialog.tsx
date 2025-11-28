@@ -37,7 +37,6 @@ export function ComplementosMultiSelectDialog({
   open,
   produtoId,
   produtoNome,
-  onConfirm,
   onClose,
   onAddGroup,
   onRemoveGroup,
@@ -297,12 +296,29 @@ export function ComplementosMultiSelectDialog({
       onOpenChange={(openState) => !openState && handleClose()}
       fullWidth
       maxWidth="md"
+      sx={{
+        '& .MuiDialog-container': {
+          alignItems: 'stretch',
+          justifyContent: 'flex-end',
+          margin: 0,
+        },
+      }}
+      PaperProps={{
+        sx: {
+          m: 0,
+          height: '100vh',
+          maxHeight: '100vh',
+          borderRadius: 0,
+          display: 'flex',
+          flexDirection: 'column',
+        },
+      }}
     >
       <DialogHeader className="relative border-b border-gray-200 pb-4">
         <button
           type="button"
           onClick={handleClose}
-          className="absolute top-0 right-0 text-secondary-text hover:text-primary transition-colors"
+          className="absolute top-2 left-2 text-secondary-text hover:text-primary transition-colors"
           aria-label="Fechar"
         >
           <MdClose size={22} />
@@ -341,7 +357,10 @@ export function ComplementosMultiSelectDialog({
         {renderContent()}
       </DialogContent>
 
-      <DialogFooter className="flex items-center justify-end border-t border-gray-100">
+      <DialogFooter
+        className="flex items-center justify-start border-t border-gray-100"
+        sx={{ justifyContent: 'flex-start' }}
+      >
         <button
           type="button"
           onClick={handleClose}
