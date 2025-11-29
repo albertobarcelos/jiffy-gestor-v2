@@ -56,6 +56,25 @@ export function InformacoesProdutoStep({
     onPrecoVendaChange(formatted)
   }
 
+  const getGrupoId = (grupo: any) => {
+    if (!grupo) return ''
+    if (typeof grupo.getId === 'function') return grupo.getId()
+    return grupo.id ?? ''
+  }
+
+  const getGrupoNome = (grupo: any) => {
+    if (!grupo) return ''
+    if (typeof grupo.getNome === 'function') return grupo.getNome()
+    return grupo.nome ?? ''
+  }
+
+  const isGrupoAtivo = (grupo: any) => {
+    if (!grupo) return true
+    if (typeof grupo.isAtivo === 'function') return grupo.isAtivo()
+    if (typeof grupo.ativo === 'boolean') return grupo.ativo
+    return true
+  }
+
   return (
     <div className="rounded-[24px] border border-[#E5E7F2] bg-white p-6 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
       {/* Título */}
@@ -122,11 +141,21 @@ export function InformacoesProdutoStep({
                 className="w-full h-12 px-4 rounded-[14px] border border-[#CBD0E3] bg-white text-primary-text focus:outline-none focus:border-[#5318A3] focus:ring-2 focus:ring-[#CBA4FF]/60 font-nunito text-sm"
               >
                 <option value="">Selecione o grupo do Produto</option>
-                {grupos.map((grupo) => (
-                  <option key={grupo.id} value={grupo.id}>
-                    {grupo.nome}
-                  </option>
-                ))}
+                {grupos.map((grupo) => {
+                  const id = getGrupoId(grupo)
+                  const nome = getGrupoNome(grupo)
+                  const ativo = isGrupoAtivo(grupo)
+                  return (
+                    <option
+                      key={id}
+                      value={id}
+                      className={ativo ? 'text-primary-text' : 'text-secondary-text'}
+                      style={ativo ? undefined : { color: '#9CA3AF' }}
+                    >
+                      {ativo ? nome : `${nome} (inativo)`}
+                    </option>
+                  )
+                })}
               </select>
             )}
           </div>

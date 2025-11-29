@@ -10,6 +10,8 @@ import { Produto } from '@/src/domain/entities/Produto'
 import { showToast } from '@/src/shared/utils/toast'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { ComplementosMultiSelectDialog } from './ComplementosMultiSelectDialog'
+import { NovoProduto } from './NovoProduto'
+import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
 import {
   MdKeyboardArrowDown,
   MdImage,
@@ -31,6 +33,10 @@ interface ProdutosListProps {
 }
 
 type ToggleField = 'favorito' | 'permiteAcrescimo' | 'permiteDesconto' | 'abreComplementos'
+type NovoProdutoModalConfig = {
+  mode: 'create' | 'edit' | 'copy'
+  produtoId?: string
+}
 
 const toggleFieldConfig: Record<
   ToggleField,
@@ -119,17 +125,7 @@ const sortProdutosAlphabetically = (lista: Produto[]): Produto[] => {
 /**
  * Item individual da lista de produtos (memoizado para evitar re-renders desnecessários)
  */
-const ProdutoListItem = memo(function ProdutoListItem({
-  produto,
-  onValorChange,
-  onSwitchToggle,
-  onMenuStatusChanged,
-  onToggleBoolean,
-  savingToggleState,
-  onOpenComplementosModal,
-  isSavingValor,
-  isSavingStatus,
-}: {
+interface ProdutoListItemProps {
   produto: Produto
   onValorChange?: (valor: number) => void
   onSwitchToggle?: (status: boolean) => void
@@ -139,7 +135,21 @@ const ProdutoListItem = memo(function ProdutoListItem({
   onOpenComplementosModal?: () => void
   isSavingValor?: boolean
   isSavingStatus?: boolean
-}) {
+  onEditProduto?: (produtoId: string) => void
+}
+
+const ProdutoListItem = memo(function ProdutoListItem({
+  produto,
+  onValorChange,
+  onSwitchToggle,
+  onMenuStatusChanged,
+  onToggleBoolean,
+  savingToggleState,
+  onOpenComplementosModal,
+  onEditProduto,
+  isSavingValor,
+  isSavingStatus,
+}: ProdutoListItemProps) {
   const valorFormatado = useMemo(() => transformarParaReal(produto.getValor()), [produto])
   const isAtivo = useMemo(() => produto.isAtivo(), [produto])
   const toggleStates = useMemo(
@@ -226,7 +236,14 @@ const ProdutoListItem = memo(function ProdutoListItem({
       <div className="flex-1">
         <div className="flex items-center gap-3 flex-wrap">
           <p className="text-primary-text font-semibold font-nunito text-base flex items-center gap-2">
-            <MdModeEdit className="text-[var(--color-primary)] text-xl" aria-label="Editar" />
+            <button
+              type="button"
+              onClick={() => onEditProduto?.(produto.getId())}
+              className="rounded-full bg-primary/10 p-1 text-[var(--color-primary)] hover:bg-primary/20 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              aria-label={`Editar ${produto.getNome()}`}
+            >
+              <MdModeEdit className="text-xl" />
+            </button>
             {produto.getNome()}
             <span className="text-sm text-secondary-text ml-2 inline-flex items-center gap-1">
               <span className="text-xs">Cód. </span>
@@ -336,6 +353,7 @@ const ProdutoListItem = memo(function ProdutoListItem({
             produtoId={produto.getId()}
             produtoAtivo={isAtivo}
             onStatusChanged={onMenuStatusChanged}
+            onEdit={onEditProduto}
           />
         </Suspense>
       </div>
@@ -377,6 +395,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
   >(new Map())
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
   const [produtoComplementosModal, setProdutoComplementosModal] = useState<Produto | null>(null)
+  const [produtoModalConfig, setProdutoModalConfig] = useState<NovoProdutoModalConfig | null>(null)
   const token = auth?.getAccessToken()
   const invalidateProdutosQueries = useCallback(async () => {
     await queryClient.invalidateQueries({
@@ -870,6 +889,20 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     setProdutoComplementosModal(null)
   }, [])
 
+  const closeNovoProdutoModal = useCallback(() => {
+    setProdutoModalConfig(null)
+  }, [])
+
+  const handleNovoProdutoSuccess = useCallback(() => {
+    closeNovoProdutoModal()
+    invalidateProdutosQueries()
+    onReload?.()
+  }, [closeNovoProdutoModal, invalidateProdutosQueries, onReload])
+
+  const handleEditProduto = useCallback((produtoId: string) => {
+    setProdutoModalConfig({ mode: 'edit', produtoId })
+  }, [])
+
   const handleAddGrupoComplemento = useCallback((produtoId?: string) => {
     showToast.info(
       produtoId
@@ -920,9 +953,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
               Atualizar Preços
             </Link>
             <button
-              onClick={() => {
-                window.location.href = '/produtos/novo'
-              }}
+              onClick={() => setProdutoModalConfig({ mode: 'create' })}
               className="h-10 px-[30px] bg-primary text-info rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
             >
               Novo
@@ -1024,7 +1055,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
             ) : (
               <div className="space-y-3">
                 {items.map((produto) => (
-                  <ProdutoListItem
+          <ProdutoListItem
                     key={produto.getId()}
                     produto={produto}
                     onValorChange={(valor) => handleValorUpdate(produto.getId(), valor)}
@@ -1035,6 +1066,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
                     onOpenComplementosModal={() => handleOpenComplementosModal(produto)}
                     isSavingValor={Boolean(savingValorMap[produto.getId()])}
                     isSavingStatus={Boolean(savingStatusMap[produto.getId()])}
+                    onEditProduto={handleEditProduto}
                   />
                 ))}
               </div>
@@ -1052,6 +1084,44 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
           </div>
         )}
       </div>
+
+      <Dialog
+        open={Boolean(produtoModalConfig)}
+        onOpenChange={(openState) => {
+          if (!openState) {
+            closeNovoProdutoModal()
+          }
+        }}
+        fullWidth
+        maxWidth="xl"
+        sx={{
+          '& .MuiDialog-container': {
+            alignItems: 'stretch',
+            justifyContent: 'flex-end',
+            margin: 0,
+          },
+        }}
+        PaperProps={{
+          sx: {
+            m: 0,
+            height: '100vh',
+            maxHeight: '100vh',
+            width: 'min(960px, 90vw)',
+            borderRadius: 0,
+            display: 'flex',
+            flexDirection: 'column',
+          },
+        }}
+      >
+        <DialogContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <NovoProduto
+            produtoId={produtoModalConfig?.produtoId}
+            isCopyMode={produtoModalConfig?.mode === 'copy'}
+            onClose={closeNovoProdutoModal}
+            onSuccess={handleNovoProdutoSuccess}
+          />
+        </DialogContent>
+      </Dialog>
 
       <ComplementosMultiSelectDialog
         open={Boolean(produtoComplementosModal)}

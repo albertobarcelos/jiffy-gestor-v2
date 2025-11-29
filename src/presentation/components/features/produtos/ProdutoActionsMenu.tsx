@@ -14,6 +14,8 @@ interface ProdutoActionsMenuProps {
   produtoId: string
   produtoAtivo: boolean
   onStatusChanged?: () => void
+  onEdit?: (produtoId: string) => void
+  onCopy?: (produtoId: string) => void
 }
 
 /**
@@ -24,6 +26,8 @@ export function ProdutoActionsMenu({
   produtoId,
   produtoAtivo,
   onStatusChanged,
+  onEdit,
+  onCopy,
 }: ProdutoActionsMenuProps) {
   const { auth } = useAuthStore()
   const queryClient = useQueryClient()
@@ -50,10 +54,18 @@ export function ProdutoActionsMenu({
   }
 
   const handleEdit = () => {
+    if (onEdit) {
+      onEdit(produtoId)
+      return
+    }
     window.location.href = `/produtos/${produtoId}/editar`
   }
 
   const handleCopy = () => {
+    if (onCopy) {
+      onCopy(produtoId)
+      return
+    }
     window.location.href = `/produtos/novo?copyFrom=${produtoId}`
   }
 

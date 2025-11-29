@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, Suspense, useRef } from 'react'
+import { useState, useEffect, useMemo, Suspense, useRef, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { InformacoesProdutoStep } from './NovoProduto/InformacoesProdutoStep'
 import { ConfiguracoesGeraisStep } from './NovoProduto/ConfiguracoesGeraisStep'
@@ -11,12 +11,19 @@ import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 interface NovoProdutoProps {
   produtoId?: string
   isCopyMode?: boolean
+  onClose?: () => void
+  onSuccess?: () => void
 }
 
 /**
  * Componente interno que usa useSearchParams
  */
-function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps) {
+function NovoProdutoContent({
+  produtoId,
+  isCopyMode = false,
+  onClose,
+  onSuccess,
+}: NovoProdutoProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { auth } = useAuthStore()
@@ -55,11 +62,22 @@ function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps)
   const lastIsCopyModeRef = useRef<boolean>(false)
 
   // Carregar grupos de produtos usando React Query (com cache)
+  const formatCurrency = useCallback((value: number | string) => {
+    const numericValue =
+      typeof value === 'number'
+        ? value
+        : Number(value.toString().replace(/[^\d,.-]/g, '').replace(',', '.')) || 0
+
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(numericValue)
+  }, [])
+
   const {
     data: grupos = [],
     isLoading: isLoadingGrupos,
   } = useGruposProdutos({
-    ativo: true,
     limit: 100,
   })
 
@@ -131,7 +149,7 @@ function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps)
           const produto = await response.json()
           
           // Preenche os campos com os dados do produto
-          setPrecoVenda(produto.valor?.toString() || '')
+          setPrecoVenda(produto.valor ? formatCurrency(produto.valor) : '')
           setUnidadeProduto(produto.unidadeMedida || null)
           setGrupoProduto(produto.grupoId || null)
           setFavorito(produto.favorito || false)
@@ -180,6 +198,10 @@ function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps)
   }
 
   const handleCancel = () => {
+    if (onClose) {
+      onClose()
+      return
+    }
     router.push('/produtos')
   }
 
@@ -214,7 +236,7 @@ function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps)
         abreComplementos,
         permiteAcrescimo,
         permiteDesconto,
-        grupoComplementosIds,
+        gruposComplementosIds: grupoComplementosIds,
         impressorasIds,
         ...(effectiveProdutoId && !effectiveIsCopyMode ? { ativo } : {}),
       }
@@ -241,9 +263,13 @@ function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps)
             ? 'Produto atualizado com sucesso!'
             : 'Produto cadastrado com sucesso!'
         )
-        setTimeout(() => {
-          router.push('/produtos')
-        }, 500)
+        if (onSuccess) {
+          onSuccess()
+        } else {
+          setTimeout(() => {
+            router.push('/produtos')
+          }, 500)
+        }
       } else {
         const error = await response.json().catch(() => ({}))
         const errorMessage = error.message || 'Erro ao salvar produto'
@@ -402,10 +428,15 @@ function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps)
  * Componente principal para criação/edição de produtos
  * Replica exatamente o design e lógica do Flutter NovoProdutoWidget
  */
-export function NovoProduto({ produtoId, isCopyMode = false }: NovoProdutoProps) {
+export function NovoProduto({ produtoId, isCopyMode = false, onClose, onSuccess }: NovoProdutoProps) {
   return (
     <Suspense fallback={<div className="flex items-center justify-center h-full">Carregando...</div>}>
-      <NovoProdutoContent produtoId={produtoId} isCopyMode={isCopyMode} />
+      <NovoProdutoContent
+        produtoId={produtoId}
+        isCopyMode={isCopyMode}
+        onClose={onClose}
+        onSuccess={onSuccess}
+      />
     </Suspense>
   )
 }
