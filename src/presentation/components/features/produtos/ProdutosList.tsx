@@ -15,6 +15,7 @@ import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
 import {
   MdKeyboardArrowDown,
   MdImage,
+  MdSearch,
   MdModeEdit,
   MdContentCopy,
   MdStarBorder,
@@ -136,6 +137,7 @@ interface ProdutoListItemProps {
   isSavingValor?: boolean
   isSavingStatus?: boolean
   onEditProduto?: (produtoId: string) => void
+  onCopyProduto?: (produtoId: string) => void
 }
 
 const ProdutoListItem = memo(function ProdutoListItem({
@@ -149,6 +151,7 @@ const ProdutoListItem = memo(function ProdutoListItem({
   onEditProduto,
   isSavingValor,
   isSavingStatus,
+  onCopyProduto,
 }: ProdutoListItemProps) {
   const valorFormatado = useMemo(() => transformarParaReal(produto.getValor()), [produto])
   const isAtivo = useMemo(() => produto.isAtivo(), [produto])
@@ -191,7 +194,7 @@ const ProdutoListItem = memo(function ProdutoListItem({
 
   const actionIcons = useMemo(
     () => [
-      { key: 'copiar', label: 'Copiar', Icon: MdContentCopy },
+      { key: 'copiar', label: 'Copiar', Icon: MdContentCopy, action: 'copy' },
       {
         key: 'complementos',
         label: 'Selecionar complementos',
@@ -228,7 +231,7 @@ const ProdutoListItem = memo(function ProdutoListItem({
   )
 
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl px-4 py-4 mb-3 shadow-sm flex items-center gap-4">
+    <div className="bg-white border border-gray-100 hover:bg-secondary-text/10 rounded-2xl px-4 py-2 mb-2 shadow-sm flex items-center gap-4">
       <div className="w-14 h-14 rounded-xl bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-2xl">
         <MdImage />
       </div>
@@ -268,24 +271,27 @@ const ProdutoListItem = memo(function ProdutoListItem({
                   title={label}
                   disabled={isLoading}
                   onClick={() => onToggleBoolean?.(field, !isActive)}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-lg transition-all ${bgColor} ${iconColor} ${
-                    isLoading
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-lg transition-all ${bgColor} ${iconColor} ${isLoading
                       ? 'opacity-60 cursor-not-allowed'
                       : 'hover:bg-primary/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary'
-                  }`}
+                    }`}
                 >
                   <Icon />
                 </button>
               )
             }
 
-            if (modal) {
+            if (modal || key === 'copiar') {
               return (
                 <button
                   key={`${produto.getId()}-${key}`}
                   type="button"
                   title={label}
-                  onClick={onOpenComplementosModal}
+                  onClick={
+                    key === 'copiar'
+                      ? () => onCopyProduto?.(produto.getId())
+                      : onOpenComplementosModal
+                  }
                   className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-lg hover:bg-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <Icon />
@@ -354,6 +360,7 @@ const ProdutoListItem = memo(function ProdutoListItem({
             produtoAtivo={isAtivo}
             onStatusChanged={onMenuStatusChanged}
             onEdit={onEditProduto}
+            onCopy={onCopyProduto}
           />
         </Suspense>
       </div>
@@ -903,6 +910,10 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     setProdutoModalConfig({ mode: 'edit', produtoId })
   }, [])
 
+  const handleCopyProduto = useCallback((produtoId: string) => {
+    setProdutoModalConfig({ mode: 'copy', produtoId })
+  }, [])
+
   const handleAddGrupoComplemento = useCallback((produtoId?: string) => {
     showToast.info(
       produtoId
@@ -935,72 +946,68 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px] pt-[30px] pb-[10px]">
-        <div className="flex items-start justify-between flex-wrap gap-4">
-          <div className="pl-5">
-            <p className="text-primary text-sm font-semibold font-nunito mb-2">
-              Produtos Cadastrados
-            </p>
-            <p className="text-tertiary text-[26px] font-medium font-nunito">
-              Total {localProdutos.length}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Link
-              href="/produtos/atualizar-preco"
-              className="h-10 px-[30px] bg-info text-primary-text border border-secondary rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-secondary-bg transition-colors"
-            >
-              Atualizar Preços
-            </Link>
-            <button
-              onClick={() => setProdutoModalConfig({ mode: 'create' })}
-              className="h-10 px-[30px] bg-primary text-info rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
-            >
-              Novo
-              <span className="text-lg">+</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Divisor amarelo */}
-      <div className="relative">
-        <div className="h-[63px] border-t-2 border-alternate"></div>
-        <div className="absolute top-3 left-[30px] right-[30px] flex gap-[10px]">
-          {/* Barra de pesquisa */}
-          <div className="flex-[3]">
-            <div className="h-[50px] relative">
-              <input
-                type="text"
-                placeholder="Pesquisar..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full px-5 pl-12 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-secondary font-nunito text-sm"
-              />
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
-                🔍
-              </span>
+      <div className="px-[30px] pt-[6px] pb-[6px]">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-start justify-between flex-wrap gap-4">
+            <div className="pl-5">
+              <p className="text-primary text-sm font-semibold font-nunito mb-2">
+                Produtos Cadastrados
+              </p>
+              <p className="text-tertiary text-[22px] font-medium font-nunito">
+                Total {localProdutos.length}
+              </p>
             </div>
-          </div>
+            <div className="flex-1 flex gap-2 items-center justify-end">
+              <div className="flex flex-wrap gap-2 w-full items-center justify-center">
+                {/* Barra de pesquisa */}
+                <div className="w-full md:w-[360px]">
+                  <div className="h-[36px] relative">
+                    <input
+                      type="text"
+                      placeholder="Pesquisar..."
+                      value={searchText}
+                      onChange={(e) => setSearchText(e.target.value)}
+                      className="w-full h-full px-5 pl-12 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-secondary font-nunito text-sm"
+                    />
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
+                      <MdSearch size={18} />
+                    </span>
+                  </div>
+                </div>
 
-          {/* Filtro de status */}
-          <div className="flex-1">
-            <div className="h-[48px]">
-              <select
-                value={filterStatus}
-                onChange={(e) =>
-                  setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
-                }
-                className="w-[175px] h-full px-5 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text focus:outline-none focus:border-secondary font-nunito text-sm"
+                {/* Filtro de status */}
+                <div className="w-full md:w-[160px]">
+                  <select
+                    value={filterStatus}
+                    onChange={(e) =>
+                      setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
+                    }
+                    className="w-full h-[36px] px-5 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text focus:outline-none focus:border-secondary font-nunito text-sm"
+                  >
+                    <option value="Todos">Todos</option>
+                    <option value="Ativo">Ativo</option>
+                    <option value="Desativado">Desativado</option>
+                  </select>
+                </div>
+              </div>
+              <Link
+                href="/produtos/atualizar-preco"
+                className="h-10 px-[30px] bg-info text-primary-text border border-secondary rounded-[30px] font-semibold font-exo text-sm flex items-center text-center hover:bg-secondary-text/10 transition-colors"
               >
-                <option value="Todos">Todos</option>
-                <option value="Ativo">Ativo</option>
-                <option value="Desativado">Desativado</option>
-              </select>
+                Atualizar Preços
+              </Link>
+              <button
+                onClick={() => setProdutoModalConfig({ mode: 'create' })}
+                className="h-10 px-[30px] bg-primary text-info rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+              >
+                Novo
+                <span className="text-lg">+</span>
+              </button>
             </div>
           </div>
         </div>
       </div>
+      <div className="h-[6px] border-t-2 border-alternate"></div>
 
       {/* Lista de produtos com scroll */}
       <div
@@ -1055,7 +1062,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
             ) : (
               <div className="space-y-3">
                 {items.map((produto) => (
-          <ProdutoListItem
+                  <ProdutoListItem
                     key={produto.getId()}
                     produto={produto}
                     onValorChange={(valor) => handleValorUpdate(produto.getId(), valor)}
@@ -1067,6 +1074,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
                     isSavingValor={Boolean(savingValorMap[produto.getId()])}
                     isSavingStatus={Boolean(savingStatusMap[produto.getId()])}
                     onEditProduto={handleEditProduto}
+                    onCopyProduto={handleCopyProduto}
                   />
                 ))}
               </div>

@@ -28,6 +28,7 @@ interface ConfiguracoesGeraisStepProps {
   ativo: boolean
   onAtivoChange: (value: boolean) => void
   isEditMode: boolean
+  canManageAtivo?: boolean
   onBack: () => void
   onSave: () => void
 }
@@ -51,7 +52,8 @@ export function ConfiguracoesGeraisStep({
   onImpressorasIdsChange,
   ativo,
   onAtivoChange,
-  isEditMode,
+  isEditMode: _isEditMode,
+  canManageAtivo = false,
   onBack,
   onSave,
 }: ConfiguracoesGeraisStepProps) {
@@ -257,9 +259,9 @@ export function ConfiguracoesGeraisStep({
 
   return (
     <>
-      <div className="rounded-[24px] border border-[#E5E7F2] bg-white p-6 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
+      <div className="rounded-[24px] border border-[#E5E7F2] bg-white p-4 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
         {/* Título */}
-        <div className="flex flex-col gap-2 mb-6">
+        <div className="flex flex-col gap-2 mb-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <h3 className="text-[#4F1D8C] text-xl font-semibold font-exo">
               Configurações Gerais
@@ -271,13 +273,13 @@ export function ConfiguracoesGeraisStep({
           </p>
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-3">
+        <div className="grid gap-3 xl:grid-cols-3">
           {/* Cartão Geral */}
           <div className="col-span-full xl:col-span-1 rounded-[24px] border border-[#E6E9F4] bg-gradient-to-b from-[#F9FAFF] to-white shadow-[0_10px_30px_rgba(15,23,42,0.08)] p-5">
-            <h4 className="text-primary-text font-semibold font-exo text-base mb-4">
+            <h4 className="text-primary-text font-semibold font-exo text-base mb-2">
               Geral
             </h4>
-            <div className="space-y-5">
+            <div className="space-y-2">
               {[
                 {
                   label: 'Favorito',
@@ -304,7 +306,7 @@ export function ConfiguracoesGeraisStep({
                   key={toggle.label}
                   type="button"
                   onClick={() => toggle.onChange(!toggle.checked)}
-                  className="w-full flex items-center justify-between gap-4 rounded-2xl border border-transparent bg-white px-4 py-3 text-left transition-all hover:border-primary/30 hover:shadow-sm"
+                  className="w-full flex items-center justify-between gap-4 rounded-2xl border border-transparent bg-white px-4 py-2 text-left transition-all hover:border-primary/30 hover:shadow-sm"
                 >
                   <span className="text-primary-text font-nunito text-sm">
                     {toggle.label}
@@ -323,11 +325,11 @@ export function ConfiguracoesGeraisStep({
                 </button>
               ))}
 
-              {isEditMode && (
+              {canManageAtivo && (
                 <button
                   type="button"
                   onClick={() => onAtivoChange(!ativo)}
-                  className="w-full flex items-center justify-between gap-4 rounded-2xl border border-transparent bg-white px-4 py-3 text-left transition-all hover:border-primary/30 hover:shadow-sm"
+                  className="w-full flex items-center justify-between gap-4 rounded-2xl border border-transparent bg-white px-4 py-2 text-left transition-all hover:border-primary/30 hover:shadow-sm"
                 >
                   <span className="text-primary-text font-nunito text-sm">
                     Ativo
@@ -349,8 +351,8 @@ export function ConfiguracoesGeraisStep({
           </div>
 
           {/* Cartão de Grupos */}
-          <div className="col-span-full xl:col-span-1 rounded-[24px] border border-[#E6E9F4] bg-white shadow-[0_10px_30px_rgba(15,23,42,0.08)] p-5">
-            <div className="flex flex-col gap-2 mb-4">
+          <div className="col-span-full xl:col-span-1 rounded-[24px] border border-[#E6E9F4] bg-white shadow-[0_10px_30px_rgba(15,23,42,0.08)] px-5 py-2">
+            <div className="flex flex-col gap-2 mb-1">
               <p className="text-primary-text font-semibold font-exo text-base">
                 Grupos de Complementos
               </p>
@@ -362,9 +364,9 @@ export function ConfiguracoesGeraisStep({
               type="button"
               onClick={handleOpenComplementosDialog}
               disabled={isLoadingComplementos || !abreComplementos}
-              className="w-full h-11 rounded-[18px] bg-[#0A397A] text-white font-semibold font-nunito text-sm flex items-center justify-center gap-2 shadow-[0_8px_20px_rgba(10,57,122,0.35)] transition-all hover:bg-[#0b458f] disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full h-9 rounded-[18px] bg-primary text-white font-semibold font-nunito text-xs flex items-center justify-center gap-2 shadow-[0_8px_20px_rgba(10,57,122,0.35)] transition-all hover:bg-[#0b458f] disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <MdAdd size={18} />
+              <MdAdd size={14} />
               Grupos de Complementos
             </button>
             {!abreComplementos && (
@@ -395,8 +397,8 @@ export function ConfiguracoesGeraisStep({
           </div>
 
           {/* Cartão de Impressoras */}
-          <div className="col-span-full xl:col-span-1 rounded-[24px] border border-[#E6E9F4] bg-white shadow-[0_10px_30px_rgba(15,23,42,0.08)] p-5">
-            <div className="flex flex-col gap-2 mb-4">
+          <div className="col-span-full xl:col-span-1 rounded-[24px] border border-[#E6E9F4] bg-white shadow-[0_10px_30px_rgba(15,23,42,0.08)] px-5 py-2">
+            <div className="flex flex-col gap-2 mb-1">
               <p className="text-primary-text font-semibold font-exo text-base">
                 Impressoras
               </p>
@@ -408,9 +410,9 @@ export function ConfiguracoesGeraisStep({
               type="button"
               onClick={handleOpenImpressorasDialog}
               disabled={isLoadingImpressoras}
-              className="w-full h-11 rounded-[18px] bg-[#0A397A] text-white font-semibold font-nunito text-sm flex items-center justify-center gap-2 shadow-[0_8px_20px_rgba(10,57,122,0.35)] transition-all hover:bg-[#0b458f] disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full h-9 rounded-[18px] bg-[#0A397A] text-white font-semibold font-nunito text-xs flex items-center justify-center gap-2 shadow-[0_8px_20px_rgba(10,57,122,0.35)] transition-all hover:bg-[#0b458f] disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <MdPrint size={18} />
+              <MdPrint size={14} />
               Selecionar Impressoras
             </button>
             {impressorasIds.length > 0 && (
@@ -437,7 +439,7 @@ export function ConfiguracoesGeraisStep({
         </div>
 
         {/* Botões de ação */}
-        <div className="mt-8 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <Button
             onClick={onBack}
             className="h-11 px-8 rounded-[30px] bg-[#CFD5E8] text-[#0A397A] font-semibold font-exo text-sm hover:bg-[#bac2da]"

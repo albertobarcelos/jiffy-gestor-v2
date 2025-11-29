@@ -7,6 +7,7 @@ import { ConfiguracoesGeraisStep } from './NovoProduto/ConfiguracoesGeraisStep'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
+import { MdImage } from 'react-icons/md'
 
 interface NovoProdutoProps {
   produtoId?: string
@@ -162,10 +163,10 @@ function NovoProdutoContent({
           )
           setImpressorasIds(produto.impressoras?.map((i: any) => i.id) || [])
 
-          // Se for modo cópia, limpa nome e descrição; senão, preenche
           if (currentEffectiveIsCopyMode) {
-            setNomeProduto('')
-            setDescricaoProduto('')
+            const nomeOriginal = produto.nome || ''
+            setNomeProduto(nomeOriginal ? `${nomeOriginal} - Cópia` : 'Cópia ')
+            setDescricaoProduto(produto.descricao || '')
           } else {
             setNomeProduto(produto.nome || '')
             setDescricaoProduto(produto.descricao || '')
@@ -238,7 +239,7 @@ function NovoProdutoContent({
         permiteDesconto,
         gruposComplementosIds: grupoComplementosIds,
         impressorasIds,
-        ...(effectiveProdutoId && !effectiveIsCopyMode ? { ativo } : {}),
+        ...(effectiveProdutoId ? { ativo } : {}),
       }
 
       const url = effectiveProdutoId && !effectiveIsCopyMode
@@ -294,24 +295,25 @@ function NovoProdutoContent({
 
   const displayNome = nomeProduto?.trim() || 'Nome do Produto'
   const displayDescricao = descricaoProduto?.trim() || 'Descrição do Produto'
-  const canToggleAtivo = !!effectiveProdutoId && !effectiveIsCopyMode
+  const canToggleAtivo = Boolean(effectiveProdutoId)
+  const canManageAtivo = Boolean(effectiveProdutoId)
 
   return (
     <div className="flex flex-col h-full">
       {/* Header fixo com título e botões */}
       <div className="sticky top-0 z-10 bg-primary-bg/90 backdrop-blur-sm rounded-tl-[30px] shadow-md">
-        <div className="px-[30px] py-[16px]">
-          <div className="rounded-[32px] border border-[#E0E4F3] bg-gradient-to-br from-[#F6F7FF] to-[#EEF1FB] px-6 py-5 shadow-[0_15px_45px_rgba(15,23,42,0.08)]">
+        <div className="px-[30px] py-[8px]">
+          <div className="rounded-[32px] border border-[#E0E4F3] bg-gradient-to-br from-[#F6F7FF] to-[#EEF1FB] px-6 py-3 shadow-[0_15px_45px_rgba(15,23,42,0.08)]">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-start gap-4">
-                <div className="h-14 w-14 rounded-2xl bg-white text-2xl flex items-center justify-center shadow-inner text-[#4F1D8C]">
-                  🧾
+                <div className="h-14 w-14 rounded-2xl bg-white flex items-center justify-center shadow-inner text-primary">
+                  <MdImage className="text-2xl" />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm font-semibold text-[#4F1D8C] font-exo uppercase tracking-wide">
+                  <p className="text-sm font-semibold text-alternate font-exo uppercase tracking-wide">
                     {getPageTitle()}
                   </p>
-                  <h2 className="text-2xl font-bold text-[#0E1B42] font-exo leading-tight">
+                  <h2 className="text-2xl font-bold text-primary font-exo leading-tight">
                     {displayNome}
                   </h2>
                   <p className="text-sm text-secondary-text font-nunito">
@@ -325,14 +327,14 @@ function NovoProdutoContent({
                   <button
                     type="button"
                     onClick={() => setAtivo((prev) => !prev)}
-                    className="flex items-center gap-2 rounded-[24px] border border-[#D4D8EB] bg-white px-3 py-2 shadow-sm hover:border-[#0A397A]/40 transition-colors"
+                    className="flex items-center gap-2 rounded-[24px] border border-[#D4D8EB] bg-white px-3 py-2 shadow-sm hover:border-primary/40 transition-colors"
                   >
                     <span className="text-sm font-semibold text-secondary-text">
                       Visível no PDV
                     </span>
                     <span
                       className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors ${
-                        ativo ? 'bg-[#0A397A]' : 'bg-gray-300'
+                        ativo ? 'bg-primary' : 'bg-gray-300'
                       }`}
                     >
                       <span
@@ -345,7 +347,7 @@ function NovoProdutoContent({
                 )}
                 <button
                   onClick={handleCancel}
-                  className="h-11 px-8 rounded-[30px] bg-white text-[#0A397A] font-semibold font-exo text-sm border border-[#D7DBEC] shadow-sm hover:bg-[#f4f6ff] transition-colors"
+                  className="h-11 px-8 rounded-[30px] bg-white text-primary font-semibold font-exo text-sm border border-[#D7DBEC] shadow-sm hover:bg-[#f4f6ff] transition-colors"
                 >
                   Cancelar
                 </button>
@@ -360,7 +362,7 @@ function NovoProdutoContent({
         <div className="flex items-center justify-center gap-6">
           <div
             className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-bold font-exo transition-colors ${
-              selectedPage === 0 ? 'bg-[#B7E246] text-[#1D3B53]' : 'bg-[#CEDCF8] text-[#1D3B53]'
+              selectedPage === 0 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-primary'
             }`}
           >
             1
@@ -372,7 +374,7 @@ function NovoProdutoContent({
           />
           <div
             className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-bold font-exo transition-colors ${
-              selectedPage === 1 ? 'bg-[#B7E246] text-[#1D3B53]' : 'bg-[#CEDCF8] text-[#1D3B53]'
+              selectedPage === 1 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-[#1D3B53]'
             }`}
           >
             2
@@ -415,6 +417,7 @@ function NovoProdutoContent({
             ativo={ativo}
             onAtivoChange={setAtivo}
             isEditMode={!!effectiveProdutoId && !effectiveIsCopyMode}
+            canManageAtivo={canManageAtivo}
             onBack={handleBack}
             onSave={handleSave}
           />
