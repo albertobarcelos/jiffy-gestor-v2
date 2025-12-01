@@ -10,6 +10,7 @@ import { Produto } from '@/src/domain/entities/Produto'
 import { showToast } from '@/src/shared/utils/toast'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { ComplementosMultiSelectDialog } from './ComplementosMultiSelectDialog'
+import { ProdutoImpressorasDialog } from './ProdutoImpressorasDialog'
 import { NovoProduto } from './NovoProduto'
 import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
 import {
@@ -134,6 +135,7 @@ interface ProdutoListItemProps {
   onToggleBoolean?: (field: ToggleField, value: boolean) => void
   savingToggleState?: Partial<Record<ToggleField, boolean>>
   onOpenComplementosModal?: () => void
+  onOpenImpressorasModal?: () => void
   isSavingValor?: boolean
   isSavingStatus?: boolean
   onEditProduto?: (produtoId: string) => void
@@ -148,6 +150,7 @@ const ProdutoListItem = memo(function ProdutoListItem({
   onToggleBoolean,
   savingToggleState,
   onOpenComplementosModal,
+  onOpenImpressorasModal,
   onEditProduto,
   isSavingValor,
   isSavingStatus,
@@ -199,7 +202,7 @@ const ProdutoListItem = memo(function ProdutoListItem({
         key: 'complementos',
         label: 'Selecionar complementos',
         Icon: MdExtension,
-        modal: true,
+        modal: 'complementos' as const,
       },
       {
         key: 'favorito',
@@ -207,7 +210,6 @@ const ProdutoListItem = memo(function ProdutoListItem({
         Icon: MdStarBorder,
         field: 'favorito' as ToggleField,
       },
-      { key: 'impressora', label: 'Impressora', Icon: MdPrint },
       {
         key: 'acrescentar',
         label: 'Permitir acréscimo',
@@ -225,6 +227,12 @@ const ProdutoListItem = memo(function ProdutoListItem({
         label: 'Abrir complementos automaticamente',
         Icon: MdLaunch,
         field: 'abreComplementos' as ToggleField,
+      },
+      {
+        key: 'impressora',
+        label: 'Impressoras vinculadas',
+        Icon: MdPrint,
+        modal: 'impressoras' as const,
       },
     ],
     []
@@ -281,17 +289,35 @@ const ProdutoListItem = memo(function ProdutoListItem({
               )
             }
 
-            if (modal || key === 'copiar') {
+            if (modal) {
+              const handleModalClick =
+                modal === 'complementos'
+                  ? onOpenComplementosModal
+                  : modal === 'impressoras'
+                    ? onOpenImpressorasModal
+                    : undefined
+
               return (
                 <button
                   key={`${produto.getId()}-${key}`}
                   type="button"
                   title={label}
-                  onClick={
-                    key === 'copiar'
-                      ? () => onCopyProduto?.(produto.getId())
-                      : onOpenComplementosModal
-                  }
+                  disabled={!handleModalClick}
+                  onClick={() => handleModalClick?.()}
+                  className={`w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${!handleModalClick ? 'opacity-60 cursor-not-allowed' : 'hover:bg-primary/10'}`}
+                >
+                  <Icon />
+                </button>
+              )
+            }
+
+            if (key === 'copiar') {
+              return (
+                <button
+                  key={`${produto.getId()}-${key}`}
+                  type="button"
+                  title={label}
+                  onClick={() => onCopyProduto?.(produto.getId())}
                   className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-lg hover:bg-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <Icon />
@@ -402,6 +428,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
   >(new Map())
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
   const [produtoComplementosModal, setProdutoComplementosModal] = useState<Produto | null>(null)
+  const [produtoImpressorasModal, setProdutoImpressorasModal] = useState<Produto | null>(null)
   const [produtoModalConfig, setProdutoModalConfig] = useState<NovoProdutoModalConfig | null>(null)
   const token = auth?.getAccessToken()
   const invalidateProdutosQueries = useCallback(async () => {
@@ -896,6 +923,14 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     setProdutoComplementosModal(null)
   }, [])
 
+  const handleOpenImpressorasModal = useCallback((produto: Produto) => {
+    setProdutoImpressorasModal(produto)
+  }, [])
+
+  const closeImpressorasModal = useCallback(() => {
+    setProdutoImpressorasModal(null)
+  }, [])
+
   const closeNovoProdutoModal = useCallback(() => {
     setProdutoModalConfig(null)
   }, [])
@@ -990,12 +1025,12 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
                   </select>
                 </div>
               </div>
-              <Link
+              {/*<Link
                 href="/produtos/atualizar-preco"
                 className="h-10 px-[30px] bg-info text-primary-text border border-secondary rounded-[30px] font-semibold font-exo text-sm flex items-center text-center hover:bg-secondary-text/10 transition-colors"
               >
                 Atualizar Preços
-              </Link>
+              </Link>*/}
               <button
                 onClick={() => setProdutoModalConfig({ mode: 'create' })}
                 className="h-10 px-[30px] bg-primary text-info rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
@@ -1071,6 +1106,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
                     onToggleBoolean={(field, value) => handleToggleBooleanField(produto.getId(), field, value)}
                     savingToggleState={savingToggleMap[produto.getId()]}
                     onOpenComplementosModal={() => handleOpenComplementosModal(produto)}
+                    onOpenImpressorasModal={() => handleOpenImpressorasModal(produto)}
                     isSavingValor={Boolean(savingValorMap[produto.getId()])}
                     isSavingStatus={Boolean(savingStatusMap[produto.getId()])}
                     onEditProduto={handleEditProduto}
@@ -1142,6 +1178,13 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
             ? handleRemoveGrupoComplemento(produtoComplementosModal.getId(), grupoId)
             : undefined
         }
+      />
+
+      <ProdutoImpressorasDialog
+        open={Boolean(produtoImpressorasModal)}
+        produtoId={produtoImpressorasModal?.getId()}
+        produtoNome={produtoImpressorasModal?.getNome()}
+        onClose={closeImpressorasModal}
       />
     </div>
   )

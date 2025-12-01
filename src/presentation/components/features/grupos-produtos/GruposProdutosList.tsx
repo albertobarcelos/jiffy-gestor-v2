@@ -23,6 +23,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useQueryClient } from '@tanstack/react-query'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { showToast } from '@/src/shared/utils/toast'
+import { MdSearch } from 'react-icons/md'
 
 interface GruposProdutosListProps {
   onReload?: () => void
@@ -245,67 +246,66 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px] pb-[4px]">
-        <div className="flex items-start justify-between">
-          <div className="w-1/2 pl-5">
-            <h1 className="text-primary text-xl font-semibold mb-1">
-              Grupos Cadastrados
-            </h1>
-            <p className="text-tertiary text-lg font-medium font-nunito">
-              Total {localGrupos.length} de {totalGrupos}
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              window.location.href = '/cadastros/grupos-produtos/novo'
-            }}
-            className="h-10 px-[30px] bg-primary text-info rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
-          >
-            Novo
-            <span className="text-lg">+</span>
-          </button>
-        </div>
-      </div>
-
-      <div className="relative">
-        <div className="h-[63px] border-t-2 border-alternate"></div>
-        <div className="absolute top-3 left-[30px] right-[30px] flex gap-[10px] ">
-          {/* Barra de pesquisa */}
-          <div className="flex-[3]">
-            <div className="h-[50px] relative">
-              <input
-                type="text"
-                placeholder="Pesquisar..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full px-5 pl-12 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-secondary font-nunito text-sm"
-              />
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
-                🔍
-              </span>
+      <div className="px-[30px] pt-[6px] pb-[6px]">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-start justify-between flex-wrap gap-4">
+            <div className="pl-5">
+              <p className="text-primary text-sm font-semibold font-nunito mb-2">
+                Grupos Cadastrados
+              </p>
+              <p className="text-tertiary text-[22px] font-medium font-nunito">
+                Total {localGrupos.length} de {totalGrupos}
+              </p>
             </div>
-          </div>
+            <div className="flex-1 flex gap-2 items-center justify-end flex-wrap md:flex-nowrap">
+              <div className="flex flex-wrap gap-2 w-full items-center justify-center">
+                {/* Barra de pesquisa */}
+                <div className="w-full md:w-[360px]">
+                  <div className="h-[36px] relative">
+                    <input
+                      type="text"
+                      placeholder="Pesquisar..."
+                      value={searchText}
+                      onChange={(e) => setSearchText(e.target.value)}
+                      className="w-full h-full px-5 pl-12 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-secondary font-nunito text-sm"
+                    />
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
+                      <MdSearch size={18} />
+                    </span>
+                  </div>
+                </div>
 
-          {/* Filtro de status */}
-          <div className="flex-1">
-            <div className="h-[48px]">
-              <select
-                value={filterStatus}
-                onChange={(e) =>
-                  setFilterStatus(
-                    e.target.value as 'Todos' | 'Ativo' | 'Desativado'
-                  )
-                }
-                className="w-[175px] h-full px-5 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text focus:outline-none focus:border-secondary text-sm"
+                {/* Filtro de status */}
+                <div className="w-full md:w-[160px]">
+                  <select
+                    value={filterStatus}
+                    onChange={(e) =>
+                      setFilterStatus(
+                        e.target.value as 'Todos' | 'Ativo' | 'Desativado'
+                      )
+                    }
+                    className="w-full h-[36px] px-5 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text focus:outline-none focus:border-secondary font-nunito text-sm"
+                  >
+                    <option value="Todos">Todos</option>
+                    <option value="Ativo">Ativo</option>
+                    <option value="Desativado">Desativado</option>
+                  </select>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  window.location.href = '/cadastros/grupos-produtos/novo'
+                }}
+                className="h-10 px-[30px] bg-primary text-info rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
               >
-                <option value="Todos">Todos</option>
-                <option value="Ativo">Ativo</option>
-                <option value="Desativado">Desativado</option>
-              </select>
+                Novo
+                <span className="text-lg">+</span>
+              </button>
             </div>
           </div>
         </div>
       </div>
+      <div className="h-[6px] border-t-2 border-alternate"></div>
 
       {/* Cabeçalho da tabela */}
       <div className="px-[30px] mt-2">
