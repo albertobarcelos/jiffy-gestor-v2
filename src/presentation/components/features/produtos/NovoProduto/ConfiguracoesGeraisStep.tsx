@@ -97,6 +97,7 @@ export function ConfiguracoesGeraisStep({
               headers: {
                 Authorization: `Bearer ${token}`,
               },
+              cache: 'no-store',
             }
           )
 
@@ -105,8 +106,16 @@ export function ConfiguracoesGeraisStep({
             const items = data.items || []
             allItems = [...allItems, ...items]
 
-            hasMore = data.hasNext && allItems.length < (data.count || 0)
-            offset += items.length
+            const fetchedCount = items.length
+            const totalCount = data.count ?? allItems.length
+            offset += fetchedCount
+
+            const apiHasNext =
+              typeof data.hasNext === 'boolean'
+                ? data.hasNext
+                : fetchedCount === limit && allItems.length < totalCount
+
+            hasMore = apiHasNext
           } else {
             hasMore = false
           }
@@ -143,6 +152,7 @@ export function ConfiguracoesGeraisStep({
               headers: {
                 Authorization: `Bearer ${token}`,
               },
+              cache: 'no-store',
             }
           )
 
@@ -151,8 +161,16 @@ export function ConfiguracoesGeraisStep({
             const items = data.items || []
             allItems = [...allItems, ...items]
 
-            hasMore = data.hasNext && allItems.length < (data.count || 0)
-            offset += items.length
+            const fetchedCount = items.length
+            const totalCount = data.count ?? allItems.length
+            offset += fetchedCount
+
+            const apiHasNext =
+              typeof data.hasNext === 'boolean'
+                ? data.hasNext
+                : fetchedCount === limit && allItems.length < totalCount
+
+            hasMore = apiHasNext
           } else {
             hasMore = false
           }

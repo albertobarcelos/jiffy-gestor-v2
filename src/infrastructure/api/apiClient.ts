@@ -76,7 +76,8 @@ export class ApiClient {
     })
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
+      const errorBody = await response.text().catch(() => '')
+      const errorData = errorBody ? JSON.parse(errorBody) : {}
       throw new ApiError(
         errorData.message || 'Erro na requisição',
         response.status,
@@ -84,7 +85,8 @@ export class ApiClient {
       )
     }
 
-    const data = await response.json()
+    const raw = await response.text()
+    const data = raw ? (JSON.parse(raw) as T) : ({} as T)
     return { data, status: response.status }
   }
 

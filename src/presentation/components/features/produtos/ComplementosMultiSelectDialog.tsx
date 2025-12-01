@@ -29,8 +29,6 @@ interface ComplementosMultiSelectDialogProps {
   produtoId?: string
   produtoNome?: string
   onClose: () => void
-  onAddGroup?: (produtoId?: string) => void
-  onRemoveGroup?: (grupoId: string) => Promise<void> | void
 }
 
 export function ComplementosMultiSelectDialog({
@@ -38,8 +36,6 @@ export function ComplementosMultiSelectDialog({
   produtoId,
   produtoNome,
   onClose,
-  onAddGroup,
-  onRemoveGroup,
 }: ComplementosMultiSelectDialogProps) {
   const { auth } = useAuthStore()
   const [searchQuery, setSearchQuery] = useState('')
@@ -47,6 +43,15 @@ export function ComplementosMultiSelectDialog({
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [isSelectDialogOpen, setIsSelectDialogOpen] = useState(false)
+  const [allSelectableGroups, setAllSelectableGroups] = useState<Array<{ id: string; nome: string }>>(
+    []
+  )
+  const [isLoadingSelectableGroups, setIsLoadingSelectableGroups] = useState(false)
+  const [selectSearch, setSelectSearch] = useState('')
+  const [tempSelection, setTempSelection] = useState<string[]>([])
+  const [isSavingSelection, setIsSavingSelection] = useState(false)
 
   const loadGroups = useCallback(async () => {
     if (!open || !produtoId) return
@@ -65,6 +70,7 @@ export function ComplementosMultiSelectDialog({
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        cache: 'no-store',
       })
 
       if (!response.ok) {
@@ -103,12 +109,74 @@ export function ComplementosMultiSelectDialog({
     }
   }, [open, produtoId, auth])
 
+  const loadSelectableGroups = useCallback(async () => {
+    const token = auth?.getAccessToken()
+    if (!token) {
+      setAllSelectableGroups([])
+      return
+    }
+
+    setIsLoadingSelectableGroups(true)
+    try {
+      const limit = 25
+      let offset = 0
+      let hasMore = true
+      const collected: Array<{ id: string; nome: string }> = []
+
+      while (hasMore) {
+        const response = await fetch(
+          `/api/grupos-complementos?ativo=true&limit=${limit}&offset=${offset}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            cache: 'no-store',
+          }
+        )
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || errorData.message || 'Erro ao carregar grupos')
+        }
+
+        const data = await response.json()
+        const items = data.items || []
+        const mapped = items
+          .map((item: any) => ({
+            id: item.id?.toString() || '',
+            nome: item.nome?.toString() || 'Grupo',
+          }))
+          .filter((item: { id: string }) => Boolean(item.id))
+
+        collected.push(...mapped)
+
+        const fetchedCount = items.length
+        const totalCount = data.count ?? collected.length
+        offset += fetchedCount
+        hasMore = fetchedCount === limit && collected.length < totalCount
+      }
+
+      setAllSelectableGroups(collected)
+    } catch (err) {
+      console.error(err)
+      showToast.error(
+        err instanceof Error ? err.message : 'Erro ao carregar grupos de complementos.'
+      )
+    } finally {
+      setIsLoadingSelectableGroups(false)
+    }
+  }, [auth])
+
   useEffect(() => {
     if (open) {
       setSearchQuery('')
       loadGroups()
     }
   }, [open, loadGroups])
+
+  useEffect(() => {
+    setTempSelection(groups.map((grupo) => grupo.id))
+  }, [groups])
 
   const filteredGroups = useMemo(() => {
     if (!searchQuery.trim()) {
@@ -126,18 +194,111 @@ export function ComplementosMultiSelectDialog({
       .filter((grupo) => grupo.complementos.length > 0)
   }, [groups, searchQuery])
 
+  const filteredSelectableGroups = useMemo(() => {
+    if (!selectSearch.trim()) {
+      return allSelectableGroups
+    }
+
+    const normalized = selectSearch.trim().toLowerCase()
+    return allSelectableGroups.filter((grupo) =>
+      grupo.nome.toLowerCase().includes(normalized)
+    )
+  }, [allSelectableGroups, selectSearch])
+
+  const persistGruposSelection = useCallback(
+    async (ids: string[], successMessage?: string) => {
+      if (!produtoId) {
+        showToast.error('Produto não encontrado.')
+        return false
+      }
+
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return false
+      }
+
+      setIsUpdating(true)
+      try {
+        const response = await fetch(`/api/produtos/${produtoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ gruposComplementosIds: ids }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || 'Erro ao atualizar grupos de complementos')
+        }
+
+        await loadGroups()
+        setTempSelection(ids)
+        showToast.success(successMessage ?? 'Grupos atualizados com sucesso!')
+        return true
+      } catch (err) {
+        console.error(err)
+        showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar grupos.')
+        return false
+      } finally {
+        setIsUpdating(false)
+      }
+    },
+    [produtoId, auth, loadGroups]
+  )
+
   const handleClose = () => {
     onClose()
   }
   const handleRemoveGroup = async (grupo: GrupoComplemento) => {
-    if (!onRemoveGroup) {
-      setGroups((prev) => prev.filter((g) => g.id !== grupo.id))
-      showToast.success(`Grupo "${grupo.nome}" removido da visualização.`)
+    if (isUpdating) return
+
+    const token = auth?.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado. Faça login novamente.')
       return
     }
 
+    if (!produtoId) {
+      showToast.error('Produto não encontrado.')
+      return
+    }
+
+    const requestUrl = `/api/produtos/${encodeURIComponent(
+      produtoId
+    )}/grupos-complementos/${encodeURIComponent(grupo.id)}`
+    console.log('[ComplementosMultiSelectDialog] Removendo grupo', {
+      produtoId,
+      grupoId: grupo.id,
+      requestUrl,
+    })
+
+    setIsUpdating(true)
     try {
-      await onRemoveGroup(grupo.id)
+      const response = await fetch(requestUrl, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      console.log('[ComplementosMultiSelectDialog] Resposta remoção', {
+        status: response.status,
+        ok: response.ok,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error(
+          '[ComplementosMultiSelectDialog] Erro ao remover grupo',
+          response.status,
+          errorData
+        )
+        throw new Error(errorData.message || 'Erro ao remover grupo do produto')
+      }
+
       setGroups((prev) => prev.filter((g) => g.id !== grupo.id))
       showToast.success(`Grupo "${grupo.nome}" removido com sucesso.`)
     } catch (error) {
@@ -147,6 +308,8 @@ export function ComplementosMultiSelectDialog({
           ? error.message
           : 'Não foi possível remover o grupo. Tente novamente.'
       )
+    } finally {
+      setIsUpdating(false)
     }
   }
 
@@ -156,6 +319,35 @@ export function ComplementosMultiSelectDialog({
       ...prev,
       [grupoId]: !prev[grupoId],
     }))
+  }
+
+  const handleOpenSelectDialog = () => {
+    setSelectSearch('')
+    setTempSelection(groups.map((grupo) => grupo.id))
+    setIsSelectDialogOpen(true)
+    loadSelectableGroups()
+  }
+
+  const handleCloseSelectDialog = () => {
+    setSelectSearch('')
+    setTempSelection(groups.map((grupo) => grupo.id))
+    setIsSelectDialogOpen(false)
+  }
+
+  const handleToggleSelection = (grupoId: string) => {
+    setTempSelection((prev) =>
+      prev.includes(grupoId) ? prev.filter((id) => id !== grupoId) : [...prev, grupoId]
+    )
+  }
+
+  const handleApplySelection = async () => {
+    if (isSavingSelection || isUpdating) return
+    setIsSavingSelection(true)
+    const success = await persistGruposSelection(tempSelection)
+    setIsSavingSelection(false)
+    if (success) {
+      setIsSelectDialogOpen(false)
+    }
   }
 
   const renderContent = () => {
@@ -291,7 +483,8 @@ export function ComplementosMultiSelectDialog({
   }
 
   return (
-    <Dialog
+    <>
+      <Dialog
       open={open}
       onOpenChange={(openState) => !openState && handleClose()}
       fullWidth
@@ -337,8 +530,9 @@ export function ComplementosMultiSelectDialog({
         <div className="flex items-center justify-between mb-3">
           <button
             type="button"
-            onClick={() => onAddGroup?.(produtoId)}
-            className="h-10 px-4 rounded-[24px] border border-primary text-primary font-semibold text-sm flex items-center gap-2 hover:bg-primary/10 transition-colors"
+            onClick={handleOpenSelectDialog}
+            disabled={isUpdating}
+            className="h-10 px-4 rounded-[24px] border border-primary text-primary font-semibold text-sm flex items-center gap-2 hover:bg-primary/10 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <MdAdd size={18} />
             Adicionar grupo
@@ -369,7 +563,88 @@ export function ComplementosMultiSelectDialog({
           Fechar
         </button>
       </DialogFooter>
-    </Dialog>
+      </Dialog>
+
+      <Dialog
+        open={isSelectDialogOpen}
+        onOpenChange={(openState) => {
+          if (!openState) {
+            handleCloseSelectDialog()
+          }
+        }}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogHeader>
+          <DialogTitle>Selecionar grupos de complementos</DialogTitle>
+        </DialogHeader>
+        <DialogContent sx={{ padding: '16px 24px' }}>
+          <div className="relative mb-4">
+            <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={18} />
+            <input
+              type="text"
+              value={selectSearch}
+              onChange={(event) => setSelectSearch(event.target.value)}
+              placeholder="Buscar grupo..."
+              className="w-full h-11 pl-10 pr-4 rounded-[24px] border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
+            />
+          </div>
+          <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+            {isLoadingSelectableGroups ? (
+              <p className="text-center text-secondary-text text-sm py-6">
+                Carregando grupos...
+              </p>
+            ) : filteredSelectableGroups.length ? (
+              filteredSelectableGroups.map((grupo) => {
+                const isSelected = tempSelection.includes(grupo.id)
+                return (
+                  <label
+                    key={grupo.id}
+                    className={`flex items-center gap-3 rounded-2xl border px-4 py-3 cursor-pointer transition-colors ${
+                      isSelected ? 'border-primary bg-primary/5' : 'border-gray-200 bg-gray-50'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => handleToggleSelection(grupo.id)}
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-primary-text">{grupo.nome}</p>
+                    </div>
+                    {isSelected && (
+                      <span className="text-xs font-semibold text-primary">Selecionado</span>
+                    )}
+                  </label>
+                )
+              })
+            ) : (
+              <p className="text-center text-secondary-text text-sm py-6">
+                Nenhum grupo encontrado.
+              </p>
+            )}
+          </div>
+        </DialogContent>
+        <DialogFooter sx={{ justifyContent: 'space-between' }}>
+          <button
+            type="button"
+            onClick={handleCloseSelectDialog}
+            className="h-10 px-5 rounded-[24px] border border-gray-300 text-sm font-semibold text-primary-text hover:bg-gray-50 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleApplySelection}
+            disabled={isSavingSelection || isUpdating}
+            className="h-10 px-6 rounded-[24px] bg-primary text-info text-sm font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isSavingSelection ? 'Aplicando...' : 'Aplicar seleção'}
+          </button>
+        </DialogFooter>
+      </Dialog>
+    </>
   )
 }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo, useCallback, memo, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useProdutosInfinite } from '@/src/presentation/hooks/useProdutos'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
@@ -125,7 +125,7 @@ const sortProdutosAlphabetically = (lista: Produto[]): Produto[] => {
 }
 
 /**
- * Item individual da lista de produtos (memoizado para evitar re-renders desnecessários)
+ * Item individual da lista de produtos
  */
 interface ProdutoListItemProps {
   produto: Produto
@@ -142,7 +142,7 @@ interface ProdutoListItemProps {
   onCopyProduto?: (produtoId: string) => void
 }
 
-const ProdutoListItem = memo(function ProdutoListItem({
+const ProdutoListItem = function ProdutoListItem({
   produto,
   onValorChange,
   onSwitchToggle,
@@ -392,7 +392,7 @@ const ProdutoListItem = memo(function ProdutoListItem({
       </div>
     </div>
   )
-})
+}
 
 /**
  * Lista de produtos com scroll infinito
@@ -949,28 +949,6 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     setProdutoModalConfig({ mode: 'copy', produtoId })
   }, [])
 
-  const handleAddGrupoComplemento = useCallback((produtoId?: string) => {
-    showToast.info(
-      produtoId
-        ? `Adicionar novo grupo ao produto ${produtoId} ainda não está disponível.`
-        : 'Selecione um produto para adicionar grupos.'
-    )
-  }, [])
-
-  const handleRemoveGrupoComplemento = useCallback(
-    async (produtoId: string, grupoId: string) => {
-      try {
-        showToast.info(
-          `Remoção do grupo ${grupoId} do produto ${produtoId} ainda está em desenvolvimento.`
-        )
-      } catch (error) {
-        console.error(error)
-        showToast.error('Não foi possível remover o grupo. Tente novamente.')
-      }
-    },
-    []
-  )
-
   const handleToggleGroup = useCallback((grupo: string) => {
     setExpandedGroups((prev) => ({
       ...prev,
@@ -1172,12 +1150,6 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
         produtoId={produtoComplementosModal?.getId()}
         produtoNome={produtoComplementosModal?.getNome()}
         onClose={closeComplementosModal}
-        onAddGroup={(id) => handleAddGrupoComplemento(id)}
-        onRemoveGroup={(grupoId) =>
-          produtoComplementosModal
-            ? handleRemoveGrupoComplemento(produtoComplementosModal.getId(), grupoId)
-            : undefined
-        }
       />
 
       <ProdutoImpressorasDialog
