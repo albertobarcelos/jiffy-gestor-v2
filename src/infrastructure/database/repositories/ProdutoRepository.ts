@@ -24,14 +24,39 @@ export class ProdutoRepository implements IProdutoRepository {
     limit: number
     offset: number
     ativo?: boolean | null
+    ativoLocal?: boolean | null
+    ativoDelivery?: boolean | null
+    grupoProdutoId?: string
+    grupoComplementosId?: string
   }): Promise<{ produtos: Produto[]; total: number }> {
     try {
-      const { name = '', limit, offset, ativo } = params
+      const {
+        name = '',
+        limit,
+        offset,
+        ativo,
+        ativoLocal,
+        ativoDelivery,
+        grupoProdutoId,
+        grupoComplementosId,
+      } = params
 
       // Constrói a URL exatamente como no Flutter
       let url = `/api/v1/cardapio/produtos/?q=${encodeURIComponent(name)}&limit=${limit}&offset=${offset}`
       if (ativo !== null && ativo !== undefined) {
         url += `&ativo=${ativo}`
+      }
+      if (ativoLocal !== null && ativoLocal !== undefined) {
+        url += `&ativoLocal=${ativoLocal}`
+      }
+      if (ativoDelivery !== null && ativoDelivery !== undefined) {
+        url += `&ativoDelivery=${ativoDelivery}`
+      }
+      if (grupoProdutoId) {
+        url += `&grupoProdutoId=${encodeURIComponent(grupoProdutoId)}`
+      }
+      if (grupoComplementosId) {
+        url += `&grupoComplementosId=${encodeURIComponent(grupoComplementosId)}`
       }
 
       const response = await this.apiClient.request<{

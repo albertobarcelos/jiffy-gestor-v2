@@ -12,6 +12,7 @@ import { MdImage } from 'react-icons/md'
 interface NovoProdutoProps {
   produtoId?: string
   isCopyMode?: boolean
+  defaultGrupoProdutoId?: string
   onClose?: () => void
   onSuccess?: () => void
 }
@@ -22,6 +23,7 @@ interface NovoProdutoProps {
 function NovoProdutoContent({
   produtoId,
   isCopyMode = false,
+  defaultGrupoProdutoId,
   onClose,
   onSuccess,
 }: NovoProdutoProps) {
@@ -55,6 +57,15 @@ function NovoProdutoContent({
   const copyFromId = useMemo(() => copyFromIdValue, [copyFromIdValue])
   const effectiveProdutoId = useMemo(() => produtoId || copyFromId, [produtoId, copyFromId])
   const effectiveIsCopyMode = useMemo(() => isCopyMode || !!copyFromId, [isCopyMode, copyFromId])
+
+  useEffect(() => {
+    if (effectiveProdutoId || effectiveIsCopyMode) {
+      return
+    }
+    if (defaultGrupoProdutoId && defaultGrupoProdutoId !== grupoProduto) {
+      setGrupoProduto(defaultGrupoProdutoId)
+    }
+  }, [defaultGrupoProdutoId, effectiveProdutoId, effectiveIsCopyMode, grupoProduto])
 
   // Refs para evitar loops infinitos
   const hasLoadedProdutoRef = useRef(false)
@@ -431,12 +442,19 @@ function NovoProdutoContent({
  * Componente principal para criação/edição de produtos
  * Replica exatamente o design e lógica do Flutter NovoProdutoWidget
  */
-export function NovoProduto({ produtoId, isCopyMode = false, onClose, onSuccess }: NovoProdutoProps) {
+export function NovoProduto({
+  produtoId,
+  isCopyMode = false,
+  defaultGrupoProdutoId,
+  onClose,
+  onSuccess,
+}: NovoProdutoProps) {
   return (
     <Suspense fallback={<div className="flex items-center justify-center h-full">Carregando...</div>}>
       <NovoProdutoContent
         produtoId={produtoId}
         isCopyMode={isCopyMode}
+        defaultGrupoProdutoId={defaultGrupoProdutoId}
         onClose={onClose}
         onSuccess={onSuccess}
       />

@@ -17,6 +17,54 @@ interface GruposComplementosResponse {
 }
 
 /**
+ * Hook para buscar grupos de complementos (lista simples)
+ */
+export function useGruposComplementos(params: GruposComplementosQueryParams = {}) {
+  const { auth, isAuthenticated } = useAuthStore()
+  const token = auth?.getAccessToken()
+
+  return useQuery<GrupoComplemento[], ApiError>({
+    queryKey: ['grupos-complementos', params.q, params.ativo],
+    queryFn: async () => {
+      if (!isAuthenticated || !token) {
+        throw new Error('Usuário não autenticado ou token ausente.')
+      }
+
+      const searchParams = new URLSearchParams()
+      if (params.q) searchParams.append('q', params.q)
+      if (params.ativo !== null && params.ativo !== undefined) {
+        searchParams.append('ativo', params.ativo.toString())
+      }
+      if (params.limit) {
+        searchParams.append('limit', params.limit.toString())
+      }
+      searchParams.append('offset', params.offset?.toString() ?? '0')
+
+      const response = await fetch(`/api/grupos-complementos?${searchParams.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new ApiError(
+          errorData.error || errorData.message || 'Erro ao carregar grupos de complementos',
+          response.status,
+          errorData
+        )
+      }
+
+      const data: GruposComplementosResponse = await response.json()
+      return (data.items || []).map((item: any) => GrupoComplemento.fromJSON(item))
+    },
+    enabled: isAuthenticated && !!token,
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+/**
  * Hook para buscar grupos de complementos com paginação infinita
  */
 export function useGruposComplementosInfinite(params: Omit<GruposComplementosQueryParams, 'offset'> = {}) {

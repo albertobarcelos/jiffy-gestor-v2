@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useProdutosInfinite } from '@/src/presentation/hooks/useProdutos'
+import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
+import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import Link from 'next/link'
@@ -189,16 +191,22 @@ const ProdutoListItem = function ProdutoListItem({
 
   const actionIcons = useMemo(
     () => [
-      { key: 'copiar', label: 'Copiar', Icon: MdContentCopy, action: 'copy' },
+      { key: 'copiar', label: 'Copiar produto', Icon: MdContentCopy, action: 'copy' },
       {
         key: 'complementos',
-        label: 'Selecionar complementos',
+        label: 'Complementos vinculados',
         Icon: MdExtension,
         modal: 'complementos' as const,
       },
       {
+        key: 'impressora',
+        label: 'Impressoras vinculadas',
+        Icon: MdPrint,
+        modal: 'impressoras' as const,
+      },
+      {
         key: 'favorito',
-        label: 'Favorito',
+        label: 'Favoritar produto',
         Icon: MdStarBorder,
         field: 'favorito' as ToggleField,
       },
@@ -216,15 +224,9 @@ const ProdutoListItem = function ProdutoListItem({
       },
       {
         key: 'abrir',
-        label: 'Abrir complementos automaticamente',
+        label: 'Permitir abrir complementos',
         Icon: MdLaunch,
         field: 'abreComplementos' as ToggleField,
-      },
-      {
-        key: 'impressora',
-        label: 'Impressoras vinculadas',
-        Icon: MdPrint,
-        modal: 'impressoras' as const,
       },
     ],
     []
@@ -242,7 +244,8 @@ const ProdutoListItem = function ProdutoListItem({
             <button
               type="button"
               onClick={() => onEditProduto?.(produto.getId())}
-              className="rounded-full bg-primary/10 p-1 text-[var(--color-primary)] hover:bg-primary/20 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              title="Editar produto"
+              className="rounded-full bg-primary/10 border border-primary p-1 text-[var(--color-primary)] hover:bg-primary/20 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               aria-label={`Editar ${produto.getNome()}`}
             >
               <MdModeEdit className="text-xl" />
@@ -261,7 +264,7 @@ const ProdutoListItem = function ProdutoListItem({
               const isLoading = Boolean(savingToggleState?.[field])
               const iconColor = isActive ? 'text-primary' : 'text-white'
               const bgColor = isActive
-                ? 'bg-primary/5 border border-primary'
+                ? 'bg-primary text-white border border-primary'
                 : 'bg-gray-300 border border-transparent'
 
               return (
@@ -273,7 +276,7 @@ const ProdutoListItem = function ProdutoListItem({
                   onClick={() => onToggleBoolean?.(field, !isActive)}
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-lg transition-all ${bgColor} ${iconColor} ${isLoading
                       ? 'opacity-60 cursor-not-allowed'
-                      : 'hover:bg-primary/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+                      : 'hover:bg-primary/80 hover:text-white  focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/80'
                     }`}
                 >
                   <Icon />
@@ -296,7 +299,7 @@ const ProdutoListItem = function ProdutoListItem({
                   title={label}
                   disabled={!handleModalClick}
                   onClick={() => handleModalClick?.()}
-                  className={`w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${!handleModalClick ? 'opacity-60 cursor-not-allowed' : 'hover:bg-primary/10'}`}
+                  className={`w-8 h-8 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${!handleModalClick ? 'opacity-60 cursor-not-allowed' : 'hover:bg-primary/10'}`}
                 >
                   <Icon />
                 </button>
@@ -310,7 +313,7 @@ const ProdutoListItem = function ProdutoListItem({
                   type="button"
                   title={label}
                   onClick={() => onCopyProduto?.(produto.getId())}
-                  className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-lg hover:bg-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="w-8 h-8 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-lg hover:bg-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <Icon />
                 </button>
@@ -355,6 +358,7 @@ const ProdutoListItem = function ProdutoListItem({
         </div>
         <div className="flex items-center">
           <label
+            title="Ativar/Desativar produto"
             className={`relative inline-flex h-7 w-12 items-center ${isSavingStatus ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
           >
             <input
@@ -396,6 +400,11 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
+  const [limitFilter, setLimitFilter] = useState(10)
+  const [ativoLocalFilter, setAtivoLocalFilter] = useState<'Todos' | 'Sim' | 'Não'>('Todos')
+  const [ativoDeliveryFilter, setAtivoDeliveryFilter] = useState<'Todos' | 'Sim' | 'Não'>('Todos')
+  const [grupoProdutoFilter, setGrupoProdutoFilter] = useState('')
+  const [grupoComplementoFilter, setGrupoComplementoFilter] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const loadMoreRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -423,6 +432,23 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     open: false,
     tab: 'produto',
     mode: 'create',
+    prefillGrupoProdutoId: undefined,
+  })
+
+  const {
+    data: gruposProdutos = [],
+    isLoading: isLoadingGruposProdutos,
+  } = useGruposProdutos({
+    limit: 100,
+    ativo: null,
+  })
+
+  const {
+    data: gruposComplementos = [],
+    isLoading: isLoadingGruposComplementos,
+  } = useGruposComplementos({
+    limit: 100,
+    ativo: null,
   })
   const token = auth?.getAccessToken()
   const invalidateProdutosQueries = useCallback(async () => {
@@ -434,11 +460,12 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
 
   const openTabsModal = useCallback(
     (config: Partial<ProdutosTabsModalState>) => {
-      setTabsModalState((prev) => ({
+      setTabsModalState(() => ({
         open: true,
-        tab: config.tab ?? prev.tab ?? 'produto',
-        mode: config.mode ?? prev.mode ?? 'create',
+        tab: config.tab ?? 'produto',
+        mode: config.mode ?? 'create',
         produto: config.produto,
+        prefillGrupoProdutoId: config.prefillGrupoProdutoId ?? undefined,
       }))
     },
     []
@@ -449,6 +476,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
       ...prev,
       open: false,
       produto: undefined,
+      prefillGrupoProdutoId: undefined,
     }))
   }, [])
 
@@ -463,6 +491,37 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
       tab,
     }))
   }, [])
+
+  const handleCreateProduto = useCallback(() => {
+    openTabsModal({
+      tab: 'produto',
+      mode: 'create',
+      produto: undefined,
+      prefillGrupoProdutoId: undefined,
+    })
+  }, [openTabsModal])
+
+  const handleCreateProdutoForGroup = useCallback(
+    (grupoNome: string) => {
+      if (!grupoNome || grupoNome.toLowerCase() === 'sem grupo') {
+        handleCreateProduto()
+        return
+      }
+
+      const normalized = grupoNome.trim().toLowerCase()
+      const matchedGroup = gruposProdutos.find(
+        (grupo) => grupo.getNome().trim().toLowerCase() === normalized
+      )
+
+      openTabsModal({
+        tab: 'produto',
+        mode: 'create',
+        produto: undefined,
+        prefillGrupoProdutoId: matchedGroup?.getId(),
+      })
+    },
+    [gruposProdutos, handleCreateProduto, openTabsModal]
+  )
   const setPendingUpdate = useCallback(
     (
       produtoId: string,
@@ -548,13 +607,37 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     return filterStatus === 'Ativo' ? true : filterStatus === 'Desativado' ? false : null
   }, [filterStatus])
 
+  const ativoLocalBoolean = useMemo<boolean | null>(() => {
+    if (ativoLocalFilter === 'Sim') return true
+    if (ativoLocalFilter === 'Não') return false
+    return null
+  }, [ativoLocalFilter])
+
+  const ativoDeliveryBoolean = useMemo<boolean | null>(() => {
+    if (ativoDeliveryFilter === 'Sim') return true
+    if (ativoDeliveryFilter === 'Não') return false
+    return null
+  }, [ativoDeliveryFilter])
+
   const queryParams = useMemo(
     () => ({
       name: debouncedSearch || undefined,
       ativo: ativoFilter,
-      limit: 10,
+      ativoLocal: ativoLocalBoolean,
+      ativoDelivery: ativoDeliveryBoolean,
+      grupoProdutoId: grupoProdutoFilter || undefined,
+      grupoComplementosId: grupoComplementoFilter || undefined,
+      limit: limitFilter,
     }),
-    [debouncedSearch, ativoFilter]
+    [
+      debouncedSearch,
+      ativoFilter,
+      ativoLocalBoolean,
+      ativoDeliveryBoolean,
+      grupoProdutoFilter,
+      grupoComplementoFilter,
+      limitFilter,
+    ]
   )
 
   // Hook otimizado com React Query
@@ -941,6 +1024,16 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     invalidateProdutosQueries()
   }, [invalidateProdutosQueries, onReload])
 
+  const handleClearFilters = useCallback(() => {
+    setSearchText('')
+    setFilterStatus('Ativo')
+    setAtivoLocalFilter('Todos')
+    setAtivoDeliveryFilter('Todos')
+    setGrupoProdutoFilter('')
+    setGrupoComplementoFilter('')
+    setLimitFilter(10)
+  }, [])
+
   const handleOpenComplementosModal = useCallback(
     (produto: Produto) => {
       openTabsModal({ tab: 'complementos', mode: 'edit', produto })
@@ -983,56 +1076,18 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px] pt-[6px] pb-[6px]">
+      <div className="px-[30px] py-[4px]">
         <div className="flex flex-col gap-4">
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div className="pl-5">
-              <p className="text-primary text-sm font-semibold font-nunito mb-2">
+              <p className="text-primary text-sm font-semibold font-nunito">
                 Produtos Cadastrados
               </p>
               <p className="text-tertiary text-[22px] font-medium font-nunito">
                 Total {localProdutos.length}
               </p>
             </div>
-            <div className="flex-1 flex gap-2 items-center justify-end">
-              <div className="flex flex-wrap gap-2 w-full items-center justify-center">
-                {/* Barra de pesquisa */}
-                <div className="w-full md:w-[360px]">
-                  <div className="h-[36px] relative">
-                    <input
-                      type="text"
-                      placeholder="Pesquisar..."
-                      value={searchText}
-                      onChange={(e) => setSearchText(e.target.value)}
-                      className="w-full h-full px-5 pl-12 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-secondary font-nunito text-sm"
-                    />
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
-                      <MdSearch size={18} />
-                    </span>
-                  </div>
-                </div>
-
-                {/* Filtro de status */}
-                <div className="w-full md:w-[160px]">
-                  <select
-                    value={filterStatus}
-                    onChange={(e) =>
-                      setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
-                    }
-                    className="w-full h-[36px] px-5 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text focus:outline-none focus:border-secondary font-nunito text-sm"
-                  >
-                    <option value="Todos">Todos</option>
-                    <option value="Ativo">Ativo</option>
-                    <option value="Desativado">Desativado</option>
-                  </select>
-                </div>
-              </div>
-              {/*<Link
-                href="/produtos/atualizar-preco"
-                className="h-10 px-[30px] bg-info text-primary-text border border-secondary rounded-[30px] font-semibold font-exo text-sm flex items-center text-center hover:bg-secondary-text/10 transition-colors"
-              >
-                Atualizar Preços
-              </Link>*/}
+            <div className="flex items-center justify-end flex-1">
               <button
                 onClick={() =>
                   openTabsModal({
@@ -1050,7 +1105,112 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
           </div>
         </div>
       </div>
-      <div className="h-[6px] border-t-2 border-alternate"></div>
+      <div className="h-[4px] border-t-2 border-alternate"></div>
+      <div className="bg-white px-[20px] py-2 border-b border-gray-100">
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex-1 min-w-[180px]">
+            <label htmlFor="produtos-search" className="text-xs font-semibold text-secondary-text mb-1 block">
+               Buscar produto...
+            </label>
+            <div className="relative h-8">
+              <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text" size={18} />
+              <input
+                id="produtos-search"
+                type="text"
+                placeholder="Pesquisar produto..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="w-full h-full pl-11 pr-4 rounded-[24px] border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              />
+            </div>
+          </div>
+
+          <div className="w-full sm:w-[160px]">
+            <label className="text-xs font-semibold text-secondary-text mb-1 block">Status</label>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')}
+              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+            >
+              <option value="Todos">Todos</option>
+              <option value="Ativo">Ativo</option>
+              <option value="Desativado">Desativado</option>
+            </select>
+          </div>
+
+          <div className="w-full sm:w-[160px]">
+            <label className="text-xs font-semibold text-secondary-text mb-1 block">Ativo no local</label>
+            <select
+              value={ativoLocalFilter}
+              onChange={(e) => setAtivoLocalFilter(e.target.value as 'Todos' | 'Sim' | 'Não')}
+              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+            >
+              <option value="Todos">Todos</option>
+              <option value="Sim">Sim</option>
+              <option value="Não">Não</option>
+            </select>
+          </div>
+
+          <div className="w-full sm:w-[160px]">
+            <label className="text-xs font-semibold text-secondary-text mb-1 block">Ativo no delivery</label>
+            <select
+              value={ativoDeliveryFilter}
+              onChange={(e) => setAtivoDeliveryFilter(e.target.value as 'Todos' | 'Sim' | 'Não')}
+              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+            >
+              <option value="Todos">Todos</option>
+              <option value="Sim">Sim</option>
+              <option value="Não">Não</option>
+            </select>
+          </div>
+
+          <div className="w-full sm:w-[220px]">
+            <label className="text-xs font-semibold text-secondary-text mb-1 block">Grupo de produtos</label>
+            <select
+              value={grupoProdutoFilter}
+              onChange={(e) => setGrupoProdutoFilter(e.target.value)}
+              disabled={isLoadingGruposProdutos}
+              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <option value="">{isLoadingGruposProdutos ? 'Carregando...' : 'Todos'}</option>
+              {!isLoadingGruposProdutos &&
+                gruposProdutos.map((grupo) => (
+                  <option key={grupo.getId()} value={grupo.getId()}>
+                    {grupo.getNome()}
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          <div className="w-full sm:w-[220px]">
+            <label className="text-xs font-semibold text-secondary-text mb-1 block">Grupo de complementos</label>
+            <select
+              value={grupoComplementoFilter}
+              onChange={(e) => setGrupoComplementoFilter(e.target.value)}
+              disabled={isLoadingGruposComplementos}
+              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <option value="">{isLoadingGruposComplementos ? 'Carregando...' : 'Todos'}</option>
+              {!isLoadingGruposComplementos &&
+                gruposComplementos.map((grupo) => (
+                  <option key={grupo.getId()} value={grupo.getId()}>
+                    {grupo.getNome()}
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          <div className="w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              className="h-8 px-5 rounded-[24px] border border-gray-300 text-sm font-semibold text-primary-text bg-white hover:bg-gray-50 transition-colors"
+            >
+              Limpar filtros
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Lista de produtos com scroll */}
       <div
@@ -1078,13 +1238,23 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
 
         {produtosAgrupados.map(([grupo, items]) => (
           <div key={grupo} className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-5">
               <div>
                 <p className="text-sm font-semibold text-primary-text uppercase tracking-wide">
                   {grupo}
                 </p>
                 <p className="text-xs text-secondary-text">{items.length} produtos</p>
               </div>
+            
+             <div className="flex items-center justify-end flex-1">
+               <button
+                 onClick={() => handleCreateProdutoForGroup(grupo)}
+                 className="h-6 px-[20px] bg-info border border-primary text-primary rounded-[10px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/10 transition-colors"
+               >
+                 Adicionar produto
+                 <span className="text-sm">+</span>
+               </button>
+             </div>
               <button
                 type="button"
                 onClick={() => handleToggleGroup(grupo)}

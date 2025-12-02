@@ -14,6 +14,7 @@ export interface ProdutosTabsModalState {
   tab: TabKey
   mode: 'create' | 'edit' | 'copy'
   produto?: Produto
+  prefillGrupoProdutoId?: string
 }
 
 interface ProdutosTabsModalProps {
@@ -106,6 +107,7 @@ export function ProdutosTabsModal({ state, onClose, onReload, onTabChange }: Pro
               <NovoProduto
                 produtoId={state.mode === 'create' ? undefined : produtoId}
                 isCopyMode={state.mode === 'copy'}
+                defaultGrupoProdutoId={state.mode === 'create' ? state.prefillGrupoProdutoId : undefined}
                 onClose={onClose}
                 onSuccess={() => {
                   onReload?.()
