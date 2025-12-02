@@ -302,18 +302,18 @@ function NovoProdutoContent({
     <div className="flex flex-col h-full">
       {/* Header fixo com título e botões */}
       <div className="sticky top-0 z-10 bg-primary-bg/90 backdrop-blur-sm rounded-tl-[30px] shadow-md">
-        <div className="px-[30px] py-[8px]">
+        <div className="px-[30px] py-[4px]">
           <div className="rounded-[32px] border border-[#E0E4F3] bg-gradient-to-br from-[#F6F7FF] to-[#EEF1FB] px-6 py-3 shadow-[0_15px_45px_rgba(15,23,42,0.08)]">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-start gap-4">
                 <div className="h-14 w-14 rounded-2xl bg-white flex items-center justify-center shadow-inner text-primary">
                   <MdImage className="text-2xl" />
                 </div>
-                <div className="space-y-1">
+                <div>
                   <p className="text-sm font-semibold text-alternate font-exo uppercase tracking-wide">
                     {getPageTitle()}
                   </p>
-                  <h2 className="text-2xl font-bold text-primary font-exo leading-tight">
+                  <h2 className="text-xl font-bold text-primary font-exo leading-tight">
                     {displayNome}
                   </h2>
                   <p className="text-sm text-secondary-text font-nunito">
@@ -358,8 +358,8 @@ function NovoProdutoContent({
       </div>
 
       {/* Indicador de steps */}
-      <div className="px-5 py-2">
-        <div className="flex items-center justify-center gap-6">
+      <div className="px-5 py-1">
+        <div className="flex items-center justify-center gap-4">
           <div
             className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-bold font-exo transition-colors ${
               selectedPage === 0 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-primary'

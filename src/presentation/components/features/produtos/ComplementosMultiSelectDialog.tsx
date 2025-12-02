@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Dialog,
   DialogContent,
@@ -29,6 +30,7 @@ interface ComplementosMultiSelectDialogProps {
   produtoId?: string
   produtoNome?: string
   onClose: () => void
+  isEmbedded?: boolean
 }
 
 export function ComplementosMultiSelectDialog({
@@ -36,6 +38,7 @@ export function ComplementosMultiSelectDialog({
   produtoId,
   produtoNome,
   onClose,
+  isEmbedded = false,
 }: ComplementosMultiSelectDialogProps) {
   const { auth } = useAuthStore()
   const [searchQuery, setSearchQuery] = useState('')
@@ -482,168 +485,207 @@ export function ComplementosMultiSelectDialog({
     )
   }
 
-  return (
+  const renderDialogBody = () => (
     <>
-      <Dialog
-      open={open}
-      onOpenChange={(openState) => !openState && handleClose()}
-      fullWidth
-      maxWidth="md"
-      sx={{
-        '& .MuiDialog-container': {
-          alignItems: 'stretch',
-          justifyContent: 'flex-end',
-          margin: 0,
-        },
-      }}
-      PaperProps={{
-        sx: {
-          m: 0,
-          height: '100vh',
-          maxHeight: '100vh',
-          borderRadius: 0,
-          display: 'flex',
-          flexDirection: 'column',
-        },
-      }}
-    >
-      <DialogHeader className="relative border-b border-gray-200 pb-4">
+      <div className="flex items-center gap-3 mb-2">
         <button
           type="button"
-          onClick={handleClose}
-          className="absolute top-2 left-2 text-secondary-text hover:text-primary transition-colors"
-          aria-label="Fechar"
+          onClick={handleOpenSelectDialog}
+          disabled={isUpdating}
+          className="h-8 px-4 rounded-[24px] border border-primary bg-primary text-white font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          <MdClose size={22} />
+          <MdAdd size={18} />
+          Adicionar grupo
         </button>
-        <div className="pr-8">
-          <DialogTitle>
-            {produtoNome ? `Complementos de ${produtoNome}` : 'Selecionar complementos'}
-          </DialogTitle>
-          <p className="text-xs text-secondary-text mt-1">
-            {groups.length} grupo{groups.length === 1 ? '' : 's'} vinculados
-          </p>
-        </div>
-      </DialogHeader>
-
-      <DialogContent sx={{ padding: '16px 24px 0 24px' }}>
-        <div className="flex items-center justify-between mb-3">
-          <button
-            type="button"
-            onClick={handleOpenSelectDialog}
-            disabled={isUpdating}
-            className="h-10 px-4 rounded-[24px] border border-primary text-primary font-semibold text-sm flex items-center gap-2 hover:bg-primary/10 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            <MdAdd size={18} />
-            Adicionar grupo
-          </button>
-        </div>
-        <div className="relative mb-4">
+        <div className="relative flex-1">
           <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
           <input
             type="text"
             placeholder="Buscar complemento..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
+            className="w-full h-8 pl-10 pr-4 rounded-[24px] border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
+          />
+        </div>
+      </div>
+      {renderContent()}
+    </>
+  )
+
+  const selectionDialog = (
+    <Dialog
+      open={isSelectDialogOpen}
+      onOpenChange={(openState) => {
+        if (!openState) {
+          handleCloseSelectDialog()
+        }
+      }}
+      fullWidth
+      maxWidth="sm"
+    >
+      <DialogHeader>
+        <DialogTitle>Selecionar grupos de complementos</DialogTitle>
+      </DialogHeader>
+      <DialogContent sx={{ padding: '16px 24px' }}>
+        <div className="relative mb-4">
+          <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={18} />
+          <input
+            type="text"
+            value={selectSearch}
+            onChange={(event) => setSelectSearch(event.target.value)}
+            placeholder="Buscar grupo..."
             className="w-full h-11 pl-10 pr-4 rounded-[24px] border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
           />
         </div>
-        {renderContent()}
+        <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+          {isLoadingSelectableGroups ? (
+            <p className="text-center text-secondary-text text-sm py-6">Carregando grupos...</p>
+          ) : filteredSelectableGroups.length ? (
+            filteredSelectableGroups.map((grupo) => {
+              const isSelected = tempSelection.includes(grupo.id)
+              return (
+                <label
+                  key={grupo.id}
+                  className={`flex items-center gap-3 rounded-2xl border px-4 py-3 cursor-pointer transition-colors ${
+                    isSelected ? 'border-primary bg-primary/5' : 'border-gray-200 bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => handleToggleSelection(grupo.id)}
+                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-primary-text">{grupo.nome}</p>
+                  </div>
+                  {isSelected && <span className="text-xs font-semibold text-primary">Selecionado</span>}
+                </label>
+              )
+            })
+          ) : (
+            <p className="text-center text-secondary-text text-sm py-6">Nenhum grupo encontrado.</p>
+          )}
+        </div>
       </DialogContent>
-
-      <DialogFooter
-        className="flex items-center justify-start border-t border-gray-100"
-        sx={{ justifyContent: 'flex-start' }}
-      >
+      <DialogFooter sx={{ justifyContent: 'space-between' }}>
         <button
           type="button"
-          onClick={handleClose}
-          className="h-10 px-6 rounded-[24px] border border-gray-300 text-sm font-semibold text-primary-text hover:bg-gray-50 transition-colors"
+          onClick={handleCloseSelectDialog}
+          className="h-10 px-5 rounded-[24px] border border-gray-300 text-sm font-semibold text-primary-text hover:bg-gray-50 transition-colors"
         >
-          Fechar
+          Cancelar
+        </button>
+        <button
+          type="button"
+          onClick={handleApplySelection}
+          disabled={isSavingSelection || isUpdating}
+          className="h-10 px-6 rounded-[24px] bg-primary text-info text-sm font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {isSavingSelection ? 'Aplicando...' : 'Aplicar seleção'}
         </button>
       </DialogFooter>
-      </Dialog>
+    </Dialog>
+  )
 
+  const selectionDialogNode =
+    isEmbedded && typeof document !== 'undefined'
+      ? createPortal(selectionDialog, document.getElementById('modal-root') ?? document.body)
+      : selectionDialog
+
+  if (isEmbedded) {
+    return (
+      <>
+        <div className="h-full flex flex-col overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-primary-text">
+                {produtoNome ? `Complementos de ${produtoNome}` : 'Complementos'}
+              </h3>
+              <p className="text-xs text-secondary-text">
+                {groups.length} grupo{groups.length === 1 ? '' : 's'} vinculados
+              </p>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto px-6 py-4">{renderDialogBody()}</div>
+          <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="h-10 px-6 rounded-[24px] border border-gray-300 text-sm font-semibold text-primary-text hover:bg-gray-50 transition-colors"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+        {selectionDialogNode}
+      </>
+    )
+  }
+
+  return (
+    <>
       <Dialog
-        open={isSelectDialogOpen}
-        onOpenChange={(openState) => {
-          if (!openState) {
-            handleCloseSelectDialog()
-          }
-        }}
+        open={open}
+        onOpenChange={(openState) => !openState && handleClose()}
         fullWidth
-        maxWidth="sm"
+        maxWidth="md"
+        sx={{
+          '& .MuiDialog-container': {
+            alignItems: 'stretch',
+            justifyContent: 'flex-end',
+            margin: 0,
+          },
+        }}
+        PaperProps={{
+          sx: {
+            m: 0,
+            height: '100vh',
+            maxHeight: '100vh',
+            borderRadius: 0,
+            display: 'flex',
+            flexDirection: 'column',
+          },
+        }}
       >
-        <DialogHeader>
-          <DialogTitle>Selecionar grupos de complementos</DialogTitle>
-        </DialogHeader>
-        <DialogContent sx={{ padding: '16px 24px' }}>
-          <div className="relative mb-4">
-            <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={18} />
-            <input
-              type="text"
-              value={selectSearch}
-              onChange={(event) => setSelectSearch(event.target.value)}
-              placeholder="Buscar grupo..."
-              className="w-full h-11 pl-10 pr-4 rounded-[24px] border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
-            />
-          </div>
-          <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
-            {isLoadingSelectableGroups ? (
-              <p className="text-center text-secondary-text text-sm py-6">
-                Carregando grupos...
-              </p>
-            ) : filteredSelectableGroups.length ? (
-              filteredSelectableGroups.map((grupo) => {
-                const isSelected = tempSelection.includes(grupo.id)
-                return (
-                  <label
-                    key={grupo.id}
-                    className={`flex items-center gap-3 rounded-2xl border px-4 py-3 cursor-pointer transition-colors ${
-                      isSelected ? 'border-primary bg-primary/5' : 'border-gray-200 bg-gray-50'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => handleToggleSelection(grupo.id)}
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                    />
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-primary-text">{grupo.nome}</p>
-                    </div>
-                    {isSelected && (
-                      <span className="text-xs font-semibold text-primary">Selecionado</span>
-                    )}
-                  </label>
-                )
-              })
-            ) : (
-              <p className="text-center text-secondary-text text-sm py-6">
-                Nenhum grupo encontrado.
-              </p>
-            )}
-          </div>
-        </DialogContent>
-        <DialogFooter sx={{ justifyContent: 'space-between' }}>
+        <DialogHeader className="relative border-b border-gray-200 pb-4">
           <button
             type="button"
-            onClick={handleCloseSelectDialog}
-            className="h-10 px-5 rounded-[24px] border border-gray-300 text-sm font-semibold text-primary-text hover:bg-gray-50 transition-colors"
+            onClick={handleClose}
+            className="absolute top-2 left-2 text-secondary-text hover:text-primary transition-colors"
+            aria-label="Fechar"
           >
-            Cancelar
+            <MdClose size={22} />
           </button>
+          <div className="pr-8">
+            <DialogTitle>
+              {produtoNome ? `Complementos de ${produtoNome}` : 'Selecionar complementos'}
+            </DialogTitle>
+            <p className="text-xs text-secondary-text mt-1">
+              {groups.length} grupo{groups.length === 1 ? '' : 's'} vinculados
+            </p>
+          </div>
+        </DialogHeader>
+
+        <DialogContent sx={{ padding: '16px 24px 0 24px' }}>
+          {renderDialogBody()}
+        </DialogContent>
+
+        <DialogFooter
+          className="flex items-center justify-start border-t border-gray-100"
+          sx={{ justifyContent: 'flex-start' }}
+        >
           <button
             type="button"
-            onClick={handleApplySelection}
-            disabled={isSavingSelection || isUpdating}
-            className="h-10 px-6 rounded-[24px] bg-primary text-info text-sm font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
+            onClick={handleClose}
+            className="h-10 px-6 rounded-[24px] border border-gray-300 text-sm font-semibold text-primary-text hover:bg-gray-50 transition-colors"
           >
-            {isSavingSelection ? 'Aplicando...' : 'Aplicar seleção'}
+            Fechar
           </button>
         </DialogFooter>
       </Dialog>
+
+      {selectionDialogNode}
     </>
   )
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Dialog,
   DialogContent,
@@ -29,6 +30,7 @@ interface ProdutoImpressorasDialogProps {
   produtoId?: string
   produtoNome?: string
   onClose: () => void
+  isEmbedded?: boolean
 }
 
 /**
@@ -39,6 +41,7 @@ export function ProdutoImpressorasDialog({
   produtoId,
   produtoNome,
   onClose,
+  isEmbedded = false,
 }: ProdutoImpressorasDialogProps) {
   const { auth } = useAuthStore()
   const [searchQuery, setSearchQuery] = useState('')
@@ -399,170 +402,207 @@ export function ProdutoImpressorasDialog({
     )
   }
 
-  return (
+  const header = (
+    <div className="pr-8 flex flex-col gap-2">
+      <div className="flex flex-col gap-1">
+        <h3 className="text-lg font-semibold text-primary-text">
+          {produtoNome ? `Impressoras de ${produtoNome}` : 'Impressoras vinculadas'}
+        </h3>
+        <p className="text-xs text-secondary-text">
+          {impressoras.length}{' '}
+          {impressoras.length === 1 ? 'impressora encontrada' : 'impressoras encontradas'}
+        </p>
+      </div>
+      
+    </div>
+  )
+
+  const body = (
     <>
-      <Dialog
-      open={open}
-      onOpenChange={(openState) => !openState && handleClose()}
-      fullWidth
-      maxWidth="md"
-      sx={{
-        '& .MuiDialog-container': {
-          alignItems: 'stretch',
-          justifyContent: 'flex-end',
-          margin: 0,
-        },
-      }}
-      PaperProps={{
-        sx: {
-          m: 0,
-          height: '100vh',
-          maxHeight: '100vh',
-          borderRadius: 0,
-          display: 'flex',
-          flexDirection: 'column',
-        },
-      }}
-    >
-      <DialogHeader className="relative border-b border-gray-200 pb-4">
+      <div className="flex items-center gap-3 mb-2">
         <button
           type="button"
-          onClick={handleClose}
-          className="absolute top-2 left-2 text-secondary-text hover:text-primary transition-colors"
-          aria-label="Fechar"
+          onClick={handleOpenSelectDialog}
+          disabled={isUpdating}
+          className="h-8 px-4 rounded-[24px] bg-primary text-white text-sm font-semibold flex items-center gap-2 transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          <MdClose size={22} />
+          <MdAdd size={16} />
+          Adicionar impressoras
         </button>
-        <div className="pr-8 flex flex-col gap-2">
-          <div className="flex flex-col gap-1">
-            <DialogTitle>
-              {produtoNome ? `Impressoras de ${produtoNome}` : 'Impressoras vinculadas'}
-            </DialogTitle>
-            <p className="text-xs text-secondary-text">
-              {impressoras.length}{' '}
-              {impressoras.length === 1 ? 'impressora encontrada' : 'impressoras encontradas'}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={handleOpenSelectDialog}
-              disabled={isUpdating}
-              className="inline-flex items-center gap-2 rounded-[20px] bg-primary text-white text-xs font-semibold px-4 py-2 transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <MdAdd size={16} />
-              Adicionar impressoras
-            </button>
-          </div>
-        </div>
-      </DialogHeader>
-
-      <DialogContent sx={{ padding: '16px 24px 0 24px' }}>
-        <div className="relative mb-4">
+        <div className="relative flex-1">
           <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
           <input
             type="text"
             placeholder="Buscar impressora..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
+            className="w-full h-8 pl-10 pr-4 rounded-[24px] border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
+          />
+        </div>
+      </div>
+      {renderContent()}
+    </>
+  )
+
+  const selectionDialog = (
+    <Dialog
+      open={isSelectDialogOpen}
+      onOpenChange={(openState) => {
+        if (!openState) {
+          handleCloseSelectDialog()
+        }
+      }}
+      fullWidth
+      maxWidth="sm"
+    >
+      <DialogHeader>
+        <DialogTitle>Selecionar impressoras</DialogTitle>
+      </DialogHeader>
+      <DialogContent sx={{ padding: '16px 24px' }}>
+        <div className="relative mb-4">
+          <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={18} />
+          <input
+            type="text"
+            value={selectSearch}
+            onChange={(event) => setSelectSearch(event.target.value)}
+            placeholder="Buscar impressora..."
             className="w-full h-11 pl-10 pr-4 rounded-[24px] border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
           />
         </div>
-        {renderContent()}
+        <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+          {isLoadingAllImpressoras ? (
+            <p className="text-center text-secondary-text text-sm py-6">Carregando impressoras...</p>
+          ) : filteredSelectableImpressoras.length ? (
+            filteredSelectableImpressoras.map((impressora) => {
+              const isSelected = tempSelection.includes(impressora.id)
+              return (
+                <label
+                  key={impressora.id}
+                  className={`flex items-center gap-3 rounded-2xl border px-4 py-3 cursor-pointer transition-colors ${
+                    isSelected ? 'border-primary bg-primary/5' : 'border-gray-200 bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => handleToggleSelection(impressora.id)}
+                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-primary-text">{impressora.nome}</p>
+                    {impressora.local && (
+                      <p className="text-xs text-secondary-text">{impressora.local}</p>
+                    )}
+                  </div>
+                  {isSelected && <span className="text-xs font-semibold text-primary">Selecionada</span>}
+                </label>
+              )
+            })
+          ) : (
+            <p className="text-center text-secondary-text text-sm py-6">Nenhuma impressora encontrada.</p>
+          )}
+        </div>
       </DialogContent>
-
-      <DialogFooter
-        className="flex items-center justify-start border-t border-gray-100"
-        sx={{ justifyContent: 'flex-start' }}
-      >
+      <DialogFooter sx={{ justifyContent: 'space-between' }}>
         <button
           type="button"
-          onClick={handleClose}
-          className="h-10 px-6 rounded-[24px] border border-gray-300 text-sm font-semibold text-primary-text hover:bg-gray-50 transition-colors"
+          onClick={handleCloseSelectDialog}
+          className="h-10 px-5 rounded-[24px] border border-gray-300 text-sm font-semibold text-primary-text hover:bg-gray-50 transition-colors"
         >
-          Fechar
+          Cancelar
+        </button>
+        <button
+          type="button"
+          onClick={handleApplySelection}
+          disabled={isSavingSelection || isUpdating}
+          className="h-10 px-6 rounded-[24px] bg-primary text-info text-sm font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {isSavingSelection ? 'Aplicando...' : 'Aplicar seleção'}
         </button>
       </DialogFooter>
-      </Dialog>
+    </Dialog>
+  )
 
+  const selectionDialogNode =
+    isEmbedded && typeof document !== 'undefined'
+      ? createPortal(selectionDialog, document.getElementById('modal-root') ?? document.body)
+      : selectionDialog
+
+  if (isEmbedded) {
+    return (
+      <>
+        <div className="h-full flex flex-col overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200">{header}</div>
+          <div className="flex-1 overflow-y-auto px-6 py-4">{body}</div>
+          <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="h-10 px-6 rounded-[24px] border border-gray-300 text-sm font-semibold text-primary-text hover:bg-gray-50 transition-colors"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+        {selectionDialogNode}
+      </>
+    )
+  }
+
+  return (
+    <>
       <Dialog
-        open={isSelectDialogOpen}
-        onOpenChange={(openState) => {
-          if (!openState) {
-            handleCloseSelectDialog()
-          }
-        }}
+        open={open}
+        onOpenChange={(openState) => !openState && handleClose()}
         fullWidth
-        maxWidth="sm"
+        maxWidth="md"
+        sx={{
+          '& .MuiDialog-container': {
+            alignItems: 'stretch',
+            justifyContent: 'flex-end',
+            margin: 0,
+          },
+        }}
+        PaperProps={{
+          sx: {
+            m: 0,
+            height: '100vh',
+            maxHeight: '100vh',
+            borderRadius: 0,
+            display: 'flex',
+            flexDirection: 'column',
+          },
+        }}
       >
-        <DialogHeader>
-          <DialogTitle>Selecionar impressoras</DialogTitle>
-        </DialogHeader>
-        <DialogContent sx={{ padding: '16px 24px' }}>
-          <div className="relative mb-4">
-            <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={18} />
-            <input
-              type="text"
-              value={selectSearch}
-              onChange={(event) => setSelectSearch(event.target.value)}
-              placeholder="Buscar impressora..."
-              className="w-full h-11 pl-10 pr-4 rounded-[24px] border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
-            />
-          </div>
-          <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
-            {isLoadingAllImpressoras ? (
-              <p className="text-center text-secondary-text text-sm py-6">Carregando impressoras...</p>
-            ) : filteredSelectableImpressoras.length ? (
-              filteredSelectableImpressoras.map((impressora) => {
-                const isSelected = tempSelection.includes(impressora.id)
-                return (
-                  <label
-                    key={impressora.id}
-                    className={`flex items-center gap-3 rounded-2xl border px-4 py-3 cursor-pointer transition-colors ${
-                      isSelected ? 'border-primary bg-primary/5' : 'border-gray-200 bg-gray-50'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => handleToggleSelection(impressora.id)}
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                    />
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-primary-text">{impressora.nome}</p>
-                      {impressora.local && (
-                        <p className="text-xs text-secondary-text">{impressora.local}</p>
-                      )}
-                    </div>
-                    {isSelected && <span className="text-xs font-semibold text-primary">Selecionada</span>}
-                  </label>
-                )
-              })
-            ) : (
-              <p className="text-center text-secondary-text text-sm py-6">
-                Nenhuma impressora encontrada.
-              </p>
-            )}
-          </div>
-        </DialogContent>
-        <DialogFooter sx={{ justifyContent: 'space-between' }}>
+        <DialogHeader className="relative border-b border-gray-200 pb-4">
           <button
             type="button"
-            onClick={handleCloseSelectDialog}
-            className="h-10 px-5 rounded-[24px] border border-gray-300 text-sm font-semibold text-primary-text hover:bg-gray-50 transition-colors"
+            onClick={handleClose}
+            className="absolute top-2 left-2 text-secondary-text hover:text-primary transition-colors"
+            aria-label="Fechar"
           >
-            Cancelar
+            <MdClose size={22} />
           </button>
+          {header}
+        </DialogHeader>
+
+        <DialogContent sx={{ padding: '16px 24px 0 24px' }}>{body}</DialogContent>
+
+        <DialogFooter
+          className="flex items-center justify-start border-t border-gray-100"
+          sx={{ justifyContent: 'flex-start' }}
+        >
           <button
             type="button"
-            onClick={handleApplySelection}
-            disabled={isSavingSelection || isUpdating}
-            className="h-10 px-6 rounded-[24px] bg-primary text-info text-sm font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
+            onClick={handleClose}
+            className="h-10 px-6 rounded-[24px] border border-gray-300 text-sm font-semibold text-primary-text hover:bg-gray-50 transition-colors"
           >
-            {isSavingSelection ? 'Aplicando...' : 'Aplicar seleção'}
+            Fechar
           </button>
         </DialogFooter>
       </Dialog>
+
+      {selectionDialogNode}
     </>
   )
 }

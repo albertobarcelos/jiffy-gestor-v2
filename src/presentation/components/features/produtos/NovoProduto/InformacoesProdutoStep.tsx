@@ -78,8 +78,8 @@ export function InformacoesProdutoStep({
   return (
     <div className="rounded-[24px] border border-[#E5E7F2] bg-white p-4 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
       {/* Título */}
-      <div className="flex flex-col gap-2 mb-4">
-        <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex flex-col gap-2 mb-1">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <h3 className="text-alternate text-xl font-semibold font-exo">
             Informações
           </h3>
@@ -91,7 +91,7 @@ export function InformacoesProdutoStep({
       </div>
 
       {/* Campos do formulário */}
-      <div className="space-y-4">
+      <div className="space-y-2">
         {/* Nome do Produto */}
         <div className="flex-1">
           <label className="block text-sm font-semibold font-nunito mb-2 text-primary-text">

@@ -9,10 +9,7 @@ import Link from 'next/link'
 import { Produto } from '@/src/domain/entities/Produto'
 import { showToast } from '@/src/shared/utils/toast'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { ComplementosMultiSelectDialog } from './ComplementosMultiSelectDialog'
-import { ProdutoImpressorasDialog } from './ProdutoImpressorasDialog'
-import { NovoProduto } from './NovoProduto'
-import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
+import { ProdutosTabsModal, ProdutosTabsModalState } from './ProdutosTabsModal'
 import {
   MdKeyboardArrowDown,
   MdImage,
@@ -35,11 +32,6 @@ interface ProdutosListProps {
 }
 
 type ToggleField = 'favorito' | 'permiteAcrescimo' | 'permiteDesconto' | 'abreComplementos'
-type NovoProdutoModalConfig = {
-  mode: 'create' | 'edit' | 'copy'
-  produtoId?: string
-}
-
 const toggleFieldConfig: Record<
   ToggleField,
   { bodyKey: string; successTrue: string; successFalse: string }
@@ -427,9 +419,11 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     >
   >(new Map())
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
-  const [produtoComplementosModal, setProdutoComplementosModal] = useState<Produto | null>(null)
-  const [produtoImpressorasModal, setProdutoImpressorasModal] = useState<Produto | null>(null)
-  const [produtoModalConfig, setProdutoModalConfig] = useState<NovoProdutoModalConfig | null>(null)
+  const [tabsModalState, setTabsModalState] = useState<ProdutosTabsModalState>({
+    open: false,
+    tab: 'produto',
+    mode: 'create',
+  })
   const token = auth?.getAccessToken()
   const invalidateProdutosQueries = useCallback(async () => {
     await queryClient.invalidateQueries({
@@ -437,6 +431,38 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
       exact: false,
     })
   }, [queryClient])
+
+  const openTabsModal = useCallback(
+    (config: Partial<ProdutosTabsModalState>) => {
+      setTabsModalState((prev) => ({
+        open: true,
+        tab: config.tab ?? prev.tab ?? 'produto',
+        mode: config.mode ?? prev.mode ?? 'create',
+        produto: config.produto,
+      }))
+    },
+    []
+  )
+
+  const closeTabsModal = useCallback(() => {
+    setTabsModalState((prev) => ({
+      ...prev,
+      open: false,
+      produto: undefined,
+    }))
+  }, [])
+
+  const handleTabsModalReload = useCallback(() => {
+    invalidateProdutosQueries()
+    onReload?.()
+  }, [invalidateProdutosQueries, onReload])
+
+  const handleTabsModalTabChange = useCallback((tab: 'produto' | 'complementos' | 'impressoras') => {
+    setTabsModalState((prev) => ({
+      ...prev,
+      tab,
+    }))
+  }, [])
   const setPendingUpdate = useCallback(
     (
       produtoId: string,
@@ -915,39 +941,37 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     invalidateProdutosQueries()
   }, [invalidateProdutosQueries, onReload])
 
-  const handleOpenComplementosModal = useCallback((produto: Produto) => {
-    setProdutoComplementosModal(produto)
-  }, [])
+  const handleOpenComplementosModal = useCallback(
+    (produto: Produto) => {
+      openTabsModal({ tab: 'complementos', mode: 'edit', produto })
+    },
+    [openTabsModal]
+  )
 
-  const closeComplementosModal = useCallback(() => {
-    setProdutoComplementosModal(null)
-  }, [])
+  const handleOpenImpressorasModal = useCallback(
+    (produto: Produto) => {
+      openTabsModal({ tab: 'impressoras', mode: 'edit', produto })
+    },
+    [openTabsModal]
+  )
 
-  const handleOpenImpressorasModal = useCallback((produto: Produto) => {
-    setProdutoImpressorasModal(produto)
-  }, [])
+  const handleEditProduto = useCallback(
+    (produtoId: string) => {
+      const produto = localProdutos.find((item) => item.getId() === produtoId)
+      if (!produto) return
+      openTabsModal({ tab: 'produto', mode: 'edit', produto })
+    },
+    [localProdutos, openTabsModal]
+  )
 
-  const closeImpressorasModal = useCallback(() => {
-    setProdutoImpressorasModal(null)
-  }, [])
-
-  const closeNovoProdutoModal = useCallback(() => {
-    setProdutoModalConfig(null)
-  }, [])
-
-  const handleNovoProdutoSuccess = useCallback(() => {
-    closeNovoProdutoModal()
-    invalidateProdutosQueries()
-    onReload?.()
-  }, [closeNovoProdutoModal, invalidateProdutosQueries, onReload])
-
-  const handleEditProduto = useCallback((produtoId: string) => {
-    setProdutoModalConfig({ mode: 'edit', produtoId })
-  }, [])
-
-  const handleCopyProduto = useCallback((produtoId: string) => {
-    setProdutoModalConfig({ mode: 'copy', produtoId })
-  }, [])
+  const handleCopyProduto = useCallback(
+    (produtoId: string) => {
+      const produto = localProdutos.find((item) => item.getId() === produtoId)
+      if (!produto) return
+      openTabsModal({ tab: 'produto', mode: 'copy', produto })
+    },
+    [localProdutos, openTabsModal]
+  )
 
   const handleToggleGroup = useCallback((grupo: string) => {
     setExpandedGroups((prev) => ({
@@ -1010,7 +1034,13 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
                 Atualizar Preços
               </Link>*/}
               <button
-                onClick={() => setProdutoModalConfig({ mode: 'create' })}
+                onClick={() =>
+                  openTabsModal({
+                    tab: 'produto',
+                    mode: 'create',
+                    produto: undefined,
+                  })
+                }
                 className="h-10 px-[30px] bg-primary text-info rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
               >
                 Novo
@@ -1107,56 +1137,11 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
         )}
       </div>
 
-      <Dialog
-        open={Boolean(produtoModalConfig)}
-        onOpenChange={(openState) => {
-          if (!openState) {
-            closeNovoProdutoModal()
-          }
-        }}
-        fullWidth
-        maxWidth="xl"
-        sx={{
-          '& .MuiDialog-container': {
-            alignItems: 'stretch',
-            justifyContent: 'flex-end',
-            margin: 0,
-          },
-        }}
-        PaperProps={{
-          sx: {
-            m: 0,
-            height: '100vh',
-            maxHeight: '100vh',
-            width: 'min(960px, 90vw)',
-            borderRadius: 0,
-            display: 'flex',
-            flexDirection: 'column',
-          },
-        }}
-      >
-        <DialogContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <NovoProduto
-            produtoId={produtoModalConfig?.produtoId}
-            isCopyMode={produtoModalConfig?.mode === 'copy'}
-            onClose={closeNovoProdutoModal}
-            onSuccess={handleNovoProdutoSuccess}
-          />
-        </DialogContent>
-      </Dialog>
-
-      <ComplementosMultiSelectDialog
-        open={Boolean(produtoComplementosModal)}
-        produtoId={produtoComplementosModal?.getId()}
-        produtoNome={produtoComplementosModal?.getNome()}
-        onClose={closeComplementosModal}
-      />
-
-      <ProdutoImpressorasDialog
-        open={Boolean(produtoImpressorasModal)}
-        produtoId={produtoImpressorasModal?.getId()}
-        produtoNome={produtoImpressorasModal?.getNome()}
-        onClose={closeImpressorasModal}
+      <ProdutosTabsModal
+        state={tabsModalState}
+        onClose={closeTabsModal}
+        onReload={handleTabsModalReload}
+        onTabChange={handleTabsModalTabChange}
       />
     </div>
   )
