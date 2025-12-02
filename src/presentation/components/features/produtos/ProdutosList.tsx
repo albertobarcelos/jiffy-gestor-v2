@@ -97,7 +97,8 @@ const cloneProdutoWithChanges = (
     changes.favorito ?? produto.isFavorito(),
     changes.abreComplementos ?? produto.abreComplementosAtivo(),
     changes.permiteAcrescimo ?? produto.permiteAcrescimoAtivo(),
-    changes.permiteDesconto ?? produto.permiteDescontoAtivo()
+    changes.permiteDesconto ?? produto.permiteDescontoAtivo(),
+    produto.getGruposComplementos()
   )
 }
 
@@ -1087,7 +1088,13 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
                 Total {localProdutos.length}
               </p>
             </div>
-            <div className="flex items-center justify-end flex-1">
+            <div className="flex items-center justify-end flex-1 gap-4">
+            <Link
+              href="/produtos/atualizar-preco"
+              className="h-10 px-[30px] bg-info text-primary-text border border-secondary rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-secondary-bg transition-colors"
+            >
+              Atualizar Preços
+            </Link>
               <button
                 onClick={() =>
                   openTabsModal({

@@ -1,6 +1,17 @@
 /**
  * Entidade de domínio representando um Produto
  */
+interface ProdutoComplementoResumo {
+  id: string
+  nome: string
+}
+
+interface ProdutoGrupoComplementoResumo {
+  id: string
+  nome: string
+  complementos: ProdutoComplementoResumo[]
+}
+
 export class Produto {
   private constructor(
     private readonly id: string,
@@ -13,7 +24,8 @@ export class Produto {
     private readonly favorito?: boolean,
     private readonly abreComplementos?: boolean,
     private readonly permiteAcrescimo?: boolean,
-    private readonly permiteDesconto?: boolean
+    private readonly permiteDesconto?: boolean,
+    private readonly gruposComplementos?: ProdutoGrupoComplementoResumo[]
   ) {}
 
   static create(
@@ -27,7 +39,8 @@ export class Produto {
     favorito?: boolean,
     abreComplementos?: boolean,
     permiteAcrescimo?: boolean,
-    permiteDesconto?: boolean
+    permiteDesconto?: boolean,
+    gruposComplementos?: ProdutoGrupoComplementoResumo[]
   ): Produto {
     if (!id || !nome) {
       throw new Error('ID e nome são obrigatórios')
@@ -44,7 +57,8 @@ export class Produto {
       favorito,
       abreComplementos,
       permiteAcrescimo,
-      permiteDesconto
+      permiteDesconto,
+      gruposComplementos
     )
   }
 
@@ -60,7 +74,19 @@ export class Produto {
       data.favorito === true || data.favorito === 'true',
       data.abreComplementos === true || data.abreComplementos === 'true',
       data.permiteAcrescimo === true || data.permiteAcrescimo === 'true',
-      data.permiteDesconto === true || data.permiteDesconto === 'true'
+      data.permiteDesconto === true || data.permiteDesconto === 'true',
+      Array.isArray(data.gruposComplementos)
+        ? data.gruposComplementos.map((grupo: any) => ({
+            id: grupo.id?.toString() || '',
+            nome: grupo.nome?.toString() || '',
+            complementos: Array.isArray(grupo.complementos)
+              ? grupo.complementos.map((comp: any) => ({
+                  id: comp.id?.toString() || '',
+                  nome: comp.nome?.toString() || '',
+                }))
+              : [],
+          }))
+        : []
     )
   }
 
@@ -108,6 +134,10 @@ export class Produto {
     return this.permiteDesconto === true
   }
 
+  getGruposComplementos(): ProdutoGrupoComplementoResumo[] {
+    return this.gruposComplementos || []
+  }
+
   toJSON() {
     return {
       id: this.id,
@@ -121,6 +151,7 @@ export class Produto {
       abreComplementos: this.abreComplementos,
       permiteAcrescimo: this.permiteAcrescimo,
       permiteDesconto: this.permiteDesconto,
+      gruposComplementos: this.gruposComplementos,
     }
   }
 }
