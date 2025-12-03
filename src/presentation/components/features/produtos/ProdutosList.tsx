@@ -436,6 +436,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     tab: 'produto',
     mode: 'create',
     prefillGrupoProdutoId: undefined,
+    grupoId: undefined,
   })
 
   const {
@@ -474,6 +475,13 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     })
   }, [queryClient])
 
+  const invalidateGruposProdutosQueries = useCallback(async () => {
+    await queryClient.invalidateQueries({
+      queryKey: ['grupos-produtos'],
+      exact: false,
+    })
+  }, [queryClient])
+
   const openTabsModal = useCallback(
     (config: Partial<ProdutosTabsModalState>) => {
       setTabsModalState(() => ({
@@ -482,6 +490,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
         mode: config.mode ?? 'create',
         produto: config.produto,
         prefillGrupoProdutoId: config.prefillGrupoProdutoId ?? undefined,
+        grupoId: config.grupoId,
       }))
     },
     []
@@ -493,15 +502,20 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
       open: false,
       produto: undefined,
       prefillGrupoProdutoId: undefined,
+      grupoId: undefined,
     }))
-  }, [])
+    invalidateProdutosQueries()
+    invalidateGruposProdutosQueries()
+    onReload?.()
+  }, [invalidateProdutosQueries, invalidateGruposProdutosQueries, onReload])
 
   const handleTabsModalReload = useCallback(() => {
     invalidateProdutosQueries()
+    invalidateGruposProdutosQueries()
     onReload?.()
-  }, [invalidateProdutosQueries, onReload])
+  }, [invalidateProdutosQueries, invalidateGruposProdutosQueries, onReload])
 
-  const handleTabsModalTabChange = useCallback((tab: 'produto' | 'complementos' | 'impressoras') => {
+  const handleTabsModalTabChange = useCallback((tab: 'produto' | 'complementos' | 'impressoras' | 'grupo') => {
     setTabsModalState((prev) => ({
       ...prev,
       tab,
@@ -1052,14 +1066,14 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
 
   const handleOpenComplementosModal = useCallback(
     (produto: Produto) => {
-      openTabsModal({ tab: 'complementos', mode: 'edit', produto })
+      openTabsModal({ tab: 'complementos', mode: 'edit', produto, grupoId: produto.getGrupoId() })
     },
     [openTabsModal]
   )
 
   const handleOpenImpressorasModal = useCallback(
     (produto: Produto) => {
-      openTabsModal({ tab: 'impressoras', mode: 'edit', produto })
+      openTabsModal({ tab: 'impressoras', mode: 'edit', produto, grupoId: produto.getGrupoId() })
     },
     [openTabsModal]
   )
@@ -1068,7 +1082,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     (produtoId: string) => {
       const produto = localProdutos.find((item) => item.getId() === produtoId)
       if (!produto) return
-      openTabsModal({ tab: 'produto', mode: 'edit', produto })
+      openTabsModal({ tab: 'produto', mode: 'edit', produto, grupoId: produto.getGrupoId() })
     },
     [localProdutos, openTabsModal]
   )
@@ -1077,9 +1091,53 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     (produtoId: string) => {
       const produto = localProdutos.find((item) => item.getId() === produtoId)
       if (!produto) return
-      openTabsModal({ tab: 'produto', mode: 'copy', produto })
+      openTabsModal({ tab: 'produto', mode: 'copy', produto, grupoId: produto.getGrupoId() })
     },
     [localProdutos, openTabsModal]
+  )
+
+  const handleEditGrupoProduto = useCallback(
+    (grupoId?: string, produto?: Produto) => {
+      if (!grupoId) return
+      openTabsModal({
+        tab: 'grupo',
+        mode: 'edit',
+        grupoId,
+        produto,
+      })
+    },
+    [openTabsModal]
+  )
+
+  const handleToggleGroupStatus = useCallback(
+    async (grupoId?: string) => {
+      if (!grupoId) return
+      const token = auth?.getAccessToken()
+      if (!token) return
+
+      try {
+        const response = await fetch(`/api/grupos-produtos/${grupoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            ativo: !gruposProdutos.find((grupo) => grupo.getId() === grupoId)?.isAtivo(),
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error('Erro ao atualizar grupo')
+        }
+
+        await invalidateGruposProdutosQueries()
+        await invalidateProdutosQueries()
+      } catch (error) {
+        console.error('Erro ao atualizar status do grupo:', error)
+      }
+    },
+    [auth, gruposProdutos, invalidateGruposProdutosQueries, invalidateProdutosQueries]
   )
 
   const handleToggleGroup = useCallback((grupo: string) => {
@@ -1287,12 +1345,30 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
                       <button
                         type="button"
                         title="Editar grupo"
-                        className="w-6 h-6 rounded-full border border-gray-200 flex items-center justify-center text-primary-text hover:bg-primary/10 transition-colors"
+                        onClick={() => handleEditGrupoProduto(grupoId, primeiroProduto)}
+                        disabled={!grupoId}
+                        className={`w-6 h-6 rounded-full border border-gray-200 flex items-center justify-center text-primary-text hover:bg-primary/10 transition-colors ${
+                          !grupoId ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
                       >
                         <MdModeEdit size={14} />
                       </button>
+                      <label className="relative inline-flex items-center h-5 w-10">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={grupoVisual ? gruposProdutos.find((g) => g.getId() === grupoId)?.isAtivo() ?? true : true}
+                          onChange={() => handleToggleGroupStatus(grupoId)}
+                          disabled={!grupoId}
+                        />
+                        <div className="w-full h-full rounded-full bg-gray-300 peer-checked:bg-accent1 transition-colors" />
+                        <span className="absolute left-1 top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-white shadow peer-checked:translate-x-5 transition-transform" />
+                      </label>
                     </div>
                     <p className="text-xs text-secondary-text">{items.length} produtos</p>
+                    {grupoVisual && !gruposProdutos.find((g) => g.getId() === grupoId)?.isAtivo() && (
+                      <p className="text-[11px] text-error font-semibold uppercase">Grupo inativo</p>
+                    )}
                   </div>
                 </div>
 

@@ -6,8 +6,9 @@ import { Produto } from '@/src/domain/entities/Produto'
 import { NovoProduto } from './NovoProduto'
 import { ComplementosMultiSelectDialog } from './ComplementosMultiSelectDialog'
 import { ProdutoImpressorasDialog } from './ProdutoImpressorasDialog'
+import { NovoGrupo } from '../grupos-produtos/NovoGrupo'
 
-type TabKey = 'produto' | 'complementos' | 'impressoras'
+type TabKey = 'produto' | 'complementos' | 'impressoras' | 'grupo'
 
 export interface ProdutosTabsModalState {
   open: boolean
@@ -15,6 +16,7 @@ export interface ProdutosTabsModalState {
   mode: 'create' | 'edit' | 'copy'
   produto?: Produto
   prefillGrupoProdutoId?: string
+  grupoId?: string
 }
 
 interface ProdutosTabsModalProps {
@@ -42,7 +44,10 @@ export function ProdutosTabsModal({ state, onClose, onReload, onTabChange }: Pro
     if (state.tab === 'complementos') {
       return state.produto ? `Complementos de ${state.produto.getNome()}` : 'Complementos'
     }
-    return state.produto ? `Impressoras de ${state.produto.getNome()}` : 'Impressoras'
+    if (state.tab === 'impressoras') {
+      return state.produto ? `Impressoras de ${state.produto.getNome()}` : 'Impressoras'
+    }
+    return state.grupoId ? 'Editar Grupo' : 'Grupo de Produtos'
   }, [state])
 
   return (
@@ -83,6 +88,7 @@ export function ProdutosTabsModal({ state, onClose, onReload, onTabChange }: Pro
               { key: 'produto', label: 'Produto', disabled: false },
               { key: 'complementos', label: 'Complementos', disabled: !produtoId },
               { key: 'impressoras', label: 'Impressoras', disabled: !produtoId },
+              { key: 'grupo', label: 'Grupo', disabled: !state.grupoId },
             ] as Array<{ key: TabKey; label: string; disabled: boolean }>
           ).map((tab) => (
             <button
@@ -148,6 +154,26 @@ export function ProdutosTabsModal({ state, onClose, onReload, onTabChange }: Pro
               ) : (
                 <div className="h-full flex items-center justify-center text-secondary-text text-sm">
                   Selecione um produto para gerenciar impressoras.
+                </div>
+              )}
+            </div>
+          )}
+
+          {state.tab === 'grupo' && (
+            <div className="h-full overflow-y-auto">
+              {state.grupoId ? (
+                <NovoGrupo
+                  grupoId={state.grupoId}
+                  isEmbedded
+                  onClose={onClose}
+                  onSaved={() => {
+                    onReload?.()
+                    onClose()
+                  }}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center text-secondary-text text-sm">
+                  Selecione um grupo válido para editar.
                 </div>
               )}
             </div>

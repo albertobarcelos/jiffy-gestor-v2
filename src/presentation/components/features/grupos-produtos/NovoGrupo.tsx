@@ -11,13 +11,16 @@ import { ProdutosPorGrupoList } from './ProdutosPorGrupoList'
 
 interface NovoGrupoProps {
   grupoId?: string
+  isEmbedded?: boolean
+  onClose?: () => void
+  onSaved?: () => void
 }
 
 /**
  * Componente para criar/editar grupo de produtos
  * Replica o design e lógica do Flutter NovoGrupoTabbedWidget
  */
-export function NovoGrupo({ grupoId }: NovoGrupoProps) {
+export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: NovoGrupoProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { auth } = useAuthStore()
@@ -175,7 +178,12 @@ export function NovoGrupo({ grupoId }: NovoGrupoProps) {
       }
 
       // Sucesso - redireciona para a lista
-      router.push('/cadastros/grupos-produtos')
+      if (isEmbedded) {
+        onSaved?.()
+        onClose?.()
+      } else {
+        router.push('/cadastros/grupos-produtos')
+      }
     } catch (error: any) {
       console.error('Erro ao salvar grupo:', error)
       alert(error.message || 'Erro ao salvar grupo')
@@ -185,7 +193,11 @@ export function NovoGrupo({ grupoId }: NovoGrupoProps) {
   }
 
   const handleCancel = () => {
-    router.push('/cadastros/grupos-produtos')
+    if (isEmbedded) {
+      onClose?.()
+    } else {
+      router.push('/cadastros/grupos-produtos')
+    }
   }
 
   if (isLoadingData) {

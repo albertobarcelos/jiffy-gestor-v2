@@ -14,7 +14,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
-import { MdClose, MdSearch, MdKeyboardArrowDown, MdDelete, MdAdd } from 'react-icons/md'
+import { MdClose, MdSearch, MdKeyboardArrowDown, MdDelete, MdAdd, MdAddCircle, MdAddShoppingCart, MdGroupAdd, MdAddAPhoto, MdCheck } from 'react-icons/md'
 
 interface GrupoComplemento {
   id: string
@@ -432,6 +432,7 @@ export function ComplementosMultiSelectDialog({
                   >
                     <MdDelete size={18} />
                   </button>
+                  <MdAddCircle size={30} className="text-primary" />
                   <div>
                     <p className="text-sm font-semibold text-primary-text">{grupo.nome}</p>
                     <p className="text-xs text-secondary-text">
@@ -460,6 +461,7 @@ export function ComplementosMultiSelectDialog({
                         key={complemento.getId()}
                         className="w-full flex items-center gap-3 rounded-2xl border px-4 py-3 text-left border-gray-200 bg-gray-50"
                       >
+                        <MdCheck size={20} className="text-primary" />
                         <div className="flex-1">
                           <p className="text-sm font-semibold text-primary-text">
                             {complemento.getNome()}
