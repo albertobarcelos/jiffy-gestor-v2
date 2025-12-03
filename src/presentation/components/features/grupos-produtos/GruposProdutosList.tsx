@@ -176,10 +176,38 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
   }, [error])
 
   const handleStatusChange = useCallback(() => {
-    // Invalidar cache para forçar refetch
     queryClient.invalidateQueries({ queryKey: ['grupos-produtos'] })
     onReload?.()
   }, [queryClient, onReload])
+
+  const handleToggleGrupoStatus = useCallback(
+    async (grupoId: string, novoStatus: boolean) => {
+      const token = auth?.getAccessToken()
+      if (!token) return
+
+      try {
+        const response = await fetch(`/api/grupos-produtos/${grupoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ ativo: novoStatus }),
+        })
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}))
+          throw new Error(error.message || 'Erro ao atualizar grupo')
+        }
+
+        handleStatusChange()
+      } catch (error) {
+        console.error('Erro ao atualizar status do grupo:', error)
+        showToast.error('Não foi possível atualizar o status do grupo.')
+      }
+    },
+    [auth, handleStatusChange]
+  )
 
   // Handler para quando o drag termina - versão simples: envia para API e recarrega a página
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
@@ -373,6 +401,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
                 grupo={grupo}
                 index={index}
                 onStatusChanged={handleStatusChange}
+                onToggleStatus={handleToggleGrupoStatus}
               />
             ))}
           </SortableContext>

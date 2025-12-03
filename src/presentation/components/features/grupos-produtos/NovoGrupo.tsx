@@ -27,7 +27,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
 
   const [nome, setNome] = useState('')
   const [ativo, setAtivo] = useState(true)
-  const [corHex, setCorHex] = useState('#CCCCCC')
+  const [corHex, setCorHex] = useState('#530CA3')
   const [iconName, setIconName] = useState('')
   const [ativoDelivery, setAtivoDelivery] = useState(false)
   const [ativoLocal, setAtivoLocal] = useState(false)
@@ -282,7 +282,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
                         {iconName ? (
                           <DinamicIcon iconName={iconName} color={corHex || '#000000'} size={28} />
                         ) : (
-                          <span className="text-tertiary text-2xl">📦</span>
+                          <span className="text-tertiary text-2xl"></span>
                         )}
                       </div>
                       <div>
@@ -342,7 +342,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
                               type="button"
                               onClick={() => setIsColorPickerOpen(true)}
                               className="w-16 h-12 rounded-lg border border-secondary/20 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                              style={{ backgroundColor: corHex || '#CCCCCC' }}
+                              style={{ backgroundColor: corHex || '#530CA3' }}
                               aria-label="Selecionar cor do grupo"
                             />
                             
@@ -408,7 +408,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
                             {iconName ? (
                               <DinamicIcon iconName={iconName} color={corHex} size={24} />
                             ) : (
-                              <span className="text-lg">📦</span>
+                              <span className="text-lg"></span>
                             )}
                           </div>
                         </button>
@@ -428,7 +428,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
                             {iconName ? (
                               <DinamicIcon iconName={iconName} color="#FFFFFF" size={24} />
                             ) : (
-                              <span className="text-lg text-white">📦</span>
+                              <span className="text-lg text-white"></span>
                             )}
                           </div>
                         </button>

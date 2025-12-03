@@ -11,12 +11,18 @@ interface GrupoItemProps {
   grupo: GrupoProduto
   index: number
   onStatusChanged?: () => void
+  onToggleStatus?: (grupoId: string, novoStatus: boolean) => void
 }
 
 /**
  * Item reordenável da lista de grupos (memoizado para evitar re-renders desnecessários)
  */
-export const GrupoItem = memo(function GrupoItem({ grupo, index, onStatusChanged }: GrupoItemProps) {
+export const GrupoItem = memo(function GrupoItem({
+  grupo,
+  index,
+  onStatusChanged,
+  onToggleStatus,
+}: GrupoItemProps) {
   const {
     attributes,
     listeners,
@@ -36,14 +42,6 @@ export const GrupoItem = memo(function GrupoItem({ grupo, index, onStatusChanged
   const iconName = useMemo(() => grupo.getIconName(), [grupo])
   const nome = useMemo(() => grupo.getNome(), [grupo])
   const isAtivo = useMemo(() => grupo.isAtivo(), [grupo])
-  const statusClass = useMemo(
-    () =>
-      isAtivo
-        ? 'bg-success/20 text-success'
-        : 'bg-error/20 text-secondary-text',
-    [isAtivo]
-  )
-
   // Função para renderizar o ícone do grupo
   const renderIcon = useMemo(() => {
     return (
@@ -90,11 +88,21 @@ export const GrupoItem = memo(function GrupoItem({ grupo, index, onStatusChanged
 
       {/* Status */}
       <div className="flex-[2] flex justify-center cursor-default">
-        <div
-          className={`min-w-[100px] px-4 py-1 rounded-[24px] text-center text-sm font-nunito font-medium ${statusClass}`}
+        <label
+          className="relative inline-flex items-center h-6 w-14 cursor-pointer"
+          onMouseDown={(event) => event.stopPropagation()}
+          onTouchStart={(event) => event.stopPropagation()}
+          title={isAtivo ? 'Ativo' : 'Desativado'}
         >
-          {isAtivo ? 'Ativo' : 'Desativado'}
-        </div>
+          <input
+            type="checkbox"
+            className="sr-only peer"
+            checked={isAtivo}
+          onChange={() => onToggleStatus?.(grupo.getId(), !isAtivo)}
+          />
+          <div className="w-full h-full rounded-full bg-gray-300 peer-checked:bg-accent1 transition-colors" />
+          <span className="absolute left-1 top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-white shadow peer-checked:translate-x-8 transition-transform" />
+        </label>
       </div>
 
       {/* Ações */}
