@@ -20,6 +20,7 @@ export class Produto {
     private readonly valor: number,
     private readonly ativo: boolean,
     private readonly nomeGrupo?: string,
+    private readonly grupoId?: string,
     private readonly estoque?: number | string,
     private readonly favorito?: boolean,
     private readonly abreComplementos?: boolean,
@@ -35,6 +36,7 @@ export class Produto {
     valor: number,
     ativo: boolean,
     nomeGrupo?: string,
+    grupoId?: string,
     estoque?: number | string,
     favorito?: boolean,
     abreComplementos?: boolean,
@@ -53,6 +55,7 @@ export class Produto {
       valor,
       ativo,
       nomeGrupo,
+      grupoId,
       estoque,
       favorito,
       abreComplementos,
@@ -70,6 +73,7 @@ export class Produto {
       typeof data.valor === 'number' ? data.valor : parseFloat(data.valor) || 0,
       data.ativo === true || data.ativo === 'true',
       data.nomeGrupo?.toString(),
+      data.grupoId?.toString(),
       data.estoque,
       data.favorito === true || data.favorito === 'true',
       data.abreComplementos === true || data.abreComplementos === 'true',
@@ -114,6 +118,10 @@ export class Produto {
     return this.nomeGrupo
   }
 
+  getGrupoId(): string | undefined {
+    return this.grupoId
+  }
+
   getEstoque(): number | string | undefined {
     return this.estoque
   }
@@ -146,6 +154,7 @@ export class Produto {
       valor: this.valor,
       ativo: this.ativo,
       nomeGrupo: this.nomeGrupo,
+      grupoId: this.grupoId,
       estoque: this.estoque,
       favorito: this.favorito,
       abreComplementos: this.abreComplementos,

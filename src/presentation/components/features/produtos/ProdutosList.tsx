@@ -12,6 +12,7 @@ import { Produto } from '@/src/domain/entities/Produto'
 import { showToast } from '@/src/shared/utils/toast'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { ProdutosTabsModal, ProdutosTabsModalState } from './ProdutosTabsModal'
+import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import {
   MdKeyboardArrowDown,
   MdImage,
@@ -93,6 +94,7 @@ const cloneProdutoWithChanges = (
     changes.valor ?? produto.getValor(),
     changes.ativo ?? produto.isAtivo(),
     produto.getNomeGrupo(),
+    produto.getGrupoId(),
     produto.getEstoque(),
     changes.favorito ?? produto.isFavorito(),
     changes.abreComplementos ?? produto.abreComplementosAtivo(),
@@ -443,6 +445,19 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     limit: 100,
     ativo: null,
   })
+  const grupoProdutoMap = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        corHex: string
+        iconName: string
+      }
+    >()
+    gruposProdutos.forEach((grupo) => {
+      map.set(grupo.getId(), { corHex: grupo.getCorHex(), iconName: grupo.getIconName() })
+    })
+    return map
+  }, [gruposProdutos])
 
   const {
     data: gruposComplementos = [],
@@ -1243,65 +1258,94 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
           </div>
         )}
 
-        {produtosAgrupados.map(([grupo, items]) => (
-          <div key={grupo} className="space-y-3">
-            <div className="flex items-center justify-between gap-5">
-              <div>
-                <p className="text-sm font-semibold text-primary-text uppercase tracking-wide">
-                  {grupo}
-                </p>
-                <p className="text-xs text-secondary-text">{items.length} produtos</p>
-              </div>
-            
-             <div className="flex items-center justify-end flex-1">
-               <button
-                 onClick={() => handleCreateProdutoForGroup(grupo)}
-                 className="h-6 px-[20px] bg-info border border-primary text-primary rounded-[10px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/10 transition-colors"
-               >
-                 Adicionar produto
-                 <span className="text-sm">+</span>
-               </button>
-             </div>
-              <button
-                type="button"
-                onClick={() => handleToggleGroup(grupo)}
-                className="flex items-center gap-1 text-primary text-sm font-semibold hover:text-primary/80 transition-colors"
-                aria-expanded={expandedGroups[grupo] !== false}
-              >
-                <span>{expandedGroups[grupo] === false ? 'Exibir' : 'Ocultar'}</span>
-                <MdKeyboardArrowDown
-                  className={`text-lg transition-transform ${expandedGroups[grupo] === false ? '-rotate-90' : 'rotate-0'}`}
-                />
-              </button>
-            </div>
+        {produtosAgrupados.map(([grupo, items]) => {
+          const primeiroProduto = items[0]
+          const grupoId = primeiroProduto?.getGrupoId()
+          const grupoVisual = grupoId ? grupoProdutoMap.get(grupoId) : undefined
+          return (
+            <div key={grupo} className="space-y-3">
+              <div className="flex items-center justify-between gap-5">
+                <div className="flex items-center gap-3">
+                  {grupoVisual ? (
+                    <span
+                      className="w-9 h-9 rounded-[10px] border-2 flex items-center justify-center bg-white text-[var(--grupo-color)] transition-colors hover:bg-[var(--grupo-color)] hover:text-white"
+                      style={{
+                        borderColor: grupoVisual.corHex,
+                        ['--grupo-color' as any]: grupoVisual.corHex,
+                      }}
+                    >
+                      <DinamicIcon iconName={grupoVisual.iconName} color="currentColor" size={18} />
+                    </span>
+                  ) : (
+                    <span className="w-9 h-9 rounded-full bg-gray-200 border border-gray-300" />
+                  )}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-primary-text uppercase tracking-wide">
+                        {grupo}
+                      </p>
+                      <button
+                        type="button"
+                        title="Editar grupo"
+                        className="w-6 h-6 rounded-full border border-gray-200 flex items-center justify-center text-primary-text hover:bg-primary/10 transition-colors"
+                      >
+                        <MdModeEdit size={14} />
+                      </button>
+                    </div>
+                    <p className="text-xs text-secondary-text">{items.length} produtos</p>
+                  </div>
+                </div>
 
-            {expandedGroups[grupo] === false ? (
-              <div className="rounded-xl border border-dashed border-secondary/40 px-4 py-3 text-sm text-secondary-text">
-                Produtos ocultos. Clique em "Exibir" para visualizar.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {items.map((produto) => (
-                  <ProdutoListItem
-                    key={produto.getId()}
-                    produto={produto}
-                    onValorChange={(valor) => handleValorUpdate(produto.getId(), valor)}
-                    onSwitchToggle={(status) => handleStatusToggle(produto.getId(), status)}
-                    onMenuStatusChanged={handleMenuStatusChanged}
-                    onToggleBoolean={(field, value) => handleToggleBooleanField(produto.getId(), field, value)}
-                    savingToggleState={savingToggleMap[produto.getId()]}
-                    onOpenComplementosModal={() => handleOpenComplementosModal(produto)}
-                    onOpenImpressorasModal={() => handleOpenImpressorasModal(produto)}
-                    isSavingValor={Boolean(savingValorMap[produto.getId()])}
-                    isSavingStatus={Boolean(savingStatusMap[produto.getId()])}
-                    onEditProduto={handleEditProduto}
-                    onCopyProduto={handleCopyProduto}
+                <div className="flex items-center justify-end flex-1">
+                  <button
+                    onClick={() => handleCreateProdutoForGroup(grupo)}
+                    className="h-6 px-[20px] bg-info border border-primary text-primary rounded-[10px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/10 transition-colors"
+                  >
+                    Adicionar produto
+                    <span className="text-sm">+</span>
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleToggleGroup(grupo)}
+                  className="flex items-center gap-1 text-primary text-sm font-semibold hover:text-primary/80 transition-colors"
+                  aria-expanded={expandedGroups[grupo] !== false}
+                >
+                  <span>{expandedGroups[grupo] === false ? 'Exibir' : 'Ocultar'}</span>
+                  <MdKeyboardArrowDown
+                    className={`text-lg transition-transform ${expandedGroups[grupo] === false ? '-rotate-90' : 'rotate-0'}`}
                   />
-                ))}
+                </button>
               </div>
-            )}
-          </div>
-        ))}
+
+              {expandedGroups[grupo] === false ? (
+                <div className="rounded-xl border border-dashed border-secondary/40 px-4 py-3 text-sm text-secondary-text">
+                  Produtos ocultos. Clique em "Exibir" para visualizar.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {items.map((produto) => (
+                    <ProdutoListItem
+                      key={produto.getId()}
+                      produto={produto}
+                      onValorChange={(valor) => handleValorUpdate(produto.getId(), valor)}
+                      onSwitchToggle={(status) => handleStatusToggle(produto.getId(), status)}
+                      onMenuStatusChanged={handleMenuStatusChanged}
+                      onToggleBoolean={(field, value) => handleToggleBooleanField(produto.getId(), field, value)}
+                      savingToggleState={savingToggleMap[produto.getId()]}
+                      onOpenComplementosModal={() => handleOpenComplementosModal(produto)}
+                      onOpenImpressorasModal={() => handleOpenImpressorasModal(produto)}
+                      isSavingValor={Boolean(savingValorMap[produto.getId()])}
+                      isSavingStatus={Boolean(savingStatusMap[produto.getId()])}
+                      onEditProduto={handleEditProduto}
+                      onCopyProduto={handleCopyProduto}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
 
         {hasNextPage && !isFetchingNextPage && (
           <div ref={loadMoreRef} className="h-10" />
