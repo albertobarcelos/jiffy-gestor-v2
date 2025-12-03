@@ -548,10 +548,10 @@ export function AtualizarPrecoLote() {
                   className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                 />
               </div>
-              <div className="flex-none w-14">Código</div>
+              <div className="flex-1 w-14">Código</div>
               <div className="flex-[1.5]">Nome</div>
-              <div className="flex-[1.4] text-center">Grupo</div>
-              <div className="flex-[1.2] text-center">Complementos</div>
+              <div className="flex-[1.4] text-center">Grupo de produtos</div>
+              <div className="flex-[1.2] text-center">Grupo de complementos</div>
               <div className="flex-1 text-center">Status</div>
               <div className="flex-1 text-right">Valor atual</div>
             </div>
@@ -563,11 +563,11 @@ export function AtualizarPrecoLote() {
                 .map((produto) => {
                 const isSelected = produtosSelecionados.has(produto.getId())
                 const gruposComplementos = produto.getGruposComplementos()
-                const complementos = gruposComplementos.flatMap((grupo) =>
-                  (grupo.complementos || []).map(
-                    (comp) => `${grupo.nome || 'Sem nome'} - ${comp.nome || 'Complemento'}`
-                  )
-                )
+                const gruposLabels = gruposComplementos.map((grupo) => {
+                  const nomeGrupo = grupo.nome || 'Grupo sem nome'
+                  const qtdComplementos = grupo.complementos?.length ?? 0
+                  return `${nomeGrupo} (${qtdComplementos} complemento${qtdComplementos === 1 ? '' : 's'})`
+                })
                 return (
                   <div
                     key={produto.getId()}
@@ -585,7 +585,7 @@ export function AtualizarPrecoLote() {
                         className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                       />
                     </div>
-                    <div className="flex-none w-24 font-mono text-xs text-secondary-text">
+                    <div className="flex-1 w-24 font-mono text-xs text-secondary-text">
                       {produto.getCodigoProduto() || '-'}
                     </div>
                     <div className="flex-[1.5] text-sm font-semibold text-primary-text truncate pr-4">
@@ -595,7 +595,7 @@ export function AtualizarPrecoLote() {
                       {produto.getNomeGrupo() || 'Sem grupo'}
                     </div>
                     <div className="flex-[1.2] flex justify-center">
-                      {complementos.length === 0 ? (
+                      {gruposLabels.length === 0 ? (
                         <span className="text-xs text-secondary-text">Nenhum</span>
                       ) : (
                         <select
@@ -606,10 +606,10 @@ export function AtualizarPrecoLote() {
                           }}
                         >
                           <option value="" disabled>
-                            {complementos.length} complemento(s)
+                            {gruposLabels.length} grupo(s)
                           </option>
-                          {complementos.map((label, index) => (
-                            <option key={`${produto.getId()}-comp-${index}`} value={label}>
+                          {gruposLabels.map((label, index) => (
+                            <option key={`${produto.getId()}-grupo-${index}`} value={label}>
                               {label}
                             </option>
                           ))}
@@ -618,7 +618,7 @@ export function AtualizarPrecoLote() {
                     </div>
                     <div className="flex-1 flex justify-center">
                       <span
-                        className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                        className={`px-4 py-1 rounded-full text-[11px] font-medium ${
                           produto.isAtivo() ? 'bg-success/20 text-success' : 'bg-error/20 text-error'
                         }`}
                       >
