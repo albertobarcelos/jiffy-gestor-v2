@@ -9,6 +9,7 @@ import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Checkbox } from '@/src/presentation/components/ui/checkbox'
+import Link from 'next/link'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
 import { MdSearch } from 'react-icons/md'
@@ -314,7 +315,7 @@ export function AtualizarPrecoLote() {
   return (
     <div className="flex flex-col h-full bg-info">
       {/* Header */}
-      <div className="bg-primary-bg border-b border-secondary px-6 py-2">
+      <div className="flex items-center justify-between bg-primary-bg border-b border-secondary px-6 py-2">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-primary-text">Atualizar Preços em Lote</h1>
@@ -323,6 +324,12 @@ export function AtualizarPrecoLote() {
             </p>
           </div>
         </div>
+        <Link
+          href="/produtos"
+          className="h-11 px-8 rounded-[30px] bg-white text-primary font-semibold font-exo text-sm border border-[#D7DBEC] shadow-sm hover:bg-[#f4f6ff] transition-colors flex items-center"
+        >
+          Cancelar
+        </Link>
       </div>
 
       <div className="bg-primary-bg border-b border-secondary px-6 py-2">
@@ -550,7 +557,10 @@ export function AtualizarPrecoLote() {
             </div>
 
             <div className="flex flex-col gap-2 mt-2">
-              {produtos.map((produto) => {
+              {produtos
+                .slice()
+                .sort((a, b) => a.getNome().localeCompare(b.getNome(), 'pt-BR'))
+                .map((produto) => {
                 const isSelected = produtosSelecionados.has(produto.getId())
                 const gruposComplementos = produto.getGruposComplementos()
                 const complementos = gruposComplementos.flatMap((grupo) =>
