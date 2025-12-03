@@ -5,6 +5,8 @@ import { Complemento } from '@/src/domain/entities/Complemento'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { ComplementoActionsMenu } from './ComplementoActionsMenu'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { MdSearch } from 'react-icons/md'
+import { showToast } from '@/src/shared/utils/toast'
 
 interface ComplementosListProps {
   onReload?: () => void
@@ -17,11 +19,10 @@ interface ComplementosListProps {
 export function ComplementosList({ onReload }: ComplementosListProps) {
   const [complementos, setComplementos] = useState<Complemento[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [hasNextPage, setHasNextPage] = useState(true)
-  const [offset, setOffset] = useState(0)
   const [searchText, setSearchText] = useState('')
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
   const [totalComplementos, setTotalComplementos] = useState(0)
+  const [togglingStatus, setTogglingStatus] = useState<Record<string, boolean>>({})
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
@@ -29,8 +30,6 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
 
   // Refs para evitar dependências desnecessárias no useCallback
   const isLoadingRef = useRef(false)
-  const hasNextPageRef = useRef(true)
-  const offsetRef = useRef(0)
   const searchTextRef = useRef('')
   const filterStatusRef = useRef<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
 
@@ -40,14 +39,6 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   }, [isLoading])
 
   useEffect(() => {
-    hasNextPageRef.current = hasNextPage
-  }, [hasNextPage])
-
-  useEffect(() => {
-    offsetRef.current = offset
-  }, [offset])
-
-  useEffect(() => {
     searchTextRef.current = searchText
   }, [searchText])
 
@@ -55,39 +46,33 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
     filterStatusRef.current = filterStatus
   }, [filterStatus])
 
-  const loadComplementos = useCallback(
-    async (reset: boolean = false) => {
-      const token = auth?.getAccessToken()
-      if (!token) {
-        return
-      }
+  const loadComplementos = useCallback(async () => {
+    const token = auth?.getAccessToken()
+    if (!token || isLoadingRef.current) {
+      return
+    }
 
-      if (isLoadingRef.current || (!hasNextPageRef.current && !reset)) return
+    setIsLoading(true)
+    isLoadingRef.current = true
 
-      setIsLoading(true)
-      isLoadingRef.current = true
+    // Determina o filtro ativo
+    let ativoFilter: boolean | null = null
+    if (filterStatusRef.current === 'Ativo') {
+      ativoFilter = true
+    } else if (filterStatusRef.current === 'Desativado') {
+      ativoFilter = false
+    }
 
-      if (reset) {
-        setOffset(0)
-        offsetRef.current = 0
-        setComplementos([])
-        setHasNextPage(true)
-        hasNextPageRef.current = true
-      }
+    try {
+      const limit = 10
+      let currentOffset = 0
+      let hasMore = true
+      const acumulado: Complemento[] = []
+      let totalFromApi: number | null = null
 
-      const currentOffset = reset ? 0 : offsetRef.current
-
-      // Determina o filtro ativo
-      let ativoFilter: boolean | null = null
-      if (filterStatusRef.current === 'Ativo') {
-        ativoFilter = true
-      } else if (filterStatusRef.current === 'Desativado') {
-        ativoFilter = false
-      }
-
-      try {
+      while (hasMore) {
         const params = new URLSearchParams({
-          limit: '10',
+          limit: limit.toString(),
           offset: currentOffset.toString(),
         })
 
@@ -118,24 +103,39 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
           Complemento.fromJSON(item)
         )
 
-        setComplementos((prev) => (reset ? newComplementos : [...prev, ...newComplementos]))
-        const newOffset = reset ? newComplementos.length : offsetRef.current + newComplementos.length
-        setOffset(newOffset)
-        offsetRef.current = newOffset
-        setHasNextPage(newComplementos.length === 10)
-        hasNextPageRef.current = newComplementos.length === 10
-        setTotalComplementos(data.count || 0)
-      } catch (error) {
-        console.error('Erro ao carregar complementos:', error)
-        setHasNextPage(false)
-        hasNextPageRef.current = false
-      } finally {
-        setIsLoading(false)
-        isLoadingRef.current = false
+        if (typeof data.count === 'number') {
+          totalFromApi = data.count
+        }
+
+        acumulado.push(...newComplementos)
+        setComplementos([...acumulado])
+
+        if (totalFromApi !== null) {
+          setTotalComplementos(totalFromApi)
+        }
+
+        currentOffset += newComplementos.length
+        hasMore =
+          newComplementos.length === limit &&
+          (totalFromApi ? currentOffset < totalFromApi : true)
+
+        if (newComplementos.length === 0) {
+          hasMore = false
+        }
       }
-    },
-    [auth]
-  )
+
+      setComplementos(acumulado)
+      setTotalComplementos(totalFromApi ?? acumulado.length)
+      if (totalFromApi !== null && totalFromApi !== acumulado.length) {
+        setTotalComplementos(acumulado.length)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar complementos:', error)
+    } finally {
+      setIsLoading(false)
+      isLoadingRef.current = false
+    }
+  }, [auth])
 
   // Debounce da busca
   useEffect(() => {
@@ -148,7 +148,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
 
     debounceTimerRef.current = setTimeout(() => {
       if (searchTextRef.current !== searchText) {
-        loadComplementos(true)
+        loadComplementos()
       }
     }, 500)
 
@@ -159,35 +159,14 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
     }
   }, [searchText, auth, loadComplementos])
 
-  // Filtro de status
+  // Recarrega ao trocar filtro de status
   useEffect(() => {
     const token = auth?.getAccessToken()
     if (!token) return
 
-    loadComplementos(true)
+    loadComplementos()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterStatus])
-
-  // Scroll infinito
-  useEffect(() => {
-    const container = scrollContainerRef.current
-    if (!container) return
-
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = container
-      if (
-        scrollTop + clientHeight >= scrollHeight - 200 &&
-        !isLoadingRef.current &&
-        hasNextPageRef.current
-      ) {
-        loadComplementos()
-      }
-    }
-
-    container.addEventListener('scroll', handleScroll)
-    return () => container.removeEventListener('scroll', handleScroll)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, hasNextPage])
 
   // Carrega complementos iniciais apenas quando o token estiver disponível
   useEffect(() => {
@@ -197,28 +176,131 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
     if (!token) return
 
     hasLoadedInitialRef.current = true
-    loadComplementos(true)
+    loadComplementos()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated])
 
   const handleStatusChange = () => {
-    loadComplementos(true)
+    loadComplementos()
     onReload?.()
   }
+
+  const handleToggleComplementoStatus = useCallback(
+    async (complemento: Complemento, novoStatus: boolean) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      const complementoId = complemento.getId()
+      const previousComplementos = complementos
+
+      setTogglingStatus((prev) => ({ ...prev, [complementoId]: true }))
+      setComplementos((prev) =>
+        prev.map((item) =>
+          item.getId() === complementoId
+            ? Complemento.create(
+                item.getId(),
+                item.getNome(),
+                item.getDescricao(),
+                item.getValor(),
+                novoStatus,
+                item.getTipoImpactoPreco(),
+                item.getOrdem()
+              )
+            : item
+        )
+      )
+
+      try {
+        const response = await fetch(`/api/complementos/${complementoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ ativo: novoStatus }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || 'Erro ao atualizar complemento')
+        }
+
+        showToast.success(
+          novoStatus ? 'Complemento ativado com sucesso!' : 'Complemento desativado com sucesso!'
+        )
+        await loadComplementos()
+        onReload?.()
+      } catch (error: any) {
+        console.error('Erro ao atualizar status do complemento:', error)
+        showToast.error(error.message || 'Erro ao atualizar status do complemento')
+        setComplementos([...previousComplementos])
+      } finally {
+        setTogglingStatus((prev) => {
+          const { [complementoId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [auth, complementos, loadComplementos, onReload]
+  )
 
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
       <div className="px-[30px] pt-[30px] pb-[10px]">
-        <div className="flex items-start justify-between">
-          <div className="w-1/2 pl-5">
-            <p className="text-primary text-sm font-semibold font-nunito mb-2">
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="min-w-[220px] flex-1 pl-5">
+            <p className="text-primary text-sm font-semibold font-nunito mb-1">
               Complementos Cadastrados
             </p>
             <p className="text-tertiary text-[26px] font-medium font-nunito">
               Total {complementos.length} de {totalComplementos}
             </p>
           </div>
+
+          <div className="flex-[2] min-w-[280px]">
+            <label
+              htmlFor="complementos-search"
+              className="text-xs font-semibold text-secondary-text mb-1 block"
+            >
+              Buscar complemento...
+            </label>
+            <div className="relative h-8">
+              <MdSearch
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
+                size={18}
+              />
+              <input
+                id="complementos-search"
+                type="text"
+                placeholder="Pesquisar complemento..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="w-full h-full pl-11 pr-4 rounded-[24px] border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              />
+            </div>
+          </div>
+
+          <div className="w-full sm:w-[160px]">
+            <label className="text-xs font-semibold text-secondary-text mb-1 block">
+              Status
+            </label>
+            <select
+              value={filterStatus}
+              onChange={(e) =>
+                setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
+              }
+              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+            >
+              <option value="Todos">Todos</option>
+              <option value="Ativo">Ativo</option>
+              <option value="Desativado">Desativado</option>
+            </select>
+          </div>
+
           <button
             onClick={() => {
               window.location.href = '/cadastros/complementos/novo'
@@ -231,46 +313,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         </div>
       </div>
 
-      {/* Divisor amarelo */}
-      <div className="relative">
-        <div className="h-[63px] border-t-2 border-alternate"></div>
-        <div className="absolute top-3 left-[30px] right-[30px] flex gap-[10px]">
-          {/* Barra de pesquisa */}
-          <div className="flex-[3]">
-            <div className="h-[50px] relative">
-              <input
-                type="text"
-                placeholder="Pesquisar..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full px-5 pl-12 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-secondary font-nunito text-sm"
-              />
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
-                🔍
-              </span>
-            </div>
-          </div>
-
-          {/* Filtro de status */}
-          <div className="flex-1">
-            <div className="h-[48px]">
-              <select
-                value={filterStatus}
-                onChange={(e) =>
-                  setFilterStatus(
-                    e.target.value as 'Todos' | 'Ativo' | 'Desativado'
-                  )
-                }
-                className="w-[175px] h-full px-5 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text focus:outline-none focus:border-secondary font-nunito text-sm"
-              >
-                <option value="Todos">Todos</option>
-                <option value="Ativo">Ativo</option>
-                <option value="Desativado">Desativado</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
+      <div className="h-[4px] border-t-2 border-alternate"></div>
 
       {/* Cabeçalho da tabela */}
       <div className="px-[30px] mt-0">
@@ -325,15 +368,26 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
               {complemento.getTipoImpactoPreco() || '-'}
             </div>
             <div className="flex-[2] flex justify-center">
-              <div
-                className={`w-20 px-3 py-1 rounded-[24px] text-center text-sm font-nunito font-medium ${
-                  complemento.isAtivo()
-                    ? 'bg-success/20 text-success'
-                    : 'bg-error/20 text-secondary-text'
+              <label
+                className={`relative inline-flex h-6 w-12 items-center ${
+                  togglingStatus[complemento.getId()]
+                    ? 'cursor-not-allowed opacity-60'
+                    : 'cursor-pointer'
                 }`}
+                title={complemento.isAtivo() ? 'Desativar complemento' : 'Ativar complemento'}
               >
-                {complemento.isAtivo() ? 'Ativo' : 'Desativado'}
-              </div>
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={complemento.isAtivo()}
+                  onChange={(event) =>
+                    handleToggleComplementoStatus(complemento, event.target.checked)
+                  }
+                  disabled={!!togglingStatus[complemento.getId()]}
+                />
+                <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-accent1" />
+                <span className="absolute left-1 top-1/2 block h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-5" />
+              </label>
             </div>
             <div className="flex-[2] flex justify-end">
               <ComplementoActionsMenu
