@@ -5,6 +5,7 @@ import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { GrupoComplementoActionsMenu } from './GrupoComplementoActionsMenu'
 import { useGruposComplementosInfinite } from '@/src/presentation/hooks/useGruposComplementos'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
+import { MdSearch } from 'react-icons/md'
 
 interface GruposComplementosListProps {
   onReload?: () => void
@@ -159,6 +160,10 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
     return data?.pages[0]?.count || 0
   }, [data])
 
+  const filteredTotal = useMemo(() => {
+    return grupos.length
+  }, [grupos])
+
   // Handler de scroll com throttle para melhor performance
   const handleScroll = useCallback(() => {
     if (scrollTimeoutRef.current) {
@@ -197,6 +202,17 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
     }
   }, [handleScroll])
 
+  // Carrega automaticamente todas as páginas (10 itens por vez)
+  useEffect(() => {
+    if (!hasNextPage) {
+      return
+    }
+
+    if (!isFetching && !isFetchingNextPage) {
+      fetchNextPage()
+    }
+  }, [hasNextPage, isFetching, isFetchingNextPage, fetchNextPage])
+
   // Notificar erro
   useEffect(() => {
     if (error) {
@@ -222,17 +238,57 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header com título e botão */}
-      <div className="px-[30px] pt-[30px] pb-[10px]">
-        <div className="flex items-start justify-between">
-          <div className="w-1/2 pl-5">
-            <p className="text-primary text-sm font-semibold font-nunito mb-2">
+      {/* Header com título, filtros e botão */}
+      <div className="px-[30px] pt-[10px] pb-[10px]">
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="min-w-[220px] flex-1 pl-5">
+            <p className="text-primary text-sm font-semibold font-nunito mb-1">
               Grupos de Complementos Cadastrados
             </p>
             <p className="text-tertiary text-[26px] font-medium font-nunito">
-              Total {grupos.length} de {totalGrupos}
+              Total {grupos.length} de {filteredTotal}
             </p>
           </div>
+
+          <div className="flex-[2] min-w-[280px]">
+            <label
+              htmlFor="grupos-complementos-search"
+              className="text-xs font-semibold text-secondary-text mb-1 block"
+            >
+              Buscar grupo...
+            </label>
+            <div className="relative h-8">
+              <input
+                id="grupos-complementos-search"
+                type="text"
+                placeholder="Pesquisar grupo..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="w-full h-full px-5 pl-12 rounded-[24px] border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              />
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
+                <MdSearch size={18} />
+              </span>
+            </div>
+          </div>
+
+          <div className="w-full sm:w-[160px]">
+            <label className="text-xs font-semibold text-secondary-text mb-1 block">
+              Status
+            </label>
+            <select
+              value={filterStatus}
+              onChange={(e) =>
+                setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
+              }
+              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+            >
+              <option value="Todos">Todos</option>
+              <option value="Ativo">Ativo</option>
+              <option value="Desativado">Desativado</option>
+            </select>
+          </div>
+
           <button
             onClick={() => {
               window.location.href = '/cadastros/grupos-complementos/novo'
@@ -244,50 +300,10 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
           </button>
         </div>
       </div>
-
-      {/* Divisor amarelo */}
-      <div className="relative">
-        <div className="h-[63px] border-t-2 border-alternate"></div>
-        <div className="absolute top-3 left-[30px] right-[30px] flex gap-[10px]">
-          {/* Barra de pesquisa */}
-          <div className="flex-[3]">
-            <div className="h-[50px] relative">
-              <input
-                type="text"
-                placeholder="Pesquisar..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full px-5 pl-12 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-secondary font-nunito text-sm"
-              />
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
-                🔍
-              </span>
-            </div>
-          </div>
-
-          {/* Filtro de status */}
-          <div className="flex-1">
-            <div className="h-[48px]">
-              <select
-                value={filterStatus}
-                onChange={(e) =>
-                  setFilterStatus(
-                    e.target.value as 'Todos' | 'Ativo' | 'Desativado'
-                  )
-                }
-                className="w-[175px] h-full px-5 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text focus:outline-none focus:border-secondary font-nunito text-sm"
-              >
-                <option value="Todos">Todos</option>
-                <option value="Ativo">Ativo</option>
-                <option value="Desativado">Desativado</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
+      <div className="h-[10px] border-t-2 border-alternate"></div>
 
       {/* Cabeçalho da tabela */}
-      <div className="px-[30px] mt-0">
+      <div className="px-[30px]">
         <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px]">
           <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text">
             Nome
