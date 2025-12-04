@@ -5,9 +5,13 @@ import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { GrupoComplementoActionsMenu } from './GrupoComplementoActionsMenu'
 import { useGruposComplementosInfinite } from '@/src/presentation/hooks/useGruposComplementos'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
-import { MdOfflinePin, MdSearch, MdOutlineOfflinePin } from 'react-icons/md'
+import { MdSearch, MdOutlineOfflinePin, MdModeEdit, MdExtension } from 'react-icons/md'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
+import {
+  GruposComplementosTabsModal,
+  GruposComplementosTabsModalState,
+} from './GruposComplementosTabsModal'
 
 interface GruposComplementosListProps {
   onReload?: () => void
@@ -20,22 +24,55 @@ const GrupoItem = memo(function GrupoItem({
   grupo,
   onToggleStatus,
   onActionsChanged,
+  onOpenComplementosModal,
+  onEditGrupo,
 }: {
   grupo: GrupoComplemento
   onToggleStatus?: (grupoId: string, novoStatus: boolean) => void
   onActionsChanged?: () => void
+  onOpenComplementosModal?: (grupo: GrupoComplemento) => void
+  onEditGrupo?: (grupo: GrupoComplemento) => void
 }) {
   const complementos = useMemo(() => grupo.getComplementos() || [], [grupo])
   const complementosIds = useMemo(() => grupo.getComplementosIds() || [], [grupo])
   const isAtivo = useMemo(() => grupo.isAtivo(), [grupo])
+  const hasComplementos = useMemo(() => complementosIds.length > 0, [complementosIds])
 
   return (
     <div className="bg-info rounded-xl mb-2 overflow-hidden">
       {/* Linha principal do grupo */}
-      <div className="h-[50px] px-4 flex items-center gap-[10px]">
-        <div className="flex-[3] flex items-center gap-1 font-nunito font-semibold text-sm text-primary-text">
-          <MdOutlineOfflinePin className="text-primary size-9" />
-          <span>{grupo.getNome()}</span>
+      <div className="px-4 flex items-center gap-[10px]">
+        <div className="flex-[3] min-w-0 flex items-start gap-3">
+          <MdOutlineOfflinePin className="text-primary size-9 shrink-0" />
+          <div className="flex flex-col gap-1">
+            <span className="truncate font-nunito font-semibold text-lg text-primary-text">
+              {grupo.getNome()}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                title="Editar grupo"
+                aria-label={`Editar ${grupo.getNome()}`}
+                onClick={() => onEditGrupo?.(grupo)}
+                className="w-6 h-6 rounded-full border border-primary/30 text-primary flex items-center justify-center hover:bg-primary/10 transition-colors"
+              >
+                <MdModeEdit className="text-base" />
+              </button>
+              <button
+                type="button"
+                title="Editar complementos do grupo"
+                aria-label={`Editar complementos do grupo ${grupo.getNome()}`}
+                onClick={() => onOpenComplementosModal?.(grupo)}
+                className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${
+                  hasComplementos
+                    ? 'bg-primary text-white border border-primary hover:bg-primary/90'
+                    : 'bg-info text-primary border border-primary/30 hover:bg-gray-300'
+                }`}
+              >
+                <MdExtension className="text-base" />
+              </button>
+            </div>
+          </div>
         </div>
         <div className="flex-[2] font-nunito text-sm text-secondary-text">
           {grupo.getQtdMinima()} / {grupo.getQtdMaxima()}
@@ -210,6 +247,13 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
 
   const { auth } = useAuthStore()
 
+  const [tabsModalState, setTabsModalState] = useState<GruposComplementosTabsModalState>({
+    open: false,
+    tab: 'grupo',
+    mode: 'create',
+    grupo: undefined,
+  })
+
   const handleActionsReload = useCallback(async () => {
     await refetch()
     onReload?.()
@@ -250,6 +294,63 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
       }
     },
     [auth, handleActionsReload]
+  )
+
+  const openTabsModal = useCallback(
+    (config: Partial<GruposComplementosTabsModalState>) => {
+      setTabsModalState(() => ({
+        open: true,
+        tab: config.tab ?? 'grupo',
+        mode: config.mode ?? 'create',
+        grupo: config.grupo,
+      }))
+    },
+    []
+  )
+
+  const closeTabsModal = useCallback(() => {
+    setTabsModalState((prev) => ({
+      ...prev,
+      open: false,
+    }))
+  }, [])
+
+  const handleTabsModalReload = useCallback(async () => {
+    await handleActionsReload()
+  }, [handleActionsReload])
+
+  const handleTabsModalTabChange = useCallback((tab: 'grupo' | 'complementos') => {
+    setTabsModalState((prev) => ({
+      ...prev,
+      tab,
+    }))
+  }, [])
+
+  const handleOpenComplementosModal = useCallback(
+    (grupo: GrupoComplemento) => {
+      openTabsModal({
+        tab: 'complementos',
+        mode: 'edit',
+        grupo,
+      })
+    },
+    [openTabsModal]
+  )
+
+  const handleEditGrupo = useCallback(
+    (grupo: GrupoComplemento) => {
+      const grupoId = grupo.getId()
+      if (tabsModalState.open && tabsModalState.grupo?.getId() === grupoId) {
+        handleTabsModalTabChange('grupo')
+        return
+      }
+      openTabsModal({
+        tab: 'grupo',
+        mode: 'edit',
+        grupo,
+      })
+    },
+    [handleTabsModalTabChange, openTabsModal, tabsModalState.grupo, tabsModalState.open]
   )
 
   return (
@@ -306,9 +407,13 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
           </div>
 
           <button
-            onClick={() => {
-              window.location.href = '/cadastros/grupos-complementos/novo'
-            }}
+            onClick={() =>
+              openTabsModal({
+                tab: 'grupo',
+                mode: 'create',
+                grupo: undefined,
+              })
+            }
             className="h-10 px-[30px] bg-primary text-info rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
           >
             Novo
@@ -374,6 +479,8 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
             grupo={grupo}
             onToggleStatus={toggleGroupStatus}
             onActionsChanged={handleActionsReload}
+            onOpenComplementosModal={handleOpenComplementosModal}
+            onEditGrupo={handleEditGrupo}
           />
         ))}
 
@@ -383,6 +490,12 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
           </div>
         )}
       </div>
+      <GruposComplementosTabsModal
+        state={tabsModalState}
+        onClose={closeTabsModal}
+        onReload={handleTabsModalReload}
+        onTabChange={handleTabsModalTabChange}
+      />
     </div>
   )
 }

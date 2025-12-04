@@ -12,13 +12,21 @@ import { useComplementos } from '@/src/presentation/hooks/useComplementos'
 
 interface NovoGrupoComplementoProps {
   grupoId?: string
+  isEmbedded?: boolean
+  onClose?: () => void
+  onSaved?: () => void
 }
 
 /**
  * Componente para criar/editar grupo de complementos
  * Replica o design e funcionalidades do Flutter
  */
-export function NovoGrupoComplemento({ grupoId }: NovoGrupoComplementoProps) {
+export function NovoGrupoComplemento({
+  grupoId,
+  isEmbedded = false,
+  onClose,
+  onSaved,
+}: NovoGrupoComplementoProps) {
   const router = useRouter()
   const { auth } = useAuthStore()
   const isEditing = !!grupoId
@@ -149,9 +157,15 @@ export function NovoGrupoComplemento({ grupoId }: NovoGrupoComplementoProps) {
         toastId,
         isEditing ? 'Grupo de complementos atualizado com sucesso!' : 'Grupo de complementos criado com sucesso!'
       )
-      setTimeout(() => {
-        router.push('/cadastros/grupos-complementos')
-      }, 500)
+
+      if (isEmbedded) {
+        onSaved?.()
+        onClose?.()
+      } else {
+        setTimeout(() => {
+          router.push('/cadastros/grupos-complementos')
+        }, 500)
+      }
     } catch (error) {
       console.error('Erro ao salvar grupo de complementos:', error)
       const errorMessage = handleApiError(error)
@@ -162,7 +176,11 @@ export function NovoGrupoComplemento({ grupoId }: NovoGrupoComplementoProps) {
   }
 
   const handleCancel = () => {
-    router.push('/cadastros/grupos-complementos')
+    if (isEmbedded) {
+      onClose?.()
+    } else {
+      router.push('/cadastros/grupos-complementos')
+    }
   }
 
   const toggleComplemento = (complementoId: string) => {
@@ -187,30 +205,33 @@ export function NovoGrupoComplemento({ grupoId }: NovoGrupoComplementoProps) {
   )
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header fixo */}
-      <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[30px] shadow-md px-[30px] py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-primary/25 text-primary flex items-center justify-center">
-              <span className="text-2xl">👤</span>
+    <div className={`flex flex-col ${isEmbedded ? 'h-full' : 'h-full'}`}>
+      {!isEmbedded && (
+        <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[30px] shadow-md px-[30px] py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-primary/25 text-primary flex items-center justify-center">
+                <span className="text-2xl">👤</span>
+              </div>
+              <h1 className="text-primary text-lg font-semibold font-exo">
+                {isEditing ? 'Editar Grupo de Complementos' : 'Novo Grupo de Complementos'}
+              </h1>
             </div>
-            <h1 className="text-primary text-lg font-semibold font-exo">
-              {isEditing ? 'Editar Grupo de Complementos' : 'Novo Grupo de Complementos'}
-            </h1>
+            <Button
+              onClick={handleCancel}
+              variant="outlined"
+              className="h-9 px-[26px] rounded-[30px] border-primary/15 text-primary bg-primary/10 hover:bg-primary/20"
+            >
+              Cancelar
+            </Button>
           </div>
-          <Button
-            onClick={handleCancel}
-            variant="outlined"
-            className="h-9 px-[26px] rounded-[30px] border-primary/15 text-primary bg-primary/10 hover:bg-primary/20"
-          >
-            Cancelar
-          </Button>
         </div>
-      </div>
+      )}
 
       {/* Formulário com scroll */}
-      <div className="flex-1 overflow-y-auto px-[30px] py-[30px]">
+      <div
+        className={`flex-1 overflow-y-auto ${isEmbedded ? 'px-6 py-6 bg-info' : 'px-[30px] py-[30px]'}`}
+      >
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Informações */}
           <div className="bg-info rounded-[12px] p-5">
