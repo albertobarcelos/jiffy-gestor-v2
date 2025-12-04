@@ -5,7 +5,14 @@ import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { GrupoComplementoActionsMenu } from './GrupoComplementoActionsMenu'
 import { useGruposComplementosInfinite } from '@/src/presentation/hooks/useGruposComplementos'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
-import { MdSearch, MdOutlineOfflinePin, MdModeEdit, MdExtension } from 'react-icons/md'
+import {
+  MdSearch,
+  MdOutlineOfflinePin,
+  MdModeEdit,
+  MdExtension,
+  MdKeyboardArrowUp,
+  MdKeyboardArrowDown,
+} from 'react-icons/md'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import {
@@ -26,23 +33,46 @@ const GrupoItem = memo(function GrupoItem({
   onActionsChanged,
   onOpenComplementosModal,
   onEditGrupo,
+  onChangeQuantidade,
+  isChangingQuantidade,
+  ordemPosicional,
 }: {
   grupo: GrupoComplemento
   onToggleStatus?: (grupoId: string, novoStatus: boolean) => void
   onActionsChanged?: () => void
   onOpenComplementosModal?: (grupo: GrupoComplemento) => void
   onEditGrupo?: (grupo: GrupoComplemento) => void
+  onChangeQuantidade?: (grupo: GrupoComplemento, tipo: 'min' | 'max', delta: number) => void
+  isChangingQuantidade?: boolean
+  ordemPosicional: number
 }) {
   const complementos = useMemo(() => grupo.getComplementos() || [], [grupo])
+  const ordem = useMemo(() => {
+    const value = grupo.getOrdem?.()
+    if (typeof value === 'undefined') {
+      console.warn('[GruposComplementosList] Grupo sem ordem recebida do backend', {
+        id: grupo.getId(),
+        nome: grupo.getNome(),
+        grupo,
+      })
+    }
+    return value
+  }, [grupo])
   const complementosIds = useMemo(() => grupo.getComplementosIds() || [], [grupo])
   const isAtivo = useMemo(() => grupo.isAtivo(), [grupo])
   const hasComplementos = useMemo(() => complementosIds.length > 0, [complementosIds])
 
   return (
-    <div className="bg-info rounded-xl mb-2 overflow-hidden">
+    <div className="bg-info rounded-xl mb-2">
       {/* Linha principal do grupo */}
       <div className="px-4 flex items-center gap-[10px]">
-        <div className="flex-[3] min-w-0 flex items-start gap-3">
+        <div className="w-16 flex flex-col items-center text-center text-xs text-secondary-text">
+          
+          <span className="text-lg font-semibold text-primary-text/70">
+            {ordemPosicional}
+          </span>
+        </div>
+        <div className="flex-[3] min-w-0 flex items-start gap-3 pl-3">
           <MdOutlineOfflinePin className="text-primary size-9 shrink-0" />
           <div className="flex flex-col gap-1">
             <span className="truncate font-nunito font-semibold text-lg text-primary-text">
@@ -74,8 +104,53 @@ const GrupoItem = memo(function GrupoItem({
             </div>
           </div>
         </div>
-        <div className="flex-[2] font-nunito text-sm text-secondary-text">
-          {grupo.getQtdMinima()} / {grupo.getQtdMaxima()}
+        <div className="flex-[3] flex justify-center">
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              {
+                label: 'Qtd mín.',
+                valor: grupo.getQtdMinima(),
+                tipo: 'min' as const,
+                invertButtons: true,
+              },
+              {
+                label: 'Qtd máx.',
+                valor: grupo.getQtdMaxima(),
+                tipo: 'max' as const,
+                invertButtons: false,
+              },
+            ].map((item) => (
+              <div
+                key={`${grupo.getId()}-${item.tipo}`}
+                className={`flex items-center gap-2 ${item.invertButtons ? 'flex-row-reverse justify-end' : ''}`}
+              >
+                <div className="flex flex-col items-center text-center text-xs text-secondary-text min-w-[70px]">
+                  <span className="uppercase tracking-wide">{item.label}</span>
+                  <span className="text-sm font-semibold text-primary-text">{item.valor}</span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <button
+                    type="button"
+                    aria-label={`Aumentar ${item.label}`}
+                    disabled={isChangingQuantidade}
+                    onClick={() => onChangeQuantidade?.(grupo, item.tipo, 1)}
+                    className="w-4 h-4 rounded-md border border-gray-300 flex items-center justify-center text-primary hover:bg-primary/10 disabled:opacity-50"
+                  >
+                    <MdKeyboardArrowUp />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Diminuir ${item.label}`}
+                    disabled={isChangingQuantidade}
+                    onClick={() => onChangeQuantidade?.(grupo, item.tipo, -1)}
+                    className="w-4 h-4 rounded-md border border-gray-300 flex items-center justify-center text-primary hover:bg-primary/10 disabled:opacity-50"
+                  >
+                    <MdKeyboardArrowDown />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
         
         <div className="flex-[2] flex items-center justify-start">
@@ -113,11 +188,12 @@ const GrupoItem = memo(function GrupoItem({
             <span className="absolute left-1 top-1/2 block h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-5" />
           </label>
         </div>
-        <div className="flex-[2] flex justify-end items-center">
+        <div className="flex-1 flex justify-end items-center">
           <GrupoComplementoActionsMenu
             grupoId={grupo.getId()}
             grupoAtivo={isAtivo}
             onStatusChanged={onActionsChanged}
+            onEditRequested={() => onEditGrupo?.(grupo)}
           />
         </div>
       </div>
@@ -246,6 +322,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
   }, [error])
 
   const { auth } = useAuthStore()
+  const [updatingQuantidadeId, setUpdatingQuantidadeId] = useState<string | null>(null)
 
   const [tabsModalState, setTabsModalState] = useState<GruposComplementosTabsModalState>({
     open: false,
@@ -353,6 +430,62 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
     [handleTabsModalTabChange, openTabsModal, tabsModalState.grupo, tabsModalState.open]
   )
 
+  const handleChangeQuantidade = useCallback(
+    async (grupo: GrupoComplemento, tipo: 'min' | 'max', delta: number) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      let novoMin = grupo.getQtdMinima()
+      let novoMax = grupo.getQtdMaxima()
+
+      if (tipo === 'min') {
+        novoMin = Math.max(0, novoMin + delta)
+        if (novoMin > novoMax) {
+          novoMax = novoMin
+        }
+      } else {
+        novoMax = Math.max(0, novoMax + delta)
+        if (novoMax < novoMin) {
+          novoMin = novoMax
+        }
+      }
+
+      if (novoMin === grupo.getQtdMinima() && novoMax === grupo.getQtdMaxima()) {
+        return
+      }
+
+      setUpdatingQuantidadeId(grupo.getId())
+
+      try {
+        const response = await fetch(`/api/grupos-complementos/${grupo.getId()}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ qtdMinima: novoMin, qtdMaxima: novoMax }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || 'Erro ao atualizar quantidades do grupo')
+        }
+
+        showToast.success('Quantidades atualizadas com sucesso!')
+        await handleActionsReload()
+      } catch (error: any) {
+        console.error('Erro ao atualizar quantidades do grupo:', error)
+        showToast.error(error.message || 'Erro ao atualizar quantidades do grupo')
+      } finally {
+        setUpdatingQuantidadeId(null)
+      }
+    },
+    [auth, handleActionsReload]
+  )
+
   return (
     <div className="flex flex-col h-full">
       {/* Header com título, filtros e botão */}
@@ -426,10 +559,13 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
       {/* Cabeçalho da tabela */}
       <div className="px-[30px]">
         <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px]">
+          <div className="w-16 font-nunito font-semibold text-sm text-primary-text text-center">
+            Ordem
+          </div>
           <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text">
             Nome
           </div>
-          <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
+          <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text text-center">
             Qtd Mín/Máx
           </div>
           <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
@@ -438,7 +574,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
           <div className="flex-[2] text-center font-nunito font-semibold text-sm text-primary-text">
             Status
           </div>
-          <div className="flex-[2] text-right font-nunito font-semibold text-sm text-primary-text">
+          <div className="flex-1 text-right font-nunito font-semibold text-sm text-primary-text">
             Ações
           </div>
         </div>
@@ -457,6 +593,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
                 key={i}
                 className="h-[50px] bg-info rounded-xl px-4 flex items-center gap-[10px] animate-pulse"
               >
+                <Skeleton className="w-10 h-4" />
                 <Skeleton className="flex-[3] h-4" />
                 <Skeleton className="flex-[2] h-4" />
                 <Skeleton className="flex-[2] h-4" />
@@ -473,16 +610,19 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
           </div>
         )}
 
-        {grupos.map((grupo) => (
-          <GrupoItem
-            key={grupo.getId()}
-            grupo={grupo}
-            onToggleStatus={toggleGroupStatus}
-            onActionsChanged={handleActionsReload}
-            onOpenComplementosModal={handleOpenComplementosModal}
-            onEditGrupo={handleEditGrupo}
-          />
-        ))}
+        {grupos.map((grupo, index) => (
+            <GrupoItem
+              key={grupo.getId()}
+              grupo={grupo}
+              onToggleStatus={toggleGroupStatus}
+              onActionsChanged={handleActionsReload}
+              onOpenComplementosModal={handleOpenComplementosModal}
+              onEditGrupo={handleEditGrupo}
+              onChangeQuantidade={handleChangeQuantidade}
+              isChangingQuantidade={updatingQuantidadeId === grupo.getId()}
+            ordemPosicional={index + 1}
+            />
+          ))}
 
         {isFetchingNextPage && (
           <div className="flex justify-center py-4">

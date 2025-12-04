@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { MdPlaylistAdd } from 'react-icons/md'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { Complemento } from '@/src/domain/entities/Complemento'
@@ -81,7 +82,15 @@ export function NovoGrupoComplemento({
             setQtdMinima(grupo.getQtdMinima().toString())
             setQtdMaxima(grupo.getQtdMaxima().toString())
             setAtivo(grupo.isAtivo())
-            setSelectedComplementosIds(grupo.getComplementosIds() || [])
+
+            const complementosIds =
+              grupo.getComplementosIds()?.length
+                ? grupo.getComplementosIds()!
+                : (grupo.getComplementos() || [])
+                    .map((comp: any) => comp?.id?.toString())
+                    .filter(Boolean)
+
+            setSelectedComplementosIds(complementosIds)
           } catch (parseError) {
             console.error('Erro ao processar dados do grupo:', parseError)
             showToast.error('Erro ao carregar dados do grupo. Verifique se as quantidades estão corretas.')
@@ -217,13 +226,7 @@ export function NovoGrupoComplemento({
                 {isEditing ? 'Editar Grupo de Complementos' : 'Novo Grupo de Complementos'}
               </h1>
             </div>
-            <Button
-              onClick={handleCancel}
-              variant="outlined"
-              className="h-9 px-[26px] rounded-[30px] border-primary/15 text-primary bg-primary/10 hover:bg-primary/20"
-            >
-              Cancelar
-            </Button>
+            
           </div>
         </div>
       )}
@@ -234,15 +237,32 @@ export function NovoGrupoComplemento({
       >
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Informações */}
-          <div className="bg-info rounded-[12px] p-5">
-            <h2 className="text-secondary text-xl font-semibold font-exo mb-4">
-              Informações
-            </h2>
+            <div className="bg-info rounded-[12px] p-5">
+              <h2 className="text-secondary text-xl font-semibold font-exo mb-4">
+                {nome?.trim().length
+                  ? `Grupo de Complementos “${nome.trim()}”`
+                  : isEditing
+                    ? 'Grupo de Complementos “Grupo”'
+                    : 'Grupo de Complementos'}
+              </h2>
             <div className="h-px bg-alternate mb-4"></div>
-
+            <div className="flex items-center gap-6 justify-end mb-6">
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full">
+                <label className="text-primary-text font-medium text-sm">Ativo</label>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={ativo}
+                    onChange={(e) => setAtivo(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-14 h-7 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-accent1"></div>
+                </label>
+              </div>
+            </div>
             <div className="space-y-4">
               <Input
-                label="Nome do Grupo *"
+                label="Nome do Grupo"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
                 required
@@ -287,49 +307,42 @@ export function NovoGrupoComplemento({
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Complementos
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setShowComplementosModal(true)}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-400 bg-info text-gray-900 hover:bg-primary-bg focus:outline-none focus:border-2 focus:border-primary text-left"
-                >
-                  {selectedComplementos.length > 0
-                    ? `${selectedComplementos.length} complemento(s) selecionado(s)`
-                    : 'Selecione os complementos'}
-                </button>
-                {selectedComplementos.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {selectedComplementos.map((comp: any) => (
-                      <span
-                        key={comp.getId()}
-                        className="px-3 py-1 bg-primary/20 text-primary rounded-lg text-sm"
-                      >
-                        {comp.getNome()}
-                        <button
-                          type="button"
-                          onClick={() => toggleComplemento(comp.getId())}
-                          className="ml-2 text-primary hover:text-primary/70"
+                <div className="flex flex-wrap items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowComplementosModal(true)}
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-primary text-info font-semibold shadow hover:bg-primary/90 transition-colors"
+                  >
+                    <MdPlaylistAdd className="text-lg" />
+                    Escolher complementos
+                  </button>
+                </div>
+                <div className="mt-3 border border-gray-300 rounded-lg px-4 py-3 bg-white text-sm text-primary-text min-h-[52px]">
+                  {selectedComplementos.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {selectedComplementos.map((comp: Complemento) => (
+                        <span
+                          key={comp.getId()}
+                          className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary font-semibold"
                         >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
+                          {comp.getNome()}
+                          <button
+                            type="button"
+                            onClick={() => toggleComplemento(comp.getId())}
+                            className="text-primary hover:text-primary/70"
+                            aria-label={`Remover ${comp.getNome()}`}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-secondary-text">Nenhum complemento selecionado</span>
+                  )}
+                </div>
               </div>
 
-              {/* Toggle Ativo */}
-              <div className="flex items-center justify-between p-4 bg-primary-bg rounded-lg">
-                <span className="text-primary-text font-medium">Ativo</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={ativo}
-                    onChange={(e) => setAtivo(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-14 h-7 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-success"></div>
-                </label>
-              </div>
             </div>
           </div>
 
@@ -343,7 +356,23 @@ export function NovoGrupoComplemento({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={isLoading || !nome}>
+            <Button
+              type="submit"
+              disabled={isLoading || !nome}
+              sx={{
+                backgroundColor: 'var(--color-primary)',
+                color: 'var(--color-info)',
+                '&:hover': {
+                  backgroundColor: 'var(--color-primary)',
+                  opacity: 0.9,
+                },
+                '&.Mui-disabled': {
+                  backgroundColor: 'var(--color-primary)',
+                  opacity: 0.4,
+                  color: 'var(--color-info)',
+                },
+              }}
+            >
               {isLoading ? 'Salvando...' : isEditing ? 'Atualizar' : 'Salvar'}
             </Button>
           </div>
