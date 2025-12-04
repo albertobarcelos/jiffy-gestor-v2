@@ -5,7 +5,9 @@ import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { GrupoComplementoActionsMenu } from './GrupoComplementoActionsMenu'
 import { useGruposComplementosInfinite } from '@/src/presentation/hooks/useGruposComplementos'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
-import { MdSearch } from 'react-icons/md'
+import { MdOfflinePin, MdSearch, MdOutlineOfflinePin } from 'react-icons/md'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { showToast } from '@/src/shared/utils/toast'
 
 interface GruposComplementosListProps {
   onReload?: () => void
@@ -16,87 +18,73 @@ interface GruposComplementosListProps {
  */
 const GrupoItem = memo(function GrupoItem({
   grupo,
-  isExpanded,
-  onToggleExpand,
-  onStatusChanged,
+  onToggleStatus,
+  onActionsChanged,
 }: {
   grupo: GrupoComplemento
-  isExpanded: boolean
-  onToggleExpand: () => void
-  onStatusChanged?: () => void
+  onToggleStatus?: (grupoId: string, novoStatus: boolean) => void
+  onActionsChanged?: () => void
 }) {
   const complementos = useMemo(() => grupo.getComplementos() || [], [grupo])
   const complementosIds = useMemo(() => grupo.getComplementosIds() || [], [grupo])
   const isAtivo = useMemo(() => grupo.isAtivo(), [grupo])
-  const statusClass = useMemo(
-    () =>
-      isAtivo
-        ? 'bg-success/20 text-success'
-        : 'bg-error/20 text-secondary-text',
-    [isAtivo]
-  )
 
   return (
     <div className="bg-info rounded-xl mb-2 overflow-hidden">
       {/* Linha principal do grupo */}
       <div className="h-[50px] px-4 flex items-center gap-[10px]">
-        <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text">
-          {grupo.getNome()}
+        <div className="flex-[3] flex items-center gap-1 font-nunito font-semibold text-sm text-primary-text">
+          <MdOutlineOfflinePin className="text-primary size-9" />
+          <span>{grupo.getNome()}</span>
         </div>
         <div className="flex-[2] font-nunito text-sm text-secondary-text">
           {grupo.getQtdMinima()} / {grupo.getQtdMaxima()}
         </div>
-        <div className="flex-[2] font-nunito text-sm text-secondary-text">
-          {complementosIds.length} complemento(s)
-        </div>
-        <div className="flex-[2] flex justify-center">
-          <div
-            className={`w-20 px-3 py-1 rounded-[24px] text-center text-sm font-nunito font-medium ${statusClass}`}
-          >
-            {isAtivo ? 'Ativo' : 'Desativado'}
-          </div>
-        </div>
-        <div className="flex-[2] flex justify-end items-center gap-2">
-          {complementos.length > 0 && (
-            <button
-              onClick={onToggleExpand}
-              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-secondary-bg/20 transition-colors"
+        
+        <div className="flex-[2] flex items-center justify-start">
+          {complementos.length === 0 ? (
+            <span className="text-sm font-nunito text-secondary-text">Nenhum complemento</span>
+          ) : (
+            <select
+              className="w-full px-3 py-1.5 rounded-xl border border-gray-300 bg-white text-sm font-semibold text-primary-text focus:outline-none focus:border-primary"
+              defaultValue=""
+              onChange={(event) => {
+                event.target.value = ''
+              }}
             >
-              <span className={`text-lg transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
-                ▼
-              </span>
-            </button>
+              <option value="" disabled>{complementos.length} complemento(s)</option>
+              {complementos.map((complemento: any, index: number) => (
+                <option key={complemento.id || index} value={complemento.nome || `complemento-${index}`}>
+                  {complemento.nome || 'Complemento sem nome'}{' '}
+                  {typeof complemento.valor !== 'undefined'
+                    ? `--- R$ ${Number(complemento.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                    : ''}
+                </option>
+              ))}
+            </select>
           )}
+        </div>
+        <div className="flex-[2] flex items-center justify-center">
+          <label className="relative inline-flex items-center h-6 w-12 cursor-pointer">
+            <input
+              type="checkbox"
+              className="sr-only peer"
+              checked={isAtivo}
+              onChange={(event) => onToggleStatus?.(grupo.getId(), event.target.checked)}
+            />
+            <div className="w-full h-full rounded-full bg-gray-300 peer-checked:bg-accent1 transition-colors" />
+            <span className="absolute left-1 top-1/2 block h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-5" />
+          </label>
+        </div>
+        <div className="flex-[2] flex justify-end items-center">
           <GrupoComplementoActionsMenu
             grupoId={grupo.getId()}
             grupoAtivo={isAtivo}
-            onStatusChanged={onStatusChanged}
+            onStatusChanged={onActionsChanged}
           />
         </div>
       </div>
 
-      {/* Lista de complementos expandida */}
-      {isExpanded && complementos.length > 0 && (
-        <div className="px-4 pb-4 border-t border-alternate/30">
-          <div className="pt-3 space-y-2">
-            {complementos.map((complemento: any, index: number) => (
-              <div
-                key={complemento.id || index}
-                className="px-3 py-2 bg-primary-bg rounded-lg"
-              >
-                <p className="text-sm font-medium text-primary-text">
-                  {complemento.nome || 'Complemento sem nome'}
-                </p>
-                {complemento.valor && (
-                  <p className="text-xs text-secondary-text">
-                    R$ {parseFloat(complemento.valor).toFixed(2)}
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 })
@@ -109,7 +97,6 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -145,6 +132,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
     isFetchingNextPage,
     isLoading,
     error,
+    refetch,
   } = useGruposComplementosInfinite({
     q: debouncedSearch || undefined,
     ativo: ativoFilter,
@@ -220,21 +208,49 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
     }
   }, [error])
 
-  const handleStatusChange = useCallback(() => {
-    onReload?.()
-  }, [onReload])
+  const { auth } = useAuthStore()
 
-  const toggleExpand = useCallback((groupId: string) => {
-    setExpandedGroups((prev) => {
-      const newSet = new Set(prev)
-      if (newSet.has(groupId)) {
-        newSet.delete(groupId)
-      } else {
-        newSet.add(groupId)
+  const handleActionsReload = useCallback(async () => {
+    await refetch()
+    onReload?.()
+  }, [refetch, onReload])
+
+  const toggleGroupStatus = useCallback(
+    async (grupoId: string, novoStatus: boolean) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
       }
-      return newSet
-    })
-  }, [])
+
+      try {
+        const response = await fetch(`/api/grupos-complementos/${grupoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ ativo: novoStatus }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || 'Erro ao atualizar status do grupo')
+        }
+
+        showToast.success(
+          novoStatus
+            ? 'Grupo de complementos ativado com sucesso!'
+            : 'Grupo de complementos desativado com sucesso!'
+        )
+        await handleActionsReload()
+      } catch (error: any) {
+        console.error('Erro ao atualizar status do grupo:', error)
+        showToast.error(error.message || 'Erro ao atualizar status do grupo')
+      }
+    },
+    [auth, handleActionsReload]
+  )
 
   return (
     <div className="flex flex-col h-full">
@@ -356,9 +372,8 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
           <GrupoItem
             key={grupo.getId()}
             grupo={grupo}
-            isExpanded={expandedGroups.has(grupo.getId())}
-            onToggleExpand={() => toggleExpand(grupo.getId())}
-            onStatusChanged={handleStatusChange}
+            onToggleStatus={toggleGroupStatus}
+            onActionsChanged={handleActionsReload}
           />
         ))}
 

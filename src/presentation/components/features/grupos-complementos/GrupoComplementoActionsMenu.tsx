@@ -89,7 +89,7 @@ export function GrupoComplementoActionsMenu({
       }
 
       setIsOpen(false)
-      onStatusChanged?.()
+      await onStatusChanged?.()
 
       alert('Grupo de complementos deletado com sucesso!')
     } catch (error) {
@@ -119,7 +119,7 @@ export function GrupoComplementoActionsMenu({
       }
 
       setIsOpen(false)
-      onStatusChanged?.()
+      await onStatusChanged?.()
 
       alert(
         grupoAtivo
