@@ -251,7 +251,7 @@ const ProdutoListItem = function ProdutoListItem({
               className="rounded-full bg-primary/10 border border-primary p-1 text-[var(--color-primary)] hover:bg-primary/20 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               aria-label={`Editar ${produto.getNome()}`}
             >
-              <MdModeEdit className="text-xl" />
+              <MdModeEdit className="text-sm" />
             </button>
             {produto.getNome()}
             <span className="text-sm text-secondary-text ml-2 inline-flex items-center gap-1">
@@ -277,7 +277,7 @@ const ProdutoListItem = function ProdutoListItem({
                   title={label}
                   disabled={isLoading}
                   onClick={() => onToggleBoolean?.(field, !isActive)}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-lg transition-all ${bgColor} ${iconColor} ${isLoading
+                  className={`w-6 h-6 p-1 rounded-full flex items-center justify-center text-lg transition-all ${bgColor} ${iconColor} ${isLoading
                       ? 'opacity-60 cursor-not-allowed'
                       : 'hover:bg-primary/80 hover:text-white  focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/80'
                     }`}
@@ -302,7 +302,7 @@ const ProdutoListItem = function ProdutoListItem({
                   title={label}
                   disabled={!handleModalClick}
                   onClick={() => handleModalClick?.()}
-                  className={`w-8 h-8 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${!handleModalClick ? 'opacity-60 cursor-not-allowed' : 'hover:bg-primary/10'}`}
+                  className={`w-6 h-6 p-1 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${!handleModalClick ? 'opacity-60 cursor-not-allowed' : 'hover:bg-primary/10'}`}
                 >
                   <Icon />
                 </button>
@@ -316,7 +316,7 @@ const ProdutoListItem = function ProdutoListItem({
                   type="button"
                   title={label}
                   onClick={() => onCopyProduto?.(produto.getId())}
-                  className="w-8 h-8 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-lg hover:bg-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="w-6 h-6 p-1 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-lg hover:bg-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <Icon />
                 </button>
@@ -327,7 +327,7 @@ const ProdutoListItem = function ProdutoListItem({
               <span
                 key={`${produto.getId()}-${key}`}
                 title={label}
-                className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-lg"
+                className="w-6 h-6 p-1 rounded-full bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-lg"
               >
                 <Icon />
               </span>
