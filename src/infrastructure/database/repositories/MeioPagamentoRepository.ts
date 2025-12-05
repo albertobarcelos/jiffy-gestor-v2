@@ -26,7 +26,7 @@ export class MeioPagamentoRepository implements IMeioPagamentoRepository {
     try {
       const { limit, offset, q = '', ativo } = params
 
-      let url = `/api/v1/preferencias/meios-pagamento?limit=${limit}&offset=${offset}`
+      let url = `/api/v1/pagamento/meios-pagamento?limit=${limit}&offset=${offset}`
       if (q) {
         url += `&q=${encodeURIComponent(q)}`
       }
