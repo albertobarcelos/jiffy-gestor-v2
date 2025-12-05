@@ -405,7 +405,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
         </div>
       </div>
 
-      <div className="h-[4px] border-t-2 border-alternate"></div>
+      <div className="h-[4px] border-t-2 border-primary/70"></div>
       <div className="bg-white px-[20px] py-2 border-b border-gray-100">
         <div className="flex flex-wrap items-end gap-2">
           {/* Barra de pesquisa */}
@@ -505,7 +505,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
               </div>
               <div className="flex-[2] flex justify-center">
                 <label
-                  className={`relative inline-flex h-6 w-12 items-center ${
+                  className={`relative inline-flex h-5 w-12 items-center ${
                     updatingTefAtivo[meioPagamento.getId()]
                       ? 'cursor-not-allowed opacity-60'
                       : 'cursor-pointer'
@@ -521,13 +521,13 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
                     }
                     disabled={!!updatingTefAtivo[meioPagamento.getId()]}
                   />
-                  <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-accent1" />
-                  <span className="absolute left-1 top-1/2 block h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-5" />
+                  <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
+                  <span className="absolute left-1 top-1/2 block h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-6" />
                 </label>
               </div>
               <div className="flex-[2] flex justify-center">
                 <label
-                  className={`relative inline-flex h-6 w-12 items-center ${
+                  className={`relative inline-flex h-5 w-12 items-center ${
                     updatingAtivo[meioPagamento.getId()]
                       ? 'cursor-not-allowed opacity-60'
                       : 'cursor-pointer'
@@ -543,8 +543,8 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
                     }
                     disabled={!!updatingAtivo[meioPagamento.getId()]}
                   />
-                  <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-accent1" />
-                  <span className="absolute left-1 top-1/2 block h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-5" />
+                  <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
+                  <span className="absolute left-1 top-1/2 block h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-6" />
                 </label>
               </div>
               <div className="flex-[2] flex justify-end">
