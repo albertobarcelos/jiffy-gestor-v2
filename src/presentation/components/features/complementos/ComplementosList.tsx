@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Complemento } from '@/src/domain/entities/Complemento'
 import { ComplementoActionsMenu } from './ComplementoActionsMenu'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { MdModeEdit, MdOutlineOfflinePin, MdSearch } from 'react-icons/md'
+import { MdAddCircle, MdModeEdit, MdOutlineOfflinePin, MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import {
   ComplementosTabsModal,
@@ -581,7 +581,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
             className=" bg-info rounded-xl px-4 mb-2 flex items-center gap-[10px] shadow-xl hover:shadow-md transition-shadow hover:bg-secondary-bg/15"
           >
             <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text flex items-center gap-1">
-              <MdOutlineOfflinePin className="text-primary size-9" />
+              <MdAddCircle className="text-primary size-9" />
               <span>{complemento.getNome()}</span>
               <button
                 type="button"

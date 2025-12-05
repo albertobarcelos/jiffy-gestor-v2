@@ -10,6 +10,7 @@ import {
   MdOutlineOfflinePin,
   MdModeEdit,
   MdExtension,
+  MdAddCircle,
   MdKeyboardArrowUp,
   MdKeyboardArrowDown,
 } from 'react-icons/md'
@@ -73,7 +74,7 @@ const GrupoItem = memo(function GrupoItem({
           </span>
         </div>
         <div className="flex-[3] min-w-0 flex items-start gap-3 pl-3">
-          <MdOutlineOfflinePin className="text-primary size-9 shrink-0" />
+          <MdAddCircle className="text-primary size-9 shrink-0" />
           <div className="flex flex-col gap-1">
             <span className="truncate font-nunito font-semibold text-lg text-primary-text">
               {grupo.getNome()}
