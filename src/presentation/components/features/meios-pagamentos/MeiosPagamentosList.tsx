@@ -146,9 +146,10 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      if (searchTextRef.current !== searchText) {
-        loadMeiosPagamento(true)
-      }
+      // Sempre executa a busca quando o debounce disparar
+      // O searchTextRef.current já foi atualizado pelo useEffect da linha 49-51
+      // e contém o valor mais recente do searchText
+      loadMeiosPagamento(true)
     }, 500)
 
     return () => {
@@ -208,13 +209,13 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px] pt-[30px] pb-[10px]">
+      <div className="px-[30px]">
         <div className="flex items-start justify-between">
           <div className="w-1/2 pl-5">
-            <p className="text-primary text-sm font-semibold font-nunito mb-2">
+            <p className="text-primary text-sm font-semibold font-nunito">
               Meios de Pagamento Cadastrados
             </p>
-            <p className="text-tertiary text-[26px] font-medium font-nunito">
+            <p className="text-tertiary text-[22px] font-medium font-nunito">
               Total {meiosPagamento.length} de {totalMeiosPagamento}
             </p>
           </div>
@@ -230,9 +231,9 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
         </div>
       </div>
 
-      {/* Divisor amarelo */}
+      {/* Divisor */}
       <div className="relative">
-        <div className="h-[63px] border-t-2 border-alternate"></div>
+        <div className="h-[4px] border-t-2 border-alternate"></div>
         <div className="absolute top-3 left-[30px] right-[30px] flex gap-[10px]">
           {/* Barra de pesquisa */}
           <div className="flex-[3]">

@@ -9,12 +9,11 @@ export default function GruposProdutosLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
-  const hideHeader = pathname?.includes('/novo') || pathname?.includes('/editar')
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopNav />
-      <main className={`flex-1 flex flex-col ${hideHeader ? '' : 'p-6'}`}>
+      <main className='px-6 py-4'>
         {children}
       </main>
     </div>
