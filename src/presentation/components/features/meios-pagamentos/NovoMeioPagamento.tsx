@@ -174,7 +174,7 @@ export function NovoMeioPagamento({
       {!isEmbedded && (
         <>
           {/* Header fixo */}
-          <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[30px] shadow-md px-[30px] py-4">
+          <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-lg shadow-md px-[30px] py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full bg-primary/25 text-primary flex items-center justify-center">
@@ -187,7 +187,7 @@ export function NovoMeioPagamento({
             <Button
               onClick={handleCancel}
               variant="outlined"
-              className="h-9 px-[26px] rounded-[30px] border-primary/15 text-primary bg-primary/10 hover:bg-primary/20"
+              className="h-9 px-[26px] rounded-lg border-primary/15 text-primary bg-primary/10 hover:bg-primary/20"
             >
               Cancelar
             </Button>
@@ -200,11 +200,11 @@ export function NovoMeioPagamento({
       <div className="flex-1 overflow-y-auto px-[30px] py-[30px]">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Dados */}
-          <div className="bg-info rounded-[12px] p-5">
-            <h2 className="text-secondary text-xl font-semibold font-exo mb-4">
+          <div className="bg-info rounded-lg p-5">
+            <h2 className="text-primary text-xl font-semibold font-exo mb-4">
               {isEditing && nome ? `Editar meio de pagamento: ${nome}` : `Novo meio de pagamento: ${nome}`}
             </h2>
-            <div className="h-px bg-alternate mb-4"></div>
+            <div className="h-px bg-primary/70 mb-4"></div>
 
             <div className="space-y-4">
               <Input
@@ -244,7 +244,7 @@ export function NovoMeioPagamento({
                     onChange={(e) => setTefAtivo(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-14 h-7 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-primary"></div>
+                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[12px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                 </label>
               </div>
 
@@ -258,7 +258,7 @@ export function NovoMeioPagamento({
                     onChange={(e) => setAtivo(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-14 h-7 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-primary"></div>
+                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[12px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                 </label>
               </div>
             </div>
@@ -270,7 +270,7 @@ export function NovoMeioPagamento({
               type="button"
               onClick={handleCancel}
               variant="outlined"
-              className="px-8"
+              className="h-8 px-8 rounded-lg"
             >
               Cancelar
             </Button>
@@ -283,7 +283,7 @@ export function NovoMeioPagamento({
                       opacity: 0.9,
                     },
                   }}
-            className=" text-white hover:bg-primary/90">
+            className=" text-white hover:bg-primary/90 h-8 px-8 rounded-lg">
               {isLoading ? 'Salvando...' : isEditing ? 'Atualizar' : 'Salvar'}
             </Button>
           </div>
