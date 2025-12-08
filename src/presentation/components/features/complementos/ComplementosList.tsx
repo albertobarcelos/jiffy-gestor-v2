@@ -482,8 +482,24 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
               Total {complementos.length} de {totalComplementos}
             </p>
           </div>
+          <button
+            onClick={() =>
+              openTabsModal({
+                mode: 'create',
+                complementoId: undefined,
+              })
+            }
+            className="h-10 px-[30px] bg-primary text-info rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+          >
+            Novo
+            <span className="text-lg">+</span>
+          </button>
+        </div>
+      </div>
 
-          <div className="flex-[2] min-w-[280px]">
+      <div className="h-[4px] border-t-2 border-primary/70"></div>
+      <div className="flex gap-3 px-[30px] pt-[10px] pb-[10px]">
+      <div className="flex flex-col min-w-[280px] max-w-[360px]">
             <label
               htmlFor="complementos-search"
               className="text-xs font-semibold text-secondary-text mb-1 block"
@@ -522,23 +538,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
               <option value="Desativado">Desativado</option>
             </select>
           </div>
-
-          <button
-            onClick={() =>
-              openTabsModal({
-                mode: 'create',
-                complementoId: undefined,
-              })
-            }
-            className="h-10 px-[30px] bg-primary text-info rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
-          >
-            Novo
-            <span className="text-lg">+</span>
-          </button>
-        </div>
-      </div>
-
-      <div className="h-[4px] border-t-2 border-alternate"></div>
+          </div>
 
       {/* Cabeçalho da tabela */}
       <div className="px-[30px] mt-4">
@@ -669,7 +669,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
                   }
                   disabled={!!togglingStatus[complemento.getId()]}
                 />
-                <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-accent1" />
+                <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
                 <span className="absolute left-1 top-1/2 block h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-5" />
               </label>
             </div>
