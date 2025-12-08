@@ -37,6 +37,8 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   })
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
+  const valorDebounceTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
+  const handleValorSubmitRef = useRef<((complementoId: string) => Promise<void>) | null>(null)
   const hasLoadedInitialRef = useRef(false)
   const { auth, isAuthenticated } = useAuthStore()
 
@@ -59,27 +61,27 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   }, [filterStatus])
 
   const formatValorInput = useCallback((value: string) => {
+    // Remove tudo exceto dígitos
     const digits = value.replace(/\D/g, '')
-    if (!digits) return ''
+    if (!digits) return 'R$ 0,00'
     const numberValue = parseInt(digits, 10)
-    return (numberValue / 100).toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
-      .replace(/^R\$\s?/, '')
+    // Formata como moeda brasileira
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(numberValue / 100)
   }, [])
 
   const formatValorFromNumber = useCallback((value: number) => {
-    return (value || 0)
-      .toLocaleString('pt-BR', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })
-      .replace(/^R\$\s?/, '')
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value || 0)
   }, [])
 
   const parseValorToNumber = useCallback((value: string) => {
-    const normalized = value.replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '')
+    // Remove R$ e espaços, depois remove pontos (milhares) e substitui vírgula por ponto
+    const normalized = value.replace(/R\$/g, '').trim().replace(/\./g, '').replace(',', '.')
     const parsed = parseFloat(normalized)
     return Number.isNaN(parsed) ? 0 : parsed
   }, [])
@@ -222,6 +224,16 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated])
 
+  // Limpa todos os timers de debounce ao desmontar o componente
+  useEffect(() => {
+    return () => {
+      valorDebounceTimersRef.current.forEach((timer) => {
+        clearTimeout(timer)
+      })
+      valorDebounceTimersRef.current.clear()
+    }
+  }, [])
+
   const handleStatusChange = () => {
     loadComplementos()
     onReload?.()
@@ -318,18 +330,42 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
     [auth, complementos, loadComplementos, onReload]
   )
 
+  const clearValorDebounceTimer = useCallback((complementoId: string) => {
+    const timer = valorDebounceTimersRef.current.get(complementoId)
+    if (timer) {
+      clearTimeout(timer)
+      valorDebounceTimersRef.current.delete(complementoId)
+    }
+  }, [])
+
   const handleValorInputChange = useCallback(
     (complementoId: string, value: string) => {
       setValorInputs((prev) => ({
         ...prev,
         [complementoId]: formatValorInput(value),
       }))
+
+      // Limpa o timer anterior se existir
+      clearValorDebounceTimer(complementoId)
+
+      // Cria um novo timer para salvar automaticamente após 2 segundos
+      const timer = setTimeout(() => {
+        if (handleValorSubmitRef.current) {
+          handleValorSubmitRef.current(complementoId)
+        }
+        valorDebounceTimersRef.current.delete(complementoId)
+      }, 2000)
+
+      valorDebounceTimersRef.current.set(complementoId, timer)
     },
-    [formatValorInput]
+    [formatValorInput, clearValorDebounceTimer]
   )
 
   const handleValorSubmit = useCallback(
     async (complementoId: string) => {
+      // Limpa o timer de debounce se existir
+      clearValorDebounceTimer(complementoId)
+
       const token = auth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
@@ -400,8 +436,13 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         })
       }
     },
-    [auth, valorInputs, parseValorToNumber, complementos, formatValorFromNumber]
+    [auth, valorInputs, parseValorToNumber, complementos, formatValorFromNumber, clearValorDebounceTimer]
   )
+
+  // Atualiza a ref quando handleValorSubmit mudar
+  useEffect(() => {
+    handleValorSubmitRef.current = handleValorSubmit
+  }, [handleValorSubmit])
 
   const handleTipoImpactoChange = useCallback(
     async (complementoId: string, novoTipo: 'nenhum' | 'aumenta' | 'diminui') => {
@@ -489,7 +530,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
                 complementoId: undefined,
               })
             }
-            className="h-10 px-[30px] bg-primary text-info rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+            className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
           >
             Novo
             <span className="text-lg">+</span>
@@ -517,7 +558,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
                 placeholder="Pesquisar complemento..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full pl-11 pr-4 rounded-[24px] border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+                className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
               />
             </div>
           </div>
@@ -531,7 +572,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
               onChange={(e) =>
                 setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
               }
-              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
             >
               <option value="Todos">Todos</option>
               <option value="Ativo">Ativo</option>
@@ -604,8 +645,8 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
             <div className="flex-[2]">
               <div className="flex flex-col items-start gap-1">
               <span className="text-xs text-secondary-text font-semibold">Valor (R$)</span>
-                 <div className="flex items-center justify-end gap-2 px-3 py-1.5 rounded-xl border border-gray-300 bg-white max-w-[110px]">
-                 <span className="text-sm text-secondary-text font-normal">R$</span>
+                 <div className="flex items-center justify-end gap-2 px-3 py-1 rounded-lg border border-gray-300 bg-white max-w-[140px]">
+                 
                    <input
                     type="text"
                     value={
@@ -613,6 +654,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
                       formatValorFromNumber(complemento.getValor())
                     }
                     onChange={(e) => handleValorInputChange(complemento.getId(), e.target.value)}
+                    onFocus={(e) => e.target.select()}
                     onBlur={() => handleValorSubmit(complemento.getId())}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
@@ -642,7 +684,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
                   )
                 }
                 disabled={!!savingTipoMap[complemento.getId()]}
-                className={`w-full px-0 py-1.5 rounded-xl border border-gray-300 bg-white text-sm font-semibold text-primary-text focus:outline-none focus:border-primary text-center ${
+                className={`w-full px-0 py-1 rounded-lg border border-gray-300 bg-white text-sm font-semibold text-primary-text focus:outline-none focus:border-primary text-center ${
                   savingTipoMap[complemento.getId()] ? 'opacity-70 cursor-not-allowed' : ''
                 }`}
               >
