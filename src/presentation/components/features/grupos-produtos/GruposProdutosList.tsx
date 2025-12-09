@@ -286,7 +286,23 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
               </p>
             </div>
             <div className="flex-1 flex gap-2 items-center justify-end flex-wrap md:flex-nowrap">
-              <div className="flex flex-wrap gap-2 w-full items-center justify-center">
+              
+              <button
+                onClick={() => {
+                  window.location.href = '/cadastros/grupos-produtos/novo'
+                }}
+                className="h-10 px-[30px] bg-primary text-info rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+              >
+                Novo
+                <span className="text-lg">+</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="h-[6px] border-t-2 border-alternate"></div>
+
+      <div className="flex flex-wrap gap-2 w-full items-center justify-center">
                 {/* Barra de pesquisa */}
                 <div className="w-full md:w-[360px]">
                   <div className="h-[36px] relative">
@@ -320,20 +336,6 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
                   </select>
                 </div>
               </div>
-              <button
-                onClick={() => {
-                  window.location.href = '/cadastros/grupos-produtos/novo'
-                }}
-                className="h-10 px-[30px] bg-primary text-info rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
-              >
-                Novo
-                <span className="text-lg">+</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className="h-[6px] border-t-2 border-alternate"></div>
 
       {/* Cabeçalho da tabela */}
       <div className="px-[30px] mt-2">

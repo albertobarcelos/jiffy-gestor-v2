@@ -89,7 +89,7 @@ export const GrupoItem = memo(function GrupoItem({
       {/* Status */}
       <div className="flex-[2] flex justify-center cursor-default">
         <label
-          className="relative inline-flex items-center h-6 w-14 cursor-pointer"
+          className="relative inline-flex items-center h-5 w-12 cursor-pointer"
           onMouseDown={(event) => event.stopPropagation()}
           onTouchStart={(event) => event.stopPropagation()}
           title={isAtivo ? 'Ativo' : 'Desativado'}
@@ -100,8 +100,8 @@ export const GrupoItem = memo(function GrupoItem({
             checked={isAtivo}
           onChange={() => onToggleStatus?.(grupo.getId(), !isAtivo)}
           />
-          <div className="w-full h-full rounded-full bg-gray-300 peer-checked:bg-accent1 transition-colors" />
-          <span className="absolute left-1 top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-white shadow peer-checked:translate-x-8 transition-transform" />
+          <div className="w-full h-full rounded-full bg-gray-300 peer-checked:bg-primary transition-colors" />
+          <span className="absolute left-1 top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-white shadow peer-checked:translate-x-6 transition-transform" />
         </label>
       </div>
 
