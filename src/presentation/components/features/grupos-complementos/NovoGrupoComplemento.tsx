@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { MdPlaylistAdd } from 'react-icons/md'
+import { MdAdd, MdPlaylistAdd } from 'react-icons/md'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { Complemento } from '@/src/domain/entities/Complemento'
@@ -10,6 +10,11 @@ import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
 import { useComplementos } from '@/src/presentation/hooks/useComplementos'
+import {
+  ComplementosTabsModal,
+  ComplementosTabsModalState,
+} from '@/src/presentation/components/features/complementos/ComplementosTabsModal'
+import { ComplementosSelectModal } from '@/src/presentation/components/features/complementos/ComplementosSelectModal'
 
 interface NovoGrupoComplementoProps {
   grupoId?: string
@@ -44,11 +49,18 @@ export function NovoGrupoComplemento({
   const [isLoadingGrupo, setIsLoadingGrupo] = useState(false)
   const [showComplementosModal, setShowComplementosModal] = useState(false)
   const hasLoadedGrupoRef = useRef(false)
+  const [complementosTabsState, setComplementosTabsState] = useState<ComplementosTabsModalState>({
+    open: false,
+    tab: 'complemento',
+    mode: 'create',
+    complementoId: undefined,
+  })
 
   // Carregar lista de complementos disponíveis usando React Query (com cache)
   const {
     data: complementos = [],
     isLoading: isLoadingComplementos,
+    refetch: refetchComplementos,
   } = useComplementos({
     ativo: true,
     limit: 1000,
@@ -201,6 +213,34 @@ export function NovoGrupoComplemento({
     })
   }
 
+  const openComplementoCreateModal = () => {
+    setComplementosTabsState((prev) => ({
+      ...prev,
+      open: true,
+      tab: 'complemento',
+      mode: 'create',
+      complementoId: undefined,
+    }))
+  }
+
+  const closeComplementosTabsModal = () => {
+    setComplementosTabsState((prev) => ({
+      ...prev,
+      open: false,
+    }))
+  }
+
+  const handleComplementosTabChange = (tab: 'complemento') => {
+    setComplementosTabsState((prev) => ({
+      ...prev,
+      tab,
+    }))
+  }
+
+  const handleComplementosTabsReload = async () => {
+    await refetchComplementos()
+  }
+
   if (isLoadingGrupo) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -238,14 +278,14 @@ export function NovoGrupoComplemento({
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Informações */}
             <div className="bg-info rounded-[12px] p-5">
-              <h2 className="text-secondary text-xl font-semibold font-exo mb-4">
+              <h2 className="text-primary text-xl font-semibold font-exo mb-4">
                 {nome?.trim().length
-                  ? `Grupo de Complementos “${nome.trim()}”`
+                  ? `Grupo de Complementos: ${nome.trim()}`
                   : isEditing
                     ? 'Grupo de Complementos “Grupo”'
                     : 'Grupo de Complementos'}
               </h2>
-            <div className="h-px bg-alternate mb-4"></div>
+            <div className="h-[2px] bg-primary/70 mb-4"></div>
             <div className="flex items-center gap-6 justify-end mb-6">
               <div className="flex items-center gap-2 px-4 py-2 rounded-full">
                 <label className="text-primary-text font-medium text-sm">Ativo</label>
@@ -256,7 +296,7 @@ export function NovoGrupoComplemento({
                     onChange={(e) => setAtivo(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-14 h-7 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-accent1"></div>
+                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[16px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
                 </label>
               </div>
             </div>
@@ -311,11 +351,12 @@ export function NovoGrupoComplemento({
                   <button
                     type="button"
                     onClick={() => setShowComplementosModal(true)}
-                    className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-primary text-info font-semibold shadow hover:bg-primary/90 transition-colors"
+                    className="inline-flex items-center h-8 gap-2 px-5 py-2 rounded-lg bg-primary text-info font-semibold shadow hover:bg-primary/90 transition-colors"
                   >
                     <MdPlaylistAdd className="text-lg" />
-                    Escolher complementos
+                    Vincular complementos
                   </button>
+                  
                 </div>
                 <div className="mt-3 border border-gray-300 rounded-lg px-4 py-3 bg-white text-sm text-primary-text min-h-[52px]">
                   {selectedComplementos.length > 0 ? (
@@ -323,7 +364,7 @@ export function NovoGrupoComplemento({
                       {selectedComplementos.map((comp: Complemento) => (
                         <span
                           key={comp.getId()}
-                          className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary font-semibold"
+                          className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary font-semibold"
                         >
                           {comp.getNome()}
                           <button
@@ -352,13 +393,14 @@ export function NovoGrupoComplemento({
               type="button"
               onClick={handleCancel}
               variant="outlined"
-              className="px-8"
+              className="px-8 h-8"
             >
               Cancelar
             </Button>
             <Button
               type="submit"
               disabled={isLoading || !nome}
+              className="h-8"
               sx={{
                 backgroundColor: 'var(--color-primary)',
                 color: 'var(--color-info)',
@@ -379,74 +421,25 @@ export function NovoGrupoComplemento({
         </form>
       </div>
 
-      {/* Modal de seleção de complementos */}
-      {showComplementosModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-info rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold text-primary-text">
-                Selecionar Complementos
-              </h3>
-              <button
-                onClick={() => setShowComplementosModal(false)}
-                className="text-secondary-text hover:text-primary-text"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              {isLoadingComplementos ? (
-                <div className="flex justify-center py-8">
-                  <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {(Array.isArray(complementos) ? complementos : []).map((comp: any) => {
-                    const isSelected = selectedComplementosIds.includes(comp.getId())
-                    return (
-                      <label
-                        key={comp.getId()}
-                        className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
-                          isSelected
-                            ? 'bg-primary/20 border-2 border-primary'
-                            : 'bg-primary-bg border-2 border-transparent hover:bg-primary-bg/80'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleComplemento(comp.getId())}
-                          className="w-5 h-5 rounded border-gray-400 text-primary focus:ring-primary"
-                        />
-                        <div className="flex-1">
-                          <p className="font-medium text-primary-text">{comp.getNome()}</p>
-                          {comp.getDescricao() && (
-                            <p className="text-sm text-secondary-text">{comp.getDescricao()}</p>
-                          )}
-                          {comp.getValor() > 0 && (
-                            <p className="text-sm text-secondary-text">
-                              R$ {comp.getValor().toFixed(2)}
-                            </p>
-                          )}
-                        </div>
-                      </label>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-            <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-alternate">
-              <Button
-                type="button"
-                onClick={() => setShowComplementosModal(false)}
-                variant="outlined"
-              >
-                Fechar
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ComplementosSelectModal
+        open={showComplementosModal}
+        title="Vincular Complementos"
+        complementos={Array.isArray(complementos) ? complementos : []}
+        selectedIds={selectedComplementosIds}
+        isLoading={isLoadingComplementos}
+        onToggle={toggleComplemento}
+        onConfirm={() => setShowComplementosModal(false)}
+        onClose={() => setShowComplementosModal(false)}
+        onCreateComplemento={openComplementoCreateModal}
+        confirmLabel="Fechar"
+        emptyMessage="Nenhum complemento disponível."
+      />
+      <ComplementosTabsModal
+        state={complementosTabsState}
+        onClose={closeComplementosTabsModal}
+        onTabChange={handleComplementosTabChange}
+        onReload={handleComplementosTabsReload}
+      />
     </div>
   )
 }

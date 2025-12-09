@@ -619,7 +619,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         {complementos.map((complemento) => (
           <div
             key={complemento.getId()}
-            className=" bg-info rounded-xl px-4 mb-2 flex items-center gap-[10px] shadow-xl hover:shadow-md transition-shadow hover:bg-secondary-bg/15"
+            className=" bg-info rounded-lg px-4 mb-2 flex items-center gap-[10px] shadow-xl hover:shadow-md transition-shadow hover:bg-secondary-bg/15"
           >
             <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text flex items-center gap-1">
               <span># {complemento.getNome()}</span>

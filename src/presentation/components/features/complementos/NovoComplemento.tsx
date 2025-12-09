@@ -212,7 +212,7 @@ export function NovoComplemento({
           <div className="bg-info rounded-[10px] p-2">
             <div className="flex items-center gap-5 mb-2">
               <h2 className="text-primary text-xl font-semibold font-exo">
-                Dados
+                Dados do Complemento
               </h2>
               <div className="flex-1 h-px bg-primary/70"></div>
             </div>

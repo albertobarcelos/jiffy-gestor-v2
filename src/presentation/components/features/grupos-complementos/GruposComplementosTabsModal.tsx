@@ -73,7 +73,7 @@ export function GruposComplementosTabsModal({
               type="button"
               disabled={tab.disabled}
               onClick={() => !tab.disabled && onTabChange(tab.key)}
-              className={`px-4 py-2 rounded-t-[14px] text-sm font-semibold transition-colors ${
+              className={`px-4 py-2 rounded-t-lg text-sm font-semibold transition-colors ${
                 state.tab === tab.key
                   ? 'bg-primary text-white'
                   : 'bg-gray-100 text-secondary-text hover:bg-gray-200'

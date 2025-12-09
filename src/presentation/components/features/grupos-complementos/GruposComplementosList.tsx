@@ -7,7 +7,6 @@ import { useGruposComplementosInfinite } from '@/src/presentation/hooks/useGrupo
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import {
   MdSearch,
-  MdOutlineOfflinePin,
   MdModeEdit,
   MdExtension,
   MdAddCircle,
@@ -64,9 +63,10 @@ const GrupoItem = memo(function GrupoItem({
   const hasComplementos = useMemo(() => complementosIds.length > 0, [complementosIds])
 
   return (
-    <div className="bg-info rounded-xl mb-2">
+    <div className="bg-info rounded-lg mb-2">
+      
       {/* Linha principal do grupo */}
-      <div className="px-4 flex items-center gap-[10px]">
+      <div className="px-4 py-2 flex items-center rounded-lg gap-[10px] shadow-lg hover:shadow-md transition-shadow hover:bg-secondary-bg/15">
         <div className="w-16 flex flex-col items-center text-center text-xs text-secondary-text">
           
           <span className="text-lg font-semibold text-primary-text/70">
@@ -74,35 +74,32 @@ const GrupoItem = memo(function GrupoItem({
           </span>
         </div>
         <div className="flex-[3] min-w-0 flex items-start gap-3 pl-3">
-          <MdAddCircle className="text-primary size-9 shrink-0" />
           <div className="flex flex-col gap-1">
-            <span className="truncate font-nunito font-semibold text-lg text-primary-text">
+            <span className="flex items-center gap-2 truncate font-nunito font-semibold text-lg text-primary-text">
               {grupo.getNome()}
-            </span>
-            <div className="flex items-center gap-2">
               <button
                 type="button"
                 title="Editar grupo"
                 aria-label={`Editar ${grupo.getNome()}`}
                 onClick={() => onEditGrupo?.(grupo)}
-                className="w-6 h-6 rounded-full border border-primary/30 text-primary flex items-center justify-center hover:bg-primary/10 transition-colors"
+                className="w-5 h-5 rounded-full border border-primary/30 text-primary flex items-center justify-center hover:bg-primary/10 transition-colors"
               >
-                <MdModeEdit className="text-base" />
+                <MdModeEdit className="text-sm" />
               </button>
               <button
                 type="button"
                 title="Editar complementos do grupo"
                 aria-label={`Editar complementos do grupo ${grupo.getNome()}`}
                 onClick={() => onOpenComplementosModal?.(grupo)}
-                className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${
+                className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors ${
                   hasComplementos
                     ? 'bg-primary text-white border border-primary hover:bg-primary/90'
                     : 'bg-info text-primary border border-primary/30 hover:bg-gray-300'
                 }`}
               >
-                <MdExtension className="text-base" />
+                <MdExtension className="text-sm" />
               </button>
-            </div>
+            </span>
           </div>
         </div>
         <div className="flex-[3] flex justify-center">
@@ -178,15 +175,15 @@ const GrupoItem = memo(function GrupoItem({
           )}
         </div>
         <div className="flex-[2] flex items-center justify-center">
-          <label className="relative inline-flex items-center h-6 w-12 cursor-pointer">
+          <label className="relative inline-flex items-center h-5 w-12 cursor-pointer">
             <input
               type="checkbox"
               className="sr-only peer"
               checked={isAtivo}
               onChange={(event) => onToggleStatus?.(grupo.getId(), event.target.checked)}
             />
-            <div className="w-full h-full rounded-full bg-gray-300 peer-checked:bg-accent1 transition-colors" />
-            <span className="absolute left-1 top-1/2 block h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-5" />
+            <div className="w-full h-full rounded-full bg-gray-300 peer-checked:bg-primary transition-colors" />
+            <span className="absolute left-1 top-1/2 block h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-6" />
           </label>
         </div>
         <div className="flex-1 flex justify-end items-center">
@@ -203,10 +200,6 @@ const GrupoItem = memo(function GrupoItem({
   )
 })
 
-/**
- * Lista de grupos de complementos com scroll infinito
- * Usa React Query para cache automático e deduplicação de requisições
- */
 export function GruposComplementosList({ onReload }: GruposComplementosListProps) {
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -500,8 +493,24 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
               Total {grupos.length} de {filteredTotal}
             </p>
           </div>
-
-          <div className="flex-[2] min-w-[280px]">
+          <button
+            onClick={() =>
+              openTabsModal({
+                tab: 'grupo',
+                mode: 'create',
+                grupo: undefined,
+              })
+            }
+            className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+          >
+            Novo
+            <span className="text-lg">+</span>
+          </button>
+        </div>
+      </div>
+      <div className="h-[10px] border-t-2 border-primary/70"></div>
+      <div className="flex gap-3 px-[20px] py-2">
+      <div className="flex-1 min-w-[180px] max-w-[360px]">
             <label
               htmlFor="grupos-complementos-search"
               className="text-xs font-semibold text-secondary-text mb-1 block"
@@ -515,7 +524,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
                 placeholder="Pesquisar grupo..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full px-5 pl-12 rounded-[24px] border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+                className="w-full h-full px-5 pl-12 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
               />
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
                 <MdSearch size={18} />
@@ -532,30 +541,14 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
               onChange={(e) =>
                 setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
               }
-              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
             >
               <option value="Todos">Todos</option>
               <option value="Ativo">Ativo</option>
               <option value="Desativado">Desativado</option>
             </select>
           </div>
-
-          <button
-            onClick={() =>
-              openTabsModal({
-                tab: 'grupo',
-                mode: 'create',
-                grupo: undefined,
-              })
-            }
-            className="h-10 px-[30px] bg-primary text-info rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
-          >
-            Novo
-            <span className="text-lg">+</span>
-          </button>
-        </div>
-      </div>
-      <div className="h-[10px] border-t-2 border-alternate"></div>
+          </div>
 
       {/* Cabeçalho da tabela */}
       <div className="px-[30px]">
@@ -567,7 +560,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
             Nome
           </div>
           <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text text-center">
-            Qtd Mín/Máx
+            Qtd de Complementos
           </div>
           <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
             Complementos
