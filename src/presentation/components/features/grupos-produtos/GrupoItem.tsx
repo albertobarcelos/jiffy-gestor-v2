@@ -6,12 +6,14 @@ import { CSS } from '@dnd-kit/utilities'
 import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { GrupoProdutoActionsMenu } from './GrupoProdutoActionsMenu'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
+import { MdModeEdit } from 'react-icons/md'
 
 interface GrupoItemProps {
   grupo: GrupoProduto
   index: number
   onStatusChanged?: () => void
   onToggleStatus?: (grupoId: string, novoStatus: boolean) => void
+  onEdit?: (grupo: GrupoProduto) => void
 }
 
 /**
@@ -22,6 +24,7 @@ export const GrupoItem = memo(function GrupoItem({
   index,
   onStatusChanged,
   onToggleStatus,
+  onEdit,
 }: GrupoItemProps) {
   const {
     attributes,
@@ -46,9 +49,8 @@ export const GrupoItem = memo(function GrupoItem({
   const renderIcon = useMemo(() => {
     return (
       <div
-        className="w-[45px] h-[45px] rounded-lg border-2 flex items-center justify-center"
+        className="w-[45px] h-[45px] bg-info rounded-lg border-2 flex items-center justify-center"
         style={{
-          backgroundColor: '#FFFFFF',
           borderColor: corHex,
         }}
       >
@@ -65,7 +67,7 @@ export const GrupoItem = memo(function GrupoItem({
     <div
       ref={setNodeRef}
       style={style}
-      className="h-[50px] bg-info rounded-xl px-4 mb-2 flex items-center gap-[10px] hover:bg-[var(--color-primary-background)] transition-colors cursor-default"
+      className="h-[50px] bg-info rounded-lg px-4 mb-2 flex items-center gap-[10px] hover:bg-[var(--color-primary-background)] transition-colors cursor-default shadow-md  hover:shadow-md"
     >
       {/* Handle de arrastar - apenas esta área é arrastável */}
       <div
@@ -82,8 +84,19 @@ export const GrupoItem = memo(function GrupoItem({
       <div className="flex-[2] flex items-center cursor-default">{renderIcon}</div>
 
       {/* Nome */}
-      <div className="flex-[4] font-nunito font-semibold text-sm text-primary-text cursor-default">
+      <div className="flex-[4] font-nunito font-semibold text-sm text-primary-text cursor-default flex items-center gap-2">
         {nome}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onEdit?.(grupo)
+          }}
+          className="w-5 h-5 rounded-full border border-gray-200 flex items-center justify-center text-primary-text hover:bg-primary/10 transition-colors"
+          title="Editar grupo"
+        >
+          <MdModeEdit />
+        </button>
       </div>
 
       {/* Status */}

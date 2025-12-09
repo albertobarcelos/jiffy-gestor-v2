@@ -201,8 +201,8 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
   }
 
   return (
-    <div className="flex flex-col h-full border border-secondary/20 rounded-2xl bg-white shadow-sm">
-      <div className="px-6 pt-6 pb-4 border-b border-secondary/10">
+    <div className="flex flex-col h-full border border-primary/20 rounded-lg bg-white shadow-sm">
+      <div className="px-6 pt-6 pb-4">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-primary-text">
@@ -222,7 +222,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
         </div>
       </div>
 
-      <div className="px-6 py-3 bg-custom-2 grid grid-cols-12 text-xs font-semibold text-primary-text">
+      <div className="mx-2 px-6 py-3 bg-custom-2 rounded-lg grid grid-cols-12 text-xs font-semibold text-primary-text">
         <div className="col-span-1">Ordem</div>
         <div className="col-span-6">Produto</div>
         <div className="col-span-3">Valor</div>
@@ -235,7 +235,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
             {[...Array(5)].map((_, index) => (
               <div
                 key={`produto-skeleton-${index}`}
-                className="h-14 rounded-xl bg-secondary/10 animate-pulse"
+                className="h-14 rounded-lg bg-primary/10 animate-pulse"
               />
             ))}
           </div>
@@ -297,7 +297,7 @@ function ProdutoItem({
     <div
       ref={setNodeRef}
       style={style}
-      className={`grid grid-cols-12 gap-3 items-center rounded-xl border border-secondary/10 px-4 py-3 bg-white shadow-sm transition ${
+      className={`grid grid-cols-12 gap-3 items-center rounded-lg border border-primary/10 px-4 py-2 bg-white shadow-md hover:bg-primary/10 transition ${
         isDragging ? 'opacity-50 ring-2 ring-primary/40' : ''
       }`}
     >
