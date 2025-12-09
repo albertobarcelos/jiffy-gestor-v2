@@ -622,8 +622,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
             className=" bg-info rounded-xl px-4 mb-2 flex items-center gap-[10px] shadow-xl hover:shadow-md transition-shadow hover:bg-secondary-bg/15"
           >
             <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text flex items-center gap-1">
-              <MdAddCircle className="text-primary size-9" />
-              <span>{complemento.getNome()}</span>
+              <span># {complemento.getNome()}</span>
               <button
                 type="button"
                 title="Editar complemento"
@@ -643,8 +642,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
             </div>
 
             <div className="flex-[2]">
-              <div className="flex flex-col items-start gap-1">
-              <span className="text-xs text-secondary-text font-semibold">Valor (R$)</span>
+              <div className="flex flex-col mt-2 items-start gap-1">
                  <div className="flex items-center justify-end gap-2 px-3 py-1 rounded-lg border border-gray-300 bg-white max-w-[140px]">
                  
                    <input
@@ -695,7 +693,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
             </div>
             <div className="flex-[2] flex justify-center">
               <label
-                className={`relative inline-flex h-6 w-12 items-center ${
+                className={`relative inline-flex h-5 w-12 items-center ${
                   togglingStatus[complemento.getId()]
                     ? 'cursor-not-allowed opacity-60'
                     : 'cursor-pointer'
@@ -712,7 +710,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
                   disabled={!!togglingStatus[complemento.getId()]}
                 />
                 <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                <span className="absolute left-1 top-1/2 block h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-5" />
+                <span className="absolute left-1 top-1/2 block h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-6" />
               </label>
             </div>
             <div className="flex-1 flex justify-end">
