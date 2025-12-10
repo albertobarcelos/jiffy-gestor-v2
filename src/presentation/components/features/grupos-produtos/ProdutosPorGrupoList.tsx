@@ -20,6 +20,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { showToast } from '@/src/shared/utils/toast'
+import { ProdutosTabsModal, ProdutosTabsModalState } from '../produtos/ProdutosTabsModal'
 
 interface ProdutoGrupo {
   id: string
@@ -44,6 +45,14 @@ const PAGE_SIZE = 10
 
 export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListProps) {
   const [localProdutos, setLocalProdutos] = useState<ProdutoGrupo[]>([])
+  const [tabsModalState, setTabsModalState] = useState<ProdutosTabsModalState>({
+    open: false,
+    tab: 'produto',
+    mode: 'create',
+    produto: undefined,
+    prefillGrupoProdutoId: undefined,
+    grupoId: undefined,
+  })
   const listRef = useRef<HTMLDivElement>(null)
   const loadMoreRef = useRef<HTMLDivElement>(null)
 
@@ -128,6 +137,38 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
     }).format(value ?? 0)
   }, [])
 
+  const handleOpenNovoProdutoModal = useCallback(() => {
+    setTabsModalState({
+      open: true,
+      tab: 'produto',
+      mode: 'create',
+      produto: undefined,
+      prefillGrupoProdutoId: grupoProdutoId,
+      grupoId: undefined,
+    })
+  }, [grupoProdutoId])
+
+  const handleCloseTabsModal = useCallback(() => {
+    setTabsModalState((prev) => ({
+      ...prev,
+      open: false,
+      produto: undefined,
+      prefillGrupoProdutoId: undefined,
+      grupoId: undefined,
+    }))
+    refetch()
+  }, [refetch])
+
+  const handleTabsModalTabChange = useCallback(
+    (tab: 'produto' | 'complementos' | 'impressoras' | 'grupo') => {
+      setTabsModalState((prev) => ({
+        ...prev,
+        tab,
+      }))
+    },
+    []
+  )
+
   const handleDragEnd = useCallback(
     async (event: DragEndEvent) => {
       const { active, over } = event
@@ -201,7 +242,8 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
   }
 
   return (
-    <div className="flex flex-col mx-2 h-full border border-primary/20 rounded-lg bg-white shadow-sm">
+    <>
+      <div className="flex flex-col mx-2 h-full border border-primary/20 rounded-lg bg-white shadow-sm">
       <div className="px-6 pt-2 pb-4">
         <div className="flex items-center justify-between">
           <div>
@@ -212,6 +254,13 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
               Arraste para reordenar a posição dos produtos
             </p>
           </div>
+          <button
+            type="button"
+            onClick={handleOpenNovoProdutoModal}
+            className="h-8 px-[10px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+            >
+            Criar novo produto
+          </button>
           <button
             type="button"
             onClick={() => refetch()}
@@ -271,7 +320,15 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
           </div>
         )}
       </div>
-    </div>
+      </div>
+
+      <ProdutosTabsModal
+        state={tabsModalState}
+        onClose={handleCloseTabsModal}
+        onReload={refetch}
+        onTabChange={handleTabsModalTabChange}
+      />
+    </>
   )
 }
 

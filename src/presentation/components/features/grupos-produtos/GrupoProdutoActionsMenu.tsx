@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 
 interface GrupoProdutoActionsMenuProps {
   grupoId: string
   grupoAtivo: boolean
   onStatusChanged?: () => void
+  onEdit?: (grupoId: string) => void
 }
 
 /**
@@ -18,10 +18,10 @@ export function GrupoProdutoActionsMenu({
   grupoId,
   grupoAtivo,
   onStatusChanged,
+  onEdit,
 }: GrupoProdutoActionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
-  const router = useRouter()
   const { auth } = useAuthStore()
 
   // Fechar menu ao clicar fora
@@ -95,7 +95,7 @@ export function GrupoProdutoActionsMenu({
 
   const handleEdit = () => {
     setIsOpen(false)
-    router.push(`/cadastros/grupos-produtos/${grupoId}/editar`)
+    onEdit?.(grupoId)
   }
 
   return (
@@ -116,7 +116,7 @@ export function GrupoProdutoActionsMenu({
             <span>✏️</span>
             <span>Editar</span>
           </button>
-          <div className="h-px bg-alternate"></div>
+          <div className="h-px bg-primary/50"></div>
           <button
             onClick={handleToggleStatus}
             className="w-full px-6 py-2 text-left text-primary-text hover:bg-primary-bg/10 transition-colors font-nunito text-sm flex items-center gap-2"

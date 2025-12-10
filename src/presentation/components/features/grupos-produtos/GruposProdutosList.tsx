@@ -28,6 +28,7 @@ import {
   GruposProdutosTabsModal,
   GruposProdutosTabsModalState,
 } from './GruposProdutosTabsModal'
+import { ProdutosTabsModal, ProdutosTabsModalState } from '../produtos/ProdutosTabsModal'
 
 interface GruposProdutosListProps {
   onReload?: () => void
@@ -50,6 +51,14 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     open: false,
     tab: 'grupo',
     mode: 'create',
+    grupoId: undefined,
+  })
+  const [produtoTabsState, setProdutoTabsState] = useState<ProdutosTabsModalState>({
+    open: false,
+    tab: 'produto',
+    mode: 'create',
+    produto: undefined,
+    prefillGrupoProdutoId: undefined,
     grupoId: undefined,
   })
 
@@ -249,6 +258,40 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       tab,
     }))
   }, [])
+
+  const handleOpenProdutoModal = useCallback(
+    (grupoId: string) => {
+      setProdutoTabsState({
+        open: true,
+        tab: 'produto',
+        mode: 'create',
+        produto: undefined,
+        prefillGrupoProdutoId: grupoId,
+        grupoId: undefined,
+      })
+    },
+    []
+  )
+
+  const handleCloseProdutoModal = useCallback(() => {
+    setProdutoTabsState((prev) => ({
+      ...prev,
+      open: false,
+      produto: undefined,
+      prefillGrupoProdutoId: undefined,
+      grupoId: undefined,
+    }))
+  }, [])
+
+  const handleProdutoTabChange = useCallback(
+    (tab: 'produto' | 'complementos' | 'impressoras' | 'grupo') => {
+      setProdutoTabsState((prev) => ({
+        ...prev,
+        tab,
+      }))
+    },
+    []
+  )
 
   // Handler para quando o drag termina - versão simples: envia para API e recarrega a página
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
@@ -456,6 +499,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
                 index={index}
                 onStatusChanged={handleStatusChange}
                 onToggleStatus={handleToggleGrupoStatus}
+                onCreateProduto={(grupoId) => handleOpenProdutoModal(grupoId)}
                 onEdit={(g) =>
                   openTabsModal({
                     tab: 'grupo',
@@ -487,6 +531,12 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       onClose={closeTabsModal}
       onReload={handleTabsModalReload}
       onTabChange={handleTabsModalTabChange}
+    />
+    <ProdutosTabsModal
+      state={produtoTabsState}
+      onClose={handleCloseProdutoModal}
+      onReload={onReload}
+      onTabChange={handleProdutoTabChange}
     />
     </>
   )

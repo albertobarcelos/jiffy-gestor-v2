@@ -6,7 +6,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { GrupoProdutoActionsMenu } from './GrupoProdutoActionsMenu'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
-import { MdModeEdit } from 'react-icons/md'
+import { MdModeEdit, MdAddCircle } from 'react-icons/md'
 
 interface GrupoItemProps {
   grupo: GrupoProduto
@@ -14,6 +14,7 @@ interface GrupoItemProps {
   onStatusChanged?: () => void
   onToggleStatus?: (grupoId: string, novoStatus: boolean) => void
   onEdit?: (grupo: GrupoProduto) => void
+  onCreateProduto?: (grupoId: string) => void
 }
 
 /**
@@ -25,6 +26,7 @@ export const GrupoItem = memo(function GrupoItem({
   onStatusChanged,
   onToggleStatus,
   onEdit,
+  onCreateProduto,
 }: GrupoItemProps) {
   const {
     attributes,
@@ -94,10 +96,21 @@ export const GrupoItem = memo(function GrupoItem({
             e.stopPropagation()
             onEdit?.(grupo)
           }}
-          className="w-5 h-5 rounded-full border border-gray-200 flex items-center justify-center text-primary-text hover:bg-primary/10 transition-colors"
+          className="w-5 h-5 rounded-full border border-primary/50 flex items-center justify-center text-primary hover:bg-primary/10 transition-colors"
           title="Editar grupo"
         >
           <MdModeEdit />
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onCreateProduto?.(grupo.getId())
+          }}
+          className="w-5 h-5 rounded-full border border-primary/50 flex items-center justify-center text-primary hover:bg-primary/10 transition-colors"
+          title="criar um novo produto"
+        >
+          <MdAddCircle />
         </button>
       </div>
 
@@ -126,6 +139,11 @@ export const GrupoItem = memo(function GrupoItem({
           grupoId={grupo.getId()}
           grupoAtivo={isAtivo}
           onStatusChanged={onStatusChanged}
+          onEdit={(grupoId) => {
+            if (onEdit) {
+              onEdit(grupo)
+            }
+          }}
         />
       </div>
     </div>
