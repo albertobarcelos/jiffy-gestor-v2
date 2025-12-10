@@ -315,10 +315,10 @@ export function AtualizarPrecoLote() {
   return (
     <div className="flex flex-col h-full bg-info">
       {/* Header */}
-      <div className="flex items-center justify-between bg-primary-bg border-b border-secondary px-6 py-2">
+      <div className="flex items-center justify-between bg-primary-bg border-b border-primary/70 px-6 py-2">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-primary-text">Atualizar Preços em Lote</h1>
+            <h1 className="text-2xl font-bold text-primary">Atualizar Preços em Lote</h1>
             <p className="text-sm text-secondary-text">
               Total de itens: {total} | Selecionados: {produtosSelecionados.size}
             </p>
@@ -326,13 +326,13 @@ export function AtualizarPrecoLote() {
         </div>
         <Link
           href="/produtos"
-          className="h-11 px-8 rounded-[30px] bg-white text-primary font-semibold font-exo text-sm border border-[#D7DBEC] shadow-sm hover:bg-[#f4f6ff] transition-colors flex items-center"
+          className="h-8 px-8 rounded-lg bg-info text-primary font-semibold font-exo text-sm border border-primary shadow-sm hover:bg-primary/20 transition-colors flex items-center"
         >
           Cancelar
         </Link>
       </div>
 
-      <div className="bg-primary-bg border-b border-secondary px-6 py-2">
+      <div className="bg-primary-bg border-b border-primary/70 px-6 py-2">
         <div className="flex flex-wrap gap-4 items-end">
           <div className="w-full sm:w-[150px]">
             <label className="block text-xs font-semibold text-secondary-text mb-1">
@@ -341,7 +341,7 @@ export function AtualizarPrecoLote() {
             <select
               value={adjustMode}
               onChange={(e) => setAdjustMode(e.target.value as 'valor' | 'percentual')}
-              className="w-full h-8 px-4 rounded-[16px] border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
+              className="w-full h-8 px-4 rounded-lg border border-primary/70 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
             >
               <option value="valor">Valor (R$)</option>
               <option value="percentual">Porcent. (%)</option>
@@ -353,7 +353,12 @@ export function AtualizarPrecoLote() {
               <Checkbox
                 checked={adjustDirection === 'increase'}
                 onChange={() => setAdjustDirection('increase')}
-                className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                sx={{
+                  color: 'var(--color-primary)',
+                  '&.Mui-checked': {
+                    color: 'var(--color-primary)',
+                  },
+                }}
               />
               ( + )
             </label>
@@ -361,7 +366,12 @@ export function AtualizarPrecoLote() {
               <Checkbox
                 checked={adjustDirection === 'decrease'}
                 onChange={() => setAdjustDirection('decrease')}
-                className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                sx={{
+                  color: 'var(--color-primary)',
+                  '&.Mui-checked': {
+                    color: 'var(--color-primary)',
+                  },
+                }}
               />
               ( - )
             </label>
@@ -372,7 +382,7 @@ export function AtualizarPrecoLote() {
               {adjustDirection === 'increase' ? 'Aumentar mais' : 'Diminuir mais'} (
               {adjustMode === 'valor' ? 'R$' : '%'})
             </label>
-            <Input
+            <Input className="rounded-lg"
               type="text"
               value={adjustAmount}
               onChange={(e) => {
@@ -382,23 +392,40 @@ export function AtualizarPrecoLote() {
               placeholder={adjustMode === 'valor' ? '0,00' : '0'}
               InputProps={{
                 sx: {
+                  border: '1px solid',
+                  borderColor: 'var(--color-primary)',
+                  backgroundColor: 'var(--color-info)',
                   height: 32,
+                  '&.Mui-focused': {
+                    borderColor: 'var(--color-primary)',
+                    borderWidth: '1px',
+                  },
+                  '&:hover': {
+                    borderColor: 'var(--color-primary)',
+                  },
                   '& input': {
                     padding: '6px 10px',
                     fontSize: '0.875rem',
+                  },
+                  '& fieldset': {
+                    border: 'none',
                   },
                 },
               }}
             />
           </div>
 
-          <div className="w-full h-8 sm:w-auto flex gap-2 items-end">
+          <div className="w-full h-8 rounded-lg sm:w-auto flex gap-2 items-end">
             <Button
               onClick={atualizarPrecos}
               disabled={
                 isUpdating || produtosSelecionados.size === 0 || !adjustAmount.trim()
               }
-              className="min-w-[180px] h-8"
+              className="min-w-[180px] h-8 hover:bg-primary/90"
+              sx={{
+                color: 'var(--color-info)',
+                backgroundColor: 'var(--color-primary)',
+              }}
             >
               {isUpdating
                 ? 'Aplicando ajuste...'
@@ -413,7 +440,7 @@ export function AtualizarPrecoLote() {
         )}
       </div>
 
-      <div className="h-[4px] border-t-2 border-alternate"></div>
+      <div className="h-[4px] border-t-2 border-primary/70"></div>
       <div className="bg-white px-[20px] py-2 border-b border-gray-100">
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex-1 min-w-[180px]">
@@ -428,7 +455,7 @@ export function AtualizarPrecoLote() {
                 placeholder="Pesquisar produto..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full pl-11 pr-4 rounded-[24px] border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+                className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
               />
             </div>
           </div>
@@ -438,7 +465,7 @@ export function AtualizarPrecoLote() {
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')}
-              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
             >
               <option value="Todos">Todos</option>
               <option value="Ativo">Ativo</option>
@@ -451,7 +478,7 @@ export function AtualizarPrecoLote() {
             <select
               value={ativoLocalFilter}
               onChange={(e) => setAtivoLocalFilter(e.target.value as 'Todos' | 'Sim' | 'Não')}
-              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
             >
               <option value="Todos">Todos</option>
               <option value="Sim">Sim</option>
@@ -464,7 +491,7 @@ export function AtualizarPrecoLote() {
             <select
               value={ativoDeliveryFilter}
               onChange={(e) => setAtivoDeliveryFilter(e.target.value as 'Todos' | 'Sim' | 'Não')}
-              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
             >
               <option value="Todos">Todos</option>
               <option value="Sim">Sim</option>
@@ -478,7 +505,7 @@ export function AtualizarPrecoLote() {
               value={grupoProdutoFilter}
               onChange={(e) => setGrupoProdutoFilter(e.target.value)}
               disabled={isLoadingGruposProdutos}
-              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <option value="">{isLoadingGruposProdutos ? 'Carregando...' : 'Todos'}</option>
               {!isLoadingGruposProdutos &&
@@ -496,7 +523,7 @@ export function AtualizarPrecoLote() {
               value={grupoComplementoFilter}
               onChange={(e) => setGrupoComplementoFilter(e.target.value)}
               disabled={isLoadingGruposComplementos}
-              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <option value="">{isLoadingGruposComplementos ? 'Carregando...' : 'Todos'}</option>
               {!isLoadingGruposComplementos &&
@@ -512,7 +539,7 @@ export function AtualizarPrecoLote() {
             <button
               type="button"
               onClick={handleClearFilters}
-              className="h-8 px-5 rounded-[24px] border border-gray-300 text-sm font-semibold text-primary-text bg-white hover:bg-gray-50 transition-colors"
+              className="h-8 px-5 rounded-lg border border-gray-300 text-sm font-semibold text-primary-text bg-white hover:bg-gray-50 transition-colors"
             >
               Limpar filtros
             </button>
@@ -534,7 +561,7 @@ export function AtualizarPrecoLote() {
           </div>
         ) : (
           <div className="bg-info rounded-lg overflow-hidden">
-            <div className="flex items-center h-11 gap-2 px-4 text-xs font-semibold text-secondary-text uppercase tracking-wide bg-secondary-bg/60">
+            <div className="flex items-center h-11 gap-2 px-4 text-xs font-semibold text-primary-text uppercase tracking-wide bg-custom-2">
               <div className="flex-none w-10 flex justify-center">
                 <Checkbox
                   checked={todosSelecionados}
@@ -571,9 +598,11 @@ export function AtualizarPrecoLote() {
                 return (
                   <div
                     key={produto.getId()}
-                    className={`flex rounded-[12px] items-center px-4 gap-2 ${isSelected ? 'bg-primary/20' : 'bg-primary-bg'} hover:bg-secondary-bg/40 transition-colors`}
+                    className={`flex rounded-lg items-center px-4 gap-2 ${isSelected ? 'bg-primary/20' : 'bg-info'} hover:bg-primary-bg transition-colors cursor-default shadow-md  hover:shadow-md`}
                     style={{ minHeight: '36px' }}
                   >
+{//                          className="h-[50px] bg-info rounded-lg px-4 mb-2 flex items-center gap-[10px] hover:bg-[var(--color-primary-background)] transition-colors cursor-default shadow-md  hover:shadow-md"
+}
                     <div className="flex-none w-10 flex justify-center">
                       <Checkbox
                         checked={isSelected}
@@ -599,7 +628,7 @@ export function AtualizarPrecoLote() {
                         <span className="text-xs text-secondary-text">Nenhum</span>
                       ) : (
                         <select
-                          className="w-full h-8 px-2 rounded-[12px] border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary"
+                          className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary"
                           defaultValue=""
                           onChange={(event) => {
                             event.currentTarget.value = ''
@@ -618,8 +647,8 @@ export function AtualizarPrecoLote() {
                     </div>
                     <div className="flex-1 flex justify-center">
                       <span
-                        className={`px-4 py-1 rounded-full text-[11px] font-medium ${
-                          produto.isAtivo() ? 'bg-success/20 text-success' : 'bg-error/20 text-error'
+                        className={`px-4 py-1 rounded-lg text-[11px] font-medium border ${
+                          produto.isAtivo() ? 'border-primary/50 text-success' : ' border-error text-error'
                         }`}
                       >
                         {produto.isAtivo() ? 'Ativo' : 'Desativado'}
