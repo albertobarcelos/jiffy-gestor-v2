@@ -204,6 +204,16 @@ const ProdutoListItem = function ProdutoListItem({
     onValorChange(parsed)
   }, [onValorChange, normalizeValor, valorInput, produto])
 
+  // Salva automaticamente após alguns segundos sem digitar (debounce)
+  useEffect(() => {
+    if (!onValorChange) return undefined
+    const timeout = setTimeout(() => {
+      handleValorSubmit()
+    }, 1500)
+
+    return () => clearTimeout(timeout)
+  }, [valorInput, handleValorSubmit, onValorChange])
+
   const actionIcons = useMemo(
     () => [
       { key: 'copiar', label: 'Copiar produto', Icon: MdContentCopy, action: 'copy' },
@@ -359,6 +369,17 @@ const ProdutoListItem = function ProdutoListItem({
               onChange={(event) => {
                 const raw = event.target.value
                 setValorInput(formatCurrencyValue(raw))
+              }}
+              onFocus={(event) => {
+                event.target.select()
+              }}
+              onClick={(event) => {
+                // Seleciona tudo a cada clique para facilitar a edição rápida
+                event.currentTarget.select()
+              }}
+              onMouseUp={(event) => {
+                // Evita que o mouseup remova a seleção aplicada no focus/click
+                event.preventDefault()
               }}
               onBlur={handleValorSubmit}
               onKeyDown={(event) => {
