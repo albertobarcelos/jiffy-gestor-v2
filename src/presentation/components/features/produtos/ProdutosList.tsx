@@ -1184,7 +1184,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px] py-[4px]">
+      <div className="px-[30px]">
         <div className="flex flex-col gap-4">
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div className="pl-5">
@@ -1198,7 +1198,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
             <div className="flex items-center justify-end flex-1 gap-4">
             <Link
               href="/produtos/atualizar-preco"
-              className="h-10 px-[30px] bg-info text-primary-text border border-secondary rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-secondary-bg transition-colors"
+              className="h-8 px-[30px] bg-info text-primary-text border border-primary/50 rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/10 transition-colors"
             >
               Atualizar Preços
             </Link>
@@ -1210,7 +1210,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
                     produto: undefined,
                   })
                 }
-                className="h-10 px-[30px] bg-primary text-info rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+                className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
               >
                 Novo
                 <span className="text-lg">+</span>
@@ -1219,7 +1219,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
           </div>
         </div>
       </div>
-      <div className="h-[4px] border-t-2 border-alternate"></div>
+      <div className="h-[4px] border-t-2 border-primary/50"></div>
       <div className="bg-white px-[20px] py-2 border-b border-gray-100">
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex-1 min-w-[180px]">
@@ -1234,7 +1234,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
                 placeholder="Pesquisar produto..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full pl-11 pr-4 rounded-[24px] border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+                className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
               />
             </div>
           </div>
@@ -1244,7 +1244,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')}
-              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
             >
               <option value="Todos">Todos</option>
               <option value="Ativo">Ativo</option>
@@ -1257,7 +1257,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
             <select
               value={ativoLocalFilter}
               onChange={(e) => setAtivoLocalFilter(e.target.value as 'Todos' | 'Sim' | 'Não')}
-              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
             >
               <option value="Todos">Todos</option>
               <option value="Sim">Sim</option>
@@ -1270,7 +1270,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
             <select
               value={ativoDeliveryFilter}
               onChange={(e) => setAtivoDeliveryFilter(e.target.value as 'Todos' | 'Sim' | 'Não')}
-              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
             >
               <option value="Todos">Todos</option>
               <option value="Sim">Sim</option>
@@ -1284,7 +1284,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
               value={grupoProdutoFilter}
               onChange={(e) => setGrupoProdutoFilter(e.target.value)}
               disabled={isLoadingGruposProdutos}
-              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <option value="">{isLoadingGruposProdutos ? 'Carregando...' : 'Todos'}</option>
               {!isLoadingGruposProdutos &&
@@ -1302,7 +1302,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
               value={grupoComplementoFilter}
               onChange={(e) => setGrupoComplementoFilter(e.target.value)}
               disabled={isLoadingGruposComplementos}
-              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <option value="">{isLoadingGruposComplementos ? 'Carregando...' : 'Todos'}</option>
               {!isLoadingGruposComplementos &&
@@ -1318,7 +1318,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
             <button
               type="button"
               onClick={handleClearFilters}
-              className="h-8 px-5 rounded-[24px] border border-gray-300 text-sm font-semibold text-primary-text bg-white hover:bg-gray-50 transition-colors"
+              className="h-8 px-5 rounded-lg border border-primary/50 text-sm font-semibold text-primary-text bg-white hover:bg-primary/10 transition-colors"
             >
               Limpar filtros
             </button>
@@ -1409,7 +1409,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
                 <div className="flex items-center justify-end flex-1">
                   <button
                     onClick={() => handleCreateProdutoForGroup(grupo)}
-                    className="h-8 px-[20px] bg-info border border-primary text-primary rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/10 transition-colors"
+                    className="h-8 px-[20px] bg-info border border-primary/50 text-primary rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/10 transition-colors"
                   >
                     Adicionar produto
                     <span className="text-sm">+</span>

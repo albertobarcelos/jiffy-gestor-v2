@@ -358,14 +358,14 @@ export function ComplementosMultiSelectDialog({
       return (
         <div className="space-y-3">
           {[...Array(4)].map((_, index) => (
-            <div key={`group-skeleton-${index}`} className="rounded-2xl border border-gray-200 bg-white">
+            <div key={`group-skeleton-${index}`} className="rounded-lg border-2 border-gray-200 bg-white">
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
                 <Skeleton className="h-4 w-40" />
                 <Skeleton className="h-4 w-16" />
               </div>
               <div className="space-y-2 px-4 py-3">
                 {[...Array(3)].map((__, subIndex) => (
-                  <div key={`item-skeleton-${index}-${subIndex}`} className="h-10 rounded-xl bg-gray-100" />
+                  <div key={`item-skeleton-${index}-${subIndex}`} className="h-10 rounded-lg bg-gray-100" />
                 ))}
               </div>
             </div>
@@ -407,7 +407,7 @@ export function ComplementosMultiSelectDialog({
           const isExpanded = expandedGroups[grupo.id] !== false
 
           return (
-            <div key={grupo.id} className="rounded-2xl border border-gray-200 bg-white">
+            <div key={grupo.id} className="rounded-lg border border-gray-200 bg-white">
               <div
                 role="button"
                 tabIndex={0}
@@ -432,7 +432,6 @@ export function ComplementosMultiSelectDialog({
                   >
                     <MdDelete size={18} />
                   </button>
-                  <MdAddCircle size={30} className="text-primary" />
                   <div>
                     <p className="text-sm font-semibold text-primary-text">{grupo.nome}</p>
                     <p className="text-xs text-secondary-text">
@@ -459,7 +458,7 @@ export function ComplementosMultiSelectDialog({
                     return (
                       <div
                         key={complemento.getId()}
-                        className="w-full flex items-center gap-3 rounded-2xl border px-4 py-3 text-left border-gray-200 bg-gray-50"
+                        className="w-full flex items-center gap-3 rounded-lg border px-4 py-3 text-left border-gray-200 bg-gray-50"
                       >
                         <MdCheck size={20} className="text-primary" />
                         <div className="flex-1">
@@ -494,10 +493,10 @@ export function ComplementosMultiSelectDialog({
           type="button"
           onClick={handleOpenSelectDialog}
           disabled={isUpdating}
-          className="h-8 px-4 rounded-[24px] border border-primary bg-primary text-white font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          className="h-8 px-4 rounded-lg border border-primary bg-primary text-white font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         >
           <MdAdd size={18} />
-          Adicionar grupo
+          Vincular grupo
         </button>
         <div className="relative flex-1">
           <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
@@ -506,7 +505,7 @@ export function ComplementosMultiSelectDialog({
             placeholder="Buscar complemento..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            className="w-full h-8 pl-10 pr-4 rounded-[24px] border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
+            className="w-full h-8 pl-10 pr-4 rounded-lg border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
           />
         </div>
       </div>
@@ -610,11 +609,11 @@ export function ComplementosMultiSelectDialog({
             </div>
           </div>
           <div className="flex-1 overflow-y-auto px-6 py-4">{renderDialogBody()}</div>
-          <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
+          <div className="px-6 py-12 border-t border-gray-100 flex justify-end">
             <button
               type="button"
               onClick={handleClose}
-              className="h-10 px-6 rounded-[24px] border border-gray-300 text-sm font-semibold text-primary-text hover:bg-gray-50 transition-colors"
+              className="h-8 px-6 rounded-lg border border-primary text-sm font-semibold text-primary hover:bg-primary/20 transition-colors"
             >
               Fechar
             </button>

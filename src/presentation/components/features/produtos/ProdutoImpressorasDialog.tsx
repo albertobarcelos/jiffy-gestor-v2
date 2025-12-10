@@ -357,7 +357,7 @@ export function ProdutoImpressorasDialog({
         {filteredImpressoras.map((impressora) => (
           <div
             key={impressora.id}
-            className="rounded-2xl border border-gray-200 bg-white px-4 py-3 flex flex-col gap-2"
+            className="rounded-lg border border-gray-200 bg-white px-4 py-3 flex flex-col gap-2"
           >
             <div className="flex items-center gap-3">
               <button
@@ -369,8 +369,8 @@ export function ProdutoImpressorasDialog({
               >
                 <MdDelete size={18} />
               </button>
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                <MdPrint size={20} />
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                <MdPrint />
               </div>
               <div className="flex-1">
                 <p className="text-sm font-semibold text-primary-text">{impressora.nome}</p>
@@ -379,7 +379,7 @@ export function ProdutoImpressorasDialog({
                 </p>
               </div>
               <span
-                className={`text-[11px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full ${
+                className={`text-[11px] font-semibold uppercase tracking-wide px-2 py-1 rounded-lg ${
                   impressora.ativo ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
                 }`}
               >
@@ -424,10 +424,10 @@ export function ProdutoImpressorasDialog({
           type="button"
           onClick={handleOpenSelectDialog}
           disabled={isUpdating}
-          className="h-8 px-4 rounded-[24px] bg-primary text-white text-sm font-semibold flex items-center gap-2 transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="h-8 px-4 rounded-lg bg-primary text-white text-sm font-semibold flex items-center gap-2 transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           <MdAdd size={16} />
-          Adicionar impressoras
+          Vincular impressoras
         </button>
         <div className="relative flex-1">
           <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
@@ -436,7 +436,7 @@ export function ProdutoImpressorasDialog({
             placeholder="Buscar impressora..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            className="w-full h-8 pl-10 pr-4 rounded-[24px] border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
+            className="w-full h-8 pl-10 pr-4 rounded-lg border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
           />
         </div>
       </div>
@@ -534,11 +534,11 @@ export function ProdutoImpressorasDialog({
         <div className="h-full flex flex-col overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">{header}</div>
           <div className="flex-1 overflow-y-auto px-6 py-4">{body}</div>
-          <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
+          <div className="px-6 py-12 border-t border-gray-100 flex justify-end">
             <button
               type="button"
               onClick={handleClose}
-              className="h-10 px-6 rounded-[24px] border border-gray-300 text-sm font-semibold text-primary-text hover:bg-gray-50 transition-colors"
+              className="h-8 px-6 rounded-lg border border-primary text-sm font-semibold text-primary hover:bg-primary/20 transition-colors"
             >
               Fechar
             </button>
