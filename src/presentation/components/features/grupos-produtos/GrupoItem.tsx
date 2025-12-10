@@ -48,20 +48,22 @@ export const GrupoItem = memo(function GrupoItem({
   // Função para renderizar o ícone do grupo
   const renderIcon = useMemo(() => {
     return (
-      <div
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          onEdit?.(grupo)
+        }}
         className="w-[45px] h-[45px] bg-info rounded-lg border-2 flex items-center justify-center"
         style={{
           borderColor: corHex,
         }}
+        title="Editar icone"
       >
-        <DinamicIcon
-          iconName={iconName}
-          color={corHex}
-          size={24}
-        />
-      </div>
+        <DinamicIcon iconName={iconName} color={corHex} size={24} />
+      </button>
     )
-  }, [corHex, iconName])
+  }, [corHex, iconName, grupo, onEdit])
 
   return (
     <div

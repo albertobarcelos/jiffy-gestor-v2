@@ -244,7 +244,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
           <div className="flex px-8">
             <button
               onClick={() => setActiveTab(0)}
-              className={`px-6 py-4 font-nunito text-sm transition-colors ${
+              className={`px-6 py-2 font-nunito text-sm transition-colors ${
                 activeTab === 0
                   ? 'text-primary border-b-2 border-primary font-semibold'
                   : 'text-secondary-text'
@@ -254,7 +254,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
             </button>
             <button
               onClick={() => setActiveTab(1)}
-              className={`px-6 py-4 font-nunito text-sm transition-colors ${
+              className={`px-6 py-2 font-nunito text-sm transition-colors ${
                 activeTab === 1
                   ? 'text-primary border-b-2 border-primary font-semibold'
                   : 'text-secondary-text'
@@ -266,11 +266,11 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
         </div>
 
         {/* Conteúdo das tabs */}
-        <div className="p-8">
+        <div className="p-1">
           {activeTab === 0 && (
             <div className="max-w-4xl">
               {/* Card de informações */}
-              <div className="bg-info rounded-t-lg rounded-b-[10px] mb-6">
+              <div className="bg-info rounded-t-lg rounded-b-lg mt-2 mx-2">
                 {/* Header do card */}
                 <div className="px-5 py-4 border-b border-primary/10">
                   <div className="flex items-center justify-between">

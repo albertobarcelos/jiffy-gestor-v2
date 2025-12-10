@@ -175,7 +175,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center py-10 gap-4">
+      <div className="flex flex-col items-center justify-center py-6 px-2 gap-4">
         <p className="text-secondary-text text-sm text-center">
           Não foi possível carregar os produtos deste grupo.
         </p>
@@ -201,8 +201,8 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
   }
 
   return (
-    <div className="flex flex-col h-full border border-primary/20 rounded-lg bg-white shadow-sm">
-      <div className="px-6 pt-6 pb-4">
+    <div className="flex flex-col mx-2 h-full border border-primary/20 rounded-lg bg-white shadow-sm">
+      <div className="px-6 pt-2 pb-4">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-primary-text">
