@@ -7,6 +7,10 @@ import { ApiError } from '@/src/infrastructure/api/apiClient'
 interface ProdutosQueryParams {
   name?: string
   ativo?: boolean | null
+  ativoLocal?: boolean | null
+  ativoDelivery?: boolean | null
+  grupoProdutoId?: string
+  grupoComplementosId?: string
   limit?: number
   offset?: number
 }
@@ -45,6 +49,18 @@ export function useProdutos(params: ProdutosQueryParams = {}) {
       if (params.ativo !== undefined && params.ativo !== null) {
         searchParams.append('ativo', params.ativo.toString())
       }
+      if (params.ativoLocal !== undefined && params.ativoLocal !== null) {
+        searchParams.append('ativoLocal', params.ativoLocal.toString())
+      }
+      if (params.ativoDelivery !== undefined && params.ativoDelivery !== null) {
+        searchParams.append('ativoDelivery', params.ativoDelivery.toString())
+      }
+      if (params.grupoProdutoId) {
+        searchParams.append('grupoProdutoId', params.grupoProdutoId)
+      }
+      if (params.grupoComplementosId) {
+        searchParams.append('grupoComplementosId', params.grupoComplementosId)
+      }
       if (params.limit) searchParams.append('limit', params.limit.toString())
       if (params.offset) searchParams.append('offset', params.offset.toString())
 
@@ -53,6 +69,8 @@ export function useProdutos(params: ProdutosQueryParams = {}) {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        cache: 'no-store',
+        next: { revalidate: 0 },
       })
 
       if (!response.ok) {
@@ -75,7 +93,11 @@ export function useProdutos(params: ProdutosQueryParams = {}) {
       }
     },
     enabled: !!token, // Só executa se tiver token
-    staleTime: 1000 * 60 * 5, // 5 minutos
+    staleTime: 0,
+    gcTime: 1000 * 60 * 1,
+    refetchOnReconnect: true,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   })
 }
 
@@ -99,6 +121,18 @@ export function useProdutosInfinite(params: Omit<ProdutosQueryParams, 'offset'> 
       if (params.ativo !== undefined && params.ativo !== null) {
         searchParams.append('ativo', params.ativo.toString())
       }
+      if (params.ativoLocal !== undefined && params.ativoLocal !== null) {
+        searchParams.append('ativoLocal', params.ativoLocal.toString())
+      }
+      if (params.ativoDelivery !== undefined && params.ativoDelivery !== null) {
+        searchParams.append('ativoDelivery', params.ativoDelivery.toString())
+      }
+      if (params.grupoProdutoId) {
+        searchParams.append('grupoProdutoId', params.grupoProdutoId)
+      }
+      if (params.grupoComplementosId) {
+        searchParams.append('grupoComplementosId', params.grupoComplementosId)
+      }
       searchParams.append('limit', limit.toString())
       searchParams.append('offset', pageParam.toString())
 
@@ -107,6 +141,8 @@ export function useProdutosInfinite(params: Omit<ProdutosQueryParams, 'offset'> 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        cache: 'no-store',
+        next: { revalidate: 0 },
       })
 
       if (!response.ok) {
@@ -134,12 +170,13 @@ export function useProdutosInfinite(params: Omit<ProdutosQueryParams, 'offset'> 
     enabled: !!token,
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextOffset,
-    staleTime: 1000 * 60 * 5, // 5 minutos
-    gcTime: 1000 * 60 * 10, // 10 minutos
-    refetchOnWindowFocus: false, // Não refetch ao focar na janela
-    refetchOnMount: false, // Não refetch ao montar se já tiver dados em cache
-    // Prefetch automático da próxima página quando estiver próxima
-    placeholderData: (previousData) => previousData,
+    staleTime: 0, // sempre considerado “stale” para refetch imediato
+    gcTime: 1000 * 60 * 1, // descarta cache rápido (1 min)
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    refetchOnMount: 'always',
+    // Não reutiliza dados anteriores para evitar exibir valores antigos
+    placeholderData: undefined,
   })
 }
 

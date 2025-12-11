@@ -77,6 +77,7 @@ export function useComplementosInfinite(params: Omit<ComplementosQueryParams, 'o
 export function useComplementos(params: { ativo?: boolean; limit?: number } = {}) {
   const { auth, isAuthenticated } = useAuthStore()
   const token = auth?.getAccessToken()
+  const normalizedLimit = Math.min(params.limit ?? 100, 100)
 
   return useQuery<Complemento[], Error>({
     queryKey: ['complementos', 'simple', params.ativo],
@@ -89,7 +90,7 @@ export function useComplementos(params: { ativo?: boolean; limit?: number } = {}
       if (params.ativo !== undefined) {
         queryParams.append('ativo', params.ativo.toString())
       }
-      queryParams.append('limit', (params.limit || 1000).toString())
+      queryParams.append('limit', normalizedLimit.toString())
       queryParams.append('offset', '0')
 
       const response = await fetch(`/api/complementos?${queryParams.toString()}`, {

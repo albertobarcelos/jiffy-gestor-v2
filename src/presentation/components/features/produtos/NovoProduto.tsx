@@ -1,29 +1,38 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo, Suspense } from 'react'
+import { useState, useEffect, useMemo, Suspense, useRef, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { InformacoesProdutoStep } from './NovoProduto/InformacoesProdutoStep'
 import { ConfiguracoesGeraisStep } from './NovoProduto/ConfiguracoesGeraisStep'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
+import { MdImage } from 'react-icons/md'
 
 interface NovoProdutoProps {
   produtoId?: string
   isCopyMode?: boolean
+  defaultGrupoProdutoId?: string
+  onClose?: () => void
+  onSuccess?: () => void
 }
 
 /**
  * Componente interno que usa useSearchParams
  */
-function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps) {
+function NovoProdutoContent({
+  produtoId,
+  isCopyMode = false,
+  defaultGrupoProdutoId,
+  onClose,
+  onSuccess,
+}: NovoProdutoProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { auth } = useAuthStore()
 
   // Estado do step atual (0 = Informações, 1 = Configurações)
   const [selectedPage, setSelectedPage] = useState(0)
-  const pageViewRef = useRef<HTMLDivElement>(null)
 
   // Estados do formulário
   const [nomeProduto, setNomeProduto] = useState('')
@@ -49,6 +58,15 @@ function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps)
   const effectiveProdutoId = useMemo(() => produtoId || copyFromId, [produtoId, copyFromId])
   const effectiveIsCopyMode = useMemo(() => isCopyMode || !!copyFromId, [isCopyMode, copyFromId])
 
+  useEffect(() => {
+    if (effectiveProdutoId || effectiveIsCopyMode) {
+      return
+    }
+    if (defaultGrupoProdutoId && defaultGrupoProdutoId !== grupoProduto) {
+      setGrupoProduto(defaultGrupoProdutoId)
+    }
+  }, [defaultGrupoProdutoId, effectiveProdutoId, effectiveIsCopyMode, grupoProduto])
+
   // Refs para evitar loops infinitos
   const hasLoadedProdutoRef = useRef(false)
   const loadedProdutoIdRef = useRef<string | null>(null)
@@ -56,11 +74,22 @@ function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps)
   const lastIsCopyModeRef = useRef<boolean>(false)
 
   // Carregar grupos de produtos usando React Query (com cache)
+  const formatCurrency = useCallback((value: number | string) => {
+    const numericValue =
+      typeof value === 'number'
+        ? value
+        : Number(value.toString().replace(/[^\d,.-]/g, '').replace(',', '.')) || 0
+
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(numericValue)
+  }, [])
+
   const {
     data: grupos = [],
     isLoading: isLoadingGrupos,
   } = useGruposProdutos({
-    ativo: true,
     limit: 100,
   })
 
@@ -132,7 +161,7 @@ function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps)
           const produto = await response.json()
           
           // Preenche os campos com os dados do produto
-          setPrecoVenda(produto.valor?.toString() || '')
+          setPrecoVenda(produto.valor ? formatCurrency(produto.valor) : '')
           setUnidadeProduto(produto.unidadeMedida || null)
           setGrupoProduto(produto.grupoId || null)
           setFavorito(produto.favorito || false)
@@ -145,10 +174,10 @@ function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps)
           )
           setImpressorasIds(produto.impressoras?.map((i: any) => i.id) || [])
 
-          // Se for modo cópia, limpa nome e descrição; senão, preenche
           if (currentEffectiveIsCopyMode) {
-            setNomeProduto('')
-            setDescricaoProduto('')
+            const nomeOriginal = produto.nome || ''
+            setNomeProduto(nomeOriginal ? `${nomeOriginal} - Cópia` : 'Cópia ')
+            setDescricaoProduto(produto.descricao || '')
           } else {
             setNomeProduto(produto.nome || '')
             setDescricaoProduto(produto.descricao || '')
@@ -174,19 +203,17 @@ function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps)
 
   const handleNext = () => {
     setSelectedPage(1)
-    if (pageViewRef.current) {
-      pageViewRef.current.scrollLeft = pageViewRef.current.clientWidth
-    }
   }
 
   const handleBack = () => {
     setSelectedPage(0)
-    if (pageViewRef.current) {
-      pageViewRef.current.scrollLeft = 0
-    }
   }
 
   const handleCancel = () => {
+    if (onClose) {
+      onClose()
+      return
+    }
     router.push('/produtos')
   }
 
@@ -221,9 +248,9 @@ function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps)
         abreComplementos,
         permiteAcrescimo,
         permiteDesconto,
-        grupoComplementosIds,
+        gruposComplementosIds: grupoComplementosIds,
         impressorasIds,
-        ...(effectiveProdutoId && !effectiveIsCopyMode ? { ativo } : {}),
+        ...(effectiveProdutoId ? { ativo } : {}),
       }
 
       const url = effectiveProdutoId && !effectiveIsCopyMode
@@ -248,9 +275,13 @@ function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps)
             ? 'Produto atualizado com sucesso!'
             : 'Produto cadastrado com sucesso!'
         )
-        setTimeout(() => {
-          router.push('/produtos')
-        }, 500)
+        if (onSuccess) {
+          onSuccess()
+        } else {
+          setTimeout(() => {
+            router.push('/produtos')
+          }, 500)
+        }
       } else {
         const error = await response.json().catch(() => ({}))
         const errorMessage = error.message || 'Erro ao salvar produto'
@@ -273,48 +304,88 @@ function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps)
     return 'Cadastrar Novo Produto'
   }
 
+  const displayNome = nomeProduto?.trim() || 'Nome do Produto'
+  const displayDescricao = descricaoProduto?.trim() || 'Descrição do Produto'
+  const canToggleAtivo = Boolean(effectiveProdutoId)
+  const canManageAtivo = Boolean(effectiveProdutoId)
+
   return (
     <div className="flex flex-col h-full">
       {/* Header fixo com título e botões */}
-      <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[30px] shadow-md">
-        <div className="px-[30px] py-[10px]">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-primary text-xl">👤</span>
-              <h2 className="text-primary text-base font-semibold font-exo">
-                {getPageTitle()}
-              </h2>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleCancel}
-                className="h-9 px-[26px] bg-primary/14 text-primary rounded-[30px] font-semibold font-exo text-sm hover:bg-primary/20 transition-colors"
-              >
-                Cancelar
-              </button>
+      <div className="sticky top-0 z-10 bg-primary-bg/90 backdrop-blur-sm rounded-tl-lg shadow-md">
+        <div className="px-[30px] py-[4px]">
+          <div className="rounded-lg border border-[#E0E4F3] bg-gradient-to-br from-[#F6F7FF] to-[#EEF1FB] px-6 py-3 shadow-[0_15px_45px_rgba(15,23,42,0.08)]">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-start gap-4">
+                <div className="h-14 w-14 rounded-lg bg-white flex items-center justify-center shadow-inner text-primary">
+                  <MdImage className="text-2xl" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-primary font-exo uppercase tracking-wide">
+                    {getPageTitle()}
+                  </p>
+                  <h2 className="text-xl font-bold text-primary font-exo leading-tight">
+                    {displayNome}
+                  </h2>
+                  <p className="text-sm text-secondary-text font-nunito">
+                    {displayDescricao}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                {canToggleAtivo && (
+                  <button
+                    type="button"
+                    onClick={() => setAtivo((prev) => !prev)}
+                    className="flex h-8 items-center gap-2 rounded-lg border border-[#D4D8EB] bg-info px-3 py-1 shadow-sm hover:border-primary/40 transition-colors"
+                  >
+                    <span className="text-sm font-semibold text-secondary-text">
+                      Visível no PDV
+                    </span>
+                    <span
+                      className={`relative inline-flex h-5 w-12 items-center rounded-full transition-colors ${
+                        ativo ? 'bg-primary' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                          ativo ? 'translate-x-7' : 'translate-x-1'
+                        }`}
+                      />
+                    </span>
+                  </button>
+                )}
+                <button
+                  onClick={handleCancel}
+                  className="h-8 px-8 rounded-lg bg-white text-primary font-semibold font-exo text-sm border border-[#D7DBEC] shadow-sm hover:bg-[#f4f6ff] transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Indicador de steps */}
-      <div className="px-5 py-2">
-        <div className="flex items-center justify-center gap-3">
+      <div className="px-5 py-1">
+        <div className="flex items-center justify-center gap-4">
           <div
-            className={`w-[30px] h-[30px] rounded-full flex items-center justify-center text-lg font-bold font-exo ${
-              selectedPage === 0 ? 'bg-accent1 text-info' : 'bg-secondary-bg text-info'
+            className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-bold font-exo transition-colors ${
+              selectedPage === 0 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-primary'
             }`}
           >
             1
           </div>
           <div
-            className={`h-[2px] w-[12%] ${
-              selectedPage === 1 ? 'bg-accent1' : 'bg-secondary-bg'
+            className={`h-[2px] w-28 transition-colors ${
+              selectedPage === 1 ? 'bg-[#B7E246]' : 'bg-[#CEDCF8]'
             }`}
           />
           <div
-            className={`w-[30px] h-[30px] rounded-full flex items-center justify-center text-lg font-bold font-exo ${
-              selectedPage === 1 ? 'bg-accent1 text-info' : 'bg-secondary-bg text-info'
+            className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-bold font-exo transition-colors ${
+              selectedPage === 1 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-[#1D3B53]'
             }`}
           >
             2
@@ -322,17 +393,9 @@ function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps)
         </div>
       </div>
 
-      {/* PageView com steps */}
-      <div
-        ref={pageViewRef}
-        className="flex-1 overflow-hidden"
-        style={{
-          display: 'flex',
-          transition: 'transform 0.3s ease',
-          transform: `translateX(-${selectedPage * 100}%)`,
-        }}
-      >
-        <div className="min-w-full flex-shrink-0 overflow-y-auto px-5 pb-5">
+      {/* Conteúdo das etapas */}
+      <div className="flex-1 overflow-y-auto px-5 pb-5">
+        {selectedPage === 0 ? (
           <InformacoesProdutoStep
             nomeProduto={nomeProduto}
             onNomeProdutoChange={setNomeProduto}
@@ -348,8 +411,7 @@ function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps)
             isLoadingGrupos={isLoadingGrupos}
             onNext={handleNext}
           />
-        </div>
-        <div className="min-w-full flex-shrink-0 overflow-y-auto px-5 pb-5">
+        ) : (
           <ConfiguracoesGeraisStep
             favorito={favorito}
             onFavoritoChange={setFavorito}
@@ -366,10 +428,11 @@ function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps)
             ativo={ativo}
             onAtivoChange={setAtivo}
             isEditMode={!!effectiveProdutoId && !effectiveIsCopyMode}
+            canManageAtivo={canManageAtivo}
             onBack={handleBack}
             onSave={handleSave}
           />
-        </div>
+        )}
       </div>
     </div>
   )
@@ -379,10 +442,22 @@ function NovoProdutoContent({ produtoId, isCopyMode = false }: NovoProdutoProps)
  * Componente principal para criação/edição de produtos
  * Replica exatamente o design e lógica do Flutter NovoProdutoWidget
  */
-export function NovoProduto({ produtoId, isCopyMode = false }: NovoProdutoProps) {
+export function NovoProduto({
+  produtoId,
+  isCopyMode = false,
+  defaultGrupoProdutoId,
+  onClose,
+  onSuccess,
+}: NovoProdutoProps) {
   return (
     <Suspense fallback={<div className="flex items-center justify-center h-full">Carregando...</div>}>
-      <NovoProdutoContent produtoId={produtoId} isCopyMode={isCopyMode} />
+      <NovoProdutoContent
+        produtoId={produtoId}
+        isCopyMode={isCopyMode}
+        defaultGrupoProdutoId={defaultGrupoProdutoId}
+        onClose={onClose}
+        onSuccess={onSuccess}
+      />
     </Suspense>
   )
 }

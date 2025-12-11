@@ -7,7 +7,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePrefetch } from '@/src/presentation/hooks/usePrefetch'
-import { MdDashboard, MdInventory, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight } from 'react-icons/md'
+import { MdDashboard, MdInventory, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose } from 'react-icons/md'
 import { 
   MdInventory2, 
   MdShoppingBag, 
@@ -27,6 +27,7 @@ import {
  */
 export function TopNav() {
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set())
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const { logout, getUser } = useAuthStore()
@@ -167,13 +168,148 @@ export function TopNav() {
     return pathname === childPath || pathname?.startsWith(childPath + '/')
   }
 
+  const closeMobileMenu = () => setIsMobileMenuOpen(false)
+
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [isMobileMenuOpen])
+
+  useEffect(() => {
+    setIsMobileMenuOpen(false)
+  }, [pathname])
+
+  const MobileMenuSection = (
+    <div className="fixed inset-0 z-50 sm:hidden">
+      <div
+        className="absolute inset-0 bg-black/40"
+        onClick={closeMobileMenu}
+      />
+      <div className="absolute inset-y-0 left-0 w-11/12 max-w-xs bg-white shadow-xl p-5 overflow-y-auto flex flex-col gap-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="relative w-10 h-10">
+              <Image
+                src="/images/jiffy-head.png"
+                alt="Jiffy"
+                fill
+                sizes="40px"
+                className="object-contain"
+              />
+            </div>
+            <span className="text-base font-semibold text-gray-900">Menu</span>
+          </div>
+          <button
+            type="button"
+            onClick={closeMobileMenu}
+            className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
+          >
+            <MdClose className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {menuItems.map((item) => {
+            const isActive = isMenuActive(item)
+            const Icon = item.icon
+
+            if (item.children) {
+              return (
+                <div key={item.name} className="flex flex-col">
+                  <button
+                    type="button"
+                    onClick={() => toggleMenu(item.name)}
+                    className={`flex items-center justify-between px-4 py-2 rounded-lg text-sm font-medium ${
+                      isActive ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Icon className="w-5 h-5" />
+                      {item.name}
+                    </span>
+                    <MdExpandMore
+                      className={`w-4 h-4 transition-transform ${
+                        expandedMenus.has(item.name) ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </button>
+                  {expandedMenus.has(item.name) && (
+                    <div className="pl-6 py-2 flex flex-col gap-1">
+                      {item.children.map((child) => {
+                        const ChildIcon = child.icon
+                        const activeChild = isChildActive(child.path)
+                        return (
+                          <Link
+                            key={child.path}
+                            href={child.path}
+                            onClick={closeMobileMenu}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${
+                              activeChild
+                                ? 'bg-primary/10 text-primary font-semibold'
+                                : 'text-gray-600 hover:bg-gray-50'
+                            }`}
+                          >
+                            <ChildIcon className="w-4 h-4" />
+                            <span>{child.name}</span>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            }
+
+            return (
+              <Link
+                key={item.path}
+                href={item.path}
+                onClick={closeMobileMenu}
+                className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium ${
+                  isActive ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <Icon className="w-5 h-5" />
+                {item.name}
+              </Link>
+            )
+          })}
+        </div>
+
+        <div className="mt-auto border-t border-gray-200 pt-4 flex items-center gap-3">
+          <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center text-white font-semibold">
+            {isHydrated
+              ? user?.getName()?.charAt(0).toUpperCase() ||
+                user?.getEmail()?.charAt(0).toUpperCase() ||
+                'U'
+              : 'U'}
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-gray-900">
+              {isHydrated ? user?.getName() || user?.getEmail() || 'Usuário' : 'Usuário'}
+            </p>
+            <p className="text-xs text-gray-500">
+              {isHydrated && user?.getEmail() ? user.getEmail() : 'Admin'}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+
   return (
-    <nav className="h-16 bg-white border-b border-gray-200 shadow-sm">
+    <nav className="h-16 bg-white border-b border-gray-200 shadow-sm relative">
       <div className="h-full flex items-center justify-between px-4">
         {/* Logo */}
         <div className="flex items-center">
           <Link href="/dashboard" className="flex items-center">
-            <div className="relative w-44 h-12 sm:w-52 sm:h-14">
+            <div className="relative w-12 h-12 sm:w-20 sm:h-14">
               <Image
                 src="/images/jiffy-head.png"
                 alt="Jiffy"
@@ -187,7 +323,10 @@ export function TopNav() {
         </div>
 
         {/* Menu Items */}
-        <div ref={menuRef} className="flex-1 flex items-center justify-start gap-1 pl-2">
+        <div
+          ref={menuRef}
+          className="hidden sm:flex flex-1 items-center justify-start gap-1 pl-2"
+        >
           {menuItems.map((item) => {
             const isActive = isMenuActive(item)
             const isExpanded = expandedMenus.has(item.name)
@@ -265,8 +404,17 @@ export function TopNav() {
           })}
         </div>
 
+        {/* Mobile toggler */}
+        <button
+          type="button"
+          className="sm:hidden p-2 rounded-lg hover:bg-gray-100 text-gray-600"
+          onClick={() => setIsMobileMenuOpen(true)}
+        >
+          <MdMenu className="w-6 h-6" />
+        </button>
+
         {/* User Actions */}
-        <div className="flex items-center gap-3">
+        <div className="hidden sm:flex items-center gap-3">
           {/* Search Icon */}
           <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -330,6 +478,7 @@ export function TopNav() {
           </button>
         </div>
       </div>
+      {isMobileMenuOpen && MobileMenuSection}
     </nav>
   )
 }

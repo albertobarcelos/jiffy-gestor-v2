@@ -8,7 +8,7 @@ import { GruposProdutosList } from '@/src/presentation/components/features/grupo
  */
 export default function GruposProdutosPage() {
   return (
-    <div className="h-full">
+    <div className="h-full flex flex-col">
       <GruposProdutosList />
     </div>
   )

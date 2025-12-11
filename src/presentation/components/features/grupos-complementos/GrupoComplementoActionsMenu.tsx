@@ -7,6 +7,7 @@ interface GrupoComplementoActionsMenuProps {
   grupoId: string
   grupoAtivo: boolean
   onStatusChanged?: () => void
+  onEditRequested?: (grupoId: string) => void
 }
 
 /**
@@ -17,9 +18,11 @@ export function GrupoComplementoActionsMenu({
   grupoId,
   grupoAtivo,
   onStatusChanged,
+  onEditRequested,
 }: GrupoComplementoActionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isUpward, setIsUpward] = useState(false)
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const { auth } = useAuthStore()
@@ -61,41 +64,15 @@ export function GrupoComplementoActionsMenu({
 
   const handleEdit = () => {
     setIsOpen(false)
-    window.location.href = `/cadastros/grupos-complementos/${grupoId}/editar`
+    if (onEditRequested) {
+      onEditRequested(grupoId)
+    } else {
+      window.location.href = `/cadastros/grupos-complementos/${grupoId}/editar`
+    }
   }
 
-  const handleDelete = async () => {
-    if (!confirm('Tem certeza que deseja deletar este grupo de complementos?')) {
-      setIsOpen(false)
-      return
-    }
-
-    try {
-      const token = auth?.getAccessToken()
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
-      const response = await fetch(`/api/grupos-complementos/${grupoId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error('Erro ao deletar grupo de complementos')
-      }
-
-      setIsOpen(false)
-      onStatusChanged?.()
-
-      alert('Grupo de complementos deletado com sucesso!')
-    } catch (error) {
-      console.error('Erro ao deletar grupo de complementos:', error)
-      alert('Erro ao deletar grupo de complementos')
-    }
+  const handleDelete = () => {
+    alert('Remoção de grupo indisponível no momento.')
   }
 
   const handleToggleStatus = async () => {
@@ -119,7 +96,7 @@ export function GrupoComplementoActionsMenu({
       }
 
       setIsOpen(false)
-      onStatusChanged?.()
+      await onStatusChanged?.()
 
       alert(
         grupoAtivo
@@ -176,14 +153,11 @@ export function GrupoComplementoActionsMenu({
 
           <div className="h-px bg-alternate"></div>
 
-          {/* Deletar */}
-          <button
-            onClick={handleDelete}
-            className="w-full h-10 px-6 flex items-center gap-2 text-primary-text hover:bg-error hover:text-info transition-colors rounded-b-[10px]"
-          >
+          {/* Deletar - temporariamente indisponível */}
+          <div className="w-full h-10 px-6 flex items-center gap-2 text-secondary-text bg-secondary-bg/40 rounded-b-[10px] text-sm">
             <span>🗑️</span>
-            <span className="text-sm font-medium">Deletar</span>
-          </button>
+            <span>Remoção indisponível</span>
+          </div>
         </div>
       )}
     </div>

@@ -6,6 +6,10 @@ interface BuscarProdutosParams {
   limit: number
   offset: number
   ativo?: boolean | null
+  ativoLocal?: boolean | null
+  ativoDelivery?: boolean | null
+  grupoProdutoId?: string
+  grupoComplementosId?: string
 }
 
 /**
