@@ -66,14 +66,7 @@ export function ComplementosSelectModal({
                 Criar novo complemento
               </button>
             )}
-            <button
-              onClick={onClose}
-              className="text-secondary-text hover:text-primary-text"
-              type="button"
-              aria-label="Fechar"
-            >
-              ✕
-            </button>
+            
           </div>
         </div>
 
@@ -153,7 +146,13 @@ export function ComplementosSelectModal({
 
         <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-primary">
           <Button type="button" onClick={onClose} variant="outlined"
-          className="h-8"
+          className="h-8 hover:bg-primary/20"
+          sx={{
+            backgroundColor: 'var(--color-info)',
+            color: 'var(--color-primary)',
+            borderColor: 'var(--color-primary)',
+            border: '1px solid',
+          }}
           >
             Fechar
           </Button>
@@ -161,7 +160,13 @@ export function ComplementosSelectModal({
             type="button"
             onClick={onConfirm}
             disabled={selectedIds.length === 0}
-            className="h-8"
+            className="h-8 hover:bg-primary/90"
+            sx={{
+              backgroundColor: 'var(--color-primary)',
+              color: 'var(--color-info)',
+              borderColor: 'var(--color-primary)',
+              border: '1px solid',
+            }}
           >
             {confirmLabel}
           </Button>
