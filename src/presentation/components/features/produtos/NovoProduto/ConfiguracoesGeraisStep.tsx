@@ -293,7 +293,7 @@ export function ConfiguracoesGeraisStep({
 
         <div className="grid gap-3 xl:grid-cols-3">
           {/* Cartão Geral */}
-          <div className="col-span-full xl:col-span-1 rounded-lg border border-[#E6E9F4] bg-gradient-to-b from-[#F9FAFF] to-white shadow-[0_10px_30px_rgba(15,23,42,0.08)] p-5">
+          <div className="col-span-full xl:col-span-1 rounded-lg border border-[#E6E9F4] bg-gradient-to-b from-[#F9FAFF] to-white shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
             <h4 className="text-primary-text font-semibold font-exo text-base mb-2">
               Geral
             </h4>

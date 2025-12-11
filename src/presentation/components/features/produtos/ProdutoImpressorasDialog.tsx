@@ -403,7 +403,7 @@ export function ProdutoImpressorasDialog({
   }
 
   const header = (
-    <div className="pr-8 flex flex-col gap-2">
+    <div className="pr-8 flex flex-row items-center justify-between gap-2">
       <div className="flex flex-col gap-1">
         <h3 className="text-lg font-semibold text-primary-text">
           {produtoNome ? `Impressoras de ${produtoNome}` : 'Impressoras vinculadas'}
@@ -413,14 +413,7 @@ export function ProdutoImpressorasDialog({
           {impressoras.length === 1 ? 'impressora encontrada' : 'impressoras encontradas'}
         </p>
       </div>
-      
-    </div>
-  )
-
-  const body = (
-    <>
-      <div className="flex items-center gap-3 mb-2">
-        <button
+      <button
           type="button"
           onClick={handleOpenSelectDialog}
           disabled={isUpdating}
@@ -429,11 +422,18 @@ export function ProdutoImpressorasDialog({
           <MdAdd size={16} />
           Vincular impressoras
         </button>
-        <div className="relative flex-1">
+    </div>
+  )
+
+  const body = (
+    <>
+      <div className="flex flex-col items-start gap-1 mb-2 max-w-[400px]">
+        <span className="text-xs font-semibold text-secondary-text">Buscar impressoras vinculadas</span>
+        <div className="relative flex-1 w-full">
           <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
           <input
             type="text"
-            placeholder="Buscar impressora..."
+            placeholder="Digite para filtrar..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             className="w-full h-8 pl-10 pr-4 rounded-lg border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
@@ -456,9 +456,18 @@ export function ProdutoImpressorasDialog({
       maxWidth="sm"
     >
       <DialogHeader>
+        <div className="flex h-16 items-top justify-between border-b-2 border-primary/70">
         <DialogTitle>Selecionar impressoras</DialogTitle>
+        <button
+          type="button"
+          className="h-8 px-6 rounded-lg bg-primary text-info text-sm font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
+          aria-label="Criar nova impressora"
+        >
+          Criar nova impressora
+        </button>
+        </div>
       </DialogHeader>
-      <DialogContent sx={{ padding: '16px 24px' }}>
+      <DialogContent sx={{ padding: '4px 24px' }}>
         <div className="relative mb-4">
           <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={18} />
           <input
@@ -466,7 +475,7 @@ export function ProdutoImpressorasDialog({
             value={selectSearch}
             onChange={(event) => setSelectSearch(event.target.value)}
             placeholder="Buscar impressora..."
-            className="w-full h-11 pl-10 pr-4 rounded-[24px] border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
+            className="w-full h-8 pl-10 pr-4 rounded-lg border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
           />
         </div>
         <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
@@ -507,7 +516,7 @@ export function ProdutoImpressorasDialog({
         <button
           type="button"
           onClick={handleCloseSelectDialog}
-          className="h-10 px-5 rounded-[24px] border border-gray-300 text-sm font-semibold text-primary-text hover:bg-gray-50 transition-colors"
+          className="h-8 px-5 rounded-lg border border-gray-300 text-sm font-semibold text-primary-text hover:bg-gray-50 transition-colors"
         >
           Cancelar
         </button>
@@ -515,7 +524,7 @@ export function ProdutoImpressorasDialog({
           type="button"
           onClick={handleApplySelection}
           disabled={isSavingSelection || isUpdating}
-          className="h-10 px-6 rounded-[24px] bg-primary text-info text-sm font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="h-8 px-6 rounded-lg bg-primary text-info text-sm font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isSavingSelection ? 'Aplicando...' : 'Aplicar seleção'}
         </button>

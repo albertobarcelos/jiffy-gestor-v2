@@ -15,6 +15,7 @@ import { showToast } from '@/src/shared/utils/toast'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { MdClose, MdSearch, MdKeyboardArrowDown, MdDelete, MdAdd, MdAddCircle, MdAddShoppingCart, MdGroupAdd, MdAddAPhoto, MdCheck } from 'react-icons/md'
+import { GruposComplementosTabsModal, GruposComplementosTabsModalState } from '../grupos-complementos/GruposComplementosTabsModal'
 
 interface GrupoComplemento {
   id: string
@@ -55,6 +56,12 @@ export function ComplementosMultiSelectDialog({
   const [selectSearch, setSelectSearch] = useState('')
   const [tempSelection, setTempSelection] = useState<string[]>([])
   const [isSavingSelection, setIsSavingSelection] = useState(false)
+  const [gruposTabsModalState, setGruposTabsModalState] = useState<GruposComplementosTabsModalState>({
+    open: false,
+    tab: 'grupo',
+    mode: 'create',
+    grupo: undefined,
+  })
 
   const loadGroups = useCallback(async () => {
     if (!open || !produtoId) return
@@ -353,6 +360,34 @@ export function ComplementosMultiSelectDialog({
     }
   }
 
+  const handleOpenNovoGrupoModal = useCallback(() => {
+    setGruposTabsModalState({
+      open: true,
+      tab: 'grupo',
+      mode: 'create',
+      grupo: undefined,
+    })
+  }, [])
+
+  const handleCloseGruposTabsModal = useCallback(() => {
+    setGruposTabsModalState((prev) => ({
+      ...prev,
+      open: false,
+    }))
+  }, [])
+
+  const handleGruposTabsTabChange = useCallback((tab: 'grupo' | 'complementos') => {
+    setGruposTabsModalState((prev) => ({
+      ...prev,
+      tab,
+    }))
+  }, [])
+
+  const handleGruposTabsReload = useCallback(async () => {
+    await loadGroups()
+    await loadSelectableGroups()
+  }, [loadGroups, loadSelectableGroups])
+
   const renderContent = () => {
     if (isLoading) {
       return (
@@ -488,21 +523,13 @@ export function ComplementosMultiSelectDialog({
 
   const renderDialogBody = () => (
     <>
-      <div className="flex items-center gap-3 mb-2">
-        <button
-          type="button"
-          onClick={handleOpenSelectDialog}
-          disabled={isUpdating}
-          className="h-8 px-4 rounded-lg border border-primary bg-primary text-white font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          <MdAdd size={18} />
-          Vincular grupo
-        </button>
+      <div className="flex flex-col gap-1 mb-2 max-w-[400px]">
+        <span className="text-xs font-semibold text-secondary-text">Buscar complementos vinculados</span>
         <div className="relative flex-1">
           <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
           <input
             type="text"
-            placeholder="Buscar complemento..."
+            placeholder="Digite para filtrar..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             className="w-full h-8 pl-10 pr-4 rounded-lg border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
@@ -525,9 +552,19 @@ export function ComplementosMultiSelectDialog({
       maxWidth="sm"
     >
       <DialogHeader>
+        <div className="flex h-16 items-top justify-between border-b-2 border-primary/70">
         <DialogTitle>Selecionar grupos de complementos</DialogTitle>
+        <button
+          type="button"
+          onClick={handleOpenNovoGrupoModal}
+          className="h-8 px-6 rounded-lg bg-primary text-info text-sm font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
+          aria-label="Criar novo grupo"
+        >
+          Criar novo grupo
+        </button>
+        </div>
       </DialogHeader>
-      <DialogContent sx={{ padding: '16px 24px' }}>
+      <DialogContent sx={{ padding: '4px 24px' }}>
         <div className="relative mb-4">
           <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={18} />
           <input
@@ -535,7 +572,7 @@ export function ComplementosMultiSelectDialog({
             value={selectSearch}
             onChange={(event) => setSelectSearch(event.target.value)}
             placeholder="Buscar grupo..."
-            className="w-full h-11 pl-10 pr-4 rounded-[24px] border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
+            className="w-full h-8 pl-10 pr-4 rounded-lg border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
           />
         </div>
         <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
@@ -547,7 +584,7 @@ export function ComplementosMultiSelectDialog({
               return (
                 <label
                   key={grupo.id}
-                  className={`flex items-center gap-3 rounded-2xl border px-4 py-3 cursor-pointer transition-colors ${
+                  className={`flex items-center gap-3 rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
                     isSelected ? 'border-primary bg-primary/5' : 'border-gray-200 bg-gray-50'
                   }`}
                 >
@@ -573,7 +610,7 @@ export function ComplementosMultiSelectDialog({
         <button
           type="button"
           onClick={handleCloseSelectDialog}
-          className="h-10 px-5 rounded-[24px] border border-gray-300 text-sm font-semibold text-primary-text hover:bg-gray-50 transition-colors"
+          className="h-8 px-5 rounded-lg border border-gray-300 text-sm font-semibold text-primary-text hover:bg-gray-50 transition-colors"
         >
           Cancelar
         </button>
@@ -581,7 +618,7 @@ export function ComplementosMultiSelectDialog({
           type="button"
           onClick={handleApplySelection}
           disabled={isSavingSelection || isUpdating}
-          className="h-10 px-6 rounded-[24px] bg-primary text-info text-sm font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="h-8 px-6 rounded-lg bg-primary text-info text-sm font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isSavingSelection ? 'Aplicando...' : 'Aplicar seleção'}
         </button>
@@ -598,7 +635,7 @@ export function ComplementosMultiSelectDialog({
     return (
       <>
         <div className="h-full flex flex-col overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+          <div className="px-6 py-4 border-b-2 border-primary/70 flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold text-primary-text">
                 {produtoNome ? `Complementos de ${produtoNome}` : 'Complementos'}
@@ -607,6 +644,15 @@ export function ComplementosMultiSelectDialog({
                 {groups.length} grupo{groups.length === 1 ? '' : 's'} vinculados
               </p>
             </div>
+            <button
+          type="button"
+          onClick={handleOpenSelectDialog}
+          disabled={isUpdating}
+          className="h-8 px-4 rounded-lg border border-primary bg-primary text-white font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          <MdAdd size={18} />
+          Vincular grupo
+        </button>
           </div>
           <div className="flex-1 overflow-y-auto px-6 py-4">{renderDialogBody()}</div>
           <div className="px-6 py-12 border-t border-gray-100 flex justify-end">
@@ -620,6 +666,12 @@ export function ComplementosMultiSelectDialog({
           </div>
         </div>
         {selectionDialogNode}
+        <GruposComplementosTabsModal
+          state={gruposTabsModalState}
+          onClose={handleCloseGruposTabsModal}
+          onTabChange={handleGruposTabsTabChange}
+          onReload={handleGruposTabsReload}
+        />
       </>
     )
   }
@@ -687,6 +739,12 @@ export function ComplementosMultiSelectDialog({
       </Dialog>
 
       {selectionDialogNode}
+      <GruposComplementosTabsModal
+        state={gruposTabsModalState}
+        onClose={handleCloseGruposTabsModal}
+        onTabChange={handleGruposTabsTabChange}
+        onReload={handleGruposTabsReload}
+      />
     </>
   )
 }
