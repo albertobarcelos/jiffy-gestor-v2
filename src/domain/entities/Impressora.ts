@@ -56,7 +56,7 @@ export class Impressora {
       data.porta?.toString(),
       data.dataAtualizacao?.toString(),
       data.dataCriacao?.toString(),
-      data.terminais
+      data.terminaisConfig || data.terminais // Aceita ambos os formatos
     )
   }
 

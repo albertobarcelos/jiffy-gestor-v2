@@ -540,7 +540,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
 
       <div className="h-[4px] border-t-2 border-primary/70"></div>
       <div className="flex gap-3 px-[20px] py-2">
-      <div className="flex-1 min-w-[180px] max-w-[360px]">
+        <div className="flex-1 min-w-[180px] max-w-[360px]">
             <label
               htmlFor="complementos-search"
               className="text-xs font-semibold text-secondary-text mb-1 block"
