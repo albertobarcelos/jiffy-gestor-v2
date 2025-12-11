@@ -80,10 +80,10 @@ export function InformacoesProdutoStep({
       {/* Título */}
       <div className="flex flex-col gap-2 mb-1">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <h3 className="text-alternate text-xl font-semibold font-exo">
+          <h3 className="text-primary text-xl font-semibold font-exo">
             Informações
           </h3>
-          <div className="flex-1 h-px bg-[#CBA4FF]/60" />
+          <div className="flex-1 h-[2px] bg-primary/50" />
         </div>
         <p className="text-sm text-secondary-text font-nunito">
           Preencha os dados principais do produto. Essas informações serão usadas para identificação e exibição no PDV.
@@ -102,7 +102,7 @@ export function InformacoesProdutoStep({
             value={nomeProduto}
             onChange={(e) => onNomeProdutoChange(e.target.value)}
             placeholder="Digite o nome que aparecerá no PDV"
-            className="w-full"
+            className="w-full rounded-lg"
           />
         </div>
 
@@ -116,7 +116,7 @@ export function InformacoesProdutoStep({
             <select
               value={unidadeProduto || ''}
               onChange={(e) => onUnidadeProdutoChange(e.target.value || null)}
-              className="w-full h-12 px-4 rounded-[14px] border border-[#CBD0E3] bg-white text-primary-text focus:outline-none focus:border-alternate focus:ring-2 focus:ring-[#CBA4FF]/60 font-nunito text-sm"
+              className="w-full h-14 px-4 rounded-lg border border-[#CBD0E3] bg-white text-primary-text focus:outline-none focus:border-primary-text hover:border-primary-text focus:border-2 font-nunito text-sm"
             >
               <option value="">Escolha a unidade de venda do Produto</option>
               <option value="UN">Unidade</option>
@@ -138,7 +138,7 @@ export function InformacoesProdutoStep({
               <select
                 value={grupoProduto || ''}
                 onChange={(e) => onGrupoProdutoChange(e.target.value || null)}
-                className="w-full h-12 px-4 rounded-[14px] border border-[#CBD0E3] bg-white text-primary-text focus:outline-none focus:border-[#5318A3] focus:ring-2 focus:ring-[#CBA4FF]/60 font-nunito text-sm"
+                className="w-full h-14 px-4 rounded-lg border border-[#CBD0E3] bg-white text-primary-text focus:outline-none focus:border-primary-text hover:border-primary-text focus:border-2 font-nunito text-sm"
               >
                 <option value="">Selecione o grupo do Produto</option>
                 {grupos.map((grupo) => {
@@ -187,7 +187,7 @@ export function InformacoesProdutoStep({
               onChange={(e) => onDescricaoProdutoChange(e.target.value)}
               placeholder="Descreva o Produto"
               rows={4}
-              className="w-full px-4 py-3 rounded-[14px] border border-[#CBD0E3] bg-white text-primary-text focus:outline-none focus:border-[#5318A3] focus:ring-2 focus:ring-[#CBA4FF]/60 font-nunito text-sm resize-none"
+              className="w-full px-4 py-3 rounded-[14px] border border-[#CBD0E3] bg-white text-primary-text focus:outline-none hover:border-primary-text focus:border-primary-text focus:border-2 font-nunito text-sm resize-none"
             />
           </div>
         </div>
@@ -197,7 +197,11 @@ export function InformacoesProdutoStep({
       <div className="flex justify-end pt-6 border-t border-dashed border-[#E4E7F4] mt-4">
         <Button
           onClick={onNext}
-          className="h-11 px-8 rounded-[30px] bg-primary text-white font-semibold font-exo text-sm hover:bg-primary"
+          className="h-8 px-10 rounded-lg text-white font-semibold font-exo text-sm hover:bg-primary/90"
+          sx={{
+            backgroundColor: 'var(--color-primary)',
+            
+          }}
         >
           Próximo
         </Button>

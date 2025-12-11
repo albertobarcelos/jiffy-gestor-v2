@@ -7,6 +7,11 @@ import { Complemento } from '@/src/domain/entities/Complemento'
 import { useComplementos } from '@/src/presentation/hooks/useComplementos'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
+import {
+  ComplementosTabsModal,
+  ComplementosTabsModalState,
+} from '@/src/presentation/components/features/complementos/ComplementosTabsModal'
+import { ComplementosSelectModal } from '@/src/presentation/components/features/complementos/ComplementosSelectModal'
 
 interface GrupoComplementoComplementosModalProps {
   open?: boolean
@@ -61,13 +66,19 @@ export function GrupoComplementoComplementosModal({
   const [complementosGrupo, setComplementosGrupo] = useState<GrupoComplementoItemResumo[]>([])
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
-  const [addSearch, setAddSearch] = useState('')
   const [selectedAddIds, setSelectedAddIds] = useState<string[]>([])
 
   const {
     data: todosComplementos = [],
     isLoading: isLoadingTodosComplementos,
+    refetch: refetchComplementos,
   } = useComplementos({ ativo: true, limit: 100 })
+  const [complementosTabsState, setComplementosTabsState] = useState<ComplementosTabsModalState>({
+    open: false,
+    tab: 'complemento',
+    mode: 'create',
+    complementoId: undefined,
+  })
 
   const carregarComplementos = useCallback(
     async (grupoId: string) => {
@@ -135,19 +146,9 @@ export function GrupoComplementoComplementosModal({
   }, [complementosGrupo, searchTerm])
 
   const availableComplementos = useMemo(() => {
-    const grupoIds = new Set(complementosGrupo.map((c) => c.id))
-    return (todosComplementos as Complemento[]).filter((item) => !grupoIds.has(item.getId()))
-  }, [todosComplementos, complementosGrupo])
-
-  const filteredAvailable = useMemo(() => {
-    const term = addSearch.trim().toLowerCase()
-    if (!term) return availableComplementos
-    return availableComplementos.filter((item) => {
-      const nome = item.getNome()?.toLowerCase() || ''
-      const descricao = item.getDescricao()?.toLowerCase() || ''
-      return nome.includes(term) || descricao.includes(term)
-    })
-  }, [availableComplementos, addSearch])
+    // Inclui todos os complementos para exibir os já selecionados marcados
+    return todosComplementos as Complemento[]
+  }, [todosComplementos])
 
   const updateGrupoComplementos = useCallback(
     async (novosIds: string[], successMessage: string) => {
@@ -218,14 +219,39 @@ export function GrupoComplementoComplementosModal({
   }, [])
 
   const handleConfirmAdd = useCallback(async () => {
-    const novosIds = Array.from(
-      new Set([...complementosGrupo.map((item) => item.id), ...selectedAddIds])
-    )
-    await updateGrupoComplementos(novosIds, 'Complementos adicionados com sucesso!')
+    const novosIds = Array.from(new Set(selectedAddIds))
+    await updateGrupoComplementos(novosIds, 'Complementos atualizados com sucesso!')
     setIsAddModalOpen(false)
     setSelectedAddIds([])
-    setAddSearch('')
-  }, [complementosGrupo, selectedAddIds, updateGrupoComplementos])
+  }, [selectedAddIds, updateGrupoComplementos])
+
+  const openComplementoCreateModal = useCallback(() => {
+    setComplementosTabsState((prev) => ({
+      ...prev,
+      open: true,
+      tab: 'complemento',
+      mode: 'create',
+      complementoId: undefined,
+    }))
+  }, [])
+
+  const closeComplementosTabsModal = useCallback(() => {
+    setComplementosTabsState((prev) => ({
+      ...prev,
+      open: false,
+    }))
+  }, [])
+
+  const handleComplementosTabChange = useCallback((tab: 'complemento') => {
+    setComplementosTabsState((prev) => ({
+      ...prev,
+      tab,
+    }))
+  }, [])
+
+  const handleComplementosTabsReload = useCallback(async () => {
+    await refetchComplementos()
+  }, [refetchComplementos])
 
   if (!isVisible || !grupo) {
     return null
@@ -233,7 +259,7 @@ export function GrupoComplementoComplementosModal({
 
   const content = (
     <div className="w-full h-full bg-info flex flex-col rounded-2xl">
-      <div className="px-6 py-4 border-b border-alternate flex items-start justify-between gap-4">
+      <div className="px-6 py-4 border-b-[2px] border-primary/70 flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase text-secondary-text">Complementos do grupo</p>
           <h2 className="text-lg font-semibold text-primary-text">{grupo.getNome()}</h2>
@@ -241,35 +267,41 @@ export function GrupoComplementoComplementosModal({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setIsAddModalOpen(true)}
-            className="h-9 px-4 rounded-full bg-primary text-white text-sm font-semibold flex items-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            onClick={() => {
+              setSelectedAddIds(complementosGrupo.map((item) => item.id))
+              setIsAddModalOpen(true)
+            }}
+            className="h-8 px-4 rounded-lg bg-primary text-white text-sm font-semibold flex items-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             disabled={isLoadingComplementos}
           >
             <MdAdd />
-            Adicionar
+            Vincular complementos
           </button>
         </div>
       </div>
 
-      <div className="px-6 py-4 border-b border-alternate">
+      <div className="px-6 py-1 ">
         <label className="text-xs font-semibold text-secondary-text mb-1 block">
           Buscar complemento do grupo
         </label>
+        <div className="flex items-center gap-2">
         <div className="relative">
           <input
             type="text"
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
             placeholder="Digite para filtrar..."
-            className="w-full h-10 rounded-xl border border-gray-200 bg-primary-bg pl-11 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary"
+            className="w-full min-w-[350px] h-8 rounded-lg border border-gray-200 bg-primary-bg pl-11 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary"
           />
           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
             <MdSearch size={18} />
           </span>
         </div>
+       
+          </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+      <div className="flex-1 overflow-y-auto px-6 py-2 space-y-2">
         {isLoadingComplementos ? (
           <div className="flex justify-center py-10">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -282,13 +314,13 @@ export function GrupoComplementoComplementosModal({
           filteredComplementos.map((complemento) => (
             <div
               key={complemento.id}
-              className="p-4 rounded-2xl border border-gray-200 bg-primary-bg/60 flex items-start gap-3 transition-colors hover:bg-primary-bg"
+              className="p-2 rounded-lg border border-gray-200 bg-primary-bg/60 flex items-start gap-3 transition-colors hover:bg-primary-bg"
             >
               <button
                 type="button"
                 onClick={() => handleRemoveComplemento(complemento.id)}
                 disabled={removingId === complemento.id}
-                className="mt-1 w-8 h-8 flex items-center justify-center rounded-full border border-error/40 text-error hover:bg-error/10 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                className="mt-1 w-6 h-6 flex items-center justify-center rounded-full border border-error/40 text-error hover:bg-error/10 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 title="Remover complemento do grupo"
               >
                 <MdDelete />
@@ -319,11 +351,11 @@ export function GrupoComplementoComplementosModal({
       </div>
 
       {onClose && (
-        <div className="px-6 py-4 border-t border-alternate flex justify-end">
+        <div className="px-6 pb-16 pt-6 border-t-[2px] border-primary/70 flex justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="h-10 px-6 rounded-full border border-gray-300 text-secondary-text hover:text-primary-text hover:border-primary transition-colors"
+            className="h-8 px-6 rounded-lg border border-gray-300 text-primary-text hover:border-primary transition-colors"
           >
             Fechar
           </button>
@@ -332,136 +364,36 @@ export function GrupoComplementoComplementosModal({
     </div>
   )
 
-  const addModal = isAddModalOpen ? (
-    <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-2xl bg-info rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
-        <div className="px-6 py-4 border-b border-alternate flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase text-secondary-text">
-              Adicionar complementos
-            </p>
-            <h3 className="text-lg font-semibold text-primary-text">{grupo.getNome()}</h3>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setIsAddModalOpen(false)
-              setSelectedAddIds([])
-              setAddSearch('')
-            }}
-            className="text-secondary-text hover:text-primary-text transition-colors"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="px-6 py-4 border-b border-alternate">
-          <label className="text-xs font-semibold text-secondary-text mb-1 block">
-            Buscar complemento disponível
-          </label>
-          <div className="relative">
-            <input
-              type="text"
-              value={addSearch}
-              onChange={(event) => setAddSearch(event.target.value)}
-              placeholder="Digite para filtrar..."
-              className="w-full h-10 rounded-xl border border-gray-200 bg-primary-bg pl-11 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary"
-            />
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
-              <MdSearch size={18} />
-            </span>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
-          {isLoadingTodosComplementos ? (
-            <div className="flex justify-center py-10">
-              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : filteredAvailable.length === 0 ? (
-            <p className="text-center text-secondary-text text-sm">
-              Nenhum complemento disponível para adicionar.
-            </p>
-          ) : (
-            filteredAvailable.map((item) => {
-              const id = item.getId()
-              const isSelected = selectedAddIds.includes(id)
-              return (
-                <label
-                  key={id}
-                  className={`flex items-start gap-3 p-4 rounded-2xl border transition-colors cursor-pointer ${
-                    isSelected
-                      ? 'border-primary bg-primary/5'
-                      : 'border-transparent bg-primary-bg hover:bg-primary-bg/80'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => toggleAddSelection(id)}
-                    className="mt-1 h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
-                  />
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="text-sm font-semibold text-primary-text">{item.getNome()}</p>
-                      <div className="text-right">
-                        {item.getValor() > 0 && (
-                          <p className="text-xs font-semibold text-primary-text">
-                            R$ {item.getValor().toFixed(2)}
-                          </p>
-                        )}
-                        
-                      </div>
-                    </div>
-                    {(item.getDescricao() || item.getTipoImpactoPreco?.()) && (
-                      <div className="mt-1 flex items-center justify-between gap-3">
-                        <p className="text-xs text-secondary-text">
-                          {item.getDescricao() || 'Sem descrição'}
-                        </p>
-                        {item.getTipoImpactoPreco?.() && (
-                          <p className="text-[11px] font-semibold text-primary uppercase tracking-wide">
-                            {item.getTipoImpactoPreco()}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </label>
-              )
-            })
-          )}
-        </div>
-
-        <div className="px-6 py-4 border-t border-alternate flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={() => {
-              setIsAddModalOpen(false)
-              setSelectedAddIds([])
-              setAddSearch('')
-            }}
-            className="h-10 px-5 rounded-full border border-gray-300 text-secondary-text hover:text-primary-text hover:border-primary transition-colors"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={handleConfirmAdd}
-            disabled={selectedAddIds.length === 0}
-            className="h-10 px-6 rounded-full bg-primary text-white font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            Adicionar selecionados
-          </button>
-        </div>
-      </div>
-    </div>
-  ) : null
+  const addModal = (
+    <ComplementosSelectModal
+      open={isAddModalOpen}
+      title="Vincular complementos"
+      complementos={availableComplementos}
+      selectedIds={selectedAddIds}
+      isLoading={isLoadingTodosComplementos}
+      onToggle={toggleAddSelection}
+      onConfirm={handleConfirmAdd}
+      onClose={() => {
+        setIsAddModalOpen(false)
+        setSelectedAddIds([])
+      }}
+      onCreateComplemento={openComplementoCreateModal}
+      confirmLabel="Vincular selecionados"
+      emptyMessage="Nenhum complemento disponível para adicionar."
+    />
+  )
 
   if (isEmbedded) {
     return (
       <>
         <div className="h-full flex flex-col">{content}</div>
         {addModal}
+        <ComplementosTabsModal
+          state={complementosTabsState}
+          onClose={closeComplementosTabsModal}
+          onTabChange={handleComplementosTabChange}
+          onReload={handleComplementosTabsReload}
+        />
       </>
     )
   }
@@ -472,6 +404,12 @@ export function GrupoComplementoComplementosModal({
         <div className="w-full max-w-3xl max-h-[85vh]">{content}</div>
       </div>
       {addModal}
+      <ComplementosTabsModal
+        state={complementosTabsState}
+        onClose={closeComplementosTabsModal}
+        onTabChange={handleComplementosTabChange}
+        onReload={handleComplementosTabsReload}
+      />
     </>
   )
 }

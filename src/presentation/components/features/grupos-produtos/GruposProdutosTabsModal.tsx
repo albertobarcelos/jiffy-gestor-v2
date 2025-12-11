@@ -1,35 +1,31 @@
 'use client'
 
-import { useMemo } from 'react'
 import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
-import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
-import { NovoGrupoComplemento } from './NovoGrupoComplemento'
-import { GrupoComplementoComplementosModal } from './GrupoComplementoComplementosModal'
+import { NovoGrupo } from './NovoGrupo'
 
-type TabKey = 'grupo' | 'complementos'
+type TabKey = 'grupo'
 
-export interface GruposComplementosTabsModalState {
+export interface GruposProdutosTabsModalState {
   open: boolean
   tab: TabKey
   mode: 'create' | 'edit'
-  grupo?: GrupoComplemento
+  grupoId?: string
 }
 
-interface GruposComplementosTabsModalProps {
-  state: GruposComplementosTabsModalState
+interface GruposProdutosTabsModalProps {
+  state: GruposProdutosTabsModalState
   onClose: () => void
-  onTabChange: (tab: TabKey) => void
   onReload?: () => void
+  onTabChange: (tab: TabKey) => void
 }
 
-export function GruposComplementosTabsModal({
+export function GruposProdutosTabsModal({
   state,
   onClose,
-  onTabChange,
   onReload,
-}: GruposComplementosTabsModalProps) {
-  const grupoId = state.grupo?.getId()
-
+  onTabChange,
+}: GruposProdutosTabsModalProps) {
+  const grupoId = state.grupoId
 
   return (
     <Dialog
@@ -53,7 +49,7 @@ export function GruposComplementosTabsModal({
           m: 0,
           height: '100vh',
           maxHeight: '100vh',
-          width: 'min(900px, 58vw)',
+          width: 'min(900px, 60vw)',
           borderRadius: 0,
           display: 'flex',
           flexDirection: 'column',
@@ -61,12 +57,13 @@ export function GruposComplementosTabsModal({
       }}
     >
       <DialogContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <div className="px-6 pt-2 flex gap-1 border-b border-gray-100 bg-white">
+        <div className="px-6 pt-4 flex gap-1 border-b border-gray-200">
           {(
-            [
-              { key: 'grupo', label: 'Grupo', disabled: false },
-              { key: 'complementos', label: 'Complementos', disabled: !grupoId },
-            ] as Array<{ key: TabKey; label: string; disabled: boolean }>
+            [{ key: 'grupo', label: 'Grupo', disabled: false }] as Array<{
+              key: TabKey
+              label: string
+              disabled: boolean
+            }>
           ).map((tab) => (
             <button
               key={tab.key}
@@ -87,7 +84,7 @@ export function GruposComplementosTabsModal({
         <div className="flex-1 overflow-hidden">
           {state.tab === 'grupo' && (
             <div className="h-full overflow-y-auto">
-              <NovoGrupoComplemento
+              <NovoGrupo
                 grupoId={state.mode === 'create' ? undefined : grupoId}
                 isEmbedded
                 onClose={onClose}
@@ -96,23 +93,6 @@ export function GruposComplementosTabsModal({
                   onClose()
                 }}
               />
-            </div>
-          )}
-
-          {state.tab === 'complementos' && (
-            <div className="h-full overflow-hidden">
-              {grupoId && state.grupo ? (
-                <GrupoComplementoComplementosModal
-                  isEmbedded
-                  grupo={state.grupo}
-                  onClose={onClose}
-                  onUpdated={onReload}
-                />
-              ) : (
-                <div className="h-full flex items-center justify-center text-secondary-text text-sm">
-                  Selecione um grupo válido para gerenciar complementos.
-                </div>
-              )}
             </div>
           )}
         </div>

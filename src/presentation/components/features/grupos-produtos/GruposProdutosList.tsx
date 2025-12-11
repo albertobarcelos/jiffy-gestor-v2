@@ -24,6 +24,11 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdSearch } from 'react-icons/md'
+import {
+  GruposProdutosTabsModal,
+  GruposProdutosTabsModalState,
+} from './GruposProdutosTabsModal'
+import { ProdutosTabsModal, ProdutosTabsModalState } from '../produtos/ProdutosTabsModal'
 
 interface GruposProdutosListProps {
   onReload?: () => void
@@ -42,6 +47,20 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
   const loadMoreRef = useRef<HTMLDivElement>(null)
   const { auth } = useAuthStore()
   const queryClient = useQueryClient()
+  const [tabsModalState, setTabsModalState] = useState<GruposProdutosTabsModalState>({
+    open: false,
+    tab: 'grupo',
+    mode: 'create',
+    grupoId: undefined,
+  })
+  const [produtoTabsState, setProdutoTabsState] = useState<ProdutosTabsModalState>({
+    open: false,
+    tab: 'produto',
+    mode: 'create',
+    produto: undefined,
+    prefillGrupoProdutoId: undefined,
+    grupoId: undefined,
+  })
 
   // Sensores para drag and drop
   const sensors = useSensors(
@@ -180,6 +199,11 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     onReload?.()
   }, [queryClient, onReload])
 
+  const handleTabsModalReload = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['grupos-produtos'] })
+    onReload?.()
+  }, [onReload, queryClient])
+
   const handleToggleGrupoStatus = useCallback(
     async (grupoId: string, novoStatus: boolean) => {
       const token = auth?.getAccessToken()
@@ -207,6 +231,66 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       }
     },
     [auth, handleStatusChange]
+  )
+
+  const openTabsModal = useCallback(
+    (config: Partial<GruposProdutosTabsModalState>) => {
+      setTabsModalState((prev) => ({
+        open: true,
+        tab: config.tab ?? prev.tab,
+        mode: config.mode ?? prev.mode,
+        grupoId: config.grupoId,
+      }))
+    },
+    []
+  )
+
+  const closeTabsModal = useCallback(() => {
+    setTabsModalState((prev) => ({
+      ...prev,
+      open: false,
+    }))
+  }, [])
+
+  const handleTabsModalTabChange = useCallback((tab: 'grupo') => {
+    setTabsModalState((prev) => ({
+      ...prev,
+      tab,
+    }))
+  }, [])
+
+  const handleOpenProdutoModal = useCallback(
+    (grupoId: string) => {
+      setProdutoTabsState({
+        open: true,
+        tab: 'produto',
+        mode: 'create',
+        produto: undefined,
+        prefillGrupoProdutoId: grupoId,
+        grupoId: undefined,
+      })
+    },
+    []
+  )
+
+  const handleCloseProdutoModal = useCallback(() => {
+    setProdutoTabsState((prev) => ({
+      ...prev,
+      open: false,
+      produto: undefined,
+      prefillGrupoProdutoId: undefined,
+      grupoId: undefined,
+    }))
+  }, [])
+
+  const handleProdutoTabChange = useCallback(
+    (tab: 'produto' | 'complementos' | 'impressoras' | 'grupo') => {
+      setProdutoTabsState((prev) => ({
+        ...prev,
+        tab,
+      }))
+    },
+    []
   )
 
   // Handler para quando o drag termina - versão simples: envia para API e recarrega a página
@@ -272,13 +356,14 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
   }, [localGrupos, auth])
 
   return (
+    <>
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px] pt-[6px] pb-[6px]">
-        <div className="flex flex-col gap-4">
+      <div className="px-[30px] pt-1 pb-[6px]">
+        <div className="flex flex-col gap-2">
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div className="pl-5">
-              <p className="text-primary text-sm font-semibold font-nunito mb-2">
+              <p className="text-primary text-sm font-semibold font-nunito mb-1">
                 Grupos Cadastrados
               </p>
               <p className="text-tertiary text-[22px] font-medium font-nunito">
@@ -286,45 +371,16 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
               </p>
             </div>
             <div className="flex-1 flex gap-2 items-center justify-end flex-wrap md:flex-nowrap">
-              <div className="flex flex-wrap gap-2 w-full items-center justify-center">
-                {/* Barra de pesquisa */}
-                <div className="w-full md:w-[360px]">
-                  <div className="h-[36px] relative">
-                    <input
-                      type="text"
-                      placeholder="Pesquisar..."
-                      value={searchText}
-                      onChange={(e) => setSearchText(e.target.value)}
-                      className="w-full h-full px-5 pl-12 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-secondary font-nunito text-sm"
-                    />
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
-                      <MdSearch size={18} />
-                    </span>
-                  </div>
-                </div>
-
-                {/* Filtro de status */}
-                <div className="w-full md:w-[160px]">
-                  <select
-                    value={filterStatus}
-                    onChange={(e) =>
-                      setFilterStatus(
-                        e.target.value as 'Todos' | 'Ativo' | 'Desativado'
-                      )
-                    }
-                    className="w-full h-[36px] px-5 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text focus:outline-none focus:border-secondary font-nunito text-sm"
-                  >
-                    <option value="Todos">Todos</option>
-                    <option value="Ativo">Ativo</option>
-                    <option value="Desativado">Desativado</option>
-                  </select>
-                </div>
-              </div>
+              
               <button
-                onClick={() => {
-                  window.location.href = '/cadastros/grupos-produtos/novo'
-                }}
-                className="h-10 px-[30px] bg-primary text-info rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+                onClick={() =>
+                  openTabsModal({
+                    tab: 'grupo',
+                    mode: 'create',
+                    grupoId: undefined,
+                  })
+                }
+                className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
               >
                 Novo
                 <span className="text-lg">+</span>
@@ -333,10 +389,51 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
           </div>
         </div>
       </div>
-      <div className="h-[6px] border-t-2 border-alternate"></div>
+      <div className="h-[2px] border-t-2 border-primary/70"></div>
+
+      <div className="flex gap-3 px-[20px] py-2">
+        <div className="flex-1 min-w-[180px] max-w-[360px]">
+            <label
+              htmlFor="grupos-complementos-search"
+              className="text-xs font-semibold text-secondary-text mb-1 block"
+            >
+              Buscar grupo...
+            </label>
+            <div className="relative h-8">
+              <input
+                id="grupos-complementos-search"
+                type="text"
+                placeholder="Pesquisar grupo..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="w-full h-full px-5 pl-12 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              />
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
+                <MdSearch size={18} />
+              </span>
+            </div>
+          </div>
+
+          <div className="w-full sm:w-[160px]">
+            <label className="text-xs font-semibold text-secondary-text mb-1 block">
+              Status
+            </label>
+            <select
+              value={filterStatus}
+              onChange={(e) =>
+                setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
+              }
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+            >
+              <option value="Todos">Todos</option>
+              <option value="Ativo">Ativo</option>
+              <option value="Desativado">Desativado</option>
+            </select>
+          </div>
+      </div>
 
       {/* Cabeçalho da tabela */}
-      <div className="px-[30px] mt-2">
+      <div className="px-[30px] mt-1">
         <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px]">
           <div className="flex-[1] font-nunito font-semibold text-sm text-primary-text">
             Ordem
@@ -368,7 +465,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
             {[...Array(8)].map((_, i) => (
               <div
                 key={i}
-                className="h-[50px] bg-info rounded-xl px-4 flex items-center gap-[10px] animate-pulse"
+                className="h-[50px] bg-info rounded-lg px-4 flex items-center gap-[10px] animate-pulse"
               >
                 <Skeleton className="flex-[1] h-4" />
                 <Skeleton className="flex-[2] h-10 w-10" />
@@ -402,6 +499,14 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
                 index={index}
                 onStatusChanged={handleStatusChange}
                 onToggleStatus={handleToggleGrupoStatus}
+                onCreateProduto={(grupoId) => handleOpenProdutoModal(grupoId)}
+                onEdit={(g) =>
+                  openTabsModal({
+                    tab: 'grupo',
+                    mode: 'edit',
+                    grupoId: g.getId(),
+                  })
+                }
               />
             ))}
           </SortableContext>
@@ -421,5 +526,18 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
         )}
       </div>
     </div>
+    <GruposProdutosTabsModal
+      state={tabsModalState}
+      onClose={closeTabsModal}
+      onReload={handleTabsModalReload}
+      onTabChange={handleTabsModalTabChange}
+    />
+    <ProdutosTabsModal
+      state={produtoTabsState}
+      onClose={handleCloseProdutoModal}
+      onReload={onReload}
+      onTabChange={handleProdutoTabChange}
+    />
+    </>
   )
 }

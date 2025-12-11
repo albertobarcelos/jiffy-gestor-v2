@@ -277,14 +277,14 @@ export function ConfiguracoesGeraisStep({
 
   return (
     <>
-      <div className="rounded-[24px] border border-[#E5E7F2] bg-white p-4 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
+      <div className="rounded-lg border border-[#E5E7F2] bg-white p-4 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
         {/* Título */}
         <div className="flex flex-col gap-2 mb-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
-            <h3 className="text-[#4F1D8C] text-xl font-semibold font-exo">
+            <h3 className="text-primary text-xl font-semibold font-exo">
               Configurações Gerais
             </h3>
-            <div className="flex-1 h-px bg-[#CBA4FF]/60" />
+            <div className="flex-1 h-px bg-primary/60" />
           </div>
           <p className="text-sm text-secondary-text font-nunito">
             Ajuste como o produto se comporta no PDV, habilite complementos e defina as impressoras responsáveis.
@@ -293,7 +293,7 @@ export function ConfiguracoesGeraisStep({
 
         <div className="grid gap-3 xl:grid-cols-3">
           {/* Cartão Geral */}
-          <div className="col-span-full xl:col-span-1 rounded-[24px] border border-[#E6E9F4] bg-gradient-to-b from-[#F9FAFF] to-white shadow-[0_10px_30px_rgba(15,23,42,0.08)] p-5">
+          <div className="col-span-full xl:col-span-1 rounded-lg border border-[#E6E9F4] bg-gradient-to-b from-[#F9FAFF] to-white shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
             <h4 className="text-primary-text font-semibold font-exo text-base mb-2">
               Geral
             </h4>
@@ -330,13 +330,13 @@ export function ConfiguracoesGeraisStep({
                     {toggle.label}
                   </span>
                   <span
-                    className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors ${
+                    className={`relative inline-flex h-5 w-12 items-center rounded-full transition-colors ${
                       toggle.checked ? 'bg-primary' : 'bg-gray-300'
                     }`}
                   >
                     <span
-                      className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                        toggle.checked ? 'translate-x-6' : 'translate-x-1'
+                      className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                        toggle.checked ? 'translate-x-7' : 'translate-x-1'
                       }`}
                     />
                   </span>
@@ -353,13 +353,13 @@ export function ConfiguracoesGeraisStep({
                     Ativo
                   </span>
                   <span
-                    className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors ${
-                      ativo ? 'bg-[#11B981]' : 'bg-gray-300'
+                    className={`relative inline-flex h-5 w-12 items-center rounded-full transition-colors ${
+                      ativo ? 'bg-primary' : 'bg-gray-300'
                     }`}
                   >
                     <span
-                      className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                        ativo ? 'translate-x-6' : 'translate-x-1'
+                      className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                        ativo ? 'translate-x-7' : 'translate-x-1'
                       }`}
                     />
                   </span>
@@ -369,7 +369,7 @@ export function ConfiguracoesGeraisStep({
           </div>
 
           {/* Cartão de Grupos */}
-          <div className="col-span-full xl:col-span-1 rounded-[24px] border border-[#E6E9F4] bg-white shadow-[0_10px_30px_rgba(15,23,42,0.08)] px-5 py-2">
+          <div className="col-span-full xl:col-span-1 rounded-lg border border-[#E6E9F4] bg-white shadow-[0_10px_30px_rgba(15,23,42,0.08)] px-5 py-2">
             <div className="flex flex-col gap-2 mb-1">
               <p className="text-primary-text font-semibold font-exo text-base">
                 Grupos de Complementos
@@ -382,7 +382,7 @@ export function ConfiguracoesGeraisStep({
               type="button"
               onClick={handleOpenComplementosDialog}
               disabled={isLoadingComplementos || !abreComplementos}
-              className="w-full h-9 rounded-[18px] bg-primary text-white font-semibold font-nunito text-xs flex items-center justify-center gap-2 shadow-[0_8px_20px_rgba(10,57,122,0.35)] transition-all hover:bg-[#0b458f] disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full h-8 rounded-lg bg-primary text-white font-semibold font-nunito text-xs flex items-center justify-center gap-2 shadow-[0_8px_20px_rgba(10,57,122,0.35)] transition-all hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <MdAdd size={14} />
               Grupos de Complementos
@@ -397,7 +397,7 @@ export function ConfiguracoesGeraisStep({
                 {selectedComplementos.map((grupo) => (
                   <span
                     key={grupo.id}
-                    className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-3 py-1 text-xs font-semibold"
+                    className="inline-flex items-center gap-1 rounded-lg hover:bg-primary/20 transition-colors bg-primary/10 text-primary px-3 py-1 text-xs font-semibold"
                   >
                     {grupo.nome || 'Grupo'}
                     <button
@@ -415,7 +415,7 @@ export function ConfiguracoesGeraisStep({
           </div>
 
           {/* Cartão de Impressoras */}
-          <div className="col-span-full xl:col-span-1 rounded-[24px] border border-[#E6E9F4] bg-white shadow-[0_10px_30px_rgba(15,23,42,0.08)] px-5 py-2">
+          <div className="col-span-full xl:col-span-1 rounded-lg border border-[#E6E9F4] bg-info shadow-[0_10px_30px_rgba(15,23,42,0.08)] px-5 py-2">
             <div className="flex flex-col gap-2 mb-1">
               <p className="text-primary-text font-semibold font-exo text-base">
                 Impressoras
@@ -428,7 +428,7 @@ export function ConfiguracoesGeraisStep({
               type="button"
               onClick={handleOpenImpressorasDialog}
               disabled={isLoadingImpressoras}
-              className="w-full h-9 rounded-[18px] bg-[#0A397A] text-white font-semibold font-nunito text-xs flex items-center justify-center gap-2 shadow-[0_8px_20px_rgba(10,57,122,0.35)] transition-all hover:bg-[#0b458f] disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full h-8 rounded-lg bg-primary hover:bg-primary/90 text-info font-semibold font-nunito text-xs flex items-center justify-center gap-2 shadow-[0_8px_20px_rgba(10,57,122,0.35)] transition-all hover:bg-[#0b458f] disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <MdPrint size={14} />
               Selecionar Impressoras
@@ -438,7 +438,7 @@ export function ConfiguracoesGeraisStep({
                 {selectedImpressoras.map((impressora) => (
                   <span
                     key={impressora.id}
-                    className="inline-flex items-center gap-1 rounded-full bg-secondary-bg text-secondary-text px-3 py-1 text-xs font-semibold"
+                    className="inline-flex items-center gap-1 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors px-3 py-1 text-xs font-semibold"
                   >
                     {impressora.nome || 'Impressora'}
                     <button
@@ -460,14 +460,22 @@ export function ConfiguracoesGeraisStep({
         <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <Button
             onClick={onBack}
-            className="h-11 px-8 rounded-[30px] bg-[#CFD5E8] text-[#0A397A] font-semibold font-exo text-sm hover:bg-[#bac2da]"
-          >
+            className="h-8 px-10 border-2 rounded-lg font-semibold font-exo text-sm hover:bg-primary/20"
+            sx={{
+              backgroundColor: 'var(--color-info)',
+              color: 'var(--color-primary)',
+              borderColor: 'var(--color-primary)',
+              border: '1px solid',
+            }}          >
             Voltar
           </Button>
           <Button
             onClick={onSave}
-            className="h-11 px-10 rounded-[30px] bg-[#0A397A] text-white font-semibold font-exo text-sm hover:bg-[#0c448f]"
-          >
+            className="h-8 px-10 rounded-lg text-white font-semibold font-exo text-sm hover:bg-primary/90"
+            sx={{
+              backgroundColor: 'var(--color-primary)',
+              
+            }}          >
             Salvar
           </Button>
         </div>

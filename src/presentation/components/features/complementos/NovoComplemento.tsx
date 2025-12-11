@@ -67,7 +67,7 @@ export function NovoComplemento({
 
           setNome(complemento.getNome())
           setDescricao(complemento.getDescricao() || '')
-          setValor(complemento.getValor().toString())
+          setValor(formatValorFromNumber(complemento.getValor()))
           const tipoBanco = (complemento.getTipoImpactoPreco() || 'nenhum').toLowerCase()
           const tipoNormalizado =
             tipoBanco === 'aumenta' || tipoBanco === 'diminui' ? tipoBanco : 'nenhum'
@@ -97,6 +97,13 @@ export function NovoComplemento({
       currency: 'BRL',
     })
     return formatted
+  }
+
+  const formatValorFromNumber = (value: number) => {
+    return value.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    })
   }
 
   const parseValorToNumber = (value: string): number => {
@@ -178,20 +185,20 @@ export function NovoComplemento({
   return (
     <div className="flex flex-col h-full">
       {/* Header fixo */}
-      <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[30px] shadow-md px-[30px] py-4">
+      <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[20px] shadow-md px-[30px] py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-primary/25 text-primary flex items-center justify-center">
-              <span className="text-2xl"><MdOutlineOfflinePin /></span>
-            </div>
+            
             <h1 className="text-primary text-lg font-semibold font-exo">
-              {isEditing ? 'Editar Complemento' : 'Cadastrar Novo Complemento'}
+              {isEditing
+                ? `Editar Complemento: ${nome || ''}`
+                : `Cadastrar Novo Complemento: ${nome || ''}`}
             </h1>
           </div>
           <Button
             onClick={handleCancel}
             variant="outlined"
-            className="h-9 px-[26px] rounded-[30px] border-primary/15 text-primary bg-primary/10 hover:bg-primary/20"
+            className="h-8 px-[26px] rounded-lg border-primary/15 text-primary bg-primary/10 hover:bg-primary/20"
           >
             Cancelar
           </Button>
@@ -204,10 +211,10 @@ export function NovoComplemento({
           {/* Dados */}
           <div className="bg-info rounded-[10px] p-2">
             <div className="flex items-center gap-5 mb-2">
-              <h2 className="text-secondary text-xl font-semibold font-exo">
-                Dados
+              <h2 className="text-primary text-xl font-semibold font-exo">
+                Dados do Complemento
               </h2>
-              <div className="flex-1 h-px bg-alternate"></div>
+              <div className="flex-1 h-px bg-primary/70"></div>
             </div>
 
             <div className="space-y-2">
@@ -220,7 +227,7 @@ export function NovoComplemento({
                     onChange={(e) => setAtivo(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-14 h-7 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-accent1"></div>
+                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[9px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                 </label>
               </div>
 
@@ -293,7 +300,7 @@ export function NovoComplemento({
             sx={{
               backgroundColor: 'var(--color-primary)',
             }}
-            className="text-white hover:bg-primary/80 w-32">
+            className="text-white hover:bg-primary/80 w-32 h-8">
               {isLoading ? 'Salvando...' : isEditing ? 'Atualizar' : 'Salvar'}
             </Button>
           </div>

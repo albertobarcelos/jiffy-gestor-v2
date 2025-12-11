@@ -223,14 +223,14 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
         <div className="flex items-center gap-2">
           <button
             onClick={handleCancel}
-            className="px-6 py-2 bg-primary-bg text-primary-text rounded-lg font-nunito text-sm hover:bg-primary-bg/80 transition-colors"
+            className="px-6 h-8 bg-primary-bg text-primary-text rounded-lg font-nunito text-sm hover:bg-primary-bg/80 transition-colors"
           >
             Cancelar
           </button>
           <button
             onClick={handleSave}
             disabled={isLoading}
-            className="px-6 py-2 bg-primary text-info rounded-lg font-nunito text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 h-8 bg-primary text-info rounded-lg font-nunito text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? 'Salvando...' : 'Salvar'}
           </button>
@@ -238,13 +238,13 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
       </div>
 
       {/* Conteúdo principal */}
-      <div className="flex-1 bg-primary-bg rounded-tl-[30px] overflow-y-auto">
+      <div className="flex-1 bg-primary-bg rounded-tl-lg overflow-y-auto">
         {/* Tabs */}
-        <div className="border-b border-secondary/20">
+        <div className="border-b border-primary/20">
           <div className="flex px-8">
             <button
               onClick={() => setActiveTab(0)}
-              className={`px-6 py-4 font-nunito text-sm transition-colors ${
+              className={`px-6 py-2 font-nunito text-sm transition-colors ${
                 activeTab === 0
                   ? 'text-primary border-b-2 border-primary font-semibold'
                   : 'text-secondary-text'
@@ -254,7 +254,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
             </button>
             <button
               onClick={() => setActiveTab(1)}
-              className={`px-6 py-4 font-nunito text-sm transition-colors ${
+              className={`px-6 py-2 font-nunito text-sm transition-colors ${
                 activeTab === 1
                   ? 'text-primary border-b-2 border-primary font-semibold'
                   : 'text-secondary-text'
@@ -266,17 +266,17 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
         </div>
 
         {/* Conteúdo das tabs */}
-        <div className="p-8">
+        <div className="p-1">
           {activeTab === 0 && (
             <div className="max-w-4xl">
               {/* Card de informações */}
-              <div className="bg-info rounded-t-[20px] rounded-b-[10px] mb-6">
+              <div className="bg-info rounded-t-lg rounded-b-lg mt-2 mx-2">
                 {/* Header do card */}
-                <div className="px-5 py-4 border-b border-secondary/10">
+                <div className="px-5 py-4 border-b border-primary/10">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div
-                        className="w-12 h-12 rounded-[10px] bg-white border-2 flex items-center justify-center"
+                        className="w-12 h-12 rounded-lg bg-white border-2 flex items-center justify-center"
                         style={{ borderColor: corHex || '#000000' }}
                       >
                         {iconName ? (
@@ -305,7 +305,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
                           onChange={(e) => setAtivo(e.target.checked)}
                           className="sr-only peer"
                         />
-                        <div className="w-11 h-6 bg-secondary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-info after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent1"></div>
+                        <div className="w-12 h-5 bg-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[16px] after:bg-info after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
                       </label>
                     </div>
                   </div>
@@ -324,7 +324,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
                         value={nome}
                         onChange={(e) => setNome(e.target.value)}
                         placeholder="Digite o nome do grupo"
-                        className="w-full px-4 py-3 bg-primary-bg border border-secondary/20 rounded-lg text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary font-nunito"
+                        className="w-full px-4 py-3 bg-primary-bg border border-primary/20 rounded-lg text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary font-nunito"
                         required
                       />
                     </div>
@@ -341,7 +341,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
                             <button
                               type="button"
                               onClick={() => setIsColorPickerOpen(true)}
-                              className="w-16 h-12 rounded-lg border border-secondary/20 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                              className="w-12 h-12 rounded-lg border border-primary/20 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                               style={{ backgroundColor: corHex || '#530CA3' }}
                               aria-label="Selecionar cor do grupo"
                             />
@@ -349,7 +349,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
                             <button
                               type="button"
                               onClick={() => setIsColorPickerOpen(true)}
-                              className="px-4 py-3 bg-primary text-info rounded-lg font-nunito text-sm font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
+                              className="px-2 py-3 bg-primary text-info rounded-lg font-nunito text-sm font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
                             >
                               Escolher cor
                             </button>
@@ -367,7 +367,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
                           <button
                             type="button"
                             onClick={() => setIsIconPickerOpen(true)}
-                            className="w-12 h-12 rounded-lg border border-secondary/30 bg-white flex items-center justify-center hover:shadow-lg transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                            className="w-12 h-12 rounded-lg border border-primary/30 bg-white flex items-center justify-center hover:shadow-lg transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                             aria-label="Selecionar ícone"
                           >
                             {iconName ? (
@@ -379,7 +379,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
                           <button
                             type="button"
                             onClick={() => setIsIconPickerOpen(true)}
-                            className="px-6 py-3 bg-primary text-info rounded-lg font-nunito text-sm font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
+                            className="px-2 py-3 bg-primary text-info rounded-lg font-nunito text-sm font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
                           >
                             Escolher Ícone
                           </button>
@@ -443,7 +443,8 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
                             type="checkbox"
                             checked={ativoDelivery}
                             onChange={(e) => setAtivoDelivery(e.target.checked)}
-                            className="w-5 h-5 rounded border-secondary/20 text-primary focus:ring-primary"
+                            className="w-5 h-5 rounded border-primary/60 text-primary focus:ring-primary"
+                            style={{ accentColor: 'var(--color-primary)' }}
                           />
                           <span className="text-primary-text text-sm font-nunito">
                             Ativo para Delivery
@@ -456,7 +457,8 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
                             type="checkbox"
                             checked={ativoLocal}
                             onChange={(e) => setAtivoLocal(e.target.checked)}
-                            className="w-5 h-5 rounded border-secondary/20 text-primary focus:ring-primary"
+                            className="w-5 h-5 rounded border-primary/60 text-primary focus:ring-primary"
+                            style={{ accentColor: 'var(--color-primary)' }}
                           />
                           <span className="text-primary-text text-sm font-nunito">
                             Ativo para Local

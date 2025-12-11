@@ -72,7 +72,7 @@ export function ProdutosTabsModal({ state, onClose, onReload, onTabChange }: Pro
           m: 0,
           height: '100vh',
           maxHeight: '100vh',
-          width: 'min(950px, 65vw)',
+          width: 'min(850px, 58vw)',
           borderRadius: 0,
           display: 'flex',
           flexDirection: 'column',
@@ -96,7 +96,7 @@ export function ProdutosTabsModal({ state, onClose, onReload, onTabChange }: Pro
               type="button"
               disabled={tab.disabled}
               onClick={() => !tab.disabled && onTabChange(tab.key)}
-              className={`px-4 py-2 rounded-t-[14px] text-sm font-semibold transition-colors ${
+              className={`px-4 py-2 rounded-t-lg text-sm font-semibold transition-colors ${
                 state.tab === tab.key
                   ? 'bg-primary text-white'
                   : 'bg-gray-100 text-secondary-text hover:bg-gray-200'

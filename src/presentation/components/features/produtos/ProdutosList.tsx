@@ -164,11 +164,23 @@ const ProdutoListItem = function ProdutoListItem({
     }),
     [produto]
   )
-  const [valorInput, setValorInput] = useState(produto.getValor().toFixed(2))
+  const formatCurrencyValue = useCallback((value: number | string) => {
+    const numberValue =
+      typeof value === 'number'
+        ? value
+        : Number(value.replace(/\D/g, '')) / 100
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+    }).format(Number.isNaN(numberValue) ? 0 : numberValue)
+  }, [])
+
+  const [valorInput, setValorInput] = useState(formatCurrencyValue(produto.getValor()))
 
   useEffect(() => {
-    setValorInput(produto.getValor().toFixed(2))
-  }, [produto])
+    setValorInput(formatCurrencyValue(produto.getValor()))
+  }, [produto, formatCurrencyValue])
 
   const normalizeValor = useCallback((valor: string) => {
     const trimmed = valor.replace(/\s/g, '').replace(/[^\d.,-]/g, '')
@@ -191,6 +203,16 @@ const ProdutoListItem = function ProdutoListItem({
     }
     onValorChange(parsed)
   }, [onValorChange, normalizeValor, valorInput, produto])
+
+  // Salva automaticamente após alguns segundos sem digitar (debounce)
+  useEffect(() => {
+    if (!onValorChange) return undefined
+    const timeout = setTimeout(() => {
+      handleValorSubmit()
+    }, 1500)
+
+    return () => clearTimeout(timeout)
+  }, [valorInput, handleValorSubmit, onValorChange])
 
   const actionIcons = useMemo(
     () => [
@@ -248,7 +270,7 @@ const ProdutoListItem = function ProdutoListItem({
               type="button"
               onClick={() => onEditProduto?.(produto.getId())}
               title="Editar produto"
-              className="rounded-full bg-primary/10 border border-primary p-1 text-[var(--color-primary)] hover:bg-primary/20 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="rounded-full bg-primary/10 border border-primary w-5 h-5 flex items-center justify-center text-[var(--color-primary)] hover:bg-primary/20 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               aria-label={`Editar ${produto.getNome()}`}
             >
               <MdModeEdit className="text-sm" />
@@ -277,7 +299,7 @@ const ProdutoListItem = function ProdutoListItem({
                   title={label}
                   disabled={isLoading}
                   onClick={() => onToggleBoolean?.(field, !isActive)}
-                  className={`w-6 h-6 p-1 rounded-full flex items-center justify-center text-lg transition-all ${bgColor} ${iconColor} ${isLoading
+                  className={`w-5 h-5 rounded-full flex items-center justify-center text-sm transition-all ${bgColor} ${iconColor} ${isLoading
                       ? 'opacity-60 cursor-not-allowed'
                       : 'hover:bg-primary/80 hover:text-white  focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/80'
                     }`}
@@ -302,7 +324,7 @@ const ProdutoListItem = function ProdutoListItem({
                   title={label}
                   disabled={!handleModalClick}
                   onClick={() => handleModalClick?.()}
-                  className={`w-6 h-6 p-1 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${!handleModalClick ? 'opacity-60 cursor-not-allowed' : 'hover:bg-primary/10'}`}
+                  className={`w-5 h-5 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${!handleModalClick ? 'opacity-60 cursor-not-allowed' : 'hover:bg-primary/10'}`}
                 >
                   <Icon />
                 </button>
@@ -316,7 +338,7 @@ const ProdutoListItem = function ProdutoListItem({
                   type="button"
                   title={label}
                   onClick={() => onCopyProduto?.(produto.getId())}
-                  className="w-6 h-6 p-1 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-lg hover:bg-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="w-5 h-5 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-sm hover:bg-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <Icon />
                 </button>
@@ -327,7 +349,7 @@ const ProdutoListItem = function ProdutoListItem({
               <span
                 key={`${produto.getId()}-${key}`}
                 title={label}
-                className="w-6 h-6 p-1 rounded-full bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-lg"
+                className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-sm"
               >
                 <Icon />
               </span>
@@ -340,13 +362,25 @@ const ProdutoListItem = function ProdutoListItem({
         <div className="flex flex-col">
           <label className="text-xs text-secondary-text font-nunito mb-1">Valor (R$)</label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text text-sm">
-              R$
-            </span>
+            
             <input
               type="text"
               value={valorInput}
-              onChange={(event) => setValorInput(event.target.value)}
+              onChange={(event) => {
+                const raw = event.target.value
+                setValorInput(formatCurrencyValue(raw))
+              }}
+              onFocus={(event) => {
+                event.target.select()
+              }}
+              onClick={(event) => {
+                // Seleciona tudo a cada clique para facilitar a edição rápida
+                event.currentTarget.select()
+              }}
+              onMouseUp={(event) => {
+                // Evita que o mouseup remova a seleção aplicada no focus/click
+                event.preventDefault()
+              }}
               onBlur={handleValorSubmit}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
@@ -354,7 +388,7 @@ const ProdutoListItem = function ProdutoListItem({
                 }
               }}
               disabled={isSavingValor}
-              className="pl-9 pr-4 py-2 rounded-xl border border-gray-200 focus:border-primary focus:outline-none text-sm font-semibold text-primary-text w-32 disabled:opacity-60 disabled:cursor-not-allowed"
+              className=" p-2 rounded-xl border border-gray-200 focus:border-primary focus:outline-none text-sm font-semibold text-primary-text w-32 disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
           <span className="text-[11px] text-secondary-text mt-1">{valorFormatado}</span>
@@ -362,7 +396,7 @@ const ProdutoListItem = function ProdutoListItem({
         <div className="flex items-center">
           <label
             title="Ativar/Desativar produto"
-            className={`relative inline-flex h-7 w-12 items-center ${isSavingStatus ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+            className={`relative inline-flex h-5 w-12 items-center ${isSavingStatus ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
           >
             <input
               type="checkbox"
@@ -372,10 +406,10 @@ const ProdutoListItem = function ProdutoListItem({
               disabled={isSavingStatus}
             />
             <div
-              className="h-full w-full rounded-full bg-gray-300 transition-colors peer-focus:ring-2 peer-focus:ring-primary peer-checked:bg-accent1"
+              className="h-full w-full rounded-full bg-gray-300 transition-colors peer-focus:ring-2 peer-focus:ring-primary peer-checked:bg-primary"
             />
             <span
-              className="absolute left-1 top-1/2 block h-5 w-5 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-5"
+              className="absolute left-1 top-1/2 block h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-6"
             />
           </label>
         </div>
@@ -1150,7 +1184,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px] py-[4px]">
+      <div className="px-[30px]">
         <div className="flex flex-col gap-4">
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div className="pl-5">
@@ -1164,7 +1198,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
             <div className="flex items-center justify-end flex-1 gap-4">
             <Link
               href="/produtos/atualizar-preco"
-              className="h-10 px-[30px] bg-info text-primary-text border border-secondary rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-secondary-bg transition-colors"
+              className="h-8 px-[30px] bg-info text-primary-text border border-primary/50 rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/10 transition-colors"
             >
               Atualizar Preços
             </Link>
@@ -1176,7 +1210,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
                     produto: undefined,
                   })
                 }
-                className="h-10 px-[30px] bg-primary text-info rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+                className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
               >
                 Novo
                 <span className="text-lg">+</span>
@@ -1185,7 +1219,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
           </div>
         </div>
       </div>
-      <div className="h-[4px] border-t-2 border-alternate"></div>
+      <div className="h-[4px] border-t-2 border-primary/50"></div>
       <div className="bg-white px-[20px] py-2 border-b border-gray-100">
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex-1 min-w-[180px]">
@@ -1200,7 +1234,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
                 placeholder="Pesquisar produto..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full pl-11 pr-4 rounded-[24px] border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+                className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
               />
             </div>
           </div>
@@ -1210,7 +1244,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')}
-              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
             >
               <option value="Todos">Todos</option>
               <option value="Ativo">Ativo</option>
@@ -1223,7 +1257,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
             <select
               value={ativoLocalFilter}
               onChange={(e) => setAtivoLocalFilter(e.target.value as 'Todos' | 'Sim' | 'Não')}
-              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
             >
               <option value="Todos">Todos</option>
               <option value="Sim">Sim</option>
@@ -1236,7 +1270,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
             <select
               value={ativoDeliveryFilter}
               onChange={(e) => setAtivoDeliveryFilter(e.target.value as 'Todos' | 'Sim' | 'Não')}
-              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
             >
               <option value="Todos">Todos</option>
               <option value="Sim">Sim</option>
@@ -1250,7 +1284,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
               value={grupoProdutoFilter}
               onChange={(e) => setGrupoProdutoFilter(e.target.value)}
               disabled={isLoadingGruposProdutos}
-              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <option value="">{isLoadingGruposProdutos ? 'Carregando...' : 'Todos'}</option>
               {!isLoadingGruposProdutos &&
@@ -1268,7 +1302,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
               value={grupoComplementoFilter}
               onChange={(e) => setGrupoComplementoFilter(e.target.value)}
               disabled={isLoadingGruposComplementos}
-              className="w-full h-8 px-5 rounded-[24px] border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <option value="">{isLoadingGruposComplementos ? 'Carregando...' : 'Todos'}</option>
               {!isLoadingGruposComplementos &&
@@ -1284,7 +1318,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
             <button
               type="button"
               onClick={handleClearFilters}
-              className="h-8 px-5 rounded-[24px] border border-gray-300 text-sm font-semibold text-primary-text bg-white hover:bg-gray-50 transition-colors"
+              className="h-8 px-5 rounded-lg border border-primary/50 text-sm font-semibold text-primary-text bg-white hover:bg-primary/10 transition-colors"
             >
               Limpar filtros
             </button>
@@ -1347,13 +1381,13 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
                         title="Editar grupo"
                         onClick={() => handleEditGrupoProduto(grupoId, primeiroProduto)}
                         disabled={!grupoId}
-                        className={`w-6 h-6 rounded-full border border-gray-200 flex items-center justify-center text-primary-text hover:bg-primary/10 transition-colors ${
+                        className={`w-5 h-5 rounded-full border border-gray-200 flex items-center justify-center text-primary-text hover:bg-primary/10 transition-colors ${
                           !grupoId ? 'opacity-50 cursor-not-allowed' : ''
                         }`}
                       >
                         <MdModeEdit size={14} />
                       </button>
-                      <label className="relative inline-flex items-center h-5 w-10">
+                      <label className="relative inline-flex items-center h-5 w-12">
                         <input
                           type="checkbox"
                           className="sr-only peer"
@@ -1361,8 +1395,8 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
                           onChange={() => handleToggleGroupStatus(grupoId)}
                           disabled={!grupoId}
                         />
-                        <div className="w-full h-full rounded-full bg-gray-300 peer-checked:bg-accent1 transition-colors" />
-                        <span className="absolute left-1 top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-white shadow peer-checked:translate-x-5 transition-transform" />
+                        <div className="w-full h-full rounded-full bg-gray-300 peer-checked:bg-primary transition-colors" />
+                        <span className="absolute left-1 top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-white shadow peer-checked:translate-x-6 transition-transform" />
                       </label>
                     </div>
                     <p className="text-xs text-secondary-text">{items.length} produtos</p>
@@ -1375,7 +1409,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
                 <div className="flex items-center justify-end flex-1">
                   <button
                     onClick={() => handleCreateProdutoForGroup(grupo)}
-                    className="h-6 px-[20px] bg-info border border-primary text-primary rounded-[10px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/10 transition-colors"
+                    className="h-8 px-[20px] bg-info border border-primary/50 text-primary rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/10 transition-colors"
                   >
                     Adicionar produto
                     <span className="text-sm">+</span>

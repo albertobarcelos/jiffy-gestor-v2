@@ -60,15 +60,11 @@ export function ComplementosTabsModal({
       }}
     >
       <DialogContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <div className="px-6 pt-6 pb-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-primary-text">{title}</h2>
-        </div>
-
         <div className="px-6 pt-2 flex gap-1 border-b border-gray-100 bg-white">
           <button
             type="button"
             onClick={() => onTabChange('complemento')}
-            className={`px-4 py-2 rounded-t-[14px] text-sm font-semibold transition-colors ${
+            className={`px-4 py-2 rounded-t-lg text-sm font-semibold transition-colors ${
               state.tab === 'complemento'
                 ? 'bg-primary text-white'
                 : 'bg-gray-100 text-secondary-text hover:bg-gray-200'

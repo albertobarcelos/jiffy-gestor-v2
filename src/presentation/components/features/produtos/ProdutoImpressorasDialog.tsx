@@ -357,7 +357,7 @@ export function ProdutoImpressorasDialog({
         {filteredImpressoras.map((impressora) => (
           <div
             key={impressora.id}
-            className="rounded-2xl border border-gray-200 bg-white px-4 py-3 flex flex-col gap-2"
+            className="rounded-lg border border-gray-200 bg-white px-4 py-3 flex flex-col gap-2"
           >
             <div className="flex items-center gap-3">
               <button
@@ -369,8 +369,8 @@ export function ProdutoImpressorasDialog({
               >
                 <MdDelete size={18} />
               </button>
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                <MdPrint size={20} />
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                <MdPrint />
               </div>
               <div className="flex-1">
                 <p className="text-sm font-semibold text-primary-text">{impressora.nome}</p>
@@ -379,7 +379,7 @@ export function ProdutoImpressorasDialog({
                 </p>
               </div>
               <span
-                className={`text-[11px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full ${
+                className={`text-[11px] font-semibold uppercase tracking-wide px-2 py-1 rounded-lg ${
                   impressora.ativo ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
                 }`}
               >
@@ -403,7 +403,7 @@ export function ProdutoImpressorasDialog({
   }
 
   const header = (
-    <div className="pr-8 flex flex-col gap-2">
+    <div className="pr-8 flex flex-row items-center justify-between gap-2">
       <div className="flex flex-col gap-1">
         <h3 className="text-lg font-semibold text-primary-text">
           {produtoNome ? `Impressoras de ${produtoNome}` : 'Impressoras vinculadas'}
@@ -413,30 +413,30 @@ export function ProdutoImpressorasDialog({
           {impressoras.length === 1 ? 'impressora encontrada' : 'impressoras encontradas'}
         </p>
       </div>
-      
+      <button
+          type="button"
+          onClick={handleOpenSelectDialog}
+          disabled={isUpdating}
+          className="h-8 px-4 rounded-lg bg-primary text-white text-sm font-semibold flex items-center gap-2 transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          <MdAdd size={16} />
+          Vincular impressoras
+        </button>
     </div>
   )
 
   const body = (
     <>
-      <div className="flex items-center gap-3 mb-2">
-        <button
-          type="button"
-          onClick={handleOpenSelectDialog}
-          disabled={isUpdating}
-          className="h-8 px-4 rounded-[24px] bg-primary text-white text-sm font-semibold flex items-center gap-2 transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          <MdAdd size={16} />
-          Adicionar impressoras
-        </button>
-        <div className="relative flex-1">
+      <div className="flex flex-col items-start gap-1 mb-2 max-w-[400px]">
+        <span className="text-xs font-semibold text-secondary-text">Buscar impressoras vinculadas</span>
+        <div className="relative flex-1 w-full">
           <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
           <input
             type="text"
-            placeholder="Buscar impressora..."
+            placeholder="Digite para filtrar..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            className="w-full h-8 pl-10 pr-4 rounded-[24px] border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
+            className="w-full h-8 pl-10 pr-4 rounded-lg border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
           />
         </div>
       </div>
@@ -456,9 +456,18 @@ export function ProdutoImpressorasDialog({
       maxWidth="sm"
     >
       <DialogHeader>
+        <div className="flex h-16 items-top justify-between border-b-2 border-primary/70">
         <DialogTitle>Selecionar impressoras</DialogTitle>
+        <button
+          type="button"
+          className="h-8 px-6 rounded-lg bg-primary text-info text-sm font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
+          aria-label="Criar nova impressora"
+        >
+          Criar nova impressora
+        </button>
+        </div>
       </DialogHeader>
-      <DialogContent sx={{ padding: '16px 24px' }}>
+      <DialogContent sx={{ padding: '4px 24px' }}>
         <div className="relative mb-4">
           <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={18} />
           <input
@@ -466,7 +475,7 @@ export function ProdutoImpressorasDialog({
             value={selectSearch}
             onChange={(event) => setSelectSearch(event.target.value)}
             placeholder="Buscar impressora..."
-            className="w-full h-11 pl-10 pr-4 rounded-[24px] border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
+            className="w-full h-8 pl-10 pr-4 rounded-lg border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
           />
         </div>
         <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
@@ -507,7 +516,7 @@ export function ProdutoImpressorasDialog({
         <button
           type="button"
           onClick={handleCloseSelectDialog}
-          className="h-10 px-5 rounded-[24px] border border-gray-300 text-sm font-semibold text-primary-text hover:bg-gray-50 transition-colors"
+          className="h-8 px-5 rounded-lg border border-gray-300 text-sm font-semibold text-primary-text hover:bg-gray-50 transition-colors"
         >
           Cancelar
         </button>
@@ -515,7 +524,7 @@ export function ProdutoImpressorasDialog({
           type="button"
           onClick={handleApplySelection}
           disabled={isSavingSelection || isUpdating}
-          className="h-10 px-6 rounded-[24px] bg-primary text-info text-sm font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="h-8 px-6 rounded-lg bg-primary text-info text-sm font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isSavingSelection ? 'Aplicando...' : 'Aplicar seleção'}
         </button>
@@ -534,11 +543,11 @@ export function ProdutoImpressorasDialog({
         <div className="h-full flex flex-col overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">{header}</div>
           <div className="flex-1 overflow-y-auto px-6 py-4">{body}</div>
-          <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
+          <div className="px-6 py-12 border-t border-gray-100 flex justify-end">
             <button
               type="button"
               onClick={handleClose}
-              className="h-10 px-6 rounded-[24px] border border-gray-300 text-sm font-semibold text-primary-text hover:bg-gray-50 transition-colors"
+              className="h-8 px-6 rounded-lg border border-primary text-sm font-semibold text-primary hover:bg-primary/20 transition-colors"
             >
               Fechar
             </button>
