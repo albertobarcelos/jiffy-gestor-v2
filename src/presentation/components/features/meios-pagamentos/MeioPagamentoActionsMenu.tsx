@@ -169,7 +169,7 @@ export function MeioPagamentoActionsMenu({
             <span className="text-sm font-medium">Editar</span>
           </button>
 
-          <div className="h-px bg-alternate"></div>
+          <div className="h-px bg-primary"></div>
 
           {/* Ativar/Desativar */}
           <button
@@ -182,7 +182,7 @@ export function MeioPagamentoActionsMenu({
             </span>
           </button>
 
-          <div className="h-px bg-alternate"></div>
+          <div className="h-px bg-primary"></div>
 
           {/* Deletar */}
           <button

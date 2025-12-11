@@ -485,7 +485,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
           >
             <div className="h-[50px] px-4 flex items-center gap-[10px]">
               <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text flex items-center gap-2">
-                <span>{meioPagamento.getNome()}</span>
+                # <span>{meioPagamento.getNome()}</span>
                 <button
                   type="button"
                   title="Editar meio de pagamento"
