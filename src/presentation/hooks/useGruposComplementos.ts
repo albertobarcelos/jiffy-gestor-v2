@@ -41,6 +41,7 @@ export function useGruposComplementos(params: GruposComplementosQueryParams = {}
       searchParams.append('offset', params.offset?.toString() ?? '0')
 
       const response = await fetch(`/api/grupos-complementos?${searchParams.toString()}`, {
+        cache: 'no-store',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -88,6 +89,7 @@ export function useGruposComplementosInfinite(params: Omit<GruposComplementosQue
       searchParams.append('offset', pageParam.toString())
 
       const response = await fetch(`/api/grupos-complementos?${searchParams.toString()}`, {
+        cache: 'no-store',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -129,11 +131,10 @@ export function useGruposComplementosInfinite(params: Omit<GruposComplementosQue
     enabled: !!token,
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextOffset,
-    staleTime: 1000 * 60 * 5, // 5 minutos
-    gcTime: 1000 * 60 * 10, // 10 minutos
-    refetchOnWindowFocus: false, // Não refetch ao focar na janela
-    refetchOnMount: false, // Não refetch ao montar se já tiver dados em cache
-    placeholderData: (previousData) => previousData, // Prefetch automático
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnWindowFocus: false,
+    refetchOnMount: 'always',
   })
 }
 
