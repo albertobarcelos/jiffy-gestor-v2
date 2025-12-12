@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient } from '@/src/infrastructure/api/apiClient'
 
+interface ProdutosResponse {
+  items?: unknown[]
+  count?: number
+  [key: string]: unknown
+}
+
 /**
  * GET - Lista produtos vinculados a um grupo
  */
@@ -36,7 +42,7 @@ export async function GET(
       offset: String(offset),
     })
 
-    const { data } = await apiClient.request(
+    const response = await apiClient.request<ProdutosResponse>(
       `/api/v1/cardapio/produtos?${query.toString()}`,
       {
         method: 'GET',
@@ -46,8 +52,9 @@ export async function GET(
       }
     )
 
-    const items = Array.isArray(data?.items) ? data.items : []
-    const count = typeof data?.count === 'number' ? data.count : items.length
+    const data = (response.data ?? {}) as ProdutosResponse
+    const items = Array.isArray(data.items) ? data.items : []
+    const count = typeof data.count === 'number' ? data.count : items.length
     const nextOffset = items.length === limit ? offset + limit : null
 
     return NextResponse.json(
