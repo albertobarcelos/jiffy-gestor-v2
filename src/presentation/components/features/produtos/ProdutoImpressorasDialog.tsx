@@ -378,13 +378,7 @@ export function ProdutoImpressorasDialog({
                   {impressora.modelo || 'Modelo não informado'}
                 </p>
               </div>
-              <span
-                className={`text-[11px] font-semibold uppercase tracking-wide px-2 py-1 rounded-lg ${
-                  impressora.ativo ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
-                }`}
-              >
-                {impressora.ativo ? 'Ativa' : 'Inativa'}
-              </span>
+              
             </div>
             <div className="flex flex-wrap items-center gap-3 text-xs text-secondary-text pl-7">
               {impressora.local && <span>Local: {impressora.local}</span>}

@@ -168,7 +168,7 @@ export function ComplementosSelectModal({
               border: '1px solid',
             }}
           >
-            {confirmLabel}
+           {confirmLabel}
           </Button>
         </div>
       </div>
