@@ -12,7 +12,16 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   images: {
-    domains: [],
+    domains: ['localhost'],
+    remotePatterns: [
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '3845',
+        pathname: '/assets/**',
+      },
+    ],
+    unoptimized: true, // Para desenvolvimento com imagens do Figma
   },
   transpilePackages: ['recharts', '@radix-ui/react-slot'],
   // Otimizações de performance

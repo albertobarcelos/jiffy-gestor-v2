@@ -1,6 +1,7 @@
 'use client'
 
 import { TopNav } from '@/src/presentation/components/layouts/TopNav'
+import { TabBar } from '@/src/presentation/components/ui/TabBar'
 
 export default function PainelContadorLayout({
   children,
@@ -8,9 +9,10 @@ export default function PainelContadorLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col h-screen overflow-hidden">
       <TopNav />
-      <main className="flex-1 overflow-hidden">{children}</main>
+      <TabBar />
+      <main className="flex-1 overflow-hidden min-h-0">{children}</main>
     </div>
   )
 }
