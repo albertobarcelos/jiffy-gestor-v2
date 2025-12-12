@@ -196,20 +196,20 @@ export function ClientesList({ onReload }: ClientesListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px] pt-[30px] pb-[10px]">
+      <div className="px-[30px] pb-1">
         <div className="flex items-start justify-between">
           <div className="w-1/2 pl-5">
-            <p className="text-primary text-sm font-semibold font-nunito mb-2">
+            <p className="text-primary text-sm font-semibold font-nunito">
               Clientes Cadastrados
             </p>
-            <p className="text-tertiary text-[26px] font-medium font-nunito">
+            <p className="text-tertiary text-[22px] font-medium font-nunito">
               Total {clientes.length} de {totalClientes}
             </p>
           </div>
           <div className="flex gap-2">
             <button
               onClick={handleAdd}
-              className="h-10 px-[30px] bg-primary text-info rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+              className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
             >
               Novo
               <span className="text-lg">+</span>
@@ -299,8 +299,8 @@ export function ClientesList({ onReload }: ClientesListProps) {
             {[...Array(5)].map((_, i) => (
               <div
                 key={i}
-                className="h-[50px] bg-info rounded-xl px-4 flex items-center gap-[10px]"
-              >
+                className=" bg-info rounded-lg px-4 mb-2 flex items-center gap-[10px] shadow-xl hover:shadow-md transition-shadow hover:bg-secondary-bg/15"
+                >
                 <Skeleton className="flex-[2] h-4" />
                 <Skeleton className="flex-[1.5] h-4" />
                 <Skeleton className="flex-[1.5] h-4" />
@@ -322,7 +322,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
         {clientes.map((cliente) => (
           <div
             key={cliente.getId()}
-            className="h-[50px] bg-info rounded-xl px-4 mb-2 flex items-center gap-[10px]"
+            className=" bg-info rounded-lg px-4 py-1 mb-2 flex items-center gap-[10px] shadow-xl hover:shadow-md transition-shadow hover:bg-secondary-bg/15"
           >
             <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
               {cliente.getNome()}
