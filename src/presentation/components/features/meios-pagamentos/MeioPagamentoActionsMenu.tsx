@@ -2,11 +2,14 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { showToast } from '@/src/shared/utils/toast'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/presentation/components/ui/dialog'
 
 interface MeioPagamentoActionsMenuProps {
   meioPagamentoId: string
   meioPagamentoAtivo: boolean
   onStatusChanged?: () => void
+  onEditRequested?: (meioPagamentoId: string) => void
 }
 
 /**
@@ -17,9 +20,12 @@ export function MeioPagamentoActionsMenu({
   meioPagamentoId,
   meioPagamentoAtivo,
   onStatusChanged,
+  onEditRequested,
 }: MeioPagamentoActionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isUpward, setIsUpward] = useState(false)
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const { auth } = useAuthStore()
@@ -61,15 +67,20 @@ export function MeioPagamentoActionsMenu({
 
   const handleEdit = () => {
     setIsOpen(false)
-    window.location.href = `/cadastros/meios-pagamentos/${meioPagamentoId}/editar`
+    if (onEditRequested) {
+      onEditRequested(meioPagamentoId)
+    } else {
+      window.location.href = `/cadastros/meios-pagamentos/${meioPagamentoId}/editar`
+    }
   }
 
-  const handleDelete = async () => {
-    if (!confirm('Tem certeza que deseja deletar este meio de pagamento?')) {
-      setIsOpen(false)
-      return
-    }
+  const handleDeleteClick = () => {
+    setIsOpen(false)
+    setIsConfirmDeleteOpen(true)
+  }
 
+  const handleConfirmDelete = async () => {
+    setIsDeleting(true)
     try {
       const token = auth?.getAccessToken()
       if (!token) {
@@ -85,16 +96,18 @@ export function MeioPagamentoActionsMenu({
       })
 
       if (!response.ok) {
-        throw new Error('Erro ao deletar meio de pagamento')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || errorData.error || 'Erro ao deletar meio de pagamento')
       }
 
-      setIsOpen(false)
+      setIsConfirmDeleteOpen(false)
       onStatusChanged?.()
-
-      alert('Meio de pagamento deletado com sucesso!')
+      showToast.success('Meio de pagamento deletado com sucesso!')
     } catch (error) {
       console.error('Erro ao deletar meio de pagamento:', error)
-      alert('Erro ao deletar meio de pagamento')
+      showToast.error(error instanceof Error ? error.message : 'Erro ao deletar meio de pagamento')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -115,25 +128,20 @@ export function MeioPagamentoActionsMenu({
       })
 
       if (!response.ok) {
-        throw new Error('Erro ao atualizar status')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || errorData.error || 'Erro ao atualizar status')
       }
 
       setIsOpen(false)
       onStatusChanged?.()
-
-      alert(
-        meioPagamentoAtivo
-          ? 'Meio de pagamento desativado com sucesso!'
-          : 'Meio de pagamento ativado com sucesso!'
-      )
     } catch (error) {
       console.error('Erro ao atualizar status:', error)
-      alert('Erro ao atualizar status do meio de pagamento')
+      showToast.error(error instanceof Error ? error.message : 'Erro ao atualizar status do meio de pagamento')
     }
   }
 
   return (
-    <div className="relative">
+    <div className="relative z-50">
       <button
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
@@ -147,7 +155,7 @@ export function MeioPagamentoActionsMenu({
           ref={menuRef}
           className={`absolute right-0 ${
             isUpward ? 'bottom-full mb-2' : 'top-full mt-2'
-          } w-[200px] bg-info rounded-[10px] shadow-lg z-50`}
+          } w-[200px] bg-info rounded-[10px] shadow-lg z-[100]`}
           style={{
             boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
           }}
@@ -161,7 +169,7 @@ export function MeioPagamentoActionsMenu({
             <span className="text-sm font-medium">Editar</span>
           </button>
 
-          <div className="h-px bg-alternate"></div>
+          <div className="h-px bg-primary"></div>
 
           {/* Ativar/Desativar */}
           <button
@@ -174,11 +182,11 @@ export function MeioPagamentoActionsMenu({
             </span>
           </button>
 
-          <div className="h-px bg-alternate"></div>
+          <div className="h-px bg-primary"></div>
 
           {/* Deletar */}
           <button
-            onClick={handleDelete}
+            onClick={handleDeleteClick}
             className="w-full h-10 px-6 flex items-center gap-2 text-primary-text hover:bg-error hover:text-info transition-colors rounded-b-[10px]"
           >
             <span>🗑️</span>
@@ -186,6 +194,43 @@ export function MeioPagamentoActionsMenu({
           </button>
         </div>
       )}
+
+      {/* Modal de confirmação de exclusão */}
+      <Dialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-primary-text">
+              Confirmar exclusão
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-primary-text">
+              Tem certeza que deseja deletar este meio de pagamento?
+            </p>
+            <p className="text-sm text-secondary-text mt-2">
+              Esta ação não pode ser desfeita.
+            </p>
+          </div>
+          <DialogFooter className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setIsConfirmDeleteOpen(false)}
+              disabled={isDeleting}
+              className="h-10 px-6 rounded-lg border border-gray-300 text-primary-text hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+              className="h-10 px-6 rounded-lg bg-error text-white font-semibold hover:bg-error/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isDeleting ? 'Deletando...' : 'Deletar'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

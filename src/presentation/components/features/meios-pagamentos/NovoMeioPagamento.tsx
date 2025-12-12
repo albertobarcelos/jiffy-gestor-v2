@@ -9,13 +9,21 @@ import { Button } from '@/src/presentation/components/ui/button'
 
 interface NovoMeioPagamentoProps {
   meioPagamentoId?: string
+  isEmbedded?: boolean
+  onSaved?: () => void
+  onCancel?: () => void
 }
 
 /**
  * Componente para criar/editar meio de pagamento
  * Replica o design e funcionalidades do Flutter
  */
-export function NovoMeioPagamento({ meioPagamentoId }: NovoMeioPagamentoProps) {
+export function NovoMeioPagamento({
+  meioPagamentoId,
+  isEmbedded = false,
+  onSaved,
+  onCancel,
+}: NovoMeioPagamentoProps) {
   const router = useRouter()
   const { auth } = useAuthStore()
   const isEditing = !!meioPagamentoId
@@ -23,7 +31,7 @@ export function NovoMeioPagamento({ meioPagamentoId }: NovoMeioPagamentoProps) {
   // Estados do formulário
   const [nome, setNome] = useState('')
   const [tefAtivo, setTefAtivo] = useState(true)
-  const [formaPagamentoFiscal, setFormaPagamentoFiscal] = useState('Dinheiro')
+  const [formaPagamentoFiscal, setFormaPagamentoFiscal] = useState('dinheiro')
   const [ativo, setAtivo] = useState(true)
 
   // Estados de loading
@@ -31,20 +39,30 @@ export function NovoMeioPagamento({ meioPagamentoId }: NovoMeioPagamentoProps) {
   const [isLoadingMeioPagamento, setIsLoadingMeioPagamento] = useState(false)
   const hasLoadedMeioPagamentoRef = useRef(false)
 
-  // Opções de forma de pagamento fiscal
-  const formasPagamentoFiscal = [
-    'Dinheiro',
-    'Cartão de Crédito',
-    'Cartão de Débito',
-    'PIX',
-    'Vale Alimentação',
-    'Vale Refeição',
-    'Outros',
-  ]
+  // Mapeamento entre valores da API (lowercase) e labels para exibição
+  const formasPagamentoFiscalMap: Record<string, string> = {
+    dinheiro: 'Dinheiro',
+    pix: 'PIX',
+    cartao_credito: 'Cartão de Crédito',
+    cartao_debito: 'Cartão de Débito',
+  }
+
+  // Opções de forma de pagamento fiscal (apenas as aceitas pela API)
+  const formasPagamentoFiscal = Object.keys(formasPagamentoFiscalMap)
 
   // Carregar dados do meio de pagamento se estiver editando
   useEffect(() => {
-    if (!isEditing || hasLoadedMeioPagamentoRef.current) return
+    if (!isEditing) {
+      // Reset quando não estiver editando
+      hasLoadedMeioPagamentoRef.current = false
+      setNome('')
+      setTefAtivo(true)
+      setFormaPagamentoFiscal('dinheiro')
+      setAtivo(true)
+      return
+    }
+
+    if (hasLoadedMeioPagamentoRef.current) return
 
     const loadMeioPagamento = async () => {
       const token = auth?.getAccessToken()
@@ -67,7 +85,9 @@ export function NovoMeioPagamento({ meioPagamentoId }: NovoMeioPagamentoProps) {
 
           setNome(meioPagamento.getNome())
           setTefAtivo(meioPagamento.isTefAtivo())
-          setFormaPagamentoFiscal(meioPagamento.getFormaPagamentoFiscal())
+          // Garantir que o valor está em lowercase para corresponder às opções do select
+          const formaFiscal = meioPagamento.getFormaPagamentoFiscal().toLowerCase()
+          setFormaPagamentoFiscal(formaFiscal)
           setAtivo(meioPagamento.isAtivo())
         }
       } catch (error) {
@@ -95,7 +115,8 @@ export function NovoMeioPagamento({ meioPagamentoId }: NovoMeioPagamentoProps) {
       const body: any = {
         nome,
         tefAtivo,
-        formaPagamentoFiscal,
+        // Garantir que o valor está em lowercase antes de enviar
+        formaPagamentoFiscal: formaPagamentoFiscal.toLowerCase(),
         ativo,
       }
 
@@ -118,8 +139,12 @@ export function NovoMeioPagamento({ meioPagamentoId }: NovoMeioPagamentoProps) {
         throw new Error(errorData.error || 'Erro ao salvar meio de pagamento')
       }
 
-      alert(isEditing ? 'Meio de pagamento atualizado com sucesso!' : 'Meio de pagamento criado com sucesso!')
-      router.push('/cadastros/meios-pagamentos')
+      if (isEmbedded && onSaved) {
+        onSaved()
+      } else {
+        alert(isEditing ? 'Meio de pagamento atualizado com sucesso!' : 'Meio de pagamento criado com sucesso!')
+        router.push('/cadastros/meios-pagamentos')
+      }
     } catch (error) {
       console.error('Erro ao salvar meio de pagamento:', error)
       alert(error instanceof Error ? error.message : 'Erro ao salvar meio de pagamento')
@@ -129,7 +154,11 @@ export function NovoMeioPagamento({ meioPagamentoId }: NovoMeioPagamentoProps) {
   }
 
   const handleCancel = () => {
-    router.push('/cadastros/meios-pagamentos')
+    if (isEmbedded && onCancel) {
+      onCancel()
+    } else {
+      router.push('/cadastros/meios-pagamentos')
+    }
   }
 
   if (isLoadingMeioPagamento) {
@@ -142,40 +171,44 @@ export function NovoMeioPagamento({ meioPagamentoId }: NovoMeioPagamentoProps) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header fixo */}
-      <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[30px] shadow-md px-[30px] py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-primary/25 text-primary flex items-center justify-center">
-              <span className="text-2xl">💳</span>
+      {!isEmbedded && (
+        <>
+          {/* Header fixo */}
+          <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-lg shadow-md px-[30px] py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-primary/25 text-primary flex items-center justify-center">
+                <span className="text-2xl">💳</span>
+              </div>
+              <h1 className="text-primary text-lg font-semibold font-exo">
+                {isEditing ? 'Editar Meio de Pagamento' : 'Novo Meio de Pagamento'}
+              </h1>
             </div>
-            <h1 className="text-primary text-lg font-semibold font-exo">
-              {isEditing ? 'Editar Meio de Pagamento' : 'Novo Meio de Pagamento'}
-            </h1>
+            <Button
+              onClick={handleCancel}
+              variant="outlined"
+              className="h-9 px-[26px] rounded-lg border-primary/15 text-primary bg-primary/10 hover:bg-primary/20"
+            >
+              Cancelar
+            </Button>
           </div>
-          <Button
-            onClick={handleCancel}
-            variant="outlined"
-            className="h-9 px-[26px] rounded-[30px] border-primary/15 text-primary bg-primary/10 hover:bg-primary/20"
-          >
-            Cancelar
-          </Button>
         </div>
-      </div>
+        </>
+      )}
 
       {/* Formulário com scroll */}
       <div className="flex-1 overflow-y-auto px-[30px] py-[30px]">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Dados */}
-          <div className="bg-info rounded-[12px] p-5">
-            <h2 className="text-secondary text-xl font-semibold font-exo mb-4">
-              Dados
+          <div className="bg-info rounded-lg p-5">
+            <h2 className="text-primary text-xl font-semibold font-exo mb-4">
+              {isEditing && nome ? `Editar meio de pagamento: ${nome}` : `Novo meio de pagamento: ${nome}`}
             </h2>
-            <div className="h-px bg-alternate mb-4"></div>
+            <div className="h-px bg-primary/70 mb-4"></div>
 
             <div className="space-y-4">
               <Input
-                label="Nome do Meio de Pagamento *"
+                label="Nome do Meio de Pagamento"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
                 required
@@ -195,14 +228,14 @@ export function NovoMeioPagamento({ meioPagamentoId }: NovoMeioPagamentoProps) {
                 >
                   {formasPagamentoFiscal.map((forma) => (
                     <option key={forma} value={forma}>
-                      {forma}
+                      {formasPagamentoFiscalMap[forma]}
                     </option>
                   ))}
                 </select>
               </div>
 
               {/* Toggle TEF Ativo */}
-              <div className="flex items-center justify-between p-4 bg-primary-bg rounded-lg">
+              <div className="flex items-center justify-end p-4 rounded-lg gap-2">
                 <span className="text-primary-text font-medium">TEF Ativo</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -211,12 +244,12 @@ export function NovoMeioPagamento({ meioPagamentoId }: NovoMeioPagamentoProps) {
                     onChange={(e) => setTefAtivo(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-14 h-7 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-success"></div>
+                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[12px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                 </label>
               </div>
 
               {/* Toggle Ativo */}
-              <div className="flex items-center justify-between p-4 bg-primary-bg rounded-lg">
+              <div className="flex items-center justify-end p-4 rounded-lg gap-2">
                 <span className="text-primary-text font-medium">Ativo</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -225,7 +258,7 @@ export function NovoMeioPagamento({ meioPagamentoId }: NovoMeioPagamentoProps) {
                     onChange={(e) => setAtivo(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-14 h-7 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-success"></div>
+                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[12px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                 </label>
               </div>
             </div>
@@ -237,11 +270,20 @@ export function NovoMeioPagamento({ meioPagamentoId }: NovoMeioPagamentoProps) {
               type="button"
               onClick={handleCancel}
               variant="outlined"
-              className="px-8"
+              className="h-8 px-8 rounded-lg"
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={isLoading || !nome}>
+            <Button type="submit" disabled={isLoading || !nome}
+                  sx={{
+                    backgroundColor: 'var(--color-primary)',
+                    color: 'var(--color-info)',
+                    '&:hover': {
+                      backgroundColor: 'var(--color-primary)',
+                      opacity: 0.9,
+                    },
+                  }}
+            className=" text-white hover:bg-primary/90 h-8 px-8 rounded-lg">
               {isLoading ? 'Salvando...' : isEditing ? 'Atualizar' : 'Salvar'}
             </Button>
           </div>

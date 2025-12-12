@@ -124,13 +124,13 @@ export function Sidebar() {
       <div className="h-full flex flex-col">
         {/* Logo */}
         {!isCompact && (
-          <div className="p-4 pt-6">
-            <div className="relative w-[200px] h-[60px]">
+          <div className="p-4 pt-6 flex justify-center">
+            <div className="relative w-[220px] h-[65px]">
               <Image
-                src="/images/logo-branco.png"
-                alt="Jiffy Gestor"
+                src="/images/jiffy-head.png"
+                alt="Jiffy"
                 fill
-                sizes="200px"
+                sizes="220px"
                 className="object-contain"
                 priority
               />
