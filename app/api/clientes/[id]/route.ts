@@ -66,8 +66,23 @@ export async function PATCH(
 
     const body = await request.json()
 
+    console.log('📥 API Route - Dados recebidos:', {
+      id,
+      cpfNoBody: body.cpf,
+      cpfType: typeof body.cpf,
+      cpfInBody: 'cpf' in body,
+      bodyCompleto: JSON.stringify(body, null, 2),
+    })
+
     // Validação com Zod (partial - todos os campos são opcionais)
     const validatedData = AtualizarClienteSchema.parse(body)
+
+    console.log('📥 API Route - Dados após validação Zod:', {
+      cpfNoValidated: validatedData.cpf,
+      cpfType: typeof validatedData.cpf,
+      cpfInValidated: 'cpf' in validatedData,
+      validatedCompleto: JSON.stringify(validatedData, null, 2),
+    })
 
     const repository = new ClienteRepository(undefined, tokenInfo.token)
     const useCase = new AtualizarClienteUseCase(repository)

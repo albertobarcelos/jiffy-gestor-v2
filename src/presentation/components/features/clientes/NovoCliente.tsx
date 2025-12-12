@@ -4,18 +4,28 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Cliente } from '@/src/domain/entities/Cliente'
-import { Input } from '@/src/presentation/components/ui/input'
+import { Input } from '@/src/presentation/components/ui/Input'
 import { Button } from '@/src/presentation/components/ui/button'
+import { showToast } from '@/src/shared/utils/toast'
+import { MdSearch, MdClear } from 'react-icons/md'
 
 interface NovoClienteProps {
   clienteId?: string
+  isEmbedded?: boolean
+  onClose?: () => void
+  onSaved?: () => void
 }
 
 /**
  * Componente para criar/editar cliente
  * Replica o design e funcionalidades do Flutter
  */
-export function NovoCliente({ clienteId }: NovoClienteProps) {
+export function NovoCliente({
+  clienteId,
+  isEmbedded = false,
+  onClose,
+  onSaved,
+}: NovoClienteProps) {
   const router = useRouter()
   const { auth } = useAuthStore()
   const isEditing = !!clienteId
@@ -43,6 +53,8 @@ export function NovoCliente({ clienteId }: NovoClienteProps) {
   // Estados de loading
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingCliente, setIsLoadingCliente] = useState(false)
+  const [isLoadingCNPJ, setIsLoadingCNPJ] = useState(false)
+  const [isLoadingCEP, setIsLoadingCEP] = useState(false)
   const hasLoadedClienteRef = useRef(false)
 
   // Carregar dados do cliente se estiver editando
@@ -66,17 +78,48 @@ export function NovoCliente({ clienteId }: NovoClienteProps) {
 
         if (response.ok) {
           const data = await response.json()
+          
+          console.log('📥 Dados recebidos da API ao carregar cliente:', {
+            clienteId,
+            cpfNaResposta: data.cpf,
+            cnpjNaResposta: data.cnpj,
+            dataCompleta: JSON.stringify(data, null, 2),
+          })
+          
           const cliente = Cliente.fromJSON(data)
+          
+          console.log('📥 Dados após fromJSON:', {
+            cpfDaEntidade: cliente.getCpf(),
+            cnpjDaEntidade: cliente.getCnpj(),
+            clienteJSON: cliente.toJSON(),
+          })
 
           setNome(cliente.getNome())
           setRazaoSocial(cliente.getRazaoSocial() || '')
-          setCpf(cliente.getCpf() || '')
-          setCnpj(cliente.getCnpj() || '')
-          setTelefone(cliente.getTelefone() || '')
+          
+          // Formata CPF e CNPJ ao carregar
+          const cpfValue = cliente.getCpf() || ''
+          const cnpjValue = cliente.getCnpj() || ''
+          
+          console.log('📥 Valores antes de formatar:', {
+            cpfValue,
+            cnpjValue,
+            cpfFormatado: cpfValue ? formatCPF(cpfValue) : '',
+            cnpjFormatado: cnpjValue ? formatCNPJ(cnpjValue) : '',
+          })
+          
+          setCpf(cpfValue ? formatCPF(cpfValue) : '')
+          setCnpj(cnpjValue ? formatCNPJ(cnpjValue) : '')
+          
+          // Formata telefone ao carregar
+          const telefoneValue = cliente.getTelefone() || ''
+          setTelefone(telefoneValue ? formatTelefone(telefoneValue) : '')
+          
           setEmail(cliente.getEmail() || '')
           setNomeFantasia(cliente.getNomeFantasia() || '')
           setAtivo(cliente.isAtivo())
-
+          
+          // Formata CEP e endereço ao carregar
           const endereco = cliente.getEndereco()
           if (endereco) {
             setIncluirEndereco(true)
@@ -85,7 +128,8 @@ export function NovoCliente({ clienteId }: NovoClienteProps) {
             setBairro(endereco.bairro || '')
             setCidade(endereco.cidade || '')
             setEstado(endereco.estado || '')
-            setCep(endereco.cep || '')
+            const cepValue = endereco.cep || ''
+            setCep(cepValue ? formatCEP(cepValue) : '')
             setComplemento(endereco.complemento || '')
           }
         }
@@ -139,6 +183,157 @@ export function NovoCliente({ clienteId }: NovoClienteProps) {
     return value
   }
 
+  /**
+   * Busca dados do CNPJ em API pública (ReceitaWS)
+   * Usa rota API do Next.js para evitar problemas de CORS
+   */
+  const handleBuscarCNPJ = async () => {
+    const rawCNPJ = cnpj.replace(/\D/g, '')
+    
+    if (rawCNPJ.length !== 14) {
+      showToast.warning('CNPJ inválido ou incompleto. Deve conter 14 dígitos.')
+      return
+    }
+
+    setIsLoadingCNPJ(true)
+
+    try {
+      // Usa rota API do Next.js para fazer a requisição pelo servidor
+      const response = await fetch(`/api/consulta-cnpj?cnpj=${rawCNPJ}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.error || 'Erro ao buscar CNPJ'
+        
+        if (response.status === 400 || response.status === 404) {
+          showToast.warning('CNPJ inválido ou não encontrado. Verifique o número digitado.')
+        } else if (response.status === 408) {
+          showToast.warning('Timeout ao buscar CNPJ. Tente novamente.')
+        } else {
+          showToast.error('Ocorreu um erro ao buscar o CNPJ. Tente novamente mais tarde.')
+        }
+        return
+      }
+
+      const data = await response.json()
+
+      // Preenche APENAS os dados pessoais (não preenche endereço)
+      if (data.razaoSocial) {
+        setRazaoSocial(data.razaoSocial)
+      }
+      if (data.nomeFantasia) {
+        setNomeFantasia(data.nomeFantasia)
+      }
+      if (data.email) {
+        setEmail(data.email)
+      }
+
+      showToast.success('Dados do CNPJ carregados com sucesso!')
+    } catch (error) {
+      console.error('Erro ao buscar CNPJ:', error)
+      showToast.error('Ocorreu um erro ao buscar o CNPJ. Tente novamente mais tarde.')
+    } finally {
+      setIsLoadingCNPJ(false)
+    }
+  }
+
+  /**
+   * Limpa o campo CNPJ
+   */
+  const handleClearCNPJ = () => {
+    setCnpj('')
+  }
+
+  /**
+   * Busca dados do CEP em API pública (ViaCEP)
+   */
+  const handleBuscarCEP = async () => {
+    const rawCEP = cep.replace(/\D/g, '')
+    
+    if (rawCEP.length !== 8) {
+      showToast.warning('CEP inválido. Deve conter 8 dígitos.')
+      return
+    }
+
+    setIsLoadingCEP(true)
+
+    // Limpa campos de endereço antes de buscar
+    setRua('')
+    setNumero('')
+    setBairro('')
+    setComplemento('')
+    setCidade('')
+    setEstado('')
+
+    try {
+      // API ViaCEP - gratuita e pública
+      const response = await fetch(`https://viacep.com.br/ws/${rawCEP}/json/`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        if (response.status === 400 || response.status === 404) {
+          showToast.warning('Formato de CEP inválido. O CEP deve conter 8 dígitos.')
+        } else {
+          showToast.error('Ocorreu um erro ao buscar o CEP. Verifique o número digitado.')
+        }
+        return
+      }
+
+      const data = await response.json()
+
+      // Verifica se a API retornou erro
+      if (data.erro === true) {
+        showToast.warning('CEP não encontrado. Verifique o número digitado e tente novamente.')
+        return
+      }
+
+      // Preenche os campos de endereço automaticamente
+      if (data.logradouro) {
+        setRua(data.logradouro)
+      }
+      if (data.bairro) {
+        setBairro(data.bairro)
+      }
+      if (data.complemento) {
+        setComplemento(data.complemento)
+      }
+      if (data.localidade) {
+        setCidade(data.localidade)
+      }
+      if (data.uf) {
+        setEstado(data.uf.toUpperCase())
+      }
+
+      // Garante que o endereço está incluído
+      if (!incluirEndereco) {
+        setIncluirEndereco(true)
+      }
+
+      showToast.success('Endereço encontrado com sucesso!')
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error)
+      showToast.error('Ocorreu um erro ao buscar o CEP. Verifique o número digitado.')
+    } finally {
+      setIsLoadingCEP(false)
+    }
+  }
+
+  /**
+   * Limpa o campo CEP
+   */
+  const handleClearCEP = () => {
+    setCep('')
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const token = auth?.getAccessToken()
@@ -150,16 +345,49 @@ export function NovoCliente({ clienteId }: NovoClienteProps) {
     setIsLoading(true)
 
     try {
+      // Remove formatação dos campos antes de enviar
+      const cpfLimpo = cpf.replace(/\D/g, '')
+      const cnpjLimpo = cnpj.replace(/\D/g, '')
+      const telefoneLimpo = telefone.replace(/\D/g, '')
+      const cepLimpo = cep.replace(/\D/g, '')
+
       const body: any = {
         nome,
         razaoSocial: razaoSocial || undefined,
-        cpf: cpf.replace(/\D/g, '') || undefined,
-        cnpj: cnpj.replace(/\D/g, '') || undefined,
-        telefone: telefone.replace(/\D/g, '') || undefined,
+        telefone: telefoneLimpo || undefined,
         email: email || undefined,
         nomeFantasia: nomeFantasia || undefined,
         ativo,
       }
+
+      // CPF e CNPJ: sempre envia se tiver valor, ou string vazia se estiver editando
+      // Isso garante que o campo seja atualizado mesmo que vazio
+      if (isEditing) {
+        // Em edição, sempre envia CPF e CNPJ (mesmo vazios) para garantir atualização
+        // IMPORTANTE: Envia string vazia explicitamente, não undefined
+        // Garante que o campo sempre exista no body, mesmo que vazio
+        body.cpf = cpfLimpo || ''
+        body.cnpj = cnpjLimpo || ''
+      } else {
+        // Em criação, envia apenas se tiver valor
+        if (cpfLimpo) body.cpf = cpfLimpo
+        if (cnpjLimpo) body.cnpj = cnpjLimpo
+      }
+
+      console.log('📤 Dados sendo enviados do componente:', {
+        modo: isEditing ? 'edição' : 'criação',
+        clienteId: clienteId || 'novo',
+        cpfOriginal: cpf,
+        cpfLimpo: cpfLimpo,
+        cpfLimpoLength: cpfLimpo.length,
+        cpfEnviado: body.cpf,
+        cpfEnviadoType: typeof body.cpf,
+        cpfEnviadoInBody: 'cpf' in body,
+        cnpjOriginal: cnpj,
+        cnpjLimpo: cnpjLimpo,
+        cnpjEnviado: body.cnpj,
+        bodyCompleto: JSON.stringify(body, null, 2),
+      })
 
       if (incluirEndereco) {
         body.endereco = {
@@ -168,7 +396,7 @@ export function NovoCliente({ clienteId }: NovoClienteProps) {
           bairro: bairro || undefined,
           cidade: cidade || undefined,
           estado: estado || undefined,
-          cep: cep.replace(/\D/g, '') || undefined,
+          cep: cepLimpo || undefined,
           complemento: complemento || undefined,
         }
       }
@@ -192,8 +420,13 @@ export function NovoCliente({ clienteId }: NovoClienteProps) {
         throw new Error(errorData.error || 'Erro ao salvar cliente')
       }
 
-      alert(isEditing ? 'Cliente atualizado com sucesso!' : 'Cliente criado com sucesso!')
-      router.push('/cadastros/clientes')
+      showToast.success(isEditing ? 'Cliente atualizado com sucesso!' : 'Cliente criado com sucesso!')
+      
+      if (onSaved) {
+        onSaved()
+      } else {
+        router.push('/cadastros/clientes')
+      }
     } catch (error) {
       console.error('Erro ao salvar cliente:', error)
       alert(error instanceof Error ? error.message : 'Erro ao salvar cliente')
@@ -203,8 +436,12 @@ export function NovoCliente({ clienteId }: NovoClienteProps) {
   }
 
   const handleCancel = () => {
-    if (confirm('Tem certeza que deseja cancelar?')) {
-      router.push('/cadastros/clientes')
+    if (isEmbedded) {
+      onClose?.()
+    } else {
+      if (confirm('Tem certeza que deseja cancelar?')) {
+        router.push('/cadastros/clientes')
+      }
     }
   }
 
@@ -310,14 +547,45 @@ export function NovoCliente({ clienteId }: NovoClienteProps) {
                 inputProps={{ maxLength: 14 }}
                 className="bg-primary-bg"
               />
-              <Input
-                label="CNPJ"
-                value={cnpj}
-                onChange={(e) => setCnpj(formatCNPJ(e.target.value))}
-                placeholder="00.000.000/0000-00"
-                inputProps={{ maxLength: 18 }}
-                className="bg-primary-bg"
-              />
+              <div className="relative">
+                <Input
+                  label="CNPJ"
+                  value={cnpj}
+                  onChange={(e) => setCnpj(formatCNPJ(e.target.value))}
+                  placeholder="00.000.000/0000-00"
+                  inputProps={{ maxLength: 18 }}
+                  className="bg-primary-bg"
+                  InputProps={{
+                    endAdornment: (
+                      <div className="flex items-center gap-1 pr-1">
+                        {cnpj && (
+                          <button
+                            type="button"
+                            onClick={handleClearCNPJ}
+                            className="p-1 hover:bg-gray-200 rounded transition-colors"
+                            aria-label="Limpar CNPJ"
+                          >
+                            <MdClear className="text-gray-500" size={18} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handleBuscarCNPJ}
+                          disabled={isLoadingCNPJ || !cnpj}
+                          className="p-1 hover:bg-primary/10 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          aria-label="Buscar CNPJ"
+                        >
+                          {isLoadingCNPJ ? (
+                            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <MdSearch className="text-primary" size={18} />
+                          )}
+                        </button>
+                      </div>
+                    ),
+                  }}
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -375,14 +643,45 @@ export function NovoCliente({ clienteId }: NovoClienteProps) {
               </h2>
 
               <div className="grid grid-cols-3 gap-4">
-                <Input
-                  label="CEP"
-                  value={cep}
-                  onChange={(e) => setCep(formatCEP(e.target.value))}
-                  placeholder="00000-000"
-                  inputProps={{ maxLength: 9 }}
-                  className="bg-primary-bg"
-                />
+                <div className="relative">
+                  <Input
+                    label="CEP"
+                    value={cep}
+                    onChange={(e) => setCep(formatCEP(e.target.value))}
+                    placeholder="00000-000"
+                    inputProps={{ maxLength: 9 }}
+                    className="bg-primary-bg"
+                    InputProps={{
+                      endAdornment: (
+                        <div className="flex items-center gap-1 pr-1">
+                          {cep && (
+                            <button
+                              type="button"
+                              onClick={handleClearCEP}
+                              className="p-1 hover:bg-gray-200 rounded transition-colors"
+                              aria-label="Limpar CEP"
+                            >
+                              <MdClear className="text-gray-500" size={18} />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={handleBuscarCEP}
+                            disabled={isLoadingCEP || !cep}
+                            className="p-1 hover:bg-primary/10 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            aria-label="Buscar CEP"
+                          >
+                            {isLoadingCEP ? (
+                              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <MdSearch className="text-primary" size={18} />
+                            )}
+                          </button>
+                        </div>
+                      ),
+                    }}
+                  />
+                </div>
                 <Input
                   label="Rua"
                   value={rua}

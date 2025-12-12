@@ -6,6 +6,9 @@ import { z } from 'zod'
 export const AtualizarClienteSchema = z.object({
   nome: z.string().min(1, 'Nome é obrigatório').optional(),
   razaoSocial: z.string().optional(),
+  // CPF e CNPJ: aceita qualquer string (incluindo vazia) ou undefined
+  // IMPORTANTE: z.string() aceita strings vazias por padrão
+  // .optional() apenas torna o campo opcional, não remove strings vazias
   cpf: z.string().optional(),
   cnpj: z.string().optional(),
   telefone: z.string().optional(),
