@@ -7,7 +7,8 @@ import { ClienteActionsMenu } from './ClienteActionsMenu'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { ClientesTabsModal, ClientesTabsModalState } from './ClientesTabsModal'
-import { MdSearch } from 'react-icons/md'
+import { MdSearch, MdModeEdit, MdVisibility } from 'react-icons/md'
+import { showToast } from '@/src/shared/utils/toast'
 
 interface ClientesListProps {
   onReload?: () => void
@@ -25,6 +26,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
   const [totalClientes, setTotalClientes] = useState(0)
+  const [togglingStatus, setTogglingStatus] = useState<Record<string, boolean>>({})
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
@@ -193,6 +195,70 @@ export function ClientesList({ onReload }: ClientesListProps) {
     setModalState({ open: true, tab: 'visualizar', mode: 'view', clienteId })
   }
 
+  /**
+   * Atualiza o status do cliente diretamente na lista
+   */
+  const handleToggleClienteStatus = useCallback(
+    async (cliente: Cliente, novoStatus: boolean) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      const clienteId = cliente.getId()
+      const previousClientes = clientes
+
+      setTogglingStatus((prev) => ({ ...prev, [clienteId]: true }))
+      // Atualização otimista
+      setClientes((prev) =>
+        prev.map((item) => {
+          if (item.getId() === clienteId) {
+            // Cria uma nova instância do Cliente com o status atualizado
+            return Cliente.fromJSON({
+              ...item.toJSON(),
+              ativo: novoStatus,
+            })
+          }
+          return item
+        })
+      )
+
+      try {
+        const response = await fetch(`/api/clientes/${clienteId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ ativo: novoStatus }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || 'Erro ao atualizar cliente')
+        }
+
+        showToast.success(
+          novoStatus ? 'Cliente ativado com sucesso!' : 'Cliente desativado com sucesso!'
+        )
+        await loadAllClientes()
+        onReload?.()
+      } catch (error: any) {
+        console.error('Erro ao atualizar status do cliente:', error)
+        showToast.error(error.message || 'Erro ao atualizar status do cliente')
+        // Reverte a atualização otimista em caso de erro
+        setClientes([...previousClientes])
+      } finally {
+        setTogglingStatus((prev) => {
+          const { [clienteId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [auth, clientes, loadAllClientes, onReload]
+  )
+
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
@@ -222,10 +288,10 @@ export function ClientesList({ onReload }: ClientesListProps) {
       <div className="flex gap-3 px-[20px] py-2">
         <div className="flex-1 min-w-[180px] max-w-[360px]">
             <label
-              htmlFor="complementos-search"
+              htmlFor="clientes-search"
               className="text-xs font-semibold text-secondary-text mb-1 block"
             >
-              Buscar complemento...
+              Buscar cliente...
             </label>
             <div className="relative h-8">
               <MdSearch
@@ -233,9 +299,9 @@ export function ClientesList({ onReload }: ClientesListProps) {
                 size={18}
               />
               <input
-                id="complementos-search"
+                id="clientes-search"
                 type="text"
-                placeholder="Pesquisar complemento..."
+                placeholder="Pesquisar cliente..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
                 className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
@@ -306,7 +372,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
                 <Skeleton className="flex-[1.5] h-4" />
                 <Skeleton className="flex-[2] h-4" />
                 <Skeleton className="flex-[2] h-4" />
-                <Skeleton className="flex-[2] h-6 w-20 mx-auto" />
+                <Skeleton className="flex-[2] h-5 w-12 mx-auto" />
                 <Skeleton className="flex-[2] h-10 w-10 ml-auto" />
               </div>
             ))}
@@ -324,8 +390,24 @@ export function ClientesList({ onReload }: ClientesListProps) {
             key={cliente.getId()}
             className=" bg-info rounded-lg px-4 py-1 mb-2 flex items-center gap-[10px] shadow-xl hover:shadow-md transition-shadow hover:bg-secondary-bg/15"
           >
-            <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
-              {cliente.getNome()}
+            <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text flex items-center">
+              <span>{cliente.getNome()}</span>
+              <button
+                onClick={() => handleEdit(cliente.getId())}
+                title="Editar cliente"
+                className="flex items-center justify-center w-6 h-6 rounded-full hover:bg-primary/10 transition-colors"
+                aria-label={`Editar ${cliente.getNome()}`}
+              >
+                <MdModeEdit className="text-primary text-base" />
+              </button>
+              <button
+                onClick={() => handleEdit(cliente.getId())}
+                title="Editar cliente"
+                className="flex items-center justify-center w-6 h-6 rounded-full hover:bg-primary/10 transition-colors"
+                aria-label={`Editar ${cliente.getNome()}`}
+              >
+                <MdVisibility className="text-primary text-base" />
+              </button>
             </div>
             <div className="flex-[1.5] font-nunito text-sm text-secondary-text">
               {cliente.getCpf() || '-'}
@@ -340,15 +422,26 @@ export function ClientesList({ onReload }: ClientesListProps) {
               {cliente.getEmail() || '-'}
             </div>
             <div className="flex-[2] flex justify-center">
-              <div
-                className={`w-20 px-3 py-1 rounded-[24px] text-center text-sm font-nunito font-medium ${
-                  cliente.isAtivo()
-                    ? 'bg-success/20 text-success'
-                    : 'bg-error/20 text-secondary-text'
+              <label
+                className={`relative inline-flex h-5 w-12 items-center ${
+                  togglingStatus[cliente.getId()]
+                    ? 'cursor-not-allowed opacity-60'
+                    : 'cursor-pointer'
                 }`}
+                title={cliente.isAtivo() ? 'Cliente Ativo' : 'Cliente Desativado'}
               >
-                {cliente.isAtivo() ? 'Ativo' : 'Desativado'}
-              </div>
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={cliente.isAtivo()}
+                  onChange={(event) =>
+                    handleToggleClienteStatus(cliente, event.target.checked)
+                  }
+                  disabled={!!togglingStatus[cliente.getId()]}
+                />
+                <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
+                <span className="absolute left-1 top-1/2 block h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-6" />
+              </label>
             </div>
             <div className="flex-[2] flex justify-end">
               <ClienteActionsMenu

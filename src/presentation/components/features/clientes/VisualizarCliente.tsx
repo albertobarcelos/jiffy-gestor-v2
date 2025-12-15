@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { Button } from '@/src/presentation/components/ui/button'
+import { MdEdit, MdPerson } from 'react-icons/md'
 
 // Funções de formatação
 const formatCPF = (value: string) => {
@@ -129,15 +130,30 @@ export function VisualizarCliente({
   return (
     <div className="flex flex-col h-full bg-primary-bg">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-primary-bg px-[30px] py-4 border-b border-gray-200">
+      <div className="sticky top-0 z-10 bg-primary-bg px-[30px] py-2 border-b-2 border-primary/70">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-success/20 text-success flex items-center justify-center">
-              <span className="text-xl">✓</span>
+          <div
+              className='w-12 h-12 rounded-full flex items-center bg-primary/25 text-primary justify-center'>
+              <span className="text-2xl"><MdPerson/></span>
             </div>
-            <h1 className="text-primary text-lg font-semibold font-exo">
-              {cliente.getNome()}
-            </h1>
+            <div className="flex flex-col items-start">
+            
+              <div className="flex items-center gap-2">
+                <h1 className="text-primary text-lg font-semibold font-exo">
+                  {cliente.getNome()}
+                </h1>
+                <button
+                  onClick={() => onEdit?.()}
+                  title="Editar cliente"
+                  className="flex items-center justify-center w-6 h-6 rounded-full hover:bg-primary/10 transition-colors"
+                  aria-label={`Editar ${cliente.getNome()}`}
+                >
+                  <MdEdit className="text-primary text-base" />
+                </button>
+              </div>
+              <span className="text-secondary-text text-sm">{cliente.getRazaoSocial()}</span>
+            </div>
           </div>
           <Button
             onClick={() => {
@@ -148,7 +164,11 @@ export function VisualizarCliente({
               }
             }}
             variant="outlined"
-            className="px-6 bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100"
+            className="px-6 h-8 rounded-lg border-primary hover:bg-primary/10"
+            sx={{
+              color: 'var(--color-primary)',
+              borderColor: 'var(--color-primary)',
+            }}
           >
             Voltar
           </Button>
@@ -156,25 +176,25 @@ export function VisualizarCliente({
       </div>
 
       {/* Conteúdo */}
-      <div className="flex-1 overflow-y-auto px-[30px] py-[30px]">
+      <div className="flex-1 overflow-y-auto px-[30px] py-2">
         {/* Grid com duas colunas: Dados e Endereço */}
-        <div className="grid grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-2 gap-2 mb-6">
           {/* Seção Dados (Esquerda) */}
-          <div className="bg-white rounded-lg p-6 shadow-sm">
+          <div className="bg-white rounded-lg px-6 py-2 shadow-sm">
             <h2 className="text-primary text-lg font-semibold font-nunito mb-3 pb-2 border-b-2 border-primary">
-              Dados
+              Dados Pessoais
             </h2>
-            <div className="space-y-4">
+            <div className="space-y-2">
               {/* Nome */}
               <div>
                 <p className="text-secondary-text text-sm mb-1 font-medium">Nome</p>
-                <p className="text-primary-text text-base">{cliente.getNome()}</p>
+                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">{cliente.getNome()}</p>
               </div>
 
               {/* CPF */}
               <div>
                 <p className="text-secondary-text text-sm mb-1 font-medium">CPF</p>
-                <p className="text-primary-text text-base">
+                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">
                   {cliente.getCpf() ? formatCPF(cliente.getCpf()!) : '-'}
                 </p>
               </div>
@@ -182,7 +202,7 @@ export function VisualizarCliente({
               {/* CNPJ */}
               <div>
                 <p className="text-secondary-text text-sm mb-1 font-medium">CNPJ</p>
-                <p className="text-primary-text text-base">
+                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">
                   {cliente.getCnpj() ? formatCNPJ(cliente.getCnpj()!) : '-'}
                 </p>
               </div>
@@ -190,7 +210,7 @@ export function VisualizarCliente({
               {/* Telefone */}
               <div>
                 <p className="text-secondary-text text-sm mb-1 font-medium">Telefone</p>
-                <p className="text-primary-text text-base">
+                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">
                   {cliente.getTelefone() ? formatTelefone(cliente.getTelefone()!) : '-'}
                 </p>
               </div>
@@ -198,7 +218,7 @@ export function VisualizarCliente({
               {/* Nome Fantasia */}
               <div>
                 <p className="text-secondary-text text-sm mb-1 font-medium">Nome Fantasia</p>
-                <p className="text-primary-text text-base">
+                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">
                   {cliente.getNomeFantasia() || '-'}
                 </p>
               </div>
@@ -206,7 +226,7 @@ export function VisualizarCliente({
               {/* Razão Social */}
               <div>
                 <p className="text-secondary-text text-sm mb-1 font-medium">Razão Social</p>
-                <p className="text-primary-text text-base">
+                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">
                   {cliente.getRazaoSocial() || '-'}
                 </p>
               </div>
@@ -214,21 +234,21 @@ export function VisualizarCliente({
               {/* E-mail */}
               <div>
                 <p className="text-secondary-text text-sm mb-1 font-medium">E-mail</p>
-                <p className="text-primary-text text-base">{cliente.getEmail() || '-'}</p>
+                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">{cliente.getEmail() || '-'}</p>
               </div>
             </div>
           </div>
 
           {/* Seção Endereço (Direita) */}
-          <div className="bg-white rounded-lg p-6 shadow-sm">
+          <div className="bg-white rounded-lg px-6 py-2 shadow-sm">
             <h2 className="text-primary text-lg font-semibold font-nunito mb-3 pb-2 border-b-2 border-primary">
               Endereço
             </h2>
-            <div className="space-y-4">
+            <div className="space-y-2">
               {/* CEP */}
               <div>
                 <p className="text-secondary-text text-sm mb-1 font-medium">CEP</p>
-                <p className="text-primary-text text-base">
+                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">
                   {endereco?.cep ? formatCEP(endereco.cep) : '-'}
                 </p>
               </div>
@@ -236,19 +256,19 @@ export function VisualizarCliente({
               {/* Bairro */}
               <div>
                 <p className="text-secondary-text text-sm mb-1 font-medium">Bairro</p>
-                <p className="text-primary-text text-base">{endereco?.bairro || '-'}</p>
+                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">{endereco?.bairro || '-'}</p>  
               </div>
 
               {/* Logradouro */}
               <div>
                 <p className="text-secondary-text text-sm mb-1 font-medium">Logradouro</p>
-                <p className="text-primary-text text-base">{endereco?.rua || '-'}</p>
+                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">{endereco?.rua || '-'}</p>
               </div>
 
               {/* Complemento */}
               <div>
                 <p className="text-secondary-text text-sm mb-1 font-medium">Complemento</p>
-                <p className="text-primary-text text-base">
+                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">
                   {endereco?.complemento || '-'}
                 </p>
               </div>
@@ -256,33 +276,21 @@ export function VisualizarCliente({
               {/* Número */}
               <div>
                 <p className="text-secondary-text text-sm mb-1 font-medium">Número</p>
-                <p className="text-primary-text text-base">{endereco?.numero || '-'}</p>
+                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">{endereco?.numero || '-'}</p>
               </div>
 
               {/* Estado */}
               <div>
                 <p className="text-secondary-text text-sm mb-1 font-medium">Estado</p>
-                <p className="text-primary-text text-base">{endereco?.estado || '-'}</p>
+                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">{endereco?.estado || '-'}</p>
               </div>
 
               {/* Cidade */}
               <div>
                 <p className="text-secondary-text text-sm mb-1 font-medium">Cidade</p>
-                <p className="text-primary-text text-base">{endereco?.cidade || '-'}</p>
+                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">{endereco?.cidade || '-'}</p>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* Seção Compras (Largura total) */}
-        <div className="bg-white rounded-lg p-6 shadow-sm">
-          <h2 className="text-primary text-lg font-semibold font-nunito mb-3 pb-2 border-b-2 border-primary">
-            Compras
-          </h2>
-          <div className="py-8">
-            <p className="text-secondary-text text-center">
-              Nenhuma compra registrada para este cliente.
-            </p>
           </div>
         </div>
       </div>

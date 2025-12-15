@@ -7,7 +7,7 @@ import { Cliente } from '@/src/domain/entities/Cliente'
 import { Input } from '@/src/presentation/components/ui/Input'
 import { Button } from '@/src/presentation/components/ui/button'
 import { showToast } from '@/src/shared/utils/toast'
-import { MdSearch, MdClear } from 'react-icons/md'
+import { MdSearch, MdClear, MdPerson, MdLocationOn } from 'react-icons/md'
 
 interface NovoClienteProps {
   clienteId?: string
@@ -122,7 +122,7 @@ export function NovoCliente({
           // Formata CEP e endereço ao carregar
           const endereco = cliente.getEndereco()
           if (endereco) {
-            setIncluirEndereco(true)
+            // Preenche os campos de endereço
             setRua(endereco.rua || '')
             setNumero(endereco.numero || '')
             setBairro(endereco.bairro || '')
@@ -131,6 +131,23 @@ export function NovoCliente({
             const cepValue = endereco.cep || ''
             setCep(cepValue ? formatCEP(cepValue) : '')
             setComplemento(endereco.complemento || '')
+            
+            // Verifica se há algum campo de endereço preenchido
+            const temEnderecoPreenchido = !!(
+              endereco.rua?.trim() ||
+              endereco.numero?.trim() ||
+              endereco.bairro?.trim() ||
+              endereco.cidade?.trim() ||
+              endereco.estado?.trim() ||
+              endereco.cep?.trim() ||
+              endereco.complemento?.trim()
+            )
+            
+            // Só ativa o switch se houver algum campo preenchido
+            setIncluirEndereco(temEnderecoPreenchido)
+          } else {
+            // Se não houver endereço, garante que o switch está desativado
+            setIncluirEndereco(false)
           }
         }
       } catch (error) {
@@ -462,11 +479,11 @@ export function NovoCliente({
             <div
               className={`w-12 h-12 rounded-full flex items-center justify-center ${
                 nome
-                  ? 'bg-success/25 text-success'
+                  ? 'bg-primary/25 text-primary'
                   : 'bg-secondary-text/10 text-secondary-text'
               }`}
             >
-              <span className="text-2xl">👤</span>
+              <span className="text-2xl"><MdPerson/></span>
             </div>
             <h1 className="text-primary text-lg font-semibold font-exo">
               {isEditing ? 'Editar Cliente' : 'Cadastrar Novo Cliente'}
@@ -475,33 +492,33 @@ export function NovoCliente({
           <Button
             onClick={handleCancel}
             variant="outlined"
-            className="h-9 px-[26px] rounded-[30px] border-primary/15 text-primary bg-primary/10 hover:bg-primary/20"
-          >
+            className="px-6 h-8 rounded-lg border-primary hover:bg-primary/10"
+            sx={{
+              color: 'var(--color-primary)',
+              borderColor: 'var(--color-primary)',
+              
+              '&:hover': {
+                backgroundColor: 'primary.100',
+                
+              },
+            }}          >
             Cancelar
           </Button>
         </div>
       </div>
 
       {/* Formulário com scroll */}
-      <div className="flex-1 overflow-y-auto px-[30px] py-[30px]">
-        <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="flex-1 overflow-y-auto px-[30px]">
+        <form onSubmit={handleSubmit} className="">
           {/* Toggle Pessoa Física/Jurídica */}
-          <div className="flex items-center justify-between p-5 bg-info rounded-[20px]">
-            <div className="flex items-center gap-3">
-              <div
-                className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                  !ativo
-                    ? 'bg-success/25 text-success'
-                    : 'bg-secondary-text/10 text-secondary-text'
-                }`}
-              >
-                <span className="text-2xl">🏢</span>
-              </div>
-              <div>
+          <div className="flex items-center border-b border-primary/70 justify-between px-5 py-3 bg-info">
+            <div className="flex flex-col items-start">
                 <p className="text-lg font-medium text-primary-text">
                   {nome || 'Nome do Cliente'}
                 </p>
-              </div>
+                <p className="text-sm text-secondary-text">
+                  {razaoSocial || 'Razão Social'}
+                </p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
@@ -510,31 +527,53 @@ export function NovoCliente({
                 onChange={(e) => setAtivo(e.target.checked)}
                 className="sr-only peer"
               />
-              <div className="w-14 h-7 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-success"></div>
+              <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[28px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
             </label>
           </div>
 
           {/* Dados Pessoais */}
-          <div className="bg-info rounded-[20px] p-5 space-y-4">
-            <h2 className="text-primary text-base font-semibold font-nunito mb-4">
+          <div className="bg-info rounded-lg px-5 py-2 space-y-4">
+            <h2 className="text-primary text-base font-semibold font-nunito mb-2">
               Dados Pessoais
             </h2>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-2">
               <Input
-                label="Nome *"
+                label="Nome"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
                 required
                 placeholder="Nome completo"
-                className="bg-primary-bg"
+                size="small"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    height: '38px',
+                    backgroundColor: 'var(--color-primary-bg)',
+                    borderRadius: '8px',
+                  },
+                  '& .MuiInputBase-input': {
+                    padding: '8px 14px',
+                    fontSize: '14px',
+                  },
+                }}
               />
               <Input
                 label="Razão Social"
                 value={razaoSocial}
                 onChange={(e) => setRazaoSocial(e.target.value)}
                 placeholder="Razão social"
-                className="bg-primary-bg"
+                size="small"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    height: '38px',
+                    backgroundColor: 'var(--color-primary-bg)',
+                    borderRadius: '8px',
+                  },
+                  '& .MuiInputBase-input': {
+                    padding: '8px 14px',
+                    fontSize: '14px',
+                  },
+                }}
               />
             </div>
 
@@ -545,7 +584,18 @@ export function NovoCliente({
                 onChange={(e) => setCpf(formatCPF(e.target.value))}
                 placeholder="000.000.000-00"
                 inputProps={{ maxLength: 14 }}
-                className="bg-primary-bg"
+                size="small"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    height: '38px',
+                    backgroundColor: 'var(--color-primary-bg)',
+                    borderRadius: '8px',
+                  },
+                  '& .MuiInputBase-input': {
+                    padding: '8px 14px',
+                    fontSize: '14px',
+                  },
+                }}
               />
               <div className="relative">
                 <Input
@@ -554,7 +604,18 @@ export function NovoCliente({
                   onChange={(e) => setCnpj(formatCNPJ(e.target.value))}
                   placeholder="00.000.000/0000-00"
                   inputProps={{ maxLength: 18 }}
-                  className="bg-primary-bg"
+                  size="small"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    height: '38px',
+                    backgroundColor: 'var(--color-primary-bg)',
+                    borderRadius: '8px',
+                  },
+                  '& .MuiInputBase-input': {
+                    padding: '8px 14px',
+                    fontSize: '14px',
+                  },
+                }}
                   InputProps={{
                     endAdornment: (
                       <div className="flex items-center gap-1 pr-1">
@@ -595,7 +656,18 @@ export function NovoCliente({
                 onChange={(e) => setTelefone(formatTelefone(e.target.value))}
                 placeholder="(00) 00000-0000"
                 inputProps={{ maxLength: 15 }}
-                className="bg-primary-bg"
+                size="small"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    height: '38px',
+                    backgroundColor: 'var(--color-primary-bg)',
+                    borderRadius: '8px',
+                  },
+                  '& .MuiInputBase-input': {
+                    padding: '8px 14px',
+                    fontSize: '14px',
+                  },
+                }}
               />
               <Input
                 label="Email"
@@ -603,7 +675,18 @@ export function NovoCliente({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="email@exemplo.com"
-                className="bg-primary-bg"
+                size="small"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    height: '38px',
+                    backgroundColor: 'var(--color-primary-bg)',
+                    borderRadius: '8px',
+                  },
+                  '& .MuiInputBase-input': {
+                    padding: '8px 14px',
+                    fontSize: '14px',
+                  },
+                }}
               />
             </div>
 
@@ -612,14 +695,25 @@ export function NovoCliente({
               value={nomeFantasia}
               onChange={(e) => setNomeFantasia(e.target.value)}
               placeholder="Nome fantasia"
-              className="bg-primary-bg"
+              size="small"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    height: '38px',
+                    backgroundColor: 'var(--color-primary-bg)',
+                    borderRadius: '8px',
+                  },
+                  '& .MuiInputBase-input': {
+                    padding: '8px 14px',
+                    fontSize: '14px',
+                  },
+                }}
             />
           </div>
 
           {/* Toggle Endereço */}
-          <div className="flex items-center justify-between p-5 bg-info rounded-[20px]">
+          <div className="flex items-center justify-between px-5 bg-info">
             <div className="flex items-center gap-3">
-              <span className="text-2xl">📍</span>
+              <span className="text-2xl text-primary"><MdLocationOn/></span>
               <span className="text-primary-text font-medium">
                 Incluir Endereço
               </span>
@@ -631,18 +725,18 @@ export function NovoCliente({
                 onChange={(e) => setIncluirEndereco(e.target.checked)}
                 className="sr-only peer"
               />
-              <div className="w-14 h-7 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-success"></div>
+              <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[28px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
             </label>
           </div>
 
           {/* Endereço */}
           {incluirEndereco && (
-            <div className="bg-info rounded-[20px] p-5 space-y-4">
+            <div className="bg-info px-5 py-1 space-y-4">
               <h2 className="text-primary text-base font-semibold font-nunito mb-4">
                 Endereço
               </h2>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="relative">
                   <Input
                     label="CEP"
@@ -650,7 +744,18 @@ export function NovoCliente({
                     onChange={(e) => setCep(formatCEP(e.target.value))}
                     placeholder="00000-000"
                     inputProps={{ maxLength: 9 }}
-                    className="bg-primary-bg"
+                    size="small"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    height: '38px',
+                    backgroundColor: 'var(--color-primary-bg)',
+                    borderRadius: '8px',
+                  },
+                  '& .MuiInputBase-input': {
+                    padding: '8px 14px',
+                    fontSize: '14px',
+                  },
+                }}
                     InputProps={{
                       endAdornment: (
                         <div className="flex items-center gap-1 pr-1">
@@ -687,24 +792,57 @@ export function NovoCliente({
                   value={rua}
                   onChange={(e) => setRua(e.target.value)}
                   placeholder="Nome da rua"
-                  className="bg-primary-bg col-span-2"
+                  size="small"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    height: '38px',
+                    backgroundColor: 'var(--color-primary-bg)',
+                    borderRadius: '8px',
+                  },
+                  '& .MuiInputBase-input': {
+                    padding: '8px 14px',
+                    fontSize: '14px',
+                  },
+                }}
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <Input
                   label="Número"
                   value={numero}
                   onChange={(e) => setNumero(e.target.value)}
                   placeholder="Número"
-                  className="bg-primary-bg"
+                  size="small"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    height: '38px',
+                    backgroundColor: 'var(--color-primary-bg)',
+                    borderRadius: '8px',
+                  },
+                  '& .MuiInputBase-input': {
+                    padding: '8px 14px',
+                    fontSize: '14px',
+                  },
+                }}
                 />
                 <Input
                   label="Bairro"
                   value={bairro}
                   onChange={(e) => setBairro(e.target.value)}
                   placeholder="Bairro"
-                  className="bg-primary-bg col-span-2"
+                  size="small"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    height: '38px',
+                    backgroundColor: 'var(--color-primary-bg)',
+                    borderRadius: '8px',
+                  },
+                  '& .MuiInputBase-input': {
+                    padding: '8px 14px',
+                    fontSize: '14px',
+                  },
+                }}
                 />
               </div>
 
@@ -714,7 +852,18 @@ export function NovoCliente({
                   value={cidade}
                   onChange={(e) => setCidade(e.target.value)}
                   placeholder="Cidade"
-                  className="bg-primary-bg"
+                  size="small"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    height: '38px',
+                    backgroundColor: 'var(--color-primary-bg)',
+                    borderRadius: '8px',
+                  },
+                  '& .MuiInputBase-input': {
+                    padding: '8px 14px',
+                    fontSize: '14px',
+                  },
+                }}
                 />
                 <Input
                   label="Estado"
@@ -722,14 +871,36 @@ export function NovoCliente({
                   onChange={(e) => setEstado(e.target.value)}
                   placeholder="UF"
                   inputProps={{ maxLength: 2 }}
-                  className="bg-primary-bg"
+                  size="small"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    height: '38px',
+                    backgroundColor: 'var(--color-primary-bg)',
+                    borderRadius: '8px',
+                  },
+                  '& .MuiInputBase-input': {
+                    padding: '8px 14px',
+                    fontSize: '14px',
+                  },
+                }}
                 />
                 <Input
                   label="Complemento"
                   value={complemento}
                   onChange={(e) => setComplemento(e.target.value)}
                   placeholder="Complemento"
-                  className="bg-primary-bg"
+                  size="small"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    height: '38px',
+                    backgroundColor: 'var(--color-primary-bg)',
+                    borderRadius: '8px',
+                  },
+                  '& .MuiInputBase-input': {
+                    padding: '8px 14px',
+                    fontSize: '14px',
+                  },
+                }}
                 />
               </div>
             </div>
@@ -741,11 +912,26 @@ export function NovoCliente({
               type="button"
               onClick={handleCancel}
               variant="outlined"
-              className="px-8"
+              className="px-6 h-8 rounded-lg border-primary hover:bg-primary/10"
+              sx={{
+                color: 'var(--color-primary)',
+                borderColor: 'var(--color-primary)',
+                
+                '&:hover': {
+                  backgroundColor: 'primary.100',
+                  
+                },
+              }}
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={isLoading || !nome}>
+            <Button type="submit" disabled={isLoading || !nome}
+             className="px-6 h-8 rounded-lg border-primary hover:bg-primary/90"
+             sx={{
+               color: 'var(--color-info)',
+               borderColor: 'var(--color-primary)',
+               backgroundColor: 'var(--color-primary)',
+             }}>
               {isLoading ? 'Salvando...' : isEditing ? 'Atualizar' : 'Salvar'}
             </Button>
           </div>
