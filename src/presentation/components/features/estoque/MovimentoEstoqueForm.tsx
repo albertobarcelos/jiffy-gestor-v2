@@ -8,7 +8,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
 import { transformarParaReal, brToEUA } from '@/src/shared/utils/formatters'
 import { Button } from '@/src/presentation/components/ui/button'
-import { Input } from '@/src/presentation/components/ui/input'
+import { Input } from '@/src/presentation/components/ui/Input'
 import {
   Select,
   SelectContent,

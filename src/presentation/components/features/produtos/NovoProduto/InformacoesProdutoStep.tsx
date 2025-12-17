@@ -1,6 +1,6 @@
 'use client'
 
-import { Input } from '@/src/presentation/components/ui/input'
+import { Input } from '@/src/presentation/components/ui/Input'
 import { Button } from '@/src/presentation/components/ui/button'
 
 interface InformacoesProdutoStepProps {
