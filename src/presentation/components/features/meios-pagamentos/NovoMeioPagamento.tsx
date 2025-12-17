@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { MeioPagamento } from '@/src/domain/entities/MeioPagamento'
-import { Input } from '@/src/presentation/components/ui/Input'
+import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
 
 interface NovoMeioPagamentoProps {
