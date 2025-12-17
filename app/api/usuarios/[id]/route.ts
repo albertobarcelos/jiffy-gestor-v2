@@ -164,7 +164,8 @@ export async function DELETE(
 
     await useCase.execute(id)
 
-    return NextResponse.json({ message: 'Usuário deletado com sucesso' })
+    // Retorna 204 No Content conforme a API externa
+    return new NextResponse(null, { status: 204 })
   } catch (error) {
     console.error('Erro ao deletar usuário:', error)
     return NextResponse.json(

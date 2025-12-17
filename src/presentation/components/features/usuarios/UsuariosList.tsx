@@ -5,7 +5,7 @@ import { Usuario } from '@/src/domain/entities/Usuario'
 import { UsuarioActionsMenu } from './UsuarioActionsMenu'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
-import { MdSearch } from 'react-icons/md'
+import { MdSearch, MdEdit } from 'react-icons/md'
 import {
   UsuariosTabsModal,
   UsuariosTabsModalState,
@@ -503,8 +503,16 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
             className="bg-info rounded-lg mb-2 shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-colors"
           >
             <div className="h-[50px] px-4 flex items-center gap-[10px]">
-              <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text">
+              <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text flex items-center gap-2">
                 {usuario.getNome()}
+                <button
+                  type="button"
+                  onClick={() => openTabsModal({ mode: 'edit', usuarioId: usuario.getId() })}
+                  className="w-6 h-6 rounded-full border border-gray-200 flex items-center justify-center text-primary-text hover:bg-primary/10 transition-colors"
+                  title="Editar usuário"
+                >
+                  <MdEdit size={14} />
+                </button>
               </div>
               <div className="flex-[2] font-nunito text-sm text-secondary-text">
                 {usuario.getTelefone() || '-'}
@@ -580,6 +588,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
                   usuarioId={usuario.getId()}
                   usuarioAtivo={usuario.isAtivo()}
                   onStatusChanged={handleStatusChange}
+                  onDeleted={handleStatusChange}
                   onEdit={() => {
                     openTabsModal({
                       mode: 'edit',
