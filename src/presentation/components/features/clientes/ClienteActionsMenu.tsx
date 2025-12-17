@@ -8,6 +8,8 @@ interface ClienteActionsMenuProps {
   clienteId: string
   clienteAtivo: boolean
   onStatusChanged?: () => void
+  onEdit?: (clienteId: string) => void
+  onView?: (clienteId: string) => void
 }
 
 /**
@@ -18,6 +20,8 @@ export function ClienteActionsMenu({
   clienteId,
   clienteAtivo,
   onStatusChanged,
+  onEdit,
+  onView,
 }: ClienteActionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isUpward, setIsUpward] = useState(false)
@@ -104,12 +108,20 @@ export function ClienteActionsMenu({
 
   const handleEdit = () => {
     setIsOpen(false)
-    window.location.href = `/cadastros/clientes/${clienteId}/editar`
+    if (onEdit) {
+      onEdit(clienteId)
+    } else {
+      window.location.href = `/cadastros/clientes/${clienteId}/editar`
+    }
   }
 
   const handleView = () => {
     setIsOpen(false)
-    window.location.href = `/cadastros/clientes/${clienteId}/visualizar`
+    if (onView) {
+      onView(clienteId)
+    } else {
+      window.location.href = `/cadastros/clientes/${clienteId}/visualizar`
+    }
   }
 
   const handleToggleStatus = async () => {
