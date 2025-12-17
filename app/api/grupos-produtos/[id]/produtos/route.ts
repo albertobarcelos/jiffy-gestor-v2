@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient } from '@/src/infrastructure/api/apiClient'
 
-interface ProdutosResponse {
-  items?: unknown[]
-  count?: number
-  [key: string]: unknown
+/**
+ * Tipo para a resposta da API de produtos
+ */
+type ProdutosResponse = {
+  items: any[]
+  count: number
 }
 
 /**

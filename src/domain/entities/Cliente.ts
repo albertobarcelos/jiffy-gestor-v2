@@ -74,12 +74,16 @@ export class Cliente {
                  data.empresaNome?.toString() ||
                  'Empresa sem nome'
     
+    // CPF e CNPJ: preserva string vazia se existir, undefined se não existir
+    const cpf = data.cpf !== undefined && data.cpf !== null ? String(data.cpf) : undefined
+    const cnpj = data.cnpj !== undefined && data.cnpj !== null ? String(data.cnpj) : undefined
+    
     return Cliente.create(
       id,
       nome,
       data.razaoSocial?.toString() || data.razao_social?.toString(),
-      data.cpf?.toString(),
-      data.cnpj?.toString(),
+      cpf, // Usa a variável processada
+      cnpj, // Usa a variável processada
       data.telefone?.toString() || data.phone?.toString(),
       data.email?.toString(),
       data.nomeFantasia?.toString() || data.nome_fantasia?.toString(),

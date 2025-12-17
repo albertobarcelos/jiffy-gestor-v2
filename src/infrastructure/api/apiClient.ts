@@ -1,4 +1,13 @@
 /**
+ * Tipo para resposta de erro da API
+ */
+type ApiErrorResponse = {
+  message?: string
+  error?: string
+  errors?: unknown
+}
+
+/**
  * Cliente HTTP para comunicação com APIs externas
  */
 export class ApiClient {
@@ -77,16 +86,39 @@ export class ApiClient {
 
     if (!response.ok) {
       const errorBody = await response.text().catch(() => '')
-      const errorData = errorBody ? JSON.parse(errorBody) : {}
+      let errorData: ApiErrorResponse = {}
+      try {
+        errorData = errorBody ? (JSON.parse(errorBody) as ApiErrorResponse) : {}
+      } catch {
+        // Se não conseguir fazer parse, usa a mensagem do status
+        errorData = { message: `Erro ${response.status}: ${response.statusText}` }
+      }
       throw new ApiError(
-        errorData.message || 'Erro na requisição',
+        errorData.message || errorData.error || 'Erro na requisição',
         response.status,
         errorData
       )
     }
 
+    // Para respostas 204 (No Content) ou outras sem corpo, retorna objeto vazio
+    if (response.status === 204 || response.headers.get('content-length') === '0') {
+      return { data: {} as T, status: response.status }
+    }
+
     const raw = await response.text()
-    const data = raw ? (JSON.parse(raw) as T) : ({} as T)
+    // Se não houver conteúdo, retorna objeto vazio
+    if (!raw || raw.trim() === '') {
+      return { data: {} as T, status: response.status }
+    }
+
+    let data: T
+    try {
+      data = JSON.parse(raw) as T
+    } catch {
+      // Se não conseguir fazer parse, retorna objeto vazio
+      data = {} as T
+    }
+    
     return { data, status: response.status }
   }
 

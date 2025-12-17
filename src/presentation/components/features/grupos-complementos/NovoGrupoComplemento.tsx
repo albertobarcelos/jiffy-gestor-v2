@@ -431,7 +431,7 @@ export function NovoGrupoComplemento({
         onConfirm={() => setShowComplementosModal(false)}
         onClose={() => setShowComplementosModal(false)}
         onCreateComplemento={openComplementoCreateModal}
-        confirmLabel="Fechar"
+        confirmLabel="Vincular selecionados"
         emptyMessage="Nenhum complemento disponível."
       />
       <ComplementosTabsModal

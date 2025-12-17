@@ -175,7 +175,7 @@ export class UsuarioRepository implements IUsuarioRepository {
 
   async deletarUsuario(id: string): Promise<void> {
     try {
-      await this.apiClient.request(
+      const response = await this.apiClient.request(
         `/api/v1/pessoas/usuarios-pdv/${id}`,
         {
           method: 'DELETE',
@@ -191,9 +191,19 @@ export class UsuarioRepository implements IUsuarioRepository {
               },
         }
       )
+      
+      // DELETE pode retornar 204 (No Content) ou 200 com corpo vazio
+      // Ambos são considerados sucesso
+      return
     } catch (error) {
       if (error instanceof ApiError) {
-        throw new Error(`Erro ao deletar usuário: ${error.message}`)
+        // Extrai a mensagem de erro mais específica possível
+        const errorMessage = 
+          (error.data as any)?.message || 
+          (error.data as any)?.error || 
+          error.message || 
+          'Erro ao deletar usuário pdv'
+        throw new Error(`Erro ao deletar usuário: ${errorMessage}`)
       }
       throw error
     }
