@@ -14,14 +14,14 @@ export function ConfiguracoesView() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-[30px] py-[30px]">
+      <div className="py-2 flex-shrink-0">
         {/* Container principal com tabs */}
-        <div className="bg-info rounded-[10px]">
+        <div className="bg-custom-2 rounded-lg">
           {/* Tabs */}
-          <div className="flex border-b border-alternate">
+          <div className="flex">
             <button
               onClick={() => setActiveTab('empresa')}
-              className={`px-5 py-3 text-sm font-semibold font-exo transition-colors ${
+              className={`px-5 py-2 text-sm font-semibold font-exo transition-colors ${
                 activeTab === 'empresa'
                   ? 'text-primary border-b-2 border-tertiary'
                   : 'text-secondary-text hover:text-primary'
@@ -31,7 +31,7 @@ export function ConfiguracoesView() {
             </button>
             <button
               onClick={() => setActiveTab('terminais')}
-              className={`px-5 py-3 text-sm font-semibold font-exo transition-colors ${
+              className={`px-5 py-2 text-sm font-semibold font-exo transition-colors ${
                 activeTab === 'terminais'
                   ? 'text-primary border-b-2 border-tertiary'
                   : 'text-secondary-text hover:text-primary'
@@ -41,7 +41,7 @@ export function ConfiguracoesView() {
             </button>
             <button
               onClick={() => setActiveTab('outras')}
-              className={`px-5 py-3 text-sm font-semibold font-exo transition-colors ${
+              className={`px-5 py-2 text-sm font-semibold font-exo transition-colors ${
                 activeTab === 'outras'
                   ? 'text-primary border-b-2 border-tertiary'
                   : 'text-secondary-text hover:text-primary'
@@ -50,13 +50,15 @@ export function ConfiguracoesView() {
               Outras Configurações
             </button>
           </div>
+        </div>
+      </div>
 
-          {/* Conteúdo das tabs */}
-          <div className="bg-[#EEEEF5] rounded-b-[10px]">
-            {activeTab === 'empresa' && <EmpresaTab />}
-            {activeTab === 'terminais' && <TerminaisTab />}
-            {activeTab === 'outras' && <OutrasConfiguracoesTab />}
-          </div>
+      {/* Conteúdo das tabs - ocupa todo o espaço restante */}
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+        <div className="bg-info rounded-b-[10px] flex-1 flex flex-col overflow-hidden">
+          {activeTab === 'empresa' && <EmpresaTab />}
+          {activeTab === 'terminais' && <TerminaisTab />}
+          {activeTab === 'outras' && <OutrasConfiguracoesTab />}
         </div>
       </div>
     </div>
