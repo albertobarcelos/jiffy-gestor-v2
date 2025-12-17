@@ -7,6 +7,7 @@ interface UsuarioActionsMenuProps {
   usuarioId: string
   usuarioAtivo: boolean
   onStatusChanged?: () => void
+  onEdit?: () => void
 }
 
 /**
@@ -17,6 +18,7 @@ export function UsuarioActionsMenu({
   usuarioId,
   usuarioAtivo,
   onStatusChanged,
+  onEdit,
 }: UsuarioActionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isUpward, setIsUpward] = useState(false)
@@ -61,7 +63,11 @@ export function UsuarioActionsMenu({
 
   const handleEdit = () => {
     setIsOpen(false)
-    window.location.href = `/cadastros/usuarios/${usuarioId}/editar`
+    if (onEdit) {
+      onEdit()
+    } else {
+      window.location.href = `/cadastros/usuarios/${usuarioId}/editar`
+    }
   }
 
   const handleDelete = async () => {
@@ -136,8 +142,12 @@ export function UsuarioActionsMenu({
     <div className="relative">
       <button
         ref={buttonRef}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={(e) => {
+          e.stopPropagation()
+          setIsOpen(!isOpen)
+        }}
         className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-secondary-bg/20 transition-colors"
+        type="button"
       >
         <span className="text-xl text-primary-text">⋮</span>
       </button>
@@ -147,10 +157,11 @@ export function UsuarioActionsMenu({
           ref={menuRef}
           className={`absolute right-0 ${
             isUpward ? 'bottom-full mb-2' : 'top-full mt-2'
-          } w-[200px] bg-info rounded-[10px] shadow-lg z-50`}
+          } w-[200px] bg-info rounded-[10px] shadow-lg z-[100]`}
           style={{
             boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
           }}
+          onClick={(e) => e.stopPropagation()}
         >
           {/* Editar */}
           <button

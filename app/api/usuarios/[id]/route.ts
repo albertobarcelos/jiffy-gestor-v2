@@ -5,6 +5,7 @@ import { BuscarUsuarioPorIdUseCase } from '@/src/application/use-cases/usuarios/
 import { AtualizarUsuarioUseCase } from '@/src/application/use-cases/usuarios/AtualizarUsuarioUseCase'
 import { DeletarUsuarioUseCase } from '@/src/application/use-cases/usuarios/DeletarUsuarioUseCase'
 import { AtualizarUsuarioSchema } from '@/src/application/dto/AtualizarUsuarioDTO'
+import { ApiClient } from '@/src/infrastructure/api/apiClient'
 
 /**
  * GET /api/usuarios/[id]
@@ -35,7 +36,52 @@ export async function GET(
       return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })
     }
 
-    return NextResponse.json(usuario.toJSON())
+    // Busca os dados brutos da API para pegar a senha também
+    const apiClient = new ApiClient()
+    try {
+      const response = await apiClient.request<any>(
+        `/api/v1/pessoas/usuarios-pdv/${id}`,
+        {
+          method: 'GET',
+          headers: tokenInfo.token
+            ? {
+                Authorization: `Bearer ${tokenInfo.token}`,
+              }
+            : {},
+        }
+      )
+
+      // Retorna os dados do usuário incluindo a senha e perfilPdvId da API externa
+      // A API externa retorna perfilPdv (objeto completo) mas não perfilPdvId diretamente
+      // Precisamos extrair o ID do objeto perfilPdv.id
+      const perfilPdvIdFromAPI = 
+        response.data?.perfilPdvId || 
+        response.data?.perfilPdv?.id || 
+        ''
+      
+      const responseData = {
+        id: response.data?.id || usuario.getId(),
+        nome: response.data?.nome || usuario.getNome(),
+        telefone: response.data?.telefone || usuario.getTelefone(),
+        ativo: response.data?.ativo !== undefined ? response.data.ativo : usuario.isAtivo(),
+        // Extrai o perfilPdvId do objeto perfilPdv.id
+        perfilPdvId: perfilPdvIdFromAPI,
+        // Garante que a senha seja retornada (pode vir como 'password' ou 'senha')
+        password: response.data?.password || response.data?.senha || '',
+      }
+      
+      console.log('Retornando dados do usuário:', {
+        responseDataAPI: response.data,
+        perfilPdvObjeto: response.data?.perfilPdv,
+        perfilPdvIdExtraido: perfilPdvIdFromAPI,
+        perfilPdvIdFinal: responseData.perfilPdvId,
+      })
+      
+      return NextResponse.json(responseData)
+    } catch (error: any) {
+      // Se houver erro ao buscar a senha, retorna pelo menos os dados do usuário
+      return NextResponse.json(usuario.toJSON())
+    }
   } catch (error) {
     console.error('Erro ao buscar usuário:', error)
     return NextResponse.json(

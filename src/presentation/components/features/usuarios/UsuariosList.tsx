@@ -6,6 +6,11 @@ import { UsuarioActionsMenu } from './UsuarioActionsMenu'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdSearch } from 'react-icons/md'
+import {
+  UsuariosTabsModal,
+  UsuariosTabsModalState,
+} from './UsuariosTabsModal'
+import { usePerfisPDV } from '@/src/presentation/hooks/usePerfisPDV'
 
 interface UsuariosListProps {
   onReload?: () => void
@@ -24,10 +29,20 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
   const [totalUsuarios, setTotalUsuarios] = useState(0)
   const [perfisMap, setPerfisMap] = useState<Record<string, string>>({}) // Mapa de perfilPdvId -> role
   const [togglingStatus, setTogglingStatus] = useState<Record<string, boolean>>({})
+  const [updatingPerfil, setUpdatingPerfil] = useState<Record<string, boolean>>({}) // Controla qual usuário está atualizando perfil
+  const [tabsModalState, setTabsModalState] = useState<UsuariosTabsModalState>({
+    open: false,
+    tab: 'usuario',
+    mode: 'create',
+    usuarioId: undefined,
+  })
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
   const { auth, isAuthenticated } = useAuthStore()
+  
+  // Carregar todos os perfis PDV
+  const { data: allPerfisPDV = [], isLoading: isLoadingPerfis } = usePerfisPDV()
 
   const searchTextRef = useRef('')
   const filterStatusRef = useRef<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
@@ -208,6 +223,113 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
     onReload?.()
   }
 
+  const openTabsModal = useCallback((config: Partial<UsuariosTabsModalState> = {}) => {
+    setTabsModalState(() => ({
+      open: true,
+      tab: config.tab ?? 'usuario',
+      mode: config.mode ?? 'create',
+      usuarioId: config.usuarioId,
+    }))
+  }, [])
+
+  const closeTabsModal = useCallback(() => {
+    setTabsModalState((prev) => ({
+      ...prev,
+      open: false,
+      usuarioId: undefined,
+    }))
+  }, [])
+
+  const handleTabsModalReload = useCallback(() => {
+    loadAllUsuarios()
+    onReload?.()
+  }, [loadAllUsuarios, onReload])
+
+  const handleTabsModalTabChange = useCallback((tab: 'usuario') => {
+    setTabsModalState((prev) => ({
+      ...prev,
+      tab,
+    }))
+  }, [])
+
+  /**
+   * Atualiza o perfil do usuário diretamente na lista
+   */
+  const handlePerfilChange = useCallback(
+    async (usuario: Usuario, novoPerfilId: string) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      const usuarioId = usuario.getId()
+      const perfilAtualId = usuario.getPerfilPdvId()
+      
+      // Se não mudou, não faz nada
+      if (novoPerfilId === perfilAtualId) {
+        return
+      }
+
+      const previousUsuarios = usuarios
+
+      setUpdatingPerfil((prev) => ({ ...prev, [usuarioId]: true }))
+      // Atualização otimista
+      setUsuarios((prev) =>
+        prev.map((item) => {
+          if (item.getId() === usuarioId) {
+            // Cria uma nova instância do Usuario com o perfil atualizado
+            return Usuario.fromJSON({
+              ...item.toJSON(),
+              perfilPdvId: novoPerfilId,
+            })
+          }
+          return item
+        })
+      )
+
+      // Atualiza o mapa de perfis se necessário
+      const novoPerfil = allPerfisPDV.find((p) => p.id === novoPerfilId)
+      if (novoPerfil) {
+        setPerfisMap((prev) => ({
+          ...prev,
+          [novoPerfilId]: novoPerfil.role,
+        }))
+      }
+
+      try {
+        const response = await fetch(`/api/usuarios/${usuarioId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ perfilPdvId: novoPerfilId }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || 'Erro ao atualizar perfil do usuário')
+        }
+
+        showToast.success('Perfil atualizado com sucesso!')
+        await loadAllUsuarios()
+        onReload?.()
+      } catch (error: any) {
+        console.error('Erro ao atualizar perfil do usuário:', error)
+        showToast.error(error.message || 'Erro ao atualizar perfil do usuário')
+        // Reverte a atualização otimista em caso de erro
+        setUsuarios([...previousUsuarios])
+      } finally {
+        setUpdatingPerfil((prev) => {
+          const { [usuarioId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [auth, usuarios, allPerfisPDV, loadAllUsuarios, onReload]
+  )
+
   /**
    * Atualiza o status do usuário diretamente na lista
    */
@@ -287,7 +409,10 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
           </div>
           <button
             onClick={() => {
-              window.location.href = '/cadastros/usuarios/novo'
+              openTabsModal({
+                mode: 'create',
+                usuarioId: undefined,
+              })
             }}
             className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
           >
@@ -375,7 +500,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
         {usuarios.map((usuario) => (
           <div
             key={usuario.getId()}
-            className="bg-info rounded-lg mb-2 overflow-hidden shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-colors"
+            className="bg-info rounded-lg mb-2 shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-colors"
           >
             <div className="h-[50px] px-4 flex items-center gap-[10px]">
               <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text">
@@ -384,10 +509,49 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
               <div className="flex-[2] font-nunito text-sm text-secondary-text">
                 {usuario.getTelefone() || '-'}
               </div>
-              <div className="flex-[2] font-nunito text-sm text-secondary-text">
-                {usuario.getPerfilPdvId()
-                  ? perfisMap[usuario.getPerfilPdvId()!] || '-'
-                  : '-'}
+              <div className="flex-[2]">
+                {isLoadingPerfis ? (
+                  <div className="text-secondary-text text-sm">Carregando...</div>
+                ) : (
+                  <select
+                    value={usuario.getPerfilPdvId() || ''}
+                    onChange={(e) => handlePerfilChange(usuario, e.target.value)}
+                    disabled={!!updatingPerfil[usuario.getId()]}
+                    className={`w-full px-2 py-1 rounded-lg border border-gray-300 bg-info text-sm text-primary-text focus:outline-none focus:border-primary ${
+                      updatingPerfil[usuario.getId()]
+                        ? 'opacity-60 cursor-not-allowed'
+                        : 'cursor-pointer hover:border-primary'
+                    }`}
+                  >
+                    {(() => {
+                      const perfilAtualId = usuario.getPerfilPdvId()
+                      const perfilAtual = perfilAtualId
+                        ? allPerfisPDV.find((p) => p.id === perfilAtualId)
+                        : null
+                      
+                      // Filtra perfis para remover o perfil atual da lista
+                      const outrosPerfis = allPerfisPDV.filter((p) => p.id !== perfilAtualId)
+                      
+                      return (
+                        <>
+                          {perfilAtual && (
+                            <option value={perfilAtual.id} key={perfilAtual.id}>
+                              {perfilAtual.role}
+                            </option>
+                          )}
+                          {outrosPerfis.map((perfil) => (
+                            <option value={perfil.id} key={perfil.id}>
+                              {perfil.role}
+                            </option>
+                          ))}
+                          {!perfilAtual && (
+                            <option value="">Selecione um perfil...</option>
+                          )}
+                        </>
+                      )
+                    })()}
+                  </select>
+                )}
               </div>
               <div className="flex-[2] flex justify-center">
                 <label
@@ -416,6 +580,12 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
                   usuarioId={usuario.getId()}
                   usuarioAtivo={usuario.isAtivo()}
                   onStatusChanged={handleStatusChange}
+                  onEdit={() => {
+                    openTabsModal({
+                      mode: 'edit',
+                      usuarioId: usuario.getId(),
+                    })
+                  }}
                 />
               </div>
             </div>
@@ -428,6 +598,13 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
           </div>
         )}
       </div>
+
+      <UsuariosTabsModal
+        state={tabsModalState}
+        onClose={closeTabsModal}
+        onReload={handleTabsModalReload}
+        onTabChange={handleTabsModalTabChange}
+      />
     </div>
   )
 }
