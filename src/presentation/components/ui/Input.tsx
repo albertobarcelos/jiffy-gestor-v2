@@ -11,8 +11,19 @@ export interface InputProps extends Omit<TextFieldProps, 'variant'> {
  * Componente Input usando Material UI TextField
  */
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ variant = 'outlined', ...props }, ref) => {
-    return <TextField ref={ref} variant={variant} fullWidth {...props} />
+  ({ variant = 'outlined', value, ...props }, ref) => {
+    // Garante que o value seja sempre uma string para evitar problemas com placeholder
+    const normalizedValue = value === null || value === undefined ? '' : value
+    
+    return (
+      <TextField
+        ref={ref}
+        variant={variant}
+        fullWidth
+        value={normalizedValue}
+        {...props}
+      />
+    )
   }
 )
 

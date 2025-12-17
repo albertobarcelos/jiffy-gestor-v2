@@ -3,6 +3,14 @@ import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient } from '@/src/infrastructure/api/apiClient'
 
 /**
+ * Tipo para a resposta da API de produtos
+ */
+type ProdutosResponse = {
+  items: any[]
+  count: number
+}
+
+/**
  * GET - Lista produtos vinculados a um grupo
  */
 export async function GET(
@@ -36,7 +44,7 @@ export async function GET(
       offset: String(offset),
     })
 
-    const { data } = await apiClient.request(
+    const { data } = await apiClient.request<ProdutosResponse>(
       `/api/v1/cardapio/produtos?${query.toString()}`,
       {
         method: 'GET',
