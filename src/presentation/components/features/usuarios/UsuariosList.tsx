@@ -429,7 +429,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
               htmlFor="complementos-search"
               className="text-xs font-semibold text-secondary-text mb-1 block"
             >
-              Buscar complemento...
+              Buscar Usuário...
             </label>
             <div className="relative h-8">
               <MdSearch
@@ -439,7 +439,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
               <input
                 id="complementos-search"
                 type="text"
-                placeholder="Pesquisar complemento..."
+                placeholder="Pesquisar usuário..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
                 className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
@@ -508,7 +508,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
                 <button
                   type="button"
                   onClick={() => openTabsModal({ mode: 'edit', usuarioId: usuario.getId() })}
-                  className="w-6 h-6 rounded-full border border-gray-200 flex items-center justify-center text-primary-text hover:bg-primary/10 transition-colors"
+                  className="w-5 h-5 rounded-full border border-primary/70 flex items-center justify-center text-primary hover:bg-primary/10 transition-colors"
                   title="Editar usuário"
                 >
                   <MdEdit size={14} />

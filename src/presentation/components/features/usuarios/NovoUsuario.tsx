@@ -12,6 +12,7 @@ import { MdPerson, MdVisibility, MdVisibilityOff } from 'react-icons/md'
 
 interface NovoUsuarioProps {
   usuarioId?: string
+  initialPerfilPdvId?: string
   isEmbedded?: boolean
   onSaved?: () => void
   onCancel?: () => void
@@ -28,6 +29,7 @@ interface PerfilPDV {
  */
 export function NovoUsuario({
   usuarioId,
+  initialPerfilPdvId,
   isEmbedded,
   onSaved,
   onCancel,
@@ -41,7 +43,7 @@ export function NovoUsuario({
   const [telefone, setTelefone] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false) // Controla visibilidade da senha
-  const [perfilPdvId, setPerfilPdvId] = useState('')
+  const [perfilPdvId, setPerfilPdvId] = useState(initialPerfilPdvId || '')
   const [ativo, setAtivo] = useState(true)
 
   // Estados de loading e dados
@@ -54,6 +56,17 @@ export function NovoUsuario({
     data: perfisPDV = [],
     isLoading: isLoadingPerfis,
   } = usePerfisPDV()
+
+  // Definir perfil inicial quando não estiver em modo de edição
+  useEffect(() => {
+    if (!isEditing && initialPerfilPdvId && perfisPDV.length > 0 && !perfilPdvId) {
+      // Verifica se o perfil inicial existe na lista de perfis
+      const perfilExiste = perfisPDV.some((p: any) => p.id === initialPerfilPdvId)
+      if (perfilExiste) {
+        setPerfilPdvId(initialPerfilPdvId)
+      }
+    }
+  }, [isEditing, initialPerfilPdvId, perfisPDV, perfilPdvId])
 
   // Garantir que o perfil seja definido quando os perfis e o perfilPdvId estiverem disponíveis
   useEffect(() => {

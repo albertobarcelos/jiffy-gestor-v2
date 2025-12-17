@@ -2,33 +2,32 @@
 
 import { useMemo } from 'react'
 import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
-import { NovoUsuario } from './NovoUsuario'
+import { NovoPerfilUsuario } from './NovoPerfilUsuario'
 
-type TabKey = 'usuario'
+type TabKey = 'perfil'
 
-export interface UsuariosTabsModalState {
+export interface PerfisUsuariosTabsModalState {
   open: boolean
   tab: TabKey
   mode: 'create' | 'edit'
-  usuarioId?: string
-  initialPerfilPdvId?: string
+  perfilId?: string
 }
 
-interface UsuariosTabsModalProps {
-  state: UsuariosTabsModalState
+interface PerfisUsuariosTabsModalProps {
+  state: PerfisUsuariosTabsModalState
   onClose: () => void
   onTabChange: (tab: TabKey) => void
   onReload?: () => void
 }
 
-export function UsuariosTabsModal({
+export function PerfisUsuariosTabsModal({
   state,
   onClose,
   onTabChange,
   onReload,
-}: UsuariosTabsModalProps) {
+}: PerfisUsuariosTabsModalProps) {
   const title = useMemo(() => {
-    return state.mode === 'create' ? 'Novo Usuário' : 'Editar Usuário'
+    return state.mode === 'create' ? 'Novo Perfil' : 'Editar Perfil'
   }, [state.mode])
 
   return (
@@ -64,23 +63,22 @@ export function UsuariosTabsModal({
         <div className="px-6 pt-2 flex gap-1 border-b border-gray-100 bg-white">
           <button
             type="button"
-            onClick={() => onTabChange('usuario')}
+            onClick={() => onTabChange('perfil')}
             className={`px-4 py-2 rounded-t-lg text-sm font-semibold transition-colors ${
-              state.tab === 'usuario'
+              state.tab === 'perfil'
                 ? 'bg-primary text-white'
                 : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
             }`}
           >
-            Usuário
+            Perfil
           </button>
         </div>
 
         <div className="flex-1 overflow-hidden">
-          {state.tab === 'usuario' && (
+          {state.tab === 'perfil' && (
             <div className="h-full overflow-y-auto">
-              <NovoUsuario
-                usuarioId={state.mode === 'edit' ? state.usuarioId : undefined}
-                initialPerfilPdvId={state.initialPerfilPdvId}
+              <NovoPerfilUsuario
+                perfilId={state.mode === 'edit' ? state.perfilId : undefined}
                 isEmbedded
                 onSaved={() => {
                   onReload?.()
