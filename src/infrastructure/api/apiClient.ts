@@ -1,4 +1,13 @@
 /**
+ * Tipo para resposta de erro da API
+ */
+type ApiErrorResponse = {
+  message?: string
+  error?: string
+  errors?: unknown
+}
+
+/**
  * Cliente HTTP para comunicação com APIs externas
  */
 export class ApiClient {
@@ -77,9 +86,9 @@ export class ApiClient {
 
     if (!response.ok) {
       const errorBody = await response.text().catch(() => '')
-      let errorData = {}
+      let errorData: ApiErrorResponse = {}
       try {
-        errorData = errorBody ? JSON.parse(errorBody) : {}
+        errorData = errorBody ? (JSON.parse(errorBody) as ApiErrorResponse) : {}
       } catch {
         // Se não conseguir fazer parse, usa a mensagem do status
         errorData = { message: `Erro ${response.status}: ${response.statusText}` }

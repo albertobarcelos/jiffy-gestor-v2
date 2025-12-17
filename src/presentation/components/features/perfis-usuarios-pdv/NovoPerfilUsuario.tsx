@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { PerfilUsuario } from '@/src/domain/entities/PerfilUsuario'
-import { Input } from '@/src/presentation/components/ui/input'
+import { Input } from '@/src/presentation/components/ui/Input'
 import { Button } from '@/src/presentation/components/ui/button'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
 
