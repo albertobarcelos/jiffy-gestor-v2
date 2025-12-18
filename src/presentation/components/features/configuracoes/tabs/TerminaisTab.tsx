@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Terminal } from '@/src/domain/entities/Terminal'
 import { MdPhone, MdEdit, MdPowerSettingsNew, MdSearch } from 'react-icons/md'
+import { showToast } from '@/src/shared/utils/toast'
+import { TerminaisTabsModal, TerminaisTabsModalState } from './TerminaisTabsModal'
 
 /**
  * Tab de Terminais - Lista de terminais carregando todos os itens de uma vez
@@ -20,6 +22,13 @@ export function TerminaisTab() {
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [totalItems, setTotalItems] = useState(0)
+  const [togglingStatus, setTogglingStatus] = useState<Record<string, boolean>>({})
+  const [tabsModalState, setTabsModalState] = useState<TerminaisTabsModalState>({
+    open: false,
+    tab: 'terminal',
+    mode: 'edit',
+    terminalId: undefined,
+  })
 
   const searchQueryRef = useRef('')
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
@@ -135,6 +144,79 @@ export function TerminaisTab() {
     }
   }, [searchQuery, loadAllTerminais])
 
+  /**
+   * Atualiza o status do terminal (bloqueado/desbloqueado)
+   */
+  const handleToggleTerminalStatus = useCallback(
+    async (terminalId: string, novoBloqueado: boolean) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      setTogglingStatus((prev) => ({ ...prev, [terminalId]: true }))
+
+      // Atualização otimista
+      const previousTerminais = terminais
+      setTerminais((prev) =>
+        prev.map((item) => {
+          if (item.terminal.getId() === terminalId) {
+            return {
+              ...item,
+              rawData: {
+                ...item.rawData,
+                bloqueado: novoBloqueado,
+              },
+              terminal: Terminal.fromJSON({
+                ...item.rawData,
+                bloqueado: novoBloqueado,
+              }),
+            }
+          }
+          return item
+        })
+      )
+
+      try {
+        const response = await fetch(`/api/terminais/${terminalId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ bloqueado: novoBloqueado }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Erro ao atualizar terminal')
+        }
+
+        showToast.success(
+          novoBloqueado
+            ? 'Terminal bloqueado com sucesso!'
+            : 'Terminal desbloqueado com sucesso!'
+        )
+
+        // Recarrega os terminais para garantir sincronização
+        await loadAllTerminais()
+      } catch (error: any) {
+        console.error('Erro ao atualizar status do terminal:', error)
+        showToast.error(error.message || 'Erro ao atualizar status do terminal')
+
+        // Reverte a atualização otimista em caso de erro
+        setTerminais(previousTerminais)
+      } finally {
+        setTogglingStatus((prev) => {
+          const { [terminalId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [auth, terminais, loadAllTerminais]
+  )
+
   // Carrega dados iniciais
   useEffect(() => {
     loadAllTerminais()
@@ -154,15 +236,7 @@ export function TerminaisTab() {
               Total {terminais.length} de {totalItems}
             </span>
           </div>
-          <button
-            onClick={() => {
-              // TODO: Implementar modal de adicionar terminal
-              alert('Funcionalidade de adicionar terminal será implementada')
-            }}
-            className="h-8 px-4 bg-primary text-info rounded-lg text-sm font-medium font-exo hover:bg-primary/90 transition-colors"
-          >
-            + Adicionar Terminal
-          </button>
+          
         </div>
       </div>
 
@@ -245,8 +319,22 @@ export function TerminaisTab() {
                  # {codigo}
                 </span>
               </div>
-              <div className="flex-[2] text-sm text-primary-text font-nunito">
+              <div className="flex-[2] flex items-center gap-1 text-sm text-primary-text font-nunito">
                 {nome}
+                <button
+                  onClick={() =>
+                    setTabsModalState({
+                      open: true,
+                      tab: 'terminal',
+                      mode: 'edit',
+                      terminalId: terminal.getId(),
+                    })
+                  }
+                  className="w-5 h-5 flex items-center justify-center text-primary hover:bg-primary/10 rounded-full border border-primary/30 transition-colors"
+                  title="Editar terminal"
+                >
+                  <MdEdit size={14} />
+                </button>
               </div>
               <div className="flex-[2] text-sm text-secondary-text font-nunito">
                 {modelo}
@@ -255,36 +343,41 @@ export function TerminaisTab() {
                 {versao}
               </div>
               <div className="flex-[1.5] flex justify-center">
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    ativo
-                      ? 'bg-success/20 text-success'
-                      : 'bg-error/20 text-error'
+                <label
+                  className={`relative inline-flex h-5 w-12 items-center ${
+                    togglingStatus[terminal.getId()]
+                      ? 'cursor-not-allowed opacity-60'
+                      : 'cursor-pointer'
                   }`}
+                  title={ativo ? 'Terminal Ativo' : 'Terminal Bloqueado'}
                 >
-                  {ativo ? 'Ativo' : 'Inativo'}
-                </span>
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={ativo}
+                    onChange={(event) =>
+                      handleToggleTerminalStatus(terminal.getId(), !event.target.checked)
+                    }
+                    disabled={!!togglingStatus[terminal.getId()]}
+                  />
+                  <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
+                  <span className="absolute left-[2px] top-1/2 block h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[28px]" />
+                </label>
               </div>
               <div className="flex-[1.5] flex justify-end gap-2">
                 <button
-                  onClick={() => {
-                    // TODO: Implementar edição
-                    alert('Funcionalidade de editar terminal será implementada')
-                  }}
+                  onClick={() =>
+                    setTabsModalState({
+                      open: true,
+                      tab: 'terminal',
+                      mode: 'edit',
+                      terminalId: terminal.getId(),
+                    })
+                  }
                   className="w-8 h-8 flex items-center justify-center text-primary hover:bg-primary/10 rounded transition-colors"
                   title="Editar terminal"
                 >
                   <MdEdit size={18} />
-                </button>
-                <button
-                  onClick={() => {
-                    // TODO: Implementar ativar/desativar
-                    alert('Funcionalidade de ativar/desativar terminal será implementada')
-                  }}
-                  className="w-8 h-8 flex items-center justify-center text-error hover:bg-error/10 rounded transition-colors"
-                  title={ativo ? 'Desativar terminal' : 'Ativar terminal'}
-                >
-                  <MdPowerSettingsNew size={18} />
                 </button>
               </div>
             </div>
@@ -297,6 +390,21 @@ export function TerminaisTab() {
           </div>
         )}
       </div>
+
+      {/* Modal de Edição */}
+      <TerminaisTabsModal
+        state={tabsModalState}
+        onClose={() =>
+          setTabsModalState({
+            open: false,
+            tab: 'terminal',
+            mode: 'edit',
+            terminalId: undefined,
+          })
+        }
+        onTabChange={(tab) => setTabsModalState((prev) => ({ ...prev, tab }))}
+        onReload={loadAllTerminais}
+      />
     </div>
   )
 }
