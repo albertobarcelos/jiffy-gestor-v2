@@ -33,13 +33,13 @@ export function RelatoriosView() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-[30px] py-[30px]">
+      <div className="px-1 py-2">
         {/* Tabs */}
-        <div className="bg-info rounded-[10px] mb-6">
-          <div className="flex border-b border-alternate">
+        <div className="bg-info rounded-lg">
+          <div className="flex border-b-2 border-primary/70">
             <button
               onClick={() => setActiveTab('vendas')}
-              className={`px-5 py-3 text-sm font-semibold font-exo transition-colors ${
+              className={`px-5 py-2 text-sm font-semibold font-exo transition-colors ${
                 activeTab === 'vendas'
                   ? 'text-primary border-b-2 border-tertiary'
                   : 'text-secondary-text hover:text-primary'
@@ -49,7 +49,7 @@ export function RelatoriosView() {
             </button>
             <button
               onClick={() => setActiveTab('faturamento')}
-              className={`px-5 py-3 text-sm font-semibold font-exo transition-colors ${
+              className={`px-5 py-2 text-sm font-semibold font-exo transition-colors ${
                 activeTab === 'faturamento'
                   ? 'text-primary border-b-2 border-tertiary'
                   : 'text-secondary-text hover:text-primary'
@@ -60,11 +60,11 @@ export function RelatoriosView() {
           </div>
 
           {/* Conteúdo das tabs */}
-          <div className="p-[18px]">
+          <div className="">
             {activeTab === 'vendas' ? (
               <VendasList />
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <h3 className="text-primary text-base font-semibold font-exo">
                   Relatório de Faturamento
                 </h3>

@@ -1,7 +1,6 @@
 'use client'
 
 import { TopNav } from '@/src/presentation/components/layouts/TopNav'
-import { Header } from '@/src/presentation/components/layouts/Header'
 
 export default function RelatoriosLayout({
   children,
@@ -11,8 +10,7 @@ export default function RelatoriosLayout({
   return (
     <div className="min-h-screen bg-gray-50">
       <TopNav />
-      <Header nomePagina="Relatórios" />
-      <main className="p-6">
+      <main className="px-6">
         {children}
       </main>
     </div>

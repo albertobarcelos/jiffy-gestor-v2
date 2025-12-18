@@ -12,7 +12,7 @@ import {
   MenuItem,
   CircularProgress,
 } from '@mui/material'
-
+import { RiBeerFill } from 'react-icons/ri'
 // Tipos
 interface Venda {
   id: string
@@ -584,12 +584,12 @@ export function VendasList() {
   return (
     <div className="flex flex-col h-full">
       {/* Container principal */}
-      <div className="bg-primary-background rounded-t-[20px] rounded-b-[10px] px-[18px] pt-[18px] pb-2">
+      <div className="bg-primary-background rounded-t-lg rounded-b-lg px-2">
         {/* Título */}
-        <h1 className="text-primary text-lg font-exo mb-2">Histórico de Vendas</h1>
+        <h1 className="text-primary text-lg font-exo">Histórico de Vendas</h1>
 
         {/* Filtros Superiores */}
-        <div className="flex items-center gap-3 mb-3">
+        <div className="flex items-center gap-3 py-2">
           {/* Campo de Pesquisa */}
           <div className="flex-[2] relative">
             <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
@@ -603,7 +603,7 @@ export function VendasList() {
                   fetchVendas(true)
                 }
               }}
-              className="w-full h-9 pl-10 pr-4 rounded-xl bg-info border-none shadow-sm text-sm font-nunito"
+              className="w-full h-8 pl-10 pr-4 rounded-lg bg-info border shadow-sm text-sm font-nunito"
             />
           </div>
 
@@ -619,7 +619,7 @@ export function VendasList() {
                 setValorMinimo(formatted)
               }}
               onKeyPress={(e) => handleValorKeyPress(e, 'min')}
-              className="w-32 h-9 pl-10 pr-4 rounded-xl bg-info border-none shadow-sm text-sm font-nunito"
+              className="w-32 h-8 pl-10 pr-4 rounded-lg bg-info border shadow-sm text-sm font-nunito"
             />
           </div>
 
@@ -635,7 +635,7 @@ export function VendasList() {
                 setValorMaximo(formatted)
               }}
               onKeyPress={(e) => handleValorKeyPress(e, 'max')}
-              className="w-32 h-9 pl-10 pr-4 rounded-xl bg-info border-none shadow-sm text-sm font-nunito"
+              className="w-32 h-8 pl-10 pr-4 rounded-lg bg-info border shadow-sm text-sm font-nunito"
             />
           </div>
 
@@ -648,12 +648,12 @@ export function VendasList() {
               value={periodo}
               onChange={(e) => setPeriodo(e.target.value)}
               sx={{
-                height: '36px',
-                backgroundColor: '#003366',
+                height: '32px',
+                backgroundColor: 'var(--color-primary)',
                 color: 'white',
                 fontSize: '13px',
                 '& .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#003366',
+                  borderColor: 'var(--color-primary)',
                 },
                 '& .MuiSvgIcon-root': {
                   color: 'white',
@@ -674,7 +674,7 @@ export function VendasList() {
 
           {/* Botão Por Datas */}
           <button
-            className="h-9 px-4 bg-primary text-white rounded-lg flex items-center gap-2 text-sm font-nunito hover:bg-primary/90 transition-colors"
+            className="h-8 px-4 bg-primary text-white rounded-lg flex items-center gap-2 text-sm font-nunito hover:bg-primary/90 transition-colors"
           >
             <MdCalendarToday size={18} />
             Por datas
@@ -682,18 +682,19 @@ export function VendasList() {
         </div>
 
         {/* Filtros Avançados */}
-        <div className="bg-[#18003366] rounded-t-[20px] px-2 pt-1.5 pb-2 mb-4 flex flex-wrap gap-x-1.5 gap-y-4">
+        <div className="bg-custom-2 rounded-t-lg px-2 pt-1.5 pb-2 flex flex-wrap items-center gap-x-2 gap-y-4">
           {/* Status da Venda */}
           <div className="flex flex-col gap-1">
             <label className="text-xs text-secondary-text font-nunito">Status da Venda</label>
-            <FormControl size="small" sx={{ minWidth: 150 }}>
+            <FormControl size="small" sx={{ minWidth: 180 }}>
               <Select
                 value={statusFilter || ''}
                 onChange={(e) => setStatusFilter(e.target.value || null)}
                 displayEmpty
                 sx={{
-                  height: '36px',
-                  backgroundColor: '#FFFFFF',
+                  height: '32px',
+                  borderRadius: '8px',
+                  backgroundColor: 'var(--color-info)',
                   '& .MuiOutlinedInput-notchedOutline': {
                     borderColor: 'transparent',
                   },
@@ -710,13 +711,13 @@ export function VendasList() {
           {/* Tipo de Venda */}
           <div className="flex flex-col gap-1">
             <label className="text-xs text-secondary-text font-nunito">Tipo de Venda</label>
-            <FormControl size="small" sx={{ minWidth: 150 }}>
+            <FormControl size="small" sx={{ minWidth: 180 }}>
               <Select
                 value={tipoVendaFilter || ''}
                 onChange={(e) => setTipoVendaFilter(e.target.value || null)}
                 displayEmpty
                 sx={{
-                  height: '36px',
+                  height: '32px',
                   backgroundColor: '#FFFFFF',
                   '& .MuiOutlinedInput-notchedOutline': {
                     borderColor: 'transparent',
@@ -733,7 +734,7 @@ export function VendasList() {
           {/* Meio de Pagamento */}
           <div className="flex flex-col gap-1">
             <label className="text-xs text-secondary-text font-nunito">Meio de Pagamento</label>
-            <FormControl size="small" sx={{ minWidth: 150 }}>
+            <FormControl size="small" sx={{ minWidth: 180 }}>
               <Select
                 value={meioPagamentoFilter}
                 onChange={(e) => setMeioPagamentoFilter(e.target.value)}
@@ -746,7 +747,7 @@ export function VendasList() {
                   },
                 }}
                 sx={{
-                  height: '36px',
+                  height: '32px',
                   backgroundColor: '#FFFFFF',
                   '& .MuiOutlinedInput-notchedOutline': {
                     borderColor: 'transparent',
@@ -766,7 +767,7 @@ export function VendasList() {
           {/* Vendas por Usuário */}
           <div className="flex flex-col gap-1">
             <label className="text-xs text-secondary-text font-nunito">Vendas por Usuário</label>
-            <FormControl size="small" sx={{ minWidth: 150 }}>
+            <FormControl size="small" sx={{ minWidth: 180 }}>
               <Select
                 value={usuarioAbertoPorFilter}
                 onChange={(e) => setUsuarioAbertoPorFilter(e.target.value)}
@@ -778,7 +779,7 @@ export function VendasList() {
                   },
                 }}
                 sx={{
-                  height: '36px',
+                  height: '32px',
                   backgroundColor: '#FFFFFF',
                   '& .MuiOutlinedInput-notchedOutline': {
                     borderColor: 'transparent',
@@ -798,7 +799,7 @@ export function VendasList() {
           {/* Terminal */}
           <div className="flex flex-col gap-1">
             <label className="text-xs text-secondary-text font-nunito">Terminal</label>
-            <FormControl size="small" sx={{ minWidth: 150 }}>
+            <FormControl size="small" sx={{ minWidth: 180 }}>
               <Select
                 value={terminalFilter}
                 onChange={(e) => setTerminalFilter(e.target.value)}
@@ -811,7 +812,7 @@ export function VendasList() {
                   },
                 }}
                 sx={{
-                  height: '36px',
+                  height: '32px',
                   backgroundColor: '#FFFFFF',
                   '& .MuiOutlinedInput-notchedOutline': {
                     borderColor: 'transparent',
@@ -831,7 +832,7 @@ export function VendasList() {
           {/* Usuário Cancelou */}
           <div className="flex flex-col gap-1">
             <label className="text-xs text-secondary-text font-nunito">Usuário Cancelou</label>
-            <FormControl size="small" sx={{ minWidth: 150 }}>
+            <FormControl size="small" sx={{ minWidth: 180 }}>
               <Select
                 value={usuarioCancelouFilter}
                 onChange={(e) => setUsuarioCancelouFilter(e.target.value)}
@@ -843,7 +844,7 @@ export function VendasList() {
                   },
                 }}
                 sx={{
-                  height: '36px',
+                  height: '32px',
                   backgroundColor: '#FFFFFF',
                   '& .MuiOutlinedInput-notchedOutline': {
                     borderColor: 'transparent',
@@ -863,7 +864,7 @@ export function VendasList() {
           {/* Botão Limpar Filtros */}
           <button
             onClick={handleClearFilters}
-            className="h-[46px] px-4 bg-alternate text-white rounded-lg flex items-center gap-2 text-sm font-nunito hover:bg-alternate/90 transition-colors"
+            className="h-8 px-4 bg-primary text-white rounded-lg flex items-center justify-center gap-2 text-sm font-nunito hover:bg-primary/90 transition-colors"
           >
             <MdFilterAltOff size={18} />
             Limpar Filtros
@@ -871,9 +872,9 @@ export function VendasList() {
         </div>
 
         {/* Cards de Métricas */}
-        <div className="flex gap-[30px] mb-4">
+        <div className="flex gap-2 m-1">
           {/* Vendas Finalizadas/Em Aberto */}
-          <div className="flex-1 h-20 bg-info rounded-[10px] p-2 flex items-center gap-3">
+          <div className="flex-1 border-2 rounded-lg p-2 flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-alternate flex items-center justify-center flex-shrink-0">
               <span className="text-info text-xl">🛒</span>
             </div>
@@ -888,7 +889,7 @@ export function VendasList() {
           </div>
 
           {/* Vendas Canceladas */}
-          <div className="flex-1 h-20 bg-info rounded-[10px] p-2 flex items-center gap-3">
+          <div className="flex-1 rounded-lg border-2 p-2 flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-error flex items-center justify-center flex-shrink-0">
               <span className="text-info text-xl">✕</span>
             </div>
@@ -901,7 +902,7 @@ export function VendasList() {
           </div>
 
           {/* Total de Produtos Vendidos */}
-          <div className="flex-1 h-20 bg-info rounded-[10px] p-2 flex items-center gap-3">
+          <div className="flex-1 rounded-lg border-2 p-2 flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-warning flex items-center justify-center flex-shrink-0">
               <span className="text-info text-xl">🍽️</span>
             </div>
@@ -914,7 +915,7 @@ export function VendasList() {
           </div>
 
           {/* Total Faturado */}
-          <div className="flex-1 h-20 bg-info rounded-[10px] p-2 flex items-center gap-3">
+          <div className="flex-1 rounded-lg border-2 p-2 flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-accent1 flex items-center justify-center flex-shrink-0">
               <span className="text-info text-xl">💰</span>
             </div>
@@ -928,28 +929,28 @@ export function VendasList() {
         </div>
 
         {/* Tabela de Vendas */}
-        <div className="bg-info rounded-[10px] overflow-hidden">
+        <div className="bg-info rounded-lg overflow-hidden">
           {/* Cabeçalho */}
-          <div className="bg-primary px-3 py-1 flex items-center gap-[10px]">
-            <div className="flex-1 font-nunito font-semibold text-xs text-white uppercase">
+          <div className="bg-custom-2 text-primary-text text-sm font-semibold font-nunito rounded-t-lg px-3 py-2 flex items-center gap-2">
+            <div className="flex-1 uppercase">
               Código Venda
             </div>
-            <div className="flex-1 text-center font-nunito font-semibold text-xs text-white uppercase">
+            <div className="flex-1 text-center uppercase">
               Data/Hora
             </div>
-            <div className="flex-1 text-center font-nunito font-semibold text-xs text-white uppercase">
+            <div className="flex-1 text-center uppercase">
               Tipo Venda
             </div>
-            <div className="flex-1 text-center font-nunito font-semibold text-xs text-white uppercase">
+            <div className="flex-1 text-center uppercase">
               Cód. Terminal
             </div>
-            <div className="flex-[2] text-center font-nunito font-semibold text-xs text-white uppercase">
+            <div className="flex-[2] text-center uppercase">
               Usuário PDV
             </div>
-            <div className="flex-1 font-nunito font-semibold text-xs text-white uppercase">
+            <div className="flex-1 uppercase">
               Valor Final
             </div>
-            <div className="flex-1 flex justify-end font-nunito font-semibold text-xs text-white uppercase">
+            <div className="flex-1 flex justify-end  uppercase">
               Cupom
             </div>
           </div>
@@ -957,7 +958,7 @@ export function VendasList() {
           {/* Lista com scroll */}
           <div
             ref={scrollContainerRef}
-            className="max-h-[calc(100vh-500px)] overflow-y-auto px-3 py-2"
+            className="max-h-[calc(100vh-500px)] overflow-y-auto px-1 py-2"
           >
             {vendas.length === 0 && !isLoading && (
               <div className="flex items-center justify-center py-12">
@@ -973,7 +974,7 @@ export function VendasList() {
               return (
                 <div
                   key={venda.id}
-                  className="h-[54px] px-[10px] py-2 mb-2 bg-info rounded-[10px] flex items-center gap-[10px] hover:bg-primary-background hover:shadow-md transition-all"
+                  className="px-2 py-1 mb-2 bg-info rounded-lg flex items-center shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-all"
                 >
                   <div className="flex-1">
                     <span className="text-sm font-semibold text-primary-text font-nunito">
@@ -994,7 +995,7 @@ export function VendasList() {
                       </>
                     ) : (
                       <>
-                        <span className="text-lg">🍺</span>
+                        <RiBeerFill size={28} color="var(--color-alternate)" />
                         <span className="text-xs text-primary-text">Balcão</span>
                       </>
                     )}
