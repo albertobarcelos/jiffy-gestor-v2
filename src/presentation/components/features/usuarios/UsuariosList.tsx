@@ -7,6 +7,13 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdSearch, MdEdit } from 'react-icons/md'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/src/presentation/components/ui/select'
+import {
   UsuariosTabsModal,
   UsuariosTabsModalState,
 } from './UsuariosTabsModal'
@@ -56,31 +63,57 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
     filterStatusRef.current = filterStatus
   }, [filterStatus])
 
-  // Carregar perfis PDV diretamente da API (sem cache)
+  // Carregar todos os perfis PDV fazendo requisições sequenciais
+  // Continua carregando páginas de 10 em 10 até não haver mais itens
   const loadPerfisPDV = useCallback(async () => {
     const token = auth?.getAccessToken()
     if (!token) return
 
     setIsLoadingPerfis(true)
     try {
-      const response = await fetch('/api/perfis-pdv', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      })
+      const allPerfis: Array<{ id: string; role: string }> = []
+      let currentOffset = 0
+      let hasMore = true
 
-      if (response.ok) {
+      // Loop para carregar todas as páginas
+      while (hasMore) {
+        const params = new URLSearchParams({
+          limit: '10',
+          offset: currentOffset.toString(),
+        })
+
+        const response = await fetch(`/api/perfis-pdv?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          const errorMessage = errorData.error || `Erro ${response.status}: ${response.statusText}`
+          throw new Error(errorMessage)
+        }
+
         const data = await response.json()
-        const perfis = (data.items || []).map((item: any) => ({
-          id: item.id?.toString() || '',
-          role: item.role?.toString() || '',
-        }))
-        setAllPerfisPDV(perfis)
-      } else {
-        console.error('Erro ao carregar perfis PDV:', response.status)
-        setAllPerfisPDV([])
+        // A API pode retornar { items: [...] } ou diretamente um array
+        const items = Array.isArray(data) ? data : (data.items || [])
+        const newPerfis = items
+          .map((item: any) => ({
+            id: item.id?.toString() || '',
+            role: item.role?.toString() || '',
+          }))
+          .filter((perfil: { id: string; role: string }) => perfil.id && perfil.role) // Filtra perfis inválidos
+
+        allPerfis.push(...newPerfis)
+
+        // Verifica se há mais páginas
+        // Se retornou menos de 10 itens, não há mais páginas
+        hasMore = newPerfis.length === 10
+        currentOffset += newPerfis.length
       }
+
+      setAllPerfisPDV(allPerfis)
     } catch (error) {
       console.error('Erro ao carregar perfis PDV:', error)
       setAllPerfisPDV([])
@@ -560,44 +593,63 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
                 {isLoadingPerfis ? (
                   <div className="text-secondary-text text-sm">Carregando...</div>
                 ) : (
-                  <select
-                    value={usuario.getPerfilPdvId() || ''}
-                    onChange={(e) => handlePerfilChange(usuario, e.target.value)}
+                  <Select
+                    value={usuario.getPerfilPdvId() || undefined}
+                    onValueChange={(value) => handlePerfilChange(usuario, value)}
                     disabled={!!updatingPerfil[usuario.getId()]}
-                    className={`w-full px-2 py-1 rounded-lg border border-gray-300 bg-info text-sm text-primary-text focus:outline-none focus:border-primary ${
-                      updatingPerfil[usuario.getId()]
-                        ? 'opacity-60 cursor-not-allowed'
-                        : 'cursor-pointer hover:border-primary'
-                    }`}
                   >
-                    {(() => {
-                      const perfilAtualId = usuario.getPerfilPdvId()
-                      const perfilAtual = perfilAtualId
-                        ? allPerfisPDV.find((p) => p.id === perfilAtualId)
-                        : null
-                      
-                      // Filtra perfis para remover o perfil atual da lista
-                      const outrosPerfis = allPerfisPDV.filter((p) => p.id !== perfilAtualId)
-                      
-                      return (
-                        <>
-                          {perfilAtual && (
-                            <option value={perfilAtual.id} key={perfilAtual.id}>
-                              {perfilAtual.role}
-                            </option>
-                          )}
-                          {outrosPerfis.map((perfil) => (
-                            <option value={perfil.id} key={perfil.id}>
-                              {perfil.role}
-                            </option>
-                          ))}
-                          {!perfilAtual && (
-                            <option value="">Selecione um perfil...</option>
-                          )}
-                        </>
-                      )
-                    })()}
-                  </select>
+                    <SelectTrigger
+                      className={`w-full px-2 py-1 h-auto rounded-lg border border-gray-300 bg-info text-sm text-primary-text focus:outline-none focus:border-primary ${
+                        updatingPerfil[usuario.getId()]
+                          ? 'opacity-60 cursor-not-allowed'
+                          : 'cursor-pointer hover:border-primary'
+                      }`}
+                    >
+                      <SelectValue placeholder="Selecione um perfil..." />
+                    </SelectTrigger>
+                    <SelectContent
+                      className="max-h-[200px] z-[9999] overflow-y-auto !bg-info border border-gray-300 shadow-lg"
+                      style={{ backgroundColor: '#FFFFFF' }}
+                    >
+                      {(() => {
+                        const perfilAtualId = usuario.getPerfilPdvId()
+                        const perfilAtual = perfilAtualId
+                          ? allPerfisPDV.find((p) => p.id === perfilAtualId)
+                          : null
+
+                        // Filtra perfis para remover o perfil atual da lista
+                        const outrosPerfis = allPerfisPDV.filter((p) => p.id !== perfilAtualId)
+
+                        return (
+                          <>
+                            {perfilAtual && (
+                              <SelectItem
+                                key={perfilAtual.id}
+                                value={perfilAtual.id}
+                                className="min-h-[32px] max-h-[40px] data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary transition-colors"
+                              >
+                                {perfilAtual.role}
+                              </SelectItem>
+                            )}
+                            {outrosPerfis.map((perfil) => (
+                              <SelectItem
+                                key={perfil.id}
+                                value={perfil.id}
+                                className="min-h-[32px] max-h-[40px] data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary transition-colors"
+                              >
+                                {perfil.role}
+                              </SelectItem>
+                            ))}
+                            {!perfilAtual && allPerfisPDV.length === 0 && (
+                              <div className="px-2 py-1.5 text-sm text-secondary-text">
+                                Nenhum perfil disponível
+                              </div>
+                            )}
+                          </>
+                        )
+                      })()}
+                    </SelectContent>
+                  </Select>
                 )}
               </div>
               <div className="flex-[2] flex justify-center">
