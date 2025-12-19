@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
+import { PerfilUsuarioRepository } from '@/src/infrastructure/database/repositories/PerfilUsuarioRepository'
+import { BuscarPerfisUsuariosUseCase } from '@/src/application/use-cases/perfis-usuarios/BuscarPerfisUsuariosUseCase'
 
 /**
  * GET /api/perfis-pdv
  * Lista perfis PDV para uso em dropdowns
  * Suporta paginação com limit e offset
+ * Usa Clean Architecture: Repository -> Use Case -> Response
  */
 export async function GET(request: NextRequest) {
   try {
@@ -15,26 +18,29 @@ export async function GET(request: NextRequest) {
     const { tokenInfo } = validation
 
     const { searchParams } = new URL(request.url)
-    const limit = searchParams.get('limit') || '10'
-    const offset = searchParams.get('offset') || '0'
+    const limit = parseInt(searchParams.get('limit') || '10', 10)
+    const offset = parseInt(searchParams.get('offset') || '0', 10)
+    const q = searchParams.get('q') || ''
+    const ativoParam = searchParams.get('ativo')
+    const ativo = ativoParam !== null ? ativoParam === 'true' : null
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://jiffy-backend-hom.nexsyn.com.br/api/v1'
-    const url = `${apiUrl}/pessoas/perfis-pdv?limit=${limit}&offset=${offset}`
-    
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${tokenInfo.token}`,
-        'Content-Type': 'application/json',
-        accept: 'application/json',
-      },
+    // Usa Clean Architecture: Repository -> Use Case
+    const repository = new PerfilUsuarioRepository(undefined, tokenInfo.token)
+    const useCase = new BuscarPerfisUsuariosUseCase(repository)
+
+    const result = await useCase.execute({
+      limit,
+      offset,
+      q,
+      ativo,
     })
 
-    if (!response.ok) {
-      throw new Error('Erro ao buscar perfis PDV')
-    }
-
-    const data = await response.json()
-    return NextResponse.json(data)
+    // Retorna no formato esperado pelos componentes (UsuariosList.tsx e NovoUsuario.tsx)
+    // Eles esperam { items: [...], count: ... } ou array direto
+    return NextResponse.json({
+      items: result.perfis.map((p) => p.toJSON()),
+      count: result.total,
+    })
   } catch (error) {
     console.error('Erro ao buscar perfis PDV:', error)
     return NextResponse.json(
