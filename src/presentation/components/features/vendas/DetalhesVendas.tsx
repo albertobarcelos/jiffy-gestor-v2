@@ -423,7 +423,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
           ) : venda ? (
             <>
               {/* Card Informações da Venda */}
-              <div className="mb-2 p-2 rounded-lg bg-primary/10 shadow-sm shadow-primary-text/50">
+              <div className="mb-2 p-2">
                 <h2 className="text-lg font-bold font-exo text-primary-text">
                   Informações da Venda
                 </h2>
@@ -436,7 +436,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                   </div>
 
                   {/* Aberto por */}
-                  <div className="flex justify-between text-sm text-primary-text font-nunito px-3 py-1 rounded-lg bg-white shadow-sm shadow-primary-text/50">
+                  <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
                     <span>
                       Aberto por: 
                     </span>
@@ -445,7 +445,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
 
                   {/* Finalizado Por */}
                   {venda.ultimoResponsavelId && (
-                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 py-1 rounded-lg bg-white shadow-sm shadow-primary-text/50">
+                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
                       <span>
                         Finalizado Por: 
                       </span>
@@ -455,7 +455,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
 
                   {/* Cancelado Por */}
                   {venda.canceladoPorId && (
-                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 py-1 rounded-lg bg-white shadow-sm shadow-primary-text/50">
+                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
                       <span>
                         Cancelado Por: 
                       </span>
@@ -464,7 +464,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                   )}
 
                   {/* Código do Terminal */}
-                  <div className="flex justify-between text-sm text-primary-text font-nunito px-3 py-1 rounded-lg bg-white shadow-sm shadow-primary-text/50">
+                  <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
                     <span>
                       Código do Terminal: 
                     </span>
@@ -472,7 +472,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                   </div>
 
                   {/* Data/Hora de Criação */}
-                  <div className="flex justify-between text-sm text-primary-text font-nunito px-3 py-1 rounded-lg bg-white shadow-sm shadow-primary-text/50">
+                  <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
                     <span>
                       Data/Hora de Criação: 
                     </span>
@@ -481,7 +481,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
 
                   {/* Data/Hora de Finalização */}
                   {venda.dataFinalizacao && (
-                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 py-1 rounded-lg bg-white shadow-sm shadow-primary-text/50">
+                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
                       <span>
                         Data/Hora de Finalização: 
                       </span>
@@ -491,7 +491,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
 
                   {/* Cliente Vinculado */}
                   {venda.clienteId && nomeCliente && (
-                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 py-1 rounded-lg bg-white shadow-sm shadow-primary-text/50">
+                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
                       <span>
                         Cliente Vinculado: 
                       </span>
@@ -501,7 +501,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
 
                   {/* Identificação da Venda */}
                   {venda.identificacao && (
-                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 py-1 rounded-lg bg-white shadow-sm shadow-primary-text/50">
+                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
                       <span>
                         Identificação da Venda: 
                       </span>
@@ -512,7 +512,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
               </div>
 
               {/* Card Produtos Lançados */}
-              <div className="mb-2 p-2 rounded-lg bg-primary/10 shadow-sm shadow-primary-text/50">
+              <div className="mb-2 p-2">
                 <h2 className="text-lg font-bold font-exo text-primary-text">
                   Produtos Lançados
                 </h2>
@@ -526,7 +526,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                     return (
                       <div
                         key={index}
-                        className={`px-3 py-1 rounded-lg shadow-sm shadow-primary-text/50 ${
+                        className={`px-3 rounded-lg ${
                           isRemovido ? 'bg-error/20' : 'bg-white'
                         }`}
                       >
@@ -674,7 +674,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                     })}
 
                   {/* Troco */}
-                  {venda.troco && venda.troco > 0 && (
+                  {venda.troco != null && Number(venda.troco) > 0 && (
                     <div className="px-3 py-2 rounded-lg bg-white shadow-sm">
                       <span className="text-sm font-semibold text-primary-text font-nunito">
                         Troco: {formatCurrency(venda.troco)}

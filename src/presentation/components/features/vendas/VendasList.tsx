@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { MdSearch, MdAttachMoney, MdCalendarToday, MdFilterAltOff } from 'react-icons/md'
+import { MdSearch, MdAttachMoney, MdCalendarToday, MdFilterAltOff, MdRestaurant } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { DetalhesVendas } from './DetalhesVendas'
 import {
@@ -738,6 +738,7 @@ export function VendasList() {
                 value={meioPagamentoFilter}
                 onChange={(e) => setMeioPagamentoFilter(e.target.value)}
                 disabled={isLoadingMeiosPagamento}
+                displayEmpty
                 MenuProps={{
                   PaperProps: {
                     sx: {
@@ -770,6 +771,7 @@ export function VendasList() {
               <Select
                 value={usuarioAbertoPorFilter}
                 onChange={(e) => setUsuarioAbertoPorFilter(e.target.value)}
+                displayEmpty
                 MenuProps={{
                   PaperProps: {
                     sx: {
@@ -803,6 +805,7 @@ export function VendasList() {
                 value={terminalFilter}
                 onChange={(e) => setTerminalFilter(e.target.value)}
                 disabled={isLoadingTerminais}
+                displayEmpty
                 MenuProps={{
                   PaperProps: {
                     sx: {
@@ -835,6 +838,7 @@ export function VendasList() {
               <Select
                 value={usuarioCancelouFilter}
                 onChange={(e) => setUsuarioCancelouFilter(e.target.value)}
+                displayEmpty
                 MenuProps={{
                   PaperProps: {
                     sx: {
@@ -903,7 +907,7 @@ export function VendasList() {
           {/* Total de Produtos Vendidos */}
           <div className="flex-1 rounded-lg border-2 p-1 flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-warning flex items-center justify-center flex-shrink-0">
-              <span className="text-info text-xl">🍽️</span>
+              <span className="text-info text-xl"><MdRestaurant /></span>
             </div>
             <div className="flex flex-col items-end flex-1">
               <span className="text-xs text-secondary-text font-nunito">Total de Produtos Vendidos</span>
@@ -916,7 +920,7 @@ export function VendasList() {
           {/* Total Faturado */}
           <div className="flex-1 rounded-lg border-2 p-1 flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-accent1 flex items-center justify-center flex-shrink-0">
-              <span className="text-info text-xl">💰</span>
+              <span className="text-info text-xl"><MdAttachMoney /></span>
             </div>
             <div className="flex flex-col items-end flex-1">
               <span className="text-xs text-secondary-text font-nunito">Total Faturado</span>
