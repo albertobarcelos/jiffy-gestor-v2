@@ -1,6 +1,6 @@
-import { IUsuarioRepository, CriarUsuarioDTO } from '@/src/domain/repositories/IUsuarioRepository'
+import { IUsuarioRepository } from '@/src/domain/repositories/IUsuarioRepository'
 import { Usuario } from '@/src/domain/entities/Usuario'
-import { CriarUsuarioSchema } from '@/src/application/dto/CriarUsuarioDTO'
+import { CriarUsuarioSchema, CriarUsuarioDTO } from '@/src/application/dto/CriarUsuarioDTO'
 
 /**
  * Caso de uso para criar usuário

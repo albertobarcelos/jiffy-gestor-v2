@@ -1,12 +1,18 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Usuario } from '@/src/domain/entities/Usuario'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
-import { usePerfisPDV } from '@/src/presentation/hooks/usePerfisPDV'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/src/presentation/components/ui/select'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdPerson, MdVisibility, MdVisibilityOff } from 'react-icons/md'
 
@@ -51,11 +57,77 @@ export function NovoUsuario({
   const [isLoadingUsuario, setIsLoadingUsuario] = useState(false)
   const hasLoadedUsuarioRef = useRef(false)
 
-  // Carregar lista de perfis PDV usando React Query (com cache)
-  const {
-    data: perfisPDV = [],
-    isLoading: isLoadingPerfis,
-  } = usePerfisPDV()
+  // Estados para perfis PDV (sempre busca dados atualizados)
+  const [perfisPDV, setPerfisPDV] = useState<PerfilPDV[]>([])
+  const [isLoadingPerfis, setIsLoadingPerfis] = useState(false)
+
+  // Carregar todos os perfis PDV fazendo requisições sequenciais
+  // Continua carregando páginas de 10 em 10 até não haver mais itens
+  const loadPerfisPDV = useCallback(async () => {
+    const token = auth?.getAccessToken()
+    if (!token) return
+
+    setIsLoadingPerfis(true)
+    try {
+      const allPerfis: PerfilPDV[] = []
+      let currentOffset = 0
+      let hasMore = true
+
+      // Loop para carregar todas as páginas
+      while (hasMore) {
+        const params = new URLSearchParams({
+          limit: '10',
+          offset: currentOffset.toString(),
+        })
+
+        const response = await fetch(`/api/perfis-pdv?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          const errorMessage = errorData.error || `Erro ${response.status}: ${response.statusText}`
+          throw new Error(errorMessage)
+        }
+
+        const data = await response.json()
+        console.log('Resposta da API perfis-pdv (offset', currentOffset, '):', data)
+        
+        // A API pode retornar { items: [...] } ou diretamente um array
+        const items = Array.isArray(data) ? data : (data.items || [])
+        const newPerfis = items
+          .map((item: any) => ({
+            id: item.id?.toString() || '',
+            role: item.role?.toString() || '',
+          }))
+          .filter((perfil: PerfilPDV) => perfil.id && perfil.role) // Filtra perfis inválidos
+
+        console.log('Perfis mapeados nesta página:', newPerfis.length, newPerfis)
+        allPerfis.push(...newPerfis)
+
+        // Verifica se há mais páginas
+        // Se retornou menos de 10 itens, não há mais páginas
+        hasMore = newPerfis.length === 10
+        currentOffset += newPerfis.length
+      }
+
+      console.log('Total de perfis PDV carregados:', allPerfis.length, allPerfis)
+      setPerfisPDV(allPerfis)
+    } catch (error) {
+      console.error('Erro ao carregar perfis PDV:', error)
+      setPerfisPDV([])
+    } finally {
+      setIsLoadingPerfis(false)
+    }
+  }, [auth])
+
+  // Carregar perfis PDV quando o componente montar
+  useEffect(() => {
+    loadPerfisPDV()
+  }, [loadPerfisPDV])
 
   // Definir perfil inicial quando não estiver em modo de edição
   useEffect(() => {
@@ -332,28 +404,47 @@ export function NovoUsuario({
                     <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                   </div>
                 ) : (
-                  <select
-                    value={perfilPdvId || ''}
-                    onChange={(e) => {
-                      console.log('Perfil alterado:', e.target.value)
-                      setPerfilPdvId(e.target.value)
+                  <Select
+                    value={perfilPdvId || undefined}
+                    onValueChange={(value) => {
+                      console.log('Perfil alterado:', value)
+                      setPerfilPdvId(value)
                     }}
-                    required
-                    className="w-full h-13 px-4 py-3 rounded-lg border border-gray-400 bg-info text-gray-900 hover:border-primary-text focus:outline-none focus:border-2 focus:border-primary-text"
                   >
-                    {!isEditing && <option value="">Selecione um perfil...</option>}
-                    {(Array.isArray(perfisPDV) ? perfisPDV : []).map((perfil: any) => {
-                      const isSelected = perfil.id === perfilPdvId
-                      if (isSelected) {
-                        console.log('Perfil selecionado encontrado:', perfil.role, perfil.id)
-                      }
-                      return (
-                        <option key={perfil.id} value={perfil.id}>
-                          {perfil.role}
-                        </option>
-                      )
-                    })}
-                  </select>
+                    <SelectTrigger className="w-full h-13 px-4 py-3 rounded-lg border border-gray-400 bg-info text-gray-900 hover:border-primary-text focus:outline-none focus:border-2 focus:border-primary-text">
+                      <SelectValue placeholder={!isEditing ? 'Selecione um perfil...' : ''} />
+                    </SelectTrigger>
+                    <SelectContent 
+                      className="max-h-[200px] z-[9999] overflow-y-auto !bg-info border border-gray-300 shadow-lg" 
+                      style={{ backgroundColor: '#FFFFFF' }}
+                    >
+                      {(() => {
+                        console.log('Renderizando SelectContent - perfisPDV:', perfisPDV.length, perfisPDV)
+                        if (perfisPDV.length === 0) {
+                          return (
+                            <div className="px-2 py-1.5 text-sm text-secondary-text">
+                              Nenhum perfil disponível
+                            </div>
+                          )
+                        }
+                        return perfisPDV.map((perfil: PerfilPDV) => {
+                          const isSelected = perfil.id === perfilPdvId
+                          if (isSelected) {
+                            console.log('Perfil selecionado encontrado:', perfil.role, perfil.id)
+                          }
+                          return (
+                            <SelectItem
+                              key={perfil.id}
+                              value={perfil.id}
+                              className="min-h-[32px] max-h-[40px] data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary transition-colors"
+                            >
+                              {perfil.role}
+                            </SelectItem>
+                          )
+                        })
+                      })()}
+                    </SelectContent>
+                  </Select>
                 )}
               
 

@@ -10,7 +10,7 @@ export interface BuscarUsuariosParams {
 }
 
 export interface CriarUsuarioDTO {
-  id: string
+  id?: string // ID é opcional na criação (gerado pelo backend)
   nome: string
   telefone?: string
   ativo?: boolean
