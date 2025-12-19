@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { MdSearch, MdAttachMoney, MdCalendarToday, MdFilterAltOff, MdRestaurant } from 'react-icons/md'
+import { MdSearch, MdAttachMoney, MdCalendarToday, MdFilterAltOff, MdRestaurant, MdPrint } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { DetalhesVendas } from './DetalhesVendas'
+import { EscolheDatasModal } from './EscolheDatasModal'
 import {
   FormControl,
   InputLabel,
@@ -89,6 +90,7 @@ export function VendasList() {
   const [selectedVendaId, setSelectedVendaId] = useState<string | null>(null)
   const [isLoadingMeiosPagamento, setIsLoadingMeiosPagamento] = useState(false)
   const [isLoadingTerminais, setIsLoadingTerminais] = useState(false)
+  const [isDatasModalOpen, setIsDatasModalOpen] = useState(false)
 
   const pageSize = 10
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -153,11 +155,36 @@ export function VendasList() {
    * Normaliza valor de moeda para número
    */
   const normalizeCurrency = (value: string): number | null => {
-    if (!value) return null
-    const clean = value.replace(/[^\d,]/g, '')
-    const withoutThousands = clean.replace(/\./g, '')
-    const withDot = withoutThousands.replace(',', '.')
-    return parseFloat(withDot) || null
+    if (!value || value.trim() === '') return null
+    
+    // Remove todos os caracteres não numéricos exceto vírgula e ponto
+    let clean = value.replace(/[^\d,.]/g, '').trim()
+    
+    if (!clean) return null
+    
+    // Se tem vírgula, assume formato brasileiro (50,00)
+    if (clean.includes(',')) {
+      // Remove pontos (separadores de milhar) e substitui vírgula por ponto
+      clean = clean.replace(/\./g, '').replace(',', '.')
+    }
+    // Se só tem ponto, pode ser formato internacional (50.00) ou separador de milhar
+    else if (clean.includes('.')) {
+      // Se tem mais de um ponto, é separador de milhar, remove todos
+      if ((clean.match(/\./g) || []).length > 1) {
+        clean = clean.replace(/\./g, '')
+      }
+      // Se tem só um ponto, pode ser decimal ou milhar
+      // Se tem 3 dígitos após o ponto, é milhar, senão é decimal
+      const parts = clean.split('.')
+      if (parts.length === 2 && parts[1].length === 3) {
+        // É milhar, remove o ponto
+        clean = clean.replace('.', '')
+      }
+      // Senão mantém como está (formato internacional)
+    }
+    
+    const num = parseFloat(clean)
+    return isNaN(num) ? null : num
   }
 
   /**
@@ -438,13 +465,23 @@ export function VendasList() {
         }
 
         const valorMin = normalizeCurrency(filters.valorMinimo)
-        if (valorMin !== null) {
+        if (valorMin !== null && valorMin > 0) {
           params.append('valorFinalMinimo', valorMin.toString())
+          console.log('🔍 Filtro Valor Mínimo:', {
+            original: filters.valorMinimo,
+            normalized: valorMin,
+            sent: valorMin.toString()
+          })
         }
 
         const valorMax = normalizeCurrency(filters.valorMaximo)
-        if (valorMax !== null) {
+        if (valorMax !== null && valorMax > 0) {
           params.append('valorFinalMaximo', valorMax.toString())
+          console.log('🔍 Filtro Valor Máximo:', {
+            original: filters.valorMaximo,
+            normalized: valorMax,
+            sent: valorMax.toString()
+          })
         }
 
         if (filters.meioPagamentoFilter) {
@@ -542,13 +579,19 @@ export function VendasList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Atualiza período quando muda
+  // Atualiza período quando muda (apenas se período não for "Todos")
   useEffect(() => {
-    const { inicio, fim } = calculatePeriodo(periodo)
-    setPeriodoInicial(inicio)
-    setPeriodoFinal(fim)
     if (periodo !== 'Todos') {
+      const { inicio, fim } = calculatePeriodo(periodo)
+      setPeriodoInicial(inicio)
+      setPeriodoFinal(fim)
       fetchVendas(true)
+    } else {
+      // Se período for "Todos" e não houver datas manuais, limpa as datas
+      if (!periodoInicial && !periodoFinal) {
+        setPeriodoInicial(null)
+        setPeriodoFinal(null)
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periodo])
@@ -579,6 +622,20 @@ export function VendasList() {
     if (e.key === 'Enter') {
       fetchVendas(true)
     }
+  }
+
+  /**
+   * Confirma seleção de datas e aplica filtro
+   */
+  const handleConfirmDatas = (dataInicial: Date | null, dataFinal: Date | null) => {
+    setPeriodoInicial(dataInicial)
+    setPeriodoFinal(dataFinal)
+    // Se datas foram selecionadas, muda período para "Todos" para não conflitar
+    if (dataInicial || dataFinal) {
+      setPeriodo('Todos')
+    }
+    // Busca vendas com as novas datas
+    fetchVendas(true)
   }
 
   return (
@@ -673,6 +730,7 @@ export function VendasList() {
 
           {/* Botão Por Datas */}
           <button
+            onClick={() => setIsDatasModalOpen(true)}
             className="h-8 px-4 bg-primary text-white rounded-lg flex items-center gap-2 text-sm font-nunito hover:bg-primary/90 transition-colors"
           >
             <MdCalendarToday size={18} />
@@ -1013,7 +1071,7 @@ export function VendasList() {
                       className="w-10 h-10 flex items-center justify-center text-primary hover:bg-primary/10 rounded transition-colors"
                       title="Comprovante de Venda"
                     >
-                      📄
+                      <MdPrint size={20}/>
                     </button>
                   </div>
                 </div>
@@ -1037,6 +1095,15 @@ export function VendasList() {
           onClose={() => setSelectedVendaId(null)}
         />
       )}
+
+      {/* Modal de Seleção de Datas */}
+      <EscolheDatasModal
+        open={isDatasModalOpen}
+        onClose={() => setIsDatasModalOpen(false)}
+        onConfirm={handleConfirmDatas}
+        dataInicial={periodoInicial}
+        dataFinal={periodoFinal}
+      />
     </div>
   )
 }

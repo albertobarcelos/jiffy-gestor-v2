@@ -634,7 +634,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                 <h2 className="text-lg font-bold font-exo text-primary-text mb-2">
                   Pagamentos Realizados
                 </h2>
-                <div className="border-t border-dashed border-gray-300 mb-3"></div>
+                <div className="border-t border-dashed border-gray-400 mb-3"></div>
 
                 <div className="space-y-2">
                   {venda.pagamentos
