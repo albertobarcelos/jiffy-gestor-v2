@@ -12,7 +12,7 @@ import {
   MenuItem,
   CircularProgress,
 } from '@mui/material'
-import { RiBeerFill } from 'react-icons/ri'
+import { TipoVendaIcon } from './TipoVendaIcon'
 // Tipos
 interface Venda {
   id: string
@@ -874,8 +874,8 @@ export function VendasList() {
         {/* Cards de Métricas */}
         <div className="flex gap-2 m-1">
           {/* Vendas Finalizadas/Em Aberto */}
-          <div className="flex-1 border-2 rounded-lg p-2 flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-alternate flex items-center justify-center flex-shrink-0">
+          <div className="flex-1 border-2 rounded-lg p-1 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-alternate flex items-center justify-center flex-shrink-0">
               <span className="text-info text-xl">🛒</span>
             </div>
             <div className="flex flex-col items-end flex-1">
@@ -889,8 +889,8 @@ export function VendasList() {
           </div>
 
           {/* Vendas Canceladas */}
-          <div className="flex-1 rounded-lg border-2 p-2 flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-error flex items-center justify-center flex-shrink-0">
+          <div className="flex-1 rounded-lg border-2 p-1 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-error flex items-center justify-center flex-shrink-0">
               <span className="text-info text-xl">✕</span>
             </div>
             <div className="flex flex-col items-end flex-1">
@@ -902,8 +902,8 @@ export function VendasList() {
           </div>
 
           {/* Total de Produtos Vendidos */}
-          <div className="flex-1 rounded-lg border-2 p-2 flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-warning flex items-center justify-center flex-shrink-0">
+          <div className="flex-1 rounded-lg border-2 p-1 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-warning flex items-center justify-center flex-shrink-0">
               <span className="text-info text-xl">🍽️</span>
             </div>
             <div className="flex flex-col items-end flex-1">
@@ -915,8 +915,8 @@ export function VendasList() {
           </div>
 
           {/* Total Faturado */}
-          <div className="flex-1 rounded-lg border-2 p-2 flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-accent1 flex items-center justify-center flex-shrink-0">
+          <div className="flex-1 rounded-lg border-2 p-1 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-accent1 flex items-center justify-center flex-shrink-0">
               <span className="text-info text-xl">💰</span>
             </div>
             <div className="flex flex-col items-end flex-1">
@@ -958,7 +958,7 @@ export function VendasList() {
           {/* Lista com scroll */}
           <div
             ref={scrollContainerRef}
-            className="max-h-[calc(100vh-500px)] overflow-y-auto px-1 py-2"
+            className="max-h-[calc(100vh-400px)] overflow-y-auto px-1 py-2"
           >
             {vendas.length === 0 && !isLoading && (
               <div className="flex items-center justify-center py-12">
@@ -986,19 +986,10 @@ export function VendasList() {
                     <span className="text-sm text-primary-text font-nunito">{time}</span>
                   </div>
                   <div className="flex-1 flex flex-col items-center">
-                    {venda.tipoVenda === 'mesa' ? (
-                      <>
-                        <div className="w-8 h-8 rounded-full border-2 border-primary flex items-center justify-center">
-                          <span className="text-xs font-semibold text-primary">🍽️</span>
-                        </div>
-                        <span className="text-xs text-primary-text">{venda.numeroMesa}</span>
-                      </>
-                    ) : (
-                      <>
-                        <RiBeerFill size={28} color="var(--color-alternate)" />
-                        <span className="text-xs text-primary-text">Balcão</span>
-                      </>
-                    )}
+                    <TipoVendaIcon
+                      tipoVenda={venda.tipoVenda}
+                      numeroMesa={venda.numeroMesa}
+                    />
                   </div>
                   <div className="flex-1 text-center">
                     <span className="text-sm text-primary-text font-nunito">
