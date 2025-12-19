@@ -4,7 +4,7 @@ import { z } from 'zod'
  * Schema de validação para criar usuário
  */
 export const CriarUsuarioSchema = z.object({
-  id: z.string().min(1, 'ID é obrigatório'),
+  id: z.string().optional(), // ID é opcional na criação (gerado pelo backend)
   nome: z.string().min(1, 'Nome é obrigatório'),
   telefone: z.string().optional(),
   ativo: z.boolean().optional().default(true),
