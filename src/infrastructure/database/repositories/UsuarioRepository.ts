@@ -101,12 +101,16 @@ export class UsuarioRepository implements IUsuarioRepository {
   async criarUsuario(data: CriarUsuarioDTO): Promise<Usuario> {
     try {
       const body: any = {
-        id: data.id,
         nome: data.nome,
         telefone: data.telefone || '',
         ativo: data.ativo !== undefined ? data.ativo : true,
         password: data.password || '',
         perfilPdvId: data.perfilPdvId || '',
+      }
+      
+      // Só inclui o id se ele for fornecido (geralmente não é necessário na criação)
+      if (data.id) {
+        body.id = data.id
       }
 
       const response = await this.apiClient.request<any>(
