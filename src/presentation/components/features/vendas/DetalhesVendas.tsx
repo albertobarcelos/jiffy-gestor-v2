@@ -6,6 +6,7 @@ import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
 import { MdClose, MdRestaurant, MdAttachMoney } from 'react-icons/md'
 import { CircularProgress } from '@mui/material'
 import { showToast } from '@/src/shared/utils/toast'
+import { TipoVendaIcon } from './TipoVendaIcon'
 
 // Tipos
 interface VendaDetalhes {
@@ -102,6 +103,16 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
+    }).format(value)
+  }
+
+  /**
+   * Formata valor numérico sem símbolo de moeda (para uso entre parênteses)
+   */
+  const formatNumber = (value: number): string => {
+    return new Intl.NumberFormat('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(value)
   }
 
@@ -220,7 +231,15 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
   )
 
   /**
+   * Calcula valor total de um complemento
+   */
+  const calcularValorComplemento = (complemento: Complemento): number => {
+    return complemento.valorUnitario * complemento.quantidade
+  }
+
+  /**
    * Calcula valor total de um produto com descontos e acréscimos
+   * NOTA: Não inclui complementos no cálculo - eles são exibidos separadamente
    */
   const calcularValorProduto = (produto: ProdutoLancado): number => {
     let valor = produto.valorUnitario * produto.quantidade
@@ -245,15 +264,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
       }
     }
 
-    // Aplica complementos
-    produto.complementos.forEach((complemento) => {
-      const valorComplemento = complemento.valorUnitario * complemento.quantidade
-      if (complemento.tipoImpactoPreco === 'aumenta') {
-        valor += valorComplemento
-      } else if (complemento.tipoImpactoPreco === 'diminui') {
-        valor -= valorComplemento
-      }
-    })
+    // Complementos NÃO são incluídos aqui - são exibidos separadamente abaixo do valor do produto
 
     return valor
   }
@@ -373,20 +384,26 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
     >
       <DialogContent sx={{ p: 0, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {/* AppBar */}
-        <div className="bg-primary rounded-t-[20px] px-4 py-3 flex items-center gap-3">
-          <div className="flex items-center gap-2 flex-1">
-            {venda?.tipoVenda === 'mesa' ? (
-              <div className="w-8 h-8 rounded-full border-2 border-white flex items-center justify-center">
-                <span className="text-white text-xs font-semibold">{venda.numeroMesa}</span>
-              </div>
-            ) : (
-              <span className="text-white text-xl">🍺</span>
+        <div className="bg-primary rounded-t-lg px-4 py-3 flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-1 justify-center">
+            {venda && (
+              <TipoVendaIcon
+                tipoVenda={venda.tipoVenda}
+                numeroMesa={venda.numeroMesa}
+                className="flex-shrink-0"
+                corPrincipal="#FFFFFF"
+                corSecundaria="rgba(255, 255, 255, 0.3)"
+                corTexto="var(--color-primary-text)"
+                corBorda="rgba(255, 255, 255, 0.5)"
+                corFundo="var(--color-primary-background)"
+                corBalcao="var(--color-info)"
+              />
             )}
             <div className="flex flex-col">
-              <span className="text-white text-sm font-exo font-bold">
+              <span className="text-white text-xl font-exo font-bold">
                 Venda Nº. {venda?.numeroVenda}
               </span>
-              <span className="text-white text-xs font-nunito">#{venda?.codigoVenda}</span>
+              <span className="text-white text-lg font-nunito">#{venda?.codigoVenda}</span>
             </div>
           </div>
           <button
@@ -398,7 +415,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
         </div>
 
         {/* Conteúdo */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 bg-info">
+        <div className="flex-1 overflow-y-auto px-4 py-2 bg-info">
           {isLoading ? (
             <div className="flex justify-center items-center py-12">
               <CircularProgress />
@@ -406,92 +423,100 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
           ) : venda ? (
             <>
               {/* Card Informações da Venda */}
-              <div className="mb-4">
-                <h2 className="text-lg font-bold font-exo text-primary-text mb-2">
+              <div className="mb-2 p-2 rounded-lg bg-primary/10 shadow-sm shadow-primary-text/50">
+                <h2 className="text-lg font-bold font-exo text-primary-text">
                   Informações da Venda
                 </h2>
-                <div className="border-t border-dashed border-gray-300 mb-3"></div>
+                <div className="border-t border-dashed border-gray-400 mb-2"></div>
 
                 <div className="space-y-2">
                   {/* Status */}
-                  <div className={`px-3 py-2 rounded-lg ${statusColor} text-white text-sm font-nunito`}>
-                    Status: {statusVenda}
+                  <div className={`flex justify-between px-3 py-2 rounded-lg ${statusColor} text-white text-sm font-nunito`}>
+                    Status: <span className="font-semibold">{statusVenda}</span>
                   </div>
 
                   {/* Aberto por */}
-                  <div className="px-3 py-2 rounded-lg bg-white shadow-sm">
-                    <span className="text-sm text-primary-text font-nunito">
-                      Aberto por: {nomesUsuarios[venda.abertoPorId] || venda.abertoPorId}
+                  <div className="flex justify-between text-sm text-primary-text font-nunito px-3 py-1 rounded-lg bg-white shadow-sm shadow-primary-text/50">
+                    <span>
+                      Aberto por: 
                     </span>
+                    <span>{nomesUsuarios[venda.abertoPorId] || venda.abertoPorId}</span>
                   </div>
 
                   {/* Finalizado Por */}
                   {venda.ultimoResponsavelId && (
-                    <div className="px-3 py-2 rounded-lg bg-white shadow-sm">
-                      <span className="text-sm text-primary-text font-nunito">
-                        Finalizado Por: {nomesUsuarios[venda.ultimoResponsavelId] || venda.ultimoResponsavelId}
+                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 py-1 rounded-lg bg-white shadow-sm shadow-primary-text/50">
+                      <span>
+                        Finalizado Por: 
                       </span>
+                      <span>{nomesUsuarios[venda.ultimoResponsavelId] || venda.ultimoResponsavelId}</span>
                     </div>
                   )}
 
                   {/* Cancelado Por */}
                   {venda.canceladoPorId && (
-                    <div className="px-3 py-2 rounded-lg bg-white shadow-sm">
-                      <span className="text-sm text-primary-text font-nunito">
-                        Cancelado Por: {nomesUsuarios[venda.canceladoPorId] || venda.canceladoPorId}
+                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 py-1 rounded-lg bg-white shadow-sm shadow-primary-text/50">
+                      <span>
+                        Cancelado Por: 
                       </span>
+                      <span>{nomesUsuarios[venda.canceladoPorId] || venda.canceladoPorId}</span>
                     </div>
                   )}
 
                   {/* Código do Terminal */}
-                  <div className="px-3 py-2 rounded-lg bg-white shadow-sm">
-                    <span className="text-sm text-primary-text font-nunito">
-                      Código do Terminal: #{venda.codigoTerminal}
+                  <div className="flex justify-between text-sm text-primary-text font-nunito px-3 py-1 rounded-lg bg-white shadow-sm shadow-primary-text/50">
+                    <span>
+                      Código do Terminal: 
                     </span>
+                    <span>#{venda.codigoTerminal}</span>
                   </div>
 
                   {/* Data/Hora de Criação */}
-                  <div className="px-3 py-2 rounded-lg bg-white shadow-sm">
-                    <span className="text-sm text-primary-text font-nunito">
-                      Data/Hora de Criação: {formatDateTime(venda.dataCriacao)}
+                  <div className="flex justify-between text-sm text-primary-text font-nunito px-3 py-1 rounded-lg bg-white shadow-sm shadow-primary-text/50">
+                    <span>
+                      Data/Hora de Criação: 
                     </span>
+                    <span>{formatDateTime(venda.dataCriacao)}</span>
                   </div>
 
                   {/* Data/Hora de Finalização */}
                   {venda.dataFinalizacao && (
-                    <div className="px-3 py-2 rounded-lg bg-white shadow-sm">
-                      <span className="text-sm text-primary-text font-nunito">
-                        Data/Hora de Finalização: {formatDateTime(venda.dataFinalizacao)}
+                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 py-1 rounded-lg bg-white shadow-sm shadow-primary-text/50">
+                      <span>
+                        Data/Hora de Finalização: 
                       </span>
+                      <span>{formatDateTime(venda.dataFinalizacao)}</span>
                     </div>
                   )}
 
                   {/* Cliente Vinculado */}
                   {venda.clienteId && nomeCliente && (
-                    <div className="px-3 py-2 rounded-lg bg-white shadow-sm">
-                      <span className="text-sm text-primary-text font-nunito">
-                        Cliente Vinculado: {nomeCliente}
+                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 py-1 rounded-lg bg-white shadow-sm shadow-primary-text/50">
+                      <span>
+                        Cliente Vinculado: 
                       </span>
+                      <span>{nomeCliente}</span>
                     </div>
                   )}
 
                   {/* Identificação da Venda */}
                   {venda.identificacao && (
-                    <div className="px-3 py-2 rounded-lg bg-white shadow-sm">
-                      <span className="text-sm text-primary-text font-nunito">
-                        Identificação da Venda: {venda.identificacao}
+                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 py-1 rounded-lg bg-white shadow-sm shadow-primary-text/50">
+                      <span>
+                        Identificação da Venda: 
                       </span>
+                      <span>{venda.identificacao}</span>
                     </div>
                   )}
                 </div>
               </div>
 
               {/* Card Produtos Lançados */}
-              <div className="mb-4">
-                <h2 className="text-lg font-bold font-exo text-primary-text mb-2">
+              <div className="mb-2 p-2 rounded-lg bg-primary/10 shadow-sm shadow-primary-text/50">
+                <h2 className="text-lg font-bold font-exo text-primary-text">
                   Produtos Lançados
                 </h2>
-                <div className="border-t border-dashed border-gray-300 mb-3"></div>
+                <div className="border-t border-dashed border-gray-400 mb-2"></div>
 
                 <div className="space-y-2">
                   {venda.produtosLancados?.map((produto, index) => {
@@ -501,59 +526,89 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                     return (
                       <div
                         key={index}
-                        className={`px-3 py-2 rounded-lg shadow-sm ${
+                        className={`px-3 py-1 rounded-lg shadow-sm shadow-primary-text/50 ${
                           isRemovido ? 'bg-error/20' : 'bg-white'
                         }`}
                       >
-                        <div className="flex items-start gap-2">
-                          <MdRestaurant className="text-primary mt-1 flex-shrink-0" size={20} />
-                          <div className="flex-1">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1">
-                                <span className="text-sm font-semibold text-primary-text font-nunito">
-                                  {produto.quantidade}x {produto.nomeProduto}
-                                </span>
-                                <div className="text-xs text-secondary-text mt-1">
-                                  {formatCurrency(produto.valorUnitario)} cada
-                                  {produto.desconto && (
-                                    <span className="ml-2 text-error">
-                                      - Desconto: {produto.tipoDesconto === 'porcentagem' ? `${produto.desconto}%` : formatCurrency(typeof produto.desconto === 'string' ? parseFloat(produto.desconto) : produto.desconto)}
-                                    </span>
-                                  )}
-                                  {produto.acrescimo && (
-                                    <span className="ml-2 text-success">
-                                      + Acréscimo: {produto.tipoAcrescimo === 'porcentagem' ? `${produto.acrescimo}%` : formatCurrency(typeof produto.acrescimo === 'string' ? parseFloat(produto.acrescimo) : produto.acrescimo)}
-                                    </span>
-                                  )}
-                                </div>
-                                {produto.complementos && produto.complementos.length > 0 && (
-                                  <div className="mt-2 space-y-1">
-                                    {produto.complementos.map((complemento, compIndex) => {
-                                      const prefix =
-                                        complemento.tipoImpactoPreco === 'aumenta'
-                                          ? '+ '
-                                          : complemento.tipoImpactoPreco === 'diminui'
-                                            ? '- '
-                                            : ''
-                                      return (
-                                        <div key={compIndex} className="text-xs text-secondary-text">
-                                          {prefix}
-                                          {complemento.quantidade}x {complemento.nomeComplemento} (
-                                          {formatCurrency(complemento.valorUnitario)})
-                                        </div>
-                                      )
-                                    })}
-                                  </div>
-                                )}
-                                <div className="text-xs text-secondary-text mt-1">
-                                  Lançado: {formatDateTime(produto.dataLancamento)} | Usuário:{' '}
-                                  {nomesUsuarios[produto.lancadoPorId] || produto.lancadoPorId}
-                                </div>
-                              </div>
-                              <div className="text-sm font-semibold text-primary-text font-nunito">
-                                {formatCurrency(valorTotal)}
-                              </div>
+                        <div className="flex flex-col gap-1">
+                          {/* Linha do produto principal */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex-2 items-center gap-2">
+                              <span className="text-sm font-semibold text-primary-text font-nunito">
+                                {produto.quantidade}x {produto.nomeProduto} ({formatNumber(produto.valorUnitario)})
+                              </span>
                             </div>
+                            {/* Se tem acréscimo ou desconto maior que 0, mostra na mesma linha */}
+                            {(() => {
+                              const acrescimoValue = produto.acrescimo 
+                                ? (typeof produto.acrescimo === 'string' ? parseFloat(produto.acrescimo) : produto.acrescimo)
+                                : 0
+                              const descontoValue = produto.desconto
+                                ? (typeof produto.desconto === 'string' ? parseFloat(produto.desconto) : produto.desconto)
+                                : 0
+                              
+                              if (acrescimoValue > 0) {
+                                const valorExibir = produto.tipoAcrescimo === 'porcentagem' 
+                                  ? `${Math.round(acrescimoValue * 100)}%` 
+                                  : formatNumber(acrescimoValue)
+                                return (
+                                  <div className="flex-1 flex justify-start text-xs text-secondary-text font-nunito">
+                                    <span className="text-success">
+                                      Acresc. +{valorExibir}
+                                    </span>
+                                  </div>
+                                )
+                              }
+                              
+                              if (descontoValue > 0) {
+                                const valorExibir = produto.tipoDesconto === 'porcentagem' 
+                                  ? `${Math.round(descontoValue * 100)}%` 
+                                  : formatNumber(descontoValue)
+                                return (
+                                  <div className="flex-1 flex justify-start text-xs text-secondary-text font-nunito">
+                                    <span className="text-error">
+                                      Desc. -{valorExibir}
+                                    </span>
+                                  </div>
+                                )
+                              }
+                              
+                              return null
+                            })()}
+                            <div className="flex-1 flex items-center justify-end text-sm font-semibold text-primary-text font-nunito">
+                              {formatCurrency(valorTotal)}
+                            </div>
+                          </div>
+
+                          {/* Linhas dos complementos */}
+                          {produto.complementos && produto.complementos.length > 0 && (
+                            <div className="space-y-1 ml-7">
+                              {produto.complementos.map((complemento, compIndex) => {
+                                const valorTotalComplemento = calcularValorComplemento(complemento)
+                                const temImpactoPreco = complemento.tipoImpactoPreco !== 'nenhum'
+                                const prefix = temImpactoPreco
+                                  ? (complemento.tipoImpactoPreco === 'aumenta' ? '+ ' : '- ')
+                                  : ''
+                                
+                                return (
+                                  <div key={compIndex} className="flex items-center justify-between gap-2">
+                                    <span className="text-xs text-secondary-text font-nunito">
+                                      {complemento.quantidade}x {complemento.nomeComplemento}
+                                      {temImpactoPreco && ` (${formatNumber(complemento.valorUnitario)})`}
+                                    </span>
+                                    <div className="text-xs font-semibold text-secondary-text font-nunito">
+                                      {temImpactoPreco ? `${prefix}${formatCurrency(valorTotalComplemento)}` : '-'}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+
+                          {/* Informações de lançamento */}
+                          <div className="text-xs text-secondary-text mt-1 ml-7">
+                            Lançado: {formatDateTime(produto.dataLancamento)} | Usuário:{' '}
+                            {nomesUsuarios[produto.lancadoPorId] || produto.lancadoPorId}
                           </div>
                         </div>
                       </div>

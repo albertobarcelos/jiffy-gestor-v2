@@ -7,6 +7,13 @@ interface TipoVendaIconProps {
   tipoVenda: 'mesa' | 'balcao'
   numeroMesa?: number | string | null
   className?: string
+  // Props opcionais para customização de cores (usado apenas quando necessário)
+  corPrincipal?: string // Cor principal (alternate) - padrão: var(--color-alternate)
+  corSecundaria?: string // Cor secundária (info) - padrão: var(--color-info)
+  corTexto?: string // Cor do texto/número - padrão: var(--color-alternate)
+  corBorda?: string // Cor da borda - padrão: rgba(131, 56, 236, 0.5)
+  corFundo?: string // Cor de fundo do círculo externo - padrão: var(--color-primary-background)
+  corBalcao?: string // Cor do ícone de balcão - padrão: var(--color-alternate)
 }
 
 /**
@@ -25,6 +32,12 @@ export function TipoVendaIcon({
   tipoVenda,
   numeroMesa,
   className = '',
+  corPrincipal = 'var(--color-alternate)',
+  corSecundaria = 'var(--color-info)',
+  corTexto = 'var(--color-alternate)',
+  corBorda = 'rgba(131, 56, 236, 0.5)',
+  corFundo = 'var(--color-primary-background)',
+  corBalcao = 'var(--color-alternate)',
 }: TipoVendaIconProps) {
   if (tipoVenda === 'mesa') {
     return (
@@ -36,7 +49,7 @@ export function TipoVendaIcon({
             width={60}
             height={60}
             viewBox="0 0 60 60"
-            fill='var(--color-alternate)'
+            fill={corPrincipal}
             className="absolute"
             style={{ top: 0, left: 0 }}
           >
@@ -46,8 +59,8 @@ export function TipoVendaIcon({
               cy="16"
               rx="8"
               ry="8"
-              fill="var(--color-info)"
-              stroke="var(--color-alternate)"
+              fill={corSecundaria}
+              stroke={corPrincipal}
               opacity="0.9"
               transform="rotate(45 37 23)"
             />
@@ -57,8 +70,8 @@ export function TipoVendaIcon({
               cy="30"
               rx="8"
               ry="8"
-              fill="var(--color-info)"
-              stroke="var(--color-alternate)"
+              fill={corSecundaria}
+              stroke={corPrincipal}
               opacity="0.9"
               transform="rotate(135 37 37)"
             />
@@ -68,8 +81,8 @@ export function TipoVendaIcon({
               cy="29"
               rx="8"
               ry="8"
-              fill="var(--color-info)"
-              stroke="var(--color-alternate)"
+              fill={corSecundaria}
+              stroke={corPrincipal}
               opacity="0.9"
               transform="rotate(225 23 37)"
             />
@@ -79,8 +92,8 @@ export function TipoVendaIcon({
               cy="16"
               rx="8"
               ry="8"
-              fill="var(--color-info)"
-              stroke="var(--color-alternate)"
+              fill={corSecundaria}
+              stroke={corPrincipal}
               opacity="0.9"
               transform="rotate(315 23 23)"
             />
@@ -92,9 +105,9 @@ export function TipoVendaIcon({
             style={{
               width: '35px',
               height: '35px',
-              backgroundColor: 'var(--color-primary-background)',
-              border: '1px solid var(--color-alternate)',
-              borderColor: 'rgba(131, 56, 236, 0.5)', // alternate com opacidade
+              backgroundColor: corFundo,
+              border: '1px solid',
+              borderColor: corBorda,
               top: '50%',
               left: '50%',
               transform: 'translate(-50%, -50%)',
@@ -112,7 +125,7 @@ export function TipoVendaIcon({
           >
             <span
               className="text-sm font-bold leading-none"
-              style={{ color: 'var(--color-alternate)' }}
+              style={{ color: corTexto }}
             >
               {numeroMesa?.toString() || ''}
             </span>
@@ -126,8 +139,8 @@ export function TipoVendaIcon({
   if (tipoVenda === 'balcao') {
     return (
       <div className={`flex h-[55px] flex-col items-center justify-center ${className}`}>
-        <RiBeerFill size={28} color="var(--color-alternate)" />
-        <span className="mt-1 text-xs font-medium text-primary-text">Balcão</span>
+        <RiBeerFill size={28} color={corBalcao} />
+        <span className="mt-1 text-xs font-medium" style={{ color: corBalcao }}>Balcão</span>
       </div>
     )
   }

@@ -585,8 +585,7 @@ export function VendasList() {
     <div className="flex flex-col h-full">
       {/* Container principal */}
       <div className="bg-primary-background rounded-t-lg rounded-b-lg px-2">
-        {/* Título */}
-        <h1 className="text-primary text-lg font-exo">Histórico de Vendas</h1>
+       
 
         {/* Filtros Superiores */}
         <div className="flex items-center gap-3 py-2">
@@ -958,7 +957,7 @@ export function VendasList() {
           {/* Lista com scroll */}
           <div
             ref={scrollContainerRef}
-            className="max-h-[calc(100vh-400px)] overflow-y-auto px-1 py-2"
+            className="max-h-[calc(100vh-350px)] overflow-y-auto px-1 py-2"
           >
             {vendas.length === 0 && !isLoading && (
               <div className="flex items-center justify-center py-12">
