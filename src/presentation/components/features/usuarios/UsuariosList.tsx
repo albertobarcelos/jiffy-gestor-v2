@@ -10,7 +10,6 @@ import {
   UsuariosTabsModal,
   UsuariosTabsModalState,
 } from './UsuariosTabsModal'
-import { usePerfisPDV } from '@/src/presentation/hooks/usePerfisPDV'
 
 interface UsuariosListProps {
   onReload?: () => void
@@ -41,8 +40,9 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
   const hasLoadedInitialRef = useRef(false)
   const { auth, isAuthenticated } = useAuthStore()
   
-  // Carregar todos os perfis PDV
-  const { data: allPerfisPDV = [], isLoading: isLoadingPerfis } = usePerfisPDV()
+  // Estados para perfis PDV (sempre busca dados atualizados)
+  const [allPerfisPDV, setAllPerfisPDV] = useState<Array<{ id: string; role: string }>>([])
+  const [isLoadingPerfis, setIsLoadingPerfis] = useState(false)
 
   const searchTextRef = useRef('')
   const filterStatusRef = useRef<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
@@ -55,6 +55,44 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
   useEffect(() => {
     filterStatusRef.current = filterStatus
   }, [filterStatus])
+
+  // Carregar perfis PDV diretamente da API (sem cache)
+  const loadPerfisPDV = useCallback(async () => {
+    const token = auth?.getAccessToken()
+    if (!token) return
+
+    setIsLoadingPerfis(true)
+    try {
+      const response = await fetch('/api/perfis-pdv', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const perfis = (data.items || []).map((item: any) => ({
+          id: item.id?.toString() || '',
+          role: item.role?.toString() || '',
+        }))
+        setAllPerfisPDV(perfis)
+      } else {
+        console.error('Erro ao carregar perfis PDV:', response.status)
+        setAllPerfisPDV([])
+      }
+    } catch (error) {
+      console.error('Erro ao carregar perfis PDV:', error)
+      setAllPerfisPDV([])
+    } finally {
+      setIsLoadingPerfis(false)
+    }
+  }, [auth])
+
+  // Carregar perfis PDV quando o componente montar
+  useEffect(() => {
+    loadPerfisPDV()
+  }, [loadPerfisPDV])
 
   /**
    * Carrega todos os usuários fazendo requisições sequenciais
@@ -241,9 +279,10 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
   }, [])
 
   const handleTabsModalReload = useCallback(() => {
+    loadPerfisPDV() // Recarrega perfis para garantir que novos perfis apareçam
     loadAllUsuarios()
     onReload?.()
-  }, [loadAllUsuarios, onReload])
+  }, [loadPerfisPDV, loadAllUsuarios, onReload])
 
   const handleTabsModalTabChange = useCallback((tab: 'usuario') => {
     setTabsModalState((prev) => ({

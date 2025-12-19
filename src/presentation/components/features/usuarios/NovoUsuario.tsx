@@ -1,12 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Usuario } from '@/src/domain/entities/Usuario'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
-import { usePerfisPDV } from '@/src/presentation/hooks/usePerfisPDV'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdPerson, MdVisibility, MdVisibilityOff } from 'react-icons/md'
 
@@ -51,11 +50,47 @@ export function NovoUsuario({
   const [isLoadingUsuario, setIsLoadingUsuario] = useState(false)
   const hasLoadedUsuarioRef = useRef(false)
 
-  // Carregar lista de perfis PDV usando React Query (com cache)
-  const {
-    data: perfisPDV = [],
-    isLoading: isLoadingPerfis,
-  } = usePerfisPDV()
+  // Estados para perfis PDV (sempre busca dados atualizados)
+  const [perfisPDV, setPerfisPDV] = useState<PerfilPDV[]>([])
+  const [isLoadingPerfis, setIsLoadingPerfis] = useState(false)
+
+  // Carregar perfis PDV diretamente da API (sem cache)
+  const loadPerfisPDV = useCallback(async () => {
+    const token = auth?.getAccessToken()
+    if (!token) return
+
+    setIsLoadingPerfis(true)
+    try {
+      const response = await fetch('/api/perfis-pdv', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const perfis = (data.items || []).map((item: any) => ({
+          id: item.id?.toString() || '',
+          role: item.role?.toString() || '',
+        }))
+        setPerfisPDV(perfis)
+      } else {
+        console.error('Erro ao carregar perfis PDV:', response.status)
+        setPerfisPDV([])
+      }
+    } catch (error) {
+      console.error('Erro ao carregar perfis PDV:', error)
+      setPerfisPDV([])
+    } finally {
+      setIsLoadingPerfis(false)
+    }
+  }, [auth])
+
+  // Carregar perfis PDV quando o componente montar
+  useEffect(() => {
+    loadPerfisPDV()
+  }, [loadPerfisPDV])
 
   // Definir perfil inicial quando não estiver em modo de edição
   useEffect(() => {
@@ -342,7 +377,7 @@ export function NovoUsuario({
                     className="w-full h-13 px-4 py-3 rounded-lg border border-gray-400 bg-info text-gray-900 hover:border-primary-text focus:outline-none focus:border-2 focus:border-primary-text"
                   >
                     {!isEditing && <option value="">Selecione um perfil...</option>}
-                    {(Array.isArray(perfisPDV) ? perfisPDV : []).map((perfil: any) => {
+                    {(Array.isArray(perfisPDV) ? perfisPDV : []).map((perfil: PerfilPDV) => {
                       const isSelected = perfil.id === perfilPdvId
                       if (isSelected) {
                         console.log('Perfil selecionado encontrado:', perfil.role, perfil.id)
