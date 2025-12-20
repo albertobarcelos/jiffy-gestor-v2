@@ -89,6 +89,12 @@ export function MeuCaixaView() {
                 : 'Carregando...'}
             </p>
             <button
+              onClick={() => router.push('/historico-fechamento')}
+              className="h-9 px-6 bg-primary text-info rounded-[30px] font-medium font-exo text-sm hover:bg-primary/90 transition-colors"
+            >
+              Histórico de Fechamentos
+            </button>
+            <button
               onClick={() => setMostrarModalFechar(true)}
               className="h-9 px-6 bg-primary text-info rounded-[30px] font-medium font-exo text-sm hover:bg-primary/90 transition-colors"
             >
