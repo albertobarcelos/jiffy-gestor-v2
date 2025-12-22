@@ -287,15 +287,23 @@ export function HistoricoFechamento() {
 
           if (resetPage) {
             setOperacoesCaixa(newItems)
+            // Após reset, a próxima página será 1
+            setCurrentPage(1)
           } else {
             setOperacoesCaixa((prev) => [...prev, ...newItems])
+            // Incrementa a página para a próxima busca
+            setCurrentPage((prev) => prev + 1)
           }
 
-          setCurrentPage((prev) => prev + 1)
-          setCanLoadMore(newItems.length === pageSize && (data.hasNext !== false))
+          // Verifica se há mais itens para carregar
+          // Se retornou menos itens que o pageSize, não há mais páginas
+          // Se retornou exatamente pageSize itens, pode haver mais páginas
+          const hasMore = newItems.length === pageSize
+          setCanLoadMore(hasMore)
         } else {
           if (resetPage) {
             setOperacoesCaixa([])
+            setCurrentPage(0)
           }
           setCanLoadMore(false)
         }
@@ -407,6 +415,26 @@ export function HistoricoFechamento() {
     return () => container.removeEventListener('scroll', handleScroll)
   }, [canLoadMore, isLoadingMore, isLoading, fetchOperacoesCaixa])
 
+  // Carrega mais itens automaticamente se a lista inicial não preencher a tela
+  useEffect(() => {
+    if (!isLoading && !isLoadingMore && canLoadMore && operacoesCaixa.length > 0) {
+      const container = scrollContainerRef.current
+      if (container) {
+        const { scrollHeight, clientHeight } = container
+        // Se não há scroll (conteúdo cabe na tela), carrega mais itens
+        if (scrollHeight <= clientHeight) {
+          // Usa um pequeno delay para evitar múltiplas chamadas
+          const timeoutId = setTimeout(() => {
+            if (canLoadMore && !isLoadingMore && !isLoading) {
+              fetchOperacoesCaixa(false)
+            }
+          }, 300)
+          return () => clearTimeout(timeoutId)
+        }
+      }
+    }
+  }, [isLoading, isLoadingMore, canLoadMore, operacoesCaixa.length, fetchOperacoesCaixa])
+
   // Atualiza período quando muda
   useEffect(() => {
     // Cancela o debounce anterior para evitar conflitos
@@ -423,12 +451,31 @@ export function HistoricoFechamento() {
       setDataAberturaFilter(null)
       setDataAberturaInputValue('')
       previousDateValueRef.current = ''
+      
+      // Atualiza os refs manualmente
+      filtersRef.current = {
+        ...filtersRef.current,
+        periodo,
+        periodoInicial: inicio,
+        periodoFinal: fim,
+        dataAberturaFilter: null,
+      }
+      
       // Dispara a busca imediatamente com reset da página (sem debounce)
       fetchOperacoesCaixa(true)
     } else if (periodo === 'Todos') {
       // Limpa os filtros de período
       setPeriodoInicial(null)
       setPeriodoFinal(null)
+      
+      // Atualiza os refs manualmente
+      filtersRef.current = {
+        ...filtersRef.current,
+        periodo: 'Todos',
+        periodoInicial: null,
+        periodoFinal: null,
+      }
+      
       // Dispara a busca imediatamente com reset da página (sem debounce)
       fetchOperacoesCaixa(true)
     }
@@ -454,6 +501,12 @@ export function HistoricoFechamento() {
    * Limpa todos os filtros
    */
   const handleClearFilters = () => {
+    // Cancela o debounce anterior
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+
+    // Limpa todos os estados
     setSearchQuery('')
     setPeriodo('Todos')
     setStatusFilter(null)
@@ -463,6 +516,19 @@ export function HistoricoFechamento() {
     setDataAberturaFilter(null)
     setDataAberturaInputValue('')
     previousDateValueRef.current = ''
+
+    // Atualiza os refs manualmente para garantir que estão sincronizados
+    filtersRef.current = {
+      searchQuery: '',
+      periodo: 'Todos',
+      statusFilter: null,
+      terminalFilter: null,
+      periodoInicial: null,
+      periodoFinal: null,
+      dataAberturaFilter: null,
+    }
+
+    // Dispara a busca imediatamente sem debounce
     fetchOperacoesCaixa(true)
   }
 
@@ -470,11 +536,26 @@ export function HistoricoFechamento() {
    * Confirma seleção de datas e aplica filtro
    */
   const handleConfirmDatas = (dataInicial: Date | null, dataFinal: Date | null) => {
+    // Cancela o debounce anterior
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+
     setPeriodoInicial(dataInicial)
     setPeriodoFinal(dataFinal)
     if (dataInicial || dataFinal) {
       setPeriodo('Todos')
     }
+
+    // Atualiza os refs manualmente para garantir que estão sincronizados
+    filtersRef.current = {
+      ...filtersRef.current,
+      periodoInicial: dataInicial,
+      periodoFinal: dataFinal,
+      periodo: dataInicial || dataFinal ? 'Todos' : filtersRef.current.periodo,
+    }
+
+    // Dispara a busca imediatamente sem debounce
     fetchOperacoesCaixa(true)
   }
 
