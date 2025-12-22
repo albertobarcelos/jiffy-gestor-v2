@@ -483,69 +483,11 @@ export function HistoricoFechamento() {
       {/* Container principal */}
       <div className="bg-primary-background rounded-t-lg rounded-b-lg px-2">
         {/* Título */}
-        <div className="px-4 py-4">
+        <div className="px-4 pt-1">
           <h1 className="text-xl font-exo font-semibold text-primary">Histórico de Fechamento de Caixa</h1>
         </div>
-
-        {/* Filtros Superiores */}
-        <div className="flex items-center gap-3 py-2">
-          {/* Campo de Pesquisa */}
-          <div className="flex-[2] relative">
-            <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
-            <input
-              type="text"
-              placeholder="Pesquisar por Código do Terminal"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-9 pl-10 pr-4 rounded-lg bg-info border shadow-sm text-sm font-nunito"
-            />
-          </div>
-
-          {/* Label Período */}
-          <span className="text-primary text-sm font-exo">Período:</span>
-
-          {/* Dropdown Período */}
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <Select
-              value={periodo}
-              onChange={(e) => setPeriodo(e.target.value)}
-              sx={{
-                height: '36px',
-                backgroundColor: 'var(--color-primary)',
-                color: 'white',
-                fontSize: '13px',
-                '& .MuiOutlinedInput-notchedOutline': {
-                  borderColor: 'var(--color-primary)',
-                },
-                '& .MuiSvgIcon-root': {
-                  color: 'white',
-                },
-              }}
-            >
-              <MenuItem value="Todos">Todos</MenuItem>
-              <MenuItem value="Hoje">Hoje</MenuItem>
-              <MenuItem value="Ontem">Ontem</MenuItem>
-              <MenuItem value="Últimos 7 Dias">Últimos 7 Dias</MenuItem>
-              <MenuItem value="Mês Atual">Mês Atual</MenuItem>
-              <MenuItem value="Mês Passado">Mês Passado</MenuItem>
-              <MenuItem value="Últimos 30 Dias">Últimos 30 Dias</MenuItem>
-              <MenuItem value="Últimos 60 Dias">Últimos 60 Dias</MenuItem>
-              <MenuItem value="Últimos 90 Dias">Últimos 90 Dias</MenuItem>
-            </Select>
-          </FormControl>
-
-          {/* Botão Por Datas */}
-          <button
-            onClick={() => setIsDatasModalOpen(true)}
-            className="h-9 px-4 bg-primary text-white rounded-lg flex items-center gap-2 text-sm font-nunito hover:bg-primary/90 transition-colors"
-          >
-            <MdCalendarToday size={18} />
-            Por datas
-          </button>
-        </div>
-
         {/* Filtros Avançados */}
-        <div className="bg-custom-2 rounded-t-lg px-2 pt-1.5 pb-2 flex flex-wrap items-center gap-x-2 gap-y-4">
+        <div className="bg-custom-2 rounded-t-lg px-2 pt-1 pb-2 flex flex-wrap items-end gap-x-2 gap-y-4">
           {/* Status */}
           <div className="flex flex-col gap-1">
             <label className="text-xs text-secondary-text font-nunito">Status</label>
@@ -697,6 +639,50 @@ export function HistoricoFechamento() {
             </div>
           </div>
 
+          <div className="flex flex-col gap-1">
+          {/* Label Período */}
+          <span className="text-primary text-xs font-exo">Período:</span>
+
+          {/* Dropdown Período */}
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <Select
+              value={periodo}
+              onChange={(e) => setPeriodo(e.target.value)}
+              sx={{
+                height: '32px',
+                backgroundColor: 'var(--color-primary)',
+                color: 'white',
+                fontSize: '13px',
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'var(--color-primary)',
+                },
+                '& .MuiSvgIcon-root': {
+                  color: 'white',
+                },
+              }}
+            >
+              <MenuItem value="Todos">Todos</MenuItem>
+              <MenuItem value="Hoje">Hoje</MenuItem>
+              <MenuItem value="Ontem">Ontem</MenuItem>
+              <MenuItem value="Últimos 7 Dias">Últimos 7 Dias</MenuItem>
+              <MenuItem value="Mês Atual">Mês Atual</MenuItem>
+              <MenuItem value="Mês Passado">Mês Passado</MenuItem>
+              <MenuItem value="Últimos 30 Dias">Últimos 30 Dias</MenuItem>
+              <MenuItem value="Últimos 60 Dias">Últimos 60 Dias</MenuItem>
+              <MenuItem value="Últimos 90 Dias">Últimos 90 Dias</MenuItem>
+            </Select>
+          </FormControl>
+          </div>
+
+          {/* Botão Por Datas */}
+          <button
+            onClick={() => setIsDatasModalOpen(true)}
+            className="h-8 px-4 bg-primary text-white rounded-lg flex items-center gap-2 text-sm font-nunito hover:bg-primary/90 transition-colors"
+          >
+            <MdCalendarToday size={18} />
+            Por datas
+          </button>
+
           {/* Botão Limpar Filtros */}
           <button
             onClick={handleClearFilters}
@@ -705,6 +691,21 @@ export function HistoricoFechamento() {
             <MdFilterAltOff size={18} />
             Limpar Filtros
           </button>
+        </div>
+         {/* Filtros Superiores */}
+         <div className="flex items-center h-10 py-1">
+          <span className="text-primary text-xs font-exo pr-2.5">Pesquisar por Código ou Nome do Terminal: </span>
+          {/* Campo de Pesquisa */}
+          <div className="flex-1 relative max-w-[300px]">
+            <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
+            <input
+              type="text"
+              placeholder="Pesquisar..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-8 pl-10 pr-4 rounded-lg bg-info border shadow-sm text-sm font-nunito"
+            />
+          </div>
         </div>
 
         {/* Cabeçalho da Tabela */}
@@ -722,7 +723,7 @@ export function HistoricoFechamento() {
         <div
           ref={scrollContainerRef}
           className="flex-1 overflow-y-auto bg-primary-background"
-          style={{ maxHeight: 'calc(100vh - 350px)' }}
+          style={{ maxHeight: 'calc(100vh - 300px)' }}
         >
           {isLoading && operacoesCaixa.length === 0 ? (
             <div className="flex justify-center items-center py-12">
