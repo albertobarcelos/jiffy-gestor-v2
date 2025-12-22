@@ -50,7 +50,9 @@ export function HistoricoFechamento() {
   const [periodoInicial, setPeriodoInicial] = useState<Date | null>(null)
   const [periodoFinal, setPeriodoFinal] = useState<Date | null>(null)
   const [dataAberturaFilter, setDataAberturaFilter] = useState<Date | null>(null)
+  const [dataAberturaInputValue, setDataAberturaInputValue] = useState<string>('')
   const [isDatasModalOpen, setIsDatasModalOpen] = useState(false)
+  const previousDateValueRef = useRef<string>('')
 
   // Estados de dados
   const [operacoesCaixa, setOperacoesCaixa] = useState<OperacaoCaixa[]>([])
@@ -211,12 +213,20 @@ export function HistoricoFechamento() {
           params.append('q', filters.searchQuery.trim())
         }
 
-        // Calcular datas - prioriza filtros manuais sobre pré-definidos
+        // Calcular datas - prioriza filtro de data de abertura individual sobre outros
         let dataInicio: string | null = null
         let dataFim: string | null = null
 
-        if (filters.periodoInicial || filters.periodoFinal) {
-          // Prioriza filtro manual
+        // Filtro de data de abertura individual tem prioridade máxima
+        if (filters.dataAberturaFilter) {
+          const inicio = new Date(filters.dataAberturaFilter)
+          inicio.setHours(0, 0, 0, 0)
+          dataInicio = inicio.toISOString()
+          const fim = new Date(filters.dataAberturaFilter)
+          fim.setHours(23, 59, 59, 999)
+          dataFim = fim.toISOString()
+        } else if (filters.periodoInicial || filters.periodoFinal) {
+          // Prioriza filtro manual do modal "Por datas"
           if (filters.periodoInicial) {
             const inicio = new Date(filters.periodoInicial)
             inicio.setHours(0, 0, 0, 0)
@@ -233,7 +243,7 @@ export function HistoricoFechamento() {
             dataFim = fim.toISOString()
           }
         } else if (filters.periodo !== 'Todos') {
-          // Usa filtro pré-definido
+          // Usa filtro pré-definido (Hoje, Ontem, etc.)
           const { inicio, fim } = calculatePeriodo(filters.periodo)
           if (inicio) {
             dataInicio = inicio.toISOString()
@@ -241,16 +251,6 @@ export function HistoricoFechamento() {
           if (fim) {
             dataFim = fim.toISOString()
           }
-        }
-
-        // Filtro de data de abertura individual (sobrescreve outros se definido)
-        if (filters.dataAberturaFilter) {
-          const inicio = new Date(filters.dataAberturaFilter)
-          inicio.setHours(0, 0, 0, 0)
-          dataInicio = inicio.toISOString()
-          const fim = new Date(filters.dataAberturaFilter)
-          fim.setHours(23, 59, 59, 999)
-          dataFim = fim.toISOString()
         }
 
         if (dataInicio) {
@@ -264,8 +264,8 @@ export function HistoricoFechamento() {
           params.append('terminalId', filters.terminalFilter)
         }
 
-        if (filters.statusFilter) {
-          params.append('status', filters.statusFilter.toUpperCase())
+        if (filters.statusFilter && filters.statusFilter.trim() !== '') {
+          params.append('status', filters.statusFilter.trim().toLowerCase())
         }
 
         const response = await fetch(`/api/caixa/operacao-caixa-terminal?${params.toString()}`, {
@@ -409,17 +409,39 @@ export function HistoricoFechamento() {
 
   // Atualiza período quando muda
   useEffect(() => {
-    if (periodo !== 'Todos' && !periodoInicial && !periodoFinal) {
+    // Cancela o debounce anterior para evitar conflitos
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+
+    if (periodo !== 'Todos') {
+      // Sempre recalcula o período quando muda, independente de valores anteriores
       const { inicio, fim } = calculatePeriodo(periodo)
       setPeriodoInicial(inicio)
       setPeriodoFinal(fim)
+      // Limpa o filtro de data de abertura individual quando usa período pré-definido
+      setDataAberturaFilter(null)
+      setDataAberturaInputValue('')
+      previousDateValueRef.current = ''
+      // Dispara a busca imediatamente com reset da página (sem debounce)
       fetchOperacoesCaixa(true)
     } else if (periodo === 'Todos') {
+      // Limpa os filtros de período
       setPeriodoInicial(null)
       setPeriodoFinal(null)
+      // Dispara a busca imediatamente com reset da página (sem debounce)
+      fetchOperacoesCaixa(true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periodo])
+
+  // Sincroniza o valor do input com o filtro de data de abertura quando limpo externamente
+  useEffect(() => {
+    if (!dataAberturaFilter && dataAberturaInputValue) {
+      // Se o filtro foi limpo externamente (ex: botão limpar filtros), limpa o input também
+      setDataAberturaInputValue('')
+    }
+  }, [dataAberturaFilter])
 
   // Carrega dados iniciais
   useEffect(() => {
@@ -439,6 +461,8 @@ export function HistoricoFechamento() {
     setPeriodoInicial(null)
     setPeriodoFinal(null)
     setDataAberturaFilter(null)
+    setDataAberturaInputValue('')
+    previousDateValueRef.current = ''
     fetchOperacoesCaixa(true)
   }
 
@@ -579,16 +603,92 @@ export function HistoricoFechamento() {
               <MdCalendarToday className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text pointer-events-none" size={18} />
               <input
                 type="date"
-                value={dataAberturaFilter ? dataAberturaFilter.toISOString().split('T')[0] : ''}
+                value={dataAberturaInputValue}
                 onChange={(e) => {
-                  const date = e.target.value ? new Date(e.target.value) : null
-                  setDataAberturaFilter(date)
+                  const value = e.target.value
+                  // Atualiza o valor do input visualmente
+                  setDataAberturaInputValue(value)
+                  
+                  // Detecta quando uma data completa foi selecionada (clicada)
+                  // Compara com o valor anterior para garantir que é uma seleção real, não apenas navegação
+                  if (value && value.length === 10) {
+                    const previousValue = previousDateValueRef.current
+                    
+                    // Se não havia valor anterior, é a primeira vez que o calendário abre
+                    // Neste caso, não aplica o filtro (evita usar o dia pré-selecionado)
+                    if (!previousValue) {
+                      // Apenas armazena o valor para comparação futura, mas não aplica o filtro
+                      previousDateValueRef.current = value
+                      return
+                    }
+                    
+                    // Se o valor mudou, verifica se foi uma seleção real ou apenas navegação
+                    if (value !== previousValue) {
+                      // Extrai dia, mês e ano de ambos os valores
+                      const [year, month, day] = value.split('-').map(Number)
+                      const [prevYear, prevMonth, prevDay] = previousValue.split('-').map(Number)
+                      
+                      // Se apenas o mês mudou mas o dia permaneceu o mesmo, é navegação no calendário
+                      // Não aplica o filtro neste caso
+                      if (day === prevDay && month !== prevMonth) {
+                        // Apenas atualiza a referência, mas não aplica o filtro
+                        previousDateValueRef.current = value
+                        return
+                      }
+                      
+                      // Se o dia mudou, é uma seleção real do usuário
+                      // Cria data no timezone local para evitar problemas de UTC
+                      const date = new Date(year, month - 1, day)
+                      // Verifica se a data é válida
+                      if (!isNaN(date.getTime())) {
+                        // Compara com a data atual do filtro para evitar atualizações desnecessárias
+                        const currentDateStr = dataAberturaFilter 
+                          ? dataAberturaFilter.toISOString().split('T')[0] 
+                          : null
+                        if (value !== currentDateStr) {
+                          setDataAberturaFilter(date)
+                          previousDateValueRef.current = value
+                        }
+                      }
+                    }
+                  } else if (!value) {
+                    // Se o campo foi limpo, remove o filtro
+                    setDataAberturaFilter(null)
+                    previousDateValueRef.current = ''
+                  }
+                }}
+                onBlur={(e) => {
+                  // Fallback: se o usuário fechar o calendário, aplica o valor apenas se for uma seleção válida
+                  const value = e.target.value
+                  if (value && value.length === 10) {
+                    const previousValue = previousDateValueRef.current
+                    
+                    // Se não havia valor anterior ou o valor mudou significativamente, aplica
+                    if (!previousValue || value !== previousValue) {
+                      const [year, month, day] = value.split('-').map(Number)
+                      const date = new Date(year, month - 1, day)
+                      if (!isNaN(date.getTime())) {
+                        const currentDateStr = dataAberturaFilter 
+                          ? dataAberturaFilter.toISOString().split('T')[0] 
+                          : null
+                        // Só aplica se for diferente da data atual do filtro
+                        if (value !== currentDateStr) {
+                          setDataAberturaFilter(date)
+                          previousDateValueRef.current = value
+                        }
+                      }
+                    }
+                  }
                 }}
                 className="w-[180px] h-8 pl-10 pr-8 rounded-lg bg-white border border-gray-300 text-sm font-nunito text-primary-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               />
               {dataAberturaFilter && (
                 <button
-                  onClick={() => setDataAberturaFilter(null)}
+                  onClick={() => {
+                    setDataAberturaFilter(null)
+                    setDataAberturaInputValue('')
+                    previousDateValueRef.current = ''
+                  }}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-secondary-text hover:text-primary-text"
                 >
                   <MdClose size={16} />
@@ -622,7 +722,7 @@ export function HistoricoFechamento() {
         <div
           ref={scrollContainerRef}
           className="flex-1 overflow-y-auto bg-primary-background"
-          style={{ maxHeight: 'calc(100vh - 400px)' }}
+          style={{ maxHeight: 'calc(100vh - 350px)' }}
         >
           {isLoading && operacoesCaixa.length === 0 ? (
             <div className="flex justify-center items-center py-12">
