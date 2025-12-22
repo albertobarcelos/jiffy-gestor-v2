@@ -1019,7 +1019,7 @@ export function VendasList() {
           {/* Lista com scroll */}
           <div
             ref={scrollContainerRef}
-            className="max-h-[calc(100vh-350px)] overflow-y-auto px-1 py-2"
+            className="max-h-[calc(100vh-350px)] overflow-y-auto px-1 py-2 scrollbar-hide"
           >
             {vendas.length === 0 && !isLoading && (
               <div className="flex items-center justify-center py-12">

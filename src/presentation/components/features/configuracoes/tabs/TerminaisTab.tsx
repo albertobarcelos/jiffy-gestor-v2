@@ -267,7 +267,7 @@ export function TerminaisTab() {
       </div>
 
       {/* Lista de terminais com scroll */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-[20px]">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-[20px] scrollbar-hide">
         {/* Barra de títulos das colunas - sticky dentro do scroll */}
         {terminais.length > 0 && (
           <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px] sticky top-0 z-10 mb-2">
