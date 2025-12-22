@@ -637,11 +637,17 @@ export function HistoricoFechamento() {
                   if (value && value.length === 10) {
                     const previousValue = previousDateValueRef.current
                     
-                    // Se não havia valor anterior, é a primeira vez que o calendário abre
-                    // Neste caso, não aplica o filtro (evita usar o dia pré-selecionado)
+                    // Se não havia valor anterior, é a primeira seleção
+                    // Aplica o filtro normalmente
                     if (!previousValue) {
-                      // Apenas armazena o valor para comparação futura, mas não aplica o filtro
-                      previousDateValueRef.current = value
+                      // Cria data no timezone local para evitar problemas de UTC
+                      const [year, month, day] = value.split('-').map(Number)
+                      const date = new Date(year, month - 1, day)
+                      // Verifica se a data é válida
+                      if (!isNaN(date.getTime())) {
+                        setDataAberturaFilter(date)
+                        previousDateValueRef.current = value
+                      }
                       return
                     }
                     
