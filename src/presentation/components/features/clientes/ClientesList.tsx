@@ -262,10 +262,10 @@ export function ClientesList({ onReload }: ClientesListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px] pb-1">
+      <div className="px-[30px] py-1 flex-shrink-0">
         <div className="flex items-start justify-between">
           <div className="w-1/2 pl-5">
-            <p className="text-primary text-sm font-semibold font-nunito">
+            <p className="text-primary text-lg font-semibold font-nunito">
               Clientes Cadastrados
             </p>
             <p className="text-tertiary text-[22px] font-medium font-nunito">
@@ -284,8 +284,8 @@ export function ClientesList({ onReload }: ClientesListProps) {
         </div>
       </div>
 
-      <div className="h-[4px] border-t-2 border-primary/70"></div>
-      <div className="flex gap-3 px-[20px] py-2">
+      <div className="h-[4px] border-t-2 border-primary/70 flex-shrink-0"></div>
+      <div className="flex gap-3 px-[20px] pb-2 flex-shrink-0">
         <div className="flex-1 min-w-[180px] max-w-[360px]">
             <label
               htmlFor="clientes-search"
@@ -328,8 +328,8 @@ export function ClientesList({ onReload }: ClientesListProps) {
           </div>
 
       {/* Cabeçalho da tabela */}
-      <div className="px-[30px] mt-0">
-        <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px]">
+      <div className="px-[30px] mt-0 flex-shrink-0">
+        <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-2">
           <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
             Nome
           </div>
@@ -357,7 +357,8 @@ export function ClientesList({ onReload }: ClientesListProps) {
       {/* Lista de clientes com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-[30px] mt-2"
+        className="flex-1 overflow-y-auto px-[30px] mt-1 scrollbar-hide"
+        style={{ maxHeight: 'calc(100vh - 300px)' }}
       >
         {/* Skeleton loaders para carregamento inicial */}
         {clientes.length === 0 && isLoading && (
@@ -365,7 +366,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
             {[...Array(5)].map((_, i) => (
               <div
                 key={i}
-                className=" bg-info rounded-lg px-4 mb-2 flex items-center gap-[10px] shadow-xl hover:shadow-md transition-shadow hover:bg-secondary-bg/15"
+                className=" bg-info rounded-lg px-4 flex items-center gap-2 shadow-xl hover:shadow-md transition-shadow hover:bg-secondary-bg/15"
                 >
                 <Skeleton className="flex-[2] h-4" />
                 <Skeleton className="flex-[1.5] h-4" />
@@ -388,7 +389,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
         {clientes.map((cliente) => (
           <div
             key={cliente.getId()}
-            className=" bg-info rounded-lg px-4 py-1 mb-2 flex items-center gap-[10px] shadow-xl hover:shadow-md transition-shadow hover:bg-secondary-bg/15"
+            className=" bg-info rounded-lg px-4 py-1 mb-1 flex items-center shadow-xl hover:shadow-md transition-shadow hover:bg-secondary-bg/15"
           >
             <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text flex items-center">
               <span>{cliente.getNome()}</span>

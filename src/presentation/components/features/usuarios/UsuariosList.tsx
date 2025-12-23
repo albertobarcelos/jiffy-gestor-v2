@@ -469,7 +469,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px]">
+      <div className="px-[30px] flex-shrink-0">
         <div className="flex items-start justify-between">
           <div className="w-1/2 pl-5">
             <p className="text-primary text-lg font-semibold font-nunito">
@@ -494,8 +494,8 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
         </div>
       </div>
 
-      <div className="h-[4px] border-t-2 border-primary/70"></div>
-      <div className="flex gap-3 px-[20px] py-2">
+      <div className="h-[4px] border-t-2 border-primary/70 flex-shrink-0"></div>
+      <div className="flex gap-3 px-[20px] pb-2 flex-shrink-0">
         <div className="flex-1 min-w-[180px] max-w-[360px]">
             <label
               htmlFor="complementos-search"
@@ -538,7 +538,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
       </div>
 
       {/* Cabeçalho da tabela */}
-      <div className="px-[30px] mt-0">
+      <div className="px-[30px] mt-0 flex-shrink-0">
         <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px]">
           <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text">
             Nome
@@ -561,7 +561,8 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
       {/* Lista de usuários com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-[30px] mt-2"
+        className="flex-1 overflow-y-auto px-[30px] mt-2 scrollbar-hide"
+        style={{ maxHeight: 'calc(100vh - 300px)' }}
       >
         {usuarios.length === 0 && !isLoading && (
           <div className="flex items-center justify-center py-12">
