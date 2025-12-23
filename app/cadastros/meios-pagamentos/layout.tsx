@@ -14,7 +14,7 @@ export default function MeiosPagamentosLayout({
     <div className="min-h-screen bg-gray-50">
       <TopNav />
       
-      <main className='px-6 py-4'>
+      <main className='px-6'>
         {children}
       </main>
     </div>

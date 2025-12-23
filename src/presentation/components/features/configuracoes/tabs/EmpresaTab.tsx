@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Cliente } from '@/src/domain/entities/Cliente'
+import { showToast } from '@/src/shared/utils/toast'
 
 /**
  * Tab de Empresa - Edição de dados da empresa
@@ -19,9 +20,6 @@ export function EmpresaTab() {
   const [nomeFantasia, setNomeFantasia] = useState('')
   const [email, setEmail] = useState('')
   const [telefone, setTelefone] = useState('')
-  const [regimeTributario, setRegimeTributario] = useState('')
-  const [inscricaoEstadual, setInscricaoEstadual] = useState('')
-  const [inscricaoMunicipal, setInscricaoMunicipal] = useState('')
   const [cep, setCep] = useState('')
   const [rua, setRua] = useState('')
   const [numero, setNumero] = useState('')
@@ -103,48 +101,61 @@ export function EmpresaTab() {
 
   const handleSave = async () => {
     const token = auth?.getAccessToken()
-    if (!token || !empresa) return
+    if (!token || !empresa) {
+      console.error('Token ou empresa não disponível')
+      return
+    }
 
     try {
+      // Monta o body apenas com campos que têm valor
+      const body: Record<string, any> = {}
+      
+      if (cnpj) body.cnpj = cnpj
+      if (razaoSocial) body.razaoSocial = razaoSocial
+      if (nomeFantasia) body.nomeFantasia = nomeFantasia
+      if (email) body.email = email
+      if (telefone) body.telefone = telefone
+
+      // Monta o endereço apenas se houver pelo menos um campo preenchido
+      const endereco: Record<string, any> = {}
+      if (cep) endereco.cep = cep
+      if (rua) endereco.rua = rua
+      if (numero) endereco.numero = numero
+      if (complemento) endereco.complemento = complemento
+      if (bairro) endereco.bairro = bairro
+      if (cidade) endereco.cidade = cidade
+      if (estado) endereco.estado = estado
+
+      // Adiciona endereco ao body apenas se houver pelo menos um campo
+      if (Object.keys(endereco).length > 0) {
+        body.endereco = endereco
+      }
+
+      console.log('Enviando dados:', body)
+
       const response = await fetch(`/api/empresas/${empresa.getId()}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          cnpj,
-          razaoSocial,
-          nomeFantasia,
-          email,
-          telefone,
-          parametroFiscal: {
-            regimeTributario,
-            inscricaoEstadual,
-            inscricaoMunicipal,
-          },
-          endereco: {
-            cep,
-            rua,
-            numero,
-            complemento,
-            bairro,
-            cidade,
-            estado,
-          },
-        }),
+        body: JSON.stringify(body),
       })
 
+      const responseData = await response.json().catch(() => ({}))
+      
       if (response.ok) {
         setIsEditing(false)
         await loadEmpresa()
-        alert('Empresa atualizada com sucesso!')
+        showToast.success('Empresa atualizada com sucesso!')
       } else {
-        alert('Erro ao atualizar empresa')
+        console.error('Erro na resposta:', response.status, responseData)
+        const errorMessage = responseData.error || responseData.message || 'Erro desconhecido'
+        showToast.error(`Erro ao atualizar empresa: ${errorMessage}`)
       }
     } catch (error) {
       console.error('Erro ao salvar empresa:', error)
-      alert('Erro ao salvar empresa')
+      showToast.error('Erro ao salvar empresa')
     }
   }
 
@@ -157,10 +168,11 @@ export function EmpresaTab() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="h-full overflow-y-auto px-6 py-2 scrollbar-hide">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-primary text-base font-semibold font-exo mb-1">
+          <h3 className="text-primary text-xl font-semibold font-exo mb-1">
             Dados da Empresa
           </h3>
           <p className="text-secondary-text text-sm font-nunito">
@@ -170,7 +182,7 @@ export function EmpresaTab() {
         {!isEditing && (
           <button
             onClick={() => setIsEditing(true)}
-            className="h-9 px-4 bg-alternate text-white rounded-[50px] text-sm font-medium font-exo hover:bg-alternate/90 transition-colors"
+            className="h-8 px-6 bg-primary text-white rounded-lg text-sm font-medium font-exo hover:bg-primary/90 transition-colors"
           >
             Editar
           </button>
@@ -179,7 +191,7 @@ export function EmpresaTab() {
           <div className="flex gap-2">
             <button
               onClick={handleSave}
-              className="h-9 px-4 bg-alternate text-white rounded-[50px] text-sm font-medium font-exo hover:bg-alternate/90 transition-colors flex items-center gap-2"
+              className="h-8 px-6 bg-primary text-white rounded-lg text-sm font-medium font-exo hover:bg-primary/90 transition-colors flex items-center gap-2"
             >
               <span>✓</span> Salvar
             </button>
@@ -188,7 +200,7 @@ export function EmpresaTab() {
                 setIsEditing(false)
                 loadEmpresa()
               }}
-              className="h-9 px-4 bg-secondary-bg text-primary-text rounded-[50px] text-sm font-medium font-exo hover:bg-secondary-bg/80 transition-colors"
+              className="h-8 px-6 bg-primary/10 text-primary border border-primary rounded-lg text-sm font-medium font-exo hover:bg-primary/15 transition-colors"
             >
               Cancelar
             </button>
@@ -196,15 +208,15 @@ export function EmpresaTab() {
         )}
       </div>
 
-      <div className="bg-info rounded-[10px] p-[18px] space-y-6">
+      <div className="bg-info px-[18px] space-y-4">
         {/* Dados Básicos */}
         <div>
-          <h4 className="text-secondary text-sm font-bold font-nunito mb-4">
+          <h4 className="text-primary text-lg font-bold font-nunito mb-2">
             Dados Básicos
           </h4>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-primary-text mb-2">
+              <label className="block text-sm font-medium text-primary-text">
                 CNPJ
               </label>
               <input
@@ -212,11 +224,11 @@ export function EmpresaTab() {
                 value={cnpj}
                 onChange={(e) => setCnpj(e.target.value)}
                 disabled={!isEditing}
-                className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-primary-text mb-2">
+              <label className="block text-sm font-medium text-primary-text">
                 Razão Social
               </label>
               <input
@@ -224,11 +236,11 @@ export function EmpresaTab() {
                 value={razaoSocial}
                 onChange={(e) => setRazaoSocial(e.target.value)}
                 disabled={!isEditing}
-                className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-primary-text mb-2">
+              <label className="block text-sm font-medium text-primary-text">
                 Nome Fantasia
               </label>
               <input
@@ -236,11 +248,11 @@ export function EmpresaTab() {
                 value={nomeFantasia}
                 onChange={(e) => setNomeFantasia(e.target.value)}
                 disabled={!isEditing}
-                className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-primary-text mb-2">
+              <label className="block text-sm font-medium text-primary-text">
                 Email
               </label>
               <input
@@ -248,11 +260,11 @@ export function EmpresaTab() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={!isEditing}
-                className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-primary-text mb-2">
+              <label className="block text-sm font-medium text-primary-text">
                 Telefone
               </label>
               <input
@@ -260,52 +272,7 @@ export function EmpresaTab() {
                 value={telefone}
                 onChange={(e) => setTelefone(e.target.value)}
                 disabled={!isEditing}
-                className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Dados Fiscais */}
-        <div>
-          <h4 className="text-secondary text-sm font-bold font-nunito mb-4">
-            Dados Fiscais
-          </h4>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-primary-text mb-2">
-                Regime Tributário
-              </label>
-              <input
-                type="text"
-                value={regimeTributario}
-                onChange={(e) => setRegimeTributario(e.target.value)}
-                disabled={!isEditing}
-                className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-primary-text mb-2">
-                Inscrição Estadual
-              </label>
-              <input
-                type="text"
-                value={inscricaoEstadual}
-                onChange={(e) => setInscricaoEstadual(e.target.value)}
-                disabled={!isEditing}
-                className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-primary-text mb-2">
-                Inscrição Municipal
-              </label>
-              <input
-                type="text"
-                value={inscricaoMunicipal}
-                onChange={(e) => setInscricaoMunicipal(e.target.value)}
-                disabled={!isEditing}
-                className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
               />
             </div>
           </div>
@@ -313,12 +280,12 @@ export function EmpresaTab() {
 
         {/* Endereço */}
         <div>
-          <h4 className="text-secondary text-sm font-bold font-nunito mb-4">
+          <h4 className="text-primary text-lg font-bold font-nunito mb-2">
             Endereço
           </h4>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-primary-text mb-2">
+              <label className="block text-sm font-medium text-primary-text">
                 CEP
               </label>
               <input
@@ -326,11 +293,11 @@ export function EmpresaTab() {
                 value={cep}
                 onChange={(e) => setCep(e.target.value)}
                 disabled={!isEditing}
-                className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
               />
             </div>
             <div className="col-span-2">
-              <label className="block text-sm font-medium text-primary-text mb-2">
+              <label className="block text-sm font-medium text-primary-text">
                 Rua
               </label>
               <input
@@ -338,11 +305,11 @@ export function EmpresaTab() {
                 value={rua}
                 onChange={(e) => setRua(e.target.value)}
                 disabled={!isEditing}
-                className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-primary-text mb-2">
+              <label className="block text-sm font-medium text-primary-text">
                 Número
               </label>
               <input
@@ -350,11 +317,11 @@ export function EmpresaTab() {
                 value={numero}
                 onChange={(e) => setNumero(e.target.value)}
                 disabled={!isEditing}
-                className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
               />
             </div>
             <div className="col-span-2">
-              <label className="block text-sm font-medium text-primary-text mb-2">
+              <label className="block text-sm font-medium text-primary-text">
                 Complemento
               </label>
               <input
@@ -362,11 +329,11 @@ export function EmpresaTab() {
                 value={complemento}
                 onChange={(e) => setComplemento(e.target.value)}
                 disabled={!isEditing}
-                className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-primary-text mb-2">
+              <label className="block text-sm font-medium text-primary-text">
                 Bairro
               </label>
               <input
@@ -374,11 +341,11 @@ export function EmpresaTab() {
                 value={bairro}
                 onChange={(e) => setBairro(e.target.value)}
                 disabled={!isEditing}
-                className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-primary-text mb-2">
+              <label className="block text-sm font-medium text-primary-text">
                 Cidade
               </label>
               <input
@@ -386,11 +353,11 @@ export function EmpresaTab() {
                 value={cidade}
                 onChange={(e) => setCidade(e.target.value)}
                 disabled={!isEditing}
-                className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-primary-text mb-2">
+              <label className="block text-sm font-medium text-primary-text">
                 Estado
               </label>
               <input
@@ -398,11 +365,12 @@ export function EmpresaTab() {
                 value={estado}
                 onChange={(e) => setEstado(e.target.value)}
                 disabled={!isEditing}
-                className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
               />
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   )

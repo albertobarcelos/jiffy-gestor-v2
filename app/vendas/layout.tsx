@@ -2,7 +2,7 @@
 
 import { TopNav } from '@/src/presentation/components/layouts/TopNav'
 
-export default function RelatoriosLayout({
+export default function VendasLayout({
   children,
 }: {
   children: React.ReactNode
@@ -16,3 +16,4 @@ export default function RelatoriosLayout({
     </div>
   )
 }
+
