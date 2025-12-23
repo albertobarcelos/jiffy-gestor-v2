@@ -483,13 +483,13 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
   return (
     <div className="flex flex-col h-full">
       {/* Header com título, filtros e botão */}
-      <div className="px-[30px] pt-[10px] pb-[10px]">
+      <div className="px-[30px] py-[4px] flex-shrink-0">
         <div className="flex flex-wrap items-end gap-4">
           <div className="min-w-[220px] flex-1 pl-5">
-            <p className="text-primary text-sm font-semibold font-nunito mb-1">
+            <p className="text-primary text-sm font-semibold font-nunito">
               Grupos de Complementos Cadastrados
             </p>
-            <p className="text-tertiary text-[26px] font-medium font-nunito">
+            <p className="text-tertiary text-[22px] font-medium font-nunito">
               Total {grupos.length} de {filteredTotal}
             </p>
           </div>
@@ -508,8 +508,8 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
           </button>
         </div>
       </div>
-      <div className="h-[10px] border-t-2 border-primary/70"></div>
-      <div className="flex gap-3 px-[20px] py-2">
+      <div className="h-[2px] border-t-2 border-primary/70 flex-shrink-0"></div>
+      <div className="flex gap-3 px-[20px] py-2 flex-shrink-0">
       <div className="flex-1 min-w-[180px] max-w-[360px]">
             <label
               htmlFor="grupos-complementos-search"
@@ -551,7 +551,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
           </div>
 
       {/* Cabeçalho da tabela */}
-      <div className="px-[30px]">
+      <div className="px-[30px] flex-shrink-0">
         <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px]">
           <div className="w-16 font-nunito font-semibold text-sm text-primary-text text-center">
             Ordem
@@ -577,7 +577,8 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
       {/* Lista de grupos com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-[30px] mt-2"
+        className="flex-1 overflow-y-auto px-[30px] mt-2 scrollbar-hide"
+        style={{ maxHeight: 'calc(100vh - 300px)' }}
       >
         {/* Skeleton loaders para carregamento inicial - sempre mostra durante loading */}
         {(isLoading || (grupos.length === 0 && isFetching)) && (

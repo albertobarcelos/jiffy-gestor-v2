@@ -385,7 +385,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px]">
+      <div className="px-[30px] pt-2 flex-shrink-0">
         <div className="flex items-start justify-between">
           <div className="w-1/2 pl-5">
             <p className="text-primary text-sm font-semibold font-nunito">
@@ -405,8 +405,8 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
         </div>
       </div>
 
-      <div className="h-[4px] border-t-2 border-primary/70"></div>
-      <div className="bg-white px-[20px] py-2 border-b border-gray-100">
+      <div className="h-[4px] border-t-2 border-primary/70 flex-shrink-0"></div>
+      <div className="bg-white px-[20px] py-2 border-b border-gray-100 flex-shrink-0">
         <div className="flex flex-wrap items-end gap-2">
           {/* Barra de pesquisa */}
           <div className="flex-1 min-w-[180px] max-w-[360px]">
@@ -447,7 +447,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
       </div>
 
       {/* Cabeçalho da tabela */}
-      <div className="px-[30px] mt-0">
+      <div className="px-[30px] mt-0 flex-shrink-0">
         <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px]">
           <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text">
             Nome
@@ -470,7 +470,8 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
       {/* Lista de meios de pagamento com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-[30px] mt-2"
+        className="flex-1 overflow-y-auto px-[30px] mt-2 scrollbar-hide"
+        style={{ maxHeight: 'calc(100vh - 300px)' }}
       >
         {meiosPagamento.length === 0 && !isLoading && (
           <div className="flex items-center justify-center py-12">

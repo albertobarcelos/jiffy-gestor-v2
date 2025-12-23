@@ -796,7 +796,7 @@ export function HistoricoFechamento() {
         </div>
 
         {/* Cabeçalho da Tabela */}
-        <div className="bg-primary px-3 py-2 flex items-center text-info text-sm font-nunito font-semibold">
+        <div className="bg-custom-2 px-3 py-2 flex items-center rounded-t-lg text-primary-text text-sm font-nunito font-semibold">
           <div className="flex-1">Cód. Terminal</div>
           <div className="flex-1">Terminal</div>
           <div className="flex-1">Fechado por</div>
@@ -809,7 +809,7 @@ export function HistoricoFechamento() {
         {/* Lista de Operações */}
         <div
           ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto bg-primary-background"
+          className="flex-1 overflow-y-auto bg-primary-background scrollbar-hide"
           style={{ maxHeight: 'calc(100vh - 300px)' }}
         >
           {isLoading && operacoesCaixa.length === 0 ? (
@@ -834,17 +834,17 @@ export function HistoricoFechamento() {
                       setSelectedOperacaoId(operacao.id)
                       setIsDetalhesModalOpen(true)
                     }}
-                    className="mx-2 my-1 px-3 py-2 rounded-lg bg-info cursor-pointer transition-all hover:bg-primary-background hover:shadow-md"
+                    className="mx-2 my-2 px-3 py-2 rounded-lg bg-info cursor-pointer transition-all hover:bg-primary/10 shadow-md shadow-primary-text/50"
                   >
                     <div className="flex items-center text-sm font-nunito text-primary-text">
                       <div className="flex-1">{operacao.codigoTerminal || '-'}</div>
                       <div className="flex-1">{operacao.nomeTerminal || '-'}</div>
                       <div className="flex-1">{operacao.nomeResponsavelFechamento || '-'}</div>
                       <div className="flex-1">
-                        {dataAbertura.date}, {dataAbertura.time}
+                        {dataAbertura.date} - {dataAbertura.time}
                       </div>
                       <div className="flex-1">
-                        {dataFechamento ? `${dataFechamento.date}, ${dataFechamento.time}` : '-'}
+                        {dataFechamento ? `${dataFechamento.date} - ${dataFechamento.time}` : '-'}
                       </div>
                       <div className="flex-1 text-center">{periodoAberto}</div>
                       <div className="flex-1 text-center">

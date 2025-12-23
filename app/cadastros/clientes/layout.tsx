@@ -15,7 +15,7 @@ export default function ClientesLayout({
   return (
     <div className="min-h-screen bg-gray-50">
       <TopNav />
-      <main className='p-6'>
+      <main className='px-6'>
         <Suspense fallback={<PageLoading />}>
           {children}
         </Suspense>

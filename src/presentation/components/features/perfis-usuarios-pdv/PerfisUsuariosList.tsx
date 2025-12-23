@@ -390,15 +390,15 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px] py-4">
+      <div className="px-[30px] pt-1 flex-shrink-0">
         <div className="flex items-start justify-between">
-          <div className="w-1/2 pl-5">
-            <p className="text-primary text-lg font-semibold font-nunito">
+          <div className="flex flex-col w-1/2 pl-5">
+            <span className="text-primary text-lg font-semibold font-nunito">
               Perfis Cadastrados
-            </p>
-            <p className="text-tertiary text-[22px] font-medium font-nunito">
+            </span>
+            <span className="text-tertiary text-[22px] font-medium font-nunito">
               Total {perfis.length} de {totalPerfis}
-            </p>
+            </span>
           </div>
           <button
             onClick={() => openTabsModal({ mode: 'create' })}
@@ -410,8 +410,8 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
         </div>
       </div>
 
-      <div className="h-[4px] border-t-2 border-primary/70"></div>
-      <div className="flex gap-3 px-[20px] py-2">
+      <div className="h-[4px] border-t-2 border-primary/70 flex-shrink-0"></div>
+      <div className="flex gap-3 px-[20px] pb-2 flex-shrink-0">
         <div className="flex-1 min-w-[180px] max-w-[360px]">
             <label
               htmlFor="complementos-search"
@@ -436,14 +436,10 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
           </div>
       </div>
 
-      {/* Lista de perfis com scroll */}
-      <div
-        ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-[30px]"
-      >
-        {/* Barra de títulos das colunas */}
-        {perfis.length > 0 && (
-          <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px]">
+      {/* Cabeçalho da tabela */}
+      {perfis.length > 0 && (
+        <div className="px-[30px] flex-shrink-0">
+          <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-2">
             <div className="w-8"></div>
             <div className="flex-[3] font-nunito font-semibold text-xs text-primary-text uppercase">
               Perfil
@@ -455,7 +451,15 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
               Ações
             </div>
           </div>
-        )}
+        </div>
+      )}
+
+      {/* Lista de perfis com scroll */}
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto px-[30px] scrollbar-hide"
+        style={{ maxHeight: 'calc(100vh - 250px)' }}
+      >
 
         {perfis.length === 0 && !isLoading && (
           <div className="flex items-center justify-center py-12">

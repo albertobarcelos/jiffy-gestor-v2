@@ -1184,7 +1184,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px]">
+      <div className="px-[30px] flex-shrink-0">
         <div className="flex flex-col gap-4">
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div className="pl-5">
@@ -1219,8 +1219,8 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
           </div>
         </div>
       </div>
-      <div className="h-[4px] border-t-2 border-primary/50"></div>
-      <div className="bg-white px-[20px] py-2 border-b border-gray-100">
+      <div className="h-[4px] border-t-2 border-primary/50 flex-shrink-0"></div>
+      <div className="bg-white px-[20px] py-2 border-b border-gray-100 flex-shrink-0">
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex-1 min-w-[180px]">
             <label htmlFor="produtos-search" className="text-xs font-semibold text-secondary-text mb-1 block">
@@ -1329,7 +1329,8 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
       {/* Lista de produtos com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-[30px] mt-4 space-y-6"
+        className="flex-1 overflow-y-auto px-[30px] mt-4 space-y-6 scrollbar-hide"
+        style={{ maxHeight: 'calc(100vh - 300px)' }}
       >
         {(isLoading || (produtos.length === 0 && isFetching)) && (
           <div className="space-y-4">
