@@ -798,10 +798,10 @@ export function HistoricoFechamento() {
         {/* Cabeçalho da Tabela */}
         <div className="bg-custom-2 px-3 py-2 flex items-center rounded-t-lg text-primary-text text-sm font-nunito font-semibold">
           <div className="flex-1">Cód. Terminal</div>
-          <div className="flex-1">Terminal</div>
-          <div className="flex-1">Fechado por</div>
-          <div className="flex-1">Data Abertura</div>
-          <div className="flex-1">Data Fechamento</div>
+          <div className="flex-[1.5]">Terminal</div>
+          <div className="flex-[2]">Fechado por</div>
+          <div className="flex-1">Dt. Abertura</div>
+          <div className="flex-1">Dt. Fechamento</div>
           <div className="flex-1 text-center">Período Aberto</div>
           <div className="flex-1 text-center">Status</div>
         </div>
@@ -838,8 +838,8 @@ export function HistoricoFechamento() {
                   >
                     <div className="flex items-center text-sm font-nunito text-primary-text">
                       <div className="flex-1">{operacao.codigoTerminal || '-'}</div>
-                      <div className="flex-1">{operacao.nomeTerminal || '-'}</div>
-                      <div className="flex-1">{operacao.nomeResponsavelFechamento || '-'}</div>
+                      <div className="flex-[1.5]">{operacao.nomeTerminal || '-'}</div>
+                      <div className="flex-[2]">{operacao.nomeResponsavelFechamento || '-'}</div>
                       <div className="flex-1">
                         {dataAbertura.date} - {dataAbertura.time}
                       </div>
@@ -847,9 +847,9 @@ export function HistoricoFechamento() {
                         {dataFechamento ? `${dataFechamento.date} - ${dataFechamento.time}` : '-'}
                       </div>
                       <div className="flex-1 text-center">{periodoAberto}</div>
-                      <div className="flex-1 text-center">
+                      <div className="flex-1 flex items-center justify-center">
                         <span
-                          className={`px-2 py-1 rounded text-xs font-semibold ${
+                          className={`px-3 py-1 rounded text-xs font-semibold ${
                             operacao.status === 'aberto'
                               ? 'bg-warning text-white'
                               : 'bg-success text-white'
