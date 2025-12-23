@@ -739,7 +739,7 @@ export function VendasList() {
         </div>
 
         {/* Filtros Avançados */}
-        <div className="bg-custom-2 rounded-t-lg px-2 pt-1.5 pb-2 flex flex-wrap items-center gap-x-2 gap-y-4">
+        <div className="bg-custom-2 rounded-t-lg px-2 pt-1.5 pb-2 flex flex-wrap items-end gap-x-2 gap-y-4">
           {/* Status da Venda */}
           <div className="flex flex-col gap-1">
             <label className="text-xs text-secondary-text font-nunito">Status da Venda</label>
