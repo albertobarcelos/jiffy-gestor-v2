@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
+import * as XLSX from 'xlsx'
 import {
   MdUpload,
   MdDescription,
@@ -11,6 +12,9 @@ import {
   MdError,
   MdArrowForward,
   MdArrowBack,
+  MdExpandMore,
+  MdExpandLess,
+  MdClose,
 } from 'react-icons/md'
 
 /**
@@ -27,6 +31,7 @@ type ImportacaoResponse = {
       status: string
       rowIndex: number
       errorMessages: string[]
+      data?: Record<string, any> // Dados completos do registro quando disponível
     }>
   }>
 }
@@ -256,15 +261,61 @@ export function CadastroPorPlanilha() {
         // Erro 400 ou outro erro
         const errorMessage = responseData.message || responseData.error || 'Erro ao processar planilha'
         
-        // Se tiver resultados no erro, processar
+        // Processar erros e sempre passar para Step 3 para exibir detalhes
+        let processedResult
+        
         if (responseData.results) {
-          const processedResult = processarResultadoAPI(responseData.results, false)
-          setResultadoAnalise(processedResult)
-          setSelectedStep(2)
+          // Se tiver resultados estruturados, processar normalmente
+          processedResult = processarResultadoAPI(responseData.results, false)
+        } else {
+          // Se não tiver resultados, criar estrutura com erros do campo 'errors'
+          const erros: Array<{ linha: number; campo: string; mensagem: string }> = []
+          
+          // Processar erros do campo 'errors' (array de strings)
+          if (responseData.errors && Array.isArray(responseData.errors)) {
+            responseData.errors.forEach((errorMsg: string) => {
+              // Tentar extrair linha e tabela da mensagem de erro
+              // Exemplo: "Os codigosGruposComplementos utilizados nas linhas 2 da tabela de Produtos..."
+              const linhaMatch = errorMsg.match(/linhas?\s+(\d+)/i)
+              const linha = linhaMatch ? parseInt(linhaMatch[1], 10) : 0
+              
+              // Tentar extrair nome da tabela
+              const tabelaMatch = errorMsg.match(/tabela\s+de\s+([^\.\s]+)/i)
+              const tabela = tabelaMatch ? tabelaMatch[1] : 'Planilha'
+              
+              // Tentar extrair nome do campo
+              const campoMatch = errorMsg.match(/^([^utilizados]+?)\s+utilizados/i) || 
+                                errorMsg.match(/campo\s+['"]?([^'"]+)['"]?/i)
+              const campo = campoMatch ? campoMatch[1].trim() : 'Campo não especificado'
+              
+              erros.push({
+                linha,
+                campo: `${tabela} - ${campo}`,
+                mensagem: errorMsg,
+              })
+            })
+          } else {
+            // Se não tiver array de erros, criar um erro genérico
+            erros.push({
+              linha: 0,
+              campo: 'Planilha',
+              mensagem: errorMessage,
+            })
+          }
+          
+          processedResult = {
+            sucesso: false,
+            mensagens: [errorMessage],
+            erros,
+            totalErrorCount: erros.length,
+            worksheetResults: [],
+          }
         }
         
+        setResultadoAnalise(processedResult)
         setIsUploading(false)
         showToast.errorLoading(toastId, errorMessage)
+        setSelectedStep(2) // Vai para o step de resultado para exibir erros detalhados
         return
       }
 
@@ -384,6 +435,7 @@ export function CadastroPorPlanilha() {
         {selectedStep === 2 && (
           <Step3Resultado
             resultadoAnalise={resultadoAnalise}
+            arquivo={arquivo}
             onBack={handleBack}
             onNext={handleNext}
           />
@@ -555,12 +607,30 @@ function Step2Upload({
           </label>
         </div>
         {arquivo && (
-          <div className="mt-3 flex items-center gap-2 text-sm text-primary-text">
-            <span className="font-semibold">Arquivo selecionado:</span>
-            <span>{arquivo.name}</span>
-            <span className="text-secondary-text">
-              ({(arquivo.size / 1024).toFixed(2)} KB)
-            </span>
+          <div className="mt-3 flex items-center justify-between gap-2 text-sm text-primary-text bg-gray-50 rounded-lg p-3 border border-[#E6E9F4]">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <span className="font-semibold whitespace-nowrap">Arquivo selecionado:</span>
+              <span className="truncate">{arquivo.name}</span>
+              <span className="text-secondary-text whitespace-nowrap">
+                ({(arquivo.size / 1024).toFixed(2)} KB)
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                onArquivoChange(null)
+                // Limpar o input file também
+                const fileInput = document.getElementById('file-upload') as HTMLInputElement
+                if (fileInput) {
+                  fileInput.value = ''
+                }
+              }}
+              disabled={isUploading}
+              className="flex items-center justify-center w-8 h-8 rounded-lg text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Remover arquivo"
+            >
+              <MdClose size={20} />
+            </button>
           </div>
         )}
       </div>
@@ -601,6 +671,7 @@ function Step2Upload({
  */
 function Step3Resultado({
   resultadoAnalise,
+  arquivo,
   onBack,
   onNext,
 }: {
@@ -619,12 +690,171 @@ function Step3Resultado({
         status: string
         rowIndex: number
         errorMessages: string[]
+        data?: Record<string, any>
       }>
     }>
   } | null
+  arquivo: File | null
   onBack: () => void
   onNext: () => void
 }) {
+  // Estado para controlar quais tabelas estão expandidas
+  const [expandedWorksheets, setExpandedWorksheets] = useState<Set<string>>(new Set())
+  // Estado para armazenar os dados lidos do arquivo XLSX por worksheet
+  const [worksheetData, setWorksheetData] = useState<Record<string, any[]>>({})
+  // Estado para controlar quais worksheets estão sendo carregados
+  const [loadingWorksheets, setLoadingWorksheets] = useState<Set<string>>(new Set())
+
+  // Função para ler o arquivo XLSX e extrair dados de um worksheet específico
+  const loadWorksheetData = async (worksheetName: string) => {
+    if (!arquivo || worksheetData[worksheetName]) {
+      return // Já carregado ou sem arquivo
+    }
+
+    setLoadingWorksheets((prev) => new Set(prev).add(worksheetName))
+
+    try {
+      // Ler o arquivo como ArrayBuffer
+      const arrayBuffer = await arquivo.arrayBuffer()
+      
+      // Parse do arquivo XLSX
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' })
+      
+      // Encontrar o worksheet pelo nome (case-insensitive)
+      const sheetName = workbook.SheetNames.find(
+        (name) => name.toLowerCase() === worksheetName.toLowerCase()
+      )
+
+      if (!sheetName) {
+        console.warn(`Worksheet "${worksheetName}" não encontrado no arquivo`)
+        setLoadingWorksheets((prev) => {
+          const newSet = new Set(prev)
+          newSet.delete(worksheetName)
+          return newSet
+        })
+        return
+      }
+
+      // Converter o worksheet para JSON (primeira linha como cabeçalho)
+      const worksheet = workbook.Sheets[sheetName]
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+        header: 1, // Usar primeira linha como cabeçalho
+        defval: '', // Valor padrão para células vazias
+      })
+
+      if (jsonData.length === 0) {
+        setLoadingWorksheets((prev) => {
+          const newSet = new Set(prev)
+          newSet.delete(worksheetName)
+          return newSet
+        })
+        return
+      }
+
+      // Primeira linha são os cabeçalhos
+      const headers = (jsonData[0] || []) as string[]
+      
+      // Converter para array de objetos
+      const data = jsonData.slice(1).map((row: unknown) => {
+        const rowArray = (row || []) as any[]
+        const rowData: Record<string, any> = {}
+        headers.forEach((header, colIndex) => {
+          rowData[header] = rowArray[colIndex] !== undefined ? rowArray[colIndex] : ''
+        })
+        return rowData
+      })
+
+      setWorksheetData((prev) => ({
+        ...prev,
+        [worksheetName]: data,
+      }))
+    } catch (error) {
+      console.error(`Erro ao ler worksheet "${worksheetName}":`, error)
+      showToast.error(`Erro ao carregar dados do worksheet "${worksheetName}"`)
+    } finally {
+      setLoadingWorksheets((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(worksheetName)
+        return newSet
+      })
+    }
+  }
+
+  const toggleWorksheet = async (worksheetName: string) => {
+    const isCurrentlyExpanded = expandedWorksheets.has(worksheetName)
+    
+    setExpandedWorksheets((prev) => {
+      const newSet = new Set(prev)
+      if (isCurrentlyExpanded) {
+        newSet.delete(worksheetName)
+      } else {
+        newSet.add(worksheetName)
+        // Carregar dados do arquivo XLSX quando expandir
+        loadWorksheetData(worksheetName)
+      }
+      return newSet
+    })
+  }
+
+  // Função para extrair registros com sucesso de um worksheet
+  const getSuccessfulRecords = (worksheet: {
+    results: Array<{
+      id: string
+      status: string
+      rowIndex: number
+      errorMessages: string[]
+      data?: Record<string, any>
+      [key: string]: any // Permitir outros campos
+    }>
+  }) => {
+    // Filtrar registros com sucesso
+    return worksheet.results.filter((result) => {
+      const isNotError = result.status !== 'error' && result.errorMessages.length === 0
+      const isSuccessStatus = result.status === 'success' || result.status === 'sucesso'
+      
+      // Verificar se tem dados no campo 'data' ou se o próprio resultado tem propriedades além dos campos padrão
+      const hasDataField = result.data && Object.keys(result.data).length > 0
+      
+      // Se não tem campo 'data', tentar usar o próprio resultado (exceto campos padrão)
+      const standardFields = ['id', 'status', 'rowIndex', 'errorMessages', 'data']
+      const hasOtherFields = Object.keys(result).some(
+        (key) => !standardFields.includes(key) && result[key] !== null && result[key] !== undefined
+      )
+      
+      return (isNotError || isSuccessStatus) && (hasDataField || hasOtherFields)
+    }).map((result) => {
+      // Se não tem campo 'data', criar um objeto 'data' com os campos não-padrão
+      if (!result.data || Object.keys(result.data).length === 0) {
+        const standardFields = ['id', 'status', 'rowIndex', 'errorMessages', 'data']
+        const dataFields: Record<string, any> = {}
+        
+        Object.keys(result).forEach((key) => {
+          if (!standardFields.includes(key) && result[key] !== null && result[key] !== undefined) {
+            dataFields[key] = result[key]
+          }
+        })
+        
+        // Se encontrou campos, criar o objeto data
+        if (Object.keys(dataFields).length > 0) {
+          return {
+            ...result,
+            data: dataFields,
+          }
+        }
+      }
+      
+      return result
+    })
+  }
+
+  // Função para obter as chaves (colunas) de um registro
+  const getRecordKeys = (records: Array<{ data?: Record<string, any> }>) => {
+    if (records.length === 0) return []
+    const firstRecord = records[0]?.data
+    if (!firstRecord) return []
+    return Object.keys(firstRecord)
+  }
+
   if (!resultadoAnalise) {
     return (
       <div className="rounded-[24px] border border-[#E5E7F2] bg-white p-4 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
@@ -648,51 +878,166 @@ function Step3Resultado({
         </p>
       </div>
 
-      {/* Resumo por Worksheet */}
+      {/* Resumo por Worksheet com Tabelas Expansíveis */}
       {resultadoAnalise.worksheetResults && resultadoAnalise.worksheetResults.length > 0 && (
         <div className="mb-6 rounded-lg border border-[#E6E9F4] bg-gradient-to-br from-[#F9FAFF] to-white p-4">
           <h4 className="text-primary-text font-semibold font-exo text-base mb-3">
             Resumo por Worksheet
           </h4>
           <div className="space-y-3">
-            {resultadoAnalise.worksheetResults.map((worksheet, index) => (
-              <div
-                key={index}
-                className="bg-white rounded-lg border border-[#E6E9F4] p-3"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold text-primary-text font-exo text-sm">
-                    {worksheet.worksheet}
-                  </span>
-                  <div className="flex gap-4 text-xs font-nunito">
-                    {worksheet.successCount > 0 && (
-                      <span className="text-green-600 font-semibold">
-                        ✓ {worksheet.successCount} sucesso(s)
-                      </span>
-                    )}
-                    {worksheet.errorCount > 0 && (
-                      <span className="text-red-600 font-semibold">
-                        ✗ {worksheet.errorCount} erro(s)
-                      </span>
-                    )}
+            {resultadoAnalise.worksheetResults.map((worksheet, index) => {
+              const successfulRecords = getSuccessfulRecords(worksheet)
+              const isExpanded = expandedWorksheets.has(worksheet.worksheet)
+              // Se tem successCount > 0, permite expandir (mesmo que não tenha dados completos)
+              const hasSuccessfulRecords = worksheet.successCount > 0
+
+              return (
+                <div
+                  key={index}
+                  className="bg-white rounded-lg border border-[#E6E9F4] overflow-hidden"
+                >
+                  {/* Header do Worksheet */}
+                  <div
+                    className={`p-3 ${hasSuccessfulRecords ? 'cursor-pointer hover:bg-gray-50' : 'cursor-default'} transition-colors`}
+                    onClick={() => {
+                      if (hasSuccessfulRecords) {
+                        toggleWorksheet(worksheet.worksheet)
+                      }
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {hasSuccessfulRecords && (
+                          <div className="text-primary-text flex items-center justify-center">
+                            {isExpanded ? (
+                              <MdExpandLess className="text-xl" />
+                            ) : (
+                              <MdExpandMore className="text-xl" />
+                            )}
+                          </div>
+                        )}
+                        <span className="font-semibold text-primary-text font-exo text-sm">
+                          {worksheet.worksheet}
+                        </span>
+                      </div>
+                      <div className="flex gap-4 text-xs font-nunito">
+                        {worksheet.successCount > 0 && (
+                          <span className="text-green-600 font-semibold">
+                            ✓ {worksheet.successCount} sucesso(s)
+                          </span>
+                        )}
+                        {worksheet.errorCount > 0 && (
+                          <span className="text-red-600 font-semibold">
+                            ✗ {worksheet.errorCount} erro(s)
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Tabela de Dados Cadastrados (quando expandido) */}
+                  {isExpanded && hasSuccessfulRecords && (
+                    <div className="border-t border-[#E6E9F4] p-3 bg-gray-50">
+                      {loadingWorksheets.has(worksheet.worksheet) ? (
+                        <div className="text-center py-8">
+                          <div className="inline-block w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-2" />
+                          <p className="text-sm text-secondary-text font-nunito">
+                            Carregando dados do arquivo...
+                          </p>
+                        </div>
+                      ) : worksheetData[worksheet.worksheet] && worksheetData[worksheet.worksheet].length > 0 ? (
+                        <>
+                          <div className="overflow-x-auto max-h-96 overflow-y-auto scrollbar-hide">
+                            <table className="w-full text-sm font-nunito border-collapse">
+                              <thead className="sticky top-0 bg-white z-10">
+                                <tr className="border-b-2 border-[#E6E9F4]">
+                                  <th className="text-left py-2 px-3 font-semibold text-primary-text text-xs uppercase whitespace-nowrap">
+                                    Linha
+                                  </th>
+                                  {Object.keys(worksheetData[worksheet.worksheet][0] || {}).map((key) => (
+                                    <th
+                                      key={key}
+                                      className="text-left py-2 px-3 font-semibold text-primary-text text-xs uppercase whitespace-nowrap"
+                                    >
+                                      {key}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {worksheetData[worksheet.worksheet].map((row, rowIndex) => (
+                                  <tr
+                                    key={rowIndex}
+                                    className="border-b border-[#E6E9F4] hover:bg-white transition-colors even:bg-gray-50/50"
+                                  >
+                                    <td className="py-2 px-3 text-secondary-text text-xs whitespace-nowrap font-semibold">
+                                      {rowIndex + 2}
+                                    </td>
+                                    {Object.keys(row).map((key) => {
+                                      const value = row[key]
+                                      return (
+                                        <td
+                                          key={key}
+                                          className="py-2 px-3 text-secondary-text text-xs whitespace-nowrap"
+                                        >
+                                          {value !== null && value !== undefined && value !== ''
+                                            ? typeof value === 'object'
+                                              ? JSON.stringify(value)
+                                              : String(value)
+                                            : '-'}
+                                        </td>
+                                      )
+                                    })}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          <div className="mt-2 text-xs text-secondary-text font-nunito text-center">
+                            Total: {worksheetData[worksheet.worksheet].length} registro(s) exibido(s)
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-center py-4 text-secondary-text font-nunito text-sm">
+                          <p className="mb-2">
+                            {worksheet.successCount} registro(s) cadastrado(s) com sucesso.
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Não foi possível carregar os dados do arquivo XLSX.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
 
-      {/* Mensagens de sucesso */}
-      {resultadoAnalise.sucesso && resultadoAnalise.mensagens.length > 0 && (
-        <div className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4">
+      {/* Mensagens de sucesso ou erro geral */}
+      {resultadoAnalise.mensagens.length > 0 && (
+        <div className={`mb-6 rounded-lg border p-4 ${
+          resultadoAnalise.sucesso 
+            ? 'border-green-200 bg-green-50' 
+            : 'border-red-200 bg-red-50'
+        }`}>
           <div className="flex items-start gap-3">
-            <MdCheckCircle className="text-green-600 text-2xl flex-shrink-0 mt-0.5" />
+            {resultadoAnalise.sucesso ? (
+              <MdCheckCircle className="text-green-600 text-2xl flex-shrink-0 mt-0.5" />
+            ) : (
+              <MdError className="text-red-600 text-2xl flex-shrink-0 mt-0.5" />
+            )}
             <div className="flex-1">
-              <h4 className="text-green-800 font-semibold font-exo text-sm mb-2">
-                Processamento Concluído
+              <h4 className={`font-semibold font-exo text-sm mb-2 ${
+                resultadoAnalise.sucesso ? 'text-green-800' : 'text-red-800'
+              }`}>
+                {resultadoAnalise.sucesso ? 'Processamento Concluído' : 'Erro no Processamento'}
               </h4>
-              <ul className="space-y-1 text-sm text-green-700 font-nunito">
+              <ul className={`space-y-1 text-sm font-nunito ${
+                resultadoAnalise.sucesso ? 'text-green-700' : 'text-red-700'
+              }`}>
                 {resultadoAnalise.mensagens.map((msg, index) => (
                   <li key={index}>• {msg}</li>
                 ))}

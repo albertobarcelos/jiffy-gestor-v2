@@ -34,53 +34,100 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    console.log('📤 Enviando arquivo para API externa:', {
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+      baseUrl: `${baseUrl}/api/v1/importacao/xlsx`,
+    })
+
     // Criar novo FormData para enviar à API externa
     const uploadFormData = new FormData()
     uploadFormData.append('file', file)
 
-    // Fazer requisição para a API externa
-    const response = await fetch(`${baseUrl}/api/v1/importacao/xlsx`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${tokenInfo.token}`,
-        // Não definir Content-Type aqui, o browser define automaticamente com boundary para multipart/form-data
-      },
-      body: uploadFormData,
-    })
+    // Fazer requisição para a API externa com timeout aumentado
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 segundos de timeout
 
-    if (!response.ok) {
-      if (response.status === 401) {
+    try {
+      const response = await fetch(`${baseUrl}/api/v1/importacao/xlsx`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenInfo.token}`,
+          // Não definir Content-Type aqui, o browser define automaticamente com boundary para multipart/form-data
+        },
+        body: uploadFormData,
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      console.log('📥 Resposta da API externa:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+      })
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          return NextResponse.json(
+            { error: 'Não autenticado' },
+            { status: 401 }
+          )
+        }
+
+        const errorText = await response.text().catch(() => '')
+        let errorData: any = {}
+
+        try {
+          errorData = errorText ? JSON.parse(errorText) : {}
+        } catch {
+          // Se não conseguir fazer parse, usa a mensagem padrão
+          errorData = { message: `Erro ${response.status}: ${response.statusText}` }
+        }
+
+        console.error('❌ Erro na resposta da API:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData,
+        })
+
         return NextResponse.json(
-          { error: 'Não autenticado' },
-          { status: 401 }
+          {
+            error: errorData.message || errorData.error || 'Erro ao processar planilha',
+            ...errorData,
+          },
+          { status: response.status }
         )
       }
 
-      const errorText = await response.text().catch(() => '')
-      let errorData: any = {}
+      // Obter a resposta JSON
+      const data = await response.json()
+      console.log('✅ Upload concluído com sucesso')
 
-      try {
-        errorData = errorText ? JSON.parse(errorText) : {}
-      } catch {
-        // Se não conseguir fazer parse, usa a mensagem padrão
-        errorData = { message: `Erro ${response.status}: ${response.statusText}` }
+      return NextResponse.json(data)
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId)
+      
+      if (fetchError.name === 'AbortError') {
+        console.error('❌ Timeout ao fazer upload da planilha')
+        return NextResponse.json(
+          { error: 'Timeout ao processar planilha. O arquivo pode ser muito grande ou a API está demorando para responder.' },
+          { status: 504 }
+        )
       }
 
+      console.error('❌ Erro ao fazer requisição para API externa:', fetchError)
       return NextResponse.json(
-        {
-          error: errorData.message || errorData.error || 'Erro ao processar planilha',
-          ...errorData,
+        { 
+          error: 'Erro ao comunicar com a API externa',
+          details: fetchError.message || 'Erro desconhecido'
         },
-        { status: response.status }
+        { status: 502 }
       )
     }
-
-    // Obter a resposta JSON
-    const data = await response.json()
-
-    return NextResponse.json(data)
   } catch (error) {
-    console.error('Erro ao fazer upload da planilha:', error)
+    console.error('❌ Erro ao fazer upload da planilha:', error)
 
     if (error instanceof ApiError) {
       return NextResponse.json(
@@ -90,7 +137,10 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: 'Erro interno do servidor ao processar planilha' },
+      { 
+        error: 'Erro interno do servidor ao processar planilha',
+        details: error instanceof Error ? error.message : 'Erro desconhecido'
+      },
       { status: 500 }
     )
   }
