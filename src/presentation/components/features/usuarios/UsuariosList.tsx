@@ -2,10 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Usuario } from '@/src/domain/entities/Usuario'
-import { UsuarioActionsMenu } from './UsuarioActionsMenu'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
-import { MdSearch, MdEdit } from 'react-icons/md'
+import { MdSearch, MdDelete } from 'react-icons/md'
 import {
   Select,
   SelectContent,
@@ -13,6 +12,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/src/presentation/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/src/presentation/components/ui/dialog'
 import {
   UsuariosTabsModal,
   UsuariosTabsModalState,
@@ -36,6 +42,9 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
   const [perfisMap, setPerfisMap] = useState<Record<string, string>>({}) // Mapa de perfilPdvId -> role
   const [togglingStatus, setTogglingStatus] = useState<Record<string, boolean>>({})
   const [updatingPerfil, setUpdatingPerfil] = useState<Record<string, boolean>>({}) // Controla qual usuário está atualizando perfil
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [usuarioToDelete, setUsuarioToDelete] = useState<string | null>(null)
   const [tabsModalState, setTabsModalState] = useState<UsuariosTabsModalState>({
     open: false,
     tab: 'usuario',
@@ -466,6 +475,57 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
     [auth, usuarios, loadAllUsuarios, onReload]
   )
 
+  /**
+   * Abre o modal de confirmação de exclusão
+   */
+  const handleDeleteClick = useCallback((usuarioId: string) => {
+    setUsuarioToDelete(usuarioId)
+    setIsConfirmDeleteOpen(true)
+  }, [])
+
+  /**
+   * Confirma e executa a exclusão do usuário
+   */
+  const handleConfirmDelete = useCallback(async () => {
+    if (!usuarioToDelete) return
+
+    setIsDeleting(true)
+
+    try {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        throw new Error('Token não encontrado')
+      }
+
+      const response = await fetch(`/api/usuarios/${usuarioToDelete}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        // Tenta obter mensagem de erro se houver corpo na resposta
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Erro ao deletar usuário')
+      }
+
+      setIsConfirmDeleteOpen(false)
+      setUsuarioToDelete(null)
+      showToast.success('Usuário deletado com sucesso!')
+      await loadAllUsuarios()
+      onReload?.()
+    } catch (error) {
+      console.error('Erro ao deletar usuário:', error)
+      showToast.error(
+        error instanceof Error ? error.message : 'Erro ao deletar usuário'
+      )
+    } finally {
+      setIsDeleting(false)
+    }
+  }, [usuarioToDelete, auth, loadAllUsuarios, onReload])
+
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
@@ -570,27 +630,26 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
           </div>
         )}
 
-        {usuarios.map((usuario) => (
+        {usuarios.map((usuario) => {
+          // Handler para abrir edição ao clicar na linha
+          const handleRowClick = () => {
+            openTabsModal({ mode: 'edit', usuarioId: usuario.getId() })
+          }
+
+          return (
           <div
             key={usuario.getId()}
-            className="bg-info rounded-lg mb-2 shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-colors"
+            onClick={handleRowClick}
+            className="bg-info rounded-lg mb-2 shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-colors cursor-pointer"
           >
             <div className="h-[50px] px-4 flex items-center gap-[10px]">
               <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text flex items-center gap-2">
                 {usuario.getNome()}
-                <button
-                  type="button"
-                  onClick={() => openTabsModal({ mode: 'edit', usuarioId: usuario.getId() })}
-                  className="w-5 h-5 rounded-full border border-primary/70 flex items-center justify-center text-primary hover:bg-primary/10 transition-colors"
-                  title="Editar usuário"
-                >
-                  <MdEdit size={14} />
-                </button>
               </div>
               <div className="flex-[2] font-nunito text-sm text-secondary-text">
                 {usuario.getTelefone() || '-'}
               </div>
-              <div className="flex-[2]">
+              <div className="flex-[2]" onClick={(e) => e.stopPropagation()}>
                 {isLoadingPerfis ? (
                   <div className="text-secondary-text text-sm">Carregando...</div>
                 ) : (
@@ -653,7 +712,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
                   </Select>
                 )}
               </div>
-              <div className="flex-[2] flex justify-center">
+              <div className="flex-[2] flex justify-center" onClick={(e) => e.stopPropagation()}>
                 <label
                   className={`relative inline-flex h-5 w-12 items-center ${
                     togglingStatus[usuario.getId()]
@@ -661,37 +720,41 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
                       : 'cursor-pointer'
                   }`}
                   title={usuario.isAtivo() ? 'Usuário Ativo' : 'Usuário Desativado'}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
                 >
                   <input
                     type="checkbox"
                     className="sr-only peer"
                     checked={usuario.isAtivo()}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      event.stopPropagation()
                       handleToggleUsuarioStatus(usuario, event.target.checked)
-                    }
+                    }}
+                    onClick={(e) => e.stopPropagation()}
                     disabled={!!togglingStatus[usuario.getId()]}
                   />
                   <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
                   <span className="absolute left-[2px] top-1/2 block h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[28px]" />
                 </label>
               </div>
-              <div className="flex-[2] flex justify-end">
-                <UsuarioActionsMenu
-                  usuarioId={usuario.getId()}
-                  usuarioAtivo={usuario.isAtivo()}
-                  onStatusChanged={handleStatusChange}
-                  onDeleted={handleStatusChange}
-                  onEdit={() => {
-                    openTabsModal({
-                      mode: 'edit',
-                      usuarioId: usuario.getId(),
-                    })
+              <div className="flex-[2] flex justify-end" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDeleteClick(usuario.getId())
                   }}
-                />
+                  className="w-10 h-10 rounded-lg flex items-center justify-center text-error hover:bg-error/10 transition-colors"
+                  title="Deletar usuário"
+                >
+                  <MdDelete size={20} />
+                </button>
               </div>
             </div>
           </div>
-        ))}
+          )
+        })}
 
         {isLoading && (
           <div className="flex justify-center py-4">
@@ -706,6 +769,46 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
         onReload={handleTabsModalReload}
         onTabChange={handleTabsModalTabChange}
       />
+
+      {/* Modal de confirmação de exclusão */}
+      <Dialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-primary-text">
+              Confirmar exclusão
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-primary-text">
+              Tem certeza que deseja deletar este usuário?
+            </p>
+            <p className="text-sm text-secondary-text mt-2">
+              Esta ação não pode ser desfeita.
+            </p>
+          </div>
+          <DialogFooter className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setIsConfirmDeleteOpen(false)
+                setUsuarioToDelete(null)
+              }}
+              disabled={isDeleting}
+              className="h-10 px-6 rounded-lg border border-gray-300 text-primary-text hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+              className="h-10 px-6 rounded-lg bg-error text-white font-semibold hover:bg-error/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isDeleting ? 'Deletando...' : 'Deletar'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
