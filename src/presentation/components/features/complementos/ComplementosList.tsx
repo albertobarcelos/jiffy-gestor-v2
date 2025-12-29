@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Complemento } from '@/src/domain/entities/Complemento'
-import { ComplementoActionsMenu } from './ComplementoActionsMenu'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { MdAddCircle, MdModeEdit, MdOutlineOfflinePin, MdSearch } from 'react-icons/md'
+import { MdAddCircle, MdOutlineOfflinePin, MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import {
   ComplementosTabsModal,
@@ -599,9 +598,6 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
           <div className="flex-[2] text-center font-nunito font-semibold text-sm text-primary-text">
             Status
           </div>
-          <div className="flex-1 text-right font-nunito font-semibold text-sm text-primary-text">
-            Ações
-          </div>
         </div>
       </div>
 
@@ -617,32 +613,29 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
           </div>
         )}
 
-        {complementos.map((complemento) => (
+        {complementos.map((complemento) => {
+          // Handler para abrir edição ao clicar na linha
+          const handleRowClick = () => {
+            openTabsModal({
+              mode: 'edit',
+              complementoId: complemento.getId(),
+            })
+          }
+
+          return (
           <div
             key={complemento.getId()}
-            className=" bg-info rounded-lg px-4 mb-2 flex items-center gap-[10px] shadow-xl hover:shadow-md transition-shadow hover:bg-secondary-bg/15"
+            onClick={handleRowClick}
+            className=" bg-info rounded-lg px-4 mb-2 flex items-center gap-[10px] shadow-xl hover:shadow-md transition-shadow hover:bg-secondary-bg/15 cursor-pointer"
           >
             <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text flex items-center gap-1">
               <span># {complemento.getNome()}</span>
-              <button
-                type="button"
-                title="Editar complemento"
-                onClick={() =>
-                  openTabsModal({
-                    mode: 'edit',
-                    complementoId: complemento.getId(),
-                  })
-                }
-                className="w-6 h-6 rounded-full border border-gray-200 flex items-center justify-center text-primary-text hover:bg-primary/10 transition-colors"
-              >
-                <MdModeEdit size={14} />
-              </button>
             </div>
             <div className="flex-[3] font-nunito text-sm text-secondary-text">
               {complemento.getDescricao() || 'Nenhuma'}
             </div>
 
-            <div className="flex-[2]">
+            <div className="flex-[2]" onClick={(e) => e.stopPropagation()}>
               <div className="flex flex-col mt-2 items-start gap-1">
                  <div className="flex items-center justify-end gap-2 px-3 py-1 rounded-lg border border-gray-300 bg-white max-w-[140px]">
                  
@@ -661,6 +654,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
                         handleValorSubmit(complemento.getId())
                       }
                     }}
+                    onClick={(e) => e.stopPropagation()}
                     disabled={!!savingValorMap[complemento.getId()]}
                     className={`w-full bg-transparent text-left text-sm font-semibold text-primary-text focus:outline-none ${
                       savingValorMap[complemento.getId()] ? 'opacity-70 cursor-not-allowed' : ''
@@ -673,7 +667,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
               </div>
             </div>
 
-            <div className="flex-1 font-nunito text-sm text-secondary-text text-center">
+            <div className="flex-1 font-nunito text-sm text-secondary-text text-center" onClick={(e) => e.stopPropagation()}>
               <select
                 value={(complemento.getTipoImpactoPreco() || 'nenhum').toLowerCase()}
                 onChange={(e) =>
@@ -682,6 +676,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
                     e.target.value as 'nenhum' | 'aumenta' | 'diminui'
                   )
                 }
+                onClick={(e) => e.stopPropagation()}
                 disabled={!!savingTipoMap[complemento.getId()]}
                 className={`w-full px-0 py-1 rounded-lg border border-gray-300 bg-white text-sm font-semibold text-primary-text focus:outline-none focus:border-primary text-center ${
                   savingTipoMap[complemento.getId()] ? 'opacity-70 cursor-not-allowed' : ''
@@ -692,7 +687,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
                 <option value="diminui">Diminui</option>
               </select>
             </div>
-            <div className="flex-[2] flex justify-center">
+            <div className="flex-[2] flex justify-center" onClick={(e) => e.stopPropagation()}>
               <label
                 className={`relative inline-flex h-5 w-12 items-center ${
                   togglingStatus[complemento.getId()]
@@ -700,29 +695,27 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
                     : 'cursor-pointer'
                 }`}
                 title={complemento.isAtivo() ? 'Complemento Ativo' : 'Complemento Desativado'}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
               >
                 <input
                   type="checkbox"
                   className="sr-only peer"
                   checked={complemento.isAtivo()}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    event.stopPropagation()
                     handleToggleComplementoStatus(complemento, event.target.checked)
-                  }
+                  }}
+                  onClick={(e) => e.stopPropagation()}
                   disabled={!!togglingStatus[complemento.getId()]}
                 />
                 <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
                 <span className="absolute left-1 top-1/2 block h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-6" />
               </label>
             </div>
-            <div className="flex-1 flex justify-end">
-              <ComplementoActionsMenu
-                complementoId={complemento.getId()}
-                complementoAtivo={complemento.isAtivo()}
-                onStatusChanged={handleStatusChange}
-              />
-            </div>
           </div>
-        ))}
+          )
+        })}
 
         {isLoading && (
           <div className="flex justify-center py-4">
