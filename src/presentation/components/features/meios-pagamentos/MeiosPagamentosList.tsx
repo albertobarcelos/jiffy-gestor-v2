@@ -2,14 +2,20 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { MeioPagamento } from '@/src/domain/entities/MeioPagamento'
-import { MeioPagamentoActionsMenu } from './MeioPagamentoActionsMenu'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { MdSearch, MdModeEdit } from 'react-icons/md'
+import { MdSearch, MdDelete } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import {
   MeiosPagamentosTabsModal,
   MeiosPagamentosTabsModalState,
 } from './MeiosPagamentosTabsModal'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/src/presentation/components/ui/dialog'
 
 interface MeiosPagamentosListProps {
   onReload?: () => void
@@ -45,6 +51,9 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
   const [totalMeiosPagamento, setTotalMeiosPagamento] = useState(0)
   const [updatingTefAtivo, setUpdatingTefAtivo] = useState<Record<string, boolean>>({})
   const [updatingAtivo, setUpdatingAtivo] = useState<Record<string, boolean>>({})
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [meioPagamentoToDelete, setMeioPagamentoToDelete] = useState<string | null>(null)
   const [tabsModalState, setTabsModalState] = useState<MeiosPagamentosTabsModalState>({
     open: false,
     tab: 'meio-pagamento',
@@ -239,6 +248,53 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
       tab,
     }))
   }, [])
+
+  const handleDeleteClick = useCallback((meioPagamentoId: string) => {
+    setMeioPagamentoToDelete(meioPagamentoId)
+    setIsConfirmDeleteOpen(true)
+  }, [])
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!meioPagamentoToDelete) return
+
+    setIsDeleting(true)
+
+    try {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        throw new Error('Token não encontrado')
+      }
+
+      const response = await fetch(`/api/meios-pagamentos/${meioPagamentoToDelete}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || errorData.error || 'Erro ao deletar meio de pagamento')
+      }
+
+      setIsConfirmDeleteOpen(false)
+      setMeioPagamentoToDelete(null)
+      showToast.success('Meio de pagamento deletado com sucesso!')
+      await loadMeiosPagamento()
+      onReload?.()
+    } catch (error) {
+      console.error('Erro ao deletar meio de pagamento:', error)
+      showToast.error(
+        error instanceof Error
+          ? error.message
+          : 'Erro ao deletar meio de pagamento'
+      )
+    } finally {
+      setIsDeleting(false)
+    }
+  }, [meioPagamentoToDelete, auth, loadMeiosPagamento, onReload])
+
 
   const handleToggleTefAtivo = useCallback(
     async (meioPagamento: MeioPagamento, novoStatus: boolean) => {
@@ -461,9 +517,6 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
           <div className="flex-[2] text-center font-nunito font-semibold text-sm text-primary-text">
             Status
           </div>
-          <div className="flex-[2] text-right font-nunito font-semibold text-sm text-primary-text">
-            Ações
-          </div>
         </div>
       </div>
 
@@ -479,32 +532,29 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
           </div>
         )}
 
-        {meiosPagamento.map((meioPagamento) => (
+        {meiosPagamento.map((meioPagamento) => {
+          // Handler para abrir edição ao clicar na linha
+          const handleRowClick = () => {
+            openTabsModal({
+              mode: 'edit',
+              meioPagamentoId: meioPagamento.getId(),
+            })
+          }
+
+          return (
           <div
             key={meioPagamento.getId()}
-            className="bg-info rounded-lg mb-2 shadow-lg hover:bg-secondary-bg/15 transition-colors"
+            onClick={handleRowClick}
+            className="bg-info rounded-lg mb-2 shadow-lg hover:bg-secondary-bg/15 transition-colors cursor-pointer"
           >
             <div className="h-[50px] px-4 flex items-center gap-[10px]">
               <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text flex items-center gap-2">
                 # <span>{meioPagamento.getNome()}</span>
-                <button
-                  type="button"
-                  title="Editar meio de pagamento"
-                  onClick={() =>
-                    openTabsModal({
-                      mode: 'edit',
-                      meioPagamentoId: meioPagamento.getId(),
-                    })
-                  }
-                  className="w-6 h-6 rounded-full border border-gray-200 flex items-center justify-center text-primary-text hover:bg-primary/10 transition-colors"
-                >
-                  <MdModeEdit size={14} />
-                </button>
               </div>
               <div className="flex-[2] font-nunito text-sm text-secondary-text">
                 {formatarFormaPagamentoFiscal(meioPagamento.getFormaPagamentoFiscal())}
               </div>
-              <div className="flex-[2] flex justify-center">
+              <div className="flex-[2] flex justify-center" onClick={(e) => e.stopPropagation()}>
                 <label
                   className={`relative inline-flex h-5 w-12 items-center ${
                     updatingTefAtivo[meioPagamento.getId()]
@@ -512,21 +562,25 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
                       : 'cursor-pointer'
                   }`}
                   title={meioPagamento.isTefAtivo() ? 'TEF Ativo' : 'TEF Inativo'}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
                 >
                   <input
                     type="checkbox"
                     className="sr-only peer"
                     checked={meioPagamento.isTefAtivo()}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      event.stopPropagation()
                       handleToggleTefAtivo(meioPagamento, event.target.checked)
-                    }
+                    }}
+                    onClick={(e) => e.stopPropagation()}
                     disabled={!!updatingTefAtivo[meioPagamento.getId()]}
                   />
                   <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
                   <span className="absolute left-1 top-1/2 block h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-6" />
                 </label>
               </div>
-              <div className="flex-[2] flex justify-center">
+              <div className="flex-[2] flex justify-center" onClick={(e) => e.stopPropagation()}>
                 <label
                   className={`relative inline-flex h-5 w-12 items-center ${
                     updatingAtivo[meioPagamento.getId()]
@@ -534,36 +588,46 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
                       : 'cursor-pointer'
                   }`}
                   title={meioPagamento.isAtivo() ? 'Ativo' : 'Desativado'}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
                 >
                   <input
                     type="checkbox"
                     className="sr-only peer"
                     checked={meioPagamento.isAtivo()}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      event.stopPropagation()
                       handleToggleAtivo(meioPagamento, event.target.checked)
-                    }
+                    }}
+                    onClick={(e) => e.stopPropagation()}
                     disabled={!!updatingAtivo[meioPagamento.getId()]}
                   />
                   <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
                   <span className="absolute left-1 top-1/2 block h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-6" />
                 </label>
               </div>
-              <div className="flex-[2] flex justify-end">
-                <MeioPagamentoActionsMenu
-                  meioPagamentoId={meioPagamento.getId()}
-                  meioPagamentoAtivo={meioPagamento.isAtivo()}
-                  onStatusChanged={handleStatusChange}
-                  onEditRequested={(id) =>
-                    openTabsModal({
-                      mode: 'edit',
-                      meioPagamentoId: id,
-                    })
-                  }
-                />
+              <div className="flex-[2] flex justify-end" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDeleteClick(meioPagamento.getId())
+                  }}
+                  className="w-10 h-10 rounded-lg flex items-center justify-center text-error hover:bg-error/10 transition-colors"
+                  title="Deletar meio de pagamento"
+                  disabled={isDeleting}
+                >
+                  {isDeleting && meioPagamentoToDelete === meioPagamento.getId() ? (
+                    <div className="w-4 h-4 border-2 border-error border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <MdDelete size={20} />
+                  )}
+                </button>
               </div>
             </div>
           </div>
-        ))}
+          )
+        })}
 
         {isLoading && (
           <div className="flex justify-center py-4">
@@ -578,6 +642,46 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
         onTabChange={handleTabsModalTabChange}
         onReload={handleTabsModalReload}
       />
+
+      {/* Modal de confirmação de exclusão */}
+      <Dialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-primary-text">
+              Confirmar exclusão
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-primary-text">
+              Tem certeza que deseja deletar este meio de pagamento?
+            </p>
+            <p className="text-sm text-secondary-text mt-2">
+              Esta ação não pode ser desfeita.
+            </p>
+          </div>
+          <DialogFooter className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setIsConfirmDeleteOpen(false)
+                setMeioPagamentoToDelete(null)
+              }}
+              disabled={isDeleting}
+              className="h-10 px-6 rounded-lg border border-gray-300 text-primary-text hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+              className="h-10 px-6 rounded-lg bg-error text-white font-semibold hover:bg-error/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isDeleting ? 'Deletando...' : 'Deletar'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
