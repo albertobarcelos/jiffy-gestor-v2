@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Impressora } from '@/src/domain/entities/Impressora'
 import { MdEdit } from 'react-icons/md'
+import { showToast } from '@/src/shared/utils/toast'
 
 interface TerminalConfig {
   terminalId: string
@@ -451,12 +452,12 @@ export function NovaImpressora({
   const handleSave = async () => {
     const token = auth?.getAccessToken()
     if (!token) {
-      alert('Token não encontrado')
+      showToast.error('Token não encontrado')
       return
     }
 
     if (!nome.trim()) {
-      alert('Nome da impressora é obrigatório')
+      showToast.error('Nome da impressora é obrigatório')
       return
     }
 
@@ -535,7 +536,7 @@ export function NovaImpressora({
         throw new Error(errorData.error || 'Erro ao atualizar impressora')
       }
 
-      alert(isEditing ? 'Impressora atualizada com sucesso!' : 'Impressora criada com sucesso!')
+      showToast.success(isEditing ? 'Impressora atualizada com sucesso!' : 'Impressora criada com sucesso!')
       
       if (isEmbedded) {
         onSaved?.()
@@ -544,7 +545,7 @@ export function NovaImpressora({
       }
     } catch (error) {
       console.error('Erro ao salvar impressora:', error)
-      alert(error instanceof Error ? error.message : 'Erro ao salvar impressora')
+      showToast.error(error instanceof Error ? error.message : 'Erro ao salvar impressora')
     } finally {
       setIsLoading(false)
     }
