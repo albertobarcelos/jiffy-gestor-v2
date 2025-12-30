@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Terminal } from '@/src/domain/entities/Terminal'
-import { MdPhone, MdEdit, MdPowerSettingsNew, MdSearch } from 'react-icons/md'
+import { MdPhone, MdPowerSettingsNew, MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { TerminaisTabsModal, TerminaisTabsModalState } from './TerminaisTabsModal'
 
@@ -286,9 +286,6 @@ export function TerminaisTab() {
             <div className="flex-[1.5] text-center font-nunito font-semibold text-xs text-primary-text uppercase">
               Status
             </div>
-            <div className="flex-[1.5] flex justify-end font-nunito font-semibold text-xs text-primary-text uppercase">
-              Ações
-            </div>
           </div>
         )}
 
@@ -309,9 +306,17 @@ export function TerminaisTab() {
           const ativo = !bloqueado
 
           return (
-            <div
+              <div
               key={terminal.getId()}
-              className=" px-4 py-2 flex items-center gap-[10px] bg-info rounded-lg my-2 shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-colors"
+              onClick={() =>
+                setTabsModalState({
+                  open: true,
+                  tab: 'terminal',
+                  mode: 'edit',
+                  terminalId: terminal.getId(),
+                })
+              }
+              className=" px-4 py-2 flex items-center gap-[10px] bg-info rounded-lg my-2 shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-colors cursor-pointer"
             >
               <div className="flex-[2] flex items-center gap-3">
                 
@@ -321,20 +326,6 @@ export function TerminaisTab() {
               </div>
               <div className="flex-[2] flex items-center gap-1 text-sm text-primary-text font-nunito">
                 {nome}
-                <button
-                  onClick={() =>
-                    setTabsModalState({
-                      open: true,
-                      tab: 'terminal',
-                      mode: 'edit',
-                      terminalId: terminal.getId(),
-                    })
-                  }
-                  className="w-5 h-5 flex items-center justify-center text-primary hover:bg-primary/10 rounded-full border border-primary/30 transition-colors"
-                  title="Editar terminal"
-                >
-                  <MdEdit size={14} />
-                </button>
               </div>
               <div className="flex-[2] text-sm text-secondary-text font-nunito">
                 {modelo}
@@ -355,34 +346,19 @@ export function TerminaisTab() {
                     type="checkbox"
                     className="sr-only peer"
                     checked={ativo}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      event.stopPropagation();
                       handleToggleTerminalStatus(terminal.getId(), !event.target.checked)
-                    }
+                    }}
                     disabled={!!togglingStatus[terminal.getId()]}
                   />
                   <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
                   <span className="absolute left-[2px] top-1/2 block h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[28px]" />
                 </label>
               </div>
-              <div className="flex-[1.5] flex justify-end gap-2">
-                <button
-                  onClick={() =>
-                    setTabsModalState({
-                      open: true,
-                      tab: 'terminal',
-                      mode: 'edit',
-                      terminalId: terminal.getId(),
-                    })
-                  }
-                  className="w-8 h-8 flex items-center justify-center text-primary hover:bg-primary/10 rounded transition-colors"
-                  title="Editar terminal"
-                >
-                  <MdEdit size={18} />
-                </button>
-              </div>
             </div>
           )
-        })}
+        })} 
 
         {isLoading && (
           <div className="flex justify-center py-8">
