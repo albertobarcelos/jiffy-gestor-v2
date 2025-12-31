@@ -3,11 +3,19 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Impressora } from '@/src/domain/entities/Impressora'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { MdSearch, MdPrint, MdEdit, MdDelete } from 'react-icons/md'
+import { MdSearch, MdPrint, MdDelete } from 'react-icons/md'
 import {
   ImpressorasTabsModal,
   ImpressorasTabsModalState,
 } from './ImpressorasTabsModal'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/src/presentation/components/ui/dialog'
+import { showToast } from '@/src/shared/utils/toast'
 
 interface ImpressorasListProps {
   onReload?: () => void
@@ -27,6 +35,9 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
     tab: 'impressora',
     mode: 'create',
   })
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [impressoraToDelete, setImpressoraToDelete] = useState<string | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
@@ -177,10 +188,15 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
     onReload?.()
   }
 
-  const handleDelete = async (impressoraId: string) => {
-    if (!confirm('Tem certeza que deseja deletar esta impressora?')) {
-      return
-    }
+  const handleDelete = useCallback((impressoraId: string) => {
+    setImpressoraToDelete(impressoraId)
+    setIsConfirmDeleteOpen(true)
+  }, [])
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!impressoraToDelete) return
+
+    setIsDeleting(true)
 
     try {
       const token = auth?.getAccessToken()
@@ -188,7 +204,7 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
         throw new Error('Token não encontrado')
       }
 
-      const response = await fetch(`/api/impressoras/${impressoraId}`, {
+      const response = await fetch(`/api/impressoras/${impressoraToDelete}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -197,17 +213,24 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
       })
 
       if (!response.ok) {
-        throw new Error('Erro ao deletar impressora')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || 'Erro ao deletar impressora')
       }
 
-      alert('Impressora deletada com sucesso!')
+      setIsConfirmDeleteOpen(false)
+      setImpressoraToDelete(null)
+      showToast.success('Impressora deletada com sucesso!')
       loadAllImpressoras()
       onReload?.()
     } catch (error) {
       console.error('Erro ao deletar impressora:', error)
-      alert('Erro ao deletar impressora')
+      showToast.error(
+        error instanceof Error ? error.message : 'Erro ao deletar impressora'
+      )
+    } finally {
+      setIsDeleting(false)
     }
-  }
+  }, [impressoraToDelete, auth, loadAllImpressoras, onReload])
 
   /**
    * Gera código abreviado do ID (primeiros 6 caracteres em maiúsculas)
@@ -295,14 +318,21 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
           </div>
         )}
 
-        {impressoras.map((impressora) => (
+        {impressoras.map((impressora) => {
+          // Handler para abrir edição ao clicar na linha
+          const handleRowClick = () => {
+            handleEdit(impressora.getId())
+          }
+
+          return (
           <div
             key={impressora.getId()}
-            className="bg-info rounded-lg mb-2 overflow-hidden shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-colors"
+            onClick={handleRowClick}
+            className="bg-info rounded-lg mb-2 overflow-hidden shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-colors cursor-pointer"
           >
             <div className="py-2 px-4 flex items-center gap-[10px]">
               {/* Icone */}
-              <div className="flex-[1] w-16 flex justify-left">
+              <div className="flex-[1] w-16 flex justify-left" onClick={(e) => e.stopPropagation()}>
                 <span className="text-2xl text-primary"><MdPrint /></span>
               </div>
               
@@ -317,16 +347,12 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
               </div>
               
               {/* Ações */}
-              <div className="flex-[1] flex justify-end">
+              <div className="flex-[1] flex justify-end" onClick={(e) => e.stopPropagation()}>
                 <button
-                  onClick={() => handleEdit(impressora.getId())}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-primary/10 transition-colors"
-                  aria-label="Editar impressora"
-                >
-                  <span className="text-primary text-lg"><MdEdit /></span>
-                </button>
-                <button
-                  onClick={() => handleDelete(impressora.getId())}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDelete(impressora.getId())
+                  }}
                   className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-error/10 transition-colors"
                   aria-label="Deletar impressora"
                 >
@@ -335,7 +361,8 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
               </div>
             </div>
           </div>
-        ))}
+          )
+        })}
 
         {isLoading && (
           <div className="flex justify-center py-4">
@@ -351,8 +378,46 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
         onReload={handleModalReload}
         onTabChange={handleTabChange}
       />
+
+      {/* Modal de confirmação de exclusão */}
+      <Dialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-primary-text">
+              Confirmar exclusão
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-primary-text">
+              Tem certeza que deseja deletar esta impressora?
+            </p>
+            <p className="text-sm text-secondary-text mt-2">
+              Esta ação não pode ser desfeita.
+            </p>
+          </div>
+          <DialogFooter className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setIsConfirmDeleteOpen(false)
+                setImpressoraToDelete(null)
+              }}
+              disabled={isDeleting}
+              className="h-10 px-6 rounded-lg border border-gray-300 text-primary-text hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+              className="h-10 px-6 rounded-lg bg-error text-white font-semibold hover:bg-error/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isDeleting ? 'Deletando...' : 'Deletar'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
-
-

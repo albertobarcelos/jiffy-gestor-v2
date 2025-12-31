@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useProdutosInfinite } from '@/src/presentation/hooks/useProdutos'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
@@ -27,8 +27,6 @@ import {
   MdLaunch,
 } from 'react-icons/md'
 
-// Lazy load do menu de ações para reduzir bundle inicial
-const ProdutoActionsMenu = lazy(() => import('./ProdutoActionsMenu').then(module => ({ default: module.ProdutoActionsMenu })))
 
 interface ProdutosListProps {
   onReload?: () => void
@@ -257,24 +255,23 @@ const ProdutoListItem = function ProdutoListItem({
     []
   )
 
+  // Handler para abrir edição ao clicar na linha
+  const handleRowClick = useCallback(() => {
+    onEditProduto?.(produto.getId())
+  }, [produto, onEditProduto])
+
   return (
-    <div className="bg-white border border-gray-100 hover:bg-secondary-text/10 rounded-2xl px-4 py-2 mb-2 shadow-sm flex items-center gap-4">
-      <div className="w-14 h-14 rounded-xl bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-2xl">
+    <div 
+      onClick={handleRowClick}
+      className="bg-white border border-gray-100 hover:bg-secondary-text/10 rounded-2xl px-4 py-2 mb-2 shadow-sm shadow-primary-text/50 flex items-center gap-4 cursor-pointer"
+    >
+      {/*<div className="w-14 h-14 rounded-xl bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-2xl">
         <MdImage />
-      </div>
+      </div>*/}
 
       <div className="flex-1">
         <div className="flex items-center gap-3 flex-wrap">
           <p className="text-primary-text font-semibold font-nunito text-base flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onEditProduto?.(produto.getId())}
-              title="Editar produto"
-              className="rounded-full bg-primary/10 border border-primary w-5 h-5 flex items-center justify-center text-[var(--color-primary)] hover:bg-primary/20 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              aria-label={`Editar ${produto.getNome()}`}
-            >
-              <MdModeEdit className="text-sm" />
-            </button>
             {produto.getNome()}
             <span className="text-sm text-secondary-text ml-2 inline-flex items-center gap-1">
               <span className="text-xs">Cód. </span>
@@ -282,7 +279,7 @@ const ProdutoListItem = function ProdutoListItem({
             </span>
           </p>
         </div>
-        <div className="flex items-center gap-2 mt-2">
+        <div className="flex items-center gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
           {actionIcons.map(({ key, label, Icon, field, modal }) => {
             if (field) {
               const isActive = toggleStates[field]
@@ -358,7 +355,7 @@ const ProdutoListItem = function ProdutoListItem({
         </div>
       </div>
 
-      <div className="flex items-center gap-4 flex-wrap justify-end">
+      <div className="flex md:mr-16 items-center gap-4 flex-wrap justify-end" onClick={(e) => e.stopPropagation()}>
         <div className="flex flex-col">
           <label className="text-xs text-secondary-text font-nunito mb-1">Valor (R$)</label>
           <div className="relative">
@@ -376,6 +373,7 @@ const ProdutoListItem = function ProdutoListItem({
               onClick={(event) => {
                 // Seleciona tudo a cada clique para facilitar a edição rápida
                 event.currentTarget.select()
+                event.stopPropagation()
               }}
               onMouseUp={(event) => {
                 // Evita que o mouseup remova a seleção aplicada no focus/click
@@ -397,12 +395,19 @@ const ProdutoListItem = function ProdutoListItem({
           <label
             title="Ativar/Desativar produto"
             className={`relative inline-flex h-5 w-12 items-center ${isSavingStatus ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             <input
               type="checkbox"
               className="sr-only peer"
               checked={isAtivo}
-              onChange={(event) => onSwitchToggle?.(event.target.checked)}
+              onChange={(event) => {
+                event.stopPropagation()
+                onSwitchToggle?.(event.target.checked)
+              }}
+              onClick={(e) => e.stopPropagation()}
               disabled={isSavingStatus}
             />
             <div
@@ -413,15 +418,6 @@ const ProdutoListItem = function ProdutoListItem({
             />
           </label>
         </div>
-        <Suspense fallback={<div className="h-10 w-10" />}>
-          <ProdutoActionsMenu
-            produtoId={produto.getId()}
-            produtoAtivo={isAtivo}
-            onStatusChanged={onMenuStatusChanged}
-            onEdit={onEditProduto}
-            onCopy={onCopyProduto}
-          />
-        </Suspense>
       </div>
     </div>
   )

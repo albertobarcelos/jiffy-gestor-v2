@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { PerfilUsuario } from '@/src/domain/entities/PerfilUsuario'
-import { PerfilUsuarioActionsMenu } from './PerfilUsuarioActionsMenu'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdSearch, MdKeyboardArrowRight, MdPerson, MdEdit, MdAdd } from 'react-icons/md'
@@ -447,9 +446,6 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
             <div className="flex-[2] text-center font-nunito font-semibold text-xs text-primary-text uppercase">
               Qtd Usuários
             </div>
-            <div className="flex-[2] flex justify-end font-nunito font-semibold text-xs text-primary-text uppercase">
-              Ações
-            </div>
           </div>
         </div>
       )}
@@ -472,15 +468,26 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
           const usuarios = usuariosPorPerfil[perfil.getId()] || []
           const contagemUsuarios = contagemUsuariosPorPerfil[perfil.getId()] ?? 0
 
+          // Handler para abrir edição ao clicar na linha do perfil
+          const handlePerfilRowClick = () => {
+            openTabsModal({ mode: 'edit', perfilId: perfil.getId() })
+          }
+
           return (
             <div
               key={perfil.getId()}
               className="bg-info rounded-xl my-2 overflow-visible shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-colors"
             >
               {/* Cabeçalho do perfil */}
-              <div className="h-[50px] px-4 flex items-center gap-[10px] relative overflow-visible">
+              <div 
+                onClick={handlePerfilRowClick}
+                className="h-[50px] px-4 flex items-center gap-[10px] relative overflow-visible cursor-pointer"
+              >
                 <button
-                  onClick={() => toggleExpand(perfil.getId())}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleExpand(perfil.getId())
+                  }}
                   className="w-8 h-8 flex items-center justify-center text-primary-text hover:bg-secondary-bg/20 rounded transition-colors"
                 >
                   <span title="Exibir usuários do perfil" 
@@ -491,14 +498,10 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
                 <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text flex items-center gap-2">
                   {perfil.getRole()}
                   <button
-                    onClick={() => openTabsModal({ mode: 'edit', perfilId: perfil.getId() })}
-                    className="w-5 h-5 flex items-center justify-center border border-primary/70 text-primary hover:bg-primary/20 rounded-full transition-colors"
-                    title="Editar perfil"
-                  >
-                    <MdEdit size={16} />
-                  </button>
-                  <button
-                    onClick={() => openUsuariosTabsModal({ mode: 'create', initialPerfilPdvId: perfil.getId() })}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      openUsuariosTabsModal({ mode: 'create', initialPerfilPdvId: perfil.getId() })
+                    }}
                     className="w-5 h-5 flex items-center justify-center border border-primary/70 text-primary hover:bg-primary/20 rounded-full transition-colors"
                     title="Adicionar novo usuário ao perfil"
                   >
@@ -507,13 +510,6 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
                 </div>
                 <div className="flex-[2] text-center font-nunito text-sm text-secondary-text">
                   {contagemUsuarios} usuário(s)
-                </div>
-                <div className="flex-[2] flex justify-end">
-                  <PerfilUsuarioActionsMenu
-                    perfilId={perfil.getId()}
-                    onStatusChanged={handleStatusChange}
-                    onEdit={() => openTabsModal({ mode: 'edit', perfilId: perfil.getId() })}
-                  />
                 </div>
               </div>
 
