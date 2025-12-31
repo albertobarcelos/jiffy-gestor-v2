@@ -14,13 +14,14 @@ interface NovoGrupoProps {
   isEmbedded?: boolean
   onClose?: () => void
   onSaved?: () => void
+  initialTab?: number // 0 = Detalhes do Grupo, 1 = Produtos Vinculados
 }
 
 /**
  * Componente para criar/editar grupo de produtos
  * Replica o design e lógica do Flutter NovoGrupoTabbedWidget
  */
-export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: NovoGrupoProps) {
+export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initialTab = 0 }: NovoGrupoProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { auth } = useAuthStore()
@@ -33,7 +34,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
   const [ativoLocal, setAtivoLocal] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(false)
-  const [activeTab, setActiveTab] = useState(0)
+  const [activeTab, setActiveTab] = useState(initialTab)
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false)
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false)
 
@@ -72,6 +73,11 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
     },
     [normalizeColor]
   )
+
+  // Atualiza a aba ativa quando initialTab mudar
+  useEffect(() => {
+    setActiveTab(initialTab)
+  }, [initialTab])
 
   // Carrega dados do grupo para edição
   useEffect(() => {
@@ -260,7 +266,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
                   : 'text-secondary-text'
               }`}
             >
-              Produtos Atrelados
+              Produtos Vinculados
             </button>
           </div>
         </div>
@@ -479,7 +485,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved }: Nov
               ) : (
                 <div className="text-center py-12">
                   <p className="text-secondary-text font-nunito">
-                    A lista de produtos atrelados aparece no modo de edição.
+                    A lista de produtos vinculados aparece no modo de edição.
                   </p>
                 </div>
               )}

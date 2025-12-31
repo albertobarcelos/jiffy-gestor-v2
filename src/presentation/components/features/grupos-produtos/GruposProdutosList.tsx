@@ -240,6 +240,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
         tab: config.tab ?? prev.tab,
         mode: config.mode ?? prev.mode,
         grupoId: config.grupoId,
+        initialTab: config.initialTab ?? prev.initialTab,
       }))
     },
     []
@@ -447,9 +448,6 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
           <div className="flex-[2] text-center font-nunito font-semibold text-sm text-primary-text">
             Status
           </div>
-          <div className="flex-[2] text-right font-nunito font-semibold text-sm text-primary-text">
-            Ações
-          </div>
         </div>
       </div>
 
@@ -471,7 +469,6 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
                 <Skeleton className="flex-[2] h-10 w-10" />
                 <Skeleton className="flex-[4] h-4" />
                 <Skeleton className="flex-[2] h-6 w-20 mx-auto" />
-                <Skeleton className="flex-[2] h-10 w-10 ml-auto" />
               </div>
             ))}
           </div>
@@ -505,6 +502,14 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
                     tab: 'grupo',
                     mode: 'edit',
                     grupoId: g.getId(),
+                  })
+                }
+                onEditProdutos={(g) =>
+                  openTabsModal({
+                    tab: 'grupo',
+                    mode: 'edit',
+                    grupoId: g.getId(),
+                    initialTab: 1, // Abre na aba "Produtos Vinculados"
                   })
                 }
               />

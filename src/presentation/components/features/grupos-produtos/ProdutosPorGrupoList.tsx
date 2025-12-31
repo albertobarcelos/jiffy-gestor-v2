@@ -248,7 +248,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-primary-text">
-              Produtos atrelados ao grupo
+              Produtos vinculados ao grupo
             </h3>
             <p className="text-sm text-secondary-text">
               Arraste para reordenar a posição dos produtos

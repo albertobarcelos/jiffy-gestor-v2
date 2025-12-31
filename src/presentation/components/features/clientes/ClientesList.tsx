@@ -3,11 +3,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Cliente } from '@/src/domain/entities/Cliente'
-import { ClienteActionsMenu } from './ClienteActionsMenu'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { ClientesTabsModal, ClientesTabsModalState } from './ClientesTabsModal'
-import { MdSearch, MdModeEdit, MdVisibility } from 'react-icons/md'
+import { MdSearch, MdVisibility } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 
 interface ClientesListProps {
@@ -348,9 +347,6 @@ export function ClientesList({ onReload }: ClientesListProps) {
           <div className="flex-[2] text-center font-nunito font-semibold text-sm text-primary-text">
             Status
           </div>
-          <div className="flex-[2] text-right font-nunito font-semibold text-sm text-primary-text">
-            Ações
-          </div>
         </div>
       </div>
 
@@ -374,7 +370,6 @@ export function ClientesList({ onReload }: ClientesListProps) {
                 <Skeleton className="flex-[2] h-4" />
                 <Skeleton className="flex-[2] h-4" />
                 <Skeleton className="flex-[2] h-5 w-12 mx-auto" />
-                <Skeleton className="flex-[2] h-10 w-10 ml-auto" />
               </div>
             ))}
           </div>
@@ -386,26 +381,28 @@ export function ClientesList({ onReload }: ClientesListProps) {
           </div>
         )}
 
-        {clientes.map((cliente) => (
+        {clientes.map((cliente) => {
+          // Handler para abrir edição ao clicar na linha
+          const handleRowClick = () => {
+            handleEdit(cliente.getId())
+          }
+
+          return (
           <div
             key={cliente.getId()}
-            className=" bg-info rounded-lg px-4 py-1 mb-1 flex items-center shadow-xl hover:shadow-md transition-shadow hover:bg-secondary-bg/15"
+            onClick={handleRowClick}
+            className=" bg-info rounded-lg px-4 py-1 mb-1 flex items-center shadow-xl hover:shadow-md transition-shadow hover:bg-secondary-bg/15 cursor-pointer"
           >
             <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text flex items-center">
               <span>{cliente.getNome()}</span>
-              <button
-                onClick={() => handleEdit(cliente.getId())}
-                title="Editar cliente"
+               <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleView(cliente.getId())
+                }}
+                title="Visualizar cliente"
                 className="flex items-center justify-center w-6 h-6 rounded-full hover:bg-primary/10 transition-colors"
-                aria-label={`Editar ${cliente.getNome()}`}
-              >
-                <MdModeEdit className="text-primary text-base" />
-              </button>
-              <button
-                onClick={() => handleEdit(cliente.getId())}
-                title="Editar cliente"
-                className="flex items-center justify-center w-6 h-6 rounded-full hover:bg-primary/10 transition-colors"
-                aria-label={`Editar ${cliente.getNome()}`}
+                aria-label={`Visualizar ${cliente.getNome()}`}
               >
                 <MdVisibility className="text-primary text-base" />
               </button>
@@ -422,7 +419,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
             <div className="flex-[2] font-nunito text-sm text-secondary-text">
               {cliente.getEmail() || '-'}
             </div>
-            <div className="flex-[2] flex justify-center">
+            <div className="flex-[2] flex justify-center" onClick={(e) => e.stopPropagation()}>
               <label
                 className={`relative inline-flex h-5 w-12 items-center ${
                   togglingStatus[cliente.getId()]
@@ -430,31 +427,27 @@ export function ClientesList({ onReload }: ClientesListProps) {
                     : 'cursor-pointer'
                 }`}
                 title={cliente.isAtivo() ? 'Cliente Ativo' : 'Cliente Desativado'}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
               >
                 <input
                   type="checkbox"
                   className="sr-only peer"
                   checked={cliente.isAtivo()}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    event.stopPropagation()
                     handleToggleClienteStatus(cliente, event.target.checked)
-                  }
+                  }}
+                  onClick={(e) => e.stopPropagation()}
                   disabled={!!togglingStatus[cliente.getId()]}
                 />
                 <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
                 <span className="absolute left-1 top-1/2 block h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-6" />
               </label>
             </div>
-            <div className="flex-[2] flex justify-end">
-              <ClienteActionsMenu
-                clienteId={cliente.getId()}
-                clienteAtivo={cliente.isAtivo()}
-                onStatusChanged={handleStatusChange}
-                onEdit={handleEdit}
-                onView={handleView}
-              />
-            </div>
           </div>
-        ))}
+          )
+        })}
 
         {isLoading && clientes.length > 0 && (
           <div className="flex justify-center py-4">

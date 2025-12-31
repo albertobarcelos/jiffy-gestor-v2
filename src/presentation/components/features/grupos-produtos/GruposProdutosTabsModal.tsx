@@ -10,6 +10,7 @@ export interface GruposProdutosTabsModalState {
   tab: TabKey
   mode: 'create' | 'edit'
   grupoId?: string
+  initialTab?: number // 0 = Detalhes do Grupo, 1 = Produtos Vinculados
 }
 
 interface GruposProdutosTabsModalProps {
@@ -85,6 +86,7 @@ export function GruposProdutosTabsModal({
           {state.tab === 'grupo' && (
             <div className="h-full overflow-y-auto">
               <NovoGrupo
+                key={`grupo-${grupoId || 'new'}-tab-${state.initialTab ?? 0}`}
                 grupoId={state.mode === 'create' ? undefined : grupoId}
                 isEmbedded
                 onClose={onClose}
@@ -92,6 +94,7 @@ export function GruposProdutosTabsModal({
                   onReload?.()
                   onClose()
                 }}
+                initialTab={state.initialTab}
               />
             </div>
           )}

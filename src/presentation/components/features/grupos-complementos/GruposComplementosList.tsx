@@ -2,12 +2,10 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
-import { GrupoComplementoActionsMenu } from './GrupoComplementoActionsMenu'
 import { useGruposComplementosInfinite } from '@/src/presentation/hooks/useGruposComplementos'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import {
   MdSearch,
-  MdModeEdit,
   MdExtension,
   MdAddCircle,
   MdKeyboardArrowUp,
@@ -62,11 +60,19 @@ const GrupoItem = memo(function GrupoItem({
   const isAtivo = useMemo(() => grupo.isAtivo(), [grupo])
   const hasComplementos = useMemo(() => complementosIds.length > 0, [complementosIds])
 
+  // Handler para abrir edição ao clicar na linha
+  const handleRowClick = useCallback(() => {
+    onEditGrupo?.(grupo)
+  }, [grupo, onEditGrupo])
+
   return (
     <div className="bg-info rounded-lg mb-2">
       
       {/* Linha principal do grupo */}
-      <div className="px-4 py-2 flex items-center rounded-lg gap-[10px] shadow-lg hover:shadow-md transition-shadow hover:bg-secondary-bg/15">
+      <div 
+        onClick={handleRowClick}
+        className="px-4 py-2 flex items-center rounded-lg gap-[10px] shadow-lg hover:shadow-md transition-shadow hover:bg-secondary-bg/15 cursor-pointer"
+      >
         <div className="w-16 flex flex-col items-center text-center text-xs text-secondary-text">
           
           <span className="text-lg font-semibold text-primary-text/70">
@@ -79,18 +85,12 @@ const GrupoItem = memo(function GrupoItem({
               {grupo.getNome()}
               <button
                 type="button"
-                title="Editar grupo"
-                aria-label={`Editar ${grupo.getNome()}`}
-                onClick={() => onEditGrupo?.(grupo)}
-                className="w-5 h-5 rounded-full border border-primary/30 text-primary flex items-center justify-center hover:bg-primary/10 transition-colors"
-              >
-                <MdModeEdit className="text-sm" />
-              </button>
-              <button
-                type="button"
                 title="Editar complementos do grupo"
                 aria-label={`Editar complementos do grupo ${grupo.getNome()}`}
-                onClick={() => onOpenComplementosModal?.(grupo)}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpenComplementosModal?.(grupo)
+                }}
                 className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors ${
                   hasComplementos
                     ? 'bg-primary text-white border border-primary hover:bg-primary/90'
@@ -102,7 +102,7 @@ const GrupoItem = memo(function GrupoItem({
             </span>
           </div>
         </div>
-        <div className="flex-[3] flex justify-center">
+        <div className="flex-[3] flex justify-center" onClick={(e) => e.stopPropagation()}>
           <div className="grid grid-cols-2 gap-4">
             {[
               {
@@ -151,7 +151,7 @@ const GrupoItem = memo(function GrupoItem({
           </div>
         </div>
         
-        <div className="flex-[2] flex items-center justify-start">
+        <div className="flex-[2] flex items-center justify-start" onClick={(e) => e.stopPropagation()}>
           {complementos.length === 0 ? (
             <span className="text-sm font-nunito text-secondary-text">Nenhum complemento</span>
           ) : (
@@ -174,25 +174,25 @@ const GrupoItem = memo(function GrupoItem({
             </select>
           )}
         </div>
-        <div className="flex-[2] flex items-center justify-center">
-          <label className="relative inline-flex items-center h-5 w-12 cursor-pointer">
+        <div className="flex-[2] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+          <label 
+            className="relative inline-flex items-center h-5 w-12 cursor-pointer"
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+          >
             <input
               type="checkbox"
               className="sr-only peer"
               checked={isAtivo}
-              onChange={(event) => onToggleStatus?.(grupo.getId(), event.target.checked)}
+              onChange={(event) => {
+                event.stopPropagation()
+                onToggleStatus?.(grupo.getId(), event.target.checked)
+              }}
+              onClick={(e) => e.stopPropagation()}
             />
             <div className="w-full h-full rounded-full bg-gray-300 peer-checked:bg-primary transition-colors" />
             <span className="absolute left-1 top-1/2 block h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-6" />
           </label>
-        </div>
-        <div className="flex-1 flex justify-end items-center">
-          <GrupoComplementoActionsMenu
-            grupoId={grupo.getId()}
-            grupoAtivo={isAtivo}
-            onStatusChanged={onActionsChanged}
-            onEditRequested={() => onEditGrupo?.(grupo)}
-          />
         </div>
       </div>
 
@@ -568,9 +568,6 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
           <div className="flex-[2] text-center font-nunito font-semibold text-sm text-primary-text">
             Status
           </div>
-          <div className="flex-1 text-right font-nunito font-semibold text-sm text-primary-text">
-            Ações
-          </div>
         </div>
       </div>
 
@@ -593,7 +590,6 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
                 <Skeleton className="flex-[2] h-4" />
                 <Skeleton className="flex-[2] h-4" />
                 <Skeleton className="flex-[2] h-6 w-20 mx-auto" />
-                <Skeleton className="flex-[2] h-10 w-10 ml-auto" />
               </div>
             ))}
           </div>
