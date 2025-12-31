@@ -1,7 +1,6 @@
-'use client'
-
-import { useState, useEffect, useMemo } from 'react'
-import { MdClose, MdSearch } from 'react-icons/md'
+import React, { useState, useEffect, useMemo } from 'react'
+import { Icon } from '@mdi/react' // Importa o componente Icon do @mdi/react
+import { mdiClose, mdiMagnify } from '@mdi/js' // Importa os paths dos ícones MDI específicos
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 
@@ -133,7 +132,7 @@ export function IconPickerModal({
         {/* Header com busca e fechar */}
         <div className="flex items-center gap-4 p-4 border-b border-secondary/10">
           <div className="flex-1 relative">
-            <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text w-5 h-5" />
+            <Icon path={mdiMagnify} className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text" size={1} />
             <input
               type="text"
               value={searchText}
@@ -146,7 +145,7 @@ export function IconPickerModal({
             onClick={onClose}
             className="p-2 text-secondary-text hover:text-primary-text hover:bg-primary-bg rounded-lg transition-colors"
           >
-            <MdClose className="w-6 h-6" />
+            <Icon path={mdiClose} className="w-6 h-6" size={1} />
           </button>
         </div>
 
@@ -256,4 +255,3 @@ function IconCard({ icon, selectedColor, onSelect }: IconCardProps) {
     </button>
   )
 }
-
