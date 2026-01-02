@@ -1,11 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { MdTrendingUp, MdTrendingDown } from 'react-icons/md'
+import { MdAttachMoney, MdRestaurant } from 'react-icons/md'
 import { BuscarVendasDashboardUseCase } from '@/src/application/use-cases/dashboard/BuscarVendasDashboardUseCase'
 import { DashboardVendas } from '@/src/domain/entities/DashboardVendas'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
 import { ModalMetodosPagamento } from './ModalMetodosPagamento'
+import {
+  FormControl,
+  Select,
+  MenuItem,
+} from '@mui/material'
 
 /**
  * Cards de métricas do dashboard
@@ -23,7 +27,7 @@ export function MetricCards() {
       setIsLoading(true)
       setError(null)
       try {
-        const useCase = new BuscarVendasDashboardUseCase(new ApiClient())
+        const useCase = new BuscarVendasDashboardUseCase()
         const vendas = await useCase.execute(periodo)
         setData(vendas)
       } catch (err) {
@@ -78,38 +82,77 @@ export function MetricCards() {
 
   return (
     <>
+      {/* Barra de seleção de período */}
+      <div className="flex items-center justify-start gap-2 mt-2">
+        <span className="text-primary text-sm font-exo">Período:</span>
+        <FormControl size="small" sx={{ minWidth: 120 }}>
+          <Select
+            value={periodo}
+            onChange={(e) => setPeriodo(e.target.value)}
+            sx={{
+              height: '20px',
+              backgroundColor: 'var(--color-primary)',
+              color: 'white',
+              fontSize: '12px',
+              '& .MuiOutlinedInput-notchedOutline': {
+                borderColor: 'var(--color-primary)',
+              },
+              '& .MuiSvgIcon-root': {
+                color: 'white',
+              },
+            }}
+          >
+            <MenuItem value="todos">Todos</MenuItem>
+            <MenuItem value="hoje">Hoje</MenuItem>
+            <MenuItem value="semana">Últimos 7 Dias</MenuItem>
+            <MenuItem value="mes">Mês Atual</MenuItem>
+            <MenuItem value="60dias">Últimos 60 Dias</MenuItem>
+            <MenuItem value="90dias">Últimos 90 Dias</MenuItem>
+          </Select>
+        </FormControl>
+      </div>
+
+      {/* Cards de métricas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Vendas Efetivadas */}
+        {/* Total Faturado */}
         <MetricCard
-          title="Vendas Efetivadas"
-          value={formatCurrency(data?.getTotalVendas())}
-          variation={data?.getVariacaoPercentual()}
-          variationLabel="vs mês anterior"
+          title="Total Faturado"
+          value={formatCurrency(data?.getTotalFaturado())}
+          icon={<MdAttachMoney size={20} />}
+          bgColorClass="bg-accent1"
+          iconColorClass="text-info"
           isPositive={true}
           onClick={() => setIsModalOpen(true)}
         />
 
-        {/* Ticket Médio */}
+        {/* Vendas Finalizadas */}
         <MetricCard
-          title="Ticket Médio"
-          value={formatCurrency(data?.getTicketMedio())}
-          variation={data?.getVariacaoPercentual()}
-          variationLabel="vs mês anterior"
+          title="Vendas Finalizadas"
+          value={formatNumber(data?.getCountVendasEfetivadas())}
+          icon={<span>🛒</span>}
+          bgColorClass="bg-alternate"
+          iconColorClass="text-info"
           isPositive={true}
         />
 
         {/* Vendas Canceladas */}
         <MetricCard
           title="Vendas Canceladas"
-          value={formatNumber(data?.getVendasCanceladas())}
+          value={formatNumber(data?.getCountVendasCanceladas())}
+          icon={<span>✕</span>}
+          bgColorClass="bg-error"
+          iconColorClass="text-info"
           isPositive={false}
         />
 
-        {/* Vendas Estornadas */}
+        {/* Produtos Vendidos */}
         <MetricCard
-          title="Vendas Estornadas"
-          value={formatNumber(data?.getVendasEstornadas())}
-          isPositive={false}
+          title="Produtos Vendidos"
+          value={formatNumber(data?.getCountProdutosVendidos())}
+          icon={<MdRestaurant size={20} />}
+          bgColorClass="bg-warning"
+          iconColorClass="text-info"
+          isPositive={true}
         />
       </div>
 
@@ -123,69 +166,40 @@ export function MetricCards() {
 }
 
 interface MetricCardProps {
-  title: string
-  value: string
-  variation?: number
-  variationLabel?: string
-  isPositive: boolean
-  onClick?: () => void
+  title: string;
+  value: string;
+  isPositive: boolean;
+  icon: React.ReactNode;
+  bgColorClass: string; // Adicionado para cor de fundo do ícone
+  iconColorClass: string; // Adicionado para cor do ícone
+  onClick?: () => void;
 }
 
 function MetricCard({
   title,
   value,
-  variation,
-  variationLabel,
   isPositive,
+  icon,
+  bgColorClass,
+  iconColorClass,
   onClick,
 }: MetricCardProps) {
-  const variationValue = variation !== undefined ? variation : (isPositive ? 12 : -10)
-  const variationAmount = isPositive ? '+$18K' : '-$10K'
-
   return (
     <div
       className={`
-        bg-white rounded-xl border border-gray-200 p-6
+        bg-white flex items-center justify-between rounded-lg border border-gray-200 p-2
         shadow-sm hover:shadow-md transition-all duration-200
         ${onClick ? 'cursor-pointer hover:border-gray-300' : ''}
       `}
       onClick={onClick}
     >
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex flex-col items-start justify-between mb-2">
         <h3 className="text-sm font-medium text-gray-600">{title}</h3>
-        {variation !== undefined && (
-          <div
-            className={`
-              flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold
-              ${isPositive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}
-            `}
-          >
-            {isPositive ? (
-              <MdTrendingUp className="w-3 h-3" />
-            ) : (
-              <MdTrendingDown className="w-3 h-3" />
-            )}
-            <span>{variationValue}%</span>
-          </div>
-        )}
-      </div>
-
-      <div className="mb-2">
         <p className="text-2xl font-bold text-gray-900">{value}</p>
       </div>
-
-      {variationLabel && (
-        <div className="flex items-center gap-2">
-          <span
-            className={`text-xs font-medium ${
-              isPositive ? 'text-green-600' : 'text-red-600'
-            }`}
-          >
-            {variationAmount}
-          </span>
-          <span className="text-xs text-gray-500">{variationLabel}</span>
-        </div>
-      )}
+      <div className={`w-12 h-12 rounded-full ${bgColorClass} flex items-center justify-center flex-shrink-0`}>
+          <span className={`${iconColorClass} text-xl`}>{icon}</span>
+      </div>
     </div>
-  )
+  );
 }

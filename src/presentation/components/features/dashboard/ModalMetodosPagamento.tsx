@@ -123,7 +123,12 @@ export function ModalMetodosPagamento({
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(value: number) => formatCurrency(value)}
+                      formatter={(value: number | undefined) => {
+                        if (typeof value === 'number') {
+                          return formatCurrency(value);
+                        }
+                        return '';
+                      }}
                       contentStyle={{
                         backgroundColor: '#FFFFFF',
                         border: '1px solid #530CA3',

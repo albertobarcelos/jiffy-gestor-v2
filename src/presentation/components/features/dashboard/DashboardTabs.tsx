@@ -78,6 +78,7 @@ function VendasPdvTab({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <GraficoVendasLinha periodo={periodo} />
         <GraficoVendasTerminal periodo={periodo} />
+        
       </div>
 
       {/* Tabela de top produtos */}

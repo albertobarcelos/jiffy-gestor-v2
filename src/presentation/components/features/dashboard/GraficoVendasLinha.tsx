@@ -121,7 +121,12 @@ export function GraficoVendasLinha({ periodo = 'mes' }: GraficoVendasLinhaProps)
             domain={[minValor * 0.9, maxValor * 1.1]}
           />
           <Tooltip
-            formatter={(value: number) => formatCurrency(value)}
+            formatter={(value: number | undefined) => {
+              if (typeof value === 'number') {
+                return formatCurrency(value);
+              }
+              return '';
+            }}
             labelFormatter={(label) => {
               const item = chartData[label as number]
               return item ? item.label : ''
