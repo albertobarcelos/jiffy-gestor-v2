@@ -19,12 +19,11 @@ import {
 } from 'recharts'
 import { BuscarMetodosPagamentoUseCase } from '@/src/application/use-cases/dashboard/BuscarMetodosPagamentoUseCase'
 import { DashboardMetodoPagamento } from '@/src/domain/entities/DashboardMetodoPagamento'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
 
 interface ModalMetodosPagamentoProps {
   isOpen: boolean
   onClose: () => void
-  periodo?: string
+  periodo: string
 }
 
 const cores = [
@@ -54,7 +53,7 @@ export function ModalMetodosPagamento({
     const loadData = async () => {
       setIsLoading(true)
       try {
-        const useCase = new BuscarMetodosPagamentoUseCase(new ApiClient())
+        const useCase = new BuscarMetodosPagamentoUseCase()
         const metodos = await useCase.execute(periodo)
         setData(metodos)
       } catch (err) {

@@ -25,6 +25,13 @@ function getPeriodoDates(periodo: string): PeriodoDates {
       fim = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       fim.setHours(23, 59, 59, 999);
       break;
+    case '30dias': // Adicionado para 'Últimos 30 Dias'
+      inicio = new Date(now);
+      inicio.setDate(now.getDate() - 29); // Hoje - 29 dias = 30 dias no total
+      inicio.setHours(0, 0, 0, 0);
+      fim = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      fim.setHours(23, 59, 59, 999);
+      break;
     case 'mes': // Corresponde a 'Mês Atual'
       inicio = new Date(now.getFullYear(), now.getMonth(), 1);
       inicio.setHours(0, 0, 0, 0);

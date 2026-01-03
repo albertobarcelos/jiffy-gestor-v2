@@ -12,17 +12,16 @@ import {
 import { Button } from '@/src/presentation/components/ui/button'
 import { BuscarTopProdutosUseCase } from '@/src/application/use-cases/dashboard/BuscarTopProdutosUseCase'
 import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
 
 interface TabelaTopProdutosProps {
-  periodo?: string
+  periodo: string
 }
 
 /**
  * Tabela de top produtos vendidos
  * Design clean e minimalista
  */
-export function TabelaTopProdutos({ periodo = 'mes' }: TabelaTopProdutosProps) {
+export function TabelaTopProdutos({ periodo }: TabelaTopProdutosProps) {
   const [data, setData] = useState<DashboardTopProduto[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -32,7 +31,7 @@ export function TabelaTopProdutos({ periodo = 'mes' }: TabelaTopProdutosProps) {
       setIsLoading(true)
       setError(null)
       try {
-        const useCase = new BuscarTopProdutosUseCase(new ApiClient())
+        const useCase = new BuscarTopProdutosUseCase()
         const produtos = await useCase.execute(periodo, 10)
         setData(produtos)
       } catch (err) {

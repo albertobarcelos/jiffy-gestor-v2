@@ -1,8 +1,8 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { Suspense } from 'react'
-import { Skeleton } from '@mui/material'
+import { Suspense, useState } from 'react'
+import { Skeleton, FormControl, Select, MenuItem } from '@mui/material'
 
 // Dynamic imports para code-splitting
 const MetricCards = dynamic(
@@ -48,8 +48,41 @@ const UltimasVendas = dynamic(
  * Otimizada com code-splitting e Suspense
  */
 export default function DashboardPage() {
+  const [periodo, setPeriodo] = useState('hoje'); // Estado para o período
+
   return (
     <div className="space-y-2">
+      {/* Barra de seleção de período */}
+      <div className="flex items-center justify-start gap-2 mt-2">
+        <span className="text-primary text-sm font-exo">Período:</span>
+        <FormControl size="small" sx={{ minWidth: 120 }}>
+          <Select
+            value={periodo}
+            onChange={(e) => setPeriodo(e.target.value)}
+            sx={{
+              height: '20px',
+              backgroundColor: 'var(--color-primary)',
+              color: 'white',
+              fontSize: '12px',
+              '& .MuiOutlinedInput-notchedOutline': {
+                borderColor: 'var(--color-primary)',
+              },
+              '& .MuiSvgIcon-root': {
+                color: 'white',
+              },
+            }}
+          >
+            <MenuItem value="todos">Todos</MenuItem>
+            <MenuItem value="hoje">Hoje</MenuItem>
+            <MenuItem value="mes">Mês Atual</MenuItem>
+            <MenuItem value="semana">Últimos 7 Dias</MenuItem>
+            <MenuItem value="30dias">Últimos 30 Dias</MenuItem>
+            <MenuItem value="60dias">Últimos 60 Dias</MenuItem>
+            <MenuItem value="90dias">Últimos 90 Dias</MenuItem>
+          </Select>
+        </FormControl>
+      </div>
+
       {/* Cards de métricas */}
       <Suspense fallback={
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -58,7 +91,7 @@ export default function DashboardPage() {
           ))}
         </div>
       }>
-        <MetricCards />
+        <MetricCards periodo={periodo} />
       </Suspense>
 
       {/* Grid principal */}
@@ -72,7 +105,7 @@ export default function DashboardPage() {
               <p className="text-sm text-gray-500">Últimos três meses</p>
             </div>
             <Suspense fallback={<Skeleton variant="rectangular" height={300} />}>
-              <GraficoVendasLinha periodo="mes" />
+              <GraficoVendasLinha periodo={periodo} />
             </Suspense>
           </div>
 
@@ -83,7 +116,7 @@ export default function DashboardPage() {
               <p className="text-sm text-gray-500">Mais vendidos</p>
             </div>
             <Suspense fallback={<Skeleton variant="rectangular" height={400} />}>
-              <TabelaTopProdutos periodo="mes" />
+              <TabelaTopProdutos periodo={periodo} />
             </Suspense>
           </div>
         </div>

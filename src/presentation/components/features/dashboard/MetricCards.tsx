@@ -5,22 +5,20 @@ import { MdAttachMoney, MdRestaurant } from 'react-icons/md'
 import { BuscarVendasDashboardUseCase } from '@/src/application/use-cases/dashboard/BuscarVendasDashboardUseCase'
 import { DashboardVendas } from '@/src/domain/entities/DashboardVendas'
 import { ModalMetodosPagamento } from './ModalMetodosPagamento'
-import {
-  FormControl,
-  Select,
-  MenuItem,
-} from '@mui/material'
+
+interface MetricCardsProps {
+  periodo: string;
+}
 
 /**
  * Cards de métricas do dashboard
  * Design clean e minimalista com cantos arredondados
  */
-export function MetricCards() {
+export function MetricCards({ periodo }: MetricCardsProps) {
   const [data, setData] = useState<DashboardVendas | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [periodo, setPeriodo] = useState('hoje')
 
   useEffect(() => {
     const loadData = async () => {
@@ -82,37 +80,6 @@ export function MetricCards() {
 
   return (
     <>
-      {/* Barra de seleção de período */}
-      <div className="flex items-center justify-start gap-2 mt-2">
-        <span className="text-primary text-sm font-exo">Período:</span>
-        <FormControl size="small" sx={{ minWidth: 120 }}>
-          <Select
-            value={periodo}
-            onChange={(e) => setPeriodo(e.target.value)}
-            sx={{
-              height: '20px',
-              backgroundColor: 'var(--color-primary)',
-              color: 'white',
-              fontSize: '12px',
-              '& .MuiOutlinedInput-notchedOutline': {
-                borderColor: 'var(--color-primary)',
-              },
-              '& .MuiSvgIcon-root': {
-                color: 'white',
-              },
-            }}
-          >
-            <MenuItem value="todos">Todos</MenuItem>
-            <MenuItem value="hoje">Hoje</MenuItem>
-            <MenuItem value="semana">Últimos 7 Dias</MenuItem>
-            <MenuItem value="mes">Mês Atual</MenuItem>
-            <MenuItem value="60dias">Últimos 60 Dias</MenuItem>
-            <MenuItem value="90dias">Últimos 90 Dias</MenuItem>
-          </Select>
-        </FormControl>
-      </div>
-
-      {/* Cards de métricas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Total Faturado */}
         <MetricCard

@@ -14,17 +14,16 @@ import {
 } from 'recharts'
 import { BuscarEvolucaoVendasUseCase } from '@/src/application/use-cases/dashboard/BuscarEvolucaoVendasUseCase'
 import { DashboardEvolucao } from '@/src/domain/entities/DashboardEvolucao'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
 
 interface GraficoVendasLinhaProps {
-  periodo?: string
+  periodo: string;
 }
 
 /**
  * Gráfico de linha para evolução de vendas
  * Replica o design do Flutter
  */
-export function GraficoVendasLinha({ periodo = 'mes' }: GraficoVendasLinhaProps) {
+export function GraficoVendasLinha({ periodo }: GraficoVendasLinhaProps) {
   const [data, setData] = useState<DashboardEvolucao[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -34,7 +33,7 @@ export function GraficoVendasLinha({ periodo = 'mes' }: GraficoVendasLinhaProps)
       setIsLoading(true)
       setError(null)
       try {
-        const useCase = new BuscarEvolucaoVendasUseCase(new ApiClient())
+        const useCase = new BuscarEvolucaoVendasUseCase()
         const evolucao = await useCase.execute(periodo)
         setData(evolucao)
       } catch (err) {
