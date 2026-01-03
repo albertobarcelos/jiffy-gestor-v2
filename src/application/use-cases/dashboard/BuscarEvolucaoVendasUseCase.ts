@@ -70,7 +70,7 @@ export class BuscarEvolucaoVendasUseCase {
       baseParams.append('periodoInicial', periodoInicial);
       baseParams.append('periodoFinal', periodoFinal);
     }
-    baseParams.append('status', status);
+    baseParams.append('status', status); // Apenas um status por chamada
 
     const limitPerPage = 100; // Um limite razoável por página
     let allVendas: any[] = [];
@@ -102,49 +102,76 @@ export class BuscarEvolucaoVendasUseCase {
     return allVendas;
   }
 
-  async execute(periodo: string = 'hoje'): Promise<DashboardEvolucao[]> {
-    const { periodoInicial, periodoFinal } = getPeriodoDates(periodo);
+  async execute(periodo: string = 'hoje', selectedStatuses: string[] = ['FINALIZADA']): Promise<DashboardEvolucao[]> {
+      const { periodoInicial, periodoFinal } = getPeriodoDates(periodo);
+      // Faz chamadas separadas para cada status selecionado
+      const fetchPromises = selectedStatuses.map(status => 
+        this.fetchAllVendas(periodoInicial, periodoFinal, status)
+    );
+    const results = await Promise.all(fetchPromises);
 
-    // Busca vendas finalizadas e canceladas em paralelo
-    const [vendasFinalizadasData, vendasCanceladasData] = await Promise.all([
-      this.fetchAllVendas(periodoInicial, periodoFinal, 'FINALIZADA'),
-      this.fetchAllVendas(periodoInicial, periodoFinal, 'CANCELADA'),
-    ]);
+    // Combina os resultados de todas as chamadas
+    const allVendasData: any[] = results.flat();
 
-    // Agrega vendas finalizadas por dia
+    // Inicializa mapas para cada status
     const finalizadasDailyMap = new Map<string, number>();
-    vendasFinalizadasData.forEach((venda: any) => {
+    const canceladasDailyMap = new Map<string, number>();
+
+    allVendasData.forEach((venda: any) => {
       const saleDate = new Date(venda.dataCriacao);
       const year = saleDate.getFullYear();
       const month = (saleDate.getMonth() + 1).toString().padStart(2, '0');
       const day = saleDate.getDate().toString().padStart(2, '0');
       const dayKey = `${year}-${month}-${day}`;
       const valor = venda.valorFinal || 0;
-      finalizadasDailyMap.set(dayKey, (finalizadasDailyMap.get(dayKey) || 0) + valor);
-    });
 
-    // Agrega vendas canceladas por dia
-    const canceladasDailyMap = new Map<string, number>();
-    vendasCanceladasData.forEach((venda: any) => {
-      const saleDate = new Date(venda.dataCriacao);
-      const year = saleDate.getFullYear();
-      const month = (saleDate.getMonth() + 1).toString().padStart(2, '0');
-      const day = saleDate.getDate().toString().padStart(2, '0');
-      const dayKey = `${year}-${month}-${day}`;
-      const valor = venda.valorFinal || 0; // Valor de venda cancelada
-      canceladasDailyMap.set(dayKey, (canceladasDailyMap.get(dayKey) || 0) + valor);
-    });
+      let vendaStatus: string;
+      if (venda.dataCancelamento) {
+        vendaStatus = 'CANCELADA';
+      } else {
+        vendaStatus = 'FINALIZADA';
+      }
 
-    // Gera dados para todos os dias do período, preenchendo dias ausentes com 0
-    const evolucaoDiaria: DashboardEvolucao[] = [];
+      switch (vendaStatus) {
+        case 'FINALIZADA':
+          finalizadasDailyMap.set(dayKey, (finalizadasDailyMap.get(dayKey) || 0) + valor);
+          break;
+        case 'CANCELADA':
+          canceladasDailyMap.set(dayKey, (canceladasDailyMap.get(dayKey) || 0) + valor);
+          break;
+        default:
+          break;
+             }
+           });
+
+           // Gera dados para todos os dias do período, preenchendo dias ausentes com 0
+           const evolucaoDiaria: DashboardEvolucao[] = [];
     
-    const startDate = new Date(periodoInicial);
-    const endDate = new Date(periodoFinal);
-    endDate.setHours(23, 59, 59, 999);
+    let effectiveStartDate: Date;
+    let effectiveEndDate: Date;
 
-    let currentDay = new Date(startDate);
-    while (currentDay <= endDate) {
-      const dayKey = currentDay.toISOString().split('T')[0];
+    if (periodoInicial && periodoFinal) {
+      effectiveStartDate = new Date(periodoInicial);
+      effectiveEndDate = new Date(periodoFinal);
+      effectiveEndDate.setHours(23, 59, 59, 999);
+    } else if (allVendasData.length > 0) {
+      // Se o período for 'todos', determina o intervalo de datas a partir dos dados obtidos
+      const dates = allVendasData.map((venda: any) => new Date(venda.dataCriacao));
+      effectiveStartDate = new Date(Math.min(...dates.map(date => date.getTime())));
+      effectiveEndDate = new Date(Math.max(...dates.map(date => date.getTime())));
+      effectiveStartDate.setHours(0, 0, 0, 0);
+      effectiveEndDate.setHours(23, 59, 59, 999);
+    } else {
+      // Nenhum filtro de período e nenhum dado, retorna array vazio
+      return [];
+    }
+
+    let currentDay = new Date(effectiveStartDate);
+    while (currentDay <= effectiveEndDate) {
+      const year = currentDay.getFullYear();
+      const month = (currentDay.getMonth() + 1).toString().padStart(2, '0');
+      const day = currentDay.getDate().toString().padStart(2, '0');
+      const dayKey = `${year}-${month}-${day}`;
       const label = currentDay.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
       
       evolucaoDiaria.push(DashboardEvolucao.create({

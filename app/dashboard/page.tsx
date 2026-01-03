@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { Suspense, useState } from 'react'
-import { Skeleton, FormControl, Select, MenuItem } from '@mui/material'
+import { Skeleton, FormControl, Select, MenuItem, FormGroup, FormControlLabel, Checkbox } from '@mui/material'
 
 // Função para obter o label do período
 const getPeriodoLabel = (periodo: string): string => {
@@ -71,6 +71,14 @@ const UltimasVendas = dynamic(
  */
 export default function DashboardPage() {
   const [periodo, setPeriodo] = useState('hoje'); // Estado para o período
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['FINALIZADA']); // Estado para os status selecionados
+
+  const handleStatusChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { value, checked } = event.target;
+    setSelectedStatuses((prev) =>
+      checked ? [...prev, value] : prev.filter((status) => status !== value)
+    );
+  };
 
   return (
     <div className="space-y-2">
@@ -121,13 +129,49 @@ export default function DashboardPage() {
         {/* Coluna esquerda - 2 colunas */}
         <div className="lg:col-span-2 space-y-6">
           {/* Gráfico de evolução */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Evolução de Vendas</h3>
-              <p className="text-sm text-gray-500">{getPeriodoLabel(periodo)}</p>
-            </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 px-6 py-2">
+                   <div className="mb-6 flex items-start gap-12">
+                     <div className="flex flex-col items-start justify-start">
+                      <h3 className="text-lg font-semibold text-gray-900">Evolução de Vendas</h3>
+                      <p className="text-sm text-gray-500">{getPeriodoLabel(periodo)}</p>
+                     </div>
+                     <FormGroup row>
+                       <FormControlLabel
+                         control={
+                           <Checkbox
+                             checked={selectedStatuses.includes('FINALIZADA')}
+                             onChange={handleStatusChange}
+                             value="FINALIZADA"
+                             sx={{
+                               color: '#3B82F6', // Cor azul para Finalizadas
+                               '&.Mui-checked': {
+                                 color: '#3B82F6',
+                               },
+                             }}
+                           />
+                         }
+                         label="Finalizadas"
+                       />
+                       <FormControlLabel
+                         control={
+                           <Checkbox
+                             checked={selectedStatuses.includes('CANCELADA')}
+                             onChange={handleStatusChange}
+                             value="CANCELADA"
+                             sx={{
+                               color: '#EF4444', // Cor vermelha para Canceladas
+                               '&.Mui-checked': {
+                                 color: '#EF4444',
+                               },
+                             }}
+                           />
+                         }
+                         label="Canceladas"
+                       />
+                     </FormGroup>
+                   </div>
             <Suspense fallback={<Skeleton variant="rectangular" height={300} />}>
-              <GraficoVendasLinha periodo={periodo} />
+              <GraficoVendasLinha periodo={periodo} selectedStatuses={selectedStatuses} />
             </Suspense>
           </div>
 

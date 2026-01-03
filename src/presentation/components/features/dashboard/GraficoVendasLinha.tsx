@@ -16,12 +16,13 @@ import { DashboardEvolucao } from '@/src/domain/entities/DashboardEvolucao'
 
 interface GraficoVendasLinhaProps {
   periodo: string;
+  selectedStatuses: string[];
 }
 
 /**
  * Gráfico de coluna para evolução de vendas
  */
-export function GraficoVendasLinha({ periodo }: GraficoVendasLinhaProps) {
+export function GraficoVendasLinha({ periodo, selectedStatuses }: GraficoVendasLinhaProps) {
   const [data, setData] = useState<DashboardEvolucao[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -32,7 +33,7 @@ export function GraficoVendasLinha({ periodo }: GraficoVendasLinhaProps) {
       setError(null)
       try {
         const useCase = new BuscarEvolucaoVendasUseCase()
-        const evolucao = await useCase.execute(periodo)
+        const evolucao = await useCase.execute(periodo, selectedStatuses)
         setData(evolucao)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erro ao carregar dados')
@@ -42,7 +43,7 @@ export function GraficoVendasLinha({ periodo }: GraficoVendasLinhaProps) {
     }
 
     loadData()
-  }, [periodo])
+  }, [periodo, selectedStatuses])
 
   const formatCurrency = (value: number) => {
     return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -88,13 +89,22 @@ export function GraficoVendasLinha({ periodo }: GraficoVendasLinhaProps) {
     valorCanceladas: item.getValorCanceladas(),
   }))
 
-  const maxValorFinalizadas = Math.max(...chartData.map((d) => d.valorFinalizadas))
-  const maxValorCanceladas = Math.max(...chartData.map((d) => d.valorCanceladas))
-  const maxValor = Math.max(maxValorFinalizadas, maxValorCanceladas);
-  const minValor = Math.min(
-    Math.min(...chartData.map((d) => d.valorFinalizadas)),
-    Math.min(...chartData.map((d) => d.valorCanceladas))
-  );
+  // Calcula min/max apenas para os valores que serão exibidos
+  let currentMax = 0;
+  let currentMin = 0;
+
+  if (selectedStatuses.includes('FINALIZADA')) {
+    currentMax = Math.max(currentMax, ...chartData.map(d => d.valorFinalizadas));
+    currentMin = Math.min(currentMin, ...chartData.map(d => d.valorFinalizadas));
+  }
+  if (selectedStatuses.includes('CANCELADA')) {
+    currentMax = Math.max(currentMax, ...chartData.map(d => d.valorCanceladas));
+    currentMin = Math.min(currentMin, ...chartData.map(d => d.valorCanceladas));
+  }
+
+  // Ajusta o domínio para incluir zero se todos os valores forem positivos
+  const finalMinDomain = currentMin < 0 ? currentMin * 1.1 : 0; // Se houver valores negativos, ajusta para baixo
+  const finalMaxDomain = currentMax * 1.1;
 
   return (
     <div className="w-full min-w-0" style={{ height: '300px' }}>
@@ -114,7 +124,7 @@ export function GraficoVendasLinha({ periodo }: GraficoVendasLinhaProps) {
             tick={{ fontSize: '12px', fill: '#6B7280' }}
             tickMargin={10}
             width={100} // Aumenta a largura do eixo Y
-            domain={[minValor * 0.9, maxValor * 1.1]}
+            domain={[finalMinDomain, finalMaxDomain]}
           />
           <Tooltip
             formatter={(value: number | undefined, name?: string) => {
@@ -134,18 +144,22 @@ export function GraficoVendasLinha({ periodo }: GraficoVendasLinhaProps) {
             }}
           />
           <Legend />
-          <Bar
-            dataKey="valorFinalizadas"
-            name="Finalizadas"
-            fill="#3B82F6"
-            barSize={20} // Largura da barra
-          />
-          <Bar
-            dataKey="valorCanceladas"
-            name="Canceladas"
-            fill="#EF4444"
-            barSize={20} // Largura da barra
-          />
+          {selectedStatuses.includes('FINALIZADA') && (
+            <Bar
+              dataKey="valorFinalizadas"
+              name="Finalizadas"
+              fill="#3B82F6"
+              barSize={20} // Largura da barra
+            />
+          )}
+          {selectedStatuses.includes('CANCELADA') && (
+            <Bar
+              dataKey="valorCanceladas"
+              name="Canceladas"
+              fill="#EF4444"
+              barSize={20} // Largura da barra
+            />
+          )}
         </BarChart>
       </ResponsiveContainer>
     </div>

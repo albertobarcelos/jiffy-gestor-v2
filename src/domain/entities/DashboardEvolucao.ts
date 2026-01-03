@@ -9,7 +9,7 @@ export class DashboardEvolucao {
     private readonly valorCanceladas: number,
   ) {}
 
-  static create(data: {
+    static create(data: {
     data: string
     label: string
     valorFinalizadas?: number
