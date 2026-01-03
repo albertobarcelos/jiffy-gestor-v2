@@ -4,6 +4,28 @@ import dynamic from 'next/dynamic'
 import { Suspense, useState } from 'react'
 import { Skeleton, FormControl, Select, MenuItem } from '@mui/material'
 
+// Função para obter o label do período
+const getPeriodoLabel = (periodo: string): string => {
+  switch (periodo) {
+    case 'todos':
+      return 'Todos os Períodos';
+    case 'hoje':
+      return 'Hoje';
+    case 'mes':
+      return 'Mês Atual';
+    case 'semana':
+      return 'Últimos 7 Dias';
+    case '30dias':
+      return 'Últimos 30 Dias';
+    case '60dias':
+      return 'Últimos 60 Dias';
+    case '90dias':
+      return 'Últimos 90 Dias';
+    default:
+      return 'Período Desconhecido';
+  }
+};
+
 // Dynamic imports para code-splitting
 const MetricCards = dynamic(
   () => import('@/src/presentation/components/features/dashboard/MetricCards').then((mod) => ({ default: mod.MetricCards })),
@@ -102,7 +124,7 @@ export default function DashboardPage() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Evolução de Vendas</h3>
-              <p className="text-sm text-gray-500">Últimos três meses</p>
+              <p className="text-sm text-gray-500">{getPeriodoLabel(periodo)}</p>
             </div>
             <Suspense fallback={<Skeleton variant="rectangular" height={300} />}>
               <GraficoVendasLinha periodo={periodo} />

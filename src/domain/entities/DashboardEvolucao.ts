@@ -4,23 +4,33 @@
 export class DashboardEvolucao {
   private constructor(
     private readonly data: string,
-    private readonly valor: number,
-    private readonly label: string
+    private readonly label: string,
+    private readonly valorFinalizadas: number,
+    private readonly valorCanceladas: number,
   ) {}
 
   static create(data: {
     data: string
-    valor: number
     label: string
+    valorFinalizadas?: number
+    valorCanceladas?: number
   }): DashboardEvolucao {
-    return new DashboardEvolucao(data.data, data.valor, data.label)
+    return new DashboardEvolucao(
+      data.data,
+      data.label,
+      data.valorFinalizadas ?? 0,
+      data.valorCanceladas ?? 0,
+    )
   }
 
+  // fromJSON pode ser ajustado se a API começar a retornar esses dois valores
+  // Por enquanto, a agregação será feita no Use Case.
   static fromJSON(data: any): DashboardEvolucao {
     return DashboardEvolucao.create({
       data: data.data ?? '',
-      valor: data.valor ?? 0,
       label: data.label ?? '',
+      valorFinalizadas: data.valorFinalizadas ?? data.valor ?? 0, // Fallback para 'valor' se for a estrutura antiga
+      valorCanceladas: data.valorCanceladas ?? 0,
     })
   }
 
@@ -28,12 +38,15 @@ export class DashboardEvolucao {
     return this.data
   }
 
-  getValor(): number {
-    return this.valor
-  }
-
   getLabel(): string {
     return this.label
   }
-}
 
+  getValorFinalizadas(): number {
+    return this.valorFinalizadas
+  }
+
+  getValorCanceladas(): number {
+    return this.valorCanceladas
+  }
+}

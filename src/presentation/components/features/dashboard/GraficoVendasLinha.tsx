@@ -2,15 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import {
-  LineChart,
-  Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Area,
-  AreaChart,
+  Legend,
 } from 'recharts'
 import { BuscarEvolucaoVendasUseCase } from '@/src/application/use-cases/dashboard/BuscarEvolucaoVendasUseCase'
 import { DashboardEvolucao } from '@/src/domain/entities/DashboardEvolucao'
@@ -20,8 +19,7 @@ interface GraficoVendasLinhaProps {
 }
 
 /**
- * Gráfico de linha para evolução de vendas
- * Replica o design do Flutter
+ * Gráfico de coluna para evolução de vendas
  */
 export function GraficoVendasLinha({ periodo }: GraficoVendasLinhaProps) {
   const [data, setData] = useState<DashboardEvolucao[]>([])
@@ -47,7 +45,7 @@ export function GraficoVendasLinha({ periodo }: GraficoVendasLinhaProps) {
   }, [periodo])
 
   const formatCurrency = (value: number) => {
-    return `R$ ${Math.round(value).toLocaleString('pt-BR')}`
+    return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }
 
   if (isLoading) {
@@ -83,52 +81,50 @@ export function GraficoVendasLinha({ periodo }: GraficoVendasLinhaProps) {
   }
 
   // Preparar dados para o gráfico
-  const chartData = data.map((item, index) => ({
-    index,
-    valor: item.getValor(),
+  const chartData = data.map((item) => ({
+    data: item.getData(),
     label: item.getLabel(),
-    data: item.getData().substring(5), // MM-DD
+    valorFinalizadas: item.getValorFinalizadas(),
+    valorCanceladas: item.getValorCanceladas(),
   }))
 
-  const maxValor = Math.max(...chartData.map((d) => d.valor))
-  const minValor = Math.min(...chartData.map((d) => d.valor))
+  const maxValorFinalizadas = Math.max(...chartData.map((d) => d.valorFinalizadas))
+  const maxValorCanceladas = Math.max(...chartData.map((d) => d.valorCanceladas))
+  const maxValor = Math.max(maxValorFinalizadas, maxValorCanceladas);
+  const minValor = Math.min(
+    Math.min(...chartData.map((d) => d.valorFinalizadas)),
+    Math.min(...chartData.map((d) => d.valorCanceladas))
+  );
 
   return (
     <div className="w-full min-w-0" style={{ height: '300px' }}>
       <ResponsiveContainer width="100%" height={300}>
-        <AreaChart data={chartData}>
-          <defs>
-            <linearGradient id="colorVendas" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.2} />
-              <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
-            </linearGradient>
-          </defs>
+        <BarChart data={chartData} margin={{
+          top: 5, right: 30, left: 30, bottom: 5, // Aumenta a margem esquerda para o eixo Y
+        }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" opacity={0.5} />
           <XAxis
-            dataKey="index"
-            tickFormatter={(value) => {
-              const item = chartData[value]
-              return item ? item.data : ''
-            }}
+            dataKey="label"
             tick={{ fontSize: '12px', fill: '#6B7280' }}
+            height={40}
             tickMargin={10}
           />
           <YAxis
             tickFormatter={formatCurrency}
             tick={{ fontSize: '12px', fill: '#6B7280' }}
             tickMargin={10}
+            width={100} // Aumenta a largura do eixo Y
             domain={[minValor * 0.9, maxValor * 1.1]}
           />
           <Tooltip
-            formatter={(value: number | undefined) => {
+            formatter={(value: number | undefined, name?: string) => {
               if (typeof value === 'number') {
-                return formatCurrency(value);
+                return [formatCurrency(value), name];
               }
               return '';
             }}
             labelFormatter={(label) => {
-              const item = chartData[label as number]
-              return item ? item.label : ''
+              return `Dia: ${label}`;
             }}
             contentStyle={{
               backgroundColor: '#FFFFFF',
@@ -137,18 +133,21 @@ export function GraficoVendasLinha({ periodo }: GraficoVendasLinhaProps) {
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
             }}
           />
-          <Area
-            type="monotone"
-            dataKey="valor"
-            stroke="#3B82F6"
-            strokeWidth={2}
-            fill="url(#colorVendas)"
-            dot={{ fill: '#3B82F6', r: 3 }}
-            activeDot={{ r: 5 }}
+          <Legend />
+          <Bar
+            dataKey="valorFinalizadas"
+            name="Finalizadas"
+            fill="#3B82F6"
+            barSize={20} // Largura da barra
           />
-        </AreaChart>
+          <Bar
+            dataKey="valorCanceladas"
+            name="Canceladas"
+            fill="#EF4444"
+            barSize={20} // Largura da barra
+          />
+        </BarChart>
       </ResponsiveContainer>
     </div>
   )
 }
-

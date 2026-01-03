@@ -64,20 +64,18 @@ function getPeriodoDates(periodo: string): PeriodoDates {
 }
 
 export class BuscarEvolucaoVendasUseCase {
-  async execute(periodo: string = 'hoje'): Promise<DashboardEvolucao[]> {
-    const { periodoInicial, periodoFinal } = getPeriodoDates(periodo);
+  private async fetchAllVendas(periodoInicial: string, periodoFinal: string, status: string): Promise<any[]> {
     const baseParams = new URLSearchParams();
-    
     if (periodoInicial && periodoFinal) {
       baseParams.append('periodoInicial', periodoInicial);
       baseParams.append('periodoFinal', periodoFinal);
     }
-    baseParams.append('status', 'FINALIZADA');
+    baseParams.append('status', status);
 
-    const limitPerPage = 100; // Um limite razoável por página, se a API tiver um máximo de 100
+    const limitPerPage = 100; // Um limite razoável por página
     let allVendas: any[] = [];
     let currentPage = 0;
-    let totalPages = 1; // Inicia com 1 para garantir pelo menos uma requisição
+    let totalPages = 1;
 
     while (currentPage < totalPages) {
       const currentParams = new URLSearchParams(baseParams.toString());
@@ -88,32 +86,53 @@ export class BuscarEvolucaoVendasUseCase {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Erro ao buscar evolução de vendas');
+        throw new Error(errorData.error || `Erro ao buscar vendas para status ${status}`);
       }
 
       const data = await response.json();
       allVendas = allVendas.concat(data.items || []);
 
-      // Atualiza totalPages com base na primeira resposta, se disponível
       if (currentPage === 0 && data.totalPages) {
         totalPages = data.totalPages;
-      } else if (currentPage === 0 && data.count && data.limit) { // Fallback se totalPages não for direto
+      } else if (currentPage === 0 && data.count && data.limit) {
         totalPages = Math.ceil(data.count / data.limit);
       }
       currentPage++;
     }
+    return allVendas;
+  }
 
-    // Agrega vendas por dia de todas as vendas coletadas
-    const dailySalesMap = new Map<string, number>();
-    allVendas.forEach((venda: any) => {
+  async execute(periodo: string = 'hoje'): Promise<DashboardEvolucao[]> {
+    const { periodoInicial, periodoFinal } = getPeriodoDates(periodo);
+
+    // Busca vendas finalizadas e canceladas em paralelo
+    const [vendasFinalizadasData, vendasCanceladasData] = await Promise.all([
+      this.fetchAllVendas(periodoInicial, periodoFinal, 'FINALIZADA'),
+      this.fetchAllVendas(periodoInicial, periodoFinal, 'CANCELADA'),
+    ]);
+
+    // Agrega vendas finalizadas por dia
+    const finalizadasDailyMap = new Map<string, number>();
+    vendasFinalizadasData.forEach((venda: any) => {
       const saleDate = new Date(venda.dataCriacao);
-      // Gerar dayKey com base na data local da venda
       const year = saleDate.getFullYear();
-      const month = (saleDate.getMonth() + 1).toString().padStart(2, '0'); // Mês é 0-indexado
+      const month = (saleDate.getMonth() + 1).toString().padStart(2, '0');
       const day = saleDate.getDate().toString().padStart(2, '0');
       const dayKey = `${year}-${month}-${day}`;
       const valor = venda.valorFinal || 0;
-      dailySalesMap.set(dayKey, (dailySalesMap.get(dayKey) || 0) + valor);
+      finalizadasDailyMap.set(dayKey, (finalizadasDailyMap.get(dayKey) || 0) + valor);
+    });
+
+    // Agrega vendas canceladas por dia
+    const canceladasDailyMap = new Map<string, number>();
+    vendasCanceladasData.forEach((venda: any) => {
+      const saleDate = new Date(venda.dataCriacao);
+      const year = saleDate.getFullYear();
+      const month = (saleDate.getMonth() + 1).toString().padStart(2, '0');
+      const day = saleDate.getDate().toString().padStart(2, '0');
+      const dayKey = `${year}-${month}-${day}`;
+      const valor = venda.valorFinal || 0; // Valor de venda cancelada
+      canceladasDailyMap.set(dayKey, (canceladasDailyMap.get(dayKey) || 0) + valor);
     });
 
     // Gera dados para todos os dias do período, preenchendo dias ausentes com 0
@@ -121,18 +140,18 @@ export class BuscarEvolucaoVendasUseCase {
     
     const startDate = new Date(periodoInicial);
     const endDate = new Date(periodoFinal);
-    endDate.setHours(23, 59, 59, 999); // Garante que o último dia seja incluído
+    endDate.setHours(23, 59, 59, 999);
 
     let currentDay = new Date(startDate);
     while (currentDay <= endDate) {
       const dayKey = currentDay.toISOString().split('T')[0];
-      const valor = dailySalesMap.get(dayKey) || 0;
       const label = currentDay.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
       
       evolucaoDiaria.push(DashboardEvolucao.create({
         data: dayKey,
-        valor: valor,
         label: label,
+        valorFinalizadas: finalizadasDailyMap.get(dayKey) || 0,
+        valorCanceladas: canceladasDailyMap.get(dayKey) || 0,
       }));
       currentDay.setDate(currentDay.getDate() + 1);
     }
