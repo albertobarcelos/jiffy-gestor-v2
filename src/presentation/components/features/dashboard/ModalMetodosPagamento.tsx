@@ -102,7 +102,7 @@ export function ModalMetodosPagamento({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Vendas por Método de Pagamento</DialogTitle>
           <DialogDescription>Detalhamento completo das vendas</DialogDescription>
@@ -123,8 +123,8 @@ export function ModalMetodosPagamento({
           ) : (
             <>
               {/* Gráfico de pizza */}
-              <div className="w-full min-w-0" style={{ height: '256px' }}>
-                <ResponsiveContainer width="100%" height={256}>
+              <div className="w-full min-w-0" style={{ height: '300px' }}>
+                <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
                       data={data.map((item, index) => ({
@@ -137,7 +137,7 @@ export function ModalMetodosPagamento({
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={(props: any) => `${props.percent?.toFixed(1) || 0}%`}
+                      label={({ percent }) => (percent ? `${((percent) * 100).toFixed(1)}%` : '')}
                       outerRadius={100}
                       fill="#8884d8"
                       dataKey="value"
@@ -159,7 +159,7 @@ export function ModalMetodosPagamento({
                         borderRadius: '8px',
                       }}
                     />
-                    <Legend />
+                    <Legend wrapperStyle={{ fontSize: '12px' }} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
