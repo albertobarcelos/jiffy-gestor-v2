@@ -17,6 +17,8 @@ interface UserPdvApiResponse {
   // Adicione outras propriedades relevantes se necessário
 }
 
+const LAST_SALES_DISPLAY_LIMIT = 10; // Definir o limite de últimas vendas a serem exibidas
+
 /**
  * Componente de Últimas Vendas
  * Design clean inspirado no exemplo
@@ -84,7 +86,7 @@ export function UltimasVendas() {
           status: 'FINALIZADA',
           periodoInicial,
           periodoFinal,
-          limit: '10',
+          limit: '100', // Aumentado para buscar mais vendas no período
           offset: '0',
         })
 
@@ -138,10 +140,15 @@ export function UltimasVendas() {
           )
         })
 
-        setVendas(vendasMapeadas)
+        // Ordenar as vendas pela data mais recente e limitar ao número desejado
+        const ultimasVendas = vendasMapeadas
+          .sort((a, b) => b.getData().getTime() - a.getData().getTime())
+          .slice(0, LAST_SALES_DISPLAY_LIMIT);
+
+        setVendas(ultimasVendas)
 
         // Coletar IDs de usuários únicos
-        const uniqueUserIds = [...new Set(vendasMapeadas.map(v => v.getUserId()).filter(id => id !== ''))]
+        const uniqueUserIds = [...new Set(ultimasVendas.map(v => v.getUserId()).filter(id => id !== ''))]
 
         // Buscar nomes dos usuários PDV
         if (uniqueUserIds.length > 0) {

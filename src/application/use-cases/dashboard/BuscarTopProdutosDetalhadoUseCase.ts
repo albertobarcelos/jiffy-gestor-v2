@@ -107,6 +107,7 @@ export class BuscarTopProdutosDetalhadoUseCase {
       params.append('periodoFinal', periodoFinal);
     }
     params.append('status', 'FINALIZADA'); // Apenas vendas finalizadas
+    params.append('limit', '100'); // Adicionado para buscar todos os itens (ou um número grande o suficiente)
 
     // Passo 1: Buscar IDs das Vendas
     const vendasResponse = await fetch(`${baseUrl}/api/v1/operacao-pdv/vendas?${params.toString()}`, { headers });
@@ -179,7 +180,7 @@ export class BuscarTopProdutosDetalhadoUseCase {
 
     // Passo 4: Retornar no Formato DashboardTopProduto[]
     const topProdutos: DashboardTopProduto[] = Array.from(productAggregation.values())
-      .sort((a, b) => b.valorTotal - a.valorTotal) // Ordena pelo valor total vendido
+      .sort((b, a) => a.quantidade - b.quantidade) // Ordena pela quantidade em ordem crescente
       .slice(0, limit) // Limita a quantidade de top produtos
       .map((item, index) => DashboardTopProduto.create({
         rank: index + 1,

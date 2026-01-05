@@ -113,6 +113,7 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
       params.append('periodoFinal', periodoFinal);
     }
     params.append('status', 'FINALIZADA'); // Apenas vendas finalizadas
+    params.append('limit', '100'); // Adicionado para buscar todos os itens (ou um número grande o suficiente)
 
     const vendasUrl = `${baseUrl}/api/v1/operacao-pdv/vendas?${params.toString()}`;
     console.log('URL da requisição de vendas:', vendasUrl);
