@@ -66,6 +66,14 @@ const GraficoTopProdutos = dynamic(
   }
 )
 
+const GraficoTopProdutosValor = dynamic(
+  () => import('@/src/presentation/components/features/dashboard/GraficoTopProdutosValor').then((mod) => ({ default: mod.GraficoTopProdutosValor })),
+  {
+    ssr: false,
+    loading: () => <Skeleton variant="rectangular" height={400} className="rounded-xl" />,
+  }
+)
+
 const UltimasVendas = dynamic(
   () => import('@/src/presentation/components/features/dashboard/UltimasVendas').then((mod) => ({ default: mod.UltimasVendas })),
   {
@@ -134,6 +142,7 @@ export default function DashboardPage() {
         <MetricCards periodo={periodo} />
       </Suspense>
 
+      {/* Grid principal */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Coluna esquerda - 2 colunas */}
         <div className="lg:col-span-2 space-y-6">
@@ -193,27 +202,38 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Top Produtos - Grid para Tabela e Gráfico, ocupando a largura total */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 space-y-6">
+      {/* Top Produtos - Container com rolagem horizontal */}
+      <div className="flex space-x-2 overflow-x-auto px-4 bg-transparent">
             {/* Tabela de top produtos */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="mb-4">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 px-6 py-2 min-w-[600px]">
+              <div className="mb-2">
                 <h3 className="text-lg font-semibold text-gray-900">Top Produtos</h3>
-                <p className="text-sm text-gray-500">Mais vendidos</p>
+                <p className="text-sm text-gray-500">Os 10 mais vendidos</p>
               </div>
               <Suspense fallback={<Skeleton variant="rectangular" height={400} />}>
                 <TabelaTopProdutos periodo={periodo} onDataLoad={setTopProdutosData} />
               </Suspense>
             </div>
 
-            {/* Gráfico de top produtos */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            {/* Gráfico de top produtos (por quantidade) */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 min-w-[600px]">
               <div className="mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">Quantidade de Produtos Vendidos</h3>
                 <p className="text-sm text-gray-500">Distribuição dos Top Produtos</p>
               </div>
               <Suspense fallback={<Skeleton variant="rectangular" height={400} />}>
                 <GraficoTopProdutos data={topProdutosData} />
+              </Suspense>
+            </div>
+
+            {/* Novo Gráfico de top produtos (por valor total) */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 min-w-[600px]">
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Valor Total dos Produtos Vendidos</h3>
+                <p className="text-sm text-gray-500">Distribuição por Valor</p>
+              </div>
+              <Suspense fallback={<Skeleton variant="rectangular" height={400} />}>
+                <GraficoTopProdutosValor data={topProdutosData} />
               </Suspense>
             </div>
           </div>

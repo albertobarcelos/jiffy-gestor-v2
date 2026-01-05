@@ -16,22 +16,30 @@ export interface TabsProps extends Omit<MuiTabsProps, 'onChange'> {
 }
 
 export const Tabs = React.forwardRef<HTMLDivElement, TabsProps>(
-  ({ defaultValue, value, onValueChange, children, ...props }, ref) => {
-    const [internalValue, setInternalValue] = React.useState(defaultValue || value || '0')
+  ({ defaultValue, value: controlledValue, onValueChange, children, ...props }, ref) => {
+    const [internalValue, setInternalValue] = React.useState(defaultValue || controlledValue || '0')
 
     const handleChange = (_event: React.SyntheticEvent, newValue: string) => {
       setInternalValue(newValue)
       onValueChange?.(newValue)
     }
 
+    const activeValue = controlledValue || internalValue; // Determina o valor ativo
+
     return (
       <MuiTabs
         ref={ref}
-        value={value || internalValue}
+        value={activeValue}
         onChange={handleChange}
         {...props}
       >
-        {children}
+        {React.Children.map(children, child => {
+          // Injeta activeTabValue em TabsContent
+          if (React.isValidElement(child) && (child.type as any).displayName === 'TabsContent') {
+            return React.cloneElement(child as React.ReactElement<TabsContentProps>, { activeTabValue: activeValue });
+          }
+          return child;
+        })}
       </MuiTabs>
     )
   }
@@ -51,24 +59,27 @@ export const TabsList = React.forwardRef<HTMLDivElement, TabsListProps>(({ child
 
 TabsList.displayName = 'TabsList'
 
-export interface TabsTriggerProps extends TabProps {
+export interface TabsTriggerProps extends Omit<TabProps, 'fullWidth' | 'indicator' | 'selectionFollowsFocus' | 'textColor'> {
   value: string
+  label?: React.ReactNode // Adicionar prop label
 }
 
-export const TabsTrigger = React.forwardRef<HTMLDivElement, TabsTriggerProps>((props, ref) => {
-  return <Tab ref={ref as any} {...props} />
+export const TabsTrigger = React.forwardRef<HTMLDivElement, TabsTriggerProps>(({ label, value, disabled, icon, iconPosition, wrapped, sx, ...props }, ref) => {
+  return <Tab ref={ref as any} label={label} value={value} disabled={disabled} icon={icon} iconPosition={iconPosition} wrapped={wrapped} sx={sx} {...props} />
 })
 
 TabsTrigger.displayName = 'TabsTrigger'
 
 export interface TabsContentProps extends React.HTMLAttributes<HTMLDivElement> {
   value: string
+  activeTabValue?: string; // Adicionar prop para o valor da aba ativa
 }
 
 export const TabsContent = React.forwardRef<HTMLDivElement, TabsContentProps>(
-  ({ value, children, ...props }, ref) => {
+  ({ value, activeTabValue, children, ...props }, ref) => {
+    const isHidden = value !== activeTabValue;
     return (
-      <Box ref={ref} role="tabpanel" hidden={false} {...props}>
+      <Box ref={ref} role="tabpanel" hidden={isHidden} {...props}>
         {children}
       </Box>
     )
