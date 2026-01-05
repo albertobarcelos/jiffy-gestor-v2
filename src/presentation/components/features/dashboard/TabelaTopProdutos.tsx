@@ -10,7 +10,7 @@ import {
   TableRow,
 } from '@/src/presentation/components/ui/table'
 import { Button } from '@/src/presentation/components/ui/button'
-import { BuscarTopProdutosUseCase } from '@/src/application/use-cases/dashboard/BuscarTopProdutosUseCase'
+import { BuscarTopProdutosDetalhadoUseCase } from '@/src/application/use-cases/dashboard/BuscarTopProdutosDetalhadoUseCase'
 import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto'
 
 interface TabelaTopProdutosProps {
@@ -31,7 +31,7 @@ export function TabelaTopProdutos({ periodo }: TabelaTopProdutosProps) {
       setIsLoading(true)
       setError(null)
       try {
-        const useCase = new BuscarTopProdutosUseCase()
+        const useCase = new BuscarTopProdutosDetalhadoUseCase()
         const produtos = await useCase.execute(periodo, 10)
         setData(produtos)
       } catch (err) {
