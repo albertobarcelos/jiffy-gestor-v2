@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic'
 import { Suspense, useState } from 'react'
 import { Skeleton, FormControl, Select, MenuItem, FormGroup, FormControlLabel, Checkbox } from '@mui/material'
+import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto' // Importar a entidade
 
 // Função para obter o label do período
 const getPeriodoLabel = (periodo: string): string => {
@@ -57,6 +58,14 @@ const TabelaTopProdutos = dynamic(
   }
 )
 
+const GraficoTopProdutos = dynamic(
+  () => import('@/src/presentation/components/features/dashboard/GraficoTopProdutos').then((mod) => ({ default: mod.GraficoTopProdutos })),
+  {
+    ssr: false,
+    loading: () => <Skeleton variant="rectangular" height={400} className="rounded-xl" />,
+  }
+)
+
 const UltimasVendas = dynamic(
   () => import('@/src/presentation/components/features/dashboard/UltimasVendas').then((mod) => ({ default: mod.UltimasVendas })),
   {
@@ -72,6 +81,7 @@ const UltimasVendas = dynamic(
 export default function DashboardPage() {
   const [periodo, setPeriodo] = useState('hoje'); // Estado para o período
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['FINALIZADA']); // Estado para os status selecionados
+  const [topProdutosData, setTopProdutosData] = useState<DashboardTopProduto[]>([]); // Novo estado para os top produtos
 
   const handleStatusChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { value, checked } = event.target;
@@ -124,7 +134,6 @@ export default function DashboardPage() {
         <MetricCards periodo={periodo} />
       </Suspense>
 
-      {/* Grid principal */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Coluna esquerda - 2 colunas */}
         <div className="lg:col-span-2 space-y-6">
@@ -174,17 +183,6 @@ export default function DashboardPage() {
               <GraficoVendasLinha periodo={periodo} selectedStatuses={selectedStatuses} />
             </Suspense>
           </div>
-
-          {/* Tabela de top produtos */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Top Produtos</h3>
-              <p className="text-sm text-gray-500">Mais vendidos</p>
-            </div>
-            <Suspense fallback={<Skeleton variant="rectangular" height={400} />}>
-              <TabelaTopProdutos periodo={periodo} />
-            </Suspense>
-          </div>
         </div>
 
         {/* Coluna direita - Últimas Vendas */}
@@ -194,6 +192,31 @@ export default function DashboardPage() {
           </Suspense>
         </div>
       </div>
+
+      {/* Top Produtos - Grid para Tabela e Gráfico, ocupando a largura total */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 space-y-6">
+            {/* Tabela de top produtos */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Top Produtos</h3>
+                <p className="text-sm text-gray-500">Mais vendidos</p>
+              </div>
+              <Suspense fallback={<Skeleton variant="rectangular" height={400} />}>
+                <TabelaTopProdutos periodo={periodo} onDataLoad={setTopProdutosData} />
+              </Suspense>
+            </div>
+
+            {/* Gráfico de top produtos */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Quantidade de Produtos Vendidos</h3>
+                <p className="text-sm text-gray-500">Distribuição dos Top Produtos</p>
+              </div>
+              <Suspense fallback={<Skeleton variant="rectangular" height={400} />}>
+                <GraficoTopProdutos data={topProdutosData} />
+              </Suspense>
+            </div>
+          </div>
     </div>
   )
 }

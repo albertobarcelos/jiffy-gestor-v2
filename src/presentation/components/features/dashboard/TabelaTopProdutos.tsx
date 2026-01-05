@@ -14,14 +14,15 @@ import { BuscarTopProdutosDetalhadoUseCase } from '@/src/application/use-cases/d
 import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto'
 
 interface TabelaTopProdutosProps {
-  periodo: string
+  periodo: string;
+  onDataLoad: (data: DashboardTopProduto[]) => void; // Nova prop
 }
 
 /**
  * Tabela de top produtos vendidos
  * Design clean e minimalista
  */
-export function TabelaTopProdutos({ periodo }: TabelaTopProdutosProps) {
+export function TabelaTopProdutos({ periodo, onDataLoad }: TabelaTopProdutosProps) {
   const [data, setData] = useState<DashboardTopProduto[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -34,6 +35,7 @@ export function TabelaTopProdutos({ periodo }: TabelaTopProdutosProps) {
         const useCase = new BuscarTopProdutosDetalhadoUseCase()
         const produtos = await useCase.execute(periodo, 10)
         setData(produtos)
+        onDataLoad(produtos); // Chamar onDataLoad aqui
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erro ao carregar dados')
       } finally {
