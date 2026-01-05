@@ -17,7 +17,7 @@ import {
   Tooltip,
   Legend,
 } from 'recharts'
-import { BuscarMetodosPagamentoUseCase } from '@/src/application/use-cases/dashboard/BuscarMetodosPagamentoUseCase'
+import { BuscarMetodosPagamentoDetalhadoUseCase } from '@/src/application/use-cases/dashboard/BuscarMetodosPagamentoDetalhadoUseCase'
 import { DashboardMetodoPagamento } from '@/src/domain/entities/DashboardMetodoPagamento'
 
 interface ModalMetodosPagamentoProps {
@@ -46,18 +46,21 @@ export function ModalMetodosPagamento({
 }: ModalMetodosPagamentoProps) {
   const [data, setData] = useState<DashboardMetodoPagamento[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null); // Adicionei estado de erro
 
   useEffect(() => {
     if (!isOpen) return
 
     const loadData = async () => {
       setIsLoading(true)
+      setError(null);
       try {
-        const useCase = new BuscarMetodosPagamentoUseCase()
+        const useCase = new BuscarMetodosPagamentoDetalhadoUseCase() // Usar o novo caso de uso
         const metodos = await useCase.execute(periodo)
         setData(metodos)
       } catch (err) {
         console.error('Erro ao carregar métodos de pagamento:', err)
+        setError(err instanceof Error ? err.message : 'Erro ao carregar dados de pagamento.'); // Capturar e setar erro
       } finally {
         setIsLoading(false)
       }
@@ -74,6 +77,28 @@ export function ModalMetodosPagamento({
   }
 
   const total = data.reduce((sum, item) => sum + item.getValor(), 0)
+
+  if (error) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Erro</DialogTitle>
+            <DialogDescription>Ocorreu um erro ao carregar os dados.</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center justify-center h-64 text-red-600">
+            <p>{error}</p>
+            <button
+              onClick={onClose}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md"
+            >
+              Fechar
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
