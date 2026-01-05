@@ -1,14 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/src/presentation/components/ui/table'
 import { Button } from '@/src/presentation/components/ui/button'
 import { BuscarTopProdutosDetalhadoUseCase } from '@/src/application/use-cases/dashboard/BuscarTopProdutosDetalhadoUseCase'
 import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto'
@@ -20,7 +12,7 @@ interface TabelaTopProdutosProps {
 
 /**
  * Tabela de top produtos vendidos
- * Design clean e minimalista
+ * Design clean e minimalista usando divs e flexbox
  */
 export function TabelaTopProdutos({ periodo, onDataLoad }: TabelaTopProdutosProps) {
   const [data, setData] = useState<DashboardTopProduto[]>([])
@@ -33,7 +25,7 @@ export function TabelaTopProdutos({ periodo, onDataLoad }: TabelaTopProdutosProp
       setError(null)
       try {
         const useCase = new BuscarTopProdutosDetalhadoUseCase()
-        const produtos = await useCase.execute(periodo, 10)
+        const produtos = await useCase.execute(periodo, 10) // Ajustado para 1000 no outro use case, mas aqui é para exibir 10
         setData(produtos)
         onDataLoad(produtos); // Chamar onDataLoad aqui
       } catch (err) {
@@ -83,29 +75,28 @@ export function TabelaTopProdutos({ periodo, onDataLoad }: TabelaTopProdutosProp
   }
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>#</TableHead>
-            <TableHead>Produto</TableHead>
-            <TableHead className="text-right">Quantidade</TableHead>
-            <TableHead className="text-right">Valor Total</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.map((produto) => (
-            <TableRow key={produto.getRank()}>
-              <TableCell className="font-semibold">{produto.getRank()}</TableCell>
-              <TableCell>{produto.getProduto()}</TableCell>
-              <TableCell className="text-right">{produto.getQuantidade()}</TableCell>
-              <TableCell className="text-right font-semibold text-gray-900">
-                {formatCurrency(produto.getValorTotal())}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div className="flex flex-col w-full text-sm">
+      {/* Cabeçalho da "tabela" */}
+      <div className="flex font-bold text-gray-700 border-b border-gray-200 py-2">
+        <div className="w-1/12">#</div>
+        <div className="w-5/12">Produto</div>
+        <div className="w-3/12 text-right">Quantidade</div>
+        <div className="w-3/12 text-right">Valor Total</div>
+      </div>
+
+      {/* Linhas da "tabela" */}
+      <div className="divide-y divide-gray-100">
+        {data.map((produto) => (
+          <div key={produto.getRank()} className="flex py-2 hover:bg-gray-50">
+            <div className="w-1/12 font-semibold text-gray-800">{produto.getRank()}</div>
+            <div className="w-5/12 text-gray-700">{produto.getProduto()}</div>
+            <div className="w-3/12 text-right text-gray-700">{produto.getQuantidade()}</div>
+            <div className="w-3/12 text-right font-semibold text-gray-900">
+              {formatCurrency(produto.getValorTotal())}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

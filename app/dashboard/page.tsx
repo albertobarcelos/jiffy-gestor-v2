@@ -205,7 +205,7 @@ export default function DashboardPage() {
       {/* Top Produtos - Container com rolagem horizontal */}
       <div className="flex space-x-2 overflow-x-auto px-4 bg-transparent">
             {/* Tabela de top produtos */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 px-6 py-2 min-w-[600px]">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 px-6 py-2 min-w-[500px]">
               <div className="mb-2">
                 <h3 className="text-lg font-semibold text-gray-900">Top Produtos</h3>
                 <p className="text-sm text-gray-500">Os 10 mais vendidos</p>
