@@ -8,6 +8,7 @@ import { GraficoVendasLinha } from './GraficoVendasLinha'
 import { GraficoVendasTerminal } from './GraficoVendasTerminal'
 import { TabelaTopProdutos } from './TabelaTopProdutos'
 import { PeriodoFilter, PeriodoType } from './PeriodoFilter'
+import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto'; // Importar DashboardTopProduto
 
 /**
  * Tabs do dashboard
@@ -67,6 +68,16 @@ function VendasPdvTab({
   periodo: PeriodoType
   onPeriodoChanged: (periodo: PeriodoType) => void
 }) {
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['FINALIZADA']); // Adicionado estado para status selecionados
+  const [topProdutosData, setTopProdutosData] = useState<DashboardTopProduto[]>([]); // Adicionado estado para top produtos
+
+  const handleStatusChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { value, checked } = event.target;
+    setSelectedStatuses((prev) =>
+      checked ? [...prev, value] : prev.filter((status) => status !== value)
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Filtro de período */}
@@ -76,13 +87,13 @@ function VendasPdvTab({
 
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <GraficoVendasLinha periodo={periodo} />
+        <GraficoVendasLinha periodo={periodo} selectedStatuses={selectedStatuses} />
         <GraficoVendasTerminal periodo={periodo} />
         
       </div>
 
       {/* Tabela de top produtos */}
-      <TabelaTopProdutos periodo={periodo} />
+      <TabelaTopProdutos periodo={periodo} onDataLoad={setTopProdutosData} />
     </div>
   )
 }

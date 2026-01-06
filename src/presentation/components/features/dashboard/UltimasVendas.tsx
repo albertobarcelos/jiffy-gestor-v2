@@ -243,7 +243,7 @@ export function UltimasVendas() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 ">
                     <div className="text-right">
                       <p className="font-semibold text-green-600">
                         +{formatCurrency(venda.getValorFaturado())}
@@ -254,7 +254,7 @@ export function UltimasVendas() {
                     {/* Ícone de olho para ver detalhes */}
                     <button
                       onClick={() => handleOpenModal(venda.getId())}
-                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex-shrink-0"
+                      className="p-2 text-primary/70 hover:text-primary rounded-lg transition-colors flex-shrink-0"
                       title="Ver detalhes da venda"
                     >
                       <MdVisibility className="w-5 h-5" />

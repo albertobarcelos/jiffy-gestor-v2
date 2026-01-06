@@ -147,7 +147,7 @@ export function ModalMetodosPagamento({
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(value: number | undefined) => {
+                      formatter={(value: any) => {
                         if (typeof value === 'number') {
                           return formatCurrency(value);
                         }

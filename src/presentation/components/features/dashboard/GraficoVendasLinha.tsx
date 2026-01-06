@@ -128,7 +128,7 @@ export function GraficoVendasLinha({ periodo, selectedStatuses }: GraficoVendasL
           />
           <Tooltip
             cursor={false} // Remove o background cinza do hover
-            formatter={(value: number | undefined, name?: string) => {
+            formatter={(value: any, name?: any) => {
               if (typeof value === 'number') {
                 return [formatCurrency(value), name];
               }

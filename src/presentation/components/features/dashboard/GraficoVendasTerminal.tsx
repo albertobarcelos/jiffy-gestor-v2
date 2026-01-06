@@ -114,7 +114,7 @@ export function GraficoVendasTerminal({ periodo = 'mes' }: GraficoVendasTerminal
               domain={[0, maxValor * 1.2]}
             />
             <Tooltip
-              formatter={(value: number | undefined) => {
+              formatter={(value: any) => {
                 if (typeof value === 'number') {
                   return formatCurrency(value);
                 }
