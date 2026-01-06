@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic'
 import { Suspense, useState } from 'react'
 import { Skeleton, FormControl, Select, MenuItem, FormGroup, FormControlLabel, Checkbox } from '@mui/material'
+import { motion } from 'framer-motion'; // Importar motion do Framer Motion
 import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto' // Importar a entidade
 
 // Função para obter o label do período
@@ -27,6 +28,32 @@ const getPeriodoLabel = (periodo: string): string => {
   }
 };
 
+// Variantes para animação de fade-in e slide-up
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1, // Atraso entre os itens filhos
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: { y: 0, opacity: 1, transition: { duration: 0.5 } },
+};
+
+const slideFromLeftVariants = {
+  hidden: { x: -100, opacity: 0 },
+  visible: { x: 0, opacity: 1, transition: { duration: 0.7 } }, // Removido 'ease' para compatibilidade de tipo
+};
+
+const slideFromRightVariants = {
+  hidden: { x: 100, opacity: 0 },
+  visible: { x: 0, opacity: 1, transition: { duration: 0.7 } }, // Removido 'ease' para compatibilidade de tipo
+};
+
 // Dynamic imports para code-splitting
 const MetricCards = dynamic(
   () => import('@/src/presentation/components/features/dashboard/MetricCards').then((mod) => ({ default: mod.MetricCards })),
@@ -40,7 +67,7 @@ const MetricCards = dynamic(
       </div>
     ),
   }
-)
+);
 
 const GraficoVendasLinha = dynamic(
   () => import('@/src/presentation/components/features/dashboard/GraficoVendasLinha').then((mod) => ({ default: mod.GraficoVendasLinha })),
@@ -48,7 +75,7 @@ const GraficoVendasLinha = dynamic(
     ssr: false,
     loading: () => <Skeleton variant="rectangular" height={300} />,
   }
-)
+);
 
 const TabelaTopProdutos = dynamic(
   () => import('@/src/presentation/components/features/dashboard/TabelaTopProdutos').then((mod) => ({ default: mod.TabelaTopProdutos })),
@@ -56,7 +83,7 @@ const TabelaTopProdutos = dynamic(
     ssr: false,
     loading: () => <Skeleton variant="rectangular" height={400} />,
   }
-)
+);
 
 const GraficoTopProdutos = dynamic(
   () => import('@/src/presentation/components/features/dashboard/GraficoTopProdutos').then((mod) => ({ default: mod.GraficoTopProdutos })),
@@ -64,7 +91,7 @@ const GraficoTopProdutos = dynamic(
     ssr: false,
     loading: () => <Skeleton variant="rectangular" height={400} className="rounded-xl" />,
   }
-)
+);
 
 const GraficoTopProdutosValor = dynamic(
   () => import('@/src/presentation/components/features/dashboard/GraficoTopProdutosValor').then((mod) => ({ default: mod.GraficoTopProdutosValor })),
@@ -72,7 +99,7 @@ const GraficoTopProdutosValor = dynamic(
     ssr: false,
     loading: () => <Skeleton variant="rectangular" height={400} className="rounded-xl" />,
   }
-)
+);
 
 const UltimasVendas = dynamic(
   () => import('@/src/presentation/components/features/dashboard/UltimasVendas').then((mod) => ({ default: mod.UltimasVendas })),
@@ -80,7 +107,7 @@ const UltimasVendas = dynamic(
     ssr: false,
     loading: () => <Skeleton variant="rectangular" height={600} className="rounded-xl" />,
   }
-)
+);
 
 /**
  * Página do dashboard
@@ -99,9 +126,14 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-2">
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="space-y-2"
+    >
       {/* Barra de seleção de período */}
-      <div className="flex items-center justify-start gap-2 mt-2">
+      <motion.div variants={itemVariants} className="flex items-center justify-start gap-2 mt-2">
         <span className="text-primary text-sm font-exo">Período:</span>
         <FormControl size="small" sx={{ minWidth: 120 }}>
           <Select
@@ -129,23 +161,25 @@ export default function DashboardPage() {
             <MenuItem value="90dias">Últimos 90 Dias</MenuItem>
           </Select>
         </FormControl>
-      </div>
+      </motion.div>
 
       {/* Cards de métricas */}
-      <Suspense fallback={
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} variant="rectangular" height={120} className="rounded-xl" />
-          ))}
-        </div>
-      }>
-        <MetricCards periodo={periodo} />
-      </Suspense>
+      <motion.div variants={itemVariants}>
+        <Suspense fallback={
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} variant="rectangular" height={120} className="rounded-xl" />
+            ))}
+          </div>
+        }>
+          <MetricCards periodo={periodo} />
+        </Suspense>
+      </motion.div>
 
       {/* Grid principal */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Coluna esquerda - 2 colunas */}
-        <div className="lg:col-span-2 space-y-6">
+        <motion.div variants={slideFromLeftVariants} initial="hidden" animate="visible" className="lg:col-span-2 space-y-6">
           {/* Gráfico de evolução */}
           <div className="bg-custom-2 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 px-6 py-2">
                    <div className="mb-6 flex items-start gap-12">
@@ -192,18 +226,18 @@ export default function DashboardPage() {
               <GraficoVendasLinha periodo={periodo} selectedStatuses={selectedStatuses} />
             </Suspense>
           </div>
-        </div>
+        </motion.div>
 
         {/* Coluna direita - Últimas Vendas */}
-        <div className="lg:col-span-1">
+        <motion.div variants={slideFromRightVariants} initial="hidden" animate="visible" className="lg:col-span-1">
           <Suspense fallback={<Skeleton variant="rectangular" height={600} className="rounded-lg" />}>
             <UltimasVendas />
           </Suspense>
-        </div>
+        </motion.div>
       </div>
 
       {/* Top Produtos - Container com rolagem horizontal */}
-      <div className="flex space-x-2 overflow-x-auto px-4 bg-transparent">
+      <motion.div variants={slideFromLeftVariants} initial="hidden" animate="visible" className="flex space-x-2 overflow-x-auto px-4 bg-transparent">
             {/* Tabela de top produtos */}
             <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 hover:bg-custom-2/40 border border-gray-200 px-6 py-2 min-w-[500px]">
               <div className="mb-2">
@@ -236,7 +270,7 @@ export default function DashboardPage() {
                 <GraficoTopProdutosValor data={topProdutosData} />
               </Suspense>
             </div>
-          </div>
-    </div>
+          </motion.div>
+    </motion.div>
   )
 }
