@@ -165,11 +165,11 @@ export function ModalMetodosPagamento({
               </div>
 
               {/* Lista de métodos */}
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {data.map((item, index) => (
                   <Card key={item.getMetodo()}>
-                    <CardContent className="flex items-center justify-between p-4">
-                      <div className="flex items-center gap-4">
+                    <CardContent className="flex items-center justify-between px-4">
+                      <div className="flex items-center gap-2">
                         <div
                           className="w-4 h-4 rounded-full"
                           style={{ backgroundColor: cores[index % cores.length] }}
@@ -197,7 +197,7 @@ export function ModalMetodosPagamento({
               </div>
 
               {/* Total */}
-              <div className="pt-4 border-t">
+              <div className="pt-2 border-t">
                 <div className="flex items-center justify-between">
                   <p className="text-lg font-exo font-semibold text-primary-text">Total</p>
                   <p className="text-lg font-exo font-bold text-primary">

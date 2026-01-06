@@ -77,23 +77,23 @@ export function TabelaTopProdutos({ periodo, onDataLoad }: TabelaTopProdutosProp
   return (
     <div className="flex flex-col w-full text-sm">
       {/* Cabeçalho da "tabela" */}
-      <div className="flex font-bold text-gray-700 border-b border-gray-200 py-2">
+      <div className="flex bg-custom-2 rounded-lg px-2 border border-primary font-bold text-primary py-2">
         <div className="w-1/12">#</div>
-        <div className="w-5/12">Produto</div>
-        <div className="w-3/12 text-right">Quantidade</div>
+        <div className="w-6/12">Produto</div>
+        <div className="w-3/12 text-center">Quant.</div>
         <div className="w-3/12 text-right">Valor Total</div>
       </div>
 
       {/* Linhas da "tabela" */}
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-gray-100 mt-2">
         {data.map((produto) => (
-          <div key={produto.getRank()} className="flex py-2 hover:bg-gray-50">
-            <div className="w-1/12 font-semibold text-gray-800">{produto.getRank()}</div>
-            <div className="w-5/12 text-gray-700">{produto.getProduto()}</div>
-            <div className="w-3/12 text-right text-gray-700">{produto.getQuantidade()}</div>
-            <div className="w-3/12 text-right font-semibold text-gray-900">
+          <div key={produto.getRank()} className="flex mb-2 shadow-sm shadow-primary-text/50 border border-gray-200 bg-info rounded-lg p-2 hover:bg-custom-2/50">
+            <span className="w-1/12 font-semibold text-primary">{produto.getRank()}</span>
+            <span className="w-6/12 text-primary">{produto.getProduto()}</span>
+            <span className="w-3/12 text-center text-primary">{produto.getQuantidade()}</span>
+            <span className="w-3/12 text-right font-semibold text-primary">
               {formatCurrency(produto.getValorTotal())}
-            </div>
+            </span>
           </div>
         ))}
       </div>

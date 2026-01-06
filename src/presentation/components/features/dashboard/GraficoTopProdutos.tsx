@@ -64,8 +64,8 @@ export function GraficoTopProdutos({ data }: GraficoTopProdutosProps) {
           interval={0}
           tick={CustomizedYAxisTick} // Usar o componente de tick personalizado
         /> {/* Eixo Y agora para categorias (nomes dos produtos) */}
-        <Tooltip />
-        <Bar dataKey="quantidade" fill="#3B82F6" />
+        <Tooltip cursor={false} />
+        <Bar dataKey="quantidade" fill="var(--color-alternate)" activeBar={{ fill: '#a168f2' }} />
       </BarChart>
     </ResponsiveContainer>
   );

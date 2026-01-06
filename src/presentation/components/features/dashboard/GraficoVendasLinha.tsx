@@ -127,6 +127,7 @@ export function GraficoVendasLinha({ periodo, selectedStatuses }: GraficoVendasL
             domain={[finalMinDomain, finalMaxDomain]}
           />
           <Tooltip
+            cursor={false} // Remove o background cinza do hover
             formatter={(value: number | undefined, name?: string) => {
               if (typeof value === 'number') {
                 return [formatCurrency(value), name];
@@ -138,7 +139,7 @@ export function GraficoVendasLinha({ periodo, selectedStatuses }: GraficoVendasL
             }}
             contentStyle={{
               backgroundColor: '#FFFFFF',
-              border: '1px solid #E5E7EB',
+              border: '1px solid #3B82F6',
               borderRadius: '8px',
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
             }}
@@ -148,8 +149,9 @@ export function GraficoVendasLinha({ periodo, selectedStatuses }: GraficoVendasL
             <Bar
               dataKey="valorFinalizadas"
               name="Finalizadas"
-              fill="#3B82F6"
+              fill="#4082b4"
               barSize={20} // Largura da barra
+              activeBar={{ fill: '#64B5F6' }} // Cor do hover
             />
           )}
           {selectedStatuses.includes('CANCELADA') && (
@@ -158,6 +160,7 @@ export function GraficoVendasLinha({ periodo, selectedStatuses }: GraficoVendasL
               name="Canceladas"
               fill="#EF4444"
               barSize={20} // Largura da barra
+              activeBar={{ fill: '#FF5252' }} // Cor do hover
             />
           )}
         </BarChart>

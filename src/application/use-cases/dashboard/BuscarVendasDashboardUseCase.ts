@@ -73,6 +73,7 @@ export class BuscarVendasDashboardUseCase {
       params.append('periodoFinal', periodoFinal);
     }
 
+    params.append('status', 'FINALIZADA');
     const response = await fetch(`/api/vendas?${params.toString()}`);
     
     if (!response.ok) {

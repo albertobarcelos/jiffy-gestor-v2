@@ -82,7 +82,7 @@ export function MetricCards({ periodo }: MetricCardsProps) {
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Total Faturado */}
-        <MetricCard
+        <MetricCard className="hover:bg-accent1/20 border border-accent1"
           title="Total Faturado"
           value={formatCurrency(data?.getTotalFaturado())}
           icon={<MdAttachMoney size={20} />}
@@ -93,7 +93,7 @@ export function MetricCards({ periodo }: MetricCardsProps) {
         />
 
         {/* Vendas Finalizadas */}
-        <MetricCard
+        <MetricCard className="hover:bg-alternate/15 border border-alternate"
           title="Vendas Finalizadas"
           value={formatNumber(data?.getCountVendasEfetivadas())}
           icon={<span>🛒</span>}
@@ -103,7 +103,7 @@ export function MetricCards({ periodo }: MetricCardsProps) {
         />
 
         {/* Vendas Canceladas */}
-        <MetricCard
+        <MetricCard className="hover:bg-error/15 border border-error"
           title="Vendas Canceladas"
           value={formatNumber(data?.getCountVendasCanceladas())}
           icon={<span>✕</span>}
@@ -113,7 +113,7 @@ export function MetricCards({ periodo }: MetricCardsProps) {
         />
 
         {/* Produtos Vendidos */}
-        <MetricCard
+        <MetricCard className="hover:bg-warning/15 border border-warning"
           title="Produtos Vendidos"
           value={formatNumber(data?.getCountProdutosVendidos())}
           icon={<MdRestaurant size={20} />}
@@ -140,6 +140,7 @@ interface MetricCardProps {
   bgColorClass: string; // Adicionado para cor de fundo do ícone
   iconColorClass: string; // Adicionado para cor do ícone
   onClick?: () => void;
+  className?: string; // Adicionado para permitir customização de classes CSS
 }
 
 function MetricCard({
@@ -150,13 +151,15 @@ function MetricCard({
   bgColorClass,
   iconColorClass,
   onClick,
+  className,
 }: MetricCardProps) {
   return (
     <div
       className={`
-        bg-white flex items-center justify-between rounded-lg border border-gray-200 p-2
+        bg-white flex items-center justify-between rounded-lg p-2
         shadow-sm hover:shadow-md transition-all duration-200
-        ${onClick ? 'cursor-pointer hover:border-gray-300' : ''}
+        ${onClick ? 'cursor-pointer' : ''}
+        ${className || ''}
       `}
       onClick={onClick}
     >
