@@ -17,14 +17,13 @@ import {
   Tooltip,
   Legend,
 } from 'recharts'
-import { BuscarMetodosPagamentoUseCase } from '@/src/application/use-cases/dashboard/BuscarMetodosPagamentoUseCase'
+import { BuscarMetodosPagamentoDetalhadoUseCase } from '@/src/application/use-cases/dashboard/BuscarMetodosPagamentoDetalhadoUseCase'
 import { DashboardMetodoPagamento } from '@/src/domain/entities/DashboardMetodoPagamento'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
 
 interface ModalMetodosPagamentoProps {
   isOpen: boolean
   onClose: () => void
-  periodo?: string
+  periodo: string
 }
 
 const cores = [
@@ -47,18 +46,21 @@ export function ModalMetodosPagamento({
 }: ModalMetodosPagamentoProps) {
   const [data, setData] = useState<DashboardMetodoPagamento[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null); // Adicionei estado de erro
 
   useEffect(() => {
     if (!isOpen) return
 
     const loadData = async () => {
       setIsLoading(true)
+      setError(null);
       try {
-        const useCase = new BuscarMetodosPagamentoUseCase(new ApiClient())
+        const useCase = new BuscarMetodosPagamentoDetalhadoUseCase() // Usar o novo caso de uso
         const metodos = await useCase.execute(periodo)
         setData(metodos)
       } catch (err) {
         console.error('Erro ao carregar métodos de pagamento:', err)
+        setError(err instanceof Error ? err.message : 'Erro ao carregar dados de pagamento.'); // Capturar e setar erro
       } finally {
         setIsLoading(false)
       }
@@ -76,9 +78,31 @@ export function ModalMetodosPagamento({
 
   const total = data.reduce((sum, item) => sum + item.getValor(), 0)
 
+  if (error) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Erro</DialogTitle>
+            <DialogDescription>Ocorreu um erro ao carregar os dados.</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center justify-center h-64 text-red-600">
+            <p>{error}</p>
+            <button
+              onClick={onClose}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md"
+            >
+              Fechar
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Vendas por Método de Pagamento</DialogTitle>
           <DialogDescription>Detalhamento completo das vendas</DialogDescription>
@@ -99,8 +123,8 @@ export function ModalMetodosPagamento({
           ) : (
             <>
               {/* Gráfico de pizza */}
-              <div className="w-full min-w-0" style={{ height: '256px' }}>
-                <ResponsiveContainer width="100%" height={256}>
+              <div className="w-full min-w-0" style={{ height: '300px' }}>
+                <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
                       data={data.map((item, index) => ({
@@ -113,7 +137,7 @@ export function ModalMetodosPagamento({
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={(props: any) => `${props.percent?.toFixed(1) || 0}%`}
+                      label={({ percent }) => (percent ? `${((percent) * 100).toFixed(1)}%` : '')}
                       outerRadius={100}
                       fill="#8884d8"
                       dataKey="value"
@@ -123,24 +147,29 @@ export function ModalMetodosPagamento({
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(value: number) => formatCurrency(value)}
+                      formatter={(value: any) => {
+                        if (typeof value === 'number') {
+                          return formatCurrency(value);
+                        }
+                        return '';
+                      }}
                       contentStyle={{
                         backgroundColor: '#FFFFFF',
                         border: '1px solid #530CA3',
                         borderRadius: '8px',
                       }}
                     />
-                    <Legend />
+                    <Legend wrapperStyle={{ fontSize: '12px' }} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
 
               {/* Lista de métodos */}
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {data.map((item, index) => (
                   <Card key={item.getMetodo()}>
-                    <CardContent className="flex items-center justify-between p-4">
-                      <div className="flex items-center gap-4">
+                    <CardContent className="flex items-center justify-between px-4">
+                      <div className="flex items-center gap-2">
                         <div
                           className="w-4 h-4 rounded-full"
                           style={{ backgroundColor: cores[index % cores.length] }}
@@ -168,7 +197,7 @@ export function ModalMetodosPagamento({
               </div>
 
               {/* Total */}
-              <div className="pt-4 border-t">
+              <div className="pt-2 border-t">
                 <div className="flex items-center justify-between">
                   <p className="text-lg font-exo font-semibold text-primary-text">Total</p>
                   <p className="text-lg font-exo font-bold text-primary">

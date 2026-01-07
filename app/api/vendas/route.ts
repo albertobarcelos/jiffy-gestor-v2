@@ -17,8 +17,11 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     
     // Parâmetros de paginação
-    const limit = searchParams.get('limit') || '10'
-    const offset = searchParams.get('offset') || '0'
+    const limitParam = searchParams.get('limit')
+    const offsetParam = searchParams.get('offset')
+
+    const limit = searchParams.get('limit') || ''
+    const offset = searchParams.get('offset') || ''
     
     // Parâmetros de filtro
     const q = searchParams.get('q') || ''
@@ -36,10 +39,11 @@ export async function GET(request: NextRequest) {
     const statusParams = searchParams.getAll('status')
 
     const apiClient = new ApiClient()
-    const params = new URLSearchParams({
-      limit,
-      offset,
-    })
+    const params = new URLSearchParams()
+
+    // Adiciona limit e offset apenas se forem fornecidos na URL da requisição
+    if (limit) params.append('limit', limit)
+    if (offset) params.append('offset', offset)
 
     if (q) params.append('q', q)
     if (tipoVenda) params.append('tipoVenda', tipoVenda)

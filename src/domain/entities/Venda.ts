@@ -6,7 +6,7 @@ export class Venda {
     private readonly id: string,
     private readonly data: Date,
     private readonly numeroVenda: number,
-    private readonly usuario: string,
+    private readonly userId: string,
     private readonly tipoVenda: string,
     private readonly valorInicial: number,
     private readonly acrescimo: number,
@@ -21,7 +21,7 @@ export class Venda {
     id: string,
     data: Date,
     numeroVenda: number,
-    usuario: string,
+    userId: string,
     tipoVenda: string,
     valorInicial: number,
     acrescimo: number,
@@ -31,7 +31,7 @@ export class Venda {
     metodoPagamento: string,
     status: 'Aprovada' | 'Cancelada'
   ): Venda {
-    if (!id || !data || numeroVenda <= 0 || !usuario || !tipoVenda) {
+    if (!id || !data || numeroVenda <= 0 || !userId || !tipoVenda) {
       throw new Error('Campos obrigatórios não preenchidos')
     }
 
@@ -39,7 +39,7 @@ export class Venda {
       id,
       data,
       numeroVenda,
-      usuario,
+      userId,
       tipoVenda,
       valorInicial,
       acrescimo,
@@ -56,7 +56,7 @@ export class Venda {
       data.id?.toString() || '',
       data.data ? new Date(data.data) : new Date(),
       typeof data.numeroVenda === 'number' ? data.numeroVenda : parseInt(data.numeroVenda) || 0,
-      data.usuario?.toString() || '',
+      data.userId?.toString() || '',
       data.tipoVenda?.toString() || '',
       typeof data.valorInicial === 'number' ? data.valorInicial : parseFloat(data.valorInicial) || 0,
       typeof data.acrescimo === 'number' ? data.acrescimo : parseFloat(data.acrescimo) || 0,
@@ -80,8 +80,8 @@ export class Venda {
     return this.numeroVenda
   }
 
-  getUsuario(): string {
-    return this.usuario
+  getUserId(): string {
+    return this.userId
   }
 
   getTipoVenda(): string {
@@ -133,7 +133,7 @@ export class Venda {
       id: this.id,
       data: this.data.toISOString(),
       numeroVenda: this.numeroVenda,
-      usuario: this.usuario,
+      userId: this.userId,
       tipoVenda: this.tipoVenda,
       valorInicial: this.valorInicial,
       acrescimo: this.acrescimo,

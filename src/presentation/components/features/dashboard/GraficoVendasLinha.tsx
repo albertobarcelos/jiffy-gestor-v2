@@ -9,22 +9,20 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Area,
-  AreaChart,
+  Legend,
 } from 'recharts'
 import { BuscarEvolucaoVendasUseCase } from '@/src/application/use-cases/dashboard/BuscarEvolucaoVendasUseCase'
 import { DashboardEvolucao } from '@/src/domain/entities/DashboardEvolucao'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
 
 interface GraficoVendasLinhaProps {
-  periodo?: string
+  periodo: string;
+  selectedStatuses: string[];
 }
 
 /**
- * Gráfico de linha para evolução de vendas
- * Replica o design do Flutter
+ * Gráfico de coluna para evolução de vendas
  */
-export function GraficoVendasLinha({ periodo = 'mes' }: GraficoVendasLinhaProps) {
+export function GraficoVendasLinha({ periodo, selectedStatuses }: GraficoVendasLinhaProps) {
   const [data, setData] = useState<DashboardEvolucao[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -34,8 +32,8 @@ export function GraficoVendasLinha({ periodo = 'mes' }: GraficoVendasLinhaProps)
       setIsLoading(true)
       setError(null)
       try {
-        const useCase = new BuscarEvolucaoVendasUseCase(new ApiClient())
-        const evolucao = await useCase.execute(periodo)
+        const useCase = new BuscarEvolucaoVendasUseCase()
+        const evolucao = await useCase.execute(periodo, selectedStatuses)
         setData(evolucao)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erro ao carregar dados')
@@ -45,10 +43,10 @@ export function GraficoVendasLinha({ periodo = 'mes' }: GraficoVendasLinhaProps)
     }
 
     loadData()
-  }, [periodo])
+  }, [periodo, selectedStatuses])
 
   const formatCurrency = (value: number) => {
-    return `R$ ${Math.round(value).toLocaleString('pt-BR')}`
+    return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }
 
   if (isLoading) {
@@ -84,67 +82,91 @@ export function GraficoVendasLinha({ periodo = 'mes' }: GraficoVendasLinhaProps)
   }
 
   // Preparar dados para o gráfico
-  const chartData = data.map((item, index) => ({
-    index,
-    valor: item.getValor(),
+  const chartData = data.map((item) => ({
+    data: item.getData(),
     label: item.getLabel(),
-    data: item.getData().substring(5), // MM-DD
+    valorFinalizadas: item.getValorFinalizadas(),
+    valorCanceladas: item.getValorCanceladas(),
   }))
 
-  const maxValor = Math.max(...chartData.map((d) => d.valor))
-  const minValor = Math.min(...chartData.map((d) => d.valor))
+  // Calcula min/max apenas para os valores que serão exibidos
+  let currentMax = 0;
+  let currentMin = 0;
+
+  if (selectedStatuses.includes('FINALIZADA')) {
+    currentMax = Math.max(currentMax, ...chartData.map(d => d.valorFinalizadas));
+    currentMin = Math.min(currentMin, ...chartData.map(d => d.valorFinalizadas));
+  }
+  if (selectedStatuses.includes('CANCELADA')) {
+    currentMax = Math.max(currentMax, ...chartData.map(d => d.valorCanceladas));
+    currentMin = Math.min(currentMin, ...chartData.map(d => d.valorCanceladas));
+  }
+
+  // Ajusta o domínio para incluir zero se todos os valores forem positivos
+  const finalMinDomain = currentMin < 0 ? currentMin * 1.1 : 0; // Se houver valores negativos, ajusta para baixo
+  const finalMaxDomain = currentMax * 1.1;
 
   return (
     <div className="w-full min-w-0" style={{ height: '300px' }}>
       <ResponsiveContainer width="100%" height={300}>
-        <AreaChart data={chartData}>
-          <defs>
-            <linearGradient id="colorVendas" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.2} />
-              <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
-            </linearGradient>
-          </defs>
+        <LineChart data={chartData} margin={{
+          top: 5, right: 30, left: 30, bottom: 5, // Aumenta a margem esquerda para o eixo Y
+        }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" opacity={0.5} />
           <XAxis
-            dataKey="index"
-            tickFormatter={(value) => {
-              const item = chartData[value]
-              return item ? item.data : ''
-            }}
+            dataKey="label"
             tick={{ fontSize: '12px', fill: '#6B7280' }}
+            height={40}
             tickMargin={10}
           />
           <YAxis
             tickFormatter={formatCurrency}
             tick={{ fontSize: '12px', fill: '#6B7280' }}
             tickMargin={10}
-            domain={[minValor * 0.9, maxValor * 1.1]}
+            width={100} // Aumenta a largura do eixo Y
+            domain={[finalMinDomain, finalMaxDomain]}
           />
           <Tooltip
-            formatter={(value: number) => formatCurrency(value)}
+            cursor={false} // Remove o background cinza do hover
+            formatter={(value: any, name?: any) => {
+              if (typeof value === 'number') {
+                return [formatCurrency(value), name];
+              }
+              return '';
+            }}
             labelFormatter={(label) => {
-              const item = chartData[label as number]
-              return item ? item.label : ''
+              return `Dia: ${label}`;
             }}
             contentStyle={{
               backgroundColor: '#FFFFFF',
-              border: '1px solid #E5E7EB',
+              border: '1px solid #3B82F6',
               borderRadius: '8px',
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
             }}
           />
-          <Area
-            type="monotone"
-            dataKey="valor"
-            stroke="#3B82F6"
-            strokeWidth={2}
-            fill="url(#colorVendas)"
-            dot={{ fill: '#3B82F6', r: 3 }}
-            activeDot={{ r: 5 }}
-          />
-        </AreaChart>
+          <Legend />
+          {selectedStatuses.includes('FINALIZADA') && (
+            <Line
+              type="monotone"
+              dataKey="valorFinalizadas"
+              name="Finalizadas"
+              stroke="var(--color-primary)"
+              strokeWidth={2}
+              activeDot={{ r: 8 }}
+            />
+          )}
+          {selectedStatuses.includes('CANCELADA') && (
+            <Line
+              type="monotone"
+              dataKey="valorCanceladas"
+              name="Canceladas"
+              stroke="#EF4444"
+              strokeWidth={2}
+              activeDot={{ r: 8 }}
+            />
+          )}
+        </LineChart>
       </ResponsiveContainer>
     </div>
   )
 }
-
