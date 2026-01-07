@@ -15,28 +15,36 @@ interface MetricCardsProps {
  * Design clean e minimalista com cantos arredondados
  */
 export function MetricCards({ periodo }: MetricCardsProps) {
-  const [data, setData] = useState<DashboardVendas | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [dataTotal, setDataTotal] = useState<DashboardVendas | null>(null);
+  const [dataFinalizadas, setDataFinalizadas] = useState<DashboardVendas | null>(null);
+  const [dataCanceladas, setDataCanceladas] = useState<DashboardVendas | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
-      setIsLoading(true)
-      setError(null)
+      setIsLoading(true);
+      setError(null);
       try {
-        const useCase = new BuscarVendasDashboardUseCase()
-        const vendas = await useCase.execute(periodo)
-        setData(vendas)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Erro ao carregar dados')
-      } finally {
-        setIsLoading(false)
-      }
-    }
+        const useCase = new BuscarVendasDashboardUseCase();
+        const total = await useCase.execute(periodo, ['FINALIZADA', 'CANCELADA']);
+        const finalizadas = await useCase.execute(periodo, ['FINALIZADA']);
+        const canceladas = await useCase.execute(periodo, ['CANCELADA']);
+        
+        setDataTotal(total);
+        setDataFinalizadas(finalizadas);
+        setDataCanceladas(canceladas);
 
-    loadData()
-  }, [periodo])
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Erro ao carregar dados');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [periodo]);
 
   const formatCurrency = (value?: number) => {
     if (!value) return 'R$ 0,00'
@@ -84,7 +92,7 @@ export function MetricCards({ periodo }: MetricCardsProps) {
         {/* Total Faturado */}
         <MetricCard className=" border hover:border-primary/50"
           title="Total Faturado"
-          value={formatCurrency(data?.getTotalFaturado())}
+          value={formatCurrency(dataTotal?.getTotalFaturado())}
           icon={<MdAttachMoney size={20} color="var(--color-primary)" />}
           bgColorClass="bg-info border-2 border-primary"
           iconColorClass="text-info"
@@ -95,7 +103,7 @@ export function MetricCards({ periodo }: MetricCardsProps) {
         {/* Vendas Finalizadas */}
         <MetricCard className=" border hover:border-primary/50"
           title="Vendas Finalizadas"
-          value={formatNumber(data?.getCountVendasEfetivadas())}
+          value={formatNumber(dataFinalizadas?.getCountVendasEfetivadas())}
           icon={<span className="text-primary"><MdShoppingCart size={20} /></span>}
           bgColorClass="bg-info border-2 border-primary"
           iconColorClass="text-info"
@@ -105,7 +113,7 @@ export function MetricCards({ periodo }: MetricCardsProps) {
         {/* Vendas Canceladas */}
         <MetricCard className=" border hover:border-primary/50"
           title="Vendas Canceladas"
-          value={formatNumber(data?.getCountVendasCanceladas())}
+          value={formatNumber(dataCanceladas?.getCountVendasCanceladas())}
           icon={<span className="text-primary">✕</span>}
           bgColorClass="bg-info border-2 border-primary"
           iconColorClass="text-info"
@@ -115,7 +123,7 @@ export function MetricCards({ periodo }: MetricCardsProps) {
         {/* Produtos Vendidos */}
         <MetricCard className=" border hover:border-primary/50"
           title="Produtos Vendidos"
-          value={formatNumber(data?.getCountProdutosVendidos())}
+          value={formatNumber(dataTotal?.getCountProdutosVendidos())}
           icon={<MdRestaurant size={20} color="var(--color-primary)"/>}
           bgColorClass="bg-info border-2 border-primary"
           iconColorClass="text-info"

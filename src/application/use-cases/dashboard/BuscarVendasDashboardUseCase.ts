@@ -64,7 +64,7 @@ function getPeriodoDates(periodo: string): PeriodoDates {
 }
 
 export class BuscarVendasDashboardUseCase {
-  async execute(periodo: string = 'hoje'): Promise<DashboardVendas> {
+  async execute(periodo: string = 'hoje', statuses: string[] = []): Promise<DashboardVendas> {
     const { periodoInicial, periodoFinal } = getPeriodoDates(periodo);
     const params = new URLSearchParams();
     
@@ -73,7 +73,7 @@ export class BuscarVendasDashboardUseCase {
       params.append('periodoFinal', periodoFinal);
     }
 
-    params.append('status', 'FINALIZADA');
+    statuses.forEach(status => params.append('status', status));
     const response = await fetch(`/api/vendas?${params.toString()}`);
     
     if (!response.ok) {

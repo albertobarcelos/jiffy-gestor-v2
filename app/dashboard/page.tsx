@@ -262,7 +262,7 @@ export default function DashboardPage() {
 
         {/* Coluna direita - Últimas Vendas */}
         <motion.div variants={slideFromRightVariants} initial="hidden" animate="visible" className="lg:col-span-1">
-          <Suspense fallback={<Skeleton variant="rectangular" height={600} className="rounded-lg" />}>
+          <Suspense fallback={<Skeleton variant="rectangular" height={390} className="rounded-lg" />}>
             <UltimasVendas />
           </Suspense>
         </motion.div>
