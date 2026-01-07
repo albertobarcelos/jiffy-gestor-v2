@@ -1,7 +1,8 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { Suspense, useState } from 'react'
+import { Suspense, useState, useRef, useEffect } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'; // Importa os ícones
 import { Skeleton, FormControl, Select, MenuItem, FormGroup, FormControlLabel, Checkbox } from '@mui/material'
 import { motion } from 'framer-motion'; // Importar motion do Framer Motion
 import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto' // Importar a entidade
@@ -118,6 +119,37 @@ export default function DashboardPage() {
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['FINALIZADA']); // Estado para os status selecionados
   const [topProdutosData, setTopProdutosData] = useState<DashboardTopProduto[]>([]); // Novo estado para os top produtos
 
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  // Função para verificar se os botões de rolagem devem ser exibidos
+  const checkScrollability = () => {
+    if (scrollContainerRef.current) {
+      const { scrollWidth, clientWidth, scrollLeft } = scrollContainerRef.current;
+      setCanScrollLeft(scrollLeft > 0);
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth);
+    }
+  };
+
+  // Efeito para adicionar listener de scroll e verificar scrollabilidade inicial
+  useEffect(() => {
+    checkScrollability();
+    scrollContainerRef.current?.addEventListener('scroll', checkScrollability);
+    window.addEventListener('resize', checkScrollability);
+    return () => {
+      scrollContainerRef.current?.removeEventListener('scroll', checkScrollability);
+      window.removeEventListener('resize', checkScrollability);
+    };
+  }, []);
+
+  // Função para rolagem dos itens
+  const scroll = (scrollOffset: number) => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollLeft += scrollOffset;
+    }
+  };
+
   const handleStatusChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { value, checked } = event.target;
     setSelectedStatuses((prev) =>
@@ -130,7 +162,7 @@ export default function DashboardPage() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="space-y-2"
+      className="space-y-2 bg-custom-2/50 p-2 rounded-lg mt-2"
     >
       {/* Barra de seleção de período */}
       <motion.div variants={itemVariants} className="flex items-center justify-start gap-2 mt-2">
@@ -181,7 +213,7 @@ export default function DashboardPage() {
         {/* Coluna esquerda - 2 colunas */}
         <motion.div variants={slideFromLeftVariants} initial="hidden" animate="visible" className="lg:col-span-2 space-y-6">
           {/* Gráfico de evolução */}
-          <div className="bg-custom-2 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 px-6 py-2">
+          <div className="bg-white rounded-lg shadow-sm shadow-primary/70 border border-gray-200 px-6 py-2">
                    <div className="mb-6 flex items-start gap-12">
                      <div className="flex flex-col items-start justify-start">
                       <h3 className="text-lg font-semibold text-primary">Evolução de Vendas</h3>
@@ -236,10 +268,30 @@ export default function DashboardPage() {
         </motion.div>
       </div>
 
-      {/* Top Produtos - Container com rolagem horizontal */}
-      <motion.div variants={slideFromLeftVariants} initial="hidden" animate="visible" className="flex space-x-2 overflow-x-auto px-4 bg-transparent">
+      {/* Top Produtos - Container com botões de rolagem */}
+      <div className="relative w-full px-9">
+        {/* Botão de rolagem para a esquerda */}
+        {canScrollLeft && (
+          <button
+            onClick={() => scroll(-300)} // Rola 300px para a esquerda
+            className="absolute left-0 top-1/2 -translate-y-1/2 bg-white rounded-full p-1 shadow-md z-10  border-2 border-primary"
+            aria-label="Scroll left"
+          >
+            <ChevronLeft size={20} className="text-primary" />
+          </button>
+        )}
+
+        {/* Conteúdo rolável */}
+        <motion.div
+          variants={slideFromLeftVariants}
+          initial="hidden"
+          animate="visible"
+          className="flex space-x-2 bg-transparent overflow-x-hidden border border-primary/50 rounded-lg px-2 pt-2" // Esconde a barra de rolagem nativa
+          ref={scrollContainerRef} // Adiciona ref para controlar a rolagem
+          style={{ scrollBehavior: 'smooth' }} // Garante rolagem suave
+        >
             {/* Tabela de top produtos */}
-            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 hover:bg-custom-2/40 border border-gray-200 px-6 py-2 min-w-[500px]">
+            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 px-6 py-2 min-w-[500px]">
               <div className="mb-2">
                 <h3 className="text-lg font-semibold text-primary">Top Produtos</h3>
                 <p className="text-sm text-primary/70">Os 10 mais vendidos</p>
@@ -250,7 +302,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Gráfico de top produtos (por quantidade) */}
-            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-alternate/70 hover:bg-alternate/10 border border-gray-200 p-6 min-w-[600px]">
+            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 p-6 min-w-[450px]">
               <div className="mb-4">
                 <h3 className="text-lg font-semibold text-primary">Quantidade de Produtos Vendidos</h3>
                 <p className="text-sm text-primary/70">Distribuição dos Top Produtos</p>
@@ -261,7 +313,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Novo Gráfico de top produtos (por valor total) */}
-            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-success/70 hover:bg-success/15 border border-gray-200 p-6 min-w-[600px]">
+            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 p-6 min-w-[600px]">
               <div className="mb-4">
                 <h3 className="text-lg font-semibold text-primary">Valor Total dos Produtos Vendidos</h3>
                 <p className="text-sm text-primary/70">Distribuição por Valor</p>
@@ -271,6 +323,18 @@ export default function DashboardPage() {
               </Suspense>
             </div>
           </motion.div>
+
+        {/* Botão de rolagem para a direita */}
+        {canScrollRight && (
+          <button
+            onClick={() => scroll(300)} // Rola 300px para a direita
+            className="absolute right-0 top-1/2 -translate-y-1/2 bg-white rounded-full p-1 shadow-md z-10  border-2 border-primary"
+            aria-label="Scroll right"
+          >
+            <ChevronRight size={20} className="text-primary" />
+          </button>
+        )}
+      </div>
     </motion.div>
   )
 }

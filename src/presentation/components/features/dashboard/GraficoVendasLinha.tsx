@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import {
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -109,7 +109,7 @@ export function GraficoVendasLinha({ periodo, selectedStatuses }: GraficoVendasL
   return (
     <div className="w-full min-w-0" style={{ height: '300px' }}>
       <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={chartData} margin={{
+        <LineChart data={chartData} margin={{
           top: 5, right: 30, left: 30, bottom: 5, // Aumenta a margem esquerda para o eixo Y
         }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" opacity={0.5} />
@@ -146,24 +146,26 @@ export function GraficoVendasLinha({ periodo, selectedStatuses }: GraficoVendasL
           />
           <Legend />
           {selectedStatuses.includes('FINALIZADA') && (
-            <Bar
+            <Line
+              type="monotone"
               dataKey="valorFinalizadas"
               name="Finalizadas"
-              fill="#4082b4"
-              barSize={20} // Largura da barra
-              activeBar={{ fill: '#64B5F6' }} // Cor do hover
+              stroke="var(--color-primary)"
+              strokeWidth={2}
+              activeDot={{ r: 8 }}
             />
           )}
           {selectedStatuses.includes('CANCELADA') && (
-            <Bar
+            <Line
+              type="monotone"
               dataKey="valorCanceladas"
               name="Canceladas"
-              fill="#EF4444"
-              barSize={20} // Largura da barra
-              activeBar={{ fill: '#FF5252' }} // Cor do hover
+              stroke="#EF4444"
+              strokeWidth={2}
+              activeDot={{ r: 8 }}
             />
           )}
-        </BarChart>
+        </LineChart>
       </ResponsiveContainer>
     </div>
   )

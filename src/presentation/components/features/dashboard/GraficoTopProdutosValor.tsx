@@ -76,7 +76,7 @@ export function GraficoTopProdutosValor({ data }: GraficoTopProdutosValorProps) 
           tick={CustomizedYAxisTick} // Usar o componente de tick personalizado
         />
         <Tooltip cursor={false} formatter={(value: any) => (value !== undefined ? formatCurrency(value) : '')} />
-        <Bar dataKey="valorTotal" fill="var(--color-success)" activeBar={{ fill: '#2ad67a' }}/>
+        <Bar dataKey="valorTotal" fill="var(--color-primary)" activeBar={{ fill: '#014991' }}/>
       </BarChart>
     </ResponsiveContainer>
   );

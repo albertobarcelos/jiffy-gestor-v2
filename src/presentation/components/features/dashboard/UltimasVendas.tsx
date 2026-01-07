@@ -210,7 +210,7 @@ export function UltimasVendas() {
 
   return (
     <>
-      <div className="bg-success/15 h-full rounded-lg shadow-sm shadow-success/70 border border-gray-200 p-6">
+      <div className="bg-white h-full rounded-lg shadow-sm shadow-primary/70 border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold text-primary">Últimas Vendas</h3>
           <span className="text-sm text-primary/70">Última semana</span>
@@ -229,11 +229,11 @@ export function UltimasVendas() {
               return (
                 <div
                   key={venda.getId()}
-                  className="flex items-center justify-between p-4 rounded-lg hover:bg-success/10 transition-colors border border-success/50 group"
+                  className="flex items-center justify-between p-4 rounded-lg hover:bg-primary/10 transition-colors border border-primary/50 group"
                 >
                   <div className="flex items-center gap-4 flex-1">
                     {/* Avatar/Logo placeholder */}
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                    <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
                       <MdPerson size={28} />
                     </div>
 

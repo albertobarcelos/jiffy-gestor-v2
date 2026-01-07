@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { MdAttachMoney, MdRestaurant } from 'react-icons/md'
+import { MdAttachMoney, MdRestaurant, MdShoppingCart } from 'react-icons/md'
 import { BuscarVendasDashboardUseCase } from '@/src/application/use-cases/dashboard/BuscarVendasDashboardUseCase'
 import { DashboardVendas } from '@/src/domain/entities/DashboardVendas'
 import { ModalMetodosPagamento } from './ModalMetodosPagamento'
@@ -82,42 +82,42 @@ export function MetricCards({ periodo }: MetricCardsProps) {
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Total Faturado */}
-        <MetricCard className="hover:bg-accent1/20 border border-accent1"
+        <MetricCard className=" border hover:border-primary/50"
           title="Total Faturado"
           value={formatCurrency(data?.getTotalFaturado())}
-          icon={<MdAttachMoney size={20} />}
-          bgColorClass="bg-accent1"
+          icon={<MdAttachMoney size={20} color="var(--color-primary)" />}
+          bgColorClass="bg-info border-2 border-primary"
           iconColorClass="text-info"
           isPositive={true}
           onClick={() => setIsModalOpen(true)}
         />
 
         {/* Vendas Finalizadas */}
-        <MetricCard className="hover:bg-alternate/15 border border-alternate"
+        <MetricCard className=" border hover:border-primary/50"
           title="Vendas Finalizadas"
           value={formatNumber(data?.getCountVendasEfetivadas())}
-          icon={<span>🛒</span>}
-          bgColorClass="bg-alternate"
+          icon={<span className="text-primary"><MdShoppingCart size={20} /></span>}
+          bgColorClass="bg-info border-2 border-primary"
           iconColorClass="text-info"
           isPositive={true}
         />
 
         {/* Vendas Canceladas */}
-        <MetricCard className="hover:bg-error/15 border border-error"
+        <MetricCard className=" border hover:border-primary/50"
           title="Vendas Canceladas"
           value={formatNumber(data?.getCountVendasCanceladas())}
-          icon={<span>✕</span>}
-          bgColorClass="bg-error"
+          icon={<span className="text-primary">✕</span>}
+          bgColorClass="bg-info border-2 border-primary"
           iconColorClass="text-info"
           isPositive={false}
         />
 
         {/* Produtos Vendidos */}
-        <MetricCard className="hover:bg-warning/15 border border-warning"
+        <MetricCard className=" border hover:border-primary/50"
           title="Produtos Vendidos"
           value={formatNumber(data?.getCountProdutosVendidos())}
-          icon={<MdRestaurant size={20} />}
-          bgColorClass="bg-warning"
+          icon={<MdRestaurant size={20} color="var(--color-primary)"/>}
+          bgColorClass="bg-info border-2 border-primary"
           iconColorClass="text-info"
           isPositive={true}
         />
