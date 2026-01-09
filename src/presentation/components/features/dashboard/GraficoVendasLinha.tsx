@@ -27,13 +27,28 @@ export function GraficoVendasLinha({ periodo, selectedStatuses }: GraficoVendasL
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Função para mapear o período do frontend para o formato esperado pelo caso de uso
+  const mapPeriodoToUseCaseFormat = (frontendPeriodo: string): string => {
+    switch (frontendPeriodo) {
+      case 'Hoje': return 'hoje';
+      case 'Últimos 7 Dias': return 'semana';
+      case 'Mês Atual': return 'mes';
+      case 'Últimos 30 Dias': return '30dias';
+      case 'Últimos 60 Dias': return '60dias';
+      case 'Últimos 90 Dias': return '90dias';
+      case 'Todos': return 'todos'; // O caso de uso lida com 'todos' retornando datas vazias
+      default: return 'todos'; // Valor padrão seguro
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true)
       setError(null)
       try {
         const useCase = new BuscarEvolucaoVendasUseCase()
-        const evolucao = await useCase.execute(periodo, selectedStatuses)
+        const mappedPeriodo = mapPeriodoToUseCaseFormat(periodo);
+        const evolucao = await useCase.execute(mappedPeriodo, selectedStatuses)
         setData(evolucao)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erro ao carregar dados')

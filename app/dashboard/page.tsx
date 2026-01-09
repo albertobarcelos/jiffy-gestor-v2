@@ -10,19 +10,19 @@ import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto' 
 // Função para obter o label do período
 const getPeriodoLabel = (periodo: string): string => {
   switch (periodo) {
-    case 'todos':
+    case 'Todos':
       return 'Todos os Períodos';
-    case 'hoje':
+    case 'Hoje':
       return 'Hoje';
-    case 'mes':
+    case 'Mês Atual':
       return 'Mês Atual';
-    case 'semana':
+    case 'Últimos 7 Dias':
       return 'Últimos 7 Dias';
-    case '30dias':
+    case 'Últimos 30 Dias':
       return 'Últimos 30 Dias';
-    case '60dias':
+    case 'Últimos 60 Dias':
       return 'Últimos 60 Dias';
-    case '90dias':
+    case 'Últimos 90 Dias':
       return 'Últimos 90 Dias';
     default:
       return 'Período Desconhecido';
@@ -115,7 +115,7 @@ const UltimasVendas = dynamic(
  * Otimizada com code-splitting e Suspense
  */
 export default function DashboardPage() {
-  const [periodo, setPeriodo] = useState('semana'); // Estado para o período
+  const [periodo, setPeriodo] = useState('Últimos 7 Dias'); // Estado para o período
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['FINALIZADA']); // Estado para os status selecionados
   const [topProdutosData, setTopProdutosData] = useState<DashboardTopProduto[]>([]); // Novo estado para os top produtos
 
@@ -184,13 +184,13 @@ export default function DashboardPage() {
               },
             }}
           >
-            <MenuItem value="todos">Todos</MenuItem>
-            <MenuItem value="hoje">Hoje</MenuItem>
-            <MenuItem value="mes">Mês Atual</MenuItem>
-            <MenuItem value="semana">Últimos 7 Dias</MenuItem>
-            <MenuItem value="30dias">Últimos 30 Dias</MenuItem>
-            <MenuItem value="60dias">Últimos 60 Dias</MenuItem>
-            <MenuItem value="90dias">Últimos 90 Dias</MenuItem>
+            <MenuItem value="Todos">Todos</MenuItem>
+            <MenuItem value="Hoje">Hoje</MenuItem>
+            <MenuItem value="Mês Atual">Mês Atual</MenuItem>
+            <MenuItem value="Últimos 7 Dias">Últimos 7 Dias</MenuItem>
+            <MenuItem value="Últimos 30 Dias">Últimos 30 Dias</MenuItem>
+            <MenuItem value="Últimos 60 Dias">Últimos 60 Dias</MenuItem>
+            <MenuItem value="Últimos 90 Dias">Últimos 90 Dias</MenuItem>
           </Select>
         </FormControl>
       </motion.div>
@@ -263,7 +263,7 @@ export default function DashboardPage() {
         {/* Coluna direita - Últimas Vendas */}
         <motion.div variants={slideFromRightVariants} initial="hidden" animate="visible" className="lg:col-span-1">
           <Suspense fallback={<Skeleton variant="rectangular" height={390} className="rounded-lg" />}>
-            <UltimasVendas />
+            <UltimasVendas periodo={periodo} />
           </Suspense>
         </motion.div>
       </div>
