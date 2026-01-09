@@ -975,8 +975,8 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               return (
                 <div
                   key={venda.id}
-                  className="px-2 py-1 mb-2 bg-info rounded-lg flex items-center shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-all"
-                >
+                  className={`px-2 py-1 mb-2 rounded-lg flex items-center shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-all ${venda.dataCancelamento ? 'bg-red-100 hover:bg-red-200' : 'bg-info hover:bg-info/80'}`}>
+                
                   <div className="flex-1">
                     <span className="text-sm font-semibold text-primary-text font-nunito">
                       #{venda.codigoVenda}
