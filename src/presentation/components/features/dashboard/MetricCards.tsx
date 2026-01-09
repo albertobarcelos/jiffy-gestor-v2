@@ -126,6 +126,9 @@ export function MetricCards({ periodo }: MetricCardsProps) {
           bgColorClass="bg-info border-2 border-primary"
           iconColorClass="text-info"
           isPositive={true}
+          onClick={() => {
+            router.push(`/relatorios?periodo=${periodo}&status=Finalizada`)
+          }}
         />
 
         {/* Vendas Canceladas */}

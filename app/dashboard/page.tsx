@@ -302,7 +302,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Gráfico de top produtos (por quantidade) */}
-            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 p-6 min-w-[450px]">
+            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 p-6 flex-1 xl:min-w-[450px]">
               <div className="mb-4">
                 <h3 className="text-lg font-semibold text-primary">Quantidade de Produtos Vendidos</h3>
                 <p className="text-sm text-primary/70">Distribuição dos Top Produtos</p>
@@ -313,7 +313,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Novo Gráfico de top produtos (por valor total) */}
-            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 p-6 min-w-[600px]">
+            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 p-6 flex-1 xl:min-w-[600px]">
               <div className="mb-4">
                 <h3 className="text-lg font-semibold text-primary">Valor Total dos Produtos Vendidos</h3>
                 <p className="text-sm text-primary/70">Distribuição por Valor</p>
