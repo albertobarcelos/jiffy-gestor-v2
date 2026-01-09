@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation' // Importar useRouter
 import { MdAttachMoney, MdRestaurant, MdShoppingCart } from 'react-icons/md'
 import { BuscarVendasDashboardUseCase } from '@/src/application/use-cases/dashboard/BuscarVendasDashboardUseCase'
 import { DashboardVendas } from '@/src/domain/entities/DashboardVendas'
 import { ModalMetodosPagamento } from './ModalMetodosPagamento'
+import { calculatePeriodo } from '@/src/shared/utils/dateFilters' // Importar calculatePeriodo
 
 interface MetricCardsProps {
   periodo: string;
@@ -15,6 +17,7 @@ interface MetricCardsProps {
  * Design clean e minimalista com cantos arredondados
  */
 export function MetricCards({ periodo }: MetricCardsProps) {
+  const router = useRouter() // Obter instância do router
   const [dataTotal, setDataTotal] = useState<DashboardVendas | null>(null);
   const [dataFinalizadas, setDataFinalizadas] = useState<DashboardVendas | null>(null);
   const [dataCanceladas, setDataCanceladas] = useState<DashboardVendas | null>(null);
@@ -22,15 +25,30 @@ export function MetricCards({ periodo }: MetricCardsProps) {
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Função para mapear o período do frontend para o formato esperado pelo caso de uso
+  const mapPeriodoToUseCaseFormat = (frontendPeriodo: string): string => {
+    switch (frontendPeriodo) {
+      case 'Hoje': return 'hoje';
+      case 'Últimos 7 Dias': return 'semana';
+      case 'Mês Atual': return 'mes';
+      case 'Últimos 30 Dias': return '30dias';
+      case 'Últimos 60 Dias': return '60dias';
+      case 'Últimos 90 Dias': return '90dias';
+      case 'Todos': return 'todos'; // O caso de uso lida com 'todos' retornando datas vazias
+      default: return 'todos'; // Valor padrão seguro
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
       setError(null);
       try {
         const useCase = new BuscarVendasDashboardUseCase();
-        const total = await useCase.execute(periodo, ['FINALIZADA', 'CANCELADA']);
-        const finalizadas = await useCase.execute(periodo, ['FINALIZADA']);
-        const canceladas = await useCase.execute(periodo, ['CANCELADA']);
+        const mappedPeriodo = mapPeriodoToUseCaseFormat(periodo);
+        const total = await useCase.execute(mappedPeriodo, ['FINALIZADA', 'CANCELADA']);
+        const finalizadas = await useCase.execute(mappedPeriodo, ['FINALIZADA']);
+        const canceladas = await useCase.execute(mappedPeriodo, ['CANCELADA']);
         
         setDataTotal(total);
         setDataFinalizadas(finalizadas);
@@ -118,6 +136,9 @@ export function MetricCards({ periodo }: MetricCardsProps) {
           bgColorClass="bg-info border-2 border-primary"
           iconColorClass="text-info"
           isPositive={false}
+          onClick={() => {
+            router.push(`/relatorios?periodo=${periodo}&status=Cancelada`)
+          }}
         />
 
         {/* Produtos Vendidos */}

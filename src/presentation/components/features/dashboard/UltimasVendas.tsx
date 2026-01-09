@@ -6,6 +6,7 @@ import { Venda } from '@/src/domain/entities/Venda'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { MdPerson, MdVisibility } from 'react-icons/md'
 import { DetalhesVendas } from '@/src/presentation/components/features/vendas/DetalhesVendas'
+import { calculatePeriodo } from '@/src/shared/utils/dateFilters' // Importar calculatePeriodo
 
 interface UserNamesMap {
   [key: string]: string;
@@ -17,13 +18,17 @@ interface UserPdvApiResponse {
   // Adicione outras propriedades relevantes se necessário
 }
 
+interface UltimasVendasProps {
+  periodo: string;
+}
+
 const LAST_SALES_DISPLAY_LIMIT = 10; // Definir o limite de últimas vendas a serem exibidas
 
 /**
  * Componente de Últimas Vendas
  * Design clean inspirado no exemplo
  */
-export function UltimasVendas() {
+export function UltimasVendas({ periodo }: UltimasVendasProps) {
   const [vendas, setVendas] = useState<Venda[]>([])
   const [userNames, setUserNames] = useState<UserNamesMap>({})
   const [isLoading, setIsLoading] = useState(true)
@@ -59,6 +64,20 @@ export function UltimasVendas() {
       setIsModalOpen(false);
     }, []);
 
+    // Função para mapear o período do frontend para o formato esperado pela função calculatePeriodo
+    const mapPeriodoToCalculateFormat = (frontendPeriodo: string): string => {
+      switch (frontendPeriodo) {
+        case 'Hoje': return 'Hoje';
+        case 'Últimos 7 Dias': return 'Últimos 7 Dias';
+        case 'Mês Atual': return 'Mês Atual';
+        case 'Últimos 30 Dias': return 'Últimos 30 Dias';
+        case 'Últimos 60 Dias': return 'Últimos 60 Dias';
+        case 'Últimos 90 Dias': return 'Últimos 90 Dias';
+        case 'Todos': return 'Todos'; 
+        default: return 'Todos'; 
+      }
+    };
+
     useEffect(() => {
     const loadVendas = async () => {
       setIsLoading(true)
@@ -72,23 +91,23 @@ export function UltimasVendas() {
         // Buscar últimas vendas da API
         const baseUrl = process.env.NEXT_PUBLIC_EXTERNAL_API_BASE_URL || ''
 
-        // Calcular data de 7 dias atrás para buscar últimas vendas
-        const hoje = new Date()
-        const seteDiasAtras = new Date(hoje)
-        seteDiasAtras.setDate(hoje.getDate() - 7)
+        // Calcular data com base na prop periodo
+        const mappedPeriodo = mapPeriodoToCalculateFormat(periodo);
+        const { inicio, fim } = calculatePeriodo(mappedPeriodo);
 
-        // Formatar datas no formato ISO (YYYY-MM-DD)
-        const periodoInicial = seteDiasAtras.toISOString().split('T')[0]
-        const periodoFinal = hoje.toISOString().split('T')[0]
+        // Formatar datas no formato ISO (YYYY-MM-DDTHH:MM:SS.sssZ)
+        const periodoInicial = inicio?.toISOString() || '';
+        const periodoFinal = fim?.toISOString() || '';
 
         // Buscar vendas finalizadas dos últimos 7 dias, ordenadas por data (mais recentes primeiro)
         const params = new URLSearchParams({
-          status: 'FINALIZADA',
           periodoInicial,
           periodoFinal,
           limit: '100', // Aumentado para buscar mais vendas no período
           offset: '0',
         })
+        params.append('status', 'FINALIZADA');
+        params.append('status', 'CANCELADA');
 
         const response = await fetch(`${baseUrl}/api/v1/operacao-pdv/vendas?${params}`, {
           headers: {

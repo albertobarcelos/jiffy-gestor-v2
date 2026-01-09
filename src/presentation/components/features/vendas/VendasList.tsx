@@ -14,6 +14,7 @@ import {
   CircularProgress,
 } from '@mui/material'
 import { TipoVendaIcon } from './TipoVendaIcon'
+import { calculatePeriodo } from '@/src/shared/utils/dateFilters' // Importar calculatePeriodo
 // Tipos
 interface Venda {
   id: string
@@ -54,28 +55,34 @@ interface Terminal {
   nome: string
 }
 
+interface VendasListProps {
+  initialPeriodo?: string; // Período inicial vindo da URL (ex: "Hoje", "Últimos 7 Dias")
+  initialStatus?: string | null; // Status inicial vindo da URL
+}
+
 /**
  * Componente de listagem de vendas
  * Implementa scroll infinito, filtros avançados e cards de métricas
  */
-export function VendasList() {
+export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   const { auth } = useAuthStore()
+
+  // Calculamos as datas iniciais com base no initialPeriodo logo no início
+  const initialDates = calculatePeriodo(initialPeriodo || 'Todos');
 
   // Estados de filtros
   const [searchQuery, setSearchQuery] = useState('')
   const [valorMinimo, setValorMinimo] = useState('')
   const [valorMaximo, setValorMaximo] = useState('')
-  const [periodo, setPeriodo] = useState<string>('Todos')
-  const [statusFilter, setStatusFilter] = useState<string | null>(null)
-  const [tipoVendaFilter, setTipoVendaFilter] = useState<string | null>(null)
-  const [meioPagamentoFilter, setMeioPagamentoFilter] = useState<string>('')
-  const [usuarioAbertoPorFilter, setUsuarioAbertoPorFilter] = useState<string>('')
-  const [terminalFilter, setTerminalFilter] = useState<string>('')
-  const [usuarioCancelouFilter, setUsuarioCancelouFilter] = useState<string>('')
-  const [periodoInicial, setPeriodoInicial] = useState<Date | null>(null)
-  const [periodoFinal, setPeriodoFinal] = useState<Date | null>(null)
-
-  // Estados de dados
+  const [periodo, setPeriodo] = useState<string>(initialPeriodo || 'Todos')
+  const [statusFilter, setStatusFilter] = useState<string | null>(initialStatus || null)
+  const [periodoInicial, setPeriodoInicial] = useState<Date | null>(initialDates.inicio)
+  const [periodoFinal, setPeriodoFinal] = useState<Date | null>(initialDates.fim)
+  const [tipoVendaFilter, setTipoVendaFilter] = useState<string | null>(null);
+  const [meioPagamentoFilter, setMeioPagamentoFilter] = useState<string>('');
+  const [usuarioAbertoPorFilter, setUsuarioAbertoPorFilter] = useState<string>('');
+  const [terminalFilter, setTerminalFilter] = useState<string>('');
+  const [usuarioCancelouFilter, setUsuarioCancelouFilter] = useState<string>('');
   const [vendas, setVendas] = useState<Venda[]>([])
   const [metricas, setMetricas] = useState<MetricasVendas | null>(null)
   const [usuariosPDV, setUsuariosPDV] = useState<UsuarioPDV[]>([])
@@ -207,69 +214,6 @@ export function VendasList() {
     return { date: dateStr, time: timeStr }
   }
 
-  /**
-   * Calcula período baseado na opção selecionada
-   */
-  const calculatePeriodo = (opcao: string): { inicio: Date | null; fim: Date | null } => {
-    const hoje = new Date()
-    hoje.setHours(23, 59, 59, 999)
-
-    switch (opcao) {
-      case 'Hoje': {
-        const inicio = new Date()
-        inicio.setHours(0, 0, 0, 0)
-        return { inicio, fim: hoje }
-      }
-      case 'Ontem': {
-        const inicio = new Date(hoje)
-        inicio.setDate(inicio.getDate() - 1)
-        inicio.setHours(0, 0, 0, 0)
-        const fim = new Date(inicio)
-        fim.setHours(23, 59, 59, 999)
-        return { inicio, fim }
-      }
-      case 'Últimos 7 Dias': {
-        const inicio = new Date(hoje)
-        inicio.setDate(inicio.getDate() - 6)
-        inicio.setHours(0, 0, 0, 0)
-        return { inicio, fim: hoje }
-      }
-      case 'Mês Atual': {
-        const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
-        inicio.setHours(0, 0, 0, 0)
-        const fim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)
-        fim.setHours(23, 59, 59, 999)
-        return { inicio, fim }
-      }
-      case 'Mês Passado': {
-        const inicio = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1)
-        inicio.setHours(0, 0, 0, 0)
-        const fim = new Date(hoje.getFullYear(), hoje.getMonth(), 0)
-        fim.setHours(23, 59, 59, 999)
-        return { inicio, fim }
-      }
-      case 'Últimos 30 Dias': {
-        const inicio = new Date(hoje)
-        inicio.setDate(inicio.getDate() - 29)
-        inicio.setHours(0, 0, 0, 0)
-        return { inicio, fim: hoje }
-      }
-      case 'Últimos 60 Dias': {
-        const inicio = new Date(hoje)
-        inicio.setDate(inicio.getDate() - 59)
-        inicio.setHours(0, 0, 0, 0)
-        return { inicio, fim: hoje }
-      }
-      case 'Últimos 90 Dias': {
-        const inicio = new Date(hoje)
-        inicio.setDate(inicio.getDate() - 89)
-        inicio.setHours(0, 0, 0, 0)
-        return { inicio, fim: hoje }
-      }
-      default:
-        return { inicio: null, fim: null }
-    }
-  }
 
   /**
    * Carrega todos os usuários PDV
@@ -550,7 +494,7 @@ export function VendasList() {
         clearTimeout(debounceTimerRef.current)
       }
     }
-  }, [searchQuery, statusFilter, tipoVendaFilter, meioPagamentoFilter, usuarioAbertoPorFilter, terminalFilter, usuarioCancelouFilter, periodo])
+  }, [searchQuery, statusFilter, tipoVendaFilter, meioPagamentoFilter, usuarioAbertoPorFilter, terminalFilter, usuarioCancelouFilter, periodo, periodoInicial, periodoFinal])
 
   // Scroll infinito
   useEffect(() => {
@@ -570,30 +514,25 @@ export function VendasList() {
     return () => container.removeEventListener('scroll', handleScroll)
   }, [canLoadMore, isLoadingMore, isLoading, fetchVendas])
 
-  // Carrega dados iniciais
+  // Efeito para carregar dados auxiliares e iniciar a busca de vendas
   useEffect(() => {
-    loadAllUsuariosPDV()
-    loadAllMeiosPagamento()
-    loadAllTerminais()
-    fetchVendas(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    loadAllUsuariosPDV();
+    loadAllMeiosPagamento();
+    loadAllTerminais();
+    // Aciona a busca inicial de vendas com os filtros já configurados
+    fetchVendas(true);
+  }, []); // Dependências vazias para rodar uma única vez na montagem
 
-  // Atualiza período quando muda (apenas se período não for "Todos")
+  // Atualiza período quando muda (apenas se período não for "Datas Personalizadas")
   useEffect(() => {
-    if (periodo !== 'Todos') {
-      const { inicio, fim } = calculatePeriodo(periodo)
-      setPeriodoInicial(inicio)
-      setPeriodoFinal(fim)
-      fetchVendas(true)
-    } else {
-      // Se período for "Todos" e não houver datas manuais, limpa as datas
-      if (!periodoInicial && !periodoFinal) {
-        setPeriodoInicial(null)
-        setPeriodoFinal(null)
-      }
+    if (periodo === 'Datas Personalizadas') {
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    const { inicio, fim } = calculatePeriodo(periodo)
+    setPeriodoInicial(inicio)
+    setPeriodoFinal(fim)
+
   }, [periodo])
 
   /**
@@ -612,7 +551,7 @@ export function VendasList() {
     setUsuarioCancelouFilter('')
     setPeriodoInicial(null)
     setPeriodoFinal(null)
-    fetchVendas(true)
+    // A busca será acionada pelo useEffect de debounce após a atualização dos estados
   }
 
   /**
@@ -725,6 +664,7 @@ export function VendasList() {
               <MenuItem value="Últimos 30 Dias">Últimos 30 Dias</MenuItem>
               <MenuItem value="Últimos 60 Dias">Últimos 60 Dias</MenuItem>
               <MenuItem value="Últimos 90 Dias">Últimos 90 Dias</MenuItem>
+              <MenuItem value="Datas Personalizadas">Datas Personalizadas</MenuItem>
             </Select>
           </FormControl>
 
@@ -1035,8 +975,8 @@ export function VendasList() {
               return (
                 <div
                   key={venda.id}
-                  className="px-2 py-1 mb-2 bg-info rounded-lg flex items-center shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-all"
-                >
+                  className={`px-2 py-1 mb-2 rounded-lg flex items-center shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-all ${venda.dataCancelamento ? 'bg-red-100 hover:bg-red-200' : 'bg-info hover:bg-info/80'}`}>
+                
                   <div className="flex-1">
                     <span className="text-sm font-semibold text-primary-text font-nunito">
                       #{venda.codigoVenda}

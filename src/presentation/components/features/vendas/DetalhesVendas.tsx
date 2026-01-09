@@ -60,6 +60,8 @@ interface Pagamento {
   realizadoPorId: string
   canceladoPorId?: string
   cancelado: boolean
+  isTefUsed?: boolean; // Adicionado
+  isTefConfirmed?: boolean; // Adicionado
 }
 
 interface MeioPagamentoDetalhes {
@@ -638,7 +640,25 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
 
                 <div className="space-y-2">
                   {venda.pagamentos
-                    ?.filter((p) => !p.cancelado)
+                    ?.filter((p) => {
+                      // Regra 1: Se `canceled` for `true`, NÃO exibir o meio de pagamento.
+                      if (p.cancelado === true) {
+                        return false;
+                      }
+
+                      // Regra 2: Se `isTefUsed` for `true` E `isTefConfirmed` for `false`, NÃO exibir.
+                      // Tratamos `isTefUsed` e `isTefConfirmed` como false se forem undefined/null para a comparação.
+                      const isUsed = p.isTefUsed === true;
+                      const isConfirmed = p.isTefConfirmed === true;
+                      if (isUsed && !isConfirmed) {
+                        return false;
+                      }
+
+                      // Regra 3: Em todos os outros casos, EXIBIR o meio de pagamento.
+                      // O campo 'tf' (representado por `isTefUsed`) não impede a exibição por si só quando falso,
+                      // desde que não caia nas regras de não exibição acima.
+                      return true;
+                    })
                     .map((pagamento, index) => {
                       const meio = nomesMeiosPagamento[pagamento.meioPagamentoId]
                       const formaPagamento = meio?.formaPagamentoFiscal || ''

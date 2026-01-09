@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation' // Importar useSearchParams
 import { Faturamento } from '@/src/domain/entities/Faturamento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { VendasList } from '@/src/presentation/components/features/vendas/VendasList'
@@ -11,6 +12,12 @@ import { VendasList } from '@/src/presentation/components/features/vendas/Vendas
  */
 export function RelatoriosView() {
   const { auth } = useAuthStore()
+  const searchParams = useSearchParams() // Obter search params da URL
+  const initialPeriodo = searchParams.get('periodo') || 'Todos' // Período vindo da URL
+  const initialStatus = searchParams.get('status') || null // Status vindo da URL
+
+  // Removemos as props de data inicial e final, já que VendasList vai cuidar disso internamente
+
   const [activeTab, setActiveTab] = useState<'vendas' | 'faturamento'>('vendas')
   const [faturamentos, setFaturamentos] = useState<Faturamento[]>([])
 
@@ -62,7 +69,10 @@ export function RelatoriosView() {
           {/* Conteúdo das tabs */}
           <div className="">
             {activeTab === 'vendas' ? (
-              <VendasList />
+              <VendasList
+                initialPeriodo={initialPeriodo}
+                initialStatus={initialStatus}
+              />
             ) : (
               <div className="space-y-4">
                 <h3 className="text-primary text-base font-semibold font-exo">

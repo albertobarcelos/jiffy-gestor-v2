@@ -19,15 +19,30 @@ export function TabelaTopProdutos({ periodo, onDataLoad }: TabelaTopProdutosProp
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Função para mapear o período do frontend para o formato esperado pelo caso de uso
+  const mapPeriodoToUseCaseFormat = (frontendPeriodo: string): string => {
+    switch (frontendPeriodo) {
+      case 'Hoje': return 'hoje';
+      case 'Últimos 7 Dias': return 'semana';
+      case 'Mês Atual': return 'mes';
+      case 'Últimos 30 Dias': return '30dias';
+      case 'Últimos 60 Dias': return '60dias';
+      case 'Últimos 90 Dias': return '90dias';
+      case 'Todos': return 'todos';
+      default: return 'todos'; 
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true)
       setError(null)
       try {
         const useCase = new BuscarTopProdutosDetalhadoUseCase()
-        const produtos = await useCase.execute(periodo, 10) // Ajustado para 1000 no outro use case, mas aqui é para exibir 10
+        const mappedPeriodo = mapPeriodoToUseCaseFormat(periodo);
+        const produtos = await useCase.execute(mappedPeriodo, 10)
         setData(produtos)
-        onDataLoad(produtos); // Chamar onDataLoad aqui
+        onDataLoad(produtos); 
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erro ao carregar dados')
       } finally {
@@ -36,7 +51,7 @@ export function TabelaTopProdutos({ periodo, onDataLoad }: TabelaTopProdutosProp
     }
 
     loadData()
-  }, [periodo])
+  }, [periodo, onDataLoad])
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
