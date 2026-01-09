@@ -24,9 +24,11 @@ export function GraficoTopProdutos({ data }: GraficoTopProdutosProps) {
           cx="50%"
           cy="50%"
           labelLine={false}
+          label={({value }) => ` ${value} Qtde`}
           outerRadius={120}
           fill="#8884d8"
           dataKey="value"
+          fontSize={10}
           nameKey="name"
         >
           {chartData.map((entry, index) => (
@@ -42,7 +44,7 @@ export function GraficoTopProdutos({ data }: GraficoTopProdutosProps) {
           align="center"
           iconType="circle"
           formatter={(value, entry) => (
-            <span style={{ color: '#666', fontSize: '12px' }}>{value}</span>
+            <span style={{ color: '#666', fontSize: '10px' }}>{value}</span>
           )}
         />
       </PieChart>
