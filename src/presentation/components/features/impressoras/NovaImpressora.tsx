@@ -31,16 +31,18 @@ interface NovaImpressoraProps {
 const MODELO_MAP: Record<string, string> = {
   generico: 'Genérico',
   sunmiIntegrada: 'Sunmi Integrada',
-  stone: 'Stone',
+  stoneIntegrada: 'Stone Integrada',
+  pagbankIntegrada: 'Pagbank Integrada',
 }
 
 const MODELO_REVERSE_MAP: Record<string, string> = {
   'Genérico': 'generico',
   'Sunmi Integrada': 'sunmiIntegrada',
-  'Stone': 'stone',
+  'Stone Integrada': 'stoneIntegrada',
+  'Pagbank Integrada': 'pagbankIntegrada',
 }
 
-const MODELOS_OPTIONS = ['Genérico', 'Sunmi Integrada', 'Stone']
+const MODELOS_OPTIONS = ['Genérico', 'Sunmi Integrada', 'Stone Integrada', 'Pagbank Integrada']
 
 /**
  * Componente para criar/editar impressora
