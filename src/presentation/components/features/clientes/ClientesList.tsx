@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
@@ -19,6 +19,8 @@ interface ClientesListProps {
  */
 export function ClientesList({ onReload }: ClientesListProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
@@ -182,17 +184,37 @@ export function ClientesList({ onReload }: ClientesListProps) {
     onReload?.()
   }
 
-  const handleAdd = () => {
+  const handleAdd = useCallback(() => {
     setModalState({ open: true, tab: 'cliente', mode: 'create' })
-  }
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.set('modalClienteOpen', 'true')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+  }, [router, searchParams, pathname])
 
-  const handleEdit = (clienteId: string) => {
+  const handleEdit = useCallback((clienteId: string) => {
     setModalState({ open: true, tab: 'cliente', mode: 'edit', clienteId })
-  }
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.set('modalClienteOpen', 'true')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+  }, [router, searchParams, pathname])
 
-  const handleView = (clienteId: string) => {
+  const handleView = useCallback((clienteId: string) => {
     setModalState({ open: true, tab: 'visualizar', mode: 'view', clienteId })
-  }
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.set('modalClienteOpen', 'true')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+  }, [router, searchParams, pathname])
+
+  const closeTabsModal = useCallback(() => {
+    setModalState((prev) => ({ ...prev, open: false }))
+
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.delete('modalClienteOpen')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+    router.refresh()
+    loadAllClientes()
+    onReload?.()
+  }, [router, searchParams, pathname, loadAllClientes, onReload])
 
   /**
    * Atualiza o status do cliente diretamente na lista
@@ -458,7 +480,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
 
       <ClientesTabsModal
         state={modalState}
-        onClose={() => setModalState({ ...modalState, open: false })}
+        onClose={closeTabsModal}
         onTabChange={(tab) => setModalState({ ...modalState, tab })}
         onReload={handleModalReload}
       />

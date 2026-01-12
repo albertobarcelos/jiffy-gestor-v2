@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { PerfilUsuario } from '@/src/domain/entities/PerfilUsuario'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { MdSearch, MdKeyboardArrowRight, MdPerson, MdEdit, MdAdd } from 'react-icons/md'
 import {
   PerfisUsuariosTabsModal,
@@ -49,6 +50,9 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
   const { auth, isAuthenticated } = useAuthStore()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
 
   const searchTextRef = useRef('')
 
@@ -340,7 +344,12 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
       mode: config.mode ?? 'create',
       perfilId: config.perfilId,
     }))
-  }, [])
+
+    // Adicionar um parâmetro na URL para forçar o recarregamento ao fechar o modal
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.set('modalPerfilOpen', 'true')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+  }, [router, searchParams, pathname])
 
   const closeTabsModal = useCallback(() => {
     setTabsModalState((prev) => ({
@@ -348,7 +357,15 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
       open: false,
       perfilId: undefined,
     }))
-  }, [])
+
+    // Remover o parâmetro da URL para forçar o recarregamento da rota
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.delete('modalPerfilOpen')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+    router.refresh() // Força a revalidação da rota principal
+    loadAllPerfis() // Recarrega a lista de perfis
+    onReload?.()
+  }, [router, searchParams, pathname, loadAllPerfis, onReload])
 
   const handleTabChange = useCallback((tab: 'perfil') => {
     setTabsModalState((prev) => ({ ...prev, tab }))
@@ -362,7 +379,12 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
       usuarioId: config.usuarioId,
       initialPerfilPdvId: config.initialPerfilPdvId,
     }))
-  }, [])
+
+    // Adicionar um parâmetro na URL para forçar o recarregamento ao fechar o modal
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.set('modalUsuarioPerfilOpen', 'true')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+  }, [router, searchParams, pathname])
 
   const closeUsuariosTabsModal = useCallback(() => {
     setUsuariosTabsModalState((prev) => ({
@@ -371,7 +393,16 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
       usuarioId: undefined,
       initialPerfilPdvId: undefined,
     }))
-  }, [])
+
+    // Remover o parâmetro da URL para forçar o recarregamento da rota
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.delete('modalUsuarioPerfilOpen')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+    router.refresh() // Força a revalidação da rota principal
+
+    // As funções de recarga do modal já lidam com o que precisa ser recarregado
+    // (expandedPerfis, loadAllPerfis, handleStatusChange)
+  }, [router, searchParams, pathname])
 
   const handleUsuariosTabChange = useCallback((tab: 'usuario') => {
     setUsuariosTabsModalState((prev) => ({ ...prev, tab }))

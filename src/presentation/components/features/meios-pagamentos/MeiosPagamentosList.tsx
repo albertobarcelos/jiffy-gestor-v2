@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { MeioPagamento } from '@/src/domain/entities/MeioPagamento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { MdSearch, MdDelete } from 'react-icons/md'
@@ -64,6 +65,9 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
   const { auth, isAuthenticated } = useAuthStore()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
 
   // Refs para evitar dependências desnecessárias no useCallback
   const isLoadingRef = useRef(false)
@@ -227,7 +231,12 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
       mode: config.mode ?? 'create',
       meioPagamentoId: config.meioPagamentoId,
     }))
-  }, [])
+
+    // Adicionar um parâmetro na URL para forçar o recarregamento ao fechar o modal
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.set('modalMeioPagamentoOpen', 'true')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+  }, [router, searchParams, pathname])
 
   const closeTabsModal = useCallback(() => {
     setTabsModalState((prev) => ({
@@ -235,7 +244,15 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
       open: false,
       meioPagamentoId: undefined,
     }))
-  }, [])
+
+    // Remover o parâmetro da URL para forçar o recarregamento da rota
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.delete('modalMeioPagamentoOpen')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+    router.refresh() // Força a revalidação da rota principal
+    loadMeiosPagamento() // Recarrega a lista de meios de pagamento
+    onReload?.()
+  }, [router, searchParams, pathname, loadMeiosPagamento, onReload])
 
   const handleTabsModalReload = useCallback(() => {
     loadMeiosPagamento()
@@ -516,6 +533,9 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
           </div>
           <div className="flex-[2] text-center font-nunito font-semibold text-sm text-primary-text">
             Status
+          </div>
+          <div className="flex-[2] text-right font-nunito font-semibold text-sm text-primary-text">
+            Ações
           </div>
         </div>
       </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Complemento } from '@/src/domain/entities/Complemento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { MdAddCircle, MdOutlineOfflinePin, MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import {
@@ -40,6 +41,9 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   const handleValorSubmitRef = useRef<((complementoId: string) => Promise<void>) | null>(null)
   const hasLoadedInitialRef = useRef(false)
   const { auth, isAuthenticated } = useAuthStore()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
 
   // Refs para evitar dependências desnecessárias no useCallback
   const isLoadingRef = useRef(false)
@@ -245,7 +249,12 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
       mode: config.mode ?? 'create',
       complementoId: config.complementoId,
     }))
-  }, [])
+
+    // Adicionar um parâmetro na URL para forçar o recarregamento ao fechar o modal
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.set('modalComplementoOpen', 'true')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+  }, [router, searchParams, pathname])
 
   const closeTabsModal = useCallback(() => {
     setTabsModalState((prev) => ({
@@ -253,7 +262,15 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
       open: false,
       complementoId: undefined,
     }))
-  }, [])
+
+    // Remover o parâmetro da URL para forçar o recarregamento da rota
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.delete('modalComplementoOpen')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+    router.refresh() // Força a revalidação da rota principal
+    loadComplementos() // Recarrega a lista de complementos
+    onReload?.()
+  }, [router, searchParams, pathname, loadComplementos, onReload])
 
   const handleTabsModalReload = useCallback(() => {
     loadComplementos()

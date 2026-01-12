@@ -1,5 +1,6 @@
 'use client'
 
+import { Suspense } from 'react'
 import { GruposComplementosList } from '@/src/presentation/components/features/grupos-complementos/GruposComplementosList'
 
 /**
@@ -9,7 +10,9 @@ import { GruposComplementosList } from '@/src/presentation/components/features/g
 export default function GruposComplementosPage() {
   return (
     <div className="h-full">
-      <GruposComplementosList />
+      <Suspense fallback={<div>Carregando grupos de complementos...</div>}>
+        <GruposComplementosList />
+      </Suspense>
     </div>
   )
 }

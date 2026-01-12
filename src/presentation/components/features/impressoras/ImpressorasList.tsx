@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Impressora } from '@/src/domain/entities/Impressora'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { MdSearch, MdPrint, MdDelete } from 'react-icons/md'
@@ -42,6 +43,9 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
   const { auth, isAuthenticated } = useAuthStore()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
 
   const searchTextRef = useRef('')
 
@@ -158,26 +162,39 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated])
 
-  const handleEdit = (impressoraId: string) => {
+  const handleEdit = useCallback((impressoraId: string) => {
     setModalState({
       open: true,
       tab: 'impressora',
       mode: 'edit',
       impressoraId,
     })
-  }
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.set('modalImpressoraOpen', 'true')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+  }, [router, searchParams, pathname])
 
-  const handleAdd = () => {
+  const handleAdd = useCallback(() => {
     setModalState({
       open: true,
       tab: 'impressora',
       mode: 'create',
     })
-  }
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.set('modalImpressoraOpen', 'true')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+  }, [router, searchParams, pathname])
 
-  const handleCloseModal = () => {
+  const handleCloseModal = useCallback(() => {
     setModalState((prev) => ({ ...prev, open: false }))
-  }
+
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.delete('modalImpressoraOpen')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+    router.refresh() // Força a revalidação da rota principal
+    loadAllImpressoras() // Recarrega a lista de impressoras
+    onReload?.()
+  }, [router, searchParams, pathname, loadAllImpressoras, onReload])
 
   const handleTabChange = (tab: 'impressora') => {
     setModalState((prev) => ({ ...prev, tab }))
