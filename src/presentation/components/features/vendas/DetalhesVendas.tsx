@@ -136,13 +136,9 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
    * Busca nome de usuário PDV
    */
   const fetchUsuarioNome = useCallback(
-    async (usuarioId: string): Promise<string> => {
-      if (nomesUsuarios[usuarioId]) {
-        return nomesUsuarios[usuarioId]
-      }
-
+    async (usuarioId: string): Promise<string | null> => {
       const token = auth?.getAccessToken()
-      if (!token) return usuarioId
+      if (!token) return null
 
       try {
         const response = await fetch(`/api/usuarios/${usuarioId}`, {
@@ -152,18 +148,16 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
           },
         })
 
-        if (!response.ok) return usuarioId
+        if (!response.ok) return null
 
         const data = await response.json()
-        const nome = data.nome || data.name || usuarioId
-        setNomesUsuarios((prev) => ({ ...prev, [usuarioId]: nome }))
-        return nome
+        return data.nome || data.name || null
       } catch (error) {
         console.error('Erro ao buscar nome do usuário:', error)
-        return usuarioId
+        return null
       }
     },
-    [auth, nomesUsuarios]
+    [auth]
   )
 
   /**
@@ -171,10 +165,6 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
    */
   const fetchMeioPagamento = useCallback(
     async (meioId: string): Promise<MeioPagamentoDetalhes | null> => {
-      if (nomesMeiosPagamento[meioId]) {
-        return nomesMeiosPagamento[meioId]
-      }
-
       const token = auth?.getAccessToken()
       if (!token) return null
 
@@ -194,14 +184,13 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
           nome: data.nome || data.name || 'Sem nome',
           formaPagamentoFiscal: data.formaPagamentoFiscal || data.formaPagamento || '',
         }
-        setNomesMeiosPagamento((prev) => ({ ...prev, [meioId]: meio }))
         return meio
       } catch (error) {
         console.error('Erro ao buscar meio de pagamento:', error)
         return null
       }
     },
-    [auth, nomesMeiosPagamento]
+    [auth]
   )
 
   /**
@@ -278,9 +267,17 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
     if (!vendaId || !open) return
 
     const token = auth?.getAccessToken()
-    if (!token) return
+    if (!token) {
+      showToast.error('Usuário não autenticado.')
+      onClose() // Fecha o modal se não houver token
+      return
+    }
 
     setIsLoading(true)
+    setVenda(null) // Limpa venda anterior para evitar exibição de dados antigos durante o carregamento
+    setNomeCliente(null) // Limpa cliente anterior
+    setNomesUsuarios({}) // Limpa usuários anteriores
+    setNomesMeiosPagamento({}) // Limpa meios de pagamento anteriores
 
     try {
       const response = await fetch(`/api/vendas/${vendaId}`, {
@@ -295,53 +292,76 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
         throw new Error(errorData.error || 'Erro ao buscar detalhes da venda')
       }
 
-      const data = await response.json()
+      const data: VendaDetalhes = await response.json()
       setVenda(data)
 
-      // Busca nomes de usuários únicos
-      const usuarioIds = new Set<string>()
-      if (data.abertoPorId) usuarioIds.add(data.abertoPorId)
-      if (data.canceladoPorId) usuarioIds.add(data.canceladoPorId)
-      if (data.ultimoResponsavelId) usuarioIds.add(data.ultimoResponsavelId)
-      data.produtosLancados?.forEach((p: ProdutoLancado) => {
-        if (p.lancadoPorId) usuarioIds.add(p.lancadoPorId)
+      // Coleta todos os IDs de usuários únicos que precisam ser buscados
+      const userIdsToFetch = new Set<string>()
+      if (data.abertoPorId) userIdsToFetch.add(data.abertoPorId)
+      if (data.canceladoPorId) userIdsToFetch.add(data.canceladoPorId)
+      if (data.ultimoResponsavelId) userIdsToFetch.add(data.ultimoResponsavelId)
+      data.produtosLancados?.forEach((p) => {
+        if (p.lancadoPorId) userIdsToFetch.add(p.lancadoPorId)
       })
-      data.pagamentos?.forEach((p: Pagamento) => {
-        if (p.realizadoPorId) usuarioIds.add(p.realizadoPorId)
-      })
-
-      // Busca nomes em paralelo
-      await Promise.all(Array.from(usuarioIds).map((id) => fetchUsuarioNome(id)))
-
-      // Busca meios de pagamento únicos
-      const meioIds = new Set<string>()
-      data.pagamentos?.forEach((p: Pagamento) => {
-        if (p.meioPagamentoId) meioIds.add(p.meioPagamentoId)
+      data.pagamentos?.forEach((p) => {
+        if (p.realizadoPorId) userIdsToFetch.add(p.realizadoPorId)
       })
 
-      await Promise.all(Array.from(meioIds).map((id) => fetchMeioPagamento(id)))
+      // Coleta todos os IDs de meios de pagamento únicos que precisam ser buscados
+      const meioIdsToFetch = new Set<string>()
+      data.pagamentos?.forEach((p) => {
+        if (p.meioPagamentoId) meioIdsToFetch.add(p.meioPagamentoId)
+      })
 
-      // Busca nome do cliente se existir
-      if (data.clienteId) {
-        const clienteNome = await fetchClienteNome(data.clienteId)
-        if (clienteNome) {
-          setNomeCliente(clienteNome)
+      // Executa todas as buscas de dados auxiliares em paralelo
+      const [userNamesResolved, meioPagamentoResolved, clienteNomeResult] = await Promise.all([
+        Promise.all(Array.from(userIdsToFetch).map((id) => fetchUsuarioNome(id))),
+        Promise.all(Array.from(meioIdsToFetch).map((id) => fetchMeioPagamento(id))),
+        data.clienteId ? fetchClienteNome(data.clienteId) : Promise.resolve(null),
+      ])
+
+      // Constrói e atualiza o estado de nomes de usuários
+      const finalNomesUsuarios: Record<string, string> = {}
+      Array.from(userIdsToFetch).forEach((id, index) => {
+        const nome = userNamesResolved[index]
+        if (nome) {
+          finalNomesUsuarios[id] = nome
         }
+      })
+      setNomesUsuarios(finalNomesUsuarios)
+
+      // Constrói e atualiza o estado de meios de pagamento
+      const finalNomesMeiosPagamento: Record<string, MeioPagamentoDetalhes> = {}
+      Array.from(meioIdsToFetch).forEach((id, index) => {
+        const meio = meioPagamentoResolved[index]
+        if (meio) {
+          finalNomesMeiosPagamento[id] = meio
+        }
+      })
+      setNomesMeiosPagamento(finalNomesMeiosPagamento)
+
+      if (clienteNomeResult) {
+        setNomeCliente(clienteNomeResult)
       }
     } catch (error) {
       console.error('Erro ao buscar detalhes da venda:', error)
       showToast.error('Erro ao buscar detalhes da venda')
+      setVenda(null) // Garante que a venda é limpa em caso de erro
+      onClose() // Fecha o modal em caso de erro grave para evitar loop infinito
     } finally {
       setIsLoading(false)
     }
-  }, [vendaId, open, auth, fetchUsuarioNome, fetchMeioPagamento, fetchClienteNome])
+  }, [vendaId, open, auth, fetchUsuarioNome, fetchMeioPagamento, fetchClienteNome, onClose])
 
   useEffect(() => {
     if (open && vendaId) {
       fetchVendaDetalhes()
     } else {
+      // Quando o modal é fechado ou vendaId é nulo, limpa os estados
       setVenda(null)
       setNomeCliente(null)
+      setNomesUsuarios({}) // Limpa cache de usuários
+      setNomesMeiosPagamento({}) // Limpa cache de meios de pagamento
     }
   }, [open, vendaId, fetchVendaDetalhes])
 

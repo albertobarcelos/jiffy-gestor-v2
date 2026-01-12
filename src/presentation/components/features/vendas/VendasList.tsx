@@ -975,7 +975,18 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               return (
                 <div
                   key={venda.id}
-                  className={`px-2 py-1 mb-2 rounded-lg flex items-center shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-all ${venda.dataCancelamento ? 'bg-red-100 hover:bg-red-200' : 'bg-info hover:bg-info/80'}`}>
+                  onClick={() => setSelectedVendaId(venda.id)} // Adicionado onClick para abrir detalhes
+                  className={`cursor-pointer px-2 py-1 mb-2 rounded-lg flex items-center shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-all ${(() => {
+                    let baseClasses = ''
+                    if (venda.dataCancelamento) {
+                      baseClasses = 'bg-red-100 hover:bg-red-200'
+                    } else if (!venda.dataCancelamento && !venda.dataFinalizacao) {
+                      baseClasses = 'bg-yellow-100 hover:bg-yellow-200'
+                    } else {
+                      baseClasses = 'bg-info hover:bg-info/80'
+                    }
+                    return baseClasses
+                  })()}`}>
                 
                   <div className="flex-1">
                     <span className="text-sm font-semibold text-primary-text font-nunito">
@@ -1007,7 +1018,10 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                   </div>
                   <div className="flex-1 flex justify-end">
                     <button
-                      onClick={() => setSelectedVendaId(venda.id)}
+                      onClick={(e) => {
+                        e.stopPropagation() // Impede que o clique no botão acione o clique da linha
+                        setSelectedVendaId(venda.id)
+                      }}
                       className="w-10 h-10 flex items-center justify-center text-primary hover:bg-primary/10 rounded transition-colors"
                       title="Comprovante de Venda"
                     >
