@@ -69,6 +69,7 @@ export function useGruposProdutos(params: GruposProdutosQueryParams = {}) {
     },
     enabled: isAuthenticated && !!token,
     staleTime: 1000 * 60 * 10, // 10 minutos (grupos mudam pouco)
+    refetchOnMount: true, // Sempre refetch ao montar para garantir dados atualizados
   })
 }
 

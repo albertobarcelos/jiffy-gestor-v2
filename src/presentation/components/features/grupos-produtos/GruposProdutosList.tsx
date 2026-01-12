@@ -24,6 +24,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdSearch } from 'react-icons/md'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import {
   GruposProdutosTabsModal,
   GruposProdutosTabsModalState,
@@ -47,6 +48,9 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
   const loadMoreRef = useRef<HTMLDivElement>(null)
   const { auth } = useAuthStore()
   const queryClient = useQueryClient()
+  const router = useRouter() // Obter a instância do router
+  const searchParams = useSearchParams() // Obter os search params da URL
+  const pathname = usePathname() // Obter o pathname da URL
   const [tabsModalState, setTabsModalState] = useState<GruposProdutosTabsModalState>({
     open: false,
     tab: 'grupo',
@@ -242,8 +246,13 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
         grupoId: config.grupoId,
         initialTab: config.initialTab ?? prev.initialTab,
       }))
+
+      // Adicionar um parâmetro na URL para forçar o recarregamento ao fechar o modal de grupo
+      const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+      currentSearchParams.set('modalGrupoOpen', 'true')
+      router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
     },
-    []
+    [router, searchParams, pathname]
   )
 
   const closeTabsModal = useCallback(() => {
@@ -251,7 +260,15 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       ...prev,
       open: false,
     }))
-  }, [])
+    
+    // Remover o parâmetro da URL para forçar o recarregamento da rota
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.delete('modalGrupoOpen')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+    router.refresh() // Força a revalidação da rota principal
+    queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false }) // Invalida todas as queries de grupos de produtos
+    queryClient.invalidateQueries({ queryKey: ['produtos', 'infinite'] }) // Invalida o cache do React Query para produtos
+  }, [router, searchParams, pathname, queryClient])
 
   const handleTabsModalTabChange = useCallback((tab: 'grupo') => {
     setTabsModalState((prev) => ({
@@ -270,8 +287,13 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
         prefillGrupoProdutoId: grupoId,
         grupoId: undefined,
       })
+
+      // Adicionar um parâmetro na URL para forçar o recarregamento ao fechar
+      const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+      currentSearchParams.set('modalProdutoOpen', 'true')
+      router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
     },
-    []
+    [router, searchParams, pathname]
   )
 
   const handleCloseProdutoModal = useCallback(() => {
@@ -282,7 +304,15 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       prefillGrupoProdutoId: undefined,
       grupoId: undefined,
     }))
-  }, [])
+    
+    // Remover o parâmetro da URL para forçar o recarregamento da rota
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.delete('modalProdutoOpen')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+    router.refresh() // Força a revalidação da rota principal
+    queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false }) // Invalida todas as queries de grupos de produtos
+    queryClient.invalidateQueries({ queryKey: ['produtos', 'infinite'] }) // Invalida o cache do React Query para produtos
+  }, [router, searchParams, queryClient, pathname])
 
   const handleProdutoTabChange = useCallback(
     (tab: 'produto' | 'complementos' | 'impressoras' | 'grupo') => {
