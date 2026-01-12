@@ -14,7 +14,8 @@ export class Venda {
     private readonly descontoItem: number,
     private readonly valorFaturado: number,
     private readonly metodoPagamento: string,
-    private readonly status: 'Aprovada' | 'Cancelada'
+    private readonly status: 'Aprovada' | 'Cancelada',
+    private readonly dataCancelamento?: Date | null,
   ) {}
 
   static create(
@@ -29,7 +30,8 @@ export class Venda {
     descontoItem: number,
     valorFaturado: number,
     metodoPagamento: string,
-    status: 'Aprovada' | 'Cancelada'
+    status: 'Aprovada' | 'Cancelada',
+    dataCancelamento?: Date | null,
   ): Venda {
     if (!id || !data || numeroVenda <= 0 || !userId || !tipoVenda) {
       throw new Error('Campos obrigatórios não preenchidos')
@@ -47,7 +49,8 @@ export class Venda {
       descontoItem,
       valorFaturado,
       metodoPagamento,
-      status
+      status,
+      dataCancelamento
     )
   }
 
@@ -64,7 +67,8 @@ export class Venda {
       typeof data.descontoItem === 'number' ? data.descontoItem : parseFloat(data.descontoItem) || 0,
       typeof data.valorFaturado === 'number' ? data.valorFaturado : parseFloat(data.valorFaturado) || 0,
       data.metodoPagamento?.toString() || '',
-      data.status === 'Aprovada' || data.status === 'Cancelada' ? data.status : 'Aprovada'
+      data.status === 'Aprovada' || data.status === 'Cancelada' ? data.status : 'Aprovada',
+      data.dataCancelamento ? new Date(data.dataCancelamento) : null
     )
   }
 
@@ -116,12 +120,17 @@ export class Venda {
     return this.status
   }
 
+  getDataCancelamento(): Date | null | undefined {
+    return this.dataCancelamento
+  }
+
   isAprovada(): boolean {
     return this.status === 'Aprovada'
   }
 
   isCancelada(): boolean {
-    return this.status === 'Cancelada'
+    // Agora a verificação de cancelamento pode usar dataCancelamento para maior robustez
+    return this.status === 'Cancelada' || !!this.dataCancelamento
   }
 
   getTotalDescontos(): number {
@@ -142,6 +151,7 @@ export class Venda {
       valorFaturado: this.valorFaturado,
       metodoPagamento: this.metodoPagamento,
       status: this.status,
+      dataCancelamento: this.dataCancelamento?.toISOString() || null,
     }
   }
 }
