@@ -26,7 +26,7 @@ import {
   MdRemoveCircleOutline,
   MdLaunch,
 } from 'react-icons/md'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 
 
 interface ProdutosListProps {
@@ -433,6 +433,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
   const queryClient = useQueryClient()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const pathname = usePathname()
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
@@ -529,9 +530,9 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
       // Adicionar um parâmetro na URL para forçar o recarregamento ao fechar
       const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
       currentSearchParams.set('modalOpen', 'true')
-      router.replace({ search: currentSearchParams.toString() }, { scroll: false })
+      router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
     },
-    [router, searchParams]
+    [router, searchParams, pathname]
   )
 
   const closeTabsModal = useCallback(() => {
@@ -549,9 +550,9 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     // Remover o parâmetro da URL para forçar o recarregamento da rota
     const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
     currentSearchParams.delete('modalOpen')
-    router.replace({ search: currentSearchParams.toString() }, { scroll: false })
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
     router.refresh() // Força a revalidação da rota principal
-  }, [invalidateProdutosQueries, invalidateGruposProdutosQueries, onReload, router, searchParams])
+  }, [invalidateProdutosQueries, invalidateGruposProdutosQueries, onReload, router, searchParams, pathname])
 
   const handleTabsModalReload = useCallback(() => {
     invalidateProdutosQueries()
