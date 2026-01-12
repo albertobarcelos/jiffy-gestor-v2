@@ -70,12 +70,6 @@ export async function GET(
         password: response.data?.password || response.data?.senha || '',
       }
       
-      console.log('Retornando dados do usuário:', {
-        responseDataAPI: response.data,
-        perfilPdvObjeto: response.data?.perfilPdv,
-        perfilPdvIdExtraido: perfilPdvIdFromAPI,
-        perfilPdvIdFinal: responseData.perfilPdvId,
-      })
       
       return NextResponse.json(responseData)
     } catch (error: any) {

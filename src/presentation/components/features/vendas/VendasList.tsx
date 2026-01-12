@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter, usePathname } from 'next/navigation' // Importar useRouter e usePathname
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { MdSearch, MdAttachMoney, MdCalendarToday, MdFilterAltOff, MdRestaurant, MdPrint } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
@@ -66,6 +67,8 @@ interface VendasListProps {
  */
 export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   const { auth } = useAuthStore()
+  const router = useRouter()
+  const pathname = usePathname()
 
   // Calculamos as datas iniciais com base no initialPeriodo logo no início
   const initialDates = calculatePeriodo(initialPeriodo || 'Todos');
@@ -411,21 +414,11 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         const valorMin = normalizeCurrency(filters.valorMinimo)
         if (valorMin !== null && valorMin > 0) {
           params.append('valorFinalMinimo', valorMin.toString())
-          console.log('🔍 Filtro Valor Mínimo:', {
-            original: filters.valorMinimo,
-            normalized: valorMin,
-            sent: valorMin.toString()
-          })
         }
 
         const valorMax = normalizeCurrency(filters.valorMaximo)
         if (valorMax !== null && valorMax > 0) {
           params.append('valorFinalMaximo', valorMax.toString())
-          console.log('🔍 Filtro Valor Máximo:', {
-            original: filters.valorMaximo,
-            normalized: valorMax,
-            sent: valorMax.toString()
-          })
         }
 
         if (filters.meioPagamentoFilter) {
@@ -538,7 +531,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   /**
    * Limpa todos os filtros
    */
-  const handleClearFilters = () => {
+  const handleClearFilters = useCallback(() => {
     setSearchQuery('')
     setValorMinimo('')
     setValorMaximo('')
@@ -551,8 +544,25 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     setUsuarioCancelouFilter('')
     setPeriodoInicial(null)
     setPeriodoFinal(null)
-    // A busca será acionada pelo useEffect de debounce após a atualização dos estados
-  }
+
+    // Remove todos os parâmetros de filtro da URL
+    const currentSearchParams = new URLSearchParams(window.location.search)
+    currentSearchParams.delete('periodo')
+    currentSearchParams.delete('status')
+    currentSearchParams.delete('q')
+    currentSearchParams.delete('valorFinalMinimo')
+    currentSearchParams.delete('valorFinalMaximo')
+    currentSearchParams.delete('tipoVenda')
+    currentSearchParams.delete('meioPagamentoId')
+    currentSearchParams.delete('abertoPorId')
+    currentSearchParams.delete('terminalId')
+    currentSearchParams.delete('canceladoPorId')
+    currentSearchParams.delete('periodoInicial')
+    currentSearchParams.delete('periodoFinal')
+
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+    router.refresh() // Força a revalidação da rota para recarregar com os filtros limpos
+  }, [router, pathname])
 
   /**
    * Handle Enter nos campos de valor
