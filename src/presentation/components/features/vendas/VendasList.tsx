@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter, usePathname } from 'next/navigation' // Importar useRouter e usePathname
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { MdSearch, MdAttachMoney, MdCalendarToday, MdFilterAltOff, MdRestaurant, MdPrint } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
@@ -66,6 +67,8 @@ interface VendasListProps {
  */
 export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   const { auth } = useAuthStore()
+  const router = useRouter()
+  const pathname = usePathname()
 
   // Calculamos as datas iniciais com base no initialPeriodo logo no início
   const initialDates = calculatePeriodo(initialPeriodo || 'Todos');
@@ -411,21 +414,11 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         const valorMin = normalizeCurrency(filters.valorMinimo)
         if (valorMin !== null && valorMin > 0) {
           params.append('valorFinalMinimo', valorMin.toString())
-          console.log('🔍 Filtro Valor Mínimo:', {
-            original: filters.valorMinimo,
-            normalized: valorMin,
-            sent: valorMin.toString()
-          })
         }
 
         const valorMax = normalizeCurrency(filters.valorMaximo)
         if (valorMax !== null && valorMax > 0) {
           params.append('valorFinalMaximo', valorMax.toString())
-          console.log('🔍 Filtro Valor Máximo:', {
-            original: filters.valorMaximo,
-            normalized: valorMax,
-            sent: valorMax.toString()
-          })
         }
 
         if (filters.meioPagamentoFilter) {
@@ -538,7 +531,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   /**
    * Limpa todos os filtros
    */
-  const handleClearFilters = () => {
+  const handleClearFilters = useCallback(() => {
     setSearchQuery('')
     setValorMinimo('')
     setValorMaximo('')
@@ -551,8 +544,25 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     setUsuarioCancelouFilter('')
     setPeriodoInicial(null)
     setPeriodoFinal(null)
-    // A busca será acionada pelo useEffect de debounce após a atualização dos estados
-  }
+
+    // Remove todos os parâmetros de filtro da URL
+    const currentSearchParams = new URLSearchParams(window.location.search)
+    currentSearchParams.delete('periodo')
+    currentSearchParams.delete('status')
+    currentSearchParams.delete('q')
+    currentSearchParams.delete('valorFinalMinimo')
+    currentSearchParams.delete('valorFinalMaximo')
+    currentSearchParams.delete('tipoVenda')
+    currentSearchParams.delete('meioPagamentoId')
+    currentSearchParams.delete('abertoPorId')
+    currentSearchParams.delete('terminalId')
+    currentSearchParams.delete('canceladoPorId')
+    currentSearchParams.delete('periodoInicial')
+    currentSearchParams.delete('periodoFinal')
+
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+    router.refresh() // Força a revalidação da rota para recarregar com os filtros limpos
+  }, [router, pathname])
 
   /**
    * Handle Enter nos campos de valor
@@ -975,7 +985,18 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               return (
                 <div
                   key={venda.id}
-                  className={`px-2 py-1 mb-2 rounded-lg flex items-center shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-all ${venda.dataCancelamento ? 'bg-red-100 hover:bg-red-200' : 'bg-info hover:bg-info/80'}`}>
+                  onClick={() => setSelectedVendaId(venda.id)} // Adicionado onClick para abrir detalhes
+                  className={`cursor-pointer px-2 py-1 mb-2 rounded-lg flex items-center shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-all ${(() => {
+                    let baseClasses = ''
+                    if (venda.dataCancelamento) {
+                      baseClasses = 'bg-red-100 hover:bg-red-200'
+                    } else if (!venda.dataCancelamento && !venda.dataFinalizacao) {
+                      baseClasses = 'bg-yellow-100 hover:bg-yellow-200'
+                    } else {
+                      baseClasses = 'bg-info hover:bg-info/80'
+                    }
+                    return baseClasses
+                  })()}`}>
                 
                   <div className="flex-1">
                     <span className="text-sm font-semibold text-primary-text font-nunito">
@@ -1007,7 +1028,10 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                   </div>
                   <div className="flex-1 flex justify-end">
                     <button
-                      onClick={() => setSelectedVendaId(venda.id)}
+                      onClick={(e) => {
+                        e.stopPropagation() // Impede que o clique no botão acione o clique da linha
+                        setSelectedVendaId(venda.id)
+                      }}
                       className="w-10 h-10 flex items-center justify-center text-primary hover:bg-primary/10 rounded transition-colors"
                       title="Comprovante de Venda"
                     >

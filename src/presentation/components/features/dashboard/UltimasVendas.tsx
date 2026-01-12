@@ -142,6 +142,7 @@ export function UltimasVendas({ periodo }: UltimasVendasProps) {
           const status = item.cancelado ? 'Cancelada' :
                         item.status === 'CANCELADA' ? 'Cancelada' :
                         'Aprovada'
+          const dataCancelamento = item.dataCancelamento ? new Date(item.dataCancelamento) : null
 
           return Venda.create(
             item.id?.toString() || '',
@@ -155,7 +156,8 @@ export function UltimasVendas({ periodo }: UltimasVendasProps) {
             0, // descontoItem
             valorFaturado,
             metodoPagamento,
-            status as 'Aprovada' | 'Cancelada'
+            status as 'Aprovada' | 'Cancelada',
+            dataCancelamento
           )
         })
 
@@ -229,7 +231,7 @@ export function UltimasVendas({ periodo }: UltimasVendasProps) {
 
   return (
     <>
-      <div className="bg-white h-[390px] rounded-lg shadow-sm shadow-primary/70 border border-gray-200 p-6 overflow-y-auto">
+      <div className="bg-white h-[390px] rounded-lg shadow-sm shadow-primary/70 border border-gray-200 p-6 overflow-y-auto scrollbar-hide">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold text-primary">Últimas Vendas</h3>
           <span className="text-sm text-primary/70">Última semana</span>
@@ -248,7 +250,8 @@ export function UltimasVendas({ periodo }: UltimasVendasProps) {
               return (
                 <div
                   key={venda.getId()}
-                  className="flex items-center justify-between p-4 rounded-lg hover:bg-primary/10 transition-colors border border-primary/50 group"
+                  className={`flex items-center justify-between p-4 rounded-lg transition-colors border border-primary/50 group cursor-pointer ${venda.getDataCancelamento() ? 'bg-red-100' : 'bg-white hover:bg-primary/10'}`}
+                  onClick={() => handleOpenModal(venda.getId())}
                 >
                   <div className="flex items-center gap-4 flex-1">
                     {/* Avatar/Logo placeholder */}
@@ -272,7 +275,6 @@ export function UltimasVendas({ periodo }: UltimasVendasProps) {
 
                     {/* Ícone de olho para ver detalhes */}
                     <button
-                      onClick={() => handleOpenModal(venda.getId())}
                       className="p-2 text-primary/70 hover:text-primary rounded-lg transition-colors flex-shrink-0"
                       title="Ver detalhes da venda"
                     >

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation' // Importar useRouter
 import { MdAttachMoney, MdRestaurant, MdShoppingCart } from 'react-icons/md'
+import { LuDoorOpen } from "react-icons/lu";
 import { BuscarVendasDashboardUseCase } from '@/src/application/use-cases/dashboard/BuscarVendasDashboardUseCase'
 import { DashboardVendas } from '@/src/domain/entities/DashboardVendas'
 import { ModalMetodosPagamento } from './ModalMetodosPagamento'
@@ -21,6 +22,7 @@ export function MetricCards({ periodo }: MetricCardsProps) {
   const [dataTotal, setDataTotal] = useState<DashboardVendas | null>(null);
   const [dataFinalizadas, setDataFinalizadas] = useState<DashboardVendas | null>(null);
   const [dataCanceladas, setDataCanceladas] = useState<DashboardVendas | null>(null);
+  const [dataAbertas, setDataAbertas] = useState<DashboardVendas | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -49,10 +51,12 @@ export function MetricCards({ periodo }: MetricCardsProps) {
         const total = await useCase.execute(mappedPeriodo, ['FINALIZADA', 'CANCELADA']);
         const finalizadas = await useCase.execute(mappedPeriodo, ['FINALIZADA']);
         const canceladas = await useCase.execute(mappedPeriodo, ['CANCELADA']);
+        const abertas = await useCase.execute(mappedPeriodo, ['ABERTA']);
         
         setDataTotal(total);
         setDataFinalizadas(finalizadas);
         setDataCanceladas(canceladas);
+        setDataAbertas(abertas);
 
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erro ao carregar dados');
@@ -106,7 +110,7 @@ export function MetricCards({ periodo }: MetricCardsProps) {
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         {/* Total Faturado */}
         <MetricCard className=" border hover:border-primary/50"
           title="Total Faturado"
@@ -141,6 +145,19 @@ export function MetricCards({ periodo }: MetricCardsProps) {
           isPositive={false}
           onClick={() => {
             router.push(`/relatorios?periodo=${periodo}&status=Cancelada`)
+          }}
+        />
+
+        {/* Vendas em Aberto */}
+        <MetricCard className=" border hover:border-primary/50"
+          title="Vendas em Aberto"
+          value={formatNumber(dataAbertas?.getCountVendasEfetivadas())}
+          icon={<LuDoorOpen size={20} color="var(--color-primary)" />}
+          bgColorClass="bg-info border-2 border-primary"
+          iconColorClass="text-info"
+          isPositive={true} // Consideramos vendas em aberto como um ponto positivo para o fluxo
+          onClick={() => {
+            router.push(`/relatorios?periodo=${periodo}&status=Aberta`)
           }}
         />
 
