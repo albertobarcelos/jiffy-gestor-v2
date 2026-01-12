@@ -1,5 +1,7 @@
 'use client'
 
+'use client'
+
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { useGruposComplementosInfinite } from '@/src/presentation/hooks/useGruposComplementos'
