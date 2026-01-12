@@ -167,7 +167,7 @@ export function ProdutosTabsModal({ state, onClose, onReload, onTabChange }: Pro
                   isEmbedded
                   onClose={onClose}
                   onSaved={() => {
-                    onReload?.()
+                    // Não chamar onReload aqui, pois NovoGrupo já fará a invalidação e o onClose.
                     onClose()
                   }}
                 />

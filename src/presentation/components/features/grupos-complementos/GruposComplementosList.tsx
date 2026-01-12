@@ -1,5 +1,7 @@
 'use client'
 
+'use client'
+
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { useGruposComplementosInfinite } from '@/src/presentation/hooks/useGruposComplementos'
@@ -11,7 +13,9 @@ import {
   MdKeyboardArrowUp,
   MdKeyboardArrowDown,
 } from 'react-icons/md'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useQueryClient } from '@tanstack/react-query'
 import { showToast } from '@/src/shared/utils/toast'
 import {
   GruposComplementosTabsModal,
@@ -317,6 +321,10 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
 
   const { auth } = useAuthStore()
   const [updatingQuantidadeId, setUpdatingQuantidadeId] = useState<string | null>(null)
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
+  const queryClient = useQueryClient() // Declarar queryClient aqui
 
   const [tabsModalState, setTabsModalState] = useState<GruposComplementosTabsModalState>({
     open: false,
@@ -375,16 +383,29 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
         mode: config.mode ?? 'create',
         grupo: config.grupo,
       }))
+
+      // Adicionar um parâmetro na URL para forçar o recarregamento ao fechar o modal de complemento
+      const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+      currentSearchParams.set('modalComplementoOpen', 'true')
+      router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
     },
-    []
+    [router, searchParams, pathname]
   )
 
-  const closeTabsModal = useCallback(() => {
+  const closeTabsModal = useCallback(async () => {
     setTabsModalState((prev) => ({
       ...prev,
       open: false,
     }))
-  }, [])
+    
+    // Remover o parâmetro da URL para forçar o recarregamento da rota
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.delete('modalComplementoOpen')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+    router.refresh() // Força a revalidação da rota principal
+    // Invalida o cache do React Query para grupos de complementos
+    await queryClient.invalidateQueries({ queryKey: ['grupos-complementos'], exact: false })
+  }, [router, searchParams, pathname, refetch])
 
   const handleTabsModalReload = useCallback(async () => {
     await handleActionsReload()

@@ -5,6 +5,7 @@ import { Usuario } from '@/src/domain/entities/Usuario'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdSearch, MdDelete } from 'react-icons/md'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import {
   Select,
   SelectContent,
@@ -55,6 +56,9 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
   const { auth, isAuthenticated } = useAuthStore()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
   
   // Estados para perfis PDV (sempre busca dados atualizados)
   const [allPerfisPDV, setAllPerfisPDV] = useState<Array<{ id: string; role: string }>>([])
@@ -310,7 +314,12 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
       mode: config.mode ?? 'create',
       usuarioId: config.usuarioId,
     }))
-  }, [])
+
+    // Adicionar um parâmetro na URL para forçar o recarregamento ao fechar o modal
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.set('modalUsuarioOpen', 'true')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+  }, [router, searchParams, pathname])
 
   const closeTabsModal = useCallback(() => {
     setTabsModalState((prev) => ({
@@ -318,7 +327,16 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
       open: false,
       usuarioId: undefined,
     }))
-  }, [])
+
+    // Remover o parâmetro da URL para forçar o recarregamento da rota
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.delete('modalUsuarioOpen')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+    router.refresh() // Força a revalidação da rota principal
+    loadPerfisPDV() // Recarrega perfis para garantir que novos perfis apareçam
+    loadAllUsuarios() // Recarrega a lista de usuários
+    onReload?.()
+  }, [router, searchParams, pathname, loadPerfisPDV, loadAllUsuarios, onReload])
 
   const handleTabsModalReload = useCallback(() => {
     loadPerfisPDV() // Recarrega perfis para garantir que novos perfis apareçam

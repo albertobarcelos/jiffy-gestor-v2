@@ -8,6 +8,7 @@ import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { IconPickerModal } from './IconPickerModal'
 import { ColorPickerModal } from './ColorPickerModal'
 import { ProdutosPorGrupoList } from './ProdutosPorGrupoList'
+import { useQueryClient } from '@tanstack/react-query'
 
 interface NovoGrupoProps {
   grupoId?: string
@@ -25,6 +26,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
   const router = useRouter()
   const searchParams = useSearchParams()
   const { auth } = useAuthStore()
+  const queryClient = useQueryClient() // Obter a instância do queryClient
 
   const [nome, setNome] = useState('')
   const [ativo, setAtivo] = useState(true)
@@ -189,6 +191,9 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
         onClose?.()
       } else {
         router.push('/cadastros/grupos-produtos')
+        router.refresh() // Força a revalidação dos dados da rota para recarregar a lista
+        queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false }) // Invalida todas as queries de grupos de produtos
+        queryClient.invalidateQueries({ queryKey: ['produtos', 'infinite'] }) // Invalida o cache do React Query para produtos
       }
     } catch (error: any) {
       console.error('Erro ao salvar grupo:', error)
