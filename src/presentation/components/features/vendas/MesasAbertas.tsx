@@ -53,6 +53,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
   const [vendas, setVendas] = useState<Venda[]>([])
   const [metricas, setMetricas] = useState<MetricasVendas | null>(null)
   const [usuariosPDV, setUsuariosPDV] = useState<UsuarioPDV[]>([])
+  const [ultimoProdutoPorVenda, setUltimoProdutoPorVenda] = useState<Record<string, string | null>>({})
 
   // Estados de UI
   const [isLoading, setIsLoading] = useState(false)
@@ -133,6 +134,51 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
       //setIsLoadingUsuariosPDV(false) // Não temos este estado, mas manter para referência
     }
   }, [auth])
+
+  /**
+   * Busca data do último produto lançado para uma lista de vendas
+   */
+  const fetchUltimoProdutoLancado = useCallback(
+    async (ids: string[]) => {
+      const token = auth?.getAccessToken()
+      if (!token || ids.length === 0) return
+
+      try {
+        const results = await Promise.all(
+          ids.map(async (id) => {
+            try {
+              const response = await fetch(`/api/vendas/${id}`, {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+              })
+              if (!response.ok) {
+                return { id, dataUltimoProdutoLancado: null }
+              }
+              const data = await response.json()
+              return { id, dataUltimoProdutoLancado: data.dataUltimoProdutoLancado || null }
+            } catch {
+              return { id, dataUltimoProdutoLancado: null }
+            }
+          })
+        )
+
+        setUltimoProdutoPorVenda((prev) => {
+          const next = { ...prev }
+          results.forEach(({ id, dataUltimoProdutoLancado }) => {
+            if (dataUltimoProdutoLancado !== undefined) {
+              next[id] = dataUltimoProdutoLancado
+            }
+          })
+          return next
+        })
+      } catch (error) {
+        console.error('Erro ao buscar último produto lançado:', error)
+      }
+    },
+    [auth]
+  )
 
 
   /**
@@ -227,6 +273,19 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
     return () => container.removeEventListener('scroll', handleScroll)
   }, [canLoadMore, isLoadingMore, isLoading, fetchVendas])
 
+  /**
+   * Busca data do último produto lançado para as vendas listadas
+   */
+  useEffect(() => {
+    const ids = vendas
+      .map((v) => v.id)
+      .filter((id) => ultimoProdutoPorVenda[id] === undefined)
+
+    if (ids.length > 0) {
+      fetchUltimoProdutoLancado(ids)
+    }
+  }, [vendas, fetchUltimoProdutoLancado, ultimoProdutoPorVenda])
+
   // Efeito para carregar dados auxiliares e iniciar a busca de vendas
   useEffect(() => {
     if (!auth) return
@@ -305,13 +364,14 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
             )}
 
             {vendas.map((venda) => {
-              const elapsedTime = formatElapsedTime(venda.dataCriacao)
+              const dataReferencia = ultimoProdutoPorVenda[venda.id] || venda.dataCriacao
+              const elapsedTime = formatElapsedTime(dataReferencia)
               const usuarioNome =
                 usuariosPDV.find((u) => u.id === venda.abertoPorId)?.nome || venda.abertoPorId
 
               // Calcula cor dinâmica para o círculo interno (começa branco e vai amarelando até o warning cheio)
               const now = new Date()
-              const start = new Date(venda.dataCriacao)
+              const start = new Date(dataReferencia)
               const diffMs = now.getTime() - start.getTime()
               const diffMinutes = Math.floor(diffMs / (1000 * 60))
               const intensity = diffMinutes <= 10 ? 0 : Math.min(100, Math.ceil(diffMinutes / 10) * 10)
@@ -344,14 +404,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
                     </div>
                   </div>
 
-                  {/* Botão de impressão posicionado no canto superior direito */}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setSelectedVendaId(venda.id); }}
-                    className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center text-primary hover:bg-primary/10 rounded transition-colors"
-                    title="Comprovante de Venda"
-                  >
-                    <MdPrint size={20}/>
-                  </button>
+                  
                 </div>
               )
             })}
