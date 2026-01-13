@@ -12,6 +12,7 @@ interface TipoVendaIconProps {
   corPrincipal?: string // Cor principal (alternate) - padrão: var(--color-alternate)
   corSecundaria?: string // Cor secundária (info) - padrão: var(--color-info)
   corTexto?: string // Cor do texto/número - padrão: var(--color-alternate)
+  corCirculoInterno?: string // Cor opcional apenas do círculo interno
   corBorda?: string // Cor da borda - padrão: rgba(131, 56, 236, 0.5)
   corFundo?: string // Cor de fundo do círculo externo - padrão: var(--color-primary-background)
   corBalcao?: string // Cor do ícone de balcão - padrão: var(--color-alternate)
@@ -37,6 +38,7 @@ export function TipoVendaIcon({
   corPrincipal = 'var(--color-alternate)',
   corSecundaria = 'var(--color-info)',
   corTexto = 'var(--color-alternate)',
+  corCirculoInterno,
   corBorda = 'rgba(131, 56, 236, 0.5)',
   corFundo = 'var(--color-primary-background)',
   corBalcao = 'var(--color-alternate)',
@@ -130,7 +132,7 @@ export function TipoVendaIcon({
             style={{
               width: `${innerCircleSize}px`,
               height: `${innerCircleSize}px`,
-              backgroundColor: corPrincipal,
+              backgroundColor: corCirculoInterno || corPrincipal,
               top: '50%',
               left: '50%',
               transform: 'translate(-50%, -50%)',

@@ -1,21 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { MdSearch, MdAttachMoney, MdCalendarToday, MdFilterAltOff, MdRestaurant, MdPrint } from 'react-icons/md'
+import { MdAttachMoney, MdRestaurant, MdPrint } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { DetalhesVendas } from './DetalhesVendas'
-import { EscolheDatasModal } from './EscolheDatasModal'
-import {
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  CircularProgress,
-} from '@mui/material'
+import { CircularProgress } from '@mui/material'
 import { TipoVendaIcon } from './TipoVendaIcon'
-import { calculatePeriodo } from '@/src/shared/utils/dateFilters'
 import { formatElapsedTime } from '@/src/shared/utils/formatters'
 // Tipos
 interface Venda {
@@ -47,50 +38,21 @@ interface UsuarioPDV {
   nome: string
 }
 
-interface MeioPagamento {
-  id: string
-  nome: string
-}
-
-interface Terminal {
-  id: string
-  nome: string
-}
 
 interface VendasAbertasProps {
   initialPeriodo?: string; // Período inicial vindo da URL (ex: "Hoje", "Últimos 7 Dias")
 }
 
 /**
- * Componente de listagem de vendas Abertas
- * Implementa scroll infinito, filtros avançados e cards de métricas
+ * Componente de listagem de mesas em aberto
+ * Exibe apenas mesas (não balcão) com scroll infinito e cards de métricas
  */
 export function VendasAbertas({ initialPeriodo }: VendasAbertasProps) {
   const { auth } = useAuthStore()
-  const router = useRouter()
-  const pathname = usePathname()
 
-  // Calculamos as datas iniciais com base no initialPeriodo logo no início
-  const initialDates = calculatePeriodo(initialPeriodo || 'Todos');
-
-  // Estados de filtros
-  const [searchQuery, setSearchQuery] = useState('')
-  const [valorMinimo, setValorMinimo] = useState('')
-  const [valorMaximo, setValorMaximo] = useState('')
-  const [periodo, setPeriodo] = useState<string>(initialPeriodo || 'Todos')
-  const [statusFilter, setStatusFilter] = useState<string | null>('Aberta') // Status fixo como 'Aberta'
-  const [periodoInicial, setPeriodoInicial] = useState<Date | null>(initialDates.inicio)
-  const [periodoFinal, setPeriodoFinal] = useState<Date | null>(initialDates.fim)
-  const [tipoVendaFilter, setTipoVendaFilter] = useState<string | null>(null);
-  const [meioPagamentoFilter, setMeioPagamentoFilter] = useState('');
-  const [usuarioAbertoPorFilter, setUsuarioAbertoPorFilter] = useState('');
-  const [terminalFilter, setTerminalFilter] = useState('');
-  const [usuarioCancelouFilter, setUsuarioCancelouFilter] = useState('');
   const [vendas, setVendas] = useState<Venda[]>([])
   const [metricas, setMetricas] = useState<MetricasVendas | null>(null)
   const [usuariosPDV, setUsuariosPDV] = useState<UsuarioPDV[]>([])
-  const [meiosPagamento, setMeiosPagamento] = useState<MeioPagamento[]>([])
-  const [terminais, setTerminais] = useState<Terminal[]>([])
 
   // Estados de UI
   const [isLoading, setIsLoading] = useState(false)
@@ -98,9 +60,6 @@ export function VendasAbertas({ initialPeriodo }: VendasAbertasProps) {
   const [canLoadMore, setCanLoadMore] = useState(true)
   const [currentPage, setCurrentPage] = useState(0)
   const [selectedVendaId, setSelectedVendaId] = useState<string | null>(null)
-  const [isLoadingMeiosPagamento, setIsLoadingMeiosPagamento] = useState(false)
-  const [isLoadingTerminais, setIsLoadingTerminais] = useState(false)
-  const [isDatasModalOpen, setIsDatasModalOpen] = useState(false)
   const [elapsedTimeUpdateTrigger, setElapsedTimeUpdateTrigger] = useState(0) // Estado para forçar atualização do tempo decorrido
 
   useEffect(() => {
@@ -111,55 +70,9 @@ export function VendasAbertas({ initialPeriodo }: VendasAbertasProps) {
     return () => clearInterval(interval)
   }, [])
 
-  const pageSize = 10
+  const pageSize = 100 // Aumentado para carregar mais itens por vez
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
-  const filtersRef = useRef({
-    searchQuery,
-    valorMinimo,
-    valorMaximo,
-    periodo,
-    statusFilter: 'Aberta', // Fixar o status no ref
-    tipoVendaFilter,
-    meioPagamentoFilter,
-    usuarioAbertoPorFilter,
-    terminalFilter,
-    usuarioCancelouFilter,
-    periodoInicial,
-    periodoFinal,
-  })
-
-  // Atualiza refs quando os valores mudam
-  useEffect(() => {
-    filtersRef.current = {
-      searchQuery,
-      valorMinimo,
-      valorMaximo,
-      periodo,
-      statusFilter: 'Aberta', // Manter status fixo no ref
-      tipoVendaFilter,
-      meioPagamentoFilter,
-      usuarioAbertoPorFilter,
-      terminalFilter,
-      usuarioCancelouFilter,
-      periodoInicial,
-      periodoFinal,
-    }
-  }, [
-    searchQuery,
-    valorMinimo,
-    valorMaximo,
-    periodo,
-    // statusFilter removido das dependências
-    //statusFilter,
-    tipoVendaFilter,
-    meioPagamentoFilter,
-    usuarioAbertoPorFilter,
-    terminalFilter,
-    usuarioCancelouFilter,
-    periodoInicial,
-    periodoFinal,
-  ])
+  const currentPageRef = useRef(0)
 
   /**
    * Formata valor como moeda brasileira
@@ -169,52 +82,6 @@ export function VendasAbertas({ initialPeriodo }: VendasAbertasProps) {
       style: 'currency',
       currency: 'BRL',
     }).format(value)
-  }
-
-  /**
-   * Normaliza valor de moeda para número
-   */
-  const normalizeCurrency = (value: string): number | null => {
-    if (!value || value.trim() === '') return null
-    
-    // Remove todos os caracteres não numéricos exceto vírgula e ponto
-    let clean = value.replace(/[^\d,.]/g, '').trim()
-    
-    if (!clean) return null
-    
-    // Se tem vírgula, assume formato brasileiro (50,00)
-    if (clean.includes(',')) {
-      // Remove pontos (separadores de milhar) e substitui vírgula por ponto
-      clean = clean.replace(/\./g, '').replace(',', '.')
-    }
-    // Se só tem ponto, pode ser formato internacional (50.00) ou separador de milhar
-    else if (clean.includes('.')) {
-      // Se tem mais de um ponto, é separador de milhar, remove todos
-      if ((clean.match(/\./g) || []).length > 1) {
-        clean = clean.replace(/\./g, '')
-      }
-      // Se tem só um ponto, pode ser decimal ou milhar
-      // Se tem 3 dígitos após o ponto, é milhar, senão é decimal
-      const parts = clean.split('.')
-      if (parts.length === 2 && parts[1].length === 3) {
-        // É milhar, remove o ponto
-        clean = clean.replace('.', '')
-      }
-      // Senão mantém como está (formato internacional)
-    }
-    
-    const num = parseFloat(clean)
-    return isNaN(num) ? null : num
-  }
-
-  /**
-   * Formata input de moeda em tempo real
-   */
-  const formatCurrencyInput = (value: string): string => {
-    const numbers = value.replace(/[^\d]/g, '')
-    if (!numbers) return ''
-    const num = parseFloat(numbers) / 100
-    return formatCurrency(num)
   }
 
 
@@ -267,173 +134,31 @@ export function VendasAbertas({ initialPeriodo }: VendasAbertasProps) {
     }
   }, [auth])
 
-  /**
-   * Carrega todos os meios de pagamento
-   */
-  const loadAllMeiosPagamento = useCallback(async () => {
-    const token = auth?.getAccessToken()
-    if (!token) return
-
-    setIsLoadingMeiosPagamento(true)
-
-    try {
-      const allMeios: MeioPagamento[] = []
-      let currentOffset = 0
-      let hasMore = true
-      const limit = 100
-
-      while (hasMore) {
-        const params = new URLSearchParams({
-          limit: limit.toString(),
-          offset: currentOffset.toString(),
-          ativo: 'true',
-        })
-
-        const response = await fetch(`/api/meios-pagamentos?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-
-        if (!response.ok) break
-
-        const data = await response.json()
-        const newMeios = (data.items || []).map((m: any) => ({
-          id: m.id,
-          nome: m.nome || m.name || 'Sem nome',
-        }))
-
-        allMeios.push(...newMeios)
-        hasMore = newMeios.length === limit
-        currentOffset += newMeios.length
-      }
-
-      setMeiosPagamento(allMeios)
-    } catch (error) {
-      console.error('Erro ao carregar meios de pagamento:', error)
-    } finally {
-      setIsLoadingMeiosPagamento(false)
-    }
-  }, [auth])
 
   /**
-   * Carrega todos os terminais
-   */
-  const loadAllTerminais = useCallback(async () => {
-    const token = auth?.getAccessToken()
-    if (!token) return
-
-    setIsLoadingTerminais(true)
-
-    try {
-      const allTerminais: Terminal[] = []
-      let currentOffset = 0
-      let hasMore = true
-      const limit = 50
-
-      while (hasMore) {
-        const params = new URLSearchParams({
-          limit: limit.toString(),
-          offset: currentOffset.toString(),
-        })
-
-        const response = await fetch(`/api/terminais?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-
-        if (!response.ok) break
-
-        const data = await response.json()
-        const newTerminais = (data.items || []).map((t: any) => ({
-          id: t.id,
-          nome: t.nome || t.name || t.codigoInterno || 'Sem nome',
-        }))
-
-        allTerminais.push(...newTerminais)
-        hasMore = newTerminais.length === limit
-        currentOffset += newTerminais.length
-      }
-
-      setTerminais(allTerminais)
-    } catch (error) {
-      console.error('Erro ao carregar terminais:', error)
-    } finally {
-      setIsLoadingTerminais(false)
-    }
-  }, [auth])
-
-  /**
-   * Busca vendas com filtros
+   * Busca apenas mesas em aberto
    */
   const fetchVendas = useCallback(
-    async (resetPage = false, initialFilters?: any) => {
+    async (resetPage = false) => {
       const token = auth?.getAccessToken()
       if (!token) return
 
       if (resetPage) {
         setIsLoading(true)
+        currentPageRef.current = 0
         setCurrentPage(0)
       } else {
         setIsLoadingMore(true)
       }
 
       try {
-        const page = resetPage ? 0 : currentPage
+        const page = resetPage ? 0 : currentPageRef.current
         const params = new URLSearchParams({
           limit: pageSize.toString(),
           offset: (page * pageSize).toString(),
+          status: 'ABERTA',
+          tipoVenda: 'mesa', // Filtro fixo: apenas mesas
         })
-
-        const filters = initialFilters || filtersRef.current
-
-        if (filters.searchQuery) {
-          params.append('q', filters.searchQuery)
-        }
-
-        if (filters.tipoVendaFilter) {
-          params.append('tipoVenda', filters.tipoVendaFilter.toLowerCase())
-        }
-
-        // Status: FIXO como ABERTA
-        params.append('status', 'ABERTA')
-
-        if (filters.usuarioAbertoPorFilter) {
-          params.append('abertoPorId', filters.usuarioAbertoPorFilter)
-        }
-
-        if (filters.usuarioCancelouFilter) {
-          params.append('canceladoPorId', filters.usuarioCancelouFilter)
-        }
-
-        const valorMin = normalizeCurrency(filters.valorMinimo)
-        if (valorMin !== null && valorMin > 0) {
-          params.append('valorFinalMinimo', valorMin.toString())
-        }
-
-        const valorMax = normalizeCurrency(filters.valorMaximo)
-        if (valorMax !== null && valorMax > 0) {
-          params.append('valorFinalMaximo', valorMax.toString())
-        }
-
-        if (filters.meioPagamentoFilter) {
-          params.append('meioPagamentoId', filters.meioPagamentoFilter)
-        }
-
-        if (filters.terminalFilter) {
-          params.append('terminalId', filters.terminalFilter)
-        }
-
-        if (filters.periodoInicial) {
-          params.append('periodoInicial', filters.periodoInicial.toISOString())
-        }
-
-        if (filters.periodoFinal) {
-          params.append('periodoFinal', filters.periodoFinal.toISOString())
-        }
 
         const response = await fetch(`/api/vendas?${params.toString()}`, {
           headers: {
@@ -451,9 +176,23 @@ export function VendasAbertas({ initialPeriodo }: VendasAbertasProps) {
 
         if (resetPage) {
           setVendas(data.items || [])
+          currentPageRef.current = 1
           setCurrentPage(1)
+          
+          // Verifica se precisa carregar mais itens para preencher a tela
+          setTimeout(() => {
+            const container = scrollContainerRef.current
+            if (container && data.hasNext) {
+              const { scrollHeight, clientHeight } = container
+              // Se o conteúdo não preenche a tela, carrega mais
+              if (scrollHeight <= clientHeight) {
+                fetchVendas(false)
+              }
+            }
+          }, 100)
         } else {
           setVendas((prev) => [...prev, ...(data.items || [])])
+          currentPageRef.current += 1
           setCurrentPage((prev) => prev + 1)
         }
 
@@ -467,25 +206,8 @@ export function VendasAbertas({ initialPeriodo }: VendasAbertasProps) {
         setIsLoadingMore(false)
       }
     },
-    [auth, currentPage]
+    [auth]
   )
-
-  // Debounce para busca
-  useEffect(() => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current)
-    }
-
-    debounceTimerRef.current = setTimeout(() => {
-      fetchVendas(true)
-    }, 1000)
-
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current)
-      }
-    }
-  }, [searchQuery, tipoVendaFilter, meioPagamentoFilter, usuarioAbertoPorFilter, terminalFilter, usuarioCancelouFilter, periodo, periodoInicial, periodoFinal])
 
   // Scroll infinito
   useEffect(() => {
@@ -507,346 +229,20 @@ export function VendasAbertas({ initialPeriodo }: VendasAbertasProps) {
 
   // Efeito para carregar dados auxiliares e iniciar a busca de vendas
   useEffect(() => {
-    loadAllUsuariosPDV();
-    loadAllMeiosPagamento();
-    loadAllTerminais();
-    // Aciona a busca inicial de vendas com os filtros já configurados
-    fetchVendas(true, { statusFilter: 'Aberta', periodo: initialPeriodo || 'Todos', periodoInicial: initialDates.inicio, periodoFinal: initialDates.fim }); // Aciona a busca inicial de vendas com os filtros já configurados
-  }, [auth, initialPeriodo])
-
-  // Atualiza período quando muda (apenas se período não for "Datas Personalizadas")
-  useEffect(() => {
-    if (periodo === 'Datas Personalizadas') {
-      return;
-    }
-
-    const { inicio, fim } = calculatePeriodo(periodo)
-    setPeriodoInicial(inicio)
-    setPeriodoFinal(fim)
-
-  }, [periodo])
-
-  /**
-   * Limpa todos os filtros
-   */
-  const handleClearFilters = useCallback(() => {
-    setSearchQuery('')
-    setValorMinimo('')
-    setValorMaximo('')
-    setPeriodo('Todos')
-    // statusFilter removido
-    setTipoVendaFilter(null)
-    setMeioPagamentoFilter('')
-    setUsuarioAbertoPorFilter('')
-    setTerminalFilter('')
-    setUsuarioCancelouFilter('')
-    setPeriodoInicial(null)
-    setPeriodoFinal(null)
-
-    // Remove todos os parâmetros de filtro da URL
-    const currentSearchParams = new URLSearchParams(window.location.search)
-    currentSearchParams.delete('periodo')
-    currentSearchParams.set('status', 'ABERTA') // Garante que o status 'Aberta' sempre esteja na URL
-    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
-    router.refresh() // Força a revalidação da rota para recarregar com os filtros limpos
-  }, [router, pathname])
-
-  /**
-   * Handle Enter nos campos de valor
-   */
-  const handleValorKeyPress = (e: React.KeyboardEvent, field: 'min' | 'max') => {
-    if (e.key === 'Enter') {
-      fetchVendas(true)
-    }
-  }
-
-  /**
-   * Confirma seleção de datas e aplica filtro
-   */
-  const handleConfirmDatas = (dataInicial: Date | null, dataFinal: Date | null) => {
-    setPeriodoInicial(dataInicial)
-    setPeriodoFinal(dataFinal)
-    // Se datas foram selecionadas, muda período para "Todos" para não conflitar
-    if (dataInicial || dataFinal) {
-      setPeriodo('Todos')
-    }
-    // Busca vendas com as novas datas
+    if (!auth) return
+    
+    loadAllUsuariosPDV()
     fetchVendas(true)
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth])
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full max-h-[calc(100vh-100px)] overflow-hidden">
       {/* Container principal */}
-      <div className="bg-primary-background rounded-t-lg rounded-b-lg px-2">
-       
-
-        {/* Filtros Superiores */}
-        <div className="flex items-center gap-3 py-2">
-          {/* Campo de Pesquisa */}
-          <div className="flex-[2] relative">
-            <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
-            <input
-              type="text"
-              placeholder="Pesquisar por Código ou Identificação da Venda"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  fetchVendas(true)
-                }
-              }}
-              className="w-full h-8 pl-10 pr-4 rounded-lg bg-info border shadow-sm text-sm font-nunito"
-            />
-          </div>
-
-          {/* Valor Mínimo */}
-          <div className="relative">
-            <MdAttachMoney className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
-            <input
-              type="text"
-              placeholder="Valor Mínimo"
-              value={valorMinimo}
-              onChange={(e) => {
-                const formatted = formatCurrencyInput(e.target.value)
-                setValorMinimo(formatted)
-              }}
-              onKeyPress={(e) => handleValorKeyPress(e, 'min')}
-              className="w-32 h-8 pl-10 pr-4 rounded-lg bg-info border shadow-sm text-sm font-nunito"
-            />
-          </div>
-
-          {/* Valor Máximo */}
-          <div className="relative">
-            <MdAttachMoney className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
-            <input
-              type="text"
-              placeholder="Valor Máximo"
-              value={valorMaximo}
-              onChange={(e) => {
-                const formatted = formatCurrencyInput(e.target.value)
-                setValorMaximo(formatted)
-              }}
-              onKeyPress={(e) => handleValorKeyPress(e, 'max')}
-              className="w-32 h-8 pl-10 pr-4 rounded-lg bg-info border shadow-sm text-sm font-nunito"
-            />
-          </div>
-
-          {/* Label Período */}
-          <span className="text-primary text-sm font-exo">Período:</span>
-
-          {/* Dropdown Período */}
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <Select
-              value={periodo}
-              onChange={(e) => setPeriodo(e.target.value)}
-              sx={{
-                height: '32px',
-                backgroundColor: 'var(--color-primary)',
-                color: 'white',
-                fontSize: '13px',
-                '& .MuiOutlinedInput-notchedOutline': {
-                  borderColor: 'var(--color-primary)',
-                },
-                '& .MuiSvgIcon-root': {
-                  color: 'white',
-                },
-              }}
-            >
-              <MenuItem value="Todos">Todos</MenuItem>
-              <MenuItem value="Hoje">Hoje</MenuItem>
-              <MenuItem value="Ontem">Ontem</MenuItem>
-              <MenuItem value="Últimos 7 Dias">Últimos 7 Dias</MenuItem>
-              <MenuItem value="Mês Atual">Mês Atual</MenuItem>
-              <MenuItem value="Mês Passado">Mês Passado</MenuItem>
-              <MenuItem value="Últimos 30 Dias">Últimos 30 Dias</MenuItem>
-              <MenuItem value="Últimos 60 Dias">Últimos 60 Dias</MenuItem>
-              <MenuItem value="Últimos 90 Dias">Últimos 90 Dias</MenuItem>
-              <MenuItem value="Datas Personalizadas">Datas Personalizadas</MenuItem>
-            </Select>
-          </FormControl>
-
-          {/* Botão Por Datas */}
-          <button
-            onClick={() => setIsDatasModalOpen(true)}
-            className="h-8 px-4 bg-primary text-white rounded-lg flex items-center gap-2 text-sm font-nunito hover:bg-primary/90 transition-colors"
-          >
-            <MdCalendarToday size={18} />
-            Por datas
-          </button>
-        </div>
-
-        {/* Filtros Avançados */}
-        <div className="bg-custom-2 rounded-t-lg px-2 pt-1.5 pb-2 flex flex-wrap items-end gap-x-2 gap-y-4">
-          {/* Status da Venda - REMOVIDO */}
-          {/* Tipo de Venda */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-secondary-text font-nunito">Tipo de Venda</label>
-            <FormControl size="small" sx={{ minWidth: 180 }}>
-              <Select
-                value={tipoVendaFilter || ''}
-                onChange={(e) => setTipoVendaFilter(e.target.value || null)}
-                displayEmpty
-                sx={{
-                  height: '32px',
-                  backgroundColor: '#FFFFFF',
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'transparent',
-                  },
-                }}
-              >
-                <MenuItem value="">Selecione...</MenuItem>
-                <MenuItem value="balcao">Balcão</MenuItem>
-                <MenuItem value="mesa">Mesa</MenuItem>
-              </Select>
-            </FormControl>
-          </div>
-
-          {/* Meio de Pagamento */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-secondary-text font-nunito">Meio de Pagamento</label>
-            <FormControl size="small" sx={{ minWidth: 180 }}>
-              <Select
-                value={meioPagamentoFilter}
-                onChange={(e) => setMeioPagamentoFilter(e.target.value)}
-                disabled={isLoadingMeiosPagamento}
-                displayEmpty
-                MenuProps={{
-                  PaperProps: {
-                    sx: {
-                      maxHeight: '400px',
-                    },
-                  },
-                }}
-                sx={{
-                  height: '32px',
-                  backgroundColor: '#FFFFFF',
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'transparent',
-                  },
-                }}
-              >
-                <MenuItem value="">Selecione...</MenuItem>
-                {meiosPagamento.map((meio) => (
-                  <MenuItem key={meio.id} value={meio.id}>
-                    {meio.nome}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </div>
-
-          {/* Vendas por Usuário */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-secondary-text font-nunito">Vendas por Usuário</label>
-            <FormControl size="small" sx={{ minWidth: 180 }}>
-              <Select
-                value={usuarioAbertoPorFilter}
-                onChange={(e) => setUsuarioAbertoPorFilter(e.target.value)}
-                displayEmpty
-                MenuProps={{
-                  PaperProps: {
-                    sx: {
-                      maxHeight: '400px',
-                    },
-                  },
-                }}
-                sx={{
-                  height: '32px',
-                  backgroundColor: '#FFFFFF',
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'transparent',
-                  },
-                }}
-              >
-                <MenuItem value="">Selecione...</MenuItem>
-                {usuariosPDV.map((usuario) => (
-                  <MenuItem key={usuario.id} value={usuario.id}>
-                    {usuario.nome}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </div>
-
-          {/* Terminal */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-secondary-text font-nunito">Terminal</label>
-            <FormControl size="small" sx={{ minWidth: 180 }}>
-              <Select
-                value={terminalFilter}
-                onChange={(e) => setTerminalFilter(e.target.value)}
-                disabled={isLoadingTerminais}
-                displayEmpty
-                MenuProps={{
-                  PaperProps: {
-                    sx: {
-                      maxHeight: '400px',
-                    },
-                  },
-                }}
-                sx={{
-                  height: '32px',
-                  backgroundColor: '#FFFFFF',
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'transparent',
-                  },
-                }}
-              >
-                <MenuItem value="">Selecione...</MenuItem>
-                {terminais.map((terminal) => (
-                  <MenuItem key={terminal.id} value={terminal.id}>
-                    {terminal.nome}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </div>
-
-          {/* Usuário Cancelou */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-secondary-text font-nunito">Usuário Cancelou</label>
-            <FormControl size="small" sx={{ minWidth: 180 }}>
-              <Select
-                value={usuarioCancelouFilter}
-                onChange={(e) => setUsuarioCancelouFilter(e.target.value)}
-                displayEmpty
-                MenuProps={{
-                  PaperProps: {
-                    sx: {
-                      maxHeight: '400px',
-                    },
-                  },
-                }}
-                sx={{
-                  height: '32px',
-                  backgroundColor: '#FFFFFF',
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'transparent',
-                  },
-                }}
-              >
-                <MenuItem value="">Selecione...</MenuItem>
-                {usuariosPDV.map((usuario) => (
-                  <MenuItem key={usuario.id} value={usuario.id}>
-                    {usuario.nome}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </div>
-
-          {/* Botão Limpar Filtros */}
-          <button
-            onClick={handleClearFilters}
-            className="h-8 px-4 bg-primary text-white rounded-lg flex items-center justify-center gap-2 text-sm font-nunito hover:bg-primary/90 transition-colors"
-          >
-            <MdFilterAltOff size={18} />
-            Limpar Filtros
-          </button>
-        </div>
+      <div className="bg-primary-background rounded-t-lg rounded-b-lg px-2 flex flex-col h-full min-h-0 overflow-hidden">
 
         {/* Cards de Métricas */}
-        <div className="flex gap-2 m-1">
+        <div className="flex gap-2 m-1 flex-shrink-0 sticky top-0 z-10 bg-primary-background">
           {/* Vendas em Aberto (fixo) */}
           <div className="flex-1 border-2 rounded-lg p-1 flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-alternate flex items-center justify-center flex-shrink-0">
@@ -891,15 +287,15 @@ export function VendasAbertas({ initialPeriodo }: VendasAbertasProps) {
         </div>
 
         {/* Tabela de Vendas */}
-        <div className="bg-info rounded-lg overflow-hidden">
+        <div className="bg-info rounded-lg flex-1 min-h-0 flex flex-col overflow-hidden">
           {/* Lista com scroll */}
           <div
             ref={scrollContainerRef}
-            className="max-h-[calc(100vh-300px)] overflow-y-auto px-1 py-2 scrollbar-hide grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
+            className="h-full overflow-y-auto px-1 py-2 scrollbar-hide grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
           >
             {vendas.length === 0 && !isLoading && (
               <div className="flex items-center justify-center py-12 col-span-full">
-                <p className="text-secondary-text">Nenhuma venda em aberto encontrada.</p>
+                <p className="text-secondary-text">Nenhuma mesa em aberto encontrada.</p>
               </div>
             )}
 
@@ -908,36 +304,34 @@ export function VendasAbertas({ initialPeriodo }: VendasAbertasProps) {
               const usuarioNome =
                 usuariosPDV.find((u) => u.id === venda.abertoPorId)?.nome || venda.abertoPorId
 
+              // Calcula cor dinâmica para o círculo interno (começa branco e vai amarelando até o warning cheio)
+              const now = new Date()
+              const start = new Date(venda.dataCriacao)
+              const diffMs = now.getTime() - start.getTime()
+              const diffMinutes = Math.floor(diffMs / (1000 * 60))
+              const intensity = diffMinutes <= 10 ? 0 : Math.min(100, Math.ceil(diffMinutes / 10) * 10)
+              const innerCircleColor =
+                intensity === 0
+                  ? 'white'
+                  : `color-mix(in srgb, white ${100 - intensity}%, var(--color-warning) ${intensity}%)`
+
               return (
                 <div
                   key={venda.id}
                   onClick={() => setSelectedVendaId(venda.id)}
-                  className={`cursor-pointer px-2 py-1 mb-2 rounded-lg flex flex-col items-center justify-between shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-all w-[220px] h-[230px] relative ${(() => {
-                    const now = new Date();
-                    const start = new Date(venda.dataCriacao);
-                    const diffMs = now.getTime() - start.getTime();
-                    const diffMinutes = Math.floor(diffMs / (1000 * 60));
-
-                    if (diffMinutes <= 10) {
-                      return 'bg-white';
-                    } else if (diffMinutes <= 100) {
-                      const roundedPercentage = Math.ceil(diffMinutes / 10) * 10; // Arredonda para a dezena mais próxima
-                      return `bg-warning/${roundedPercentage}`;
-                    } else {
-                      return 'bg-warning/100';
-                    }
-                  })()}`}>
+                  className="cursor-pointer px-2 rounded-lg flex flex-col items-center justify-between shadow-sm shadow-primary-text/50 hover:bg-primary/15 transition-all w-[220px] h-[240px] relative bg-primary/5">
 
                   <div className="flex flex-col items-center justify-center flex-grow">
                     <TipoVendaIcon
                       tipoVenda={venda.tipoVenda}
                       numeroMesa={venda.numeroMesa}
-                      size={130} // Tamanho grande para o ícone
-                      corTexto="var(--color-info)" // Cor do texto do número da mesa
+                      size={150} // Tamanho grande para o ícone
+                      corTexto="var(--color-alternate)" // Cor do texto do número da mesa
+                      corCirculoInterno={innerCircleColor} // Fundo dinâmico: branco -> amarelo
                     />
                   </div>
 
-                  <div className="w-full flex flex-col items-start px-2 mt-auto">
+                  <div className="w-full flex flex-col items-start px-2 mb-4">
                     <span className="text-xs text-primary-text font-nunito font-semibold">Usuário: <span className="font-normal">{usuarioNome}</span></span>
                     <div className="flex justify-between w-full text-xs text-primary-text font-nunito mt-1">
                       <div className="flex flex-col items-start"><span className="font-semibold">Valor a faturar</span><span>{formatCurrency(venda.valorFinal)}</span></div>
@@ -975,14 +369,6 @@ export function VendasAbertas({ initialPeriodo }: VendasAbertasProps) {
         />
       )}
 
-      {/* Modal de Seleção de Datas */}
-      <EscolheDatasModal
-        open={isDatasModalOpen}
-        onClose={() => setIsDatasModalOpen(false)}
-        onConfirm={handleConfirmDatas}
-        dataInicial={periodoInicial}
-        dataFinal={periodoFinal}
-      />
     </div>
   )
 }
