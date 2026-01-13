@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useRouter, usePathname } from 'next/navigation' // Importar useRouter e usePathname
+import { useRouter, usePathname } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { MdSearch, MdAttachMoney, MdCalendarToday, MdFilterAltOff, MdRestaurant, MdPrint } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
@@ -15,7 +15,8 @@ import {
   CircularProgress,
 } from '@mui/material'
 import { TipoVendaIcon } from './TipoVendaIcon'
-import { calculatePeriodo } from '@/src/shared/utils/dateFilters' // Importar calculatePeriodo
+import { calculatePeriodo } from '@/src/shared/utils/dateFilters'
+import { formatElapsedTime } from '@/src/shared/utils/formatters'
 // Tipos
 interface Venda {
   id: string
@@ -56,16 +57,15 @@ interface Terminal {
   nome: string
 }
 
-interface VendasListProps {
+interface VendasAbertasProps {
   initialPeriodo?: string; // Período inicial vindo da URL (ex: "Hoje", "Últimos 7 Dias")
-  initialStatus?: string | null; // Status inicial vindo da URL
 }
 
 /**
- * Componente de listagem de vendas
+ * Componente de listagem de vendas Abertas
  * Implementa scroll infinito, filtros avançados e cards de métricas
  */
-export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
+export function VendasAbertas({ initialPeriodo }: VendasAbertasProps) {
   const { auth } = useAuthStore()
   const router = useRouter()
   const pathname = usePathname()
@@ -78,14 +78,14 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   const [valorMinimo, setValorMinimo] = useState('')
   const [valorMaximo, setValorMaximo] = useState('')
   const [periodo, setPeriodo] = useState<string>(initialPeriodo || 'Todos')
-  const [statusFilter, setStatusFilter] = useState<string | null>(initialStatus || null)
+  const [statusFilter, setStatusFilter] = useState<string | null>('Aberta') // Status fixo como 'Aberta'
   const [periodoInicial, setPeriodoInicial] = useState<Date | null>(initialDates.inicio)
   const [periodoFinal, setPeriodoFinal] = useState<Date | null>(initialDates.fim)
   const [tipoVendaFilter, setTipoVendaFilter] = useState<string | null>(null);
-  const [meioPagamentoFilter, setMeioPagamentoFilter] = useState<string>('');
-  const [usuarioAbertoPorFilter, setUsuarioAbertoPorFilter] = useState<string>('');
-  const [terminalFilter, setTerminalFilter] = useState<string>('');
-  const [usuarioCancelouFilter, setUsuarioCancelouFilter] = useState<string>('');
+  const [meioPagamentoFilter, setMeioPagamentoFilter] = useState('');
+  const [usuarioAbertoPorFilter, setUsuarioAbertoPorFilter] = useState('');
+  const [terminalFilter, setTerminalFilter] = useState('');
+  const [usuarioCancelouFilter, setUsuarioCancelouFilter] = useState('');
   const [vendas, setVendas] = useState<Venda[]>([])
   const [metricas, setMetricas] = useState<MetricasVendas | null>(null)
   const [usuariosPDV, setUsuariosPDV] = useState<UsuarioPDV[]>([])
@@ -101,6 +101,15 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   const [isLoadingMeiosPagamento, setIsLoadingMeiosPagamento] = useState(false)
   const [isLoadingTerminais, setIsLoadingTerminais] = useState(false)
   const [isDatasModalOpen, setIsDatasModalOpen] = useState(false)
+  const [elapsedTimeUpdateTrigger, setElapsedTimeUpdateTrigger] = useState(0) // Estado para forçar atualização do tempo decorrido
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setElapsedTimeUpdateTrigger(prev => prev + 1) // Atualiza a cada minuto para re-renderizar o tempo
+    }, 60 * 1000) // 1 minuto
+
+    return () => clearInterval(interval)
+  }, [])
 
   const pageSize = 10
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -110,7 +119,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     valorMinimo,
     valorMaximo,
     periodo,
-    statusFilter,
+    statusFilter: 'Aberta', // Fixar o status no ref
     tipoVendaFilter,
     meioPagamentoFilter,
     usuarioAbertoPorFilter,
@@ -127,7 +136,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       valorMinimo,
       valorMaximo,
       periodo,
-      statusFilter,
+      statusFilter: 'Aberta', // Manter status fixo no ref
       tipoVendaFilter,
       meioPagamentoFilter,
       usuarioAbertoPorFilter,
@@ -141,7 +150,8 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     valorMinimo,
     valorMaximo,
     periodo,
-    statusFilter,
+    // statusFilter removido das dependências
+    //statusFilter,
     tipoVendaFilter,
     meioPagamentoFilter,
     usuarioAbertoPorFilter,
@@ -207,15 +217,6 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     return formatCurrency(num)
   }
 
-  /**
-   * Formata data para exibição na lista
-   */
-  const formatDateList = (dateString: string): { date: string; time: string } => {
-    const date = new Date(dateString)
-    const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
-    const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-    return { date: dateStr, time: timeStr }
-  }
 
 
   /**
@@ -261,6 +262,8 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       setUsuariosPDV(allUsuarios)
     } catch (error) {
       console.error('Erro ao carregar usuários PDV:', error)
+    } finally {
+      //setIsLoadingUsuariosPDV(false) // Não temos este estado, mas manter para referência
     }
   }, [auth])
 
@@ -367,7 +370,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
    * Busca vendas com filtros
    */
   const fetchVendas = useCallback(
-    async (resetPage = false) => {
+    async (resetPage = false, initialFilters?: any) => {
       const token = auth?.getAccessToken()
       if (!token) return
 
@@ -385,7 +388,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           offset: (page * pageSize).toString(),
         })
 
-        const filters = filtersRef.current
+        const filters = initialFilters || filtersRef.current
 
         if (filters.searchQuery) {
           params.append('q', filters.searchQuery)
@@ -395,13 +398,8 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           params.append('tipoVenda', filters.tipoVendaFilter.toLowerCase())
         }
 
-        // Status: se null, envia FINALIZADA e CANCELADA
-        if (filters.statusFilter) {
-          params.append('status', filters.statusFilter.toUpperCase())
-        } else {
-          params.append('status', 'FINALIZADA')
-          params.append('status', 'CANCELADA')
-        }
+        // Status: FIXO como ABERTA
+        params.append('status', 'ABERTA')
 
         if (filters.usuarioAbertoPorFilter) {
           params.append('abertoPorId', filters.usuarioAbertoPorFilter)
@@ -487,7 +485,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         clearTimeout(debounceTimerRef.current)
       }
     }
-  }, [searchQuery, statusFilter, tipoVendaFilter, meioPagamentoFilter, usuarioAbertoPorFilter, terminalFilter, usuarioCancelouFilter, periodo, periodoInicial, periodoFinal])
+  }, [searchQuery, tipoVendaFilter, meioPagamentoFilter, usuarioAbertoPorFilter, terminalFilter, usuarioCancelouFilter, periodo, periodoInicial, periodoFinal])
 
   // Scroll infinito
   useEffect(() => {
@@ -513,8 +511,8 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     loadAllMeiosPagamento();
     loadAllTerminais();
     // Aciona a busca inicial de vendas com os filtros já configurados
-    fetchVendas(true);
-  }, []); // Dependências vazias para rodar uma única vez na montagem
+    fetchVendas(true, { statusFilter: 'Aberta', periodo: initialPeriodo || 'Todos', periodoInicial: initialDates.inicio, periodoFinal: initialDates.fim }); // Aciona a busca inicial de vendas com os filtros já configurados
+  }, [auth, initialPeriodo])
 
   // Atualiza período quando muda (apenas se período não for "Datas Personalizadas")
   useEffect(() => {
@@ -536,7 +534,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     setValorMinimo('')
     setValorMaximo('')
     setPeriodo('Todos')
-    setStatusFilter(null)
+    // statusFilter removido
     setTipoVendaFilter(null)
     setMeioPagamentoFilter('')
     setUsuarioAbertoPorFilter('')
@@ -548,18 +546,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     // Remove todos os parâmetros de filtro da URL
     const currentSearchParams = new URLSearchParams(window.location.search)
     currentSearchParams.delete('periodo')
-    currentSearchParams.delete('status')
-    currentSearchParams.delete('q')
-    currentSearchParams.delete('valorFinalMinimo')
-    currentSearchParams.delete('valorFinalMaximo')
-    currentSearchParams.delete('tipoVenda')
-    currentSearchParams.delete('meioPagamentoId')
-    currentSearchParams.delete('abertoPorId')
-    currentSearchParams.delete('terminalId')
-    currentSearchParams.delete('canceladoPorId')
-    currentSearchParams.delete('periodoInicial')
-    currentSearchParams.delete('periodoFinal')
-
+    currentSearchParams.set('status', 'ABERTA') // Garante que o status 'Aberta' sempre esteja na URL
     router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
     router.refresh() // Força a revalidação da rota para recarregar com os filtros limpos
   }, [router, pathname])
@@ -690,31 +677,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
 
         {/* Filtros Avançados */}
         <div className="bg-custom-2 rounded-t-lg px-2 pt-1.5 pb-2 flex flex-wrap items-end gap-x-2 gap-y-4">
-          {/* Status da Venda */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-secondary-text font-nunito">Status da Venda</label>
-            <FormControl size="small" sx={{ minWidth: 180 }}>
-              <Select
-                value={statusFilter || ''}
-                onChange={(e) => setStatusFilter(e.target.value || null)}
-                displayEmpty
-                sx={{
-                  height: '32px',
-                  borderRadius: '8px',
-                  backgroundColor: 'var(--color-info)',
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'transparent',
-                  },
-                }}
-              >
-                <MenuItem value="">Selecione...</MenuItem>
-                <MenuItem value="Aberta">Aberta</MenuItem>
-                <MenuItem value="Finalizada">Finalizada</MenuItem>
-                <MenuItem value="Cancelada">Cancelada</MenuItem>
-              </Select>
-            </FormControl>
-          </div>
-
+          {/* Status da Venda - REMOVIDO */}
           {/* Tipo de Venda */}
           <div className="flex flex-col gap-1">
             <label className="text-xs text-secondary-text font-nunito">Tipo de Venda</label>
@@ -884,14 +847,14 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
 
         {/* Cards de Métricas */}
         <div className="flex gap-2 m-1">
-          {/* Vendas Finalizadas/Em Aberto */}
+          {/* Vendas em Aberto (fixo) */}
           <div className="flex-1 border-2 rounded-lg p-1 flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-alternate flex items-center justify-center flex-shrink-0">
               <span className="text-info text-xl">🛒</span>
             </div>
             <div className="flex flex-col items-end flex-1">
               <span className="text-xs text-secondary-text font-nunito">
-                {statusFilter === 'Aberta' ? 'Vendas em Aberto' : 'Vendas Finalizadas'}
+                Vendas em Aberto
               </span>
               <span className="text-[22px] text-primary font-exo">
                 {metricas?.countVendasEfetivadas || 0}
@@ -899,26 +862,14 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             </div>
           </div>
 
-          {/* Vendas Canceladas */}
-          <div className="flex-1 rounded-lg border-2 p-1 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-error flex items-center justify-center flex-shrink-0">
-              <span className="text-info text-xl">✕</span>
-            </div>
-            <div className="flex flex-col items-end flex-1">
-              <span className="text-xs text-secondary-text font-nunito">Vendas Canceladas</span>
-              <span className="text-[22px] text-primary font-exo">
-                {metricas?.countVendasCanceladas || 0}
-              </span>
-            </div>
-          </div>
-
+          {/* Vendas Canceladas - REMOVIDO */}
           {/* Total de Produtos Vendidos */}
           <div className="flex-1 rounded-lg border-2 p-1 flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-warning flex items-center justify-center flex-shrink-0">
               <span className="text-info text-xl"><MdRestaurant /></span>
             </div>
             <div className="flex flex-col items-end flex-1">
-              <span className="text-xs text-secondary-text font-nunito">Total de Produtos Vendidos</span>
+              <span className="text-xs text-secondary-text font-nunito">Total de Produtos à Vender</span>
               <span className="text-[22px] text-primary font-exo">
                 {metricas?.countProdutosVendidos || 0}
               </span>
@@ -931,7 +882,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               <span className="text-info text-xl"><MdAttachMoney /></span>
             </div>
             <div className="flex flex-col items-end flex-1">
-              <span className="text-xs text-secondary-text font-nunito">Total Faturado</span>
+              <span className="text-xs text-secondary-text font-nunito">Total à faturar</span>
               <span className="text-[22px] text-primary font-exo">
                 {metricas?.totalFaturado ? formatCurrency(metricas.totalFaturado) : 'R$ 0,00'}
               </span>
@@ -941,110 +892,73 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
 
         {/* Tabela de Vendas */}
         <div className="bg-info rounded-lg overflow-hidden">
-          {/* Cabeçalho */}
-          <div className="bg-custom-2 text-primary-text text-sm font-semibold font-nunito rounded-t-lg px-3 py-2 flex items-center gap-2">
-            <div className="flex-1 uppercase">
-              Código Venda
-            </div>
-            <div className="flex-1 text-center uppercase">
-              Data/Hora
-            </div>
-            <div className="flex-1 text-center uppercase">
-              Tipo Venda
-            </div>
-            <div className="flex-1 text-center uppercase">
-              Cód. Terminal
-            </div>
-            <div className="flex-[2] text-center uppercase">
-              Usuário PDV
-            </div>
-            <div className="flex-1 uppercase">
-              Valor Final
-            </div>
-            <div className="flex-1 flex justify-end  uppercase">
-              Cupom
-            </div>
-          </div>
-
           {/* Lista com scroll */}
           <div
             ref={scrollContainerRef}
-            className="max-h-[calc(100vh-350px)] overflow-y-auto px-1 py-2 scrollbar-hide"
+            className="max-h-[calc(100vh-300px)] overflow-y-auto px-1 py-2 scrollbar-hide grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
           >
             {vendas.length === 0 && !isLoading && (
-              <div className="flex items-center justify-center py-12">
-                <p className="text-secondary-text">Nenhuma venda encontrada.</p>
+              <div className="flex items-center justify-center py-12 col-span-full">
+                <p className="text-secondary-text">Nenhuma venda em aberto encontrada.</p>
               </div>
             )}
 
             {vendas.map((venda) => {
-              const { date, time } = formatDateList(venda.dataCriacao)
+              const elapsedTime = formatElapsedTime(venda.dataCriacao)
               const usuarioNome =
                 usuariosPDV.find((u) => u.id === venda.abertoPorId)?.nome || venda.abertoPorId
 
               return (
                 <div
                   key={venda.id}
-                  onClick={() => setSelectedVendaId(venda.id)} // Adicionado onClick para abrir detalhes
-                  className={`cursor-pointer px-2 py-1 mb-2 rounded-lg flex items-center shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-all ${(() => {
-                    let baseClasses = ''
-                    if (venda.dataCancelamento) {
-                      baseClasses = 'bg-red-100 hover:bg-red-200'
-                    } else if (!venda.dataCancelamento && !venda.dataFinalizacao) {
-                      baseClasses = 'bg-yellow-100 hover:bg-yellow-200'
+                  onClick={() => setSelectedVendaId(venda.id)}
+                  className={`cursor-pointer px-2 py-1 mb-2 rounded-lg flex flex-col items-center justify-between shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-all w-[220px] h-[230px] relative ${(() => {
+                    const now = new Date();
+                    const start = new Date(venda.dataCriacao);
+                    const diffMs = now.getTime() - start.getTime();
+                    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+
+                    if (diffMinutes <= 10) {
+                      return 'bg-white';
+                    } else if (diffMinutes <= 100) {
+                      const roundedPercentage = Math.ceil(diffMinutes / 10) * 10; // Arredonda para a dezena mais próxima
+                      return `bg-warning/${roundedPercentage}`;
                     } else {
-                      baseClasses = 'bg-info hover:bg-info/80'
+                      return 'bg-warning/100';
                     }
-                    return baseClasses
                   })()}`}>
-                
-                  <div className="flex-1">
-                    <span className="text-sm font-semibold text-primary-text font-nunito">
-                      #{venda.codigoVenda}
-                    </span>
+
+                  <div className="flex flex-col items-center justify-center flex-grow">
+                    <TipoVendaIcon
+                      tipoVenda={venda.tipoVenda}
+                      numeroMesa={venda.numeroMesa}
+                      size={130} // Tamanho grande para o ícone
+                      corTexto="var(--color-info)" // Cor do texto do número da mesa
+                    />
                   </div>
-                  <div className="flex-1 flex flex-col items-center">
-                    <span className="text-sm text-primary-text font-nunito">{date}</span>
-                    <span className="text-sm text-primary-text font-nunito">{time}</span>
+
+                  <div className="w-full flex flex-col items-start px-2 mt-auto">
+                    <span className="text-xs text-primary-text font-nunito font-semibold">Usuário: <span className="font-normal">{usuarioNome}</span></span>
+                    <div className="flex justify-between w-full text-xs text-primary-text font-nunito mt-1">
+                      <div className="flex flex-col items-start"><span className="font-semibold">Valor a faturar</span><span>{formatCurrency(venda.valorFinal)}</span></div>
+                      <div className="flex flex-col items-start"><span className="font-semibold">Aberto há</span><span>{elapsedTime}</span></div>
+                    </div>
                   </div>
-                  <div className="flex-1 flex flex-col items-center">
-                  <TipoVendaIcon
-                    tipoVenda={venda.tipoVenda}
-                    numeroMesa={venda.numeroMesa}
-                    corTexto="var(--color-info)" // Garante que o número da mesa seja visível
-                  />
-                  </div>
-                  <div className="flex-1 text-center">
-                    <span className="text-sm text-primary-text font-nunito">
-                      #{venda.codigoTerminal}
-                    </span>
-                  </div>
-                  <div className="flex-[2] text-center">
-                    <span className="text-sm text-primary-text font-nunito">{usuarioNome}</span>
-                  </div>
-                  <div className="flex-1">
-                    <span className="text-sm text-primary-text font-nunito">
-                      {formatCurrency(venda.valorFinal)}
-                    </span>
-                  </div>
-                  <div className="flex-1 flex justify-end">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation() // Impede que o clique no botão acione o clique da linha
-                        setSelectedVendaId(venda.id)
-                      }}
-                      className="w-10 h-10 flex items-center justify-center text-primary hover:bg-primary/10 rounded transition-colors"
-                      title="Comprovante de Venda"
-                    >
-                      <MdPrint size={20}/>
-                    </button>
-                  </div>
+
+                  {/* Botão de impressão posicionado no canto superior direito */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setSelectedVendaId(venda.id); }}
+                    className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center text-primary hover:bg-primary/10 rounded transition-colors"
+                    title="Comprovante de Venda"
+                  >
+                    <MdPrint size={20}/>
+                  </button>
                 </div>
               )
             })}
 
             {isLoadingMore && (
-              <div className="flex justify-center py-4">
+              <div className="flex justify-center py-4 col-span-full">
                 <CircularProgress size={24} />
               </div>
             )}
@@ -1072,4 +986,3 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     </div>
   )
 }
-
