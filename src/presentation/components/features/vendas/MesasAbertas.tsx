@@ -39,7 +39,7 @@ interface UsuarioPDV {
 }
 
 
-interface VendasAbertasProps {
+interface MesasAbertasProps {
   initialPeriodo?: string; // Período inicial vindo da URL (ex: "Hoje", "Últimos 7 Dias")
 }
 
@@ -47,7 +47,7 @@ interface VendasAbertasProps {
  * Componente de listagem de mesas em aberto
  * Exibe apenas mesas (não balcão) com scroll infinito e cards de métricas
  */
-export function VendasAbertas({ initialPeriodo }: VendasAbertasProps) {
+export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
   const { auth } = useAuthStore()
 
   const [vendas, setVendas] = useState<Venda[]>([])
@@ -245,12 +245,17 @@ export function VendasAbertas({ initialPeriodo }: VendasAbertasProps) {
         <div className="flex gap-2 m-1 flex-shrink-0 sticky top-0 z-10 bg-primary-background">
           {/* Vendas em Aberto (fixo) */}
           <div className="flex-1 border-2 rounded-lg p-1 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-alternate flex items-center justify-center flex-shrink-0">
-              <span className="text-info text-xl">🛒</span>
+            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0">
+              <TipoVendaIcon
+                tipoVenda="mesa"
+                numeroMesa={metricas?.countVendasEfetivadas || 0}
+                size={60}
+                corTexto="var(--color-info)"
+              />
             </div>
             <div className="flex flex-col items-end flex-1">
               <span className="text-xs text-secondary-text font-nunito">
-                Vendas em Aberto
+                Mesas Abertas
               </span>
               <span className="text-[22px] text-primary font-exo">
                 {metricas?.countVendasEfetivadas || 0}
@@ -291,7 +296,7 @@ export function VendasAbertas({ initialPeriodo }: VendasAbertasProps) {
           {/* Lista com scroll */}
           <div
             ref={scrollContainerRef}
-            className="h-full overflow-y-auto px-1 py-2 scrollbar-hide grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
+            className="h-full overflow-y-auto px-1 py-2 scrollbar-hide grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4"
           >
             {vendas.length === 0 && !isLoading && (
               <div className="flex items-center justify-center py-12 col-span-full">
@@ -319,13 +324,13 @@ export function VendasAbertas({ initialPeriodo }: VendasAbertasProps) {
                 <div
                   key={venda.id}
                   onClick={() => setSelectedVendaId(venda.id)}
-                  className="cursor-pointer px-2 rounded-lg flex flex-col items-center justify-between shadow-sm shadow-primary-text/50 hover:bg-primary/15 transition-all w-[220px] h-[240px] relative bg-primary/5">
+                  className="cursor-pointer px-2 rounded-lg flex flex-col items-center justify-between shadow-sm shadow-primary-text/50 hover:bg-primary/5 transition-all w-[200px] h-[220px] relative bg-info">
 
                   <div className="flex flex-col items-center justify-center flex-grow">
                     <TipoVendaIcon
                       tipoVenda={venda.tipoVenda}
                       numeroMesa={venda.numeroMesa}
-                      size={150} // Tamanho grande para o ícone
+                      size={110} // Tamanho grande para o ícone
                       corTexto="var(--color-alternate)" // Cor do texto do número da mesa
                       corCirculoInterno={innerCircleColor} // Fundo dinâmico: branco -> amarelo
                     />

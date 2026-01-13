@@ -1,17 +1,17 @@
 'use client'
 
 import { Suspense } from 'react'
-import { VendasAbertas } from '@/src/presentation/components/features/vendas/VendasAbertas'
+import { MesasAbertas } from '@/src/presentation/components/features/vendas/MesasAbertas'
 
 /**
- * Página de Vendas Abertas
- * Exibe a lista de vendas com status 'Aberta'.
+ * Página de Mesas Abertas
+ * Exibe a lista de vendas (mesas) com status 'Aberta'.
  */
-export default function VendasAbertasPage() {
+export default function MesasAbertasPage() {
   return (
     <div className="h-full">
       <Suspense fallback={<div>Carregando vendas abertas...</div>}>
-        <VendasAbertas />
+        <MesasAbertas />
       </Suspense>
     </div>
   )
