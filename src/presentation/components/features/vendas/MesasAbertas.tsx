@@ -20,6 +20,8 @@ interface Venda {
   codigoTerminal: string
   terminalId: string
   dataCriacao: string
+  dataUltimoProdutoLancado?: string
+  dataUltimaMovimentacao?: string
   dataCancelamento?: string
   dataFinalizacao?: string
   metodoPagamento?: string
@@ -54,6 +56,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
   const [metricas, setMetricas] = useState<MetricasVendas | null>(null)
   const [usuariosPDV, setUsuariosPDV] = useState<UsuarioPDV[]>([])
   const [ultimoProdutoPorVenda, setUltimoProdutoPorVenda] = useState<Record<string, string | null>>({})
+  const [apenasSemMovimentacao, setApenasSemMovimentacao] = useState(false)
 
   // Estados de UI
   const [isLoading, setIsLoading] = useState(false)
@@ -83,6 +86,39 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
       style: 'currency',
       currency: 'BRL',
     }).format(value)
+  }
+
+  /**
+   * Faz parsing considerando o horário como local (ignora offset/Z se presente).
+   */
+  const parseDateLocalWallTime = (value: string): Date => {
+    const stripped = value.replace(/([+-]\d{2}:\d{2}|[zZ])$/, '')
+    const parsed = new Date(stripped)
+    if (!Number.isNaN(parsed.getTime())) return parsed
+    return new Date(value)
+  }
+
+  /**
+   * Ordena vendas por data de criação (mais recente primeiro).
+   */
+  const sortByDataCriacaoDesc = (items: Venda[]) =>
+    [...items].sort((a, b) => {
+      const aDate = parseDateLocalWallTime(a.dataCriacao).getTime()
+      const bDate = parseDateLocalWallTime(b.dataCriacao).getTime()
+      return bDate - aDate
+    })
+
+  /**
+   * Retorna o tempo em minutos desde a última movimentação conhecida.
+   */
+  const diffMinutosDesdeUltimaMovimentacao = (venda: Venda): number => {
+    const referencia =
+      venda.dataUltimaMovimentacao ||
+      venda.dataUltimoProdutoLancado ||
+      ultimoProdutoPorVenda[venda.id] ||
+      venda.dataCriacao
+    const ref = parseDateLocalWallTime(referencia || venda.dataCriacao)
+    return Math.floor((Date.now() - ref.getTime()) / (1000 * 60))
   }
 
 
@@ -185,7 +221,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
    * Busca apenas mesas em aberto
    */
   const fetchVendas = useCallback(
-    async (resetPage = false) => {
+    async (resetPage = false, filterWithoutMovement: boolean = apenasSemMovimentacao) => {
       const token = auth?.getAccessToken()
       if (!token) return
 
@@ -220,10 +256,30 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
 
         const data = await response.json()
 
+        const filteredItems = sortByDataCriacaoDesc(
+          (data.items || []).filter((item: Venda) => {
+            if (item.dataCancelamento || item.dataFinalizacao) return false
+
+            if (!filterWithoutMovement) return true
+            return diffMinutosDesdeUltimaMovimentacao(item) > 15
+          })
+        )
+
         if (resetPage) {
-          setVendas(data.items || [])
+          setVendas(filteredItems)
           currentPageRef.current = 1
           setCurrentPage(1)
+          const nextCount = filteredItems.length
+          if (data.metricas) {
+            setMetricas({ ...data.metricas, countVendasEfetivadas: nextCount })
+          } else {
+            setMetricas({
+              countVendasEfetivadas: nextCount,
+              countVendasCanceladas: 0,
+              countProdutosVendidos: 0,
+              totalFaturado: 0,
+            })
+          }
           
           // Verifica se precisa carregar mais itens para preencher a tela
           setTimeout(() => {
@@ -237,12 +293,24 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
             }
           }, 100)
         } else {
-          setVendas((prev) => [...prev, ...(data.items || [])])
+          setVendas((prev) => {
+            const next = [...prev, ...filteredItems]
+            const nextCount = next.length
+            setMetricas((prevMetricas) => {
+              const base = data.metricas ?? prevMetricas ?? {
+                countVendasCanceladas: 0,
+                countProdutosVendidos: 0,
+                totalFaturado: 0,
+                countVendasEfetivadas: 0,
+              }
+              return { ...base, countVendasEfetivadas: nextCount }
+            })
+            return next
+          })
           currentPageRef.current += 1
           setCurrentPage((prev) => prev + 1)
         }
 
-        setMetricas(data.metricas || null)
         setCanLoadMore(data.hasNext || false)
       } catch (error) {
         console.error('Erro ao buscar vendas:', error)
@@ -252,7 +320,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
         setIsLoadingMore(false)
       }
     },
-    [auth]
+    [auth, apenasSemMovimentacao]
   )
 
   // Scroll infinito
@@ -293,12 +361,29 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
     loadAllUsuariosPDV()
     fetchVendas(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auth])
+  }, [auth, apenasSemMovimentacao])
 
   return (
     <div className="flex flex-col h-full max-h-[calc(100vh-100px)] overflow-hidden">
       {/* Container principal */}
       <div className="bg-primary-background rounded-t-lg rounded-b-lg px-2 flex flex-col h-full min-h-0 overflow-hidden">
+
+        {/* Filtro por tempo sem movimentação */}
+        <div className="flex items-center justify-end gap-2 py-2">
+          <label className="text-sm text-primary-text font-nunito flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={apenasSemMovimentacao}
+              onChange={(e) => {
+                const checked = e.target.checked
+                setApenasSemMovimentacao(checked)
+                fetchVendas(true, checked)
+              }}
+              className="h-4 w-4"
+            />
+            Mostrar apenas mesas com +15 min sem movimentação
+          </label>
+        </div>
 
         {/* Cards de Métricas */}
         <div className="flex gap-2 m-1 flex-shrink-0 sticky top-0 z-10 bg-primary-background">
@@ -364,14 +449,14 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
             )}
 
             {vendas.map((venda) => {
-              const dataReferencia = ultimoProdutoPorVenda[venda.id] || venda.dataCriacao
+              const dataReferencia = venda.dataUltimoProdutoLancado || venda.dataUltimaMovimentacao || venda.dataCriacao
               const elapsedTime = formatElapsedTime(dataReferencia)
               const usuarioNome =
                 usuariosPDV.find((u) => u.id === venda.abertoPorId)?.nome || venda.abertoPorId
 
               // Calcula cor dinâmica para o círculo interno (começa branco e vai amarelando até o warning cheio)
               const now = new Date()
-              const start = new Date(dataReferencia)
+              const start = parseDateLocalWallTime(dataReferencia)
               const diffMs = now.getTime() - start.getTime()
               const diffMinutes = Math.floor(diffMs / (1000 * 60))
               const intensity = diffMinutes <= 10 ? 0 : Math.min(100, Math.ceil(diffMinutes / 10) * 10)

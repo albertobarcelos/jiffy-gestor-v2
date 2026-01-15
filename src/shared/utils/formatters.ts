@@ -47,24 +47,39 @@ export function brToEUA(valorBr: string): number {
  * - A partir de 24 horas: "X dias" (arredondado para o dia mais próximo)
  */
 export function formatElapsedTime(initialDate: Date | string): string {
-  const now = new Date();
-  const start = new Date(initialDate);
-  const diffMs = now.getTime() - start.getTime();
+  const parseAsLocalWallTime = (value: Date | string): number => {
+    if (value instanceof Date) return value.getTime()
+
+    const raw = value || ''
+    // Remove sufixo de fuso (Z ou ±hh:mm) para interpretar como horário local "puro"
+    const stripped = raw.replace(/([+-]\d{2}:\d{2}|[zZ])$/, '')
+    const localParsed = new Date(stripped)
+
+    if (!Number.isNaN(localParsed.getTime())) {
+      return localParsed.getTime()
+    }
+
+    // Fallback para parsing padrão caso a limpeza falhe
+    const fallback = new Date(raw)
+    return fallback.getTime()
+  }
+
+  const startMs = parseAsLocalWallTime(initialDate)
+  const nowMs = Date.now()
+  const diffMs = nowMs - startMs
   const diffMinutes = Math.floor(diffMs / (1000 * 60));
 
   if (diffMinutes <= 10) {
     return 'agora';
   } else if (diffMinutes < 60) {
-    const roundedMinutes = Math.ceil(diffMinutes / 10) * 10;
-    return `${roundedMinutes} min`;
+    // Exibe minutos exatos (sem arredondar para cima)
+    return `${diffMinutes} min`;
   } else if (diffMinutes < 24 * 60) {
     const hours = Math.floor(diffMinutes / 60);
     const remainingMinutes = diffMinutes % 60;
-    const roundedMinutes = Math.ceil(remainingMinutes / 10) * 10;
-    if (roundedMinutes === 60) { // Se arredondar para 60 min, adiciona 1h
-      return `${hours + 1}h`;
-    }
-    return `${hours}h ${roundedMinutes} min`;
+    // Exibe minutos restantes exatos (sem arredondar para cima)
+    if (remainingMinutes === 0) return `${hours}h`;
+    return `${hours}h ${remainingMinutes} min`;
   } else {
     const diffDays = Math.round(diffMinutes / (24 * 60));
     return `${diffDays} dia${diffDays === 1 ? '' : 's'}`;

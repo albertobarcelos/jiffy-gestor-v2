@@ -28,6 +28,8 @@ interface Venda {
   codigoTerminal: string
   terminalId: string
   dataCriacao: string
+  dataUltimoProdutoLancado?: string
+  dataUltimaMovimentacao?: string
   dataCancelamento?: string
   dataFinalizacao?: string
   metodoPagamento?: string
@@ -78,7 +80,9 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   const [valorMinimo, setValorMinimo] = useState('')
   const [valorMaximo, setValorMaximo] = useState('')
   const [periodo, setPeriodo] = useState<string>(initialPeriodo || 'Todos')
-  const [statusFilter, setStatusFilter] = useState<string | null>(initialStatus || null)
+  const [statusFilter, setStatusFilter] = useState<string | null>(
+    initialStatus?.toLowerCase() === 'aberta' ? null : initialStatus || null
+  )
   const [periodoInicial, setPeriodoInicial] = useState<Date | null>(initialDates.inicio)
   const [periodoFinal, setPeriodoFinal] = useState<Date | null>(initialDates.fim)
   const [tipoVendaFilter, setTipoVendaFilter] = useState<string | null>(null);
@@ -211,9 +215,18 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
    * Formata data para exibição na lista
    */
   const formatDateList = (dateString: string): { date: string; time: string } => {
+    // Mantém o horário exatamente como recebido (ISO em UTC)
     const date = new Date(dateString)
-    const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
-    const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    const dateStr = date.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: 'short',
+      timeZone: 'UTC',
+    })
+    const timeStr = date.toLocaleTimeString('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'UTC',
+    })
     return { date: dateStr, time: timeStr }
   }
 
@@ -396,8 +409,9 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         }
 
         // Status: se null, envia FINALIZADA e CANCELADA
-        if (filters.statusFilter) {
-          params.append('status', filters.statusFilter.toUpperCase())
+        const normalizedStatus = filters.statusFilter?.toUpperCase()
+        if (normalizedStatus && normalizedStatus !== 'ABERTA') {
+          params.append('status', normalizedStatus)
         } else {
           params.append('status', 'FINALIZADA')
           params.append('status', 'CANCELADA')
@@ -451,11 +465,15 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
 
         const data = await response.json()
 
+        const filteredItems = (data.items || []).filter(
+          (v: Venda) => v.dataCancelamento || v.dataFinalizacao
+        )
+
         if (resetPage) {
-          setVendas(data.items || [])
+          setVendas(filteredItems)
           setCurrentPage(1)
         } else {
-          setVendas((prev) => [...prev, ...(data.items || [])])
+          setVendas((prev) => [...prev, ...filteredItems])
           setCurrentPage((prev) => prev + 1)
         }
 
@@ -708,7 +726,6 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                 }}
               >
                 <MenuItem value="">Selecione...</MenuItem>
-                <MenuItem value="Aberta">Aberta</MenuItem>
                 <MenuItem value="Finalizada">Finalizada</MenuItem>
                 <MenuItem value="Cancelada">Cancelada</MenuItem>
               </Select>
