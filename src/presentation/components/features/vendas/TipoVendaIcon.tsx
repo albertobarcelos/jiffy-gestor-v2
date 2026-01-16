@@ -8,6 +8,8 @@ interface TipoVendaIconProps {
   numeroMesa?: number | string | null
   className?: string
   size?: number // Adicionado a prop size
+  containerScale?: number // Permite reduzir o container (ajustar padding externo)
+  title?: string // Tooltip opcional (renderizada via data-tooltip custom)
   // Props opcionais para customização de cores (usado apenas quando necessário)
   corPrincipal?: string // Cor principal (alternate) - padrão: var(--color-alternate)
   corSecundaria?: string // Cor secundária (info) - padrão: var(--color-info)
@@ -35,6 +37,7 @@ export function TipoVendaIcon({
   numeroMesa,
   className = '',
   size = 60, // Valor padrão de 60px
+  containerScale = 1, // 1 = comportamento atual; <1 reduz o fundo/área útil
   corPrincipal = 'var(--color-alternate)',
   corSecundaria = 'var(--color-info)',
   corTexto = 'var(--color-alternate)',
@@ -42,18 +45,25 @@ export function TipoVendaIcon({
   corBorda = 'rgba(131, 56, 236, 0.5)',
   corFundo = 'var(--color-primary-background)',
   corBalcao = 'var(--color-alternate)',
+  title,
 }: TipoVendaIconProps) {
-  const iconHeight = size + (size / 6); // Ajusta a altura total do container
-  const outerCircleSize = size; // Tamanho do SVG e do container principal
-  const borderCircleSize = size * 0.6; // Tamanho do círculo com a borda
-  const innerCircleSize = size * 0.5; // Tamanho do círculo interno (sólido)
-  const textFontSize = size / 4; // Tamanho da fonte do número da mesa
-  const beerIconSize = size / 2; // Tamanho do ícone da cerveja para balcão
-  const balcaoTextSize = size / 6; // Tamanho da fonte do texto "Balcão"
+  const scale = containerScale
+  const outerCircleSize = size // Tamanho do SVG e do container principal (mantém pétalas/tamanhos)
+  const containerSize = size * scale // Ajusta apenas o container externo (reduz fundo)
+  const iconHeight = containerSize // Altura do container externo
+  const borderCircleSize = size * 0.6 // Tamanho do círculo com a borda
+  const innerCircleSize = size * 0.5 // Tamanho do círculo interno (sólido)
+  const textFontSize = size / 4 // Tamanho da fonte do número da mesa
+  const beerIconSize = size / 2 // Tamanho do ícone da cerveja para balcão
+  const balcaoTextSize = size / 6 // Tamanho da fonte do texto "Balcão"
 
   if (tipoVenda === 'mesa') {
     return (
-      <div className={`relative flex flex-col items-center justify-center ${className}`} style={{ height: `${iconHeight}px`, width: `${outerCircleSize}px` }}>
+      <div
+        className={`relative flex flex-col items-center justify-center tooltip-hover ${className}`}
+        style={{ height: `${iconHeight}px`, width: `${containerSize}px` }}
+        data-tooltip={title || ''}
+      >
         {/* Container Stack - equivalente ao Stack do Flutter */}
         <div className="relative flex items-center justify-center" style={{ width: `${outerCircleSize}px`, height: `${outerCircleSize}px` }}>
           {/* Quatro pétalas decorativas ao redor */}
@@ -67,8 +77,8 @@ export function TipoVendaIcon({
           >
             {/* Pétala nordeste (diagonal superior direita) */}
             <ellipse
-              cx={`${outerCircleSize * 0.6}`}
-              cy={`${outerCircleSize * 0.28}`}
+              cx={`${outerCircleSize * 0.55}`}
+              cy={`${outerCircleSize * 0.22}`}
               rx={`${outerCircleSize * 0.13}`}
               ry={`${outerCircleSize * 0.13}`}
               fill={corSecundaria}
@@ -100,8 +110,8 @@ export function TipoVendaIcon({
             />
             {/* Pétala noroeste (diagonal superior esquerda) */}
             <ellipse
-              cx={`${outerCircleSize * 0.38}`}
-              cy={`${outerCircleSize * 0.28}`}
+              cx={`${outerCircleSize * 0.43}`}
+              cy={`${outerCircleSize * 0.22}`}
               rx={`${outerCircleSize * 0.13}`}
               ry={`${outerCircleSize * 0.13}`}
               fill={corSecundaria}
@@ -136,6 +146,9 @@ export function TipoVendaIcon({
               top: '50%',
               left: '50%',
               transform: 'translate(-50%, -50%)',
+              border: '1px solid',
+              borderColor: corBorda,
+              
             }}
           >
             <span

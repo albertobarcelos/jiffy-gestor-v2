@@ -1029,6 +1029,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                     tipoVenda={venda.tipoVenda}
                     numeroMesa={venda.numeroMesa}
                     corTexto="var(--color-info)" // Garante que o número da mesa seja visível
+                    containerScale={0.90}
                   />
                   </div>
                   <div className="flex-1 text-center">

@@ -412,6 +412,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
               <TipoVendaIcon
                 tipoVenda={venda.tipoVenda}
                 numeroMesa={venda.numeroMesa}
+                containerScale={0.90}
                 className="flex-shrink-0"
                 corPrincipal="#FFFFFF"
                 corSecundaria="rgba(255, 255, 255, 0.3)"

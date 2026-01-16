@@ -20,8 +20,10 @@ interface Venda {
   codigoTerminal: string
   terminalId: string
   dataCriacao: string
+  dataUltimaModificacao?: string
   dataUltimoProdutoLancado?: string
   dataUltimaMovimentacao?: string
+  clienteId?: string
   dataCancelamento?: string
   dataFinalizacao?: string
   metodoPagamento?: string
@@ -45,6 +47,11 @@ interface MesasAbertasProps {
   initialPeriodo?: string; // Período inicial vindo da URL (ex: "Hoje", "Últimos 7 Dias")
 }
 
+const COR_INICIAL = '#EEEFF5'
+const COR_FINAL = '#E6AA37'
+const DUR_MIN_MS = 15 * 60 * 1000 // 15 minutos
+const DUR_MAX_MS = 2 * 60 * 60 * 1000 // 2 horas
+
 /**
  * Componente de listagem de mesas em aberto
  * Exibe apenas mesas (não balcão) com scroll infinito e cards de métricas
@@ -56,7 +63,38 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
   const [metricas, setMetricas] = useState<MetricasVendas | null>(null)
   const [usuariosPDV, setUsuariosPDV] = useState<UsuarioPDV[]>([])
   const [ultimoProdutoPorVenda, setUltimoProdutoPorVenda] = useState<Record<string, string | null>>({})
+  const [vendaClienteIdMap, setVendaClienteIdMap] = useState<Record<string, string | null>>({})
+  const [clienteNomeMap, setClienteNomeMap] = useState<Record<string, string | null>>({})
   const [apenasSemMovimentacao, setApenasSemMovimentacao] = useState(false)
+  const [cachesHydrated, setCachesHydrated] = useState(false)
+
+  // Hidrata caches de cliente a partir da sessionStorage para evitar refetch após reload
+  useEffect(() => {
+    try {
+      const storedVendaCliente = sessionStorage.getItem('mesasAbertas_vendaClienteIdMap')
+      const storedClienteNome = sessionStorage.getItem('mesasAbertas_clienteNomeMap')
+      if (storedVendaCliente) {
+        setVendaClienteIdMap(JSON.parse(storedVendaCliente))
+      }
+      if (storedClienteNome) {
+        setClienteNomeMap(JSON.parse(storedClienteNome))
+      }
+      setCachesHydrated(true)
+    } catch (err) {
+      console.warn('Não foi possível ler caches de cliente da sessão', err)
+      setCachesHydrated(true)
+    }
+  }, [])
+
+  // Persiste caches na sessionStorage para reaproveitar após reload
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('mesasAbertas_vendaClienteIdMap', JSON.stringify(vendaClienteIdMap))
+      sessionStorage.setItem('mesasAbertas_clienteNomeMap', JSON.stringify(clienteNomeMap))
+    } catch (err) {
+      console.warn('Não foi possível salvar caches de cliente na sessão', err)
+    }
+  }, [vendaClienteIdMap, clienteNomeMap])
 
   // Estados de UI
   const [isLoading, setIsLoading] = useState(false)
@@ -89,13 +127,68 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
   }
 
   /**
-   * Faz parsing considerando o horário como local (ignora offset/Z se presente).
+   * Parser alinhado ao formatElapsedTime:
+   * - Se string, remove offset/Z para tratar como horário local "puro"
+   * - Se falhar, tenta parse padrão
    */
   const parseDateLocalWallTime = (value: string): Date => {
-    const stripped = value.replace(/([+-]\d{2}:\d{2}|[zZ])$/, '')
-    const parsed = new Date(stripped)
-    if (!Number.isNaN(parsed.getTime())) return parsed
-    return new Date(value)
+    const raw = value || ''
+    const stripped = raw.replace(/([+-]\d{2}:\d{2}|[zZ])$/, '')
+    const localParsed = new Date(stripped)
+    if (!Number.isNaN(localParsed.getTime())) return localParsed
+    const fallback = new Date(raw)
+    if (!Number.isNaN(fallback.getTime())) return fallback
+    return new Date()
+  }
+
+  /**
+   * Converte Date|string em timestamp ms, usando o mesmo parser de cima.
+   */
+  const toMs = (value: Date | string): number => {
+    if (value instanceof Date) return value.getTime()
+    return parseDateLocalWallTime(value).getTime()
+  }
+
+  /**
+   * Formata diff em minutos para texto (min, h, dia).
+   */
+  const formatDiffTooltip = (diffMinutes: number): string => {
+    if (diffMinutes < 60) return `${diffMinutes} min`
+    const hours = Math.floor(diffMinutes / 60)
+    const minutes = diffMinutes % 60
+
+    if (hours < 24) {
+      if (minutes === 0) return `${hours}h`
+      return `${hours}h ${minutes} min`
+    }
+
+    const days = Math.floor(hours / 24)
+    const remHours = hours % 24
+    if (remHours === 0 && minutes === 0) return `${days} dia${days === 1 ? '' : 's'}`
+    if (minutes === 0) return `${days} dia${days === 1 ? '' : 's'} ${remHours}h`
+    return `${days} dia${days === 1 ? '' : 's'} ${remHours}h ${minutes} min`
+  }
+
+  const lerpColor = (hexA: string, hexB: string, t: number): string => {
+    const toRGB = (hex: string) => {
+      const n = parseInt(hex.replace('#', ''), 16)
+      return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }
+    }
+    const a = toRGB(hexA)
+    const b = toRGB(hexB)
+    const clamped = Math.max(0, Math.min(1, t))
+    const mix = (x: number, y: number) => Math.round(x + (y - x) * clamped)
+    return `#${[mix(a.r, b.r), mix(a.g, b.g), mix(a.b, b.b)]
+      .map((v) => v.toString(16).padStart(2, '0'))
+      .join('')}`
+  }
+
+  const getCorMesaPorTempoJS = (tempoReferencia: Date | string): string => {
+    const abertaMs = Math.max(0, Date.now() - toMs(tempoReferencia))
+    if (abertaMs < DUR_MIN_MS) return COR_INICIAL
+    if (abertaMs >= DUR_MAX_MS) return COR_FINAL
+    const progresso = (abertaMs - DUR_MIN_MS) / (DUR_MAX_MS - DUR_MIN_MS)
+    return lerpColor(COR_INICIAL, COR_FINAL, progresso)
   }
 
   /**
@@ -109,14 +202,17 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
     })
 
   /**
+   * Ordena por tempo sem movimentação (mais recente primeiro: menor diff).
+   */
+  const sortByUltimaMovimentacaoAsc = (items: Venda[]) =>
+    [...items].sort((a, b) => diffMinutosDesdeUltimaMovimentacao(a) - diffMinutosDesdeUltimaMovimentacao(b))
+
+  /**
    * Retorna o tempo em minutos desde a última movimentação conhecida.
    */
   const diffMinutosDesdeUltimaMovimentacao = (venda: Venda): number => {
     const referencia =
-      venda.dataUltimaMovimentacao ||
-      venda.dataUltimoProdutoLancado ||
-      ultimoProdutoPorVenda[venda.id] ||
-      venda.dataCriacao
+      venda.dataUltimaModificacao 
     const ref = parseDateLocalWallTime(referencia || venda.dataCriacao)
     return Math.floor((Date.now() - ref.getTime()) / (1000 * 60))
   }
@@ -216,6 +312,83 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
     [auth]
   )
 
+  /**
+   * Busca o clienteId a partir do detalhe da venda (endpoint de detalhes).
+   */
+  const fetchClienteIdPorVenda = useCallback(
+    async (ids: string[]) => {
+      const token = auth?.getAccessToken()
+      if (!token || ids.length === 0) return
+
+      const results = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const response = await fetch(`/api/vendas/${id}`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            })
+            if (!response.ok) return { id, clienteId: null }
+            const data = await response.json()
+            const clienteId = (data.clienteId as string | undefined) || null
+            return { id, clienteId }
+          } catch {
+            return { id, clienteId: null }
+          }
+        })
+      )
+
+      setVendaClienteIdMap((prev) => {
+        const next = { ...prev }
+        results.forEach(({ id, clienteId }) => {
+          // marca mesmo que null para evitar refetch infinito
+          next[id] = clienteId
+        })
+        return next
+      })
+    },
+    [auth]
+  )
+
+  /**
+   * Busca nome do cliente dado o clienteId (usa mesmo endpoint de VisualizarCliente).
+   */
+  const fetchNomesClientes = useCallback(
+    async (clienteIds: string[]) => {
+      const token = auth?.getAccessToken()
+      if (!token || clienteIds.length === 0) return
+
+      const results = await Promise.all(
+        clienteIds.map(async (clienteId) => {
+          try {
+            const response = await fetch(`/api/clientes/${clienteId}`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            })
+            if (!response.ok) return { clienteId, nome: null }
+            const data = await response.json()
+            const nome = (data?.nome || data?.razaoSocial || '').trim()
+            return { clienteId, nome: nome || null }
+          } catch {
+            return { clienteId, nome: null }
+          }
+        })
+      )
+
+      setClienteNomeMap((prev) => {
+        const next = { ...prev }
+        results.forEach(({ clienteId, nome }) => {
+          next[clienteId] = nome // nome pode ser null para evitar refetch
+        })
+        return next
+      })
+    },
+    [auth]
+  )
+
 
   /**
    * Busca apenas mesas em aberto
@@ -256,7 +429,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
 
         const data = await response.json()
 
-        const filteredItems = sortByDataCriacaoDesc(
+        const filteredItems = sortByUltimaMovimentacaoAsc(
           (data.items || []).filter((item: Venda) => {
             if (item.dataCancelamento || item.dataFinalizacao) return false
 
@@ -354,14 +527,35 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
     }
   }, [vendas, fetchUltimoProdutoLancado, ultimoProdutoPorVenda])
 
+  // Buscar clienteId via detalhe da venda para cada venda listada
+  useEffect(() => {
+    const ids = vendas
+      .map((v) => v.id)
+      .filter((id) => !(id in vendaClienteIdMap))
+
+    if (ids.length > 0) {
+      fetchClienteIdPorVenda(ids)
+    }
+  }, [vendas, vendaClienteIdMap, fetchClienteIdPorVenda])
+
+  // Buscar nome do cliente para clienteIds recém obtidos
+  useEffect(() => {
+    const clienteIds = Object.values(vendaClienteIdMap).filter(
+      (cid): cid is string => !!cid && !(cid in clienteNomeMap)
+    )
+    if (clienteIds.length > 0) {
+      fetchNomesClientes(clienteIds)
+    }
+  }, [vendaClienteIdMap, clienteNomeMap, fetchNomesClientes])
+
   // Efeito para carregar dados auxiliares e iniciar a busca de vendas
   useEffect(() => {
-    if (!auth) return
+    if (!auth || !cachesHydrated) return
     
     loadAllUsuariosPDV()
     fetchVendas(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auth, apenasSemMovimentacao])
+  }, [auth, cachesHydrated, apenasSemMovimentacao])
 
   return (
     <div className="flex flex-col h-full max-h-[calc(100vh-100px)] overflow-hidden">
@@ -394,6 +588,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
                 tipoVenda="mesa"
                 numeroMesa={metricas?.countVendasEfetivadas || 0}
                 size={60}
+                containerScale={0.90}
                 corTexto="var(--color-info)"
               />
             </div>
@@ -414,7 +609,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
               <span className="text-info text-xl"><MdRestaurant /></span>
             </div>
             <div className="flex flex-col items-end flex-1">
-              <span className="text-xs text-secondary-text font-nunito">Total de Produtos à Vender</span>
+              <span className="text-xs text-secondary-text font-nunito">Total de Produtos vendidos</span>
               <span className="text-[22px] text-primary font-exo">
                 {metricas?.countProdutosVendidos || 0}
               </span>
@@ -449,21 +644,74 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
             )}
 
             {vendas.map((venda) => {
-              const dataReferencia = venda.dataUltimoProdutoLancado || venda.dataUltimaMovimentacao || venda.dataCriacao
-              const elapsedTime = formatElapsedTime(dataReferencia)
+              // Texto "Movimentado há" usa data de criação; cor/tooltip usam movimentações
+              const elapsedTime = formatElapsedTime(venda.dataCriacao)
               const usuarioNome =
                 usuariosPDV.find((u) => u.id === venda.abertoPorId)?.nome || venda.abertoPorId
+              const resolvedClienteId =
+                venda.clienteId || vendaClienteIdMap[venda.id] || undefined
+              const clienteNome =
+                (resolvedClienteId !== undefined && clienteNomeMap[resolvedClienteId]) || null
 
-              // Calcula cor dinâmica para o círculo interno (começa branco e vai amarelando até o warning cheio)
-              const now = new Date()
-              const start = parseDateLocalWallTime(dataReferencia)
-              const diffMs = now.getTime() - start.getTime()
-              const diffMinutes = Math.floor(diffMs / (1000 * 60))
-              const intensity = diffMinutes <= 10 ? 0 : Math.min(100, Math.ceil(diffMinutes / 10) * 10)
-              const innerCircleColor =
-                intensity === 0
-                  ? 'white'
-                  : `color-mix(in srgb, white ${100 - intensity}%, var(--color-warning) ${intensity}%)`
+              const minutosUltimoProduto = venda.dataUltimoProdutoLancado
+                ? Math.floor((Date.now() - toMs(venda.dataUltimoProdutoLancado)) / 60000)
+                : ultimoProdutoPorVenda[venda.id]
+                ? Math.floor((Date.now() - toMs(ultimoProdutoPorVenda[venda.id]!)) / 60000)
+                : Math.floor((Date.now() - toMs(venda.dataCriacao)) / 60000)
+
+              // Fallback para movimentação: dataUltimaMovimentacao -> dataUltimoProdutoLancado -> detalhe -> criação
+              const minutosUltimaMov =
+                venda.dataUltimaMovimentacao && venda.dataUltimaMovimentacao.length > 0
+                  ? Math.floor((Date.now() - toMs(venda.dataUltimaMovimentacao)) / 60000)
+                  : venda.dataUltimaModificacao && venda.dataUltimaModificacao.length > 0
+                  ? Math.floor((Date.now() - toMs(venda.dataUltimaModificacao)) / 60000)
+                  : venda.dataUltimoProdutoLancado && venda.dataUltimoProdutoLancado.length > 0
+                  ? Math.floor((Date.now() - toMs(venda.dataUltimoProdutoLancado)) / 60000)
+                  : ultimoProdutoPorVenda[venda.id]
+                  ? Math.floor((Date.now() - toMs(ultimoProdutoPorVenda[venda.id]!)) / 60000)
+                  : Math.floor((Date.now() - toMs(venda.dataCriacao)) / 60000)
+
+              // Debug do tempo de movimentação
+              if (typeof window !== 'undefined') {
+                // eslint-disable-next-line no-console
+                console.log('mesas-abertas::ultima-mov', {
+                  id: venda.id,
+                  dataUltimaMovimentacao: venda.dataUltimaMovimentacao,
+                  minutosUltimaMov,
+                  dataUltimoProdutoLancado: venda.dataUltimoProdutoLancado,
+                  minutosUltimoProduto,
+                  dataCriacao: venda.dataCriacao,
+                })
+              }
+
+              // Debug: ver se estamos capturando os tempos corretamente
+              if (typeof window !== 'undefined') {
+                // eslint-disable-next-line no-console
+                console.log('mesas-abertas::tempos', {
+                  id: venda.id,
+                  minutosUltimoProduto,
+                  minutosUltimaMov,
+                  dataUltimoProdutoLancado: venda.dataUltimoProdutoLancado,
+                  dataUltimaMovimentacao: venda.dataUltimaMovimentacao,
+                  dataCriacao: venda.dataCriacao,
+                })
+              }
+
+              const movimentoTooltip =
+                `# Últ. produto - ${formatDiffTooltip(minutosUltimoProduto)}` +
+                (minutosUltimaMov !== null && minutosUltimaMov !== undefined
+                  ? `\n\n# Últ. movimentação - ${formatDiffTooltip(minutosUltimaMov)}`
+                  : '')
+
+              // Cor baseada no tempo de movimentação (15 min -> 2h)
+              let innerCircleColor = COR_FINAL
+              const minutosParaCor = minutosUltimoProduto
+              if (minutosParaCor < 15) {
+                innerCircleColor = COR_INICIAL
+              } else if (minutosParaCor < 120) {
+                const progresso = (minutosParaCor - 15) / (120 - 15)
+                innerCircleColor = lerpColor(COR_INICIAL, COR_FINAL, progresso)
+              }
 
               return (
                 <div
@@ -476,16 +724,23 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
                       tipoVenda={venda.tipoVenda}
                       numeroMesa={venda.numeroMesa}
                       size={110} // Tamanho grande para o ícone
+                      containerScale={0.90} // Reduz espaço externo do ícone
                       corTexto="var(--color-alternate)" // Cor do texto do número da mesa
                       corCirculoInterno={innerCircleColor} // Fundo dinâmico: branco -> amarelo
+                      corBorda="var(--color-alternate)" // Borda sempre forte (roxo)
+                      className="mt-0 mb-0"
+                      title={movimentoTooltip}
                     />
+                    {clienteNome ? (
+                      <span className="text-xs text-primary-text font-semibold font-nunito">{clienteNome}</span>
+                    ) : <span className="text-xs text-info font-nunito">-</span>}
                   </div>
 
                   <div className="w-full flex flex-col items-start px-2 mb-4">
                     <span className="text-xs text-primary-text font-nunito font-semibold">Usuário: <span className="font-normal">{usuarioNome}</span></span>
                     <div className="flex justify-between w-full text-xs text-primary-text font-nunito mt-1">
-                      <div className="flex flex-col items-start"><span className="font-semibold">Valor a faturar</span><span>{formatCurrency(venda.valorFinal)}</span></div>
-                      <div className="flex flex-col items-start"><span className="font-semibold">Aberto há</span><span>{elapsedTime}</span></div>
+                      <div className="flex flex-col items-start"><span className="font-semibold">Valor atual</span><span>{formatCurrency(venda.valorFinal)}</span></div>
+                      <div className="flex flex-col items-start"><span className="font-semibold">Aberta há</span><span>{elapsedTime}</span></div>
                     </div>
                   </div>
 
