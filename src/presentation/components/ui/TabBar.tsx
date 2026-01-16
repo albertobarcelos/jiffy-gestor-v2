@@ -35,8 +35,8 @@ export function TabBar() {
   }
 
   return (
-    <div className="bg-white/90 backdrop-blur-sm border-b border-gray-200 shadow-sm">
-      <div className="flex items-center gap-0.5 overflow-x-auto scrollbar-hide px-2">
+    <div className="bg-white/90 backdrop-blur-sm border-b border-gray-200 shadow-sm ">
+      <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide px-2">
         {tabs.map((tab) => {
           const isActive = activeTabId === tab.id
           
@@ -44,11 +44,11 @@ export function TabBar() {
             <div
               key={tab.id}
               className={`
-                group relative flex items-center gap-2 px-4 py-2.5 min-w-fit
-                border-b-2 transition-all duration-200 cursor-pointer
+                group relative flex items-center gap-2 px-4 py-2 min-w-fit mt-2
+                border-t border-x bg-alternate/15 transition-all duration-200 cursor-pointer rounded-t-lg
                 ${isActive 
-                  ? 'border-blue-600 bg-blue-50/50' 
-                  : 'border-transparent hover:border-gray-300 hover:bg-gray-50/50'
+                  ? 'border-secondary' 
+                  : 'border-alternate/30 hover:bg-alternate/20'
                 }
               `}
               onClick={() => setActiveTab(tab.id)}
@@ -56,7 +56,7 @@ export function TabBar() {
               <span
                 className={`
                   text-sm font-medium transition-colors whitespace-nowrap
-                  ${isActive ? 'text-blue-700' : 'text-gray-600 hover:text-gray-900'}
+                  ${isActive ? 'text-secondary' : 'text-alternate hover:text-secondary'}
                 `}
               >
                 {tab.label}
@@ -72,8 +72,8 @@ export function TabBar() {
                     ml-1 p-0.5 rounded transition-all duration-200
                     opacity-0 group-hover:opacity-100
                     ${isActive 
-                      ? 'text-blue-600 hover:bg-blue-100' 
-                      : 'text-gray-400 hover:bg-gray-200 hover:text-gray-600'
+                      ? 'text-secondary' 
+                      : 'text-alternate'
                     }
                   `}
                   title="Fechar aba"

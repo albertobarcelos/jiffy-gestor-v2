@@ -194,7 +194,7 @@ export function TopNav() {
         className="absolute inset-0 bg-black/40"
         onClick={closeMobileMenu}
       />
-      <div className="absolute inset-y-0 left-0 w-11/12 max-w-xs bg-white shadow-xl p-5 overflow-y-auto flex flex-col gap-6">
+      <div className="absolute inset-y-0 left-0 w-11/12 max-w-xs bg-white shadow-xl p-5 overflow-y-auto flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="relative w-10 h-10">
@@ -228,7 +228,7 @@ export function TopNav() {
                   <button
                     type="button"
                     onClick={() => toggleMenu(item.name)}
-                    className={`flex items-center justify-between px-4 py-2 rounded-lg text-sm font-medium ${
+                    className={`flex items-center justify-between px-2 py-2 rounded-lg text-sm font-medium ${
                       isActive ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
@@ -308,7 +308,7 @@ export function TopNav() {
 
   return (
     <nav className="h-16 bg-white border-b border-gray-200 shadow-sm relative">
-      <div className="h-full flex items-center justify-between px-4">
+      <div className="h-full flex items-center justify-between">
         {/* Logo */}
         <div className="flex items-center">
           <Link href="/dashboard" className="flex items-center">
@@ -328,7 +328,7 @@ export function TopNav() {
         {/* Menu Items */}
         <div
           ref={menuRef}
-          className="hidden sm:flex flex-1 items-center justify-start gap-1 pl-2"
+          className="hidden sm:flex flex-1 items-center justify-between gap-1 pl-2"
         >
           {menuItems.map((item) => {
             const isActive = isMenuActive(item)
@@ -394,7 +394,7 @@ export function TopNav() {
                 href={item.path}
                 onMouseEnter={() => handleLinkHover(item.path)}
                 prefetch={true}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                className={`flex items-center gap-1.5 px-2 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                   isActive
                     ? 'bg-gray-100 text-gray-900'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
