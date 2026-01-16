@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import Link from 'next/link'
 import { Venda } from '@/src/domain/entities/Venda'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { MdPerson, MdVisibility } from 'react-icons/md'
