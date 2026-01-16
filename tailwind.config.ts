@@ -8,6 +8,18 @@ const config: Config = {
     './app/**/*.{js,ts,jsx,tsx,mdx}',
     './src/**/*.{js,ts,jsx,tsx,mdx}',
   ],
+  safelist: [
+    'bg-warning/10',
+    'bg-warning/20',
+    'bg-warning/30',
+    'bg-warning/40',
+    'bg-warning/50',
+    'bg-warning/60',
+    'bg-warning/70',
+    'bg-warning/80',
+    'bg-warning/90',
+    'bg-warning/100',
+  ],
   theme: {
     extend: {
       colors: {
