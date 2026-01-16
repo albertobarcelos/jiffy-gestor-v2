@@ -99,7 +99,11 @@ export function UltimasVendas({ periodo }: UltimasVendasProps) {
         const periodoInicial = inicio?.toISOString() || '';
         const periodoFinal = fim?.toISOString() || '';
 
-        // Buscar vendas finalizadas dos últimos 7 dias, ordenadas por data (mais recentes primeiro)
+        // Calcular data com base na prop periodo
+        const mappedPeriodo = mapPeriodoToCalculateFormat(periodo);
+        const { inicio, fim } = calculatePeriodo(mappedPeriodo);
+
+        // Buscar vendas finalizadas, ordenadas por data (mais recentes primeiro)
         const params = new URLSearchParams({
           periodoInicial,
           periodoFinal,
@@ -213,7 +217,7 @@ export function UltimasVendas({ periodo }: UltimasVendasProps) {
     }
 
     loadVendas()
-  }, [auth])
+  }, [auth, periodo])
 
 
   if (isLoading) {

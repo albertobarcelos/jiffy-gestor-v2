@@ -10,6 +10,10 @@ export class Auth {
     private readonly expiresAt: Date
   ) {}
 
+  /**
+   * Cria uma instância de Auth calculando expiração baseada em horas
+   * @deprecated Prefira usar createWithExpiration para usar exp do token JWT
+   */
   static create(accessToken: string, user: User, expiresInHours: number = 24): Auth {
     if (!accessToken) {
       throw new Error('Token de acesso é obrigatório')
@@ -17,6 +21,22 @@ export class Auth {
 
     const expiresAt = new Date()
     expiresAt.setHours(expiresAt.getHours() + expiresInHours)
+
+    return new Auth(accessToken, user, expiresAt)
+  }
+
+  /**
+   * Cria uma instância de Auth com data de expiração específica
+   * Recomendado para usar a expiração real do token JWT (campo exp)
+   */
+  static createWithExpiration(accessToken: string, user: User, expiresAt: Date): Auth {
+    if (!accessToken) {
+      throw new Error('Token de acesso é obrigatório')
+    }
+
+    if (!expiresAt || isNaN(expiresAt.getTime())) {
+      throw new Error('Data de expiração inválida')
+    }
 
     return new Auth(accessToken, user, expiresAt)
   }
