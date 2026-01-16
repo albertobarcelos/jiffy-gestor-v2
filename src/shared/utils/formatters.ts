@@ -80,8 +80,22 @@ export function formatElapsedTime(initialDate: Date | string): string {
     // Exibe minutos restantes exatos (sem arredondar para cima)
     if (remainingMinutes === 0) return `${hours}h`;
     return `${hours}h ${remainingMinutes} min`;
-  } else {
-    const diffDays = Math.round(diffMinutes / (24 * 60));
-    return `${diffDays} dia${diffDays === 1 ? '' : 's'}`;
   }
+
+  // 24h ou mais: calcula dias completos + horas/minutos restantes (sem arredondar)
+  const minutesPerDay = 24 * 60
+  const diffDays = Math.floor(diffMinutes / minutesPerDay)
+  const remainingAfterDays = diffMinutes - diffDays * minutesPerDay
+  const remainingHours = Math.floor(remainingAfterDays / 60)
+  const remainingMinutes = remainingAfterDays % 60
+
+  if (remainingHours === 0 && remainingMinutes === 0) {
+    return `${diffDays} dia${diffDays === 1 ? '' : 's'}`
+  }
+
+  if (remainingMinutes === 0) {
+    return `${diffDays} dia${diffDays === 1 ? '' : 's'} ${remainingHours}h`
+  }
+
+  return `${diffDays} dia${diffDays === 1 ? '' : 's'} ${remainingHours}h ${remainingMinutes} min`
 }
