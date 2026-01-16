@@ -164,9 +164,9 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
 
     const days = Math.floor(hours / 24)
     const remHours = hours % 24
-    if (remHours === 0 && minutes === 0) return `${days} dia${days === 1 ? '' : 's'}`
-    if (minutes === 0) return `${days} dia${days === 1 ? '' : 's'} ${remHours}h`
-    return `${days} dia${days === 1 ? '' : 's'} ${remHours}h ${minutes} min`
+    // Para >= 1 dia, não exibimos minutos
+    if (remHours === 0) return `${days} dia${days === 1 ? '' : 's'}`
+    return `${days} dia${days === 1 ? '' : 's'} ${remHours}h`
   }
 
   const lerpColor = (hexA: string, hexB: string, t: number): string => {

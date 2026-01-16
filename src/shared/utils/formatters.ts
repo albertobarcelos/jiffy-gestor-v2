@@ -87,15 +87,11 @@ export function formatElapsedTime(initialDate: Date | string): string {
   const diffDays = Math.floor(diffMinutes / minutesPerDay)
   const remainingAfterDays = diffMinutes - diffDays * minutesPerDay
   const remainingHours = Math.floor(remainingAfterDays / 60)
-  const remainingMinutes = remainingAfterDays % 60
 
-  if (remainingHours === 0 && remainingMinutes === 0) {
+  // Para > 1 dia, não exibimos minutos
+  if (remainingHours === 0) {
     return `${diffDays} dia${diffDays === 1 ? '' : 's'}`
   }
 
-  if (remainingMinutes === 0) {
-    return `${diffDays} dia${diffDays === 1 ? '' : 's'} ${remainingHours}h`
-  }
-
-  return `${diffDays} dia${diffDays === 1 ? '' : 's'} ${remainingHours}h ${remainingMinutes} min`
+  return `${diffDays} dia${diffDays === 1 ? '' : 's'} ${remainingHours}h`
 }
