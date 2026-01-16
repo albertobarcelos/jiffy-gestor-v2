@@ -58,7 +58,7 @@ export function ConfiguracaoImpostosView() {
 
   const categoriasImpostos: Array<{
     nome: string
-    icon: React.ComponentType<{ size?: number }>
+    icon: React.ComponentType<{ size?: number; color?: string; style?: React.CSSProperties }>
     color: string
   }> = [
     { nome: 'CFOP e Situação Tributária (CSOSN)', icon: MdDescription, color: '#530ca3' },
@@ -439,11 +439,19 @@ export function ConfiguracaoImpostosView() {
               {categoriasImpostos.map((categoria) => {
                 const Icon = categoria.icon
                 return (
-                  <Grid item xs={12} sm={6} md={4} key={categoria.nome}>
+                  <Grid size={{ xs: 12, sm: 6, md: 4 }} key={categoria.nome}>
                     <Button
                       variant="outlined"
                       fullWidth
-                      startIcon={<Icon size={18} color={categoria.color} style={{ fontSize: 'clamp(16px, 3vw, 20px)' }} />}
+                      startIcon={
+                        <Icon 
+                          size={18} 
+                          style={{ 
+                            color: categoria.color, 
+                            fontSize: 'clamp(16px, 3vw, 20px)' 
+                          }} 
+                        />
+                      }
                       sx={{
                         borderColor: categoria.color,
                         borderWidth: '2px',
