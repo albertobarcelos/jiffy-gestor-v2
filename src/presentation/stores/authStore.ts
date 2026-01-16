@@ -77,6 +77,8 @@ export const useAuthStore = create<AuthState>()(
         // Limpar localStorage (Zustand persist faz isso automaticamente, mas garantimos)
         try {
           localStorage.removeItem('auth-storage')
+          // Limpar também as abas ao fazer logout
+          localStorage.removeItem('tabs-storage')
         } catch (error) {
           console.error('Erro ao limpar localStorage:', error)
         }

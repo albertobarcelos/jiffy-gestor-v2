@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import Link from 'next/link'
 import { Venda } from '@/src/domain/entities/Venda'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { MdPerson, MdVisibility } from 'react-icons/md'
@@ -32,53 +31,53 @@ export function UltimasVendas({ periodo }: UltimasVendasProps) {
   const [vendas, setVendas] = useState<Venda[]>([])
   const [userNames, setUserNames] = useState<UserNamesMap>({})
   const [isLoading, setIsLoading] = useState(true)
-    const { auth } = useAuthStore()
+  const { auth } = useAuthStore()
 
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedVendaId, setSelectedVendaId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedVendaId, setSelectedVendaId] = useState<string | null>(null);
 
-    const formatCurrency = useCallback((value: number) => {
-      return new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL',
-      }).format(value)
-    }, [])
+  const formatCurrency = useCallback((value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value)
+  }, [])
 
-    const formatDate = useCallback((date: Date) => {
-      const day = date.getDate()
-      const month = date.toLocaleDateString('pt-BR', { month: 'long' })
-      const hours = date.getHours().toString().padStart(2, '0')
-      const minutes = date.getMinutes().toString().padStart(2, '0')
-      const period = date.getHours() >= 12 ? 'PM' : 'AM'
-      // Formato: "20 fevereiro, 11:20 AM"
-      return `${day} ${month}, ${hours}:${minutes} ${period}`
-    }, [])
+  const formatDate = useCallback((date: Date) => {
+    const day = date.getDate()
+    const month = date.toLocaleDateString('pt-BR', { month: 'long' })
+    const hours = date.getHours().toString().padStart(2, '0')
+    const minutes = date.getMinutes().toString().padStart(2, '0')
+    const period = date.getHours() >= 12 ? 'PM' : 'AM'
+    // Formato: "20 fevereiro, 11:20 AM"
+    return `${day} ${month}, ${hours}:${minutes} ${period}`
+  }, [])
 
-    const handleOpenModal = useCallback((vendaId: string) => {
-      setSelectedVendaId(vendaId);
-      setIsModalOpen(true);
-    }, []);
+  const handleOpenModal = useCallback((vendaId: string) => {
+    setSelectedVendaId(vendaId);
+    setIsModalOpen(true);
+  }, []);
 
-    const handleCloseModal = useCallback(() => {
-      setSelectedVendaId(null);
-      setIsModalOpen(false);
-    }, []);
+  const handleCloseModal = useCallback(() => {
+    setSelectedVendaId(null);
+    setIsModalOpen(false);
+  }, []);
 
-    // Função para mapear o período do frontend para o formato esperado pela função calculatePeriodo
-    const mapPeriodoToCalculateFormat = (frontendPeriodo: string): string => {
-      switch (frontendPeriodo) {
-        case 'Hoje': return 'Hoje';
-        case 'Últimos 7 Dias': return 'Últimos 7 Dias';
-        case 'Mês Atual': return 'Mês Atual';
-        case 'Últimos 30 Dias': return 'Últimos 30 Dias';
-        case 'Últimos 60 Dias': return 'Últimos 60 Dias';
-        case 'Últimos 90 Dias': return 'Últimos 90 Dias';
-        case 'Todos': return 'Todos'; 
-        default: return 'Todos'; 
-      }
-    };
+  // Função para mapear o período do frontend para o formato esperado pela função calculatePeriodo
+  const mapPeriodoToCalculateFormat = (frontendPeriodo: string): string => {
+    switch (frontendPeriodo) {
+      case 'Hoje': return 'Hoje';
+      case 'Últimos 7 Dias': return 'Últimos 7 Dias';
+      case 'Mês Atual': return 'Mês Atual';
+      case 'Últimos 30 Dias': return 'Últimos 30 Dias';
+      case 'Últimos 60 Dias': return 'Últimos 60 Dias';
+      case 'Últimos 90 Dias': return 'Últimos 90 Dias';
+      case 'Todos': return 'Todos'; 
+      default: return 'Todos'; 
+    }
+  };
 
-    useEffect(() => {
+  useEffect(() => {
     const loadVendas = async () => {
       setIsLoading(true)
       try {
@@ -95,17 +94,20 @@ export function UltimasVendas({ periodo }: UltimasVendasProps) {
         const mappedPeriodo = mapPeriodoToCalculateFormat(periodo);
         const { inicio, fim } = calculatePeriodo(mappedPeriodo);
 
-        // Formatar datas no formato ISO (YYYY-MM-DDTHH:MM:SS.sssZ)
-        const periodoInicial = inicio?.toISOString() || '';
-        const periodoFinal = fim?.toISOString() || '';
-
-        // Buscar vendas finalizadas dos últimos 7 dias, ordenadas por data (mais recentes primeiro)
+        // Buscar vendas finalizadas, ordenadas por data (mais recentes primeiro)
         const params = new URLSearchParams({
-          periodoInicial,
-          periodoFinal,
           limit: '100', // Aumentado para buscar mais vendas no período
           offset: '0',
         })
+        
+        // Só adiciona parâmetros de data se não for "Todos"
+        if (mappedPeriodo !== 'Todos' && inicio && fim) {
+          const periodoInicial = inicio.toISOString();
+          const periodoFinal = fim.toISOString();
+          params.append('periodoInicial', periodoInicial);
+          params.append('periodoFinal', periodoFinal);
+        }
+        
         params.append('status', 'FINALIZADA');
         params.append('status', 'CANCELADA');
 
@@ -213,7 +215,7 @@ export function UltimasVendas({ periodo }: UltimasVendasProps) {
     }
 
     loadVendas()
-  }, [auth])
+  }, [auth, periodo])
 
 
   if (isLoading) {
@@ -287,13 +289,11 @@ export function UltimasVendas({ periodo }: UltimasVendasProps) {
           )}
         </div>
       </div>
-      {isModalOpen && (
-        <DetalhesVendas
-          vendaId={selectedVendaId!}
-          open={isModalOpen}
-          onClose={handleCloseModal}
-        />
-      )}
+      <DetalhesVendas
+        vendaId={selectedVendaId || ''}
+        open={isModalOpen}
+        onClose={handleCloseModal}
+      />
     </>
   )
 }

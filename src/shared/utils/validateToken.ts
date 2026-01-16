@@ -2,14 +2,16 @@ import jwt from 'jsonwebtoken'
 
 /**
  * Interface para o payload do token JWT
- * Baseado na análise do código Flutter e comportamento do sistema
+ * Baseado na confirmação do backend e estrutura real do token
  */
 export interface TokenPayload {
-  sub?: string // User ID
-  email?: string
-  empresaId?: string
-  iat?: number // Issued at
-  exp?: number // Expiration
+  userId?: string // ID do usuário (campo principal retornado pelo backend)
+  empresaId?: string // ID da empresa (multi-tenancy)
+  generatedFor?: string // Para qual sistema foi gerado
+  iat?: number // Issued at (timestamp Unix em segundos)
+  exp?: number // Expiration (timestamp Unix em segundos)
+  sub?: string // User ID alternativo (compatibilidade, usar userId primeiro)
+  email?: string // Email do usuário (opcional)
   [key: string]: unknown // Permite campos adicionais
 }
 
@@ -125,12 +127,14 @@ export function validateToken(token: string, secret?: string): TokenValidationRe
 
 /**
  * Extrai informações específicas do token
+ * Usa userId como campo principal (conforme backend), com fallback para sub
  */
 export function extractTokenInfo(token: string): {
   userId?: string
   email?: string
   empresaId?: string
   expiresAt?: Date
+  generatedFor?: string
 } {
   const decoded = decodeToken(token)
   
@@ -139,10 +143,12 @@ export function extractTokenInfo(token: string): {
   }
   
   return {
-    userId: decoded.sub,
+    // Usa userId primeiro (campo retornado pelo backend), fallback para sub
+    userId: decoded.userId || decoded.sub,
     email: decoded.email,
     empresaId: decoded.empresaId,
     expiresAt: decoded.exp ? new Date(decoded.exp * 1000) : undefined,
+    generatedFor: decoded.generatedFor,
   }
 }
 

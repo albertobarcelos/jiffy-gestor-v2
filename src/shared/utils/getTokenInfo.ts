@@ -12,6 +12,7 @@ export interface TokenInfo {
   email?: string
   empresaId?: string
   expiresAt?: Date
+  generatedFor?: string
 }
 
 /**
@@ -46,6 +47,7 @@ export function getTokenInfo(request: NextRequest): TokenInfo | null {
     email: info.email,
     empresaId: info.empresaId,
     expiresAt: info.expiresAt,
+    generatedFor: info.generatedFor,
   }
 }
 

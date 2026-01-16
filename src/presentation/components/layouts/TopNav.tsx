@@ -18,7 +18,8 @@ import {
   MdPayment,
   MdCategory,
   MdAddCircle,
-  MdReceipt
+  MdReceipt,
+  MdAccountBalance
 } from 'react-icons/md'
 
 /**
@@ -54,7 +55,7 @@ export function TopNav() {
       '/produtos',
       '/cadastros/grupos-produtos',
       '/estoque',
-      '/fiscal-flow',
+      '/pedidos-clientes',
     ]
     
     // Prefetch com delay para não bloquear a renderização inicial
@@ -150,7 +151,8 @@ export function TopNav() {
     },
     { name: 'Estoque', path: '/estoque', icon: MdInventory },
     { name: 'Meu Caixa', path: '/meu-caixa', icon: MdPointOfSale },
-    { name: 'Fiscal Flow', path: '/fiscal-flow', icon: MdReceipt },
+    { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: MdReceipt },
+    { name: 'Painel do Contador', path: '/painel-contador', icon: MdAccountBalance },
     { name: 'Relatórios', path: '/relatorios', icon: MdAssessment },
     { name: 'Configurações', path: '/configuracoes', icon: MdSettings },
   ]
@@ -397,9 +399,10 @@ export function TopNav() {
                     ? 'bg-gray-100 text-gray-900'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`}
+                title={item.name === 'Configurações' ? item.name : undefined}
               >
                 <Icon className="w-5 h-5" />
-                <span>{item.name}</span>
+                {item.name !== 'Configurações' && <span>{item.name}</span>}
               </Link>
             )
           })}
@@ -422,7 +425,6 @@ export function TopNav() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </button>
-
           {/* Notifications */}
           <button className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
