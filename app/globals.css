@@ -37,6 +37,35 @@
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
   }
+
+  /* Tooltip customizada para icones de mesa */
+  .tooltip-hover {
+    position: relative;
+  }
+  .tooltip-hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    min-width: 180px;
+    top: 90%;
+    left: 110%;
+    transform: translate(-50%, -50%);
+    background: #ffffff;
+    color: #000000;
+    padding: 6px 4px;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    white-space: pre-line;
+    font-size: 10px;
+    line-height: 1.3;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease-out, transform 120ms ease-out;
+    z-index: 20;
+  }
+  .tooltip-hover:hover::after {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
 }
 
 /**

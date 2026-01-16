@@ -15,6 +15,8 @@ export class Venda {
     private readonly valorFaturado: number,
     private readonly metodoPagamento: string,
     private readonly status: 'Aprovada' | 'Cancelada',
+    private readonly dataUltimoProdutoLancado?: Date | null,
+    private readonly dataUltimaMovimentacao?: Date | null,
     private readonly dataCancelamento?: Date | null,
   ) {}
 
@@ -31,6 +33,8 @@ export class Venda {
     valorFaturado: number,
     metodoPagamento: string,
     status: 'Aprovada' | 'Cancelada',
+    dataUltimoProdutoLancado?: Date | null,
+    dataUltimaMovimentacao?: Date | null,
     dataCancelamento?: Date | null,
   ): Venda {
     if (!id || !data || numeroVenda <= 0 || !userId || !tipoVenda) {
@@ -50,6 +54,8 @@ export class Venda {
       valorFaturado,
       metodoPagamento,
       status,
+      dataUltimoProdutoLancado,
+      dataUltimaMovimentacao,
       dataCancelamento
     )
   }
@@ -68,6 +74,8 @@ export class Venda {
       typeof data.valorFaturado === 'number' ? data.valorFaturado : parseFloat(data.valorFaturado) || 0,
       data.metodoPagamento?.toString() || '',
       data.status === 'Aprovada' || data.status === 'Cancelada' ? data.status : 'Aprovada',
+      data.dataUltimoProdutoLancado ? new Date(data.dataUltimoProdutoLancado) : null,
+      data.dataUltimaMovimentacao ? new Date(data.dataUltimaMovimentacao) : null,
       data.dataCancelamento ? new Date(data.dataCancelamento) : null
     )
   }
@@ -124,6 +132,14 @@ export class Venda {
     return this.dataCancelamento
   }
 
+  getDataUltimoProdutoLancado(): Date | null | undefined {
+    return this.dataUltimoProdutoLancado
+  }
+
+  getDataUltimaMovimentacao(): Date | null | undefined {
+    return this.dataUltimaMovimentacao
+  }
+
   isAprovada(): boolean {
     return this.status === 'Aprovada'
   }
@@ -151,6 +167,8 @@ export class Venda {
       valorFaturado: this.valorFaturado,
       metodoPagamento: this.metodoPagamento,
       status: this.status,
+      dataUltimoProdutoLancado: this.dataUltimoProdutoLancado?.toISOString() || null,
+      dataUltimaMovimentacao: this.dataUltimaMovimentacao?.toISOString() || null,
       dataCancelamento: this.dataCancelamento?.toISOString() || null,
     }
   }
