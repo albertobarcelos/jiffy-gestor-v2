@@ -69,6 +69,7 @@ export function useGruposProdutos(params: GruposProdutosQueryParams = {}) {
     },
     enabled: isAuthenticated && !!token,
     staleTime: 1000 * 60 * 10, // 10 minutos (grupos mudam pouco)
+    refetchOnMount: true, // Sempre refetch ao montar para garantir dados atualizados
   })
 }
 
@@ -130,7 +131,7 @@ export function useGruposProdutosInfinite(params: Omit<GruposProdutosQueryParams
     staleTime: 1000 * 60 * 5, // 5 minutos
     gcTime: 1000 * 60 * 10, // 10 minutos
     refetchOnWindowFocus: false, // Não refetch ao focar na janela
-    refetchOnMount: false, // Não refetch ao montar se já tiver dados em cache
+    refetchOnMount: true, // SEMPRE refetch ao montar para garantir dados atualizados após reordenação
     placeholderData: (previousData) => previousData, // Prefetch automático
   })
 }

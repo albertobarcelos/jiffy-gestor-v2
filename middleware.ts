@@ -10,7 +10,12 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   
   // Rotas públicas - bypass rápido
-  if (pathname === '/login' || pathname.startsWith('/api/auth/login')) {
+  if (
+    pathname === '/login' || 
+    pathname.startsWith('/api/auth/login') ||
+    pathname.startsWith('/api/consulta-cnpj') ||
+    pathname.startsWith('/api/consulta-cep')
+  ) {
     return NextResponse.next()
   }
 

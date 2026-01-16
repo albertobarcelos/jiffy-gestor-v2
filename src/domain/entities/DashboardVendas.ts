@@ -3,65 +3,55 @@
  */
 export class DashboardVendas {
   private constructor(
-    private readonly totalVendas: number,
-    private readonly ticketMedio: number,
-    private readonly vendasCanceladas: number,
-    private readonly vendasEstornadas: number,
-    private readonly variacaoPercentual: number,
-    private readonly numeroVendas: number
+    private readonly totalFaturado: number,
+    private readonly countVendasEfetivadas: number,
+    private readonly countVendasCanceladas: number,
+    private readonly countProdutosVendidos: number,
   ) {}
 
   static create(data: {
-    totalVendas?: number
-    ticketMedio?: number
-    vendasCanceladas?: number
-    vendasEstornadas?: number
-    variacaoPercentual?: number
-    numeroVendas?: number
+    totalFaturado?: number
+    countVendasEfetivadas?: number
+    countVendasCanceladas?: number
+    countProdutosVendidos?: number
   }): DashboardVendas {
     return new DashboardVendas(
-      data.totalVendas ?? 0,
-      data.ticketMedio ?? 0,
-      data.vendasCanceladas ?? 0,
-      data.vendasEstornadas ?? 0,
-      data.variacaoPercentual ?? 0,
-      data.numeroVendas ?? 0
+      data.totalFaturado ?? 0,
+      data.countVendasEfetivadas ?? 0,
+      data.countVendasCanceladas ?? 0,
+      data.countProdutosVendidos ?? 0,
     )
   }
 
   static fromJSON(data: any): DashboardVendas {
+    const metrics = data?.metricas || {}; // Correção aqui: usar 'metricas'
     return DashboardVendas.create({
-      totalVendas: data.totalVendas,
-      ticketMedio: data.ticketMedio,
-      vendasCanceladas: data.vendasCanceladas,
-      vendasEstornadas: data.vendasEstornadas,
-      variacaoPercentual: data.variacaoPercentual,
-      numeroVendas: data.numeroVendas,
+      totalFaturado: metrics.totalFaturado,
+      countVendasEfetivadas: metrics.countVendasEfetivadas,
+      countVendasCanceladas: metrics.countVendasCanceladas,
+      countProdutosVendidos: metrics.countProdutosVendidos,
     })
   }
 
-  getTotalVendas(): number {
-    return this.totalVendas
+  getTotalFaturado(): number {
+    return this.totalFaturado
+  }
+
+  getCountVendasEfetivadas(): number {
+    return this.countVendasEfetivadas
+  }
+
+  getCountVendasCanceladas(): number {
+    return this.countVendasCanceladas
+  }
+  
+  getCountProdutosVendidos(): number {
+    return this.countProdutosVendidos
   }
 
   getTicketMedio(): number {
-    return this.ticketMedio
-  }
-
-  getVendasCanceladas(): number {
-    return this.vendasCanceladas
-  }
-
-  getVendasEstornadas(): number {
-    return this.vendasEstornadas
-  }
-
-  getVariacaoPercentual(): number {
-    return this.variacaoPercentual
-  }
-
-  getNumeroVendas(): number {
-    return this.numeroVendas
+    if (this.countVendasEfetivadas === 0) return 0;
+    return this.totalFaturado / this.countVendasEfetivadas;
   }
 }
 

@@ -101,12 +101,16 @@ export class UsuarioRepository implements IUsuarioRepository {
   async criarUsuario(data: CriarUsuarioDTO): Promise<Usuario> {
     try {
       const body: any = {
-        id: data.id,
         nome: data.nome,
         telefone: data.telefone || '',
         ativo: data.ativo !== undefined ? data.ativo : true,
         password: data.password || '',
         perfilPdvId: data.perfilPdvId || '',
+      }
+      
+      // Só inclui o id se ele for fornecido (geralmente não é necessário na criação)
+      if (data.id) {
+        body.id = data.id
       }
 
       const response = await this.apiClient.request<any>(
@@ -175,7 +179,7 @@ export class UsuarioRepository implements IUsuarioRepository {
 
   async deletarUsuario(id: string): Promise<void> {
     try {
-      await this.apiClient.request(
+      const response = await this.apiClient.request(
         `/api/v1/pessoas/usuarios-pdv/${id}`,
         {
           method: 'DELETE',
@@ -191,9 +195,19 @@ export class UsuarioRepository implements IUsuarioRepository {
               },
         }
       )
+      
+      // DELETE pode retornar 204 (No Content) ou 200 com corpo vazio
+      // Ambos são considerados sucesso
+      return
     } catch (error) {
       if (error instanceof ApiError) {
-        throw new Error(`Erro ao deletar usuário: ${error.message}`)
+        // Extrai a mensagem de erro mais específica possível
+        const errorMessage = 
+          (error.data as any)?.message || 
+          (error.data as any)?.error || 
+          error.message || 
+          'Erro ao deletar usuário pdv'
+        throw new Error(`Erro ao deletar usuário: ${errorMessage}`)
       }
       throw error
     }

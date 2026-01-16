@@ -1,7 +1,6 @@
 'use client'
 
 import { TopNav } from '@/src/presentation/components/layouts/TopNav'
-import { Header } from '@/src/presentation/components/layouts/Header'
 
 export default function ConfiguracoesLayout({
   children,
@@ -9,10 +8,9 @@ export default function ConfiguracoesLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       <TopNav />
-      <Header nomePagina="Configurações" />
-      <main className="p-6">
+      <main className="flex-1 overflow-hidden px-6">
         {children}
       </main>
     </div>

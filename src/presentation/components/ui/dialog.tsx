@@ -100,10 +100,14 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
 
 DialogContent.displayName = 'DialogContent'
 
-export const DialogFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, children, ...props }, ref) => {
+export interface DialogFooterProps extends React.HTMLAttributes<HTMLDivElement> {
+  sx?: any
+}
+
+export const DialogFooter = React.forwardRef<HTMLDivElement, DialogFooterProps>(
+  ({ className, children, sx, ...props }, ref) => {
     return (
-      <MuiDialogActions ref={ref} sx={{ p: 3, pt: 2 }} {...props}>
+      <MuiDialogActions ref={ref} sx={{ p: 3, pt: 2, ...sx }} {...props}>
         {children}
       </MuiDialogActions>
     )

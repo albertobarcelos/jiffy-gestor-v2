@@ -1,12 +1,43 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { MeioPagamento } from '@/src/domain/entities/MeioPagamento'
-import { MeioPagamentoActionsMenu } from './MeioPagamentoActionsMenu'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { MdSearch, MdDelete } from 'react-icons/md'
+import { showToast } from '@/src/shared/utils/toast'
+import {
+  MeiosPagamentosTabsModal,
+  MeiosPagamentosTabsModalState,
+} from './MeiosPagamentosTabsModal'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/src/presentation/components/ui/dialog'
 
 interface MeiosPagamentosListProps {
   onReload?: () => void
+}
+
+/**
+ * Mapeamento entre valores da API e labels para exibição
+ */
+const formasPagamentoFiscalMap: Record<string, string> = {
+  dinheiro: 'Dinheiro',
+  pix: 'PIX',
+  cartao_credito: 'Cartão Crédito',
+  cartao_debito: 'Cartão Débito',
+}
+
+/**
+ * Função para formatar a forma de pagamento fiscal para exibição
+ */
+function formatarFormaPagamentoFiscal(forma: string): string {
+  const formaLower = forma.toLowerCase()
+  return formasPagamentoFiscalMap[formaLower] || forma
 }
 
 /**
@@ -16,20 +47,30 @@ interface MeiosPagamentosListProps {
 export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
   const [meiosPagamento, setMeiosPagamento] = useState<MeioPagamento[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [hasNextPage, setHasNextPage] = useState(true)
-  const [offset, setOffset] = useState(0)
   const [searchText, setSearchText] = useState('')
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
   const [totalMeiosPagamento, setTotalMeiosPagamento] = useState(0)
+  const [updatingTefAtivo, setUpdatingTefAtivo] = useState<Record<string, boolean>>({})
+  const [updatingAtivo, setUpdatingAtivo] = useState<Record<string, boolean>>({})
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [meioPagamentoToDelete, setMeioPagamentoToDelete] = useState<string | null>(null)
+  const [tabsModalState, setTabsModalState] = useState<MeiosPagamentosTabsModalState>({
+    open: false,
+    tab: 'meio-pagamento',
+    mode: 'create',
+    meioPagamentoId: undefined,
+  })
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
   const { auth, isAuthenticated } = useAuthStore()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
 
   // Refs para evitar dependências desnecessárias no useCallback
   const isLoadingRef = useRef(false)
-  const hasNextPageRef = useRef(true)
-  const offsetRef = useRef(0)
   const searchTextRef = useRef('')
   const filterStatusRef = useRef<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
 
@@ -39,14 +80,6 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
   }, [isLoading])
 
   useEffect(() => {
-    hasNextPageRef.current = hasNextPage
-  }, [hasNextPage])
-
-  useEffect(() => {
-    offsetRef.current = offset
-  }, [offset])
-
-  useEffect(() => {
     searchTextRef.current = searchText
   }, [searchText])
 
@@ -54,39 +87,33 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
     filterStatusRef.current = filterStatus
   }, [filterStatus])
 
-  const loadMeiosPagamento = useCallback(
-    async (reset: boolean = false) => {
-      const token = auth?.getAccessToken()
-      if (!token) {
-        return
-      }
+  const loadMeiosPagamento = useCallback(async () => {
+    const token = auth?.getAccessToken()
+    if (!token || isLoadingRef.current) {
+      return
+    }
 
-      if (isLoadingRef.current || (!hasNextPageRef.current && !reset)) return
+    setIsLoading(true)
+    isLoadingRef.current = true
 
-      setIsLoading(true)
-      isLoadingRef.current = true
+    // Determina o filtro ativo
+    let ativoFilter: boolean | null = null
+    if (filterStatusRef.current === 'Ativo') {
+      ativoFilter = true
+    } else if (filterStatusRef.current === 'Desativado') {
+      ativoFilter = false
+    }
 
-      if (reset) {
-        setOffset(0)
-        offsetRef.current = 0
-        setMeiosPagamento([])
-        setHasNextPage(true)
-        hasNextPageRef.current = true
-      }
+    try {
+      const limit = 10
+      let currentOffset = 0
+      let hasMore = true
+      const acumulado: MeioPagamento[] = []
+      let totalFromApi: number | null = null
 
-      const currentOffset = reset ? 0 : offsetRef.current
-
-      // Determina o filtro ativo
-      let ativoFilter: boolean | null = null
-      if (filterStatusRef.current === 'Ativo') {
-        ativoFilter = true
-      } else if (filterStatusRef.current === 'Desativado') {
-        ativoFilter = false
-      }
-
-      try {
+      while (hasMore) {
         const params = new URLSearchParams({
-          limit: '10',
+          limit: limit.toString(),
           offset: currentOffset.toString(),
         })
 
@@ -117,24 +144,39 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
           MeioPagamento.fromJSON(item)
         )
 
-        setMeiosPagamento((prev) => (reset ? newMeiosPagamento : [...prev, ...newMeiosPagamento]))
-        const newOffset = reset ? newMeiosPagamento.length : offsetRef.current + newMeiosPagamento.length
-        setOffset(newOffset)
-        offsetRef.current = newOffset
-        setHasNextPage(newMeiosPagamento.length === 10)
-        hasNextPageRef.current = newMeiosPagamento.length === 10
-        setTotalMeiosPagamento(data.count || 0)
-      } catch (error) {
-        console.error('Erro ao carregar meios de pagamento:', error)
-        setHasNextPage(false)
-        hasNextPageRef.current = false
-      } finally {
-        setIsLoading(false)
-        isLoadingRef.current = false
+        if (typeof data.count === 'number') {
+          totalFromApi = data.count
+        }
+
+        acumulado.push(...newMeiosPagamento)
+        setMeiosPagamento([...acumulado])
+
+        if (totalFromApi !== null) {
+          setTotalMeiosPagamento(totalFromApi)
+        }
+
+        currentOffset += newMeiosPagamento.length
+        hasMore =
+          newMeiosPagamento.length === limit &&
+          (totalFromApi ? currentOffset < totalFromApi : true)
+
+        if (newMeiosPagamento.length === 0) {
+          hasMore = false
+        }
       }
-    },
-    [auth]
-  )
+
+      setMeiosPagamento(acumulado)
+      setTotalMeiosPagamento(totalFromApi ?? acumulado.length)
+      if (totalFromApi !== null && totalFromApi !== acumulado.length) {
+        setTotalMeiosPagamento(acumulado.length)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar meios de pagamento:', error)
+    } finally {
+      setIsLoading(false)
+      isLoadingRef.current = false
+    }
+  }, [auth])
 
   // Debounce da busca
   useEffect(() => {
@@ -146,9 +188,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      if (searchTextRef.current !== searchText) {
-        loadMeiosPagamento(true)
-      }
+      loadMeiosPagamento()
     }, 500)
 
     return () => {
@@ -158,35 +198,14 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
     }
   }, [searchText, auth, loadMeiosPagamento])
 
-  // Filtro de status
+  // Recarrega ao trocar filtro de status
   useEffect(() => {
     const token = auth?.getAccessToken()
     if (!token) return
 
-    loadMeiosPagamento(true)
+    loadMeiosPagamento()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterStatus])
-
-  // Scroll infinito
-  useEffect(() => {
-    const container = scrollContainerRef.current
-    if (!container) return
-
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = container
-      if (
-        scrollTop + clientHeight >= scrollHeight - 200 &&
-        !isLoadingRef.current &&
-        hasNextPageRef.current
-      ) {
-        loadMeiosPagamento()
-      }
-    }
-
-    container.addEventListener('scroll', handleScroll)
-    return () => container.removeEventListener('scroll', handleScroll)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, hasNextPage])
 
   // Carrega meios de pagamento iniciais apenas quando o token estiver disponível
   useEffect(() => {
@@ -196,33 +215,262 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
     if (!token) return
 
     hasLoadedInitialRef.current = true
-    loadMeiosPagamento(true)
+    loadMeiosPagamento()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated])
 
   const handleStatusChange = () => {
-    loadMeiosPagamento(true)
+    loadMeiosPagamento()
     onReload?.()
   }
+
+  const openTabsModal = useCallback((config: Partial<MeiosPagamentosTabsModalState> = {}) => {
+    setTabsModalState(() => ({
+      open: true,
+      tab: config.tab ?? 'meio-pagamento',
+      mode: config.mode ?? 'create',
+      meioPagamentoId: config.meioPagamentoId,
+    }))
+
+    // Adicionar um parâmetro na URL para forçar o recarregamento ao fechar o modal
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.set('modalMeioPagamentoOpen', 'true')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+  }, [router, searchParams, pathname])
+
+  const closeTabsModal = useCallback(() => {
+    setTabsModalState((prev) => ({
+      ...prev,
+      open: false,
+      meioPagamentoId: undefined,
+    }))
+
+    // Remover o parâmetro da URL para forçar o recarregamento da rota
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.delete('modalMeioPagamentoOpen')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+    router.refresh() // Força a revalidação da rota principal
+    loadMeiosPagamento() // Recarrega a lista de meios de pagamento
+    onReload?.()
+  }, [router, searchParams, pathname, loadMeiosPagamento, onReload])
+
+  const handleTabsModalReload = useCallback(() => {
+    loadMeiosPagamento()
+    onReload?.()
+  }, [loadMeiosPagamento, onReload])
+
+  const handleTabsModalTabChange = useCallback((tab: 'meio-pagamento') => {
+    setTabsModalState((prev) => ({
+      ...prev,
+      tab,
+    }))
+  }, [])
+
+  const handleDeleteClick = useCallback((meioPagamentoId: string) => {
+    setMeioPagamentoToDelete(meioPagamentoId)
+    setIsConfirmDeleteOpen(true)
+  }, [])
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!meioPagamentoToDelete) return
+
+    setIsDeleting(true)
+
+    try {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        throw new Error('Token não encontrado')
+      }
+
+      const response = await fetch(`/api/meios-pagamentos/${meioPagamentoToDelete}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || errorData.error || 'Erro ao deletar meio de pagamento')
+      }
+
+      setIsConfirmDeleteOpen(false)
+      setMeioPagamentoToDelete(null)
+      showToast.success('Meio de pagamento deletado com sucesso!')
+      await loadMeiosPagamento()
+      onReload?.()
+    } catch (error) {
+      console.error('Erro ao deletar meio de pagamento:', error)
+      showToast.error(
+        error instanceof Error
+          ? error.message
+          : 'Erro ao deletar meio de pagamento'
+      )
+    } finally {
+      setIsDeleting(false)
+    }
+  }, [meioPagamentoToDelete, auth, loadMeiosPagamento, onReload])
+
+
+  const handleToggleTefAtivo = useCallback(
+    async (meioPagamento: MeioPagamento, novoStatus: boolean) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        return
+      }
+
+      const meioPagamentoId = meioPagamento.getId()
+      const previousTefAtivo = meioPagamento.isTefAtivo()
+
+      setUpdatingTefAtivo((prev) => ({ ...prev, [meioPagamentoId]: true }))
+      setMeiosPagamento((prev) =>
+        prev.map((item) => {
+          if (item.getId() === meioPagamentoId) {
+            return MeioPagamento.create(
+              item.getId(),
+              item.getNome(),
+              novoStatus,
+              item.getFormaPagamentoFiscal(),
+              item.isAtivo()
+            )
+          }
+          return item
+        })
+      )
+
+      try {
+        const response = await fetch(`/api/meios-pagamentos/${meioPagamentoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ tefAtivo: novoStatus }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || errorData.error || 'Erro ao atualizar TEF')
+        }
+
+        await loadMeiosPagamento()
+        onReload?.()
+      } catch (error) {
+        console.error('Erro ao atualizar TEF:', error)
+        showToast.error(error instanceof Error ? error.message : 'Erro ao atualizar TEF')
+        // Reverter para o estado anterior em caso de erro
+        setMeiosPagamento((prev) =>
+          prev.map((item) => {
+            if (item.getId() === meioPagamentoId) {
+              return MeioPagamento.create(
+                item.getId(),
+                item.getNome(),
+                previousTefAtivo,
+                item.getFormaPagamentoFiscal(),
+                item.isAtivo()
+              )
+            }
+            return item
+          })
+        )
+      } finally {
+        setUpdatingTefAtivo((prev) => {
+          const { [meioPagamentoId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [auth, loadMeiosPagamento, onReload]
+  )
+
+  const handleToggleAtivo = useCallback(
+    async (meioPagamento: MeioPagamento, novoStatus: boolean) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        return
+      }
+
+      const meioPagamentoId = meioPagamento.getId()
+      const previousAtivo = meioPagamento.isAtivo()
+
+      setUpdatingAtivo((prev) => ({ ...prev, [meioPagamentoId]: true }))
+      setMeiosPagamento((prev) =>
+        prev.map((item) => {
+          if (item.getId() === meioPagamentoId) {
+            return MeioPagamento.create(
+              item.getId(),
+              item.getNome(),
+              item.isTefAtivo(),
+              item.getFormaPagamentoFiscal(),
+              novoStatus
+            )
+          }
+          return item
+        })
+      )
+
+      try {
+        const response = await fetch(`/api/meios-pagamentos/${meioPagamentoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ ativo: novoStatus }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || errorData.error || 'Erro ao atualizar status')
+        }
+
+        await loadMeiosPagamento()
+        onReload?.()
+      } catch (error) {
+        console.error('Erro ao atualizar status:', error)
+        showToast.error(error instanceof Error ? error.message : 'Erro ao atualizar status')
+        // Reverter para o estado anterior em caso de erro
+        setMeiosPagamento((prev) =>
+          prev.map((item) => {
+            if (item.getId() === meioPagamentoId) {
+              return MeioPagamento.create(
+                item.getId(),
+                item.getNome(),
+                item.isTefAtivo(),
+                item.getFormaPagamentoFiscal(),
+                previousAtivo
+              )
+            }
+            return item
+          })
+        )
+      } finally {
+        setUpdatingAtivo((prev) => {
+          const { [meioPagamentoId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [auth, loadMeiosPagamento, onReload]
+  )
 
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px] pt-[30px] pb-[10px]">
+      <div className="px-[30px] pt-2 flex-shrink-0">
         <div className="flex items-start justify-between">
           <div className="w-1/2 pl-5">
-            <p className="text-primary text-sm font-semibold font-nunito mb-2">
+            <p className="text-primary text-sm font-semibold font-nunito">
               Meios de Pagamento Cadastrados
             </p>
-            <p className="text-tertiary text-[26px] font-medium font-nunito">
+            <p className="text-tertiary text-[22px] font-medium font-nunito">
               Total {meiosPagamento.length} de {totalMeiosPagamento}
             </p>
           </div>
           <button
-            onClick={() => {
-              window.location.href = '/cadastros/meios-pagamentos/novo'
-            }}
-            className="h-10 px-[30px] bg-primary text-info rounded-[30px] font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+            onClick={() => openTabsModal({ mode: 'create' })}
+            className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
           >
             Novo
             <span className="text-lg">+</span>
@@ -230,49 +478,49 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
         </div>
       </div>
 
-      {/* Divisor amarelo */}
-      <div className="relative">
-        <div className="h-[63px] border-t-2 border-alternate"></div>
-        <div className="absolute top-3 left-[30px] right-[30px] flex gap-[10px]">
+      <div className="h-[4px] border-t-2 border-primary/70 flex-shrink-0"></div>
+      <div className="bg-white px-[20px] py-2 border-b border-gray-100 flex-shrink-0">
+        <div className="flex flex-wrap items-end gap-2">
           {/* Barra de pesquisa */}
-          <div className="flex-[3]">
-            <div className="h-[50px] relative">
+          <div className="flex-1 min-w-[180px] max-w-[360px]">
+            <label htmlFor="meios-pagamentos-search" className="text-xs font-semibold text-secondary-text mb-1 block">
+              Buscar meio de pagamento...
+            </label>
+            <div className="relative h-8">
+              <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text" size={18} />
               <input
+                id="meios-pagamentos-search"
                 type="text"
                 placeholder="Pesquisar..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full px-5 pl-12 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-secondary font-nunito text-sm"
+                className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
               />
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
-                🔍
-              </span>
             </div>
           </div>
 
           {/* Filtro de status */}
-          <div className="flex-1">
-            <div className="h-[48px]">
-              <select
-                value={filterStatus}
-                onChange={(e) =>
-                  setFilterStatus(
-                    e.target.value as 'Todos' | 'Ativo' | 'Desativado'
-                  )
-                }
-                className="w-[175px] h-full px-5 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text focus:outline-none focus:border-secondary font-nunito text-sm"
-              >
-                <option value="Todos">Todos</option>
-                <option value="Ativo">Ativo</option>
-                <option value="Desativado">Desativado</option>
-              </select>
-            </div>
+          <div className="w-full sm:w-[160px]">
+            <label className="text-xs font-semibold text-secondary-text mb-1 block">Status</label>
+            <select
+              value={filterStatus}
+              onChange={(e) =>
+                setFilterStatus(
+                  e.target.value as 'Todos' | 'Ativo' | 'Desativado'
+                )
+              }
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+            >
+              <option value="Todos">Todos</option>
+              <option value="Ativo">Ativo</option>
+              <option value="Desativado">Desativado</option>
+            </select>
           </div>
         </div>
       </div>
 
       {/* Cabeçalho da tabela */}
-      <div className="px-[30px] mt-0">
+      <div className="px-[30px] mt-0 flex-shrink-0">
         <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px]">
           <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text">
             Nome
@@ -295,7 +543,8 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
       {/* Lista de meios de pagamento com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-[30px] mt-2"
+        className="flex-1 overflow-y-auto px-[30px] mt-2 scrollbar-hide"
+        style={{ maxHeight: 'calc(100vh - 300px)' }}
       >
         {meiosPagamento.length === 0 && !isLoading && (
           <div className="flex items-center justify-center py-12">
@@ -303,50 +552,102 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
           </div>
         )}
 
-        {meiosPagamento.map((meioPagamento) => (
+        {meiosPagamento.map((meioPagamento) => {
+          // Handler para abrir edição ao clicar na linha
+          const handleRowClick = () => {
+            openTabsModal({
+              mode: 'edit',
+              meioPagamentoId: meioPagamento.getId(),
+            })
+          }
+
+          return (
           <div
             key={meioPagamento.getId()}
-            className="bg-info rounded-xl mb-2 overflow-hidden"
+            onClick={handleRowClick}
+            className="bg-info rounded-lg mb-2 shadow-lg hover:bg-secondary-bg/15 transition-colors cursor-pointer"
           >
             <div className="h-[50px] px-4 flex items-center gap-[10px]">
-              <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text">
-                {meioPagamento.getNome()}
+              <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text flex items-center gap-2">
+                # <span>{meioPagamento.getNome()}</span>
               </div>
               <div className="flex-[2] font-nunito text-sm text-secondary-text">
-                {meioPagamento.getFormaPagamentoFiscal()}
+                {formatarFormaPagamentoFiscal(meioPagamento.getFormaPagamentoFiscal())}
               </div>
-              <div className="flex-[2] flex justify-center">
-                <div
-                  className={`w-20 px-3 py-1 rounded-[24px] text-center text-sm font-nunito font-medium ${
-                    meioPagamento.isTefAtivo()
-                      ? 'bg-success/20 text-success'
-                      : 'bg-secondary-bg/20 text-secondary-text'
+              <div className="flex-[2] flex justify-center" onClick={(e) => e.stopPropagation()}>
+                <label
+                  className={`relative inline-flex h-5 w-12 items-center ${
+                    updatingTefAtivo[meioPagamento.getId()]
+                      ? 'cursor-not-allowed opacity-60'
+                      : 'cursor-pointer'
                   }`}
+                  title={meioPagamento.isTefAtivo() ? 'TEF Ativo' : 'TEF Inativo'}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
                 >
-                  {meioPagamento.isTefAtivo() ? 'Sim' : 'Não'}
-                </div>
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={meioPagamento.isTefAtivo()}
+                    onChange={(event) => {
+                      event.stopPropagation()
+                      handleToggleTefAtivo(meioPagamento, event.target.checked)
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    disabled={!!updatingTefAtivo[meioPagamento.getId()]}
+                  />
+                  <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
+                  <span className="absolute left-1 top-1/2 block h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-6" />
+                </label>
               </div>
-              <div className="flex-[2] flex justify-center">
-                <div
-                  className={`w-20 px-3 py-1 rounded-[24px] text-center text-sm font-nunito font-medium ${
-                    meioPagamento.isAtivo()
-                      ? 'bg-success/20 text-success'
-                      : 'bg-error/20 text-secondary-text'
+              <div className="flex-[2] flex justify-center" onClick={(e) => e.stopPropagation()}>
+                <label
+                  className={`relative inline-flex h-5 w-12 items-center ${
+                    updatingAtivo[meioPagamento.getId()]
+                      ? 'cursor-not-allowed opacity-60'
+                      : 'cursor-pointer'
                   }`}
+                  title={meioPagamento.isAtivo() ? 'Ativo' : 'Desativado'}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
                 >
-                  {meioPagamento.isAtivo() ? 'Ativo' : 'Desativado'}
-                </div>
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={meioPagamento.isAtivo()}
+                    onChange={(event) => {
+                      event.stopPropagation()
+                      handleToggleAtivo(meioPagamento, event.target.checked)
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    disabled={!!updatingAtivo[meioPagamento.getId()]}
+                  />
+                  <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
+                  <span className="absolute left-1 top-1/2 block h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-6" />
+                </label>
               </div>
-              <div className="flex-[2] flex justify-end">
-                <MeioPagamentoActionsMenu
-                  meioPagamentoId={meioPagamento.getId()}
-                  meioPagamentoAtivo={meioPagamento.isAtivo()}
-                  onStatusChanged={handleStatusChange}
-                />
+              <div className="flex-[2] flex justify-end" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDeleteClick(meioPagamento.getId())
+                  }}
+                  className="w-10 h-10 rounded-lg flex items-center justify-center text-error hover:bg-error/10 transition-colors"
+                  title="Deletar meio de pagamento"
+                  disabled={isDeleting}
+                >
+                  {isDeleting && meioPagamentoToDelete === meioPagamento.getId() ? (
+                    <div className="w-4 h-4 border-2 border-error border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <MdDelete size={20} />
+                  )}
+                </button>
               </div>
             </div>
           </div>
-        ))}
+          )
+        })}
 
         {isLoading && (
           <div className="flex justify-center py-4">
@@ -354,6 +655,53 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
           </div>
         )}
       </div>
+
+      <MeiosPagamentosTabsModal
+        state={tabsModalState}
+        onClose={closeTabsModal}
+        onTabChange={handleTabsModalTabChange}
+        onReload={handleTabsModalReload}
+      />
+
+      {/* Modal de confirmação de exclusão */}
+      <Dialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-primary-text">
+              Confirmar exclusão
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-primary-text">
+              Tem certeza que deseja deletar este meio de pagamento?
+            </p>
+            <p className="text-sm text-secondary-text mt-2">
+              Esta ação não pode ser desfeita.
+            </p>
+          </div>
+          <DialogFooter className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setIsConfirmDeleteOpen(false)
+                setMeioPagamentoToDelete(null)
+              }}
+              disabled={isDeleting}
+              className="h-10 px-6 rounded-lg border border-gray-300 text-primary-text hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+              className="h-10 px-6 rounded-lg bg-error text-white font-semibold hover:bg-error/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isDeleting ? 'Deletando...' : 'Deletar'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

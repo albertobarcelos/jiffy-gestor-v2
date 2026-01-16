@@ -1,5 +1,6 @@
 'use client'
 
+import { Suspense } from 'react'
 import { ProdutosList } from '@/src/presentation/components/features/produtos/ProdutosList'
 
 /**
@@ -10,7 +11,9 @@ import { ProdutosList } from '@/src/presentation/components/features/produtos/Pr
 export default function ProdutosPage() {
   return (
     <div className="h-full">
-      <ProdutosList />
+      <Suspense fallback={<div>Carregando produtos...</div>}>
+        <ProdutosList />
+      </Suspense>
     </div>
   )
 }

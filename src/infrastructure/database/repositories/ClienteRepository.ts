@@ -150,13 +150,32 @@ export class ClienteRepository implements IClienteRepository {
       const requestBody: any = {}
 
       if (data.nome) requestBody.nome = data.nome
-      if (data.razaoSocial) requestBody.razaoSocial = data.razaoSocial
-      if (data.cpf) requestBody.cpf = data.cpf
-      if (data.cnpj) requestBody.cnpj = data.cnpj
-      if (data.telefone) requestBody.telefone = data.telefone
-      if (data.email) requestBody.email = data.email
-      if (data.nomeFantasia) requestBody.nomeFantasia = data.nomeFantasia
+      if (data.razaoSocial !== undefined) requestBody.razaoSocial = data.razaoSocial || ''
+      
+      // CPF e CNPJ: sempre envia (mesmo que vazio) para garantir atualização
+      // IMPORTANTE: Envia da mesma forma que criarCliente para manter consistência
+      // Se estiver presente no DTO, envia o valor; se não, envia string vazia
+      requestBody.cpf = data.cpf !== undefined && data.cpf !== null ? data.cpf : ''
+      requestBody.cnpj = data.cnpj !== undefined && data.cnpj !== null ? data.cnpj : ''
+      
+      if (data.telefone !== undefined) requestBody.telefone = data.telefone || ''
+      if (data.email !== undefined) requestBody.email = data.email || ''
+      if (data.nomeFantasia !== undefined) requestBody.nomeFantasia = data.nomeFantasia || ''
       if (data.ativo !== undefined) requestBody.ativo = data.ativo
+      
+      console.log('📤 Repository - Processamento CPF/CNPJ:', {
+        id,
+        cpfInData: data.cpf,
+        cpfType: typeof data.cpf,
+        cpfInObject: 'cpf' in data,
+        cpfEnviado: requestBody.cpf,
+        cpfEnviadoType: typeof requestBody.cpf,
+        cnpjInData: data.cnpj,
+        cnpjType: typeof data.cnpj,
+        cnpjInObject: 'cnpj' in data,
+        cnpjEnviado: requestBody.cnpj,
+        requestBodyCompleto: JSON.stringify(requestBody, null, 2),
+      })
 
       if (data.endereco) {
         requestBody.endereco = {
@@ -169,6 +188,16 @@ export class ClienteRepository implements IClienteRepository {
           complemento: data.endereco.complemento || '',
         }
       }
+
+      // Log do body final que será enviado
+      const bodyString = JSON.stringify(requestBody)
+      console.log('📤 Repository - Body final sendo enviado para API externa:', {
+        url: `/api/v1/pessoas/clientes/${id}`,
+        method: 'PATCH',
+        bodyString,
+        cpfNoBodyString: bodyString.includes('"cpf"'),
+        bodyParsed: JSON.parse(bodyString),
+      })
 
       const response = await this.apiClient.request<any>(
         `/api/v1/pessoas/clientes/${id}`,
@@ -184,9 +213,15 @@ export class ClienteRepository implements IClienteRepository {
                 'Content-Type': 'application/json',
                 accept: 'application/json',
               },
-          body: JSON.stringify(requestBody),
+          body: bodyString,
         }
       )
+
+      console.log('📥 Repository - Resposta da API externa:', {
+        status: response.status,
+        cpfNaResposta: response.data?.cpf,
+        dataCompleta: JSON.stringify(response.data, null, 2),
+      })
 
       return Cliente.fromJSON(response.data)
     } catch (error) {

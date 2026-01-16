@@ -6,7 +6,7 @@ export class Venda {
     private readonly id: string,
     private readonly data: Date,
     private readonly numeroVenda: number,
-    private readonly usuario: string,
+    private readonly userId: string,
     private readonly tipoVenda: string,
     private readonly valorInicial: number,
     private readonly acrescimo: number,
@@ -14,14 +14,15 @@ export class Venda {
     private readonly descontoItem: number,
     private readonly valorFaturado: number,
     private readonly metodoPagamento: string,
-    private readonly status: 'Aprovada' | 'Cancelada'
+    private readonly status: 'Aprovada' | 'Cancelada',
+    private readonly dataCancelamento?: Date | null,
   ) {}
 
   static create(
     id: string,
     data: Date,
     numeroVenda: number,
-    usuario: string,
+    userId: string,
     tipoVenda: string,
     valorInicial: number,
     acrescimo: number,
@@ -29,9 +30,10 @@ export class Venda {
     descontoItem: number,
     valorFaturado: number,
     metodoPagamento: string,
-    status: 'Aprovada' | 'Cancelada'
+    status: 'Aprovada' | 'Cancelada',
+    dataCancelamento?: Date | null,
   ): Venda {
-    if (!id || !data || numeroVenda <= 0 || !usuario || !tipoVenda) {
+    if (!id || !data || numeroVenda <= 0 || !userId || !tipoVenda) {
       throw new Error('Campos obrigatórios não preenchidos')
     }
 
@@ -39,7 +41,7 @@ export class Venda {
       id,
       data,
       numeroVenda,
-      usuario,
+      userId,
       tipoVenda,
       valorInicial,
       acrescimo,
@@ -47,7 +49,8 @@ export class Venda {
       descontoItem,
       valorFaturado,
       metodoPagamento,
-      status
+      status,
+      dataCancelamento
     )
   }
 
@@ -56,7 +59,7 @@ export class Venda {
       data.id?.toString() || '',
       data.data ? new Date(data.data) : new Date(),
       typeof data.numeroVenda === 'number' ? data.numeroVenda : parseInt(data.numeroVenda) || 0,
-      data.usuario?.toString() || '',
+      data.userId?.toString() || '',
       data.tipoVenda?.toString() || '',
       typeof data.valorInicial === 'number' ? data.valorInicial : parseFloat(data.valorInicial) || 0,
       typeof data.acrescimo === 'number' ? data.acrescimo : parseFloat(data.acrescimo) || 0,
@@ -64,7 +67,8 @@ export class Venda {
       typeof data.descontoItem === 'number' ? data.descontoItem : parseFloat(data.descontoItem) || 0,
       typeof data.valorFaturado === 'number' ? data.valorFaturado : parseFloat(data.valorFaturado) || 0,
       data.metodoPagamento?.toString() || '',
-      data.status === 'Aprovada' || data.status === 'Cancelada' ? data.status : 'Aprovada'
+      data.status === 'Aprovada' || data.status === 'Cancelada' ? data.status : 'Aprovada',
+      data.dataCancelamento ? new Date(data.dataCancelamento) : null
     )
   }
 
@@ -80,8 +84,8 @@ export class Venda {
     return this.numeroVenda
   }
 
-  getUsuario(): string {
-    return this.usuario
+  getUserId(): string {
+    return this.userId
   }
 
   getTipoVenda(): string {
@@ -116,12 +120,17 @@ export class Venda {
     return this.status
   }
 
+  getDataCancelamento(): Date | null | undefined {
+    return this.dataCancelamento
+  }
+
   isAprovada(): boolean {
     return this.status === 'Aprovada'
   }
 
   isCancelada(): boolean {
-    return this.status === 'Cancelada'
+    // Agora a verificação de cancelamento pode usar dataCancelamento para maior robustez
+    return this.status === 'Cancelada' || !!this.dataCancelamento
   }
 
   getTotalDescontos(): number {
@@ -133,7 +142,7 @@ export class Venda {
       id: this.id,
       data: this.data.toISOString(),
       numeroVenda: this.numeroVenda,
-      usuario: this.usuario,
+      userId: this.userId,
       tipoVenda: this.tipoVenda,
       valorInicial: this.valorInicial,
       acrescimo: this.acrescimo,
@@ -142,6 +151,7 @@ export class Venda {
       valorFaturado: this.valorFaturado,
       metodoPagamento: this.metodoPagamento,
       status: this.status,
+      dataCancelamento: this.dataCancelamento?.toISOString() || null,
     }
   }
 }

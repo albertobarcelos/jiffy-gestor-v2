@@ -1,40 +1,72 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { MdTrendingUp, MdTrendingDown } from 'react-icons/md'
+import { useRouter } from 'next/navigation' // Importar useRouter
+import { MdAttachMoney, MdRestaurant, MdShoppingCart } from 'react-icons/md'
+import { LuDoorOpen } from "react-icons/lu";
 import { BuscarVendasDashboardUseCase } from '@/src/application/use-cases/dashboard/BuscarVendasDashboardUseCase'
 import { DashboardVendas } from '@/src/domain/entities/DashboardVendas'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
 import { ModalMetodosPagamento } from './ModalMetodosPagamento'
+import { calculatePeriodo } from '@/src/shared/utils/dateFilters' // Importar calculatePeriodo
+
+interface MetricCardsProps {
+  periodo: string;
+}
 
 /**
  * Cards de métricas do dashboard
  * Design clean e minimalista com cantos arredondados
  */
-export function MetricCards() {
-  const [data, setData] = useState<DashboardVendas | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [periodo, setPeriodo] = useState('hoje')
+export function MetricCards({ periodo }: MetricCardsProps) {
+  const router = useRouter() // Obter instância do router
+  const [dataTotal, setDataTotal] = useState<DashboardVendas | null>(null);
+  const [dataFinalizadas, setDataFinalizadas] = useState<DashboardVendas | null>(null);
+  const [dataCanceladas, setDataCanceladas] = useState<DashboardVendas | null>(null);
+  const [dataAbertas, setDataAbertas] = useState<DashboardVendas | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Função para mapear o período do frontend para o formato esperado pelo caso de uso
+  const mapPeriodoToUseCaseFormat = (frontendPeriodo: string): string => {
+    switch (frontendPeriodo) {
+      case 'Hoje': return 'hoje';
+      case 'Últimos 7 Dias': return 'semana';
+      case 'Mês Atual': return 'mes';
+      case 'Últimos 30 Dias': return '30dias';
+      case 'Últimos 60 Dias': return '60dias';
+      case 'Últimos 90 Dias': return '90dias';
+      case 'Todos': return 'todos'; // O caso de uso lida com 'todos' retornando datas vazias
+      default: return 'todos'; // Valor padrão seguro
+    }
+  };
 
   useEffect(() => {
     const loadData = async () => {
-      setIsLoading(true)
-      setError(null)
+      setIsLoading(true);
+      setError(null);
       try {
-        const useCase = new BuscarVendasDashboardUseCase(new ApiClient())
-        const vendas = await useCase.execute(periodo)
-        setData(vendas)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Erro ao carregar dados')
-      } finally {
-        setIsLoading(false)
-      }
-    }
+        const useCase = new BuscarVendasDashboardUseCase();
+        const mappedPeriodo = mapPeriodoToUseCaseFormat(periodo);
+        const total = await useCase.execute(mappedPeriodo, ['FINALIZADA', 'CANCELADA']);
+        const finalizadas = await useCase.execute(mappedPeriodo, ['FINALIZADA']);
+        const canceladas = await useCase.execute(mappedPeriodo, ['CANCELADA']);
+        const abertas = await useCase.execute(mappedPeriodo, ['ABERTA']);
+        
+        setDataTotal(total);
+        setDataFinalizadas(finalizadas);
+        setDataCanceladas(canceladas);
+        setDataAbertas(abertas);
 
-    loadData()
-  }, [periodo])
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Erro ao carregar dados');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [periodo]);
 
   const formatCurrency = (value?: number) => {
     if (!value) return 'R$ 0,00'
@@ -78,38 +110,65 @@ export function MetricCards() {
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Vendas Efetivadas */}
-        <MetricCard
-          title="Vendas Efetivadas"
-          value={formatCurrency(data?.getTotalVendas())}
-          variation={data?.getVariacaoPercentual()}
-          variationLabel="vs mês anterior"
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+        {/* Total Faturado */}
+        <MetricCard className=" border hover:border-primary/50"
+          title="Total Faturado"
+          value={formatCurrency(dataTotal?.getTotalFaturado())}
+          icon={<MdAttachMoney size={20} color="var(--color-primary)" />}
+          bgColorClass="bg-info border-2 border-primary"
+          iconColorClass="text-info"
           isPositive={true}
           onClick={() => setIsModalOpen(true)}
         />
 
-        {/* Ticket Médio */}
-        <MetricCard
-          title="Ticket Médio"
-          value={formatCurrency(data?.getTicketMedio())}
-          variation={data?.getVariacaoPercentual()}
-          variationLabel="vs mês anterior"
+        {/* Vendas Finalizadas */}
+        <MetricCard className=" border hover:border-primary/50"
+          title="Vendas Finalizadas"
+          value={formatNumber(dataFinalizadas?.getCountVendasEfetivadas())}
+          icon={<span className="text-primary"><MdShoppingCart size={20} /></span>}
+          bgColorClass="bg-info border-2 border-primary"
+          iconColorClass="text-info"
           isPositive={true}
+          onClick={() => {
+            router.push(`/relatorios?periodo=${periodo}&status=Finalizada`)
+          }}
         />
 
         {/* Vendas Canceladas */}
-        <MetricCard
+        <MetricCard className=" border hover:border-primary/50"
           title="Vendas Canceladas"
-          value={formatNumber(data?.getVendasCanceladas())}
+          value={formatNumber(dataCanceladas?.getCountVendasCanceladas())}
+          icon={<span className="text-primary">✕</span>}
+          bgColorClass="bg-info border-2 border-primary"
+          iconColorClass="text-info"
           isPositive={false}
+          onClick={() => {
+            router.push(`/relatorios?periodo=${periodo}&status=Cancelada`)
+          }}
         />
 
-        {/* Vendas Estornadas */}
-        <MetricCard
-          title="Vendas Estornadas"
-          value={formatNumber(data?.getVendasEstornadas())}
-          isPositive={false}
+        {/* Vendas em Aberto */}
+        <MetricCard className=" border hover:border-primary/50"
+          title="Vendas em Aberto"
+          value={formatNumber(dataAbertas?.getCountVendasEfetivadas())}
+          icon={<LuDoorOpen size={20} color="var(--color-primary)" />}
+          bgColorClass="bg-info border-2 border-primary"
+          iconColorClass="text-info"
+          isPositive={true} // Consideramos vendas em aberto como um ponto positivo para o fluxo
+          onClick={() => {
+            router.push(`/relatorios?periodo=${periodo}&status=Aberta`)
+          }}
+        />
+
+        {/* Produtos Vendidos */}
+        <MetricCard className=" border hover:border-primary/50"
+          title="Produtos Vendidos"
+          value={formatNumber(dataTotal?.getCountProdutosVendidos())}
+          icon={<MdRestaurant size={20} color="var(--color-primary)"/>}
+          bgColorClass="bg-info border-2 border-primary"
+          iconColorClass="text-info"
+          isPositive={true}
         />
       </div>
 
@@ -123,69 +182,43 @@ export function MetricCards() {
 }
 
 interface MetricCardProps {
-  title: string
-  value: string
-  variation?: number
-  variationLabel?: string
-  isPositive: boolean
-  onClick?: () => void
+  title: string;
+  value: string;
+  isPositive: boolean;
+  icon: React.ReactNode;
+  bgColorClass: string; // Adicionado para cor de fundo do ícone
+  iconColorClass: string; // Adicionado para cor do ícone
+  onClick?: () => void;
+  className?: string; // Adicionado para permitir customização de classes CSS
 }
 
 function MetricCard({
   title,
   value,
-  variation,
-  variationLabel,
   isPositive,
+  icon,
+  bgColorClass,
+  iconColorClass,
   onClick,
+  className,
 }: MetricCardProps) {
-  const variationValue = variation !== undefined ? variation : (isPositive ? 12 : -10)
-  const variationAmount = isPositive ? '+$18K' : '-$10K'
-
   return (
     <div
       className={`
-        bg-white rounded-xl border border-gray-200 p-6
+        bg-white flex items-center justify-between rounded-lg p-2
         shadow-sm hover:shadow-md transition-all duration-200
-        ${onClick ? 'cursor-pointer hover:border-gray-300' : ''}
+        ${onClick ? 'cursor-pointer' : ''}
+        ${className || ''}
       `}
       onClick={onClick}
     >
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex flex-col items-start justify-between mb-2">
         <h3 className="text-sm font-medium text-gray-600">{title}</h3>
-        {variation !== undefined && (
-          <div
-            className={`
-              flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold
-              ${isPositive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}
-            `}
-          >
-            {isPositive ? (
-              <MdTrendingUp className="w-3 h-3" />
-            ) : (
-              <MdTrendingDown className="w-3 h-3" />
-            )}
-            <span>{variationValue}%</span>
-          </div>
-        )}
-      </div>
-
-      <div className="mb-2">
         <p className="text-2xl font-bold text-gray-900">{value}</p>
       </div>
-
-      {variationLabel && (
-        <div className="flex items-center gap-2">
-          <span
-            className={`text-xs font-medium ${
-              isPositive ? 'text-green-600' : 'text-red-600'
-            }`}
-          >
-            {variationAmount}
-          </span>
-          <span className="text-xs text-gray-500">{variationLabel}</span>
-        </div>
-      )}
+      <div className={`w-12 h-12 rounded-full ${bgColorClass} flex items-center justify-center flex-shrink-0`}>
+          <span className={`${iconColorClass} text-xl`}>{icon}</span>
+      </div>
     </div>
-  )
+  );
 }

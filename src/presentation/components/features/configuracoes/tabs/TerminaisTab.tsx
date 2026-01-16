@@ -3,114 +3,125 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Terminal } from '@/src/domain/entities/Terminal'
+import { MdPhone, MdPowerSettingsNew, MdSearch } from 'react-icons/md'
+import { showToast } from '@/src/shared/utils/toast'
+import { TerminaisTabsModal, TerminaisTabsModalState } from './TerminaisTabsModal'
 
 /**
- * Tab de Terminais - Lista de terminais com scroll infinito
+ * Tab de Terminais - Lista de terminais carregando todos os itens de uma vez
+ * Faz requisições sequenciais de 10 em 10 até carregar tudo
  */
+interface TerminalData {
+  terminal: Terminal
+  rawData: any // Dados brutos da API para campos extras
+}
+
 export function TerminaisTab() {
   const { auth } = useAuthStore()
-  const [terminais, setTerminais] = useState<Terminal[]>([])
+  const [terminais, setTerminais] = useState<TerminalData[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [hasNextPage, setHasNextPage] = useState(true)
-  const [offset, setOffset] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [totalItems, setTotalItems] = useState(0)
+  const [togglingStatus, setTogglingStatus] = useState<Record<string, boolean>>({})
+  const [tabsModalState, setTabsModalState] = useState<TerminaisTabsModalState>({
+    open: false,
+    tab: 'terminal',
+    mode: 'edit',
+    terminalId: undefined,
+  })
 
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const isLoadingRef = useRef(false)
-  const hasNextPageRef = useRef(true)
-  const offsetRef = useRef(0)
   const searchQueryRef = useRef('')
-
-  useEffect(() => {
-    isLoadingRef.current = isLoading
-  }, [isLoading])
-
-  useEffect(() => {
-    hasNextPageRef.current = hasNextPage
-  }, [hasNextPage])
-
-  useEffect(() => {
-    offsetRef.current = offset
-  }, [offset])
+  const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
 
   useEffect(() => {
     searchQueryRef.current = searchQuery
   }, [searchQuery])
 
-  const loadTerminais = useCallback(
-    async (reset: boolean = false) => {
+  /**
+   * Carrega todos os terminais fazendo requisições sequenciais
+   * Continua carregando páginas de 10 em 10 até não haver mais itens
+   */
+  const loadAllTerminais = useCallback(
+    async () => {
       const token = auth?.getAccessToken()
-      if (!token) return
-
-      if (isLoadingRef.current || (!hasNextPageRef.current && !reset)) return
-
-      setIsLoading(true)
-      isLoadingRef.current = true
-
-      if (reset) {
-        setOffset(0)
-        offsetRef.current = 0
-        setTerminais([])
-        setHasNextPage(true)
-        hasNextPageRef.current = true
+      if (!token) {
+        return
       }
 
-      const currentOffset = reset ? 0 : offsetRef.current
-      const currentQuery = searchQueryRef.current
+      setIsLoading(true)
 
       try {
-        const params = new URLSearchParams({
-          limit: '10',
-          offset: currentOffset.toString(),
-        })
-        if (currentQuery) {
-          params.append('q', currentQuery)
-        }
+        const allTerminais: TerminalData[] = []
+        let currentOffset = 0
+        let hasMore = true
+        let totalCount = 0
 
-        const response = await fetch(`/api/terminais?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
+        // Loop para carregar todas as páginas
+        while (hasMore) {
+          const params = new URLSearchParams({
+            limit: '10',
+            offset: currentOffset.toString(),
+          })
 
-        if (response.ok) {
+          if (searchQueryRef.current) {
+            params.append('q', searchQueryRef.current)
+          }
+
+          const response = await fetch(`/api/terminais?${params.toString()}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            const errorMessage = errorData.error || `Erro ${response.status}: ${response.statusText}`
+            throw new Error(errorMessage)
+          }
+
           const data = await response.json()
-          
+
           // Debug: log da resposta da API
           if (process.env.NODE_ENV === 'development') {
             console.log('Resposta da API de terminais:', data)
           }
-          
-          // Filtrar e mapear apenas itens válidos
+
+          // Filtrar e mapear apenas itens válidos, mantendo dados brutos
           const newTerminais = (data.items || [])
             .map((t: any) => {
               try {
-                return Terminal.fromJSON(t)
+                const terminal = Terminal.fromJSON(t)
+                return {
+                  terminal,
+                  rawData: t, // Mantém dados brutos para campos extras
+                }
               } catch (error) {
                 console.warn('Erro ao criar Terminal:', error, 'Dados:', t)
                 return null
               }
             })
-            .filter((t: Terminal | null): t is Terminal => t !== null)
-          
-          setTerminais((prev) => (reset ? newTerminais : [...prev, ...newTerminais]))
-          const newOffset = reset ? newTerminais.length : offsetRef.current + newTerminais.length
-          setOffset(newOffset)
-          offsetRef.current = newOffset
-          setHasNextPage(data.hasNextPage ?? false)
-          hasNextPageRef.current = data.hasNextPage ?? false
-          setTotalItems(data.total ?? 0)
-        } else {
-          console.error('Erro na resposta da API:', response.status, await response.text().catch(() => ''))
+            .filter((t: TerminalData | null): t is TerminalData => t !== null)
+
+          allTerminais.push(...newTerminais)
+
+          // Atualiza o total apenas na primeira requisição
+          if (currentOffset === 0) {
+            totalCount = data.count || data.total || 0
+          }
+
+          // Verifica se há mais páginas
+          // Se retornou menos de 10 itens, não há mais páginas
+          hasMore = newTerminais.length === 10
+          currentOffset += newTerminais.length
         }
+
+        setTerminais(allTerminais)
+        setTotalItems(totalCount)
       } catch (error) {
         console.error('Erro ao carregar terminais:', error)
-        setHasNextPage(false)
-        hasNextPageRef.current = false
       } finally {
         setIsLoading(false)
-        isLoadingRef.current = false
       }
     },
     [auth]
@@ -118,134 +129,258 @@ export function TerminaisTab() {
 
   // Debounce para busca
   useEffect(() => {
-    const timer = setTimeout(() => {
-      loadTerminais(true)
-    }, 300)
-
-    return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery])
-
-  // Scroll infinito
-  useEffect(() => {
-    const container = scrollContainerRef.current
-    if (!container) return
-
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = container
-      if (
-        scrollTop + clientHeight >= scrollHeight - 200 &&
-        !isLoadingRef.current &&
-        hasNextPageRef.current
-      ) {
-        loadTerminais()
-      }
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
     }
 
-    container.addEventListener('scroll', handleScroll)
-    return () => container.removeEventListener('scroll', handleScroll)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, hasNextPage])
+    debounceTimerRef.current = setTimeout(() => {
+      loadAllTerminais()
+    }, 300)
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+    }
+  }, [searchQuery, loadAllTerminais])
+
+  /**
+   * Atualiza o status do terminal (bloqueado/desbloqueado)
+   */
+  const handleToggleTerminalStatus = useCallback(
+    async (terminalId: string, novoBloqueado: boolean) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      setTogglingStatus((prev) => ({ ...prev, [terminalId]: true }))
+
+      // Atualização otimista
+      const previousTerminais = terminais
+      setTerminais((prev) =>
+        prev.map((item) => {
+          if (item.terminal.getId() === terminalId) {
+            return {
+              ...item,
+              rawData: {
+                ...item.rawData,
+                bloqueado: novoBloqueado,
+              },
+              terminal: Terminal.fromJSON({
+                ...item.rawData,
+                bloqueado: novoBloqueado,
+              }),
+            }
+          }
+          return item
+        })
+      )
+
+      try {
+        const response = await fetch(`/api/terminais/${terminalId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ bloqueado: novoBloqueado }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Erro ao atualizar terminal')
+        }
+
+        showToast.success(
+          novoBloqueado
+            ? 'Terminal bloqueado com sucesso!'
+            : 'Terminal desbloqueado com sucesso!'
+        )
+
+        // Recarrega os terminais para garantir sincronização
+        await loadAllTerminais()
+      } catch (error: any) {
+        console.error('Erro ao atualizar status do terminal:', error)
+        showToast.error(error.message || 'Erro ao atualizar status do terminal')
+
+        // Reverte a atualização otimista em caso de erro
+        setTerminais(previousTerminais)
+      } finally {
+        setTogglingStatus((prev) => {
+          const { [terminalId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [auth, terminais, loadAllTerminais]
+  )
 
   // Carrega dados iniciais
   useEffect(() => {
-    loadTerminais(true)
+    loadAllTerminais()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h3 className="text-primary text-base font-semibold font-exo mb-1">
-            Terminais
-          </h3>
-          <p className="text-tertiary text-[26px] font-medium font-nunito">
-            Total {terminais.length} de {totalItems}
-          </p>
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Header fixo */}
+      <div className="px-4 flex-shrink-0">
+        <div className="flex items-center justify-between border-b-2 border-primary/70 pb-2">
+          <div className="flex flex-col">
+            <span className="text-primary text-2xl font-semibold font-exo">
+              Terminais Cadastrados
+            </span>
+            <span className="text-tertiary text-[20px] font-medium font-nunito">
+              Total {terminais.length} de {totalItems}
+            </span>
+          </div>
+          
         </div>
-        <button
-          onClick={() => {
-            // TODO: Implementar modal de adicionar terminal
-            alert('Funcionalidade de adicionar terminal será implementada')
-          }}
-          className="h-9 px-4 bg-primary text-info rounded-[50px] text-sm font-medium font-exo hover:bg-primary/90 transition-colors"
-        >
-          + Adicionar Terminal
-        </button>
       </div>
 
-      {/* Busca */}
-      <div className="bg-info rounded-[10px] p-4">
-        <input
-          type="text"
-          placeholder="Buscar terminais..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary"
-        />
+      {/* Busca fixa */}
+      <div className="flex gap-3 px-[20px] pb-2 flex-shrink-0">
+        <div className="flex-1 min-w-[180px] max-w-[360px]">
+          <label
+            htmlFor="terminais-search"
+            className="text-xs font-semibold text-secondary-text mb-1 block"
+          >
+            Buscar Terminal...
+          </label>
+          <div className="relative h-8">
+            <MdSearch
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
+              size={18}
+            />
+            <input
+              id="terminais-search"
+              type="text"
+              placeholder="Pesquisar..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+            />
+          </div>
+        </div>
       </div>
 
-      {/* Lista de terminais */}
-      <div
-        ref={scrollContainerRef}
-        className="max-h-[calc(100vh-400px)] overflow-y-auto bg-info rounded-[10px] p-4 space-y-3"
-      >
+      {/* Lista de terminais com scroll */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-[20px] scrollbar-hide">
+        {/* Barra de títulos das colunas - sticky dentro do scroll */}
+        {terminais.length > 0 && (
+          <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px] sticky top-0 z-10 mb-2">
+            <div className="flex-[2] font-nunito font-semibold text-xs text-primary-text uppercase">
+              Código do Terminal
+            </div>
+            <div className="flex-[2] font-nunito font-semibold text-xs text-primary-text uppercase">
+              Nome do Terminal
+            </div>
+            <div className="flex-[2] font-nunito font-semibold text-xs text-primary-text uppercase">
+              Modelo Dispositivo
+            </div>
+            <div className="flex-[1.5] font-nunito font-semibold text-xs text-primary-text uppercase">
+              Versão APK
+            </div>
+            <div className="flex-[1.5] text-center font-nunito font-semibold text-xs text-primary-text uppercase">
+              Status
+            </div>
+          </div>
+        )}
+
         {terminais.length === 0 && !isLoading && (
           <div className="flex items-center justify-center py-12">
             <p className="text-secondary-text">Nenhum terminal encontrado.</p>
           </div>
         )}
 
-        {terminais.map((terminal) => (
-          <div
-            key={terminal.getId()}
-            className="p-4 bg-primary-bg rounded-lg border border-secondary flex items-center justify-between"
-          >
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <p className="text-sm font-semibold text-primary-text">
-                  {terminal.getName()}
-                </p>
-                <span
-                  className={`px-2 py-1 rounded text-xs font-medium ${
-                    terminal.getAtivo()
-                      ? 'bg-success/20 text-success'
-                      : 'bg-error/20 text-error'
-                  }`}
-                >
-                  {terminal.getAtivo() ? 'Ativo' : 'Inativo'}
+        {terminais.map(({ terminal, rawData }) => {
+          // Extrai campos dos dados brutos conforme documentação da API
+          const codigo = rawData?.codigoInterno || rawData?.codigo || rawData?.code || terminal.getName() || 'N/A'
+          const nome = rawData?.nome || terminal.getName() || codigo
+          const modelo = rawData?.modeloDispositivo || rawData?.modelo || rawData?.deviceModel || 'Unknown'
+          const versao = rawData?.versaoApk || rawData?.versao || rawData?.apkVersion || rawData?.version || '1.0.0'
+          // Status: bloqueado = false significa ATIVO, bloqueado = true significa BLOQUEADO/INATIVO
+          const bloqueado = rawData?.bloqueado ?? terminal.getBloqueado()
+          const ativo = !bloqueado
+
+          return (
+              <div
+              key={terminal.getId()}
+              onClick={() =>
+                setTabsModalState({
+                  open: true,
+                  tab: 'terminal',
+                  mode: 'edit',
+                  terminalId: terminal.getId(),
+                })
+              }
+              className=" px-4 py-2 flex items-center gap-[10px] bg-info rounded-lg my-2 shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-colors cursor-pointer"
+            >
+              <div className="flex-[2] flex items-center gap-3">
+                
+                <span className="text-sm font-medium text-primary-text font-nunito">
+                 # {codigo}
                 </span>
-                {terminal.getSincronizado() && (
-                  <span className="px-2 py-1 rounded text-xs font-medium bg-info/20 text-info">
-                    Sincronizado
-                  </span>
-                )}
               </div>
-              <p className="text-xs text-secondary-text">
-                MAC: {terminal.getEnderecoMac() || 'N/A'}
-              </p>
+              <div className="flex-[2] flex items-center gap-1 text-sm text-primary-text font-nunito">
+                {nome}
+              </div>
+              <div className="flex-[2] text-sm text-secondary-text font-nunito">
+                {modelo}
+              </div>
+              <div className="flex-[1.5] text-sm text-secondary-text font-nunito">
+                {versao}
+              </div>
+              <div className="flex-[1.5] flex justify-center">
+                <label
+                  className={`relative inline-flex h-5 w-12 items-center ${
+                    togglingStatus[terminal.getId()]
+                      ? 'cursor-not-allowed opacity-60'
+                      : 'cursor-pointer'
+                  }`}
+                  title={ativo ? 'Terminal Ativo' : 'Terminal Bloqueado'}
+                >
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={ativo}
+                    onChange={(event) => {
+                      event.stopPropagation();
+                      handleToggleTerminalStatus(terminal.getId(), !event.target.checked)
+                    }}
+                    disabled={!!togglingStatus[terminal.getId()]}
+                  />
+                  <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
+                  <span className="absolute left-[2px] top-1/2 block h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[28px]" />
+                </label>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  // TODO: Implementar edição
-                  alert('Funcionalidade de editar terminal será implementada')
-                }}
-                className="h-8 px-3 bg-alternate text-white rounded-lg text-xs font-medium hover:bg-alternate/90 transition-colors"
-              >
-                Editar
-              </button>
-            </div>
-          </div>
-        ))}
+          )
+        })} 
 
         {isLoading && (
-          <div className="flex justify-center py-4">
+          <div className="flex justify-center py-8">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
         )}
       </div>
+
+      {/* Modal de Edição */}
+      <TerminaisTabsModal
+        state={tabsModalState}
+        onClose={() =>
+          setTabsModalState({
+            open: false,
+            tab: 'terminal',
+            mode: 'edit',
+            terminalId: undefined,
+          })
+        }
+        onTabChange={(tab) => setTabsModalState((prev) => ({ ...prev, tab }))}
+        onReload={loadAllTerminais}
+      />
     </div>
   )
 }

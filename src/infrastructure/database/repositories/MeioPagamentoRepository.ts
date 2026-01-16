@@ -26,7 +26,7 @@ export class MeioPagamentoRepository implements IMeioPagamentoRepository {
     try {
       const { limit, offset, q = '', ativo } = params
 
-      let url = `/api/v1/preferencias/meios-pagamento?limit=${limit}&offset=${offset}`
+      let url = `/api/v1/pagamento/meios-pagamento?limit=${limit}&offset=${offset}`
       if (q) {
         url += `&q=${encodeURIComponent(q)}`
       }
@@ -71,7 +71,7 @@ export class MeioPagamentoRepository implements IMeioPagamentoRepository {
   async buscarMeioPagamentoPorId(id: string): Promise<MeioPagamento | null> {
     try {
       const response = await this.apiClient.request<any>(
-        `/api/v1/preferencias/meios-pagamento/${id}`,
+        `/api/v1/pagamento/meios-pagamento/${id}`,
         {
           method: 'GET',
           headers: this.token
@@ -108,7 +108,7 @@ export class MeioPagamentoRepository implements IMeioPagamentoRepository {
       }
 
       const response = await this.apiClient.request<any>(
-        `/api/v1/preferencias/meios-pagamento`,
+        `/api/v1/pagamento/meios-pagamento`,
         {
           method: 'POST',
           headers: this.token
@@ -144,7 +144,7 @@ export class MeioPagamentoRepository implements IMeioPagamentoRepository {
       if (data.ativo !== undefined) requestBody.ativo = data.ativo
 
       const response = await this.apiClient.request<any>(
-        `/api/v1/preferencias/meios-pagamento/${id}`,
+        `/api/v1/pagamento/meios-pagamento/${id}`,
         {
           method: 'PATCH',
           headers: this.token
@@ -173,7 +173,7 @@ export class MeioPagamentoRepository implements IMeioPagamentoRepository {
   async deletarMeioPagamento(id: string): Promise<void> {
     try {
       await this.apiClient.request(
-        `/api/v1/preferencias/meios-pagamento/${id}`,
+        `/api/v1/pagamento/meios-pagamento/${id}`,
         {
           method: 'DELETE',
           headers: this.token

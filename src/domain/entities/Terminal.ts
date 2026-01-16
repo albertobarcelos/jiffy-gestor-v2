@@ -8,7 +8,7 @@ export class Terminal {
     private readonly id: string,
     private readonly name: string,
     private readonly sincronizado: boolean,
-    private readonly ativo: boolean,
+    private readonly bloqueado: boolean,
     private readonly enderecoMac: string,
     private readonly metodoPagamento: MeioPagamento[] = []
   ) {}
@@ -17,7 +17,7 @@ export class Terminal {
     id: string,
     name: string,
     sincronizado: boolean,
-    ativo: boolean,
+    bloqueado: boolean,
     enderecoMac: string,
     metodoPagamento: MeioPagamento[] = []
   ): Terminal {
@@ -25,7 +25,7 @@ export class Terminal {
     const validId = id || `temp-${Date.now()}-${Math.random()}`
     const validName = name || 'Terminal sem nome'
 
-    return new Terminal(validId, validName, sincronizado, ativo, enderecoMac, metodoPagamento)
+    return new Terminal(validId, validName, sincronizado, bloqueado, enderecoMac, metodoPagamento)
   }
 
   static fromJSON(data: any): Terminal {
@@ -41,11 +41,14 @@ export class Terminal {
                  data.terminalName?.toString() ||
                  'Terminal sem nome'
     
+    // Mapeia bloqueado: false = ativo, true = bloqueado/inativo
+    const bloqueado = data.bloqueado ?? false
+    
     return Terminal.create(
       id,
       name,
       data.sincronizado ?? false,
-      data.ativo ?? false,
+      bloqueado,
       data.enderecoMac?.toString() || 
       data.endereco_mac?.toString() || 
       data.macAddress?.toString() || 
@@ -75,8 +78,13 @@ export class Terminal {
     return this.sincronizado
   }
 
+  getBloqueado(): boolean {
+    return this.bloqueado
+  }
+
   getAtivo(): boolean {
-    return this.ativo
+    // Terminal está ativo quando NÃO está bloqueado
+    return !this.bloqueado
   }
 
   getEnderecoMac(): string {
@@ -92,7 +100,8 @@ export class Terminal {
       id: this.id,
       name: this.name,
       sincronizado: this.sincronizado,
-      ativo: this.ativo,
+      bloqueado: this.bloqueado,
+      ativo: !this.bloqueado, // Mantém compatibilidade
       enderecoMac: this.enderecoMac,
       metodoPagamento: this.metodoPagamento.map((mp) => mp.toJSON()),
     }

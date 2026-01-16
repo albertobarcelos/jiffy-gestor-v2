@@ -25,6 +25,10 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '10', 10)
     const offset = parseInt(searchParams.get('offset') || '0', 10)
     const ativoParam = searchParams.get('ativo')
+    const ativoLocalParam = searchParams.get('ativoLocal')
+    const ativoDeliveryParam = searchParams.get('ativoDelivery')
+    const grupoProdutoId = searchParams.get('grupoProdutoId') || undefined
+    const grupoComplementosId = searchParams.get('grupoComplementosId') || undefined
 
     let ativo: boolean | null = null
     if (ativoParam === 'true') {
@@ -32,6 +36,15 @@ export async function GET(req: NextRequest) {
     } else if (ativoParam === 'false') {
       ativo = false
     }
+
+    const parseOptionalBoolean = (value: string | null): boolean | null => {
+      if (value === 'true') return true
+      if (value === 'false') return false
+      return null
+    }
+
+    const ativoLocal = parseOptionalBoolean(ativoLocalParam)
+    const ativoDelivery = parseOptionalBoolean(ativoDeliveryParam)
 
     const apiClient = new ApiClient()
     const produtoRepository = new ProdutoRepository(apiClient, tokenInfo.token)
@@ -42,18 +55,24 @@ export async function GET(req: NextRequest) {
       limit,
       offset,
       ativo,
+      ativoLocal,
+      ativoDelivery,
+      grupoProdutoId,
+      grupoComplementosId,
     })
 
-    const response = NextResponse.json({ 
-      success: true, 
-      items: produtos.map(p => p.toJSON()), 
-      count: total 
-    })
-
-    // Cache headers para melhor performance
-    response.headers.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=120')
-    
-    return response
+    return NextResponse.json(
+      {
+        success: true,
+        items: produtos.map((p) => p.toJSON()),
+        count: total,
+      },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        },
+      }
+    )
   } catch (error: any) {
     console.error('Erro na API de produtos:', error)
     return NextResponse.json(

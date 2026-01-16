@@ -8,6 +8,7 @@ export class GrupoComplemento {
     private readonly qtdMinima: number,
     private readonly qtdMaxima: number,
     private readonly ativo: boolean,
+    private readonly ordem?: number,
     private readonly complementosIds?: string[],
     private readonly complementos?: any[]
   ) {}
@@ -18,6 +19,7 @@ export class GrupoComplemento {
     qtdMinima: number,
     qtdMaxima: number,
     ativo: boolean,
+    ordem?: number,
     complementosIds?: string[],
     complementos?: any[]
   ): GrupoComplemento {
@@ -39,6 +41,7 @@ export class GrupoComplemento {
       qtdMinima,
       qtdMaxima,
       ativo,
+      ordem,
       complementosIds,
       complementos
     )
@@ -71,6 +74,11 @@ export class GrupoComplemento {
             ? data.complementosIds.map((id: any) => id.toString())
             : [])
         : undefined,
+      typeof data.ordem === 'number'
+        ? data.ordem
+        : typeof data.ordem === 'string'
+          ? Number(data.ordem)
+          : undefined,
       data.complementos
     )
   }
@@ -95,6 +103,10 @@ export class GrupoComplemento {
     return this.ativo
   }
 
+  getOrdem(): number | undefined {
+    return this.ordem
+  }
+
   getComplementosIds(): string[] | undefined {
     return this.complementosIds
   }
@@ -110,6 +122,7 @@ export class GrupoComplemento {
       qtdMinima: this.qtdMinima,
       qtdMaxima: this.qtdMaxima,
       ativo: this.ativo,
+      ordem: this.ordem,
       complementosIds: this.complementosIds,
       complementos: this.complementos,
     }

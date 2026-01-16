@@ -4,19 +4,31 @@ import { memo, useMemo } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
-import { GrupoProdutoActionsMenu } from './GrupoProdutoActionsMenu'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
+import { MdModeEdit, MdAddCircle, MdLink } from 'react-icons/md'
 
 interface GrupoItemProps {
   grupo: GrupoProduto
   index: number
   onStatusChanged?: () => void
+  onToggleStatus?: (grupoId: string, novoStatus: boolean) => void
+  onEdit?: (grupo: GrupoProduto) => void
+  onEditProdutos?: (grupo: GrupoProduto) => void // Abre edição na aba de produtos vinculados
+  onCreateProduto?: (grupoId: string) => void
 }
 
 /**
  * Item reordenável da lista de grupos (memoizado para evitar re-renders desnecessários)
  */
-export const GrupoItem = memo(function GrupoItem({ grupo, index, onStatusChanged }: GrupoItemProps) {
+export const GrupoItem = memo(function GrupoItem({
+  grupo,
+  index,
+  onStatusChanged,
+  onToggleStatus,
+  onEdit,
+  onEditProdutos,
+  onCreateProduto,
+}: GrupoItemProps) {
   const {
     attributes,
     listeners,
@@ -36,38 +48,39 @@ export const GrupoItem = memo(function GrupoItem({ grupo, index, onStatusChanged
   const iconName = useMemo(() => grupo.getIconName(), [grupo])
   const nome = useMemo(() => grupo.getNome(), [grupo])
   const isAtivo = useMemo(() => grupo.isAtivo(), [grupo])
-  const statusClass = useMemo(
-    () =>
-      isAtivo
-        ? 'bg-success/20 text-success'
-        : 'bg-error/20 text-secondary-text',
-    [isAtivo]
-  )
-
+  
+  // Handler para abrir edição ao clicar na área clicável
+  const handleRowClick = useMemo(() => {
+    return () => {
+      onEdit?.(grupo)
+    }
+  }, [grupo, onEdit])
+  
   // Função para renderizar o ícone do grupo
   const renderIcon = useMemo(() => {
     return (
-      <div
-        className="w-[45px] h-[45px] rounded-lg border-2 flex items-center justify-center"
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          onEdit?.(grupo)
+        }}
+        className="w-[45px] h-[45px] bg-info rounded-lg border-2 flex items-center justify-center"
         style={{
-          backgroundColor: '#FFFFFF',
           borderColor: corHex,
         }}
+        title="Editar icone"
       >
-        <DinamicIcon
-          iconName={iconName}
-          color={corHex}
-          size={24}
-        />
-      </div>
+        <DinamicIcon iconName={iconName} color={corHex} size={24} />
+      </button>
     )
-  }, [corHex, iconName])
+  }, [corHex, iconName, grupo, onEdit])
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className="h-[50px] bg-info rounded-xl px-4 mb-2 flex items-center gap-[10px]"
+      className="h-[50px] bg-info rounded-lg px-4 mb-2 flex items-center gap-[10px] hover:bg-[var(--color-primary-background)] transition-colors cursor-default shadow-md  hover:shadow-md"
     >
       {/* Handle de arrastar - apenas esta área é arrastável */}
       <div
@@ -80,30 +93,66 @@ export const GrupoItem = memo(function GrupoItem({ grupo, index, onStatusChanged
         <span>{index + 1}</span>
       </div>
 
-      {/* Ícone */}
-      <div className="flex-[2] flex items-center cursor-default">{renderIcon}</div>
-
-      {/* Nome */}
-      <div className="flex-[4] font-nunito font-semibold text-sm text-primary-text cursor-default">
-        {nome}
+      {/* Ícone - área clicável */}
+      <div 
+        onClick={handleRowClick}
+        className="flex-[2] flex items-center cursor-pointer"
+      >
+        {renderIcon}
       </div>
 
-      {/* Status */}
-      <div className="flex-[2] flex justify-center cursor-default">
-        <div
-          className={`w-20 px-3 py-1 rounded-[24px] text-center text-sm font-nunito font-medium ${statusClass}`}
+      {/* Nome - área clicável */}
+      <div 
+        onClick={handleRowClick}
+        className="flex-[4] font-nunito font-semibold text-sm text-primary-text cursor-pointer flex items-center gap-2"
+      >
+        <span>{nome}</span>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onEditProdutos?.(grupo)
+          }}
+          className="w-5 h-5 rounded-full border border-primary/50 flex items-center justify-center text-primary hover:bg-primary/10 transition-colors"
+          title="Ver produtos vinculados"
         >
-          {isAtivo ? 'Ativo' : 'Desativado'}
-        </div>
+          <MdLink />
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onCreateProduto?.(grupo.getId())
+          }}
+          className="w-5 h-5 rounded-full border border-primary/50 flex items-center justify-center text-primary hover:bg-primary/10 transition-colors"
+          title="criar um novo produto"
+        >
+          <MdAddCircle />
+        </button>
       </div>
 
-      {/* Ações */}
-      <div className="flex-[2] flex justify-end cursor-default">
-        <GrupoProdutoActionsMenu
-          grupoId={grupo.getId()}
-          grupoAtivo={isAtivo}
-          onStatusChanged={onStatusChanged}
-        />
+      {/* Status - área clicável */}
+      <div 
+        onClick={handleRowClick}
+        className="flex-[2] flex justify-center cursor-pointer"
+      >
+        <label
+          className="relative inline-flex items-center h-5 w-12 cursor-pointer"
+          onMouseDown={(event) => event.stopPropagation()}
+          onTouchStart={(event) => event.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          title={isAtivo ? 'Ativo' : 'Desativado'}
+        >
+          <input
+            type="checkbox"
+            className="sr-only peer"
+            checked={isAtivo}
+            onChange={() => onToggleStatus?.(grupo.getId(), !isAtivo)}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <div className="w-full h-full rounded-full bg-gray-300 peer-checked:bg-primary transition-colors" />
+          <span className="absolute left-1 top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-white shadow peer-checked:translate-x-6 transition-transform" />
+        </label>
       </div>
     </div>
   )

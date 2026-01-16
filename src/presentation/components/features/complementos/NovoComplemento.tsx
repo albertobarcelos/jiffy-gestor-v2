@@ -6,16 +6,26 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Complemento } from '@/src/domain/entities/Complemento'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
+import { showToast } from '@/src/shared/utils/toast'
+import { MdOutlineOfflinePin } from 'react-icons/md'
 
 interface NovoComplementoProps {
   complementoId?: string
+  isEmbedded?: boolean
+  onSaved?: () => void
+  onCancel?: () => void
 }
 
 /**
  * Componente para criar/editar complemento
  * Replica o design e funcionalidades do Flutter
  */
-export function NovoComplemento({ complementoId }: NovoComplementoProps) {
+export function NovoComplemento({
+  complementoId,
+  isEmbedded,
+  onSaved,
+  onCancel,
+}: NovoComplementoProps) {
   const router = useRouter()
   const { auth } = useAuthStore()
   const isEditing = !!complementoId
@@ -24,7 +34,7 @@ export function NovoComplemento({ complementoId }: NovoComplementoProps) {
   const [nome, setNome] = useState('')
   const [descricao, setDescricao] = useState('')
   const [valor, setValor] = useState('')
-  const [tipoImpactoPreco, setTipoImpactoPreco] = useState('Nenhum')
+  const [tipoImpactoPreco, setTipoImpactoPreco] = useState<'nenhum' | 'aumenta' | 'diminui'>('nenhum')
   const [ativo, setAtivo] = useState(true)
 
   // Estados de loading
@@ -57,8 +67,11 @@ export function NovoComplemento({ complementoId }: NovoComplementoProps) {
 
           setNome(complemento.getNome())
           setDescricao(complemento.getDescricao() || '')
-          setValor(complemento.getValor().toString())
-          setTipoImpactoPreco(complemento.getTipoImpactoPreco() || 'Nenhum')
+          setValor(formatValorFromNumber(complemento.getValor()))
+          const tipoBanco = (complemento.getTipoImpactoPreco() || 'nenhum').toLowerCase()
+          const tipoNormalizado =
+            tipoBanco === 'aumenta' || tipoBanco === 'diminui' ? tipoBanco : 'nenhum'
+          setTipoImpactoPreco(tipoNormalizado)
           setAtivo(complemento.isAtivo())
         }
       } catch (error) {
@@ -73,12 +86,30 @@ export function NovoComplemento({ complementoId }: NovoComplementoProps) {
   }, [isEditing, complementoId])
 
   // Formatação de valor monetário
-  const formatValor = (value: string) => {
-    // Remove tudo que não é número ou vírgula/ponto
-    const numbers = value.replace(/[^\d,.-]/g, '')
-    // Substitui vírgula por ponto
-    const normalized = numbers.replace(',', '.')
-    return normalized
+  const formatValorInput = (value: string) => {
+    const digits = value.replace(/\D/g, '')
+    if (!digits) {
+      return ''
+    }
+    const numberValue = parseInt(digits, 10)
+    const formatted = (numberValue / 100).toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    })
+    return formatted
+  }
+
+  const formatValorFromNumber = (value: number) => {
+    return value.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    })
+  }
+
+  const parseValorToNumber = (value: string): number => {
+    const normalized = value.replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '')
+    const parsed = parseFloat(normalized)
+    return Number.isNaN(parsed) ? 0 : parsed
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -92,14 +123,14 @@ export function NovoComplemento({ complementoId }: NovoComplementoProps) {
     setIsLoading(true)
 
     try {
-      const valorNumero = parseFloat(formatValor(valor)) || 0
+      const valorNumero = parseValorToNumber(valor)
 
       const body: any = {
         nome,
         descricao: descricao || undefined,
         valor: valorNumero,
         ativo,
-        tipoImpactoPreco: tipoImpactoPreco !== 'Nenhum' ? tipoImpactoPreco : undefined,
+        tipoImpactoPreco,
       }
 
       const url = isEditing
@@ -121,18 +152,26 @@ export function NovoComplemento({ complementoId }: NovoComplementoProps) {
         throw new Error(errorData.error || 'Erro ao salvar complemento')
       }
 
-      alert(isEditing ? 'Complemento atualizado com sucesso!' : 'Complemento criado com sucesso!')
-      router.push('/cadastros/complementos')
+      showToast.success(isEditing ? 'Complemento atualizado com sucesso!' : 'Complemento criado com sucesso!')
+      if (isEmbedded) {
+        onSaved?.()
+      } else {
+        router.push('/cadastros/complementos')
+      }
     } catch (error) {
       console.error('Erro ao salvar complemento:', error)
-      alert(error instanceof Error ? error.message : 'Erro ao salvar complemento')
+      showToast.error(error instanceof Error ? error.message : 'Erro ao salvar complemento')
     } finally {
       setIsLoading(false)
     }
   }
 
   const handleCancel = () => {
-    router.push('/cadastros/complementos')
+    if (isEmbedded) {
+      onCancel?.()
+    } else {
+      router.push('/cadastros/complementos')
+    }
   }
 
   if (isLoadingComplemento) {
@@ -146,20 +185,20 @@ export function NovoComplemento({ complementoId }: NovoComplementoProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header fixo */}
-      <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[30px] shadow-md px-[30px] py-4">
+      <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[20px] shadow-md px-[30px] py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-primary/25 text-primary flex items-center justify-center">
-              <span className="text-2xl">➕</span>
-            </div>
+            
             <h1 className="text-primary text-lg font-semibold font-exo">
-              {isEditing ? 'Editar Complemento' : 'Cadastrar Novo Complemento'}
+              {isEditing
+                ? `Editar Complemento: ${nome || ''}`
+                : `Cadastrar Novo Complemento: ${nome || ''}`}
             </h1>
           </div>
           <Button
             onClick={handleCancel}
             variant="outlined"
-            className="h-9 px-[26px] rounded-[30px] border-primary/15 text-primary bg-primary/10 hover:bg-primary/20"
+            className="h-8 px-[26px] rounded-lg border-primary/15 text-primary bg-primary/10 hover:bg-primary/20"
           >
             Cancelar
           </Button>
@@ -170,22 +209,43 @@ export function NovoComplemento({ complementoId }: NovoComplementoProps) {
       <div className="flex-1 overflow-y-auto px-[30px] py-[30px]">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Dados */}
-          <div className="bg-info rounded-[10px] p-5">
-            <div className="flex items-center gap-5 mb-6">
-              <h2 className="text-secondary text-xl font-semibold font-exo">
-                Dados
+          <div className="bg-info rounded-[10px] p-2">
+            <div className="flex items-center gap-5 mb-2">
+              <h2 className="text-primary text-xl font-semibold font-exo">
+                Dados do Complemento
               </h2>
-              <div className="flex-1 h-px bg-alternate"></div>
+              <div className="flex-1 h-px bg-primary/70"></div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-end gap-3 rounded-lg px-4 py-1">
+                <span className="text-primary-text font-medium">Ativo</span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={ativo}
+                    onChange={(e) => setAtivo(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[9px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                </label>
+              </div>
+
               <Input
-                label="Nome *"
+                label="Nome do Complemento"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
                 required
                 placeholder="Nome do complemento"
                 className="bg-primary-bg"
+                InputLabelProps={{
+                  required: true,
+                  sx: {
+                    '& .MuiFormLabel-asterisk': {
+                      color: 'var(--color-error)',
+                    },
+                  },
+                }}
               />
 
               <Input
@@ -204,9 +264,9 @@ export function NovoComplemento({ complementoId }: NovoComplementoProps) {
                   <input
                     type="text"
                     value={valor}
-                    onChange={(e) => setValor(formatValor(e.target.value))}
-                    placeholder="0,00"
-                    className="w-full px-4 py-3 rounded-xl border-[1.5px] border-gray-400 bg-primary-bg text-gray-900 placeholder:text-gray-500 focus:outline-none focus:border-2 focus:border-yellow-500"
+                    onChange={(e) => setValor(formatValorInput(e.target.value))}
+                    placeholder="R$ 0,00"
+                    className="w-full px-4 py-3 rounded-xl border-[1.5px] border-gray-400 bg-primary-bg text-gray-900 placeholder:text-gray-500 focus:outline-none focus:border-2 focus:border-primary-text"
                   />
                 </div>
 
@@ -216,42 +276,31 @@ export function NovoComplemento({ complementoId }: NovoComplementoProps) {
                   </label>
                   <select
                     value={tipoImpactoPreco}
-                    onChange={(e) => setTipoImpactoPreco(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border-[1.5px] border-gray-400 bg-primary-bg text-gray-900 focus:outline-none focus:border-2 focus:border-yellow-500"
+                    onChange={(e) => {
+                      const value = e.target.value.toLowerCase()
+                      setTipoImpactoPreco(
+                        value === 'aumenta' || value === 'diminui' ? value : 'nenhum'
+                      )
+                    }}
+                    className="w-full px-4 py-3 rounded-xl border-[1.5px] border-gray-400 bg-primary-bg text-gray-900 focus:outline-none focus:border-2 focus:border-primary-text"
                   >
-                    <option value="Nenhum">Nenhum</option>
-                    <option value="Adicionar">Adicionar</option>
-                    <option value="Substituir">Substituir</option>
+                    <option value="nenhum">Nenhum</option>
+                    <option value="aumenta">Aumenta</option>
+                    <option value="diminui">Diminui</option>
                   </select>
                 </div>
-              </div>
-
-              <div className="flex items-center justify-between p-4 bg-primary-bg rounded-lg">
-                <span className="text-primary-text font-medium">Ativo</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={ativo}
-                    onChange={(e) => setAtivo(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-14 h-7 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-success"></div>
-                </label>
               </div>
             </div>
           </div>
 
           {/* Botões de ação */}
-          <div className="flex justify-end gap-4 pt-4">
-            <Button
-              type="button"
-              onClick={handleCancel}
-              variant="outlined"
-              className="px-8"
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isLoading || !nome}>
+          <div className="flex justify-end pt-4">
+            
+            <Button type="submit" disabled={isLoading || !nome} 
+            sx={{
+              backgroundColor: 'var(--color-primary)',
+            }}
+            className="text-white hover:bg-primary/80 w-32 h-8">
               {isLoading ? 'Salvando...' : isEditing ? 'Atualizar' : 'Salvar'}
             </Button>
           </div>

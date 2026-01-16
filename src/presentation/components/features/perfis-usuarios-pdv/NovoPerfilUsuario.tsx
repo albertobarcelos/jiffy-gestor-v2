@@ -7,9 +7,17 @@ import { PerfilUsuario } from '@/src/domain/entities/PerfilUsuario'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
+import { MdPerson, MdClose, MdSearch } from 'react-icons/md'
+import {
+  MeiosPagamentosTabsModal,
+  MeiosPagamentosTabsModalState,
+} from '../meios-pagamentos/MeiosPagamentosTabsModal'
 
 interface NovoPerfilUsuarioProps {
   perfilId?: string
+  isEmbedded?: boolean
+  onSaved?: () => void
+  onCancel?: () => void
 }
 
 interface MeioPagamento {
@@ -21,7 +29,12 @@ interface MeioPagamento {
  * Componente para criar/editar perfil de usuário
  * Replica o design e funcionalidades do Flutter
  */
-export function NovoPerfilUsuario({ perfilId }: NovoPerfilUsuarioProps) {
+export function NovoPerfilUsuario({
+  perfilId,
+  isEmbedded = false,
+  onSaved,
+  onCancel,
+}: NovoPerfilUsuarioProps) {
   const router = useRouter()
   const { auth } = useAuthStore()
   const isEditing = !!perfilId
@@ -40,12 +53,21 @@ export function NovoPerfilUsuario({ perfilId }: NovoPerfilUsuarioProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingPerfil, setIsLoadingPerfil] = useState(false)
   const [showMeiosPagamentoModal, setShowMeiosPagamentoModal] = useState(false)
+  const [searchMeioPagamento, setSearchMeioPagamento] = useState('')
+  const [meiosPagamentosTabsModalState, setMeiosPagamentosTabsModalState] =
+    useState<MeiosPagamentosTabsModalState>({
+      open: false,
+      tab: 'meio-pagamento',
+      mode: 'create',
+      meioPagamentoId: undefined,
+    })
   const hasLoadedPerfilRef = useRef(false)
 
   // Carregar lista de meios de pagamento usando React Query (com cache)
   const {
     data,
     isLoading: isLoadingMeiosPagamento,
+    refetch: refetchMeiosPagamento,
   } = useMeiosPagamentoInfinite({
     limit: 100,
   })
@@ -157,8 +179,12 @@ export function NovoPerfilUsuario({ perfilId }: NovoPerfilUsuarioProps) {
         throw new Error(errorData.error || 'Erro ao salvar perfil')
       }
 
-      alert(isEditing ? 'Perfil atualizado com sucesso!' : 'Perfil criado com sucesso!')
-      router.push('/cadastros/perfis-usuarios-pdv')
+      if (isEmbedded) {
+        onSaved?.()
+      } else {
+        alert(isEditing ? 'Perfil atualizado com sucesso!' : 'Perfil criado com sucesso!')
+        router.push('/cadastros/perfis-usuarios-pdv')
+      }
     } catch (error) {
       console.error('Erro ao salvar perfil:', error)
       alert(error instanceof Error ? error.message : 'Erro ao salvar perfil')
@@ -168,7 +194,11 @@ export function NovoPerfilUsuario({ perfilId }: NovoPerfilUsuarioProps) {
   }
 
   const handleCancel = () => {
-    router.push('/cadastros/perfis-usuarios-pdv')
+    if (isEmbedded) {
+      onCancel?.()
+    } else {
+      router.push('/cadastros/perfis-usuarios-pdv')
+    }
   }
 
   const toggleMeioPagamento = (meio: MeioPagamento) => {
@@ -182,6 +212,32 @@ export function NovoPerfilUsuario({ perfilId }: NovoPerfilUsuarioProps) {
     })
   }
 
+  const openMeiosPagamentosTabsModal = () => {
+    setMeiosPagamentosTabsModalState({
+      open: true,
+      tab: 'meio-pagamento',
+      mode: 'create',
+      meioPagamentoId: undefined,
+    })
+  }
+
+  const closeMeiosPagamentosTabsModal = () => {
+    setMeiosPagamentosTabsModalState((prev) => ({
+      ...prev,
+      open: false,
+      meioPagamentoId: undefined,
+    }))
+  }
+
+  const handleMeiosPagamentosTabChange = (tab: 'meio-pagamento') => {
+    setMeiosPagamentosTabsModalState((prev) => ({ ...prev, tab }))
+  }
+
+  const handleMeiosPagamentosReload = async () => {
+    // Recarrega a lista de meios de pagamento
+    await refetchMeiosPagamento()
+  }
+
   if (isLoadingPerfil) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -193,11 +249,11 @@ export function NovoPerfilUsuario({ perfilId }: NovoPerfilUsuarioProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header fixo */}
-      <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[30px] shadow-md px-[30px] py-4">
+      <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[30px] shadow-md px-[30px] py-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-primary/25 text-primary flex items-center justify-center">
-              <span className="text-2xl">👥</span>
+              <span className="text-2xl"><MdPerson /></span>
             </div>
             <h1 className="text-primary text-lg font-semibold font-exo">
               {isEditing ? 'Editar Perfil de Usuário' : 'Novo Perfil de Usuário'}
@@ -206,7 +262,12 @@ export function NovoPerfilUsuario({ perfilId }: NovoPerfilUsuarioProps) {
           <Button
             onClick={handleCancel}
             variant="outlined"
-            className="h-9 px-[26px] rounded-[30px] border-primary/15 text-primary bg-primary/10 hover:bg-primary/20"
+            className="h-8 px-8 rounded-lg hover:bg-primary/15 transition-colors"
+            sx={{
+              backgroundColor: 'var(--color-info)',
+              color: 'var(--color-primary)',
+              borderColor: 'var(--color-primary)',
+            }}
           >
             Cancelar
           </Button>
@@ -214,18 +275,18 @@ export function NovoPerfilUsuario({ perfilId }: NovoPerfilUsuarioProps) {
       </div>
 
       {/* Formulário com scroll */}
-      <div className="flex-1 overflow-y-auto px-[30px] py-[30px]">
-        <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="flex-1 overflow-y-auto px-[30px] py-2">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* Dados */}
-          <div className="bg-info rounded-[12px] p-5">
-            <h2 className="text-secondary text-xl font-semibold font-exo mb-4">
-              Dados
+          <div className="bg-info">
+            <h2 className="text-primary text-xl font-semibold font-exo mb-1">
+              Dados do Perfil
             </h2>
-            <div className="h-px bg-alternate mb-4"></div>
+            <div className="h-[2px] bg-primary/70 mb-4"></div>
 
-            <div className="space-y-4">
+            <div className="space-y-2">
               <Input
-                label="Nome do Perfil *"
+                label="Nome do Perfil"
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
                 required
@@ -234,60 +295,69 @@ export function NovoPerfilUsuario({ perfilId }: NovoPerfilUsuarioProps) {
               />
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Meios de Pagamento *
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setShowMeiosPagamentoModal(true)}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-400 bg-info text-left text-gray-900 focus:outline-none focus:border-2 focus:border-primary"
-                >
-                  {isLoadingMeiosPagamento ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                      <span>Carregando...</span>
-                    </div>
-                  ) : selectedMeiosPagamento.length === 0 ? (
-                    'Selecionar Meios de Pagamento'
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {selectedMeiosPagamento.map((mp) => (
-                        <span
-                          key={mp.id}
-                          className="px-3 py-1 bg-primary-bg rounded-full text-sm border border-alternate flex items-center gap-2"
-                        >
-                          {mp.nome}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setSelectedMeiosPagamento((prev) =>
-                                prev.filter((p) => p.id !== mp.id)
-                              )
-                            }}
-                            className="text-secondary-text hover:text-primary"
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowMeiosPagamentoModal(true)}
+                    className="flex-1 px-4 py-3 rounded-lg border border-gray-400 bg-info text-left text-gray-900 focus:outline-none focus:border-2 focus:border-primary"
+                  >
+                    {isLoadingMeiosPagamento ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                        <span>Carregando...</span>
+                      </div>
+                    ) : selectedMeiosPagamento.length === 0 ? (
+                      'Clique para Selecionar Meios de Pagamento'
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedMeiosPagamento.map((mp) => (
+                          <span
+                            key={mp.id}
+                            className="px-3 py-1 bg-primary-bg rounded-full text-sm border border-primary flex items-center gap-2"
                           >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </button>
+                            {mp.nome}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedMeiosPagamento((prev) =>
+                                  prev.filter((p) => p.id !== mp.id)
+                                )
+                              }}
+                              className="text-secondary-text hover:text-primary text-sm"
+                            >
+                              <MdClose />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowMeiosPagamentoModal(true)}
+                    className="h-8 px-4 rounded-lg bg-primary text-info font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
+                  >
+                    Vincular Pagamentos
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Permissões */}
-          <div className="bg-info rounded-[12px] p-5">
-            <h2 className="text-secondary text-xl font-semibold font-exo mb-4">
+          <div className="bg-info">
+            <h2 className="text-primary text-xl font-semibold font-exo mb-1">
               Permissões
             </h2>
-            <div className="h-px bg-alternate mb-4"></div>
+            <div className="h-[2px] bg-primary/70 mb-2"></div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               {/* Toggle Cancelar Venda */}
-              <div className="flex items-center justify-between p-4 bg-primary-bg rounded-lg">
+              <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
                 <span className="text-primary-text font-medium">Pode Cancelar Venda?</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -296,12 +366,12 @@ export function NovoPerfilUsuario({ perfilId }: NovoPerfilUsuarioProps) {
                     onChange={(e) => setCancelarVenda(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-14 h-7 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-success"></div>
+                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                 </label>
               </div>
 
               {/* Toggle Cancelar Produto */}
-              <div className="flex items-center justify-between p-4 bg-primary-bg rounded-lg">
+              <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
                 <span className="text-primary-text font-medium">Pode Cancelar Produto?</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -310,12 +380,12 @@ export function NovoPerfilUsuario({ perfilId }: NovoPerfilUsuarioProps) {
                     onChange={(e) => setCancelarProduto(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-14 h-7 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-success"></div>
+                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                 </label>
               </div>
 
               {/* Toggle Aplicar Desconto Produto */}
-              <div className="flex items-center justify-between p-4 bg-primary-bg rounded-lg">
+              <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
                 <span className="text-primary-text font-medium">Pode Aplicar Desconto no Produto?</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -324,12 +394,12 @@ export function NovoPerfilUsuario({ perfilId }: NovoPerfilUsuarioProps) {
                     onChange={(e) => setAplicarDescontoProduto(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-14 h-7 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-success"></div>
+                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                 </label>
               </div>
 
               {/* Toggle Aplicar Desconto Venda */}
-              <div className="flex items-center justify-between p-4 bg-primary-bg rounded-lg">
+              <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
                 <span className="text-primary-text font-medium">Pode Aplicar Desconto na Venda?</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -338,12 +408,12 @@ export function NovoPerfilUsuario({ perfilId }: NovoPerfilUsuarioProps) {
                     onChange={(e) => setAplicarDescontoVenda(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-14 h-7 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-success"></div>
+                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                 </label>
               </div>
 
               {/* Toggle Aplicar Acréscimo Produto */}
-              <div className="flex items-center justify-between p-4 bg-primary-bg rounded-lg">
+              <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
                 <span className="text-primary-text font-medium">Pode Aplicar Acréscimo no Produto?</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -352,12 +422,12 @@ export function NovoPerfilUsuario({ perfilId }: NovoPerfilUsuarioProps) {
                     onChange={(e) => setAplicarAcrescimoProduto(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-14 h-7 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-success"></div>
+                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                 </label>
               </div>
 
               {/* Toggle Aplicar Acréscimo Venda */}
-              <div className="flex items-center justify-between p-4 bg-primary-bg rounded-lg">
+              <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
                 <span className="text-primary-text font-medium">Pode Aplicar Acréscimo na Venda?</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -366,23 +436,35 @@ export function NovoPerfilUsuario({ perfilId }: NovoPerfilUsuarioProps) {
                     onChange={(e) => setAplicarAcrescimoVenda(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-14 h-7 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-success"></div>
+                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                 </label>
               </div>
             </div>
           </div>
 
           {/* Botões de ação */}
-          <div className="flex justify-end gap-4 pt-4">
+          <div className="flex justify-end gap-4 pt-2">
             <Button
               type="button"
               onClick={handleCancel}
               variant="outlined"
-              className="px-8"
+              className="h-8 px-8 rounded-lg hover:bg-primary/15 transition-colors"
+              sx={{
+                backgroundColor: 'var(--color-info)',
+                color: 'var(--color-primary)',
+                borderColor: 'var(--color-primary)',
+              }}
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={isLoading || !role}>
+            <Button type="submit" disabled={isLoading || !role} 
+            className="h-8 rounded-lg text-white hover:bg-primary/90"
+            sx={{
+              backgroundColor: 'var(--color-primary)',
+              color: 'var(--color-info)',
+              borderColor: 'var(--color-primary)',
+            }}
+            >
               {isLoading ? 'Salvando...' : isEditing ? 'Atualizar' : 'Salvar'}
             </Button>
           </div>
@@ -394,7 +476,7 @@ export function NovoPerfilUsuario({ perfilId }: NovoPerfilUsuarioProps) {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-info rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold text-primary-text">Selecionar Meios de Pagamento</h3>
+              <h3 className="text-xl font-semibold text-primary">Vincular Meios de Pagamento</h3>
               <button
                 type="button"
                 onClick={() => setShowMeiosPagamentoModal(false)}
@@ -403,15 +485,41 @@ export function NovoPerfilUsuario({ perfilId }: NovoPerfilUsuarioProps) {
                 ✕
               </button>
             </div>
+            <div className="mb-4 flex gap-2 items-center">
+              <div className="flex-1 relative">
+                <MdSearch
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text"
+                  size={18}
+                />
+                <input
+                  type="text"
+                  placeholder="Buscar meio de pagamento..."
+                  value={searchMeioPagamento}
+                  onChange={(e) => setSearchMeioPagamento(e.target.value)}
+                  className="w-full h-8 pl-10 pr-4 rounded-lg border border-gray-300 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={openMeiosPagamentosTabsModal}
+                className="h-8 px-4 rounded-lg bg-primary text-info font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
+              >
+                Adicionar Meios de Pagamento
+              </button>
+            </div>
             <div className="space-y-2">
-              {meiosPagamento.map((meio) => {
+              {meiosPagamento
+                .filter((meio) =>
+                  meio.nome.toLowerCase().includes(searchMeioPagamento.toLowerCase())
+                )
+                .map((meio) => {
                 const isSelected = selectedMeiosPagamento.some((mp) => mp.id === meio.id)
                 return (
                   <button
                     key={meio.id}
                     type="button"
                     onClick={() => toggleMeioPagamento(meio)}
-                    className={`w-full p-3 rounded-lg border-2 text-left transition-colors ${
+                    className={`w-full py-2 px-4 rounded-lg border-2 text-left transition-colors ${
                       isSelected
                         ? 'border-primary bg-primary/10'
                         : 'border-gray-300 bg-info hover:bg-primary-bg'
@@ -429,7 +537,12 @@ export function NovoPerfilUsuario({ perfilId }: NovoPerfilUsuarioProps) {
               <Button
                 type="button"
                 onClick={() => setShowMeiosPagamentoModal(false)}
-                className="px-6"
+                className="h-8 px-4 rounded-lg bg-primary text-info font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
+                sx={{
+                  backgroundColor: 'var(--color-primary)',
+                  color: 'var(--color-info)',
+                  borderColor: 'var(--color-primary)',
+                }}
               >
                 Confirmar
               </Button>
@@ -437,6 +550,13 @@ export function NovoPerfilUsuario({ perfilId }: NovoPerfilUsuarioProps) {
           </div>
         </div>
       )}
+
+      <MeiosPagamentosTabsModal
+        state={meiosPagamentosTabsModalState}
+        onClose={closeMeiosPagamentosTabsModal}
+        onTabChange={handleMeiosPagamentosTabChange}
+        onReload={handleMeiosPagamentosReload}
+      />
     </div>
   )
 }

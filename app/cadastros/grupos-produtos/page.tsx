@@ -1,5 +1,6 @@
 'use client'
 
+import { Suspense } from 'react'
 import { GruposProdutosList } from '@/src/presentation/components/features/grupos-produtos/GruposProdutosList'
 
 /**
@@ -8,8 +9,10 @@ import { GruposProdutosList } from '@/src/presentation/components/features/grupo
  */
 export default function GruposProdutosPage() {
   return (
-    <div className="h-full">
-      <GruposProdutosList />
+    <div className="h-full flex flex-col">
+      <Suspense fallback={<div>Carregando grupos...</div>}>
+        <GruposProdutosList />
+      </Suspense>
     </div>
   )
 }
