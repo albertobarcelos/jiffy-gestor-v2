@@ -44,7 +44,7 @@ export function TabBar() {
             <div
               key={tab.id}
               className={`
-                group relative flex items-center gap-2 px-4 py-2 min-w-fit mt-2
+                group relative flex items-center gap-2 px-2 py-1 min-w-fit mt-2
                 border-t border-x bg-alternate/15 transition-all duration-200 cursor-pointer rounded-t-lg
                 ${isActive 
                   ? 'border-secondary' 
@@ -68,9 +68,7 @@ export function TabBar() {
                     e.stopPropagation()
                     removeTab(tab.id)
                   }}
-                  className={`
-                    ml-1 p-0.5 rounded transition-all duration-200
-                    opacity-0 group-hover:opacity-100
+                  className={`hover:bg-alternate/20 rounded-full p-0.5
                     ${isActive 
                       ? 'text-secondary' 
                       : 'text-alternate'
