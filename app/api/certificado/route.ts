@@ -1,0 +1,272 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getTokenInfo } from '@/src/shared/utils/getTokenInfo'
+
+const FISCAL_SERVICE_URL = process.env.FISCAL_SERVICE_URL || 'http://localhost:8081'
+
+/**
+ * POST /api/certificado - Cadastrar certificado digital
+ */
+export async function POST(req: NextRequest) {
+  // Forçar saída no terminal (stderr sempre aparece)
+  console.error('[CERTIFICADO] 🚀 API Route /api/certificado chamada!')
+  console.log('[CERTIFICADO] 🚀 API Route /api/certificado chamada!')
+  try {
+    const tokenInfo = getTokenInfo(req)
+    if (!tokenInfo) {
+      return NextResponse.json(
+        { success: false, error: 'Não autenticado' },
+        { status: 401 }
+      )
+    }
+
+    const body = await req.json()
+
+    const logData = {
+      uf: body.uf,
+      ambiente: body.ambiente,
+      cnpj: body.cnpj?.substring(0, 4) + '...',
+      aliasCertificado: body.aliasCertificado,
+    }
+    console.error('[CERTIFICADO] 📨 Backend proxy recebeu:', JSON.stringify(logData, null, 2))
+    console.log('[CERTIFICADO] 📨 Backend proxy recebeu:', logData)
+    
+    // Log do token (apenas para debug - não mostrar completo)
+    const tokenPreview = tokenInfo.token ? 
+      `${tokenInfo.token.substring(0, 20)}... (${tokenInfo.token.length} chars)` : 
+      'TOKEN AUSENTE'
+    console.error('[CERTIFICADO] 🔑 Token sendo enviado:', tokenPreview)
+    console.error('[CERTIFICADO] 🔑 EmpresaId do token:', tokenInfo.empresaId)
+
+    // Enviar para o fiscal service
+    const response = await fetch(`${FISCAL_SERVICE_URL}/v1/certificados`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${tokenInfo.token}`,
+      },
+      body: JSON.stringify(body),
+    })
+
+    console.error('[CERTIFICADO] 📥 Fiscal service respondeu:', response.status)
+    console.log('[CERTIFICADO] 📥 Fiscal service respondeu:', response.status)
+
+    if (!response.ok) {
+      let errorData: any = {}
+      let errorText = ''
+      
+      try {
+        errorText = await response.text()
+        console.error('❌ Fiscal service resposta (texto):', errorText)
+        
+        if (errorText) {
+          try {
+            errorData = JSON.parse(errorText)
+          } catch (e) {
+            // Se não for JSON, usa o texto como mensagem
+            errorData = { message: errorText || 'Erro ao cadastrar certificado' }
+          }
+        }
+      } catch (e) {
+        console.error('❌ Erro ao ler resposta do fiscal service:', e)
+        errorData = { message: 'Erro ao processar resposta do servidor' }
+      }
+      
+      console.error('❌ Fiscal service erro:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        body: errorData,
+        text: errorText
+      })
+      
+      // Retorna mensagem específica do fiscal service ou genérica
+      const errorMessage = errorData.message || 
+                          errorData.error || 
+                          (response.status === 403 ? 'Acesso negado. Verifique se o token JWT é válido e se você tem permissão.' : 
+                           `Erro ao cadastrar certificado (${response.status})`)
+      
+      return NextResponse.json(
+        { success: false, message: errorMessage },
+        { status: response.status }
+      )
+    }
+
+    const data = await response.json()
+    return NextResponse.json({ success: true, data })
+  } catch (error: any) {
+    console.error('Erro ao cadastrar certificado:', error)
+    return NextResponse.json(
+      { success: false, message: error.message || 'Erro interno' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * GET /api/certificado - Buscar certificado cadastrado
+ */
+export async function GET(req: NextRequest) {
+  try {
+    const tokenInfo = getTokenInfo(req)
+    if (!tokenInfo) {
+      return NextResponse.json(
+        { success: false, error: 'Não autenticado' },
+        { status: 401 }
+      )
+    }
+
+    // Buscar do fiscal service
+    const response = await fetch(`${FISCAL_SERVICE_URL}/v1/certificados/ativo`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${tokenInfo.token}`,
+      },
+    })
+
+    if (response.status === 404) {
+      // Nenhum certificado encontrado
+      return NextResponse.json({ success: true, data: null })
+    }
+
+    if (!response.ok) {
+      let errorData: any = {}
+      let errorText = ''
+      
+      try {
+        errorText = await response.text()
+        console.error('[CERTIFICADO GET] ❌ Fiscal service resposta (texto):', errorText)
+        
+        if (errorText) {
+          try {
+            errorData = JSON.parse(errorText)
+          } catch (e) {
+            errorData = { message: errorText || 'Erro ao buscar certificado' }
+          }
+        }
+      } catch (e) {
+        console.error('[CERTIFICADO GET] ❌ Erro ao ler resposta do fiscal service:', e)
+        errorData = { message: 'Erro ao processar resposta do servidor' }
+      }
+      
+      console.error('[CERTIFICADO GET] ❌ Fiscal service erro:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorData,
+        text: errorText
+      })
+      
+      const errorMessage = errorData.message || 
+                          errorData.error || 
+                          `Erro ao buscar certificado (${response.status})`
+      
+      return NextResponse.json(
+        { success: false, message: errorMessage },
+        { status: response.status }
+      )
+    }
+
+    const data = await response.json()
+    console.log('[CERTIFICADO GET] ✅ Certificado encontrado:', { 
+      id: data.id, 
+      uf: data.uf, 
+      ambiente: data.ambiente 
+    })
+    return NextResponse.json({ success: true, data })
+  } catch (error: any) {
+    console.error('[CERTIFICADO GET] ❌ Erro ao buscar certificado:', error)
+    return NextResponse.json(
+      { success: false, message: error.message || 'Erro interno' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * DELETE /api/certificado - Remover certificado cadastrado
+ */
+export async function DELETE(req: NextRequest) {
+  try {
+    const tokenInfo = getTokenInfo(req)
+    if (!tokenInfo) {
+      return NextResponse.json(
+        { success: false, error: 'Não autenticado' },
+        { status: 401 }
+      )
+    }
+
+    // Extrair parâmetros da query string
+    const { searchParams } = new URL(req.url)
+    const uf = searchParams.get('uf')
+    const ambiente = searchParams.get('ambiente')
+
+    if (!uf || !ambiente) {
+      return NextResponse.json(
+        { success: false, message: 'UF e ambiente são obrigatórios' },
+        { status: 400 }
+      )
+    }
+
+    console.log('[CERTIFICADO DELETE] 🗑️ Removendo certificado:', {
+      empresaId: tokenInfo.empresaId,
+      uf,
+      ambiente
+    })
+
+    // Remover do fiscal service
+    const response = await fetch(
+      `${FISCAL_SERVICE_URL}/v1/certificados/${tokenInfo.empresaId}?uf=${uf}&ambiente=${ambiente}`,
+      {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${tokenInfo.token}`,
+        },
+      }
+    )
+
+    if (response.status === 404) {
+      return NextResponse.json(
+        { success: false, message: 'Certificado não encontrado' },
+        { status: 404 }
+      )
+    }
+
+    if (!response.ok) {
+      let errorData: any = {}
+      let errorText = ''
+      
+      try {
+        errorText = await response.text()
+        console.error('[CERTIFICADO DELETE] ❌ Fiscal service resposta (texto):', errorText)
+        
+        if (errorText) {
+          try {
+            errorData = JSON.parse(errorText)
+          } catch (e) {
+            errorData = { message: errorText || 'Erro ao remover certificado' }
+          }
+        }
+      } catch (e) {
+        console.error('[CERTIFICADO DELETE] ❌ Erro ao ler resposta do fiscal service:', e)
+        errorData = { message: 'Erro ao processar resposta do servidor' }
+      }
+      
+      const errorMessage = errorData.message || 
+                          errorData.error || 
+                          `Erro ao remover certificado (${response.status})`
+      
+      return NextResponse.json(
+        { success: false, message: errorMessage },
+        { status: response.status }
+      )
+    }
+
+    console.log('[CERTIFICADO DELETE] ✅ Certificado removido com sucesso')
+    return NextResponse.json({ success: true })
+  } catch (error: any) {
+    console.error('[CERTIFICADO DELETE] ❌ Erro ao remover certificado:', error)
+    return NextResponse.json(
+      { success: false, message: error.message || 'Erro interno' },
+      { status: 500 }
+    )
+  }
+}

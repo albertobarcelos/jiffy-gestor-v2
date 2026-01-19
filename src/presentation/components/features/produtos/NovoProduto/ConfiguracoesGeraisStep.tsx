@@ -31,6 +31,7 @@ interface ConfiguracoesGeraisStepProps {
   canManageAtivo?: boolean
   onBack: () => void
   onSave: () => void
+  saveButtonText?: string
 }
 
 /**
@@ -56,6 +57,7 @@ export function ConfiguracoesGeraisStep({
   canManageAtivo = false,
   onBack,
   onSave,
+  saveButtonText = 'Salvar',
 }: ConfiguracoesGeraisStepProps) {
   const { auth } = useAuthStore()
   const [allComplementos, setAllComplementos] = useState<any[]>([])
@@ -476,7 +478,7 @@ export function ConfiguracoesGeraisStep({
               backgroundColor: 'var(--color-primary)',
               
             }}          >
-            Salvar
+            {saveButtonText}
           </Button>
         </div>
       </div>

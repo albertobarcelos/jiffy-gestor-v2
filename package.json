@@ -3,9 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/dev-server.js",
+    "dev:port": "next dev -p",
     "build": "next build",
-    "start": "next start",
+    "start": "node scripts/start-server.js",
+    "start:port": "next start -p",
     "lint": "next lint",
     "type-check": "tsc --noEmit"
   },

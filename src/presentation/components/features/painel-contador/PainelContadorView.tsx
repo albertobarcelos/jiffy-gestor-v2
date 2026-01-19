@@ -1,11 +1,14 @@
 'use client'
 
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { MdCheckCircle } from 'react-icons/md'
 import { Button } from '@/src/presentation/components/ui/button'
 import { useTabsStore } from '@/src/presentation/stores/tabsStore'
 import { ConfiguracaoImpostosView } from '@/src/presentation/components/features/impostos/ConfiguracaoImpostosView'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { CertificadoUploadModal } from './CertificadoUploadModal'
+import { showToast } from '@/src/shared/utils/toast'
+import { MapearProdutosView } from './MapearProdutosView'
 
 /**
  * Página principal do Portal do Contador (conteúdo completo).
@@ -14,8 +17,11 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 export function PainelContadorView() {
   const { addTab, activeTabId, setActiveTab: setActiveTabStore } = useTabsStore()
   const { auth } = useAuthStore()
-  const [empresaNome, setEmpresaNome] = React.useState<string>('Empresa')
-  const [empresaCnpj, setEmpresaCnpj] = React.useState<string>('--')
+  const [empresaNome, setEmpresaNome] = useState<string>('Empresa')
+  const [empresaCnpj, setEmpresaCnpj] = useState<string>('--')
+  const [certificado, setCertificado] = useState<any>(null)
+  const [isLoadingCertificado, setIsLoadingCertificado] = useState(true)
+  const [showUploadModal, setShowUploadModal] = useState(false)
 
   useEffect(() => {
     addTab({
@@ -59,16 +65,114 @@ export function PainelContadorView() {
     loadEmpresa()
   }, [auth])
 
+  // Busca dados do certificado
+  const loadCertificado = async () => {
+    const token = auth?.getAccessToken()
+    if (!token) return
+
+    setIsLoadingCertificado(true)
+    try {
+      const response = await fetch('/api/certificado', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) {
+        setCertificado(null)
+        return
+      }
+      const result = await response.json()
+      setCertificado(result.data)
+    } catch (error) {
+      console.error('Erro ao carregar certificado:', error)
+      setCertificado(null)
+    } finally {
+      setIsLoadingCertificado(false)
+    }
+  }
+
+  useEffect(() => {
+    loadCertificado()
+  }, [auth])
+
+  // Calcula dias restantes até expiração
+  const calcularDiasRestantes = (dataValidade: string | null | undefined): number | null => {
+    if (!dataValidade) return null
+    const hoje = new Date()
+    const validade = new Date(dataValidade)
+    const diffTime = validade.getTime() - hoje.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    return diffDays
+  }
+
+  // Formata data para exibição
+  const formatarData = (dataISO: string): string => {
+    const data = new Date(dataISO)
+    return data.toLocaleDateString('pt-BR')
+  }
+
   if (activeTabId === 'impostos') {
     return <ConfiguracaoImpostosView />
   }
 
+  if (activeTabId === 'config-ncm-cest') {
+    return <MapearProdutosView />
+  }
+
   const handleOpenCertificadoConfig = () => {
-    addTab({
-      id: 'config-certificado',
-      label: 'Configurar Certificado',
-      path: '/painel-contador/config/certificado',
-    })
+    setShowUploadModal(true)
+  }
+
+  const handleRemoverCertificado = async () => {
+    if (!certificado) return
+
+    // Confirmação antes de remover
+    const confirmar = window.confirm(
+      `Tem certeza que deseja remover o certificado digital?\n\n` +
+      `UF: ${certificado.uf}\n` +
+      `Ambiente: ${certificado.ambiente === 'HOMOLOGACAO' ? 'Homologação' : 'Produção'}\n\n` +
+      `Após a remoção, não será mais possível emitir notas fiscais até que um novo certificado seja cadastrado.`
+    )
+
+    if (!confirmar) return
+
+    const token = auth?.getAccessToken()
+    if (!token) {
+      showToast.error('Sessão expirada. Faça login novamente.')
+      return
+    }
+
+    const toastId = showToast.loading('Removendo certificado...')
+
+    try {
+      const response = await fetch(
+        `/api/certificado?uf=${certificado.uf}&ambiente=${certificado.ambiente}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      )
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Erro ao remover certificado')
+      }
+
+      showToast.successLoading(toastId, 'Certificado removido com sucesso!')
+      
+      // Recarregar dados (agora não terá certificado)
+      await loadCertificado()
+    } catch (error: any) {
+      console.error('Erro ao remover certificado:', error)
+      showToast.errorLoading(toastId, error.message || 'Erro ao remover certificado')
+    }
+  }
+
+  const handleCertificadoSuccess = async () => {
+    // Aguardar um pouco para garantir que o certificado foi salvo no banco
+    await new Promise(resolve => setTimeout(resolve, 500))
+    // Recarregar dados do certificado
+    await loadCertificado()
   }
 
   const handleOpenNCMConfig = () => {
@@ -89,7 +193,14 @@ export function PainelContadorView() {
   }
 
   return (
-    <div className=" pb-2 flex h-full w-full flex-col items-stretch bg-info overflow-y-auto lg:flex-row lg:overflow-hidden">
+    <>
+      <CertificadoUploadModal 
+        open={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        onSuccess={handleCertificadoSuccess}
+      />
+      
+      <div className=" pb-2 flex h-full w-full flex-col items-stretch bg-info overflow-y-auto lg:flex-row lg:overflow-hidden">
       {/* Painel Esquerdo - Roxo */}
       <div className="flex min-h-full flex-1 w-[58%] flex-col overflow-hidden rounded-tr-none rounded-br-none bg-secondary lg:rounded-tr-[48px] lg:rounded-br-[48px]">
         {/* Seção Superior com Título e Ilustração */}
@@ -187,29 +298,73 @@ export function PainelContadorView() {
               <div className="flex flex-row w-full mb-2 items-center rounded-[10px] px-3 py-1 gap-2">
                 <div className="flex flex-col gap-1">
                 <p className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
-                  Cadastre o certificado digital da empresa e deixe sua comunicação com a SEFAZ funcionando
+                  {certificado 
+                    ? 'Certificado digital cadastrado e ativo' 
+                    : 'Cadastre o certificado digital da empresa e deixe sua comunicação com a SEFAZ funcionando'}
                 </p>
-                  <span className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
-                    Tipo: A1
-                  </span>
-                  <span className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
-                    Validade: 22/12/2025
-                  </span>
+                  {certificado && (
+                    <>
+                      <span className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
+                        Tipo: A1
+                      </span>
+                      <span className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
+                        Validade: {certificado.validadeCertificado ? formatarData(certificado.validadeCertificado) : '--'}
+                      </span>
+                      <span className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
+                        Ambiente: {certificado.ambiente === 'HOMOLOGACAO' ? 'Homologação' : 'Produção'}
+                      </span>
+                    </>
+                  )}
                 </div>
                 <div className="flex flex-col w-full mb-2 items-center rounded-[10px] px-3 py-1 gap-2">
-                  <Button
-                    onClick={handleOpenCertificadoConfig}
-                    className="rounded-lg px-3 py-2 text-white text-sm font-medium"
-                    sx={{
-                      backgroundColor: 'var(--color-secondary)',
-                      '&:hover': { backgroundColor: 'var(--color-alternate)' },
-                    }}
-                  >
-                    Cadastrar Certificado
-                  </Button>
-                  <span className="font-inter font-medium text-[#f6f8fc] text-sm bg-accent1 rounded-lg px-3 py-1">
-                    Expira em 27 dias
-                  </span>
+                  {certificado ? (
+                    <Button
+                      onClick={handleRemoverCertificado}
+                      className="rounded-lg px-3 py-2 text-white text-sm font-medium"
+                      disabled={isLoadingCertificado}
+                      sx={{
+                        backgroundColor: '#dc2626',
+                        '&:hover': { backgroundColor: '#b91c1c' },
+                      }}
+                    >
+                      Remover Certificado
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleOpenCertificadoConfig}
+                      className="rounded-lg px-3 py-2 text-white text-sm font-medium"
+                      disabled={isLoadingCertificado}
+                      sx={{
+                        backgroundColor: 'var(--color-secondary)',
+                        '&:hover': { backgroundColor: 'var(--color-alternate)' },
+                      }}
+                    >
+                      Cadastrar Certificado
+                    </Button>
+                  )}
+                  {certificado && certificado.validadeCertificado && (() => {
+                    const diasRestantes = calcularDiasRestantes(certificado.validadeCertificado)
+                    if (diasRestantes === null) return null
+                    
+                    const isExpiringSoon = diasRestantes <= 30
+                    const isExpired = diasRestantes < 0
+                    
+                    return (
+                      <span 
+                        className={`font-inter font-medium text-sm rounded-lg px-3 py-1 ${
+                          isExpired 
+                            ? 'bg-[#ffa3a3] text-[#dd1717]' 
+                            : isExpiringSoon 
+                            ? 'bg-[#fff3cd] text-[#856404]' 
+                            : 'bg-accent1 text-[#f6f8fc]'
+                        }`}
+                      >
+                        {isExpired 
+                          ? 'Expirado' 
+                          : `Expira em ${diasRestantes} dia${diasRestantes !== 1 ? 's' : ''}`}
+                      </span>
+                    )
+                  })()}
                   </div>
                 </div>
               </>
@@ -308,5 +463,6 @@ export function PainelContadorView() {
         ))}
       </div>
     </div>
+    </>
   )
 }

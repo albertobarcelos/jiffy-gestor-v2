@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, Suspense, useRef, useCallback } from 'rea
 import { useRouter, useSearchParams } from 'next/navigation'
 import { InformacoesProdutoStep } from './NovoProduto/InformacoesProdutoStep'
 import { ConfiguracoesGeraisStep } from './NovoProduto/ConfiguracoesGeraisStep'
+import { ConfiguracaoFiscalStep } from './NovoProduto/ConfiguracaoFiscalStep'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
@@ -31,7 +32,7 @@ function NovoProdutoContent({
   const searchParams = useSearchParams()
   const { auth } = useAuthStore()
 
-  // Estado do step atual (0 = Informações, 1 = Configurações)
+  // Estado do step atual (0 = Informações, 1 = Configurações, 2 = Configuração Fiscal)
   const [selectedPage, setSelectedPage] = useState(0)
 
   // Estados do formulário
@@ -47,6 +48,13 @@ function NovoProdutoContent({
   const [ativo, setAtivo] = useState(true)
   const [grupoComplementosIds, setGrupoComplementosIds] = useState<string[]>([])
   const [impressorasIds, setImpressorasIds] = useState<string[]>([])
+
+  // Estados fiscais
+  const [ncm, setNcm] = useState('')
+  const [cest, setCest] = useState('')
+  const [origemMercadoria, setOrigemMercadoria] = useState<string | null>('0') // Padrão: 0 - Nacional
+  const [tipoProduto, setTipoProduto] = useState<string | null>('00') // Padrão: 00 - Mercadoria para Revenda
+  const [indicadorProducaoEscala, setIndicadorProducaoEscala] = useState<string | null>(null)
 
   // Estados de loading
   const [isLoadingProduto, setIsLoadingProduto] = useState(false)
@@ -65,6 +73,12 @@ function NovoProdutoContent({
     if (defaultGrupoProdutoId && defaultGrupoProdutoId !== grupoProduto) {
       setGrupoProduto(defaultGrupoProdutoId)
     }
+    // Resetar campos fiscais para valores padrão na criação
+    setNcm('')
+    setCest('')
+    setOrigemMercadoria('0') // Padrão na criação
+    setTipoProduto('00') // Padrão na criação
+    setIndicadorProducaoEscala(null)
   }, [defaultGrupoProdutoId, effectiveProdutoId, effectiveIsCopyMode, grupoProduto])
 
   // Refs para evitar loops infinitos
@@ -173,6 +187,27 @@ function NovoProdutoContent({
             produto.gruposComplementos?.map((g: any) => g.id) || []
           )
           setImpressorasIds(produto.impressoras?.map((i: any) => i.id) || [])
+          
+          // Preenche os campos fiscais (busca primeiro em produto.fiscal, depois em produto para compatibilidade)
+          const dadosFiscais = produto.fiscal || {}
+          setNcm(dadosFiscais.ncm || produto.ncm || '')
+          setCest(dadosFiscais.cest || '')
+          // Na edição, não aplica valores padrão - mantém vazio se não houver valor
+          setOrigemMercadoria(
+            dadosFiscais.origemMercadoria?.toString() || 
+            produto.origemMercadoria?.toString() || 
+            ''
+          )
+          setTipoProduto(
+            dadosFiscais.tipoProduto || 
+            produto.tipoProduto || 
+            ''
+          )
+          setIndicadorProducaoEscala(
+            dadosFiscais.indicadorProducaoEscala || 
+            produto.indicadorProducaoEscala || 
+            null
+          )
 
           if (currentEffectiveIsCopyMode) {
             const nomeOriginal = produto.nome || ''
@@ -201,12 +236,35 @@ function NovoProdutoContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [produtoId, isCopyMode]) // Apenas quando produtoId ou isCopyMode mudarem (valores estáveis das props)
 
+  // Preencher automaticamente o Indicador de Produção em Escala Relevante quando CEST for preenchido
+  useEffect(() => {
+    if (cest && cest.trim() !== '') {
+      // Se CEST foi preenchido e o indicador está vazio, preenche automaticamente com "Produzido em Escala Relevante"
+      if (!indicadorProducaoEscala) {
+        setIndicadorProducaoEscala('1')
+      }
+    }
+    // Não limpa o indicador quando CEST é removido - o usuário pode querer manter
+  }, [cest]) // Apenas monitora o CEST, não o indicador
+
   const handleNext = () => {
-    setSelectedPage(1)
+    if (selectedPage < 2) {
+      setSelectedPage(selectedPage + 1)
+    }
   }
 
   const handleBack = () => {
-    setSelectedPage(0)
+    if (selectedPage > 0) {
+      setSelectedPage(selectedPage - 1)
+    }
+  }
+
+  const handleBackFromFiscal = () => {
+    setSelectedPage(1)
+  }
+
+  const handleNextFromFiscal = () => {
+    handleSave()
   }
 
   const handleCancel = () => {
@@ -218,10 +276,16 @@ function NovoProdutoContent({
   }
 
   const handleSave = async () => {
-    // Validação
+    // Validação do Preço de Venda
     const precoVendaNum = parseFloat(precoVenda.replace(/[^\d,]/g, '').replace(',', '.'))
     if (!precoVenda || precoVendaNum === 0) {
       showToast.error('O campo "Preço de Venda" não pode ser vazio ou zero.')
+      return
+    }
+
+    // Validação: Se o Indicador de Produção em Escala Relevante estiver preenchido, o CEST deve estar preenchido
+    if (indicadorProducaoEscala && (!cest || cest.trim() === '')) {
+      showToast.error('A informação sobre a "Produção em Escala Relevante" foi preenchida sem preencher o código CEST')
       return
     }
 
@@ -238,7 +302,15 @@ function NovoProdutoContent({
         return
       }
 
-      const body = {
+      // Montar objeto de dados fiscais (só inclui se houver pelo menos um campo preenchido)
+      const fiscalData: any = {}
+      if (ncm && ncm.trim() !== '') fiscalData.ncm = ncm.trim()
+      if (cest && cest.trim() !== '') fiscalData.cest = cest.trim()
+      if (origemMercadoria) fiscalData.origemMercadoria = parseInt(origemMercadoria)
+      if (tipoProduto) fiscalData.tipoProduto = tipoProduto
+      if (indicadorProducaoEscala) fiscalData.indicadorProducaoEscala = indicadorProducaoEscala
+
+      const body: any = {
         nome: nomeProduto,
         descricao: descricaoProduto,
         valor: precoVendaNum,
@@ -250,7 +322,14 @@ function NovoProdutoContent({
         permiteDesconto,
         gruposComplementosIds: grupoComplementosIds,
         impressorasIds,
+        // Manter ncm no body para compatibilidade (backend ainda aceita)
+        ncm: ncm || undefined,
         ...(effectiveProdutoId ? { ativo } : {}),
+      }
+
+      // Adicionar objeto fiscal apenas se houver dados fiscais
+      if (Object.keys(fiscalData).length > 0) {
+        body.fiscal = fiscalData
       }
 
       const url = effectiveProdutoId && !effectiveIsCopyMode
@@ -373,22 +452,34 @@ function NovoProdutoContent({
         <div className="flex items-center justify-center gap-4">
           <div
             className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-bold font-exo transition-colors ${
-              selectedPage === 0 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-primary'
+              selectedPage >= 0 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-primary'
             }`}
           >
             1
           </div>
           <div
             className={`h-[2px] w-28 transition-colors ${
-              selectedPage === 1 ? 'bg-[#B7E246]' : 'bg-[#CEDCF8]'
+              selectedPage >= 1 ? 'bg-[#B7E246]' : 'bg-[#CEDCF8]'
             }`}
           />
           <div
             className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-bold font-exo transition-colors ${
-              selectedPage === 1 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-[#1D3B53]'
+              selectedPage >= 1 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-[#1D3B53]'
             }`}
           >
             2
+          </div>
+          <div
+            className={`h-[2px] w-28 transition-colors ${
+              selectedPage >= 2 ? 'bg-[#B7E246]' : 'bg-[#CEDCF8]'
+            }`}
+          />
+          <div
+            className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-bold font-exo transition-colors ${
+              selectedPage >= 2 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-[#1D3B53]'
+            }`}
+          >
+            3
           </div>
         </div>
       </div>
@@ -411,7 +502,7 @@ function NovoProdutoContent({
             isLoadingGrupos={isLoadingGrupos}
             onNext={handleNext}
           />
-        ) : (
+        ) : selectedPage === 1 ? (
           <ConfiguracoesGeraisStep
             favorito={favorito}
             onFavoritoChange={setFavorito}
@@ -430,7 +521,23 @@ function NovoProdutoContent({
             isEditMode={!!effectiveProdutoId && !effectiveIsCopyMode}
             canManageAtivo={canManageAtivo}
             onBack={handleBack}
-            onSave={handleSave}
+            onSave={handleNext}
+            saveButtonText="Próximo"
+          />
+        ) : (
+          <ConfiguracaoFiscalStep
+            ncm={ncm}
+            onNcmChange={setNcm}
+            cest={cest}
+            onCestChange={setCest}
+            origemMercadoria={origemMercadoria}
+            onOrigemMercadoriaChange={setOrigemMercadoria}
+            tipoProduto={tipoProduto}
+            onTipoProdutoChange={setTipoProduto}
+            indicadorProducaoEscala={indicadorProducaoEscala}
+            onIndicadorProducaoEscalaChange={setIndicadorProducaoEscala}
+            onBack={handleBackFromFiscal}
+            onNext={handleNextFromFiscal}
           />
         )}
       </div>
