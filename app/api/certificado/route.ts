@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getTokenInfo } from '@/src/shared/utils/getTokenInfo'
 
-const FISCAL_SERVICE_URL = process.env.FISCAL_SERVICE_URL || 'http://localhost:8081'
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000'
 
 /**
  * POST /api/certificado - Cadastrar certificado digital
@@ -37,8 +37,9 @@ export async function POST(req: NextRequest) {
     console.error('[CERTIFICADO] 🔑 Token sendo enviado:', tokenPreview)
     console.error('[CERTIFICADO] 🔑 EmpresaId do token:', tokenInfo.empresaId)
 
-    // Enviar para o fiscal service
-    const response = await fetch(`${FISCAL_SERVICE_URL}/v1/certificados`, {
+    // ✅ Arquitetura correta: Frontend → Next.js API Route → jiffy-backend → App-Services → FiscalGateway → FiscalService
+    // Enviar para o jiffy-backend
+    const response = await fetch(`${BACKEND_URL}/api/v1/fiscal/certificados`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -115,8 +116,9 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    // Buscar do fiscal service
-    const response = await fetch(`${FISCAL_SERVICE_URL}/v1/certificados/ativo`, {
+    // ✅ Arquitetura correta: Frontend → Next.js API Route → jiffy-backend → App-Services → FiscalGateway → FiscalService
+    // Buscar do jiffy-backend
+    const response = await fetch(`${BACKEND_URL}/api/v1/fiscal/certificados/ativo`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${tokenInfo.token}`,
@@ -196,25 +198,25 @@ export async function DELETE(req: NextRequest) {
 
     // Extrair parâmetros da query string
     const { searchParams } = new URL(req.url)
-    const uf = searchParams.get('uf')
     const ambiente = searchParams.get('ambiente')
 
-    if (!uf || !ambiente) {
+    // UF não é mais necessária - uma empresa tem apenas UMA configuração por ambiente
+    if (!ambiente) {
       return NextResponse.json(
-        { success: false, message: 'UF e ambiente são obrigatórios' },
+        { success: false, message: 'Ambiente é obrigatório' },
         { status: 400 }
       )
     }
 
     console.log('[CERTIFICADO DELETE] 🗑️ Removendo certificado:', {
       empresaId: tokenInfo.empresaId,
-      uf,
       ambiente
     })
 
-    // Remover do fiscal service
+    // ✅ Arquitetura correta: Frontend → Next.js API Route → jiffy-backend → App-Services → FiscalGateway → FiscalService
+    // Remover do jiffy-backend
     const response = await fetch(
-      `${FISCAL_SERVICE_URL}/v1/certificados/${tokenInfo.empresaId}?uf=${uf}&ambiente=${ambiente}`,
+      `${BACKEND_URL}/api/v1/fiscal/certificados/${tokenInfo.empresaId}?ambiente=${ambiente}`,
       {
         method: 'DELETE',
         headers: {

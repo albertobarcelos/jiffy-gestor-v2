@@ -9,6 +9,11 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { CertificadoUploadModal } from './CertificadoUploadModal'
 import { showToast } from '@/src/shared/utils/toast'
 import { MapearProdutosView } from './MapearProdutosView'
+import { Etapa1DadosFiscaisEmpresa } from './Etapa1DadosFiscaisEmpresa'
+import { Etapa3EmissorFiscal } from './Etapa3EmissorFiscal'
+import { Etapa4CenarioFiscal } from './Etapa4CenarioFiscal'
+import { Etapa5TabelaIbpt } from './Etapa5TabelaIbpt'
+import { ConfiguracaoEmpresaCompleta } from './ConfiguracaoEmpresaCompleta'
 
 /**
  * Página principal do Portal do Contador (conteúdo completo).
@@ -16,7 +21,7 @@ import { MapearProdutosView } from './MapearProdutosView'
  */
 export function PainelContadorView() {
   const { addTab, activeTabId, setActiveTab: setActiveTabStore } = useTabsStore()
-  const { auth } = useAuthStore()
+  const { auth, isRehydrated } = useAuthStore()
   const [empresaNome, setEmpresaNome] = useState<string>('Empresa')
   const [empresaCnpj, setEmpresaCnpj] = useState<string>('--')
   const [certificado, setCertificado] = useState<any>(null)
@@ -40,6 +45,9 @@ export function PainelContadorView() {
 
   // Busca dados da empresa para exibir nome e CNPJ
   useEffect(() => {
+    // Aguardar reidratação do Zustand antes de fazer requisições
+    if (!isRehydrated) return
+    
     const loadEmpresa = async () => {
       const token = auth?.getAccessToken()
       if (!token) return
@@ -90,8 +98,10 @@ export function PainelContadorView() {
   }
 
   useEffect(() => {
-    loadCertificado()
-  }, [auth])
+    if (isRehydrated) {
+      loadCertificado()
+    }
+  }, [auth, isRehydrated])
 
   // Calcula dias restantes até expiração
   const calcularDiasRestantes = (dataValidade: string | null | undefined): number | null => {
@@ -117,6 +127,10 @@ export function PainelContadorView() {
     return <MapearProdutosView />
   }
 
+  if (activeTabId === 'config-empresa-completa') {
+    return <ConfiguracaoEmpresaCompleta />
+  }
+
   const handleOpenCertificadoConfig = () => {
     setShowUploadModal(true)
   }
@@ -127,7 +141,6 @@ export function PainelContadorView() {
     // Confirmação antes de remover
     const confirmar = window.confirm(
       `Tem certeza que deseja remover o certificado digital?\n\n` +
-      `UF: ${certificado.uf}\n` +
       `Ambiente: ${certificado.ambiente === 'HOMOLOGACAO' ? 'Homologação' : 'Produção'}\n\n` +
       `Após a remoção, não será mais possível emitir notas fiscais até que um novo certificado seja cadastrado.`
     )
@@ -143,8 +156,9 @@ export function PainelContadorView() {
     const toastId = showToast.loading('Removendo certificado...')
 
     try {
+      // UF não é mais necessária - uma empresa tem apenas UMA configuração por ambiente
       const response = await fetch(
-        `/api/certificado?uf=${certificado.uf}&ambiente=${certificado.ambiente}`,
+        `/api/certificado?ambiente=${certificado.ambiente}`,
         {
           method: 'DELETE',
           headers: {
@@ -267,7 +281,7 @@ export function PainelContadorView() {
         {/* Barra de Progresso */}
         <div className="mx-4 mt-4 flex-1 flex flex-col">
           <h2 className="font-manrope font-bold text-white text-[clamp(12px,2.5vw,16px)] sm:text-[clamp(14px,3vw,18px)] md:text-[clamp(16px,3.5vw,22px)] lg:text-[24px] tracking-[-0.32px] leading-[1.4] md:leading-[1.3] mb-1.5 sm:mb-1.75 md:mb-2 break-words">
-            Configuração Contábil: 3 de 5 Etapas concluídas
+            Configuração Contábil: 4 de 5 Etapas concluídas
           </h2>
 
           <div className="w-full max-w-[947px] h-[18px] sm:h-[20px] md:h-[22px] lg:h-[26px] bg-[#f5f8fa] rounded-xl relative overflow-hidden mb-2 sm:mb-2.25 md:mb-2.5 lg:mb-3">
@@ -275,7 +289,7 @@ export function PainelContadorView() {
           </div>
 
           <div className="flex flex-col px-4 gap-[0.75rem] sm:gap-1 md:gap-[1.25rem] lg:gap-[1.5rem]">
-            {['Certificado Cadastrado', 'Regime Tributário Definido', 'Mapeamento dos NCMs'].map((etapa) => (
+            {['Dados Fiscais Configurados', 'Certificado Cadastrado', 'Emissor Fiscal Configurado', 'Mapeamento dos NCMs'].map((etapa) => (
               <div key={etapa} className="flex items-center gap-[0.5rem] sm:gap-[0.75rem]">
                 <MdCheckCircle className="flex-shrink-0 text-white" size={20} />
                 <span className="font-manrope font-bold text-white text-[clamp(11px,2.2vw,14px)] sm:text-[clamp(12px,2.5vw,16px)] md:text-[clamp(14px,3vw,16px)] lg:text-[18px] tracking-[-0.2px] leading-[1.4] md:leading-[1.3]">
@@ -292,7 +306,12 @@ export function PainelContadorView() {
         {[
           {
             id: 1,
-            title: 'Configurar Certificado Digital',
+            title: 'Dados Fiscais da Empresa',
+            content: <Etapa1DadosFiscaisEmpresa />,
+          },
+          {
+            id: 2,
+            title: 'Certificado Digital',
             content: (
               <>
               <div className="flex flex-row w-full mb-2 items-center rounded-[10px] px-3 py-1 gap-2">
@@ -371,72 +390,19 @@ export function PainelContadorView() {
             ),
           },
           {
-            id: 2,
-            title: 'Mapear NCM, Cest e CFOP',
-            content: (
-              <>
-              <div className="flex flex-row w-full mb-2 items-center rounded-[10px] px-3 py-1 gap-2">
-                <div className="flex flex-row justify-between gap-1">
-                <p className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
-                  Classifique produtos para que notas e impostos sejam calculados corretamente
-                </p>
-                <div className="flex flex-col w-full mb-2 items-center rounded-[10px] px-3 py-1 gap-2">
-                  <Button
-                    onClick={handleOpenNCMConfig}
-                    className="rounded-lg px-3 py-2 text-white text-sm font-medium"
-                    sx={{
-                      backgroundColor: 'var(--color-secondary)',
-                      '&:hover': { backgroundColor: 'var(--color-alternate)' },
-                    }}
-                  >
-                    Mapear Produtos
-                  </Button>
-                  <div className="inline-flex items-center rounded-lg bg-[#ffa3a3] px-3 py-1 h-[26px] sm:h-[28px] lg:h-[30px] w-fit">
-                    <span className="font-inter font-medium text-[#dd1717] text-[11px] sm:text-[12px] leading-[1.4]">
-                      8 PRODUTOS PENDENTES
-                    </span>
-                  </div>
-                </div>
-                </div>
-              </div>
-              </>
-            ),
+            id: 3,
+            title: 'Emissor Fiscal',
+            content: <Etapa3EmissorFiscal />,
           },
           {
-            id: 3,
-            title: 'Configurar Impostos',
-            content: (
-              <>
-              <div className="flex flex-row w-full mb-2 items-center rounded-[10px] px-3 py-1 gap-2">
-                <div className="flex flex-col w-full mb-2 items-start rounded-[10px] px-3 py-1 gap-2">
-                <p className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
-                  Configure os cenários fiscais e defina as regras de impostos para sua empresa
-                </p>
-                  <span className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
-                    Cenário: Padrão
-                  </span>
-                  <span className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
-                    Status: Ativo
-                  </span>
-                </div>
-                <div className="flex flex-col w-full mb-2 items-center rounded-[10px] px-3 py-1 gap-2">
-                  <Button
-                    onClick={handleOpenImpostosConfig}
-                    className="rounded-lg px-3 py-2 text-white text-sm font-medium"
-                    sx={{
-                      backgroundColor: 'var(--color-secondary)',
-                      '&:hover': { backgroundColor: 'var(--color-alternate)' },
-                    }}
-                  >
-                    Configurar Impostos
-                  </Button>
-                  <span className="font-inter font-medium text-[#f6f8fc] text-sm bg-accent1 rounded-lg px-3 py-1">
-                    Configurado
-                  </span>
-                </div>
-                </div>
-              </>
-            ),
+            id: 4,
+            title: 'Cenário Fiscal',
+            content: <Etapa4CenarioFiscal />,
+          },
+          {
+            id: 5,
+            title: 'Tabela IBPT',
+            content: <Etapa5TabelaIbpt />,
           },
         ].map((step, index, arr) => (
           <div key={step.id} className="flex items-stretch gap-3">

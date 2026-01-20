@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getTokenInfo } from '@/src/shared/utils/getTokenInfo'
 
-const FISCAL_SERVICE_URL = process.env.FISCAL_SERVICE_URL || 'http://localhost:8081'
+// ✅ Arquitetura correta: Frontend → Next.js API Route → jiffy-backend → App-Services → FiscalGateway → FiscalService
+// Produtos fiscais são gerenciados pelos App-Services de produto no jiffy-backend
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000'
 
 /**
  * GET /api/produtos-fiscais - Listar todos os produtos fiscais
@@ -19,9 +21,10 @@ export async function GET(req: NextRequest) {
     }
 
     console.error('[PRODUTOS-FISCAIS] 🔑 Token encontrado, empresaId:', tokenInfo.empresaId)
-    console.error('[PRODUTOS-FISCAIS] 📡 Chamando fiscal service:', `${FISCAL_SERVICE_URL}/v1/produtos-fiscais`)
+    console.error('[PRODUTOS-FISCAIS] 📡 Chamando jiffy-backend:', `${BACKEND_URL}/api/v1/fiscal/produtos-fiscais`)
 
-    const response = await fetch(`${FISCAL_SERVICE_URL}/v1/produtos-fiscais`, {
+    // ✅ Arquitetura correta: Frontend → Next.js API Route → jiffy-backend → App-Services → FiscalGateway → FiscalService
+    const response = await fetch(`${BACKEND_URL}/api/v1/fiscal/produtos-fiscais`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${tokenInfo.token}`,
@@ -36,7 +39,7 @@ export async function GET(req: NextRequest) {
       
       try {
         errorText = await response.text()
-        console.error('[PRODUTOS-FISCAIS] ❌ Fiscal service resposta (texto):', errorText)
+        console.error('[PRODUTOS-FISCAIS] ❌ Jiffy-backend resposta (texto):', errorText)
         
         if (errorText) {
           try {
@@ -109,7 +112,8 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
 
-    const response = await fetch(`${FISCAL_SERVICE_URL}/v1/produtos-fiscais`, {
+    // ✅ Arquitetura correta: Frontend → Next.js API Route → jiffy-backend → App-Services → FiscalGateway → FiscalService
+    const response = await fetch(`${BACKEND_URL}/api/v1/fiscal/produtos-fiscais`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
