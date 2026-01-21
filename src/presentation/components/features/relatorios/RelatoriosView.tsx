@@ -54,7 +54,7 @@ export function RelatoriosView() {
             >
               Vendas
             </button>
-            <button
+            {/*<button
               onClick={() => setActiveTab('faturamento')}
               className={`px-5 py-2 text-sm font-semibold font-exo transition-colors ${
                 activeTab === 'faturamento'
@@ -63,7 +63,7 @@ export function RelatoriosView() {
               }`}
             >
               Faturamento
-            </button>
+            </button>*/}
           </div>
 
           {/* Conteúdo das tabs */}
