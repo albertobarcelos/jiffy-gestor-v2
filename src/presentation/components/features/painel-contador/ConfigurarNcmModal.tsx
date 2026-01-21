@@ -59,6 +59,7 @@ export function ConfigurarNcmModal({
 }: ConfigurarNcmModalProps) {
   const { auth } = useAuthStore()
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingRegime, setIsLoadingRegime] = useState(true)
   const [regimeTributario, setRegimeTributario] = useState<number | null>(null)
   const [formData, setFormData] = useState({
     ncm: '',
@@ -75,13 +76,22 @@ export function ConfigurarNcmModal({
   // Buscar regime tributário da empresa
   useEffect(() => {
     const loadRegimeTributario = async () => {
+      setIsLoadingRegime(true)
       const token = auth?.getAccessToken()
-      if (!token) return
+      if (!token) {
+        setIsLoadingRegime(false)
+        setRegimeTributario(1) // Default: Simples Nacional
+        return
+      }
 
       try {
         const tokenInfo = extractTokenInfo(token)
         const empresaId = tokenInfo?.empresaId
-        if (!empresaId) return
+        if (!empresaId) {
+          setIsLoadingRegime(false)
+          setRegimeTributario(1) // Default: Simples Nacional
+          return
+        }
 
         const response = await fetch(`/api/v1/fiscal/empresas-fiscais/${empresaId}/todas`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -89,25 +99,53 @@ export function ConfigurarNcmModal({
 
         if (response.ok) {
           const configs = await response.json()
+          console.log('[ConfigurarNcmModal] Configurações fiscais recebidas:', configs)
           if (configs && configs.length > 0) {
             const codigoRegime = configs[0].codigoRegimeTributario
-            setRegimeTributario(codigoRegime || 1)
+            console.log('[ConfigurarNcmModal] Código regime tributário (raw):', codigoRegime, 'tipo:', typeof codigoRegime)
+            // Garantir que seja número (pode vir como string da API)
+            const regimeNumero = typeof codigoRegime === 'string' 
+              ? parseInt(codigoRegime, 10) 
+              : (typeof codigoRegime === 'number' ? codigoRegime : null)
+            console.log('[ConfigurarNcmModal] Código regime tributário (convertido):', regimeNumero)
+            // Validar se é um número válido (1, 2 ou 3)
+            if (regimeNumero === 1 || regimeNumero === 2 || regimeNumero === 3) {
+              console.log('[ConfigurarNcmModal] Regime tributário carregado:', regimeNumero, 'isSimplesNacional:', regimeNumero === 1 || regimeNumero === 2)
+              setRegimeTributario(regimeNumero)
+            } else {
+              console.warn('[ConfigurarNcmModal] Regime tributário inválido:', codigoRegime, 'usando default: 1')
+              setRegimeTributario(1) // Default: Simples Nacional
+            }
           } else {
+            console.warn('[ConfigurarNcmModal] Nenhuma configuração encontrada, usando default: 1')
             setRegimeTributario(1) // Default: Simples Nacional
           }
+        } else {
+          const errorText = await response.text()
+          console.warn('[ConfigurarNcmModal] Erro ao buscar regime tributário:', response.status, errorText, 'usando default: 1')
+          setRegimeTributario(1) // Default: Simples Nacional
         }
       } catch (error) {
-        console.error('Erro ao buscar regime tributário:', error)
+        console.error('[ConfigurarNcmModal] Erro ao buscar regime tributário:', error)
         setRegimeTributario(1) // Default: Simples Nacional
+      } finally {
+        setIsLoadingRegime(false)
       }
     }
 
     if (open) {
       loadRegimeTributario()
+    } else {
+      // Reset quando o modal fecha
+      setRegimeTributario(null)
+      setIsLoadingRegime(true)
     }
   }, [open, auth])
 
   // Determinar se é Simples Nacional (1 ou 2) ou Regime Normal (3)
+  // Se regimeTributario for null (ainda carregando), não renderiza os campos até carregar
+  // Se for 1 ou 2 = Simples Nacional (usa CSOSN)
+  // Se for 3 = Regime Normal (usa CST)
   const isSimplesNacional = regimeTributario === 1 || regimeTributario === 2
 
   useEffect(() => {
@@ -291,15 +329,55 @@ export function ConfigurarNcmModal({
   ]
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+    <Dialog 
+      open={open} 
+      onOpenChange={onClose}
+      maxWidth="md"
+      fullWidth
+      sx={{
+        '& .MuiDialog-container': {
+          zIndex: 1300,
+        },
+        // Garante que elementos portaled apareçam acima do Dialog
+        '& .MuiBackdrop-root': {
+          zIndex: 1300,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', // Backdrop opaco
+        },
+        '& .MuiDialog-paper': {
+          zIndex: 1300,
+          backgroundColor: '#ffffff', // Fundo branco sólido
+          opacity: 1, // Garante opacidade total
+        },
+      }}
+    >
+      <DialogContent 
+        sx={{ 
+          maxWidth: '56rem', 
+          maxHeight: '90vh', 
+          overflow: 'hidden', // Remove overflow do container principal
+          backgroundColor: '#ffffff', // Fundo branco sólido
+          padding: 0,
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <DialogHeader sx={{ padding: '24px 24px 16px 24px', flexShrink: 0 }}>
           <DialogTitle>
             {configuracaoImposto ? 'Editar Configuração de Impostos por NCM' : 'Nova Configuração de Impostos por NCM'}
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <div 
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            padding: '0 24px',
+            minHeight: 0, // Permite que o flex funcione corretamente
+          }}
+          className="scrollbar-thin"
+        >
+          <form id="configurar-ncm-form" onSubmit={handleSubmit} className="space-y-4" style={{ paddingTop: '8px', paddingBottom: '24px' }}>
           <div className="space-y-2">
             <Label htmlFor="ncm">NCM *</Label>
             <Input
@@ -334,7 +412,14 @@ export function ConfigurarNcmModal({
             </div>
 
             {/* Lógica Condicional: Mostrar CSOSN se Simples Nacional, ou CST se Regime Normal */}
-            {isSimplesNacional ? (
+            {isLoadingRegime ? (
+              <div className="space-y-2">
+                <Label>Carregando regime tributário...</Label>
+                <div className="h-10 flex items-center text-sm text-secondary-text/70">
+                  Aguarde...
+                </div>
+              </div>
+            ) : isSimplesNacional ? (
               <div className="space-y-2">
                 <Label htmlFor="csosn">CSOSN (Simples Nacional) *</Label>
                 <Select
@@ -484,20 +569,32 @@ export function ConfigurarNcmModal({
             </div>
           </div>
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outlined"
-              onClick={onClose}
-              disabled={isLoading}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Salvando...' : 'Salvar'}
-            </Button>
-          </DialogFooter>
-        </form>
+          </form>
+        </div>
+
+        <DialogFooter sx={{ padding: '16px 24px 24px 24px', flexShrink: 0, borderTop: '1px solid #e5e7eb', marginTop: 0 }}>
+          <Button
+            type="button"
+            variant="outlined"
+            onClick={onClose}
+            disabled={isLoading}
+          >
+            Cancelar
+          </Button>
+          <Button 
+            type="button"
+            onClick={(e) => {
+              e.preventDefault()
+              const form = document.getElementById('configurar-ncm-form') as HTMLFormElement
+              if (form) {
+                form.requestSubmit()
+              }
+            }}
+            disabled={isLoading}
+          >
+            {isLoading ? 'Salvando...' : 'Salvar'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

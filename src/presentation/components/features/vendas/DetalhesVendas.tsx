@@ -29,6 +29,12 @@ interface VendaDetalhes {
   troco?: number
   produtosLancados: ProdutoLancado[]
   pagamentos: Pagamento[]
+  // Campos fiscais
+  statusVenda?: string | null
+  origem?: string | null
+  solicitarEmissaoFiscal?: boolean | null
+  statusFiscal?: string | null
+  documentoFiscalId?: string | null
 }
 
 interface ProdutoLancado {
@@ -529,6 +535,53 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                         Identificação da Venda: 
                       </span>
                       <span>{venda.identificacao}</span>
+                    </div>
+                  )}
+
+                  {/* Origem da Venda */}
+                  {venda.origem && (
+                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                      <span>
+                        Origem: 
+                      </span>
+                      <span>{venda.origem}</span>
+                    </div>
+                  )}
+
+                  {/* Status Fiscal */}
+                  {venda.statusFiscal && (
+                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                      <span>
+                        Status Fiscal: 
+                      </span>
+                      <span className={`font-semibold ${
+                        venda.statusFiscal === 'EMITIDA' ? 'text-green-600' :
+                        venda.statusFiscal === 'PENDENTE_EMISSAO' ? 'text-yellow-600' :
+                        venda.statusFiscal === 'ERRO' ? 'text-red-600' :
+                        'text-gray-600'
+                      }`}>
+                        {venda.statusFiscal}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Solicitar Emissão Fiscal */}
+                  {venda.solicitarEmissaoFiscal && (
+                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-yellow-50">
+                      <span>
+                        Solicitar Emissão Fiscal: 
+                      </span>
+                      <span className="font-semibold text-yellow-600">Sim</span>
+                    </div>
+                  )}
+
+                  {/* Documento Fiscal ID */}
+                  {venda.documentoFiscalId && (
+                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-green-50">
+                      <span>
+                        Documento Fiscal ID: 
+                      </span>
+                      <span className="font-mono text-xs">{venda.documentoFiscalId}</span>
                     </div>
                   )}
                 </div>

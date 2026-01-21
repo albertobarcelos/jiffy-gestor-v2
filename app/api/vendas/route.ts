@@ -88,3 +88,64 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * POST /api/vendas
+ * Cria uma nova venda
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const validation = validateRequest(request)
+    if (!validation.valid || !validation.tokenInfo) {
+      return validation.error!
+    }
+    const { tokenInfo } = validation
+
+    const body = await request.json()
+    
+    // Log para debug
+    console.log('📤 Criando venda - Token Info:', {
+      userId: tokenInfo.userId,
+      empresaId: tokenInfo.empresaId,
+    })
+    console.log('📤 Body recebido:', JSON.stringify(body, null, 2))
+
+    const apiClient = new ApiClient()
+    const response = await apiClient.request<any>(
+      `/api/v1/operacao-pdv/vendas`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenInfo.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      }
+    )
+
+    return NextResponse.json(response.data || {}, { status: 201 })
+  } catch (error) {
+    console.error('Erro ao criar venda:', error)
+    if (error instanceof ApiError) {
+      console.error('Detalhes do ApiError:', {
+        message: error.message,
+        status: error.status,
+        data: error.data,
+      })
+      return NextResponse.json(
+        { error: error.message || 'Erro ao criar venda', details: error.data },
+        { status: error.status }
+      )
+    }
+    // Log detalhado para erros não-ApiError
+    console.error('Erro não-ApiError:', {
+      error,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    })
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Erro interno do servidor', details: String(error) },
+      { status: 500 }
+    )
+  }
+}
+

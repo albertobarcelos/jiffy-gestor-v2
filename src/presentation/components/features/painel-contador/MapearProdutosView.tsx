@@ -4,6 +4,8 @@ import React, { useEffect, useState } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { ConfigurarNcmModal } from './ConfigurarNcmModal'
+import { HistoricoConfiguracaoNcmModal } from './HistoricoConfiguracaoNcmModal'
+import { CopiarConfiguracaoNcmModal } from './CopiarConfiguracaoNcmModal'
 import { extractTokenInfo } from '@/src/shared/utils/validateToken'
 
 interface ConfiguracaoImpostoNcm {
@@ -34,6 +36,9 @@ export function MapearProdutosView() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedConfig, setSelectedConfig] = useState<ConfiguracaoImpostoNcm | null>(null)
   const [showModal, setShowModal] = useState(false)
+  const [showHistoricoModal, setShowHistoricoModal] = useState(false)
+  const [showCopiarModal, setShowCopiarModal] = useState(false)
+  const [ncmSelecionado, setNcmSelecionado] = useState<string | null>(null)
   const [regimeTributario, setRegimeTributario] = useState<number | null>(null)
 
   // Buscar regime tributário da empresa
@@ -58,10 +63,25 @@ export function MapearProdutosView() {
           const configs = await response.json()
           if (configs && configs.length > 0) {
             const codigoRegime = configs[0].codigoRegimeTributario
-            setRegimeTributario(codigoRegime || 1)
+            // Garantir que seja número (pode vir como string da API)
+            const regimeNumero = typeof codigoRegime === 'string' 
+              ? parseInt(codigoRegime, 10) 
+              : codigoRegime
+            // Validar se é um número válido (1, 2 ou 3)
+            if (regimeNumero === 1 || regimeNumero === 2 || regimeNumero === 3) {
+              console.log('[MapearProdutosView] Regime tributário carregado:', regimeNumero)
+              setRegimeTributario(regimeNumero)
+            } else {
+              console.warn('[MapearProdutosView] Regime tributário inválido:', codigoRegime, 'usando default: 1')
+              setRegimeTributario(1) // Default: Simples Nacional
+            }
           } else {
+            console.warn('[MapearProdutosView] Nenhuma configuração encontrada, usando default: 1')
             setRegimeTributario(1) // Default: Simples Nacional
           }
+        } else {
+          console.warn('[MapearProdutosView] Erro ao buscar regime tributário, usando default: 1')
+          setRegimeTributario(1) // Default: Simples Nacional
         }
       } catch (error) {
         console.error('Erro ao buscar regime tributário:', error)
@@ -73,7 +93,8 @@ export function MapearProdutosView() {
   }, [auth, isRehydrated])
 
   // Determinar se é Simples Nacional (1 ou 2) ou Regime Normal (3)
-  const isSimplesNacional = regimeTributario === 1 || regimeTributario === 2
+  // Se regimeTributario for null, assume Simples Nacional por padrão
+  const isSimplesNacional = regimeTributario === null || regimeTributario === 1 || regimeTributario === 2
 
   useEffect(() => {
     // Aguardar reidratação do Zustand antes de fazer requisições
@@ -129,6 +150,31 @@ export function MapearProdutosView() {
     handleModalClose()
   }
 
+  const handleViewHistorico = (codigoNcm: string) => {
+    setNcmSelecionado(codigoNcm)
+    setShowHistoricoModal(true)
+  }
+
+  const handleCopiarConfiguracao = (codigoNcm: string) => {
+    setNcmSelecionado(codigoNcm)
+    setShowCopiarModal(true)
+  }
+
+  const handleHistoricoModalClose = () => {
+    setShowHistoricoModal(false)
+    setNcmSelecionado(null)
+  }
+
+  const handleCopiarModalClose = () => {
+    setShowCopiarModal(false)
+    setNcmSelecionado(null)
+  }
+
+  const handleCopiarModalSuccess = () => {
+    loadConfiguracoesImpostos()
+    handleCopiarModalClose()
+  }
+
   const formatarAliquota = (aliquota?: number): string => {
     if (aliquota === undefined || aliquota === null) return '--'
     return `${aliquota.toFixed(2)}%`
@@ -164,6 +210,23 @@ export function MapearProdutosView() {
         onSuccess={handleModalSuccess}
         configuracaoImposto={selectedConfig}
       />
+      
+      {ncmSelecionado && (
+        <>
+          <HistoricoConfiguracaoNcmModal
+            open={showHistoricoModal}
+            onClose={handleHistoricoModalClose}
+            codigoNcm={ncmSelecionado}
+          />
+          <CopiarConfiguracaoNcmModal
+            open={showCopiarModal}
+            onClose={handleCopiarModalClose}
+            onSuccess={handleCopiarModalSuccess}
+            codigoNcmOrigem={ncmSelecionado}
+            todasConfiguracoes={configuracoesImpostos}
+          />
+        </>
+      )}
 
       <div className="flex flex-col h-full w-full p-6 bg-info">
         <div className="mb-6">
@@ -206,6 +269,9 @@ export function MapearProdutosView() {
                       <th className="px-4 py-3 text-left text-xs font-semibold text-secondary-text uppercase">
                         Alíquota ICMS (%)
                       </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-secondary-text uppercase">
+                        Ações
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-secondary/10">
@@ -232,6 +298,34 @@ export function MapearProdutosView() {
                         </td>
                         <td className="px-4 py-3 text-sm text-secondary-text">
                           {formatarAliquota(config.icms?.aliquota)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex gap-2">
+                            {config.ncm?.codigo && (
+                              <>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleViewHistorico(config.ncm!.codigo)
+                                  }}
+                                  className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                                  title="Ver histórico"
+                                >
+                                  Histórico
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleCopiarConfiguracao(config.ncm!.codigo)
+                                  }}
+                                  className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
+                                  title="Copiar configuração"
+                                >
+                                  Copiar
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
