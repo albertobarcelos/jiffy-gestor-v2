@@ -31,17 +31,20 @@ export function GraficoTopProdutos({ data }: GraficoTopProdutosProps) {
 
   // Label customizada para aproximar os valores do gráfico
   const renderLabel = (props: PieLabelRenderProps) => {
-    const { cx = 0, cy = 0, midAngle = 0, outerRadius = 0, value = 0 } = props;
+    const { cx = 0, cy = 0, midAngle = 0, outerRadius = 0, value = 0, index = 0, payload } = props;
     const radiusFactor = isMobile ? 0.83 : 1.2
     const radius = Number(outerRadius) * radiusFactor;
     const x = Number(cx) + radius * Math.cos(-Number(midAngle) * RADIAN);
     const y = Number(cy) + radius * Math.sin(-Number(midAngle) * RADIAN);
+    const sliceColor = isMobile
+      ? '#000'
+      : (payload && (payload.fill as string)) || COLORS[index % COLORS.length];
 
     return (
       <text
         x={x}
         y={y}
-        fill="#000"
+        fill={sliceColor}
         fontSize={10}
         textAnchor="middle"
         dominantBaseline="middle"
