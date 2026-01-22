@@ -438,7 +438,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
         </div>
 
         {/* Conteúdo */}
-        <div className="flex-1 overflow-y-auto px-4 py-2 bg-info">
+        <div className="flex-1 overflow-y-auto md:px-2 py-2 bg-info">
           {isLoading ? (
             <div className="flex justify-center items-center py-12">
               <CircularProgress />
@@ -452,14 +452,14 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                 </h2>
                 <div className="border-t border-dashed border-gray-400 mb-2"></div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 md:px-2">
                   {/* Status */}
-                  <div className={`flex justify-between px-3 py-2 rounded-lg ${statusColor} text-white text-sm font-nunito`}>
+                  <div className={`flex justify-between px-3 py-2 rounded-lg ${statusColor} text-white md:text-sm text-xs font-nunito`}>
                     Status: <span className="font-semibold">{statusVenda}</span>
                   </div>
 
                   {/* Aberto por */}
-                  <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                  <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
                     <span>
                       Aberto por: 
                     </span>
@@ -468,7 +468,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
 
                   {/* Finalizado Por */}
                   {venda.ultimoResponsavelId && (
-                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                    <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
                       <span>
                         Finalizado Por: 
                       </span>
@@ -478,7 +478,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
 
                   {/* Cancelado Por */}
                   {venda.canceladoPorId && (
-                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                    <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
                       <span>
                         Cancelado Por: 
                       </span>
@@ -487,7 +487,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                   )}
 
                   {/* Código do Terminal */}
-                  <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                  <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
                     <span>
                       Código do Terminal: 
                     </span>
@@ -495,7 +495,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                   </div>
 
                   {/* Data/Hora de Criação */}
-                  <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                  <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
                     <span>
                       Data/Hora de Criação: 
                     </span>
@@ -504,7 +504,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
 
                   {/* Data/Hora de Finalização */}
                   {venda.dataFinalizacao && (
-                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                    <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
                       <span>
                         Data/Hora de Finalização: 
                       </span>
@@ -514,7 +514,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
 
                   {/* Cliente Vinculado */}
                   {venda.clienteId && nomeCliente && (
-                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                    <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
                       <span>
                         Cliente Vinculado: 
                       </span>
@@ -524,7 +524,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
 
                   {/* Identificação da Venda */}
                   {venda.identificacao && (
-                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                    <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
                       <span>
                         Identificação da Venda: 
                       </span>
@@ -549,7 +549,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                     return (
                       <div
                         key={index}
-                        className={`px-3 rounded-lg ${
+                        className={`md:px-3 px-1 rounded-lg ${
                           isRemovido ? 'bg-error/20' : 'bg-white'
                         }`}
                       >
@@ -557,7 +557,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                           {/* Linha do produto principal */}
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex-2 items-center gap-2">
-                              <span className="text-sm font-semibold text-primary-text font-nunito">
+                              <span className="md:text-sm text-xs font-semibold text-primary-text font-nunito">
                                 {produto.quantidade}x {produto.nomeProduto} ({formatNumber(produto.valorUnitario)})
                               </span>
                             </div>
@@ -575,7 +575,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                                   ? `${Math.round(acrescimoValue * 100)}%` 
                                   : formatNumber(acrescimoValue)
                                 return (
-                                  <div className="flex-1 flex justify-start text-xs text-secondary-text font-nunito">
+                                  <div className="flex-1 flex justify-start md:text-sm text-xs text-secondary-text font-nunito">
                                     <span className="text-success">
                                       Acresc. +{valorExibir}
                                     </span>
@@ -605,7 +605,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
 
                           {/* Linhas dos complementos */}
                           {produto.complementos && produto.complementos.length > 0 && (
-                            <div className="space-y-1 ml-7">
+                            <div className="space-y-1 md:ml-7 ml-2">
                               {produto.complementos.map((complemento, compIndex) => {
                                 const valorTotalComplemento = calcularValorComplemento(complemento)
                                 const temImpactoPreco = complemento.tipoImpactoPreco !== 'nenhum'
@@ -629,9 +629,9 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                           )}
 
                           {/* Informações de lançamento */}
-                          <div className="text-xs text-secondary-text mt-1 ml-7">
-                            Lançado: {formatDateTime(produto.dataLancamento)} | Usuário:{' '}
-                            {nomesUsuarios[produto.lancadoPorId] || produto.lancadoPorId}
+                          <div className="flex flex-col md:flex-row text-xs text-secondary-text mt-1 md:ml-7">
+                            <span>Lançado: {formatDateTime(produto.dataLancamento)} |</span> <span>Usuário: {' '}
+                            {nomesUsuarios[produto.lancadoPorId] || produto.lancadoPorId}</span>
                           </div>
                         </div>
                       </div>
@@ -653,7 +653,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
               </div>
 
               {/* Card Pagamentos Realizados */}
-              <div className="mb-4">
+              <div className="px-2 mb-4">
                 <h2 className="text-lg font-bold font-exo text-primary-text mb-2">
                   Pagamentos Realizados
                 </h2>

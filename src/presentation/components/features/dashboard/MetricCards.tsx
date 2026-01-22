@@ -110,7 +110,7 @@ export function MetricCards({ periodo }: MetricCardsProps) {
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 md:gap-6 gap-1">
         {/* Total Faturado */}
         <MetricCard className=" border hover:border-primary/50"
           title="Total Faturado"
@@ -213,11 +213,11 @@ function MetricCard({
       onClick={onClick}
     >
       <div className="flex flex-col items-start justify-between mb-2">
-        <h3 className="text-sm font-medium text-gray-600">{title}</h3>
-        <p className="text-2xl font-bold text-gray-900">{value}</p>
+        <h3 className="md:text-sm text-xs font-medium text-gray-600">{title}</h3>
+        <p className="md:text-2xl text-lg font-bold text-gray-900">{value}</p>
       </div>
-      <div className={`w-12 h-12 rounded-full ${bgColorClass} flex items-center justify-center flex-shrink-0`}>
-          <span className={`${iconColorClass} text-xl`}>{icon}</span>
+      <div className={`md:w-12 md:h-12 w-10 h-10 rounded-full ${bgColorClass} flex items-center justify-center flex-shrink-0`}>
+          <span className={`${iconColorClass} md:text-xl text-lg`}>{icon}</span>
       </div>
     </div>
   );

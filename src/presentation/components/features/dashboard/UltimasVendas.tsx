@@ -257,12 +257,12 @@ export function UltimasVendas({ periodo }: UltimasVendasProps) {
                 >
                   <div className="flex items-center gap-4 flex-1">
                     {/* Avatar/Logo placeholder */}
-                    <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                    <div className="w-10 h-10 hidden md:flex bg-primary rounded-lg items-center justify-center text-white font-semibold text-sm flex-shrink-0">
                       <MdPerson size={28} />
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-900 truncate">{displayedName}</p>
+                      <p className="font-semibold md:text-sm text-xs text-gray-900 truncate">{displayedName}</p>
                       <p className="text-sm text-gray-500">{formatDate(venda.getData())}</p>
                     </div>
                   </div>

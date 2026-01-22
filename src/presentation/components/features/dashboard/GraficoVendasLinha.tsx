@@ -125,19 +125,19 @@ export function GraficoVendasLinha({ periodo, selectedStatuses }: GraficoVendasL
     <div className="w-full min-w-0" style={{ height: '300px' }}>
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={chartData} margin={{
-          top: 5, right: 30, left: 30, bottom: 5, // Aumenta a margem esquerda para o eixo Y
+          top: 5, right: 30, left: 0, bottom: 5, // Aumenta a margem esquerda para o eixo Y
         }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" opacity={0.5} />
           <XAxis
             dataKey="label"
-            tick={{ fontSize: '12px', fill: '#6B7280' }}
+            tick={{ fontSize: '10px', fill: '#6B7280' }}
             height={40}
             tickMargin={10}
           />
           <YAxis
             tickFormatter={formatCurrency}
-            tick={{ fontSize: '12px', fill: '#6B7280' }}
-            tickMargin={10}
+            tick={{ fontSize: '10px', fill: '#6B7280' }}
+            tickMargin={4}
             width={100} // Aumenta a largura do eixo Y
             domain={[finalMinDomain, finalMaxDomain]}
           />
