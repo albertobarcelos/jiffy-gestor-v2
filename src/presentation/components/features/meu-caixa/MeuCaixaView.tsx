@@ -88,12 +88,7 @@ export function MeuCaixaView() {
                 ? `Aberto em ${formatarData(caixaAtual.getDataAbertura())}`
                 : 'Carregando...'}
             </p>
-            <button
-              onClick={() => router.push('/vendas/abertas')}
-              className="h-9 px-6 bg-primary text-info rounded-[30px] font-medium font-exo text-sm hover:bg-primary/90 transition-colors"
-            >
-              Vendas Abertas
-            </button>
+           
             <button
               onClick={() => router.push('/historico-fechamento')}
               className="h-9 px-6 bg-primary text-info rounded-[30px] font-medium font-exo text-sm hover:bg-primary/90 transition-colors"
