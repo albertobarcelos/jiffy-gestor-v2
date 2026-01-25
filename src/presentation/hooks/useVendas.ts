@@ -3,6 +3,45 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 
+/**
+ * Extrai o motivo de rejeição (xMotivo) do XML de retorno da SEFAZ
+ */
+function extrairMotivoRejeicao(xmlRetorno: string): string | null {
+  if (!xmlRetorno) return null
+  
+  try {
+    // Tentar extrair xMotivo usando regex (mais simples que parser XML completo)
+    // Formato: <xMotivo>mensagem</xMotivo> ou <xMotivo>mensagem</xMotivo>
+    const match = xmlRetorno.match(/<xMotivo[^>]*>(.*?)<\/xMotivo>/i)
+    if (match && match[1]) {
+      // Decodificar entidades HTML
+      return match[1]
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&apos;/g, "'")
+        .trim()
+    }
+    
+    // Tentar formato alternativo: <erro><xMotivo>mensagem</xMotivo></erro>
+    const matchErro = xmlRetorno.match(/<erro>[\s\S]*?<xMotivo[^>]*>(.*?)<\/xMotivo>[\s\S]*?<\/erro>/i)
+    if (matchErro && matchErro[1]) {
+      return matchErro[1]
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&apos;/g, "'")
+        .trim()
+    }
+  } catch (error) {
+    console.error('Erro ao extrair motivo de rejeição do XML:', error)
+  }
+  
+  return null
+}
+
 interface VendasQueryParams {
   q?: string
   tipoVenda?: string
@@ -191,6 +230,69 @@ export function useCreateVenda() {
 }
 
 /**
+ * Hook para criar uma nova venda do gestor (venda_gestor)
+ */
+export function useCreateVendaGestor() {
+  const { auth } = useAuthStore()
+  const queryClient = useQueryClient()
+  const token = auth?.getAccessToken()
+
+  return useMutation({
+    mutationFn: async (data: any) => {
+      if (!token) {
+        throw new Error('Token não encontrado')
+      }
+
+      console.log('📤 [Hook] Enviando requisição para criar venda gestor:', {
+        url: '/api/vendas/gestor',
+        data: JSON.stringify(data, null, 2),
+      })
+
+      const response = await fetch('/api/vendas/gestor', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      })
+
+      console.log('📥 [Hook] Resposta recebida:', {
+        status: response.status,
+        ok: response.ok,
+        statusText: response.statusText,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('❌ [Hook] Erro na resposta da API:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData: JSON.stringify(errorData, null, 2),
+        })
+        const errorMessage = errorData.error || errorData.message || errorData.details || `Erro ${response.status}: ${response.statusText}`
+        const error = new Error(errorMessage)
+        ;(error as any).response = { data: errorData, status: response.status }
+        throw error
+      }
+
+      const result = await response.json()
+      console.log('✅ [Hook] Venda criada com sucesso:', result)
+      return result
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vendas'] })
+      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      // Toast de sucesso é exibido no componente
+    },
+    onError: (error: Error) => {
+      // Toast de erro é exibido no componente
+      console.error('❌ [Hook] Erro ao criar venda gestor:', error)
+    },
+  })
+}
+
+/**
  * Hook para atualizar uma venda existente
  */
 export function useUpdateVenda() {
@@ -281,12 +383,18 @@ export function useMarcarEmissaoFiscal() {
   const token = auth?.getAccessToken()
 
   return useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async (params: { id: string; tabelaOrigem?: 'venda' | 'venda_gestor' }) => {
       if (!token) {
         throw new Error('Token não encontrado')
       }
 
-      const response = await fetch(`/api/vendas/${id}/marcar-emissao-fiscal`, {
+      // Vendas do gestor não precisam ser marcadas, pois já aparecem no gestor por padrão
+      // Apenas vendas PDV precisam ser marcadas
+      if (params.tabelaOrigem === 'venda_gestor') {
+        throw new Error('Vendas do gestor não podem ser marcadas para emissão fiscal')
+      }
+
+      const response = await fetch(`/api/vendas/${params.id}/marcar-emissao-fiscal`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -302,9 +410,10 @@ export function useMarcarEmissaoFiscal() {
 
       return await response.json()
     },
-    onSuccess: (_, id) => {
+    onSuccess: (_, params) => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['venda', id] })
+      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      queryClient.invalidateQueries({ queryKey: ['venda', params.id] })
       showToast.success('Venda marcada para emissão fiscal!')
     },
     onError: (error: Error) => {
@@ -314,7 +423,7 @@ export function useMarcarEmissaoFiscal() {
 }
 
 /**
- * Hook para emitir NFe (NFC-e ou NF-e) para uma venda
+ * Hook para emitir NFe (NFC-e ou NF-e) para uma venda PDV
  */
 export function useEmitirNfe() {
   const { auth } = useAuthStore()
@@ -355,6 +464,166 @@ export function useEmitirNfe() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
+        
+        // Tentar extrair mensagem de erro do xmlRetorno se disponível
+        let errorMessage = errorData.error || errorData.message || `Erro ${response.status}: ${response.statusText}`
+        
+        // Se a resposta contém xmlRetorno, tentar extrair o xMotivo
+        if (errorData.xmlRetorno) {
+          const xMotivo = extrairMotivoRejeicao(errorData.xmlRetorno)
+          if (xMotivo) {
+            errorMessage = `Nota fiscal rejeitada: ${xMotivo}`
+          }
+        }
+        
+        throw new Error(errorMessage)
+      }
+
+      const result = await response.json()
+      
+      // Verificar se a nota foi rejeitada mesmo com status 200
+      if (result.status === 'REJEITADA' && result.xmlRetorno) {
+        const xMotivo = extrairMotivoRejeicao(result.xmlRetorno)
+        const errorMessage = xMotivo 
+          ? `Nota fiscal rejeitada: ${xMotivo}`
+          : 'Nota fiscal rejeitada pela SEFAZ'
+        throw new Error(errorMessage)
+      }
+
+      return result
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['vendas'] })
+      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      queryClient.invalidateQueries({ queryKey: ['venda', variables.id] })
+      showToast.success('NFe emitida com sucesso!')
+    },
+    onError: (error: Error) => {
+      showToast.error(error.message || 'Erro ao emitir NFe')
+    },
+  })
+}
+
+/**
+ * Hook para emitir NFe (NFC-e ou NF-e) para uma venda GESTOR
+ */
+export function useEmitirNfeGestor() {
+  const { auth } = useAuthStore()
+  const queryClient = useQueryClient()
+  const token = auth?.getAccessToken()
+
+  return useMutation({
+    mutationFn: async ({ 
+      id, 
+      modelo, 
+      serie, 
+      ambiente, 
+      crt 
+    }: { 
+      id: string
+      modelo: 55 | 65
+      serie: number
+      ambiente: 'HOMOLOGACAO' | 'PRODUCAO'
+      crt: 1 | 2 | 3
+    }) => {
+      if (!token) {
+        throw new Error('Token não encontrado')
+      }
+
+      // Mapear modelo para tipoDocumento
+      const tipoDocumento = modelo === 55 ? 'NFE' : 'NFCE'
+
+      const response = await fetch(`/api/vendas/gestor/${id}/emitir-nfe`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tipoDocumento,
+          serie,
+          ambiente,
+          crt,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        
+        // Tentar extrair mensagem de erro do xmlRetorno se disponível
+        let errorMessage = errorData.error || errorData.message || `Erro ${response.status}: ${response.statusText}`
+        
+        // Se a resposta contém xmlRetorno, tentar extrair o xMotivo
+        if (errorData.xmlRetorno) {
+          const xMotivo = extrairMotivoRejeicao(errorData.xmlRetorno)
+          if (xMotivo) {
+            errorMessage = `Nota fiscal rejeitada: ${xMotivo}`
+          }
+        }
+        
+        throw new Error(errorMessage)
+      }
+
+      const result = await response.json()
+      
+      // Verificar se a nota foi rejeitada mesmo com status 200
+      if (result.status === 'REJEITADA' && result.xmlRetorno) {
+        const xMotivo = extrairMotivoRejeicao(result.xmlRetorno)
+        const errorMessage = xMotivo 
+          ? `Nota fiscal rejeitada: ${xMotivo}`
+          : 'Nota fiscal rejeitada pela SEFAZ'
+        throw new Error(errorMessage)
+      }
+
+      return result
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['vendas'] })
+      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id] })
+      showToast.success('NFe emitida com sucesso!')
+    },
+    onError: (error: Error) => {
+      showToast.error(error.message || 'Erro ao emitir NFe')
+    },
+  })
+}
+
+/**
+ * Hook para cancelar uma venda do gestor
+ */
+export function useCancelarVendaGestor() {
+  const { auth } = useAuthStore()
+  const queryClient = useQueryClient()
+  const token = auth?.getAccessToken()
+
+  return useMutation({
+    mutationFn: async ({ 
+      id, 
+      motivo 
+    }: { 
+      id: string
+      motivo: string
+    }) => {
+      if (!token) {
+        throw new Error('Token não encontrado')
+      }
+
+      if (motivo.length < 15) {
+        throw new Error('Justificativa deve ter no mínimo 15 caracteres')
+      }
+
+      const response = await fetch(`/api/vendas/gestor/${id}/cancelar`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ motivo }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
         const errorMessage = errorData.error || errorData.message || `Erro ${response.status}: ${response.statusText}`
         throw new Error(errorMessage)
       }
@@ -363,11 +632,12 @@ export function useEmitirNfe() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['venda', variables.id] })
-      showToast.success('NFe emitida com sucesso!')
+      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id] })
+      showToast.success('Venda cancelada com sucesso!')
     },
     onError: (error: Error) => {
-      showToast.error(error.message || 'Erro ao emitir NFe')
+      showToast.error(error.message || 'Erro ao cancelar venda')
     },
   })
 }

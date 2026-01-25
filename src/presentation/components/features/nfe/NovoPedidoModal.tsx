@@ -11,11 +11,11 @@ import { useClientes } from '@/src/presentation/hooks/useClientes'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
 import { Produto } from '@/src/domain/entities/Produto'
-import { useCreateVenda } from '@/src/presentation/hooks/useVendas'
+import { useCreateVendaGestor } from '@/src/presentation/hooks/useVendas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { extractTokenInfo } from '@/src/shared/utils/validateToken'
-import { MdAdd, MdDelete, MdSearch } from 'react-icons/md'
+import { MdAdd, MdDelete } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 
 interface NovoPedidoModalProps {
@@ -36,23 +36,16 @@ interface PagamentoSelecionado {
   valor: number
 }
 
-type TipoVenda = 'balcao' | 'mesa' | 'delivery'
-type EtapaInicial = 
-  | 'EM_ANALISE' 
-  | 'EM_PRODUCAO' 
-  | 'PRONTOS_ENTREGA' 
-  | 'COM_ENTREGADOR' 
-  | 'FINALIZADAS' 
-  | 'PENDENTE_EMISSAO'
+type OrigemVenda = 'GESTOR' | 'IFOOD' | 'RAPPI' | 'OUTROS'
+type StatusVenda = 'ABERTA' | 'FINALIZADA' | 'PENDENTE_EMISSAO'
 
 export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalProps) {
   const { auth } = useAuthStore()
-  const createVenda = useCreateVenda()
+  const createVendaGestor = useCreateVendaGestor()
   
-  const [tipoVenda, setTipoVenda] = useState<TipoVenda>('balcao')
+  const [origem, setOrigem] = useState<OrigemVenda>('GESTOR')
+  const [status, setStatus] = useState<StatusVenda>('FINALIZADA')
   const [clienteId, setClienteId] = useState<string>('')
-  const [numeroMesa, setNumeroMesa] = useState<string>('')
-  const [etapaInicial, setEtapaInicial] = useState<EtapaInicial>('FINALIZADAS')
   const [produtos, setProdutos] = useState<ProdutoSelecionado[]>([])
   const [pagamentos, setPagamentos] = useState<PagamentoSelecionado[]>([])
   const [meioPagamentoId, setMeioPagamentoId] = useState<string>('')
@@ -135,24 +128,12 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     return meiosPagamentoData.pages.flatMap(page => page.meiosPagamento || [])
   }, [meiosPagamentoData])
 
-  // Obter etapas disponíveis baseado no tipo de venda
-  const etapasDisponiveis = useMemo(() => {
-    if (tipoVenda === 'delivery') {
-      return [
-        { value: 'EM_ANALISE', label: 'Em análise' },
-        { value: 'EM_PRODUCAO', label: 'Em Produção' },
-        { value: 'PRONTOS_ENTREGA', label: 'Prontos para Entrega' },
-        { value: 'COM_ENTREGADOR', label: 'Com entregador' },
-        { value: 'FINALIZADAS', label: 'Finalizadas' },
-        { value: 'PENDENTE_EMISSAO', label: 'Pendente Emissão Fiscal' },
-      ]
-    } else {
-      return [
-        { value: 'FINALIZADAS', label: 'Finalizadas' },
-        { value: 'PENDENTE_EMISSAO', label: 'Pendente Emissão Fiscal' },
-      ]
-    }
-  }, [tipoVenda])
+  // Status disponíveis para vendas do gestor
+  const statusDisponiveis = [
+    { value: 'ABERTA', label: 'Aberta (Em Andamento)' },
+    { value: 'FINALIZADA', label: 'Finalizada' },
+    { value: 'PENDENTE_EMISSAO', label: 'Finalizada + Emitir NFe' },
+  ]
 
   // Calcular totais
   const totalProdutos = useMemo(() => {
@@ -226,19 +207,14 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
       return
     }
 
-    if (tipoVenda === 'mesa' && !numeroMesa) {
-      showToast.error('Informe o número da mesa')
-      return
-    }
-
-    // Se etapa é FINALIZADAS ou PENDENTE_EMISSAO, precisa de pagamento
-    if ((etapaInicial === 'FINALIZADAS' || etapaInicial === 'PENDENTE_EMISSAO') && pagamentos.length === 0) {
-      showToast.error('Adicione pelo menos uma forma de pagamento')
+    // Se status é FINALIZADA ou PENDENTE_EMISSAO, precisa de pagamento
+    if ((status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') && pagamentos.length === 0) {
+      showToast.error('Adicione pelo menos uma forma de pagamento para vendas finalizadas')
       return
     }
 
     // Validar se pagamentos cobrem o total
-    if (etapaInicial === 'FINALIZADAS' || etapaInicial === 'PENDENTE_EMISSAO') {
+    if (status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') {
       const diferenca = totalProdutos - totalPagamentos
       if (Math.abs(diferenca) > 0.01) {
         showToast.error(`Valor dos pagamentos (${transformarParaReal(totalPagamentos)}) não corresponde ao total (${transformarParaReal(totalProdutos)})`)
@@ -247,68 +223,9 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     }
 
     try {
-      // Obter empresaId do token
-      const token = auth?.getAccessToken()
-      if (!token) {
-        showToast.error('Token não encontrado')
-        return
-      }
-
-      const tokenInfo = extractTokenInfo(token)
-      if (!tokenInfo.empresaId) {
-        showToast.error('Empresa não identificada')
-        return
-      }
-
-      if (!tokenInfo.userId) {
-        showToast.error('Usuário não identificado')
-        return
-      }
-
-      const empresaId = tokenInfo.empresaId
-      const userId = tokenInfo.userId
-      
-      console.log('🔍 Token Info:', { empresaId, userId })
-
-      // Mapear etapa inicial para statusVenda e flags
-      let statusVenda: string | undefined
-      let dataFinalizacao: string | undefined
-      let solicitarEmissaoFiscal = false
-
-      if (tipoVenda === 'delivery') {
-        const statusMap: Record<EtapaInicial, string> = {
-          'EM_ANALISE': '1', // PENDENTE
-          'EM_PRODUCAO': '2', // EM_PRODUCAO
-          'PRONTOS_ENTREGA': '3', // PRONTO
-          'COM_ENTREGADOR': '4', // FINALIZADO (sem dataFinalizacao)
-          'FINALIZADAS': '4', // FINALIZADO (com dataFinalizacao)
-          'PENDENTE_EMISSAO': '4', // FINALIZADO (com dataFinalizacao)
-        }
-        statusVenda = statusMap[etapaInicial]
-        
-        if (etapaInicial === 'FINALIZADAS' || etapaInicial === 'PENDENTE_EMISSAO') {
-          dataFinalizacao = new Date().toISOString()
-        }
-      } else {
-        // Para balcão e mesa, se estiver finalizada, statusVenda deve ser '4' (FINALIZADO)
-        if (etapaInicial === 'FINALIZADAS' || etapaInicial === 'PENDENTE_EMISSAO') {
-          statusVenda = '4' // FINALIZADO
-          dataFinalizacao = new Date().toISOString()
-        }
-        // Se não estiver finalizada, não envia statusVenda (venda aberta)
-      }
-
-      if (etapaInicial === 'PENDENTE_EMISSAO') {
-        solicitarEmissaoFiscal = true
-      }
-
-      // Construir payload apenas com campos definidos (remover undefined)
-      // Nota: abertoPorId e ultimoResponsavelId são preenchidos automaticamente pelo backend
-      // com base no usuário autenticado (req.user.id)
+      // Construir payload para venda_gestor
       const vendaData: any = {
-        tipoVenda,
-        terminalId: `GESTOR-${empresaId}`, // Terminal GESTOR
-        origem: 'GESTOR',
+        origem,
         valorFinal: totalProdutos,
         totalDesconto: 0,
         totalAcrescimo: 0,
@@ -316,40 +233,59 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
           produtoId: p.produtoId,
           quantidade: p.quantidade,
           valorUnitario: p.valorUnitario,
+          complementos: [], // Pode ser expandido futuramente
         })),
       }
 
-      // Adicionar campos opcionais apenas se tiverem valor
-      if (clienteId) vendaData.clientId = clienteId
-      if (tipoVenda === 'mesa' && numeroMesa) vendaData.numeroMesa = numeroMesa
-      if (statusVenda) vendaData.statusVenda = statusVenda
-      if (dataFinalizacao) vendaData.dataFinalizacao = dataFinalizacao
-      if (solicitarEmissaoFiscal) vendaData.solicitarEmissaoFiscal = solicitarEmissaoFiscal
-      
-      // Adicionar pagamentos apenas se necessário
-      if (etapaInicial === 'FINALIZADAS' || etapaInicial === 'PENDENTE_EMISSAO') {
+      // Adicionar clienteId se selecionado
+      if (clienteId) {
+        vendaData.clienteId = clienteId
+      }
+
+      // Se finalizada, adicionar dataFinalizacao e pagamentos
+      if (status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') {
+        vendaData.dataFinalizacao = new Date().toISOString()
         vendaData.pagamentos = pagamentos.map(p => ({
           meioPagamentoId: p.meioPagamentoId,
           valor: p.valor,
         }))
+      } else {
+        // Venda aberta não tem pagamentos
+        vendaData.pagamentos = []
       }
 
-      console.log('📤 Dados sendo enviados:', vendaData)
-      await createVenda.mutateAsync(vendaData)
+      // Se PENDENTE_EMISSAO, marcar flag para criar resumo fiscal automaticamente
+      if (status === 'PENDENTE_EMISSAO') {
+        vendaData.solicitarEmissaoFiscal = true
+      }
+
+      console.log('📤 Criando venda gestor:', vendaData)
+      const resultado = await createVendaGestor.mutateAsync(vendaData)
+      console.log('✅ Venda criada com sucesso:', resultado)
       showToast.success('Pedido criado com sucesso!')
+      resetForm()
       onSuccess()
     } catch (error: any) {
       console.error('❌ Erro ao criar pedido:', error)
-      const errorMessage = error?.response?.data?.message || error?.message || 'Erro ao criar pedido'
+      console.error('❌ Detalhes do erro:', {
+        message: error?.message,
+        response: error?.response,
+        responseData: error?.response?.data,
+        stack: error?.stack,
+      })
+      const errorMessage = 
+        error?.response?.data?.message || 
+        error?.response?.data?.error || 
+        error?.message || 
+        'Erro ao criar pedido'
       showToast.error(errorMessage)
     }
   }
 
   const resetForm = () => {
-    setTipoVenda('balcao')
+    setOrigem('GESTOR')
+    setStatus('FINALIZADA')
     setClienteId('')
-    setNumeroMesa('')
-    setEtapaInicial('FINALIZADAS')
     setProdutos([])
     setPagamentos([])
     setMeioPagamentoId('')
@@ -393,41 +329,21 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
           style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 24px', minHeight: 0 }}
           className="scrollbar-thin"
         >
-          {/* Tipo de Venda */}
+          {/* Origem */}
           <div className="space-y-2">
-            <Label>Tipo de Venda</Label>
-            <Select value={tipoVenda} onValueChange={(value) => {
-              setTipoVenda(value as TipoVenda)
-              // Resetar etapa inicial quando mudar tipo
-              if (value === 'delivery') {
-                setEtapaInicial('EM_ANALISE')
-              } else {
-                setEtapaInicial('FINALIZADAS')
-              }
-            }}>
+            <Label>Origem do Pedido</Label>
+            <Select value={origem} onValueChange={(value) => setOrigem(value as OrigemVenda)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="balcao">Balcão</SelectItem>
-                <SelectItem value="mesa">Mesa</SelectItem>
-                <SelectItem value="delivery">Delivery</SelectItem>
+                <SelectItem value="GESTOR">Gestor (Manual)</SelectItem>
+                <SelectItem value="IFOOD">iFood</SelectItem>
+                <SelectItem value="RAPPI">Rappi</SelectItem>
+                <SelectItem value="OUTROS">Outros</SelectItem>
               </SelectContent>
             </Select>
           </div>
-
-          {/* Número da Mesa (se tipo = mesa) */}
-          {tipoVenda === 'mesa' && (
-            <div className="space-y-2">
-              <Label>Número da Mesa</Label>
-              <Input
-                type="text"
-                value={numeroMesa}
-                onChange={(e) => setNumeroMesa(e.target.value)}
-                placeholder="Ex: 1, 2, 3..."
-              />
-            </div>
-          )}
 
           {/* Cliente */}
           <div className="space-y-2">
@@ -463,17 +379,17 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
             )}
           </div>
 
-          {/* Etapa Inicial */}
+          {/* Status */}
           <div className="space-y-2">
-            <Label>Etapa Inicial</Label>
-            <Select value={etapaInicial} onValueChange={(value) => setEtapaInicial(value as EtapaInicial)}>
+            <Label>Status do Pedido</Label>
+            <Select value={status} onValueChange={(value) => setStatus(value as StatusVenda)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {etapasDisponiveis.map(etapa => (
-                  <SelectItem key={etapa.value} value={etapa.value}>
-                    {etapa.label}
+                {statusDisponiveis.map(st => (
+                  <SelectItem key={st.value} value={st.value}>
+                    {st.label}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -615,8 +531,8 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
             )}
           </div>
 
-          {/* Pagamentos (se etapa finalizada ou pendente emissão) */}
-          {(etapaInicial === 'FINALIZADAS' || etapaInicial === 'PENDENTE_EMISSAO') && (
+          {/* Pagamentos (se status finalizada ou pendente emissão) */}
+          {(status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') && (
             <div className="space-y-2">
               <Label>Formas de Pagamento</Label>
               <div className="flex gap-2">
@@ -684,11 +600,11 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
         </div>
 
         <DialogFooter sx={{ padding: '16px 24px 24px 24px', flexShrink: 0, borderTop: '1px solid #e5e7eb', marginTop: 0 }}>
-          <Button variant="outlined" onClick={handleClose} disabled={createVenda.isPending}>
+          <Button variant="outlined" onClick={handleClose} disabled={createVendaGestor.isPending}>
             Cancelar
           </Button>
-          <Button onClick={handleSubmit} disabled={createVenda.isPending}>
-            {createVenda.isPending ? 'Criando...' : 'Criar Pedido'}
+          <Button onClick={handleSubmit} disabled={createVendaGestor.isPending}>
+            {createVendaGestor.isPending ? 'Criando...' : 'Criar Pedido'}
           </Button>
         </DialogFooter>
       </DialogContent>

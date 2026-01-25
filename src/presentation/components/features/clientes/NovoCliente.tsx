@@ -6,6 +6,14 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/src/presentation/components/ui/select'
+import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdSearch, MdClear, MdPerson, MdLocationOn } from 'react-icons/md'
 
@@ -15,6 +23,37 @@ interface NovoClienteProps {
   onClose?: () => void
   onSaved?: () => void
 }
+
+// Siglas dos estados brasileiros em ordem alfabética
+const ESTADOS_BRASILEIROS = [
+  { sigla: 'AC', nome: 'Acre' },
+  { sigla: 'AL', nome: 'Alagoas' },
+  { sigla: 'AP', nome: 'Amapá' },
+  { sigla: 'AM', nome: 'Amazonas' },
+  { sigla: 'BA', nome: 'Bahia' },
+  { sigla: 'CE', nome: 'Ceará' },
+  { sigla: 'DF', nome: 'Distrito Federal' },
+  { sigla: 'ES', nome: 'Espírito Santo' },
+  { sigla: 'GO', nome: 'Goiás' },
+  { sigla: 'MA', nome: 'Maranhão' },
+  { sigla: 'MT', nome: 'Mato Grosso' },
+  { sigla: 'MS', nome: 'Mato Grosso do Sul' },
+  { sigla: 'MG', nome: 'Minas Gerais' },
+  { sigla: 'PA', nome: 'Pará' },
+  { sigla: 'PB', nome: 'Paraíba' },
+  { sigla: 'PR', nome: 'Paraná' },
+  { sigla: 'PE', nome: 'Pernambuco' },
+  { sigla: 'PI', nome: 'Piauí' },
+  { sigla: 'RJ', nome: 'Rio de Janeiro' },
+  { sigla: 'RN', nome: 'Rio Grande do Norte' },
+  { sigla: 'RS', nome: 'Rio Grande do Sul' },
+  { sigla: 'RO', nome: 'Rondônia' },
+  { sigla: 'RR', nome: 'Roraima' },
+  { sigla: 'SC', nome: 'Santa Catarina' },
+  { sigla: 'SP', nome: 'São Paulo' },
+  { sigla: 'SE', nome: 'Sergipe' },
+  { sigla: 'TO', nome: 'Tocantins' },
+]
 
 /**
  * Componente para criar/editar cliente
@@ -49,6 +88,7 @@ export function NovoCliente({
   const [estado, setEstado] = useState('')
   const [cep, setCep] = useState('')
   const [complemento, setComplemento] = useState('')
+  const [cidadeValida, setCidadeValida] = useState<boolean | null>(null)
 
   // Estados de loading
   const [isLoading, setIsLoading] = useState(false)
@@ -357,6 +397,37 @@ export function NovoCliente({
     if (!token) {
       alert('Token não encontrado')
       return
+    }
+
+    // Validar cidade antes de salvar
+    if (cidade && estado) {
+      if (cidadeValida === false) {
+        showToast.error(
+          `Cidade "${cidade}" não encontrada no estado ${estado}. Por favor, selecione uma cidade válida da lista de sugestões.`
+        )
+        return
+      }
+
+      // Se ainda não foi validada, validar agora
+      if (cidadeValida === null) {
+        try {
+          const response = await fetch(
+            `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(cidade)}&uf=${estado}`
+          )
+          if (response.ok) {
+            const data = await response.json()
+            if (!data.valido) {
+              showToast.error(
+                `Cidade "${cidade}" não encontrada no estado ${estado}. Por favor, selecione uma cidade válida da lista de sugestões.`
+              )
+              return
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao validar cidade:', error)
+          // Continuar mesmo se a validação falhar (pode ser problema de rede)
+        }
+      }
     }
 
     setIsLoading(true)
@@ -847,43 +918,39 @@ export function NovoCliente({
               </div>
 
               <div className="grid grid-cols-3 gap-4">
-                <Input
-                  label="Cidade"
-                  value={cidade}
-                  onChange={(e) => setCidade(e.target.value)}
-                  placeholder="Cidade"
-                  size="small"
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    height: '38px',
-                    backgroundColor: 'var(--color-primary-bg)',
-                    borderRadius: '8px',
-                  },
-                  '& .MuiInputBase-input': {
-                    padding: '8px 14px',
-                    fontSize: '14px',
-                  },
-                }}
-                />
-                <Input
-                  label="Estado"
-                  value={estado}
-                  onChange={(e) => setEstado(e.target.value)}
-                  placeholder="UF"
-                  inputProps={{ maxLength: 2 }}
-                  size="small"
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    height: '38px',
-                    backgroundColor: 'var(--color-primary-bg)',
-                    borderRadius: '8px',
-                  },
-                  '& .MuiInputBase-input': {
-                    padding: '8px 14px',
-                    fontSize: '14px',
-                  },
-                }}
-                />
+                <div className="flex flex-col">
+                  <CidadeAutocomplete
+                    value={cidade}
+                    onChange={setCidade}
+                    estado={estado}
+                    label="Cidade"
+                    placeholder="Digite o nome da cidade"
+                    required={false}
+                    disabled={!estado}
+                    onValidationChange={setCidadeValida}
+                    className="w-full"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-sm font-medium text-primary-text mb-1">
+                    Estado
+                  </label>
+                  <Select
+                    value={estado}
+                    onValueChange={setEstado}
+                  >
+                    <SelectTrigger className="h-[38px] bg-primary-bg">
+                      <SelectValue placeholder="Selecione o estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ESTADOS_BRASILEIROS.map((estadoOption) => (
+                        <SelectItem key={estadoOption.sigla} value={estadoOption.sigla}>
+                          {estadoOption.sigla} - {estadoOption.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Input
                   label="Complemento"
                   value={complemento}

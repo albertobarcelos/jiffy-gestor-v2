@@ -15,6 +15,7 @@ import {
 } from '@/src/presentation/components/ui/select'
 import { extractTokenInfo } from '@/src/shared/utils/validateToken'
 import { MdCheckCircle, MdError, MdSave } from 'react-icons/md'
+import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
 
 interface EmpresaData {
   id: string
@@ -42,6 +43,37 @@ interface ConfiguracaoFiscal {
   simplesNacional?: boolean
   contribuinteIcms?: boolean
 }
+
+// Siglas dos estados brasileiros em ordem alfabética
+const ESTADOS_BRASILEIROS = [
+  { sigla: 'AC', nome: 'Acre' },
+  { sigla: 'AL', nome: 'Alagoas' },
+  { sigla: 'AP', nome: 'Amapá' },
+  { sigla: 'AM', nome: 'Amazonas' },
+  { sigla: 'BA', nome: 'Bahia' },
+  { sigla: 'CE', nome: 'Ceará' },
+  { sigla: 'DF', nome: 'Distrito Federal' },
+  { sigla: 'ES', nome: 'Espírito Santo' },
+  { sigla: 'GO', nome: 'Goiás' },
+  { sigla: 'MA', nome: 'Maranhão' },
+  { sigla: 'MT', nome: 'Mato Grosso' },
+  { sigla: 'MS', nome: 'Mato Grosso do Sul' },
+  { sigla: 'MG', nome: 'Minas Gerais' },
+  { sigla: 'PA', nome: 'Pará' },
+  { sigla: 'PB', nome: 'Paraíba' },
+  { sigla: 'PR', nome: 'Paraná' },
+  { sigla: 'PE', nome: 'Pernambuco' },
+  { sigla: 'PI', nome: 'Piauí' },
+  { sigla: 'RJ', nome: 'Rio de Janeiro' },
+  { sigla: 'RN', nome: 'Rio Grande do Norte' },
+  { sigla: 'RS', nome: 'Rio Grande do Sul' },
+  { sigla: 'RO', nome: 'Rondônia' },
+  { sigla: 'RR', nome: 'Roraima' },
+  { sigla: 'SC', nome: 'Santa Catarina' },
+  { sigla: 'SP', nome: 'São Paulo' },
+  { sigla: 'SE', nome: 'Sergipe' },
+  { sigla: 'TO', nome: 'Tocantins' },
+]
 
 export function ConfiguracaoEmpresaCompleta() {
   const { auth, isRehydrated } = useAuthStore()
@@ -73,6 +105,9 @@ export function ConfiguracaoEmpresaCompleta() {
     inscricaoMunicipal: '',
     codigoRegimeTributario: '1' as '1' | '2' | '3',
   })
+
+  // Validação de cidade
+  const [cidadeValida, setCidadeValida] = useState<boolean | null>(null)
 
   useEffect(() => {
     if (!isRehydrated) return
@@ -168,6 +203,39 @@ export function ConfiguracaoEmpresaCompleta() {
     if (!formDataFiscal.isento && !formDataFiscal.inscricaoEstadual.trim()) {
       showToast.error('Inscrição Estadual é obrigatória ou marque "Isento"')
       return
+    }
+
+    // Validar cidade antes de salvar
+    if (formDataEmpresa.cidade && formDataEmpresa.estado) {
+      if (cidadeValida === false) {
+        showToast.error(
+          `Cidade "${formDataEmpresa.cidade}" não encontrada no estado ${formDataEmpresa.estado}. ` +
+          `Por favor, selecione uma cidade válida da lista de sugestões.`
+        )
+        return
+      }
+
+      // Se ainda não foi validada, validar agora
+      if (cidadeValida === null) {
+        try {
+          const response = await fetch(
+            `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(formDataEmpresa.cidade)}&uf=${formDataEmpresa.estado}`
+          )
+          if (response.ok) {
+            const data = await response.json()
+            if (!data.valido) {
+              showToast.error(
+                `Cidade "${formDataEmpresa.cidade}" não encontrada no estado ${formDataEmpresa.estado}. ` +
+                `Por favor, selecione uma cidade válida da lista de sugestões.`
+              )
+              return
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao validar cidade:', error)
+          // Continuar mesmo se a validação falhar (pode ser problema de rede)
+        }
+      }
     }
 
     setIsSaving(true)
@@ -428,30 +496,40 @@ export function ConfiguracaoEmpresaCompleta() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="cidade">Cidade</Label>
-                <Input
-                  id="cidade"
+                <CidadeAutocomplete
                   value={formDataEmpresa.cidade}
-                  onChange={(e) =>
-                    setFormDataEmpresa({ ...formDataEmpresa, cidade: e.target.value })
+                  onChange={(cidade) =>
+                    setFormDataEmpresa({ ...formDataEmpresa, cidade })
                   }
-                  placeholder="Nome da cidade"
+                  estado={formDataEmpresa.estado}
+                  label="Cidade"
+                  placeholder="Digite o nome da cidade"
+                  required={false}
+                  disabled={!formDataEmpresa.estado}
+                  onValidationChange={setCidadeValida}
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="estado">Estado (UF) *</Label>
-                <Input
-                  id="estado"
+                <Select
                   value={formDataEmpresa.estado}
-                  onChange={(e) => {
-                    const value = e.target.value.toUpperCase().slice(0, 2)
+                  onValueChange={(value) => {
                     setFormDataEmpresa({ ...formDataEmpresa, estado: value })
                   }}
-                  placeholder="SP"
-                  maxLength={2}
                   required
-                />
+                >
+                  <SelectTrigger id="estado">
+                    <SelectValue placeholder="Selecione o estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ESTADOS_BRASILEIROS.map((estado) => (
+                      <SelectItem key={estado.sigla} value={estado.sigla}>
+                        {estado.sigla} - {estado.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>

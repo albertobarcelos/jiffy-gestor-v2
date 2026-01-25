@@ -5,6 +5,7 @@ import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 /**
  * GET /api/vendas
  * Lista vendas com paginação e filtros
+ * Se houver parâmetro 'unificado', redireciona para endpoint unificado
  */
 export async function GET(request: NextRequest) {
   try {
@@ -15,6 +16,43 @@ export async function GET(request: NextRequest) {
     const { tokenInfo } = validation
 
     const { searchParams } = new URL(request.url)
+    
+    // Verificar se é requisição para endpoint unificado
+    const isUnificado = searchParams.get('unificado') === 'true' || request.url.includes('/unificado')
+    
+    if (isUnificado) {
+      // Redirecionar para endpoint unificado
+      const params = new URLSearchParams()
+      params.append('empresaId', tokenInfo.empresaId)
+      
+      const origem = searchParams.get('origem')
+      const statusFiscal = searchParams.get('statusFiscal')
+      const mes = searchParams.get('mes')
+      const ano = searchParams.get('ano')
+      const page = searchParams.get('page')
+      const limit = searchParams.get('limit')
+      
+      if (origem) params.append('origem', origem)
+      if (statusFiscal) params.append('statusFiscal', statusFiscal)
+      if (mes) params.append('mes', mes)
+      if (ano) params.append('ano', ano)
+      if (page) params.append('page', page)
+      if (limit) params.append('limit', limit)
+
+      const apiClient = new ApiClient()
+      const response = await apiClient.request<any>(
+        `/api/v1/operacao-pdv/vendas/unificado?${params.toString()}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${tokenInfo.token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      )
+
+      return NextResponse.json(response.data || {})
+    }
     
     // Parâmetros de paginação
     const limitParam = searchParams.get('limit')
@@ -34,6 +72,8 @@ export async function GET(request: NextRequest) {
     const terminalId = searchParams.get('terminalId') || ''
     const periodoInicial = searchParams.get('periodoInicial') || ''
     const periodoFinal = searchParams.get('periodoFinal') || ''
+    const solicitarEmissaoFiscal = searchParams.get('solicitarEmissaoFiscal') || ''
+    const statusFiscal = searchParams.get('statusFiscal') || ''
     
     // Status pode ter múltiplos valores
     const statusParams = searchParams.getAll('status')
@@ -55,6 +95,8 @@ export async function GET(request: NextRequest) {
     if (terminalId) params.append('terminalId', terminalId)
     if (periodoInicial) params.append('periodoInicial', periodoInicial)
     if (periodoFinal) params.append('periodoFinal', periodoFinal)
+    if (solicitarEmissaoFiscal) params.append('solicitarEmissaoFiscal', solicitarEmissaoFiscal)
+    if (statusFiscal) params.append('statusFiscal', statusFiscal)
     
     // Adiciona múltiplos valores de status
     statusParams.forEach((status) => {
@@ -110,8 +152,13 @@ export async function POST(request: NextRequest) {
     console.log('📤 Body recebido:', JSON.stringify(body, null, 2))
 
     const apiClient = new ApiClient()
+    // Usar rota específica para gestor quando origem = "GESTOR"
+    const endpoint = body.origem === 'GESTOR' 
+      ? `/api/v1/operacao-pdv/vendas/gestor`
+      : `/api/v1/operacao-pdv/vendas`
+    
     const response = await apiClient.request<any>(
-      `/api/v1/operacao-pdv/vendas`,
+      endpoint,
       {
         method: 'POST',
         headers: {

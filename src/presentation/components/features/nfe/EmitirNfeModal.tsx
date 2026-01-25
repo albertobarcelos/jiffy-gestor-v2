@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/presentation/components/ui/dialog'
 import { Button } from '@/src/presentation/components/ui/button'
-import { useEmitirNfe } from '@/src/presentation/hooks/useVendas'
+import { useEmitirNfe, useEmitirNfeGestor } from '@/src/presentation/hooks/useVendas'
 import { showToast } from '@/src/shared/utils/toast'
 
 interface EmitirNfeModalProps {
@@ -11,10 +11,15 @@ interface EmitirNfeModalProps {
   onClose: () => void
   vendaId: string
   vendaNumero?: string
+  tabelaOrigem?: 'venda' | 'venda_gestor' // Indica de qual tabela é a venda
 }
 
-export function EmitirNfeModal({ open, onClose, vendaId, vendaNumero }: EmitirNfeModalProps) {
-  const emitirNfe = useEmitirNfe()
+export function EmitirNfeModal({ open, onClose, vendaId, vendaNumero, tabelaOrigem = 'venda' }: EmitirNfeModalProps) {
+  const emitirNfePdv = useEmitirNfe()
+  const emitirNfeGestor = useEmitirNfeGestor()
+  
+  // Usar o hook correto baseado na tabela de origem
+  const emitirNfe = tabelaOrigem === 'venda_gestor' ? emitirNfeGestor : emitirNfePdv
   const [formData, setFormData] = useState({
     modelo: 65 as 55 | 65, // 55 = NF-e, 65 = NFC-e
     serie: 1,
