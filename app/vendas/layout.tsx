@@ -10,7 +10,7 @@ export default function VendasLayout({
   return (
     <div className="min-h-screen bg-gray-50">
       <TopNav />
-      <main className="px-2 md:px-6">
+      <main className="md:px-6">
         {children}
       </main>
     </div>

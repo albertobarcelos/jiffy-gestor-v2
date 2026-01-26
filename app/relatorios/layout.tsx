@@ -10,7 +10,7 @@ export default function RelatoriosLayout({
   return (
     <div className="min-h-screen bg-gray-50">
       <TopNav />
-      <main className="px-6">
+      <main className="px-1 md:px-6">
         {children}
       </main>
     </div>
