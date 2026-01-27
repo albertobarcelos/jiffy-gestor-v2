@@ -161,8 +161,13 @@ export function EmpresaTab() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="flex flex-col items-center justify-center py-12">
+        <img
+          src="/images/jiffy-loading.gif"
+          alt="Carregando"
+          className="w-20 object-contain"
+        />
+        <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
       </div>
     )
   }

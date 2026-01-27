@@ -39,7 +39,7 @@ export function ConfiguracoesView() {
             >
               Terminais
             </button>
-            <button
+            {/*<button
               onClick={() => setActiveTab('outras')}
               className={`px-5 py-2 text-sm font-semibold font-exo transition-colors ${
                 activeTab === 'outras'
@@ -48,7 +48,7 @@ export function ConfiguracoesView() {
               }`}
             >
               Outras Configurações
-            </button>
+            </button>*/}
           </div>
         </div>
       </div>
