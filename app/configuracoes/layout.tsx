@@ -10,7 +10,7 @@ export default function ConfiguracoesLayout({
   return (
     <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       <TopNav />
-      <main className="flex-1 overflow-hidden px-6">
+      <main className="flex-1 overflow-hidden md:px-6 px-1">
         {children}
       </main>
     </div>

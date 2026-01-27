@@ -168,14 +168,14 @@ export function EmpresaTab() {
   }
 
   return (
-    <div className="h-full overflow-y-auto px-6 py-2 scrollbar-hide">
+    <div className="h-full overflow-y-auto md:px-6 px-1 py-2 scrollbar-hide">
       <div className="space-y-2">
         <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-primary text-xl font-semibold font-exo mb-1">
+          <h3 className="text-primary text-lg md:text-xl font-semibold font-exo mb-1">
             Dados da Empresa
           </h3>
-          <p className="text-secondary-text text-sm font-nunito">
+          <p className="text-secondary-text text-xs md:text-sm font-nunito">
             Gerencie as informações da sua empresa
           </p>
         </div>
@@ -188,7 +188,7 @@ export function EmpresaTab() {
           </button>
         )}
         {isEditing && (
-          <div className="flex gap-2">
+          <div className="flex flex-col md:flex-row gap-2">
             <button
               onClick={handleSave}
               className="h-8 px-6 bg-primary text-white rounded-lg text-sm font-medium font-exo hover:bg-primary/90 transition-colors flex items-center gap-2"
@@ -208,13 +208,13 @@ export function EmpresaTab() {
         )}
       </div>
 
-      <div className="bg-info px-[18px] space-y-4">
+      <div className="bg-info md:px-[18px] px-1 space-y-4">
         {/* Dados Básicos */}
         <div>
           <h4 className="text-primary text-lg font-bold font-nunito mb-2">
             Dados Básicos
           </h4>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
             <div>
               <label className="block text-sm font-medium text-primary-text">
                 CNPJ
@@ -283,7 +283,7 @@ export function EmpresaTab() {
           <h4 className="text-primary text-lg font-bold font-nunito mb-2">
             Endereço
           </h4>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid md:grid-cols-3 grid-cols-1 gap-4">
             <div>
               <label className="block text-sm font-medium text-primary-text">
                 CEP
@@ -296,7 +296,7 @@ export function EmpresaTab() {
                 className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
               />
             </div>
-            <div className="col-span-2">
+            <div className="md:col-span-2 col-span-1">
               <label className="block text-sm font-medium text-primary-text">
                 Rua
               </label>
@@ -320,7 +320,7 @@ export function EmpresaTab() {
                 className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
               />
             </div>
-            <div className="col-span-2">
+            <div className="md:col-span-2 col-span-1">
               <label className="block text-sm font-medium text-primary-text">
                 Complemento
               </label>

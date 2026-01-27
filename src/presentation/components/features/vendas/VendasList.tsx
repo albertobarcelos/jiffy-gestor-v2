@@ -1016,29 +1016,42 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             ref={scrollContainerRef}
             className="max-h-[calc(100vh-350px)] overflow-y-auto px-1 py-2 scrollbar-hide"
           >
+            {isLoading && (
+              <div className="flex items-center justify-center py-12">
+                <img
+                  src="/images/jiffy-loading.gif"
+                  alt="Carregando"
+                  className="w-20 object-contain"
+                />
+              </div>
+            )}
+
             {vendas.length === 0 && !isLoading && (
               <div className="flex items-center justify-center py-12">
                 <p className="text-secondary-text">Nenhuma venda encontrada.</p>
               </div>
             )}
 
-            {vendas.map((venda) => {
+            {vendas.map((venda, index) => {
               const { date, time } = formatDateList(venda.dataCriacao)
               const usuarioNome =
                 usuariosPDV.find((u) => u.id === venda.abertoPorId)?.nome || venda.abertoPorId
+              const isZebraEven = index % 2 === 0
 
               return (
                 <div
                   key={venda.id}
                   onClick={() => setSelectedVendaId(venda.id)} // Adicionado onClick para abrir detalhes
-                  className={`cursor-pointer px-2 py-1 mb-2 rounded-lg flex items-center shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-all ${(() => {
+                  className={`cursor-pointer px-2 py-1 rounded-lg flex items-center  hover:bg-primary/10 transition-all ${(() => {
                     let baseClasses = ''
                     if (venda.dataCancelamento) {
                       baseClasses = 'bg-red-100 hover:bg-red-200'
                     } else if (!venda.dataCancelamento && !venda.dataFinalizacao) {
                       baseClasses = 'bg-yellow-100 hover:bg-yellow-200'
                     } else {
-                      baseClasses = 'bg-info hover:bg-info/80'
+                      baseClasses = isZebraEven
+                        ? 'bg-white hover:bg-gray-100'
+                        : 'bg-gray-50 hover:bg-gray-200'
                     }
                     return baseClasses
                   })()}`}>
