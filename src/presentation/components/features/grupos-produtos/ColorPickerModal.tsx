@@ -107,18 +107,18 @@ export function ColorPickerModal({ open, onClose, onSelect }: ColorPickerModalPr
         onClick={onClose}
       />
 
-      <div className="relative bg-white rounded-2xl w-[600px] h-[600px] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.2)] flex flex-col">
+      <div className="relative bg-white rounded-2xl md:w-[600px] md:h-[600px] w-[300px] h-[500px] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.2)] flex flex-col">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h2 className="text-lg font-bold text-primary-text">Selecione uma cor</h2>
-            <p className="text-sm text-secondary-text">
+            <h2 className="md:text-lg text-sm font-bold text-primary-text">Selecione uma cor</h2>
+            <p className="md:text-sm text-xs text-secondary-text">
               Clique em uma cor para aplicar imediatamente
             </p>
           </div>
           <button
             type="button"
             onClick={fetchColors}
-            className="text-sm text-primary underline hover:opacity-80 transition-opacity"
+            className="md:text-sm text-xs text-primary underline hover:opacity-80 transition-opacity"
           >
             Recarregar
           </button>
@@ -126,8 +126,13 @@ export function ColorPickerModal({ open, onClose, onSelect }: ColorPickerModalPr
 
         <div className="flex-1 overflow-y-auto">
           {isLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            <div className="flex flex-col items-center justify-center h-full gap-2">
+              <img
+                src="/images/jiffy-loading.gif"
+                alt="Carregando"
+                className="w-12 h-12 object-contain"
+              />
+              <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center h-full gap-2">
@@ -151,7 +156,7 @@ export function ColorPickerModal({ open, onClose, onSelect }: ColorPickerModalPr
                   key={color}
                   type="button"
                   onClick={() => handleSelect(color)}
-                  className="w-[100px] h-[100px] rounded-2xl border-2 border-transparent hover:border-primary transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  className="md:w-[100px] md:h-[100px] w-[50px] h-[50px] rounded-lg border-2 border-transparent hover:border-primary transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                   style={{ backgroundColor: color }}
                   aria-label={`Selecionar a cor ${color}`}
                 />
@@ -163,7 +168,7 @@ export function ColorPickerModal({ open, onClose, onSelect }: ColorPickerModalPr
         <button
           type="button"
           onClick={onClose}
-          className="mt-4 self-end px-6 py-2 rounded-full border border-secondary-text text-secondary-text hover:bg-secondary-text/10 transition-colors text-sm font-semibold"
+          className="mt-4 self-end px-6 py-2 rounded-lg border border-secondary-text text-secondary-text hover:bg-secondary-text/10 transition-colors text-sm font-semibold"
         >
           Fechar
         </button>

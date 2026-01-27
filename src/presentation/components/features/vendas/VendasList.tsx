@@ -1017,12 +1017,13 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             className="max-h-[calc(100vh-350px)] overflow-y-auto px-1 py-2 scrollbar-hide"
           >
             {isLoading && (
-              <div className="flex items-center justify-center py-12">
+              <div className="flex flex-col items-center justify-center py-12">
                 <img
                   src="/images/jiffy-loading.gif"
                   alt="Carregando"
                   className="w-20 object-contain"
                 />
+                <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
               </div>
             )}
 

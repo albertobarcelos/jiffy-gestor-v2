@@ -243,23 +243,24 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
 
   return (
     <>
-      <div className="flex flex-col mx-2 h-full border border-primary/20 rounded-lg bg-white shadow-sm">
-      <div className="px-6 pt-2 pb-4">
-        <div className="flex items-center justify-between">
+      <div className="flex flex-col md:mx-2 mx-1 h-full border border-primary/20 rounded-lg bg-white shadow-sm">
+      <div className="md:px-6 px-2 pt-2 pb-4">
+        <div className="flex items-center justify-between gap-2">
           <div>
-            <h3 className="text-lg font-semibold text-primary-text">
+            <h3 className="md:text-lg text-sm font-semibold text-primary-text">
               Produtos vinculados ao grupo
             </h3>
-            <p className="text-sm text-secondary-text">
+            <p className="md:text-sm text-xs text-secondary-text">
               Arraste para reordenar a posição dos produtos
             </p>
           </div>
+          <div className="flex flex-col md:flex-row items-center gap-2">
           <button
             type="button"
             onClick={handleOpenNovoProdutoModal}
-            className="h-8 px-[10px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+            className="md:h-8 md:px-[10px] px-2 py-1 md:py-0 bg-primary text-info rounded-lg font-semibold font-exo md:text-sm text-xs flex items-center gap-2 hover:bg-primary/90 transition-colors"
             >
-            Criar novo produto
+            Novo produto
           </button>
           <button
             type="button"
@@ -268,17 +269,18 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
           >
             Atualizar
           </button>
+          </div>
         </div>
       </div>
 
-      <div className="mx-2 px-6 py-3 bg-custom-2 rounded-lg grid grid-cols-12 text-xs font-semibold text-primary-text">
-        <div className="col-span-1">Ordem</div>
+      <div className="md:mx-2 mx-1 px-2 md:px-6 py-3 bg-custom-2 rounded-lg grid grid-cols-12 text-xs font-semibold text-primary-text">
+        <div className="col-span-1">#</div>
         <div className="col-span-6">Produto</div>
         <div className="col-span-3">Valor</div>
-        <div className="col-span-2 text-right pr-5">Reordenar</div>
+        <div className="col-span-2 text-right pr-5">Ordenar</div>
       </div>
 
-      <div ref={listRef} className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
+      <div ref={listRef} className="flex-1 overflow-y-auto md:px-6 px-1 py-4 space-y-2">
         {isLoading && localProdutos.length === 0 && (
           <div className="space-y-2">
             {[...Array(5)].map((_, index) => (
@@ -354,20 +356,22 @@ function ProdutoItem({
     <div
       ref={setNodeRef}
       style={style}
-      className={`grid grid-cols-12 gap-3 items-center rounded-lg border border-primary/10 px-4 py-2 bg-white shadow-md hover:bg-primary/10 transition ${
+      className={`grid grid-cols-12 gap-3 items-center rounded-lg border border-primary/10 md:px-4 px-1 py-2 bg-white shadow-md hover:bg-primary/10 transition ${
         isDragging ? 'opacity-50 ring-2 ring-primary/40' : ''
       }`}
     >
-      <div className="col-span-1 text-sm font-semibold text-primary-text">{index + 1}</div>
-      <div className="col-span-6 text-sm text-primary-text truncate">{produto.nome}</div>
-      <div className="col-span-3 text-sm text-primary-text">{formatCurrency(produto.valor)}</div>
+      <div className="col-span-1 md:text-sm text-xs font-semibold text-primary-text">{index + 1}</div>
+      <div className="col-span-6 md:text-sm text-xs text-primary-text whitespace-normal break-words">
+        {produto.nome}
+      </div>
+      <div className="col-span-3 md:text-sm text-xs text-primary-text">{formatCurrency(produto.valor)}</div>
       <div
         className="col-span-2 flex justify-end pr-2 cursor-grab active:cursor-grabbing text-secondary-text hover:text-primary transition"
         {...attributes}
         {...listeners}
       >
         <svg
-          className="w-5 h-5"
+          className="md:w-5 md:h-5 w-3 h-3"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"

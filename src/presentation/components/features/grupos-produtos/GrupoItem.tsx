@@ -65,7 +65,7 @@ export const GrupoItem = memo(function GrupoItem({
           e.stopPropagation()
           onEdit?.(grupo)
         }}
-        className="w-[45px] h-[45px] bg-info rounded-lg border-2 flex items-center justify-center"
+        className="md:w-[45px] md:h-[45px] w-7 h-7 bg-info rounded-lg border-2 flex items-center justify-center"
         style={{
           borderColor: corHex,
         }}
@@ -80,16 +80,16 @@ export const GrupoItem = memo(function GrupoItem({
     <div
       ref={setNodeRef}
       style={style}
-      className="h-[50px] bg-info rounded-lg px-4 mb-2 flex items-center gap-[10px] hover:bg-[var(--color-primary-background)] transition-colors cursor-default shadow-md  hover:shadow-md"
+      className="h-[50px] bg-info rounded-lg md:px-4 px-1 mb-2 flex items-center gap-[10px] hover:bg-[var(--color-primary-background)] transition-colors cursor-default shadow-md  hover:shadow-md"
     >
       {/* Handle de arrastar - apenas esta área é arrastável */}
       <div
         {...attributes}
         {...listeners}
-        className="flex-[1] font-nunito font-semibold text-sm text-primary-text flex items-center gap-2 cursor-grab active:cursor-grabbing select-none hover:bg-primary-bg/30 rounded-lg px-2 py-1 transition-colors"
+        className="flex-[1] font-nunito font-semibold text-sm text-primary-text flex items-center gap-2 cursor-grab active:cursor-grabbing select-none hover:bg-primary-bg/30 rounded-lg md:px-2 px-1 py-1 transition-colors"
         title="Arraste para reordenar"
       >
-        <span className="text-secondary-text text-lg leading-none">☰</span>
+        <span className="text-secondary-text md:text-lg text-sm leading-none">☰</span>
         <span>{index + 1}</span>
       </div>
 
@@ -104,9 +104,10 @@ export const GrupoItem = memo(function GrupoItem({
       {/* Nome - área clicável */}
       <div 
         onClick={handleRowClick}
-        className="flex-[4] font-nunito font-semibold text-sm text-primary-text cursor-pointer flex items-center gap-2"
+        className="flex-[4] font-nunito font-semibold text-xs md:text-sm text-primary-text cursor-pointer flex flex-col md:flex-row items-start md:items-center justify-start gap-2"
       >
         <span>{nome}</span>
+        <div className="flex items-center gap-1">
         <button
           type="button"
           onClick={(e) => {
@@ -129,6 +130,7 @@ export const GrupoItem = memo(function GrupoItem({
         >
           <MdAddCircle />
         </button>
+        </div>
       </div>
 
       {/* Status - área clicável */}
@@ -137,7 +139,7 @@ export const GrupoItem = memo(function GrupoItem({
         className="flex-[2] flex justify-center cursor-pointer"
       >
         <label
-          className="relative inline-flex items-center h-5 w-12 cursor-pointer"
+          className="relative inline-flex items-center h-4 w-8 md:h-5 md:w-12 cursor-pointer"
           onMouseDown={(event) => event.stopPropagation()}
           onTouchStart={(event) => event.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
@@ -151,7 +153,7 @@ export const GrupoItem = memo(function GrupoItem({
             onClick={(e) => e.stopPropagation()}
           />
           <div className="w-full h-full rounded-full bg-gray-300 peer-checked:bg-primary transition-colors" />
-          <span className="absolute left-1 top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-white shadow peer-checked:translate-x-6 transition-transform" />
+          <span className="absolute left-[2px] top-1/2 -translate-y-1/2 h-[12px] w-[12px] md:h-3 md:w-3 rounded-full bg-white shadow peer-checked:translate-x-[12px] md:peer-checked:translate-x-6 transition-transform" />
         </label>
       </div>
     </div>

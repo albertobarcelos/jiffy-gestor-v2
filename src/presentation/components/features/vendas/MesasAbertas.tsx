@@ -98,6 +98,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
 
   // Estados de UI
   const [isLoading, setIsLoading] = useState(false)
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [canLoadMore, setCanLoadMore] = useState(true)
   const [currentPage, setCurrentPage] = useState(0)
@@ -491,6 +492,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
       } finally {
         setIsLoading(false)
         setIsLoadingMore(false)
+        setHasLoadedOnce(true)
       }
     },
     [auth, apenasSemMovimentacao]
@@ -636,7 +638,18 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
             ref={scrollContainerRef}
             className="h-full overflow-y-auto overflow-x-hidden px-1 py-2 scrollbar-hide grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2"
           >
-            {vendas.length === 0 && !isLoading && (
+            {isLoading && vendas.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-12 col-span-full">
+                <img
+                  src="/images/jiffy-loading.gif"
+                  alt="Carregando"
+                  className="w-20 object-contain"
+                />
+                <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
+              </div>
+            )}
+
+            {vendas.length === 0 && !isLoading && hasLoadedOnce && (
               <div className="flex items-center justify-center md:py-12 col-span-full">
                 <p className="text-secondary-text">Nenhuma mesa em aberto encontrada.</p>
               </div>

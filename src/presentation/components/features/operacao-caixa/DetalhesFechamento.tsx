@@ -242,8 +242,13 @@ export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesF
           style={{ fontFamily: "'Roboto Mono', 'Courier New', monospace" }}
         >
           {isLoading ? (
-            <div className="flex justify-center items-center py-12">
-              <CircularProgress />
+            <div className="flex flex-col items-center justify-center py-12">
+              <img
+                src="/images/jiffy-loading.gif"
+                alt="Carregando"
+                className="w-20 object-contain"
+              />
+              <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
             </div>
           ) : operacaoCaixa ? (
             <>

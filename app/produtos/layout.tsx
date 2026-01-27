@@ -17,7 +17,7 @@ export default function ProdutosLayout({
       <TopNav />
 
       {/* Conteúdo principal */}
-      <main className='px-6 py-4'>
+      <main className='md:px-6 px-1 py-4'>
         {children}
       </main>
     </div>

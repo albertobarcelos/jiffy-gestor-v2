@@ -1,5 +1,6 @@
 'use client'
 
+import { Suspense } from 'react'
 import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
 import { NovoGrupo } from './NovoGrupo'
 
@@ -50,7 +51,8 @@ export function GruposProdutosTabsModal({
           m: 0,
           height: '100vh',
           maxHeight: '100vh',
-          width: 'min(900px, 60vw)',
+          width: { xs: '95vw', md: 'min(900px, 60vw)' },
+          maxWidth: { xs: '95vw', md: 'min(900px, 60vw)' },
           borderRadius: 0,
           display: 'flex',
           flexDirection: 'column',
@@ -85,17 +87,32 @@ export function GruposProdutosTabsModal({
         <div className="flex-1 overflow-hidden">
           {state.tab === 'grupo' && (
             <div className="h-full overflow-y-auto">
-              <NovoGrupo
-                key={`grupo-${grupoId || 'new'}-tab-${state.initialTab ?? 0}`}
-                grupoId={state.mode === 'create' ? undefined : grupoId}
-                isEmbedded
-                onClose={onClose}
-                onSaved={() => {
-                  onReload?.()
-                  onClose()
-                }}
-                initialTab={state.initialTab}
-              />
+              <Suspense
+                fallback={
+                  <div className="flex flex-col items-center justify-center py-12 gap-2">
+                    <img
+                      src="/images/jiffy-loading.gif"
+                      alt="Carregando"
+                      className="w-16 h-16 object-contain"
+                    />
+                    <span className="text-sm font-medium font-nunito text-primary-text">
+                      Carregando...
+                    </span>
+                  </div>
+                }
+              >
+                <NovoGrupo
+                  key={`grupo-${grupoId || 'new'}-tab-${state.initialTab ?? 0}`}
+                  grupoId={state.mode === 'create' ? undefined : grupoId}
+                  isEmbedded
+                  onClose={onClose}
+                  onSaved={() => {
+                    onReload?.()
+                    onClose()
+                  }}
+                  initialTab={state.initialTab}
+                />
+              </Suspense>
             </div>
           )}
         </div>

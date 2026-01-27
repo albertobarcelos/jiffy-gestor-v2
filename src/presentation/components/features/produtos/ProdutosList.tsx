@@ -1195,7 +1195,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px] flex-shrink-0">
+      <div className="md:px-[30px] px-1 flex-shrink-0">
         <div className="flex flex-col gap-4">
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div className="pl-5">

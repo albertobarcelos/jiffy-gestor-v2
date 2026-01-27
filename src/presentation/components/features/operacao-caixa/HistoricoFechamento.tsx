@@ -830,12 +830,13 @@ export function HistoricoFechamento() {
           style={{ maxHeight: 'calc(100vh - 300px)' }}
         >
           {isLoading && operacoesCaixa.length === 0 ? (
-            <div className="flex justify-center items-center py-12">
+            <div className="flex flex-col items-center justify-center py-12">
               <img
                 src="/images/jiffy-loading.gif"
                 alt="Carregando"
                 className="w-20 object-contain"
               />
+              <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
             </div>
           ) : operacoesCaixa.length === 0 ? (
             <div className="flex justify-center items-center py-12">
