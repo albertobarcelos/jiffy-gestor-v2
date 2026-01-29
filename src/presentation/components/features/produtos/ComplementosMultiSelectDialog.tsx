@@ -429,13 +429,16 @@ export function ComplementosMultiSelectDialog({
 
     return (
       <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
-        {filteredGroups.map((grupo) => {
+        {filteredGroups.map((grupo, groupIndex) => {
           const maxLabel = grupo.qtdMaxima ? `máx ${grupo.qtdMaxima}` : 'sem limite'
           const minLabel = grupo.qtdMinima ? `mín ${grupo.qtdMinima}` : 'mín 0'
           const isExpanded = expandedGroups[grupo.id] !== false
 
           return (
-            <div key={grupo.id} className="rounded-lg border border-gray-200 bg-white">
+            <div
+              key={grupo.id}
+              className={`rounded-lg ${groupIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}
+            >
               <div
                 role="button"
                 tabIndex={0}
@@ -482,11 +485,13 @@ export function ComplementosMultiSelectDialog({
               </div>
               {isExpanded && (
                 <div className="px-4 pb-4 space-y-2">
-                  {grupo.complementos.map((complemento) => {
+                  {grupo.complementos.map((complemento, index) => {
                     return (
                       <div
                         key={complemento.getId()}
-                        className="w-full flex items-center gap-3 rounded-lg border px-4 py-3 text-left border-gray-200 bg-gray-50"
+                        className={`w-full flex items-center gap-3 rounded-lg px-4 py-3 text-left ${
+                          index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+                        }`}
                       >
                         <MdCheck size={20} className="text-primary" />
                         <div className="flex-1">
@@ -577,13 +582,15 @@ export function ComplementosMultiSelectDialog({
               <p className="text-secondary-text text-sm text-center">Carregando grupos...</p>
             </div>
           ) : filteredSelectableGroups.length ? (
-            filteredSelectableGroups.map((grupo) => {
+            filteredSelectableGroups.map((grupo, index) => {
               const isSelected = tempSelection.includes(grupo.id)
               return (
                 <label
                   key={grupo.id}
-                  className={`flex items-center md:gap-3 gap-1 rounded-lg border md:px-4 px-1.5 py-3 cursor-pointer transition-colors ${
-                    isSelected ? 'border-primary bg-primary/5' : 'border-gray-200 bg-gray-50'
+                  className={`flex items-center md:gap-3 gap-1 rounded-lg md:px-4 px-1.5 py-3 cursor-pointer transition-colors ${
+                    isSelected
+                      ? 'border-primary bg-primary/5'
+                      : `border-gray-200 ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`
                   }`}
                 >
                   <input

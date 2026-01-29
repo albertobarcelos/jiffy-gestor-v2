@@ -556,7 +556,6 @@ const ProdutoListItem = function ProdutoListItem({
               className=" p-2 rounded-xl border border-gray-200 focus:border-primary focus:outline-none md:text-sm text-xs font-semibold text-primary-text w-32 disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
-          <span className="text-[11px] text-secondary-text mt-1">{valorFormatado}</span>
         </div>
         <div className="flex items-center">
           <label

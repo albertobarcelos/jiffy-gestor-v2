@@ -281,16 +281,16 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
       </div>
 
       <div ref={listRef} className="flex-1 overflow-y-auto md:px-6 px-1 py-4 space-y-2">
-        {isLoading && localProdutos.length === 0 && (
-          <div className="space-y-2">
-            {[...Array(5)].map((_, index) => (
-              <div
-                key={`produto-skeleton-${index}`}
-                className="h-14 rounded-lg bg-primary/10 animate-pulse"
-              />
-            ))}
-          </div>
-        )}
+      {isLoading && localProdutos.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-8 gap-2">
+          <img
+            src="/images/jiffy-loading.gif"
+            alt="Carregando"
+            className="w-20 object-contain"
+          />
+          <p className="text-sm text-secondary-text text-center">Carregando produtos...</p>
+        </div>
+      )}
 
         <DndContext
           sensors={sensors}
@@ -356,9 +356,9 @@ function ProdutoItem({
     <div
       ref={setNodeRef}
       style={style}
-      className={`grid grid-cols-12 gap-3 items-center rounded-lg border border-primary/10 md:px-4 px-1 py-2 bg-white shadow-md hover:bg-primary/10 transition ${
-        isDragging ? 'opacity-50 ring-2 ring-primary/40' : ''
-      }`}
+      className={`grid grid-cols-12 gap-3 items-center rounded-lg md:px-4 px-1 py-2 transition ${
+        index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+      } ${isDragging ? 'opacity-50 ring-2 ring-primary/40' : ''}`}
     >
       <div className="col-span-1 md:text-sm text-xs font-semibold text-primary-text">{index + 1}</div>
       <div className="col-span-6 md:text-sm text-xs text-primary-text whitespace-normal break-words">

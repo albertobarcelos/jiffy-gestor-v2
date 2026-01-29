@@ -259,10 +259,10 @@ export function GrupoComplementoComplementosModal({
 
   const content = (
     <div className="w-full h-full bg-info flex flex-col rounded-2xl">
-      <div className="px-6 py-4 border-b-[2px] border-primary/70 flex items-start justify-between gap-4">
+      <div className="md:px-6 px-2 md:py-4 py-2 border-b-[2px] border-primary/70 flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase text-secondary-text">Complementos do grupo</p>
-          <h2 className="text-lg font-semibold text-primary-text">{grupo.getNome()}</h2>
+          <p className="text-xs font-semibold uppercase text-primary-text">Complementos do grupo:</p>
+          <h2 className="md:text-lg text-sm font-semibold text-secondary-text">{grupo.getNome()}</h2>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -271,7 +271,7 @@ export function GrupoComplementoComplementosModal({
               setSelectedAddIds(complementosGrupo.map((item) => item.id))
               setIsAddModalOpen(true)
             }}
-            className="h-8 px-4 rounded-lg bg-primary text-white text-sm font-semibold flex items-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            className="md:h-8 md:px-4 px-1 py-1 rounded-lg bg-primary text-white md:text-sm text-xs font-semibold flex items-center md:gap-2 hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             disabled={isLoadingComplementos}
           >
             <MdAdd />
@@ -280,7 +280,7 @@ export function GrupoComplementoComplementosModal({
         </div>
       </div>
 
-      <div className="px-6 py-1 ">
+      <div className="md:px-6 px-2 md:py-1 py-1 ">
         <label className="text-xs font-semibold text-secondary-text mb-1 block">
           Buscar complemento do grupo
         </label>
@@ -291,7 +291,7 @@ export function GrupoComplementoComplementosModal({
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
             placeholder="Digite para filtrar..."
-            className="w-full min-w-[350px] h-8 rounded-lg border border-gray-200 bg-primary-bg pl-11 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary"
+            className="w-full md:min-w-[350px] min-w-[280px] h-8 rounded-lg border border-gray-200 bg-primary-bg pl-11 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary"
           />
           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
             <MdSearch size={18} />
@@ -301,7 +301,7 @@ export function GrupoComplementoComplementosModal({
           </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 py-2 space-y-2">
+      <div className="flex-1 overflow-y-auto md:px-6 px-2 md:py-2 py-1 space-y-2">
         {isLoadingComplementos ? (
           <div className="flex justify-center py-10">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
