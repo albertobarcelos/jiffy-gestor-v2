@@ -731,6 +731,10 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     return data?.pages.flatMap((page) => page.produtos) || []
   }, [data])
 
+  const totalProdutos = useMemo(() => {
+    return data?.pages?.[0]?.count ?? 0
+  }, [data])
+
   useEffect(() => {
     if (produtos.length === 0) {
       setLocalProdutos([])
@@ -1203,7 +1207,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
                 Produtos Cadastrados
               </p>
               <p className="text-tertiary text-[22px] font-medium font-nunito">
-                Total {localProdutos.length}
+                Total {localProdutos.length} de {totalProdutos}
               </p>
             </div>
             <div className="flex items-center justify-end flex-1 gap-4">
