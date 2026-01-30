@@ -73,18 +73,24 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   const pathname = usePathname()
 
   // Calculamos as datas iniciais com base no initialPeriodo logo no início
-  const initialDates = calculatePeriodo(initialPeriodo || 'Todos');
+  const initialPeriodoValue = initialPeriodo || 'Todos'
+  const initialDates = calculatePeriodo(initialPeriodoValue)
 
   // Estados de filtros
   const [searchQuery, setSearchQuery] = useState('')
   const [valorMinimo, setValorMinimo] = useState('')
   const [valorMaximo, setValorMaximo] = useState('')
-  const [periodo, setPeriodo] = useState<string>(initialPeriodo || 'Todos')
+  const [periodo, setPeriodo] = useState<string>(initialPeriodoValue)
   const [statusFilter, setStatusFilter] = useState<string | null>(
     initialStatus?.toLowerCase() === 'aberta' ? null : initialStatus || null
   )
-  const [periodoInicial, setPeriodoInicial] = useState<Date | null>(initialDates.inicio)
-  const [periodoFinal, setPeriodoFinal] = useState<Date | null>(initialDates.fim)
+  // Se período inicial for "Todos", garante que as datas sejam null
+  const [periodoInicial, setPeriodoInicial] = useState<Date | null>(
+    initialPeriodoValue === 'Todos' ? null : initialDates.inicio
+  )
+  const [periodoFinal, setPeriodoFinal] = useState<Date | null>(
+    initialPeriodoValue === 'Todos' ? null : initialDates.fim
+  )
   const [tipoVendaFilter, setTipoVendaFilter] = useState<string | null>(null);
   const [meioPagamentoFilter, setMeioPagamentoFilter] = useState<string>('');
   const [usuarioAbertoPorFilter, setUsuarioAbertoPorFilter] = useState<string>('');
@@ -98,15 +104,12 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
 
   // Estados de UI
   const [isLoading, setIsLoading] = useState(false)
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
-  const [canLoadMore, setCanLoadMore] = useState(true)
-  const [currentPage, setCurrentPage] = useState(0)
   const [selectedVendaId, setSelectedVendaId] = useState<string | null>(null)
   const [isLoadingMeiosPagamento, setIsLoadingMeiosPagamento] = useState(false)
   const [isLoadingTerminais, setIsLoadingTerminais] = useState(false)
   const [isDatasModalOpen, setIsDatasModalOpen] = useState(false)
 
-  const pageSize = 10
+  const pageSize = 100 // Aumentado para buscar mais itens por página
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const filtersRef = useRef({
@@ -377,79 +380,90 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   }, [auth])
 
   /**
-   * Busca vendas com filtros
+   * Busca TODAS as vendas com filtros (carrega todas as páginas automaticamente)
    */
-  const fetchVendas = useCallback(
-    async (resetPage = false) => {
-      const token = auth?.getAccessToken()
-      if (!token) return
+  const fetchVendas = useCallback(async () => {
+    const token = auth?.getAccessToken()
+    if (!token) return
 
-      if (resetPage) {
-        setIsLoading(true)
-        setCurrentPage(0)
-      } else {
-        setIsLoadingMore(true)
+    setIsLoading(true)
+    setVendas([]) // Limpa a lista antes de buscar
+
+    try {
+      const filters = filtersRef.current
+
+      // Monta os parâmetros base (sem paginação inicial)
+      const baseParams = new URLSearchParams()
+
+      if (filters.searchQuery) {
+        baseParams.append('q', filters.searchQuery)
       }
 
-      try {
-        const page = resetPage ? 0 : currentPage
-        const params = new URLSearchParams({
-          limit: pageSize.toString(),
-          offset: (page * pageSize).toString(),
-        })
+      if (filters.tipoVendaFilter) {
+        baseParams.append('tipoVenda', filters.tipoVendaFilter.toLowerCase())
+      }
 
-        const filters = filtersRef.current
+      // Status: se null, envia FINALIZADA e CANCELADA
+      const normalizedStatus = filters.statusFilter?.toUpperCase()
+      if (normalizedStatus && normalizedStatus !== 'ABERTA') {
+        baseParams.append('status', normalizedStatus)
+      } else {
+        baseParams.append('status', 'FINALIZADA')
+        baseParams.append('status', 'CANCELADA')
+      }
 
-        if (filters.searchQuery) {
-          params.append('q', filters.searchQuery)
-        }
+      if (filters.usuarioAbertoPorFilter) {
+        baseParams.append('abertoPorId', filters.usuarioAbertoPorFilter)
+      }
 
-        if (filters.tipoVendaFilter) {
-          params.append('tipoVenda', filters.tipoVendaFilter.toLowerCase())
-        }
+      if (filters.usuarioCancelouFilter) {
+        baseParams.append('canceladoPorId', filters.usuarioCancelouFilter)
+      }
 
-        // Status: se null, envia FINALIZADA e CANCELADA
-        const normalizedStatus = filters.statusFilter?.toUpperCase()
-        if (normalizedStatus && normalizedStatus !== 'ABERTA') {
-          params.append('status', normalizedStatus)
-        } else {
-          params.append('status', 'FINALIZADA')
-          params.append('status', 'CANCELADA')
-        }
+      const valorMin = normalizeCurrency(filters.valorMinimo)
+      if (valorMin !== null && valorMin > 0) {
+        baseParams.append('valorFinalMinimo', valorMin.toString())
+      }
 
-        if (filters.usuarioAbertoPorFilter) {
-          params.append('abertoPorId', filters.usuarioAbertoPorFilter)
-        }
+      const valorMax = normalizeCurrency(filters.valorMaximo)
+      if (valorMax !== null && valorMax > 0) {
+        baseParams.append('valorFinalMaximo', valorMax.toString())
+      }
 
-        if (filters.usuarioCancelouFilter) {
-          params.append('canceladoPorId', filters.usuarioCancelouFilter)
-        }
+      if (filters.meioPagamentoFilter) {
+        baseParams.append('meioPagamentoId', filters.meioPagamentoFilter)
+      }
 
-        const valorMin = normalizeCurrency(filters.valorMinimo)
-        if (valorMin !== null && valorMin > 0) {
-          params.append('valorFinalMinimo', valorMin.toString())
-        }
+      if (filters.terminalFilter) {
+        baseParams.append('terminalId', filters.terminalFilter)
+      }
 
-        const valorMax = normalizeCurrency(filters.valorMaximo)
-        if (valorMax !== null && valorMax > 0) {
-          params.append('valorFinalMaximo', valorMax.toString())
-        }
-
-        if (filters.meioPagamentoFilter) {
-          params.append('meioPagamentoId', filters.meioPagamentoFilter)
-        }
-
-        if (filters.terminalFilter) {
-          params.append('terminalId', filters.terminalFilter)
-        }
-
+      // Só envia parâmetros de período se o período não for "Todos" e as datas estiverem definidas
+      if (filters.periodo !== 'Todos' && filters.periodo !== 'Datas Personalizadas') {
         if (filters.periodoInicial) {
-          params.append('periodoInicial', filters.periodoInicial.toISOString())
+          baseParams.append('periodoInicial', filters.periodoInicial.toISOString())
         }
-
         if (filters.periodoFinal) {
-          params.append('periodoFinal', filters.periodoFinal.toISOString())
+          baseParams.append('periodoFinal', filters.periodoFinal.toISOString())
         }
+      } else if (filters.periodo === 'Datas Personalizadas') {
+        // Para datas personalizadas, envia apenas se ambas as datas estiverem definidas
+        if (filters.periodoInicial && filters.periodoFinal) {
+          baseParams.append('periodoInicial', filters.periodoInicial.toISOString())
+          baseParams.append('periodoFinal', filters.periodoFinal.toISOString())
+        }
+      }
+
+      // Busca todas as páginas automaticamente
+      let allItems: Venda[] = []
+      let currentPage = 0
+      let totalPages = 1
+      let metricasData: MetricasVendas | null = null
+
+      while (currentPage < totalPages) {
+        const params = new URLSearchParams(baseParams.toString())
+        params.append('limit', pageSize.toString())
+        params.append('offset', (currentPage * pageSize).toString())
 
         const response = await fetch(`/api/vendas?${params.toString()}`, {
           headers: {
@@ -465,30 +479,86 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
 
         const data = await response.json()
 
-        const filteredItems = (data.items || []).filter(
-          (v: Venda) => v.dataCancelamento || v.dataFinalizacao
-        )
-
-        if (resetPage) {
-          setVendas(filteredItems)
-          setCurrentPage(1)
-        } else {
-          setVendas((prev) => [...prev, ...filteredItems])
-          setCurrentPage((prev) => prev + 1)
+        // Salva as métricas apenas da primeira página
+        if (currentPage === 0) {
+          metricasData = data.metricas || null
+          // Calcula total de páginas
+          if (data.totalPages) {
+            totalPages = data.totalPages
+          } else if (data.count && data.limit) {
+            totalPages = Math.ceil(data.count / data.limit)
+          } else if ((data.items || []).length < pageSize) {
+            totalPages = 1
+          }
         }
 
-        setMetricas(data.metricas || null)
-        setCanLoadMore(data.hasNext || false)
-      } catch (error) {
-        console.error('Erro ao buscar vendas:', error)
-        showToast.error('Erro ao buscar vendas')
-      } finally {
-        setIsLoading(false)
-        setIsLoadingMore(false)
+        // Filtra os itens respeitando o status selecionado
+        const filteredItems = (data.items || []).filter((v: Venda) => {
+          const normalizedStatus = filters.statusFilter?.toUpperCase()
+          
+          // Se não há filtro de status ou é "Aberta", mostra todas (finalizadas e canceladas)
+          if (!normalizedStatus || normalizedStatus === 'ABERTA') {
+            // Se for "Aberta", mostra apenas vendas sem finalização e sem cancelamento
+            if (normalizedStatus === 'ABERTA') {
+              return !v.dataCancelamento && !v.dataFinalizacao
+            }
+            // Se não há filtro, mostra finalizadas e canceladas
+            return v.dataCancelamento || v.dataFinalizacao
+          }
+          
+          // Se filtro é "CANCELADA", mostra apenas vendas canceladas
+          if (normalizedStatus === 'CANCELADA') {
+            return !!v.dataCancelamento
+          }
+          
+          // Se filtro é "FINALIZADA", mostra apenas vendas finalizadas
+          if (normalizedStatus === 'FINALIZADA') {
+            return !!v.dataFinalizacao && !v.dataCancelamento
+          }
+          
+          // Fallback: mostra todas
+          return v.dataCancelamento || v.dataFinalizacao
+        })
+
+        allItems = [...allItems, ...filteredItems]
+        currentPage++
+
+        console.log(`📄 [VendasList] Página ${currentPage}/${totalPages} carregada - ${filteredItems.length} itens filtrados (Total acumulado: ${allItems.length})`)
       }
-    },
-    [auth, currentPage]
-  )
+
+      // Log detalhado dos filtros e contagem final
+      console.log('📊 [VendasList] Filtros aplicados:', {
+        periodo: filters.periodo,
+        statusFilter: filters.statusFilter || 'Todos (FINALIZADA + CANCELADA)',
+        periodoInicial: filters.periodoInicial?.toISOString() || 'Não definido',
+        periodoFinal: filters.periodoFinal?.toISOString() || 'Não definido',
+        tipoVenda: filters.tipoVendaFilter || 'Todos',
+        meioPagamento: filters.meioPagamentoFilter || 'Todos',
+        terminal: filters.terminalFilter || 'Todos',
+        usuarioAbertoPor: filters.usuarioAbertoPorFilter || 'Todos',
+        usuarioCancelou: filters.usuarioCancelouFilter || 'Todos',
+        valorMinimo: filters.valorMinimo || 'Não definido',
+        valorMaximo: filters.valorMaximo || 'Não definido',
+        searchQuery: filters.searchQuery || 'Não definido',
+      })
+      console.log('📦 [VendasList] Dados recebidos da API:', {
+        totalPages: totalPages,
+        metricas: metricasData,
+      })
+      console.log('✅ [VendasList] Total de itens carregados na lista:', {
+        totalItemsFiltrados: allItems.length,
+        totalPagesCarregadas: currentPage,
+      })
+
+      setVendas(allItems)
+      setMetricas(metricasData)
+    } catch (error) {
+      console.error('Erro ao buscar vendas:', error)
+      showToast.error('Erro ao buscar vendas')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [auth, pageSize])
 
   // Debounce para busca
   useEffect(() => {
@@ -497,7 +567,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      fetchVendas(true)
+      fetchVendas()
     }, 1000)
 
     return () => {
@@ -505,25 +575,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         clearTimeout(debounceTimerRef.current)
       }
     }
-  }, [searchQuery, statusFilter, tipoVendaFilter, meioPagamentoFilter, usuarioAbertoPorFilter, terminalFilter, usuarioCancelouFilter, periodo, periodoInicial, periodoFinal])
-
-  // Scroll infinito
-  useEffect(() => {
-    const container = scrollContainerRef.current
-    if (!container) return
-
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = container
-      const isNearBottom = scrollTop + clientHeight >= scrollHeight - 100
-
-      if (isNearBottom && canLoadMore && !isLoadingMore && !isLoading) {
-        fetchVendas(false)
-      }
-    }
-
-    container.addEventListener('scroll', handleScroll)
-    return () => container.removeEventListener('scroll', handleScroll)
-  }, [canLoadMore, isLoadingMore, isLoading, fetchVendas])
+  }, [searchQuery, statusFilter, tipoVendaFilter, meioPagamentoFilter, usuarioAbertoPorFilter, terminalFilter, usuarioCancelouFilter, periodo, periodoInicial, periodoFinal, fetchVendas])
 
   // Efeito para carregar dados auxiliares e iniciar a busca de vendas
   useEffect(() => {
@@ -531,8 +583,8 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     loadAllMeiosPagamento();
     loadAllTerminais();
     // Aciona a busca inicial de vendas com os filtros já configurados
-    fetchVendas(true);
-  }, []); // Dependências vazias para rodar uma única vez na montagem
+    fetchVendas();
+  }, [fetchVendas]); // Dependência apenas do fetchVendas
 
   // Atualiza período quando muda (apenas se período não for "Datas Personalizadas")
   useEffect(() => {
@@ -541,9 +593,14 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     }
 
     const { inicio, fim } = calculatePeriodo(periodo)
-    setPeriodoInicial(inicio)
-    setPeriodoFinal(fim)
-
+    // Quando período for "Todos", garante que as datas sejam null
+    if (periodo === 'Todos') {
+      setPeriodoInicial(null)
+      setPeriodoFinal(null)
+    } else {
+      setPeriodoInicial(inicio)
+      setPeriodoFinal(fim)
+    }
   }, [periodo])
 
   /**
@@ -587,7 +644,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
    */
   const handleValorKeyPress = (e: React.KeyboardEvent, field: 'min' | 'max') => {
     if (e.key === 'Enter') {
-      fetchVendas(true)
+      fetchVendas()
     }
   }
 
@@ -602,7 +659,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       setPeriodo('Todos')
     }
     // Busca vendas com as novas datas
-    fetchVendas(true)
+    fetchVendas()
   }
 
   return (
@@ -623,7 +680,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyPress={(e) => {
                 if (e.key === 'Enter') {
-                  fetchVendas(true)
+                  fetchVendas()
                 }
               }}
               className="w-full h-8 pl-10 pr-4 rounded-lg bg-info border shadow-sm text-sm font-nunito"
@@ -1061,11 +1118,6 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               )
             })}
 
-            {isLoadingMore && (
-              <div className="flex justify-center py-4">
-                <CircularProgress size={24} />
-              </div>
-            )}
           </div>
         </div>
       </div>

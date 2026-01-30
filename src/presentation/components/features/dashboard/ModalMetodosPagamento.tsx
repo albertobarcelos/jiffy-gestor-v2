@@ -36,31 +36,59 @@ const cores = [
 ]
 
 /**
+ * Mapeia o período do frontend para o formato esperado pelo use case
+ */
+const mapPeriodoToUseCaseFormat = (frontendPeriodo: string): string => {
+  switch (frontendPeriodo) {
+    case 'Hoje':
+      return 'hoje'
+    case 'Últimos 7 Dias':
+      return 'semana'
+    case 'Mês Atual':
+      return 'mes'
+    case 'Últimos 30 Dias':
+      return '30dias'
+    case 'Últimos 60 Dias':
+      return '60dias'
+    case 'Últimos 90 Dias':
+      return '90dias'
+    case 'Todos':
+      return 'todos' // O caso de uso lida com 'todos' retornando datas vazias
+    default:
+      return 'mes' // Valor padrão seguro
+  }
+}
+
+/**
  * Modal de métodos de pagamento
  * Replica o design do Flutter
  */
 export function ModalMetodosPagamento({
   isOpen,
   onClose,
-  periodo = 'mes',
+  periodo = 'Mês Atual',
 }: ModalMetodosPagamentoProps) {
   const [data, setData] = useState<DashboardMetodoPagamento[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null); // Adicionei estado de erro
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isOpen) return
 
     const loadData = async () => {
       setIsLoading(true)
-      setError(null);
+      setError(null)
       try {
-        const useCase = new BuscarMetodosPagamentoDetalhadoUseCase() // Usar o novo caso de uso
-        const metodos = await useCase.execute(periodo)
+        // Mapeia o período do frontend para o formato do use case
+        const mappedPeriodo = mapPeriodoToUseCaseFormat(periodo)
+        console.log(`ModalMetodosPagamento: período original="${periodo}", mapeado="${mappedPeriodo}"`)
+        
+        const useCase = new BuscarMetodosPagamentoDetalhadoUseCase()
+        const metodos = await useCase.execute(mappedPeriodo)
         setData(metodos)
       } catch (err) {
         console.error('Erro ao carregar métodos de pagamento:', err)
-        setError(err instanceof Error ? err.message : 'Erro ao carregar dados de pagamento.'); // Capturar e setar erro
+        setError(err instanceof Error ? err.message : 'Erro ao carregar dados de pagamento.')
       } finally {
         setIsLoading(false)
       }
