@@ -1033,7 +1033,10 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               Usuário PDV
             </div>
             <div className="flex-1 uppercase">
-              Valor Final
+              VL. Faturado
+            </div>
+            <div className="flex-1 uppercase">
+              VL. Cancelado
             </div>
             <div className="flex-1 flex justify-end  uppercase">
               Cupom
@@ -1099,7 +1102,12 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                   </div>
                   <div className="flex-1">
                     <span className="text-sm text-primary-text font-nunito">
-                      {formatCurrency(venda.valorFinal)}
+                      {venda.dataCancelamento ? '-' : formatCurrency(venda.valorFinal)}
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <span className="text-sm text-primary-text font-nunito">
+                      {venda.dataCancelamento ? formatCurrency(venda.valorFinal) : '-'}
                     </span>
                   </div>
                   <div className="flex-1 flex justify-end">
