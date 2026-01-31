@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
-import { MdClose, MdCalendarToday } from 'react-icons/md'
+import { MdClose, MdCalendarToday, MdAccessTime } from 'react-icons/md'
 
 interface EscolheDatasModalProps {
   open: boolean
@@ -24,14 +24,53 @@ const formatDateForInput = (date: Date | null | undefined): string => {
 }
 
 /**
+ * Formata Date para string no formato HH:mm (formato do input time)
+ */
+const formatTimeForInput = (date: Date | null | undefined): string => {
+  if (!date) return ''
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
+/**
  * Converte string YYYY-MM-DD para Date
+ * Usa componentes locais para evitar problemas de timezone
  */
 const parseDateFromInput = (dateString: string): Date | null => {
   if (!dateString) return null
-  const date = new Date(dateString)
-  // Ajustar para o início do dia (00:00:00)
-  date.setHours(0, 0, 0, 0)
+  
+  // Extrai ano, mês e dia da string YYYY-MM-DD
+  const [year, month, day] = dateString.split('-').map(Number)
+  
+  // Cria a data usando componentes locais (não UTC)
+  // month - 1 porque Date usa índice 0-11 para meses
+  const date = new Date(year, month - 1, day, 0, 0, 0, 0)
+  
   return date
+}
+
+/**
+ * Converte string HH:mm para objeto com horas e minutos
+ */
+const parseTimeFromInput = (timeString: string): { hours: number; minutes: number } | null => {
+  if (!timeString) return null
+  
+  const [hours, minutes] = timeString.split(':').map(Number)
+  return { hours, minutes }
+}
+
+/**
+ * Combina data e hora em um objeto Date
+ */
+const combineDateAndTime = (date: Date | null, time: { hours: number; minutes: number } | null): Date | null => {
+  if (!date) return null
+  
+  const combined = new Date(date)
+  if (time) {
+    combined.setHours(time.hours, time.minutes, 0, 0)
+  }
+  return combined
 }
 
 /**
@@ -48,21 +87,40 @@ export function EscolheDatasModal({
   const [dataInicialStr, setDataInicialStr] = useState<string>(
     formatDateForInput(initialDataInicial)
   )
+  const [horaInicialStr, setHoraInicialStr] = useState<string>(
+    formatTimeForInput(initialDataInicial)
+  )
   const [dataFinalStr, setDataFinalStr] = useState<string>(formatDateForInput(initialDataFinal))
+  const [horaFinalStr, setHoraFinalStr] = useState<string>(
+    formatTimeForInput(initialDataFinal)
+  )
 
   // Atualiza os valores quando as props mudam
   useEffect(() => {
     setDataInicialStr(formatDateForInput(initialDataInicial))
+    setHoraInicialStr(formatTimeForInput(initialDataInicial))
     setDataFinalStr(formatDateForInput(initialDataFinal))
+    setHoraFinalStr(formatTimeForInput(initialDataFinal))
   }, [initialDataInicial, initialDataFinal, open])
 
   const handleConfirm = () => {
-    const dataInicial = parseDateFromInput(dataInicialStr)
-    const dataFinal = parseDateFromInput(dataFinalStr)
+    const dataInicialDate = parseDateFromInput(dataInicialStr)
+    const dataFinalDate = parseDateFromInput(dataFinalStr)
     
-    // Se data final foi selecionada, ajustar para o final do dia (23:59:59)
-    if (dataFinal) {
+    // Combina data e hora
+    const horaInicial = parseTimeFromInput(horaInicialStr)
+    const horaFinal = parseTimeFromInput(horaFinalStr)
+    
+    let dataInicial = combineDateAndTime(dataInicialDate, horaInicial)
+    let dataFinal = combineDateAndTime(dataFinalDate, horaFinal)
+    
+    // Se data final foi selecionada mas não tem hora, ajustar para o final do dia (23:59:59)
+    if (dataFinal && !horaFinalStr) {
       dataFinal.setHours(23, 59, 59, 999)
+    }
+    // Se data inicial foi selecionada mas não tem hora, ajustar para o início do dia (00:00:00)
+    if (dataInicial && !horaInicialStr) {
+      dataInicial.setHours(0, 0, 0, 0)
     }
     
     onConfirm(dataInicial, dataFinal)
@@ -72,7 +130,9 @@ export function EscolheDatasModal({
   const handleClose = () => {
     // Resetar para valores iniciais ao fechar sem confirmar
     setDataInicialStr(formatDateForInput(initialDataInicial))
+    setHoraInicialStr(formatTimeForInput(initialDataInicial))
     setDataFinalStr(formatDateForInput(initialDataFinal))
+    setHoraFinalStr(formatTimeForInput(initialDataFinal))
     onClose()
   }
 
@@ -123,31 +183,55 @@ export function EscolheDatasModal({
             {/* Data Inicial */}
             <div className="flex flex-col gap-1">
               <label className="text-sm font-nunito text-primary-text">Data Inicial</label>
-              <div className="relative">
-                <MdCalendarToday className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text pointer-events-none" size={20} />
-                <input
-                  type="date"
-                  value={dataInicialStr}
-                  onChange={(e) => setDataInicialStr(e.target.value)}
-                  placeholder="Escolha..."
-                  className="w-full h-10 pl-10 pr-4 rounded-lg bg-white border border-gray-300 text-sm font-nunito text-primary-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                />
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <MdCalendarToday className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text pointer-events-none" size={20} />
+                  <input
+                    type="date"
+                    value={dataInicialStr}
+                    onChange={(e) => setDataInicialStr(e.target.value)}
+                    placeholder="Escolha..."
+                    className="w-full h-10 pl-10 pr-4 rounded-lg bg-white border border-gray-300 text-sm font-nunito text-primary-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  />
+                </div>
+                <div className="relative flex-1">
+                  <MdAccessTime className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text pointer-events-none" size={20} />
+                  <input
+                    type="time"
+                    value={horaInicialStr}
+                    onChange={(e) => setHoraInicialStr(e.target.value)}
+                    placeholder="HH:mm"
+                    className="w-full h-10 pl-10 pr-4 rounded-lg bg-white border border-gray-300 text-sm font-nunito text-primary-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  />
+                </div>
               </div>
             </div>
 
             {/* Data Final */}
             <div className="flex flex-col gap-1">
               <label className="text-sm font-nunito text-primary-text">Data Final</label>
-              <div className="relative">
-                <MdCalendarToday className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text pointer-events-none" size={20} />
-                <input
-                  type="date"
-                  value={dataFinalStr}
-                  onChange={(e) => setDataFinalStr(e.target.value)}
-                  min={minDataFinal}
-                  placeholder="Escolha..."
-                  className="w-full h-10 pl-10 pr-4 rounded-lg bg-white border border-gray-300 text-sm font-nunito text-primary-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                />
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <MdCalendarToday className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text pointer-events-none" size={20} />
+                  <input
+                    type="date"
+                    value={dataFinalStr}
+                    onChange={(e) => setDataFinalStr(e.target.value)}
+                    min={minDataFinal}
+                    placeholder="Escolha..."
+                    className="w-full h-10 pl-10 pr-4 rounded-lg bg-white border border-gray-300 text-sm font-nunito text-primary-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  />
+                </div>
+                <div className="relative flex-1">
+                  <MdAccessTime className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text pointer-events-none" size={20} />
+                  <input
+                    type="time"
+                    value={horaFinalStr}
+                    onChange={(e) => setHoraFinalStr(e.target.value)}
+                    placeholder="HH:mm"
+                    className="w-full h-10 pl-10 pr-4 rounded-lg bg-white border border-gray-300 text-sm font-nunito text-primary-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  />
+                </div>
               </div>
             </div>
           </div>

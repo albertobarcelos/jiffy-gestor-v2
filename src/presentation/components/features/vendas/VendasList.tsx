@@ -447,9 +447,11 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           baseParams.append('periodoFinal', filters.periodoFinal.toISOString())
         }
       } else if (filters.periodo === 'Datas Personalizadas') {
-        // Para datas personalizadas, envia apenas se ambas as datas estiverem definidas
-        if (filters.periodoInicial && filters.periodoFinal) {
+        // Para datas personalizadas, envia as datas que estiverem definidas
+        if (filters.periodoInicial) {
           baseParams.append('periodoInicial', filters.periodoInicial.toISOString())
+        }
+        if (filters.periodoFinal) {
           baseParams.append('periodoFinal', filters.periodoFinal.toISOString())
         }
       }
@@ -566,9 +568,13 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       clearTimeout(debounceTimerRef.current)
     }
 
+    // Para datas personalizadas, busca imediatamente sem debounce
+    const isDatasPersonalizadas = periodo === 'Datas Personalizadas'
+    const delay = isDatasPersonalizadas ? 100 : 1000
+
     debounceTimerRef.current = setTimeout(() => {
       fetchVendas()
-    }, 1000)
+    }, delay)
 
     return () => {
       if (debounceTimerRef.current) {
@@ -652,14 +658,21 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
    * Confirma seleção de datas e aplica filtro
    */
   const handleConfirmDatas = (dataInicial: Date | null, dataFinal: Date | null) => {
+    // Atualiza o filtersRef imediatamente para garantir que fetchVendas use os valores corretos
+    // Isso evita problemas de race condition com o useEffect
+    const novoPeriodo = (dataInicial || dataFinal) ? 'Datas Personalizadas' : 'Todos'
+    
+    filtersRef.current.periodoInicial = dataInicial
+    filtersRef.current.periodoFinal = dataFinal
+    filtersRef.current.periodo = novoPeriodo
+    
+    // Atualiza os estados (isso vai disparar o useEffect, mas o filtersRef já está atualizado)
     setPeriodoInicial(dataInicial)
     setPeriodoFinal(dataFinal)
-    // Se datas foram selecionadas, muda período para "Todos" para não conflitar
-    if (dataInicial || dataFinal) {
-      setPeriodo('Todos')
-    }
-    // Busca vendas com as novas datas
-    fetchVendas()
+    setPeriodo(novoPeriodo)
+    
+    // O useEffect com debounce vai disparar automaticamente e buscar as vendas
+    // O filtersRef já está atualizado, então fetchVendas() vai usar os valores corretos
   }
 
   return (
