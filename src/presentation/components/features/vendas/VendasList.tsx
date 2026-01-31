@@ -216,20 +216,20 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
 
   /**
    * Formata data para exibição na lista
+   * Converte a data UTC do banco para o fuso horário local do navegador
    */
   const formatDateList = (dateString: string): { date: string; time: string } => {
-    // Mantém o horário exatamente como recebido (ISO em UTC)
     const date = new Date(dateString)
-    const dateStr = date.toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: 'short',
-      timeZone: 'UTC',
-    })
-    const timeStr = date.toLocaleTimeString('pt-BR', {
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'UTC',
-    })
+    
+    // Usa métodos locais para converter UTC para o fuso horário do navegador
+    const day = date.getDate().toString().padStart(2, '0')
+    const month = date.toLocaleDateString('pt-BR', { month: 'short' })
+    const hours = date.getHours().toString().padStart(2, '0')
+    const minutes = date.getMinutes().toString().padStart(2, '0')
+    
+    const dateStr = `${day} ${month}`
+    const timeStr = `${hours}:${minutes}`
+    
     return { date: dateStr, time: timeStr }
   }
 
