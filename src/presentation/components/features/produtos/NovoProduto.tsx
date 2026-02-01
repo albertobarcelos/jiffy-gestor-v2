@@ -47,6 +47,8 @@ function NovoProdutoContent({
   const [ativo, setAtivo] = useState(true)
   const [grupoComplementosIds, setGrupoComplementosIds] = useState<string[]>([])
   const [impressorasIds, setImpressorasIds] = useState<string[]>([])
+  // Guardar os grupos originais para comparar na remoção
+  const [originalGrupoComplementosIds, setOriginalGrupoComplementosIds] = useState<string[]>([])
 
   // Estados de loading
   const [isLoadingProduto, setIsLoadingProduto] = useState(false)
@@ -169,9 +171,9 @@ function NovoProdutoContent({
           setPermiteAcrescimo(produto.permiteAcrescimo || false)
           setAbreComplementos(produto.abreComplementos || false)
           setAtivo(produto.ativo ?? true)
-          setGrupoComplementosIds(
-            produto.gruposComplementos?.map((g: any) => g.id) || []
-          )
+          const gruposIds = produto.gruposComplementos?.map((g: any) => g.id) || []
+          setGrupoComplementosIds(gruposIds)
+          setOriginalGrupoComplementosIds(gruposIds) // Guardar os grupos originais
           setImpressorasIds(produto.impressoras?.map((i: any) => i.id) || [])
 
           if (currentEffectiveIsCopyMode) {
@@ -259,33 +261,79 @@ function NovoProdutoContent({
 
       const method = effectiveProdutoId && !effectiveIsCopyMode ? 'PATCH' : 'POST'
 
+      const isEditMode = effectiveProdutoId && !effectiveIsCopyMode
+      
+      // Se for edição e gruposComplementosIds estiver vazio, precisamos remover
+      // os grupos individualmente usando DELETE, pois a API externa não processa array vazio
+      const shouldRemoveGruposIndividually = isEditMode && 
+        Array.isArray(grupoComplementosIds) && 
+        grupoComplementosIds.length === 0 &&
+        originalGrupoComplementosIds.length > 0
+
+      // Primeiro, salvar o produto (sem gruposComplementosIds se for remoção individual)
+      const bodyToSend = shouldRemoveGruposIndividually
+        ? { ...body, gruposComplementosIds: undefined }
+        : body
+
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify(bodyToSend),
       })
 
-      if (response.ok) {
-        showToast.successLoading(
-          toastId,
-          effectiveProdutoId && !effectiveIsCopyMode
-            ? 'Produto atualizado com sucesso!'
-            : 'Produto cadastrado com sucesso!'
-        )
-        if (onSuccess) {
-          onSuccess()
-        } else {
-          setTimeout(() => {
-            router.push('/produtos')
-          }, 500)
-        }
-      } else {
+      if (!response.ok) {
         const error = await response.json().catch(() => ({}))
         const errorMessage = error.message || 'Erro ao salvar produto'
         showToast.errorLoading(toastId, errorMessage)
+        return
+      }
+
+      // Se precisar remover grupos individualmente (quando array está vazio)
+      if (shouldRemoveGruposIndividually) {
+        try {
+          // Remover cada grupo individualmente usando DELETE
+          const deletePromises = originalGrupoComplementosIds.map((grupoId) =>
+            fetch(`/api/produtos/${effectiveProdutoId}/grupos-complementos/${grupoId}`, {
+              method: 'DELETE',
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            })
+          )
+
+          const deleteResults = await Promise.allSettled(deletePromises)
+          
+          // Verificar se alguma remoção falhou
+          const failedDeletes = deleteResults.filter(
+            (result) => result.status === 'rejected' || 
+            (result.status === 'fulfilled' && !result.value.ok)
+          )
+
+          if (failedDeletes.length > 0) {
+            console.error('Alguns grupos não puderam ser removidos:', failedDeletes)
+            // Não falha o salvamento, apenas loga o erro
+          }
+        } catch (error) {
+          console.error('Erro ao remover grupos de complementos:', error)
+          // Não falha o salvamento, apenas loga o erro
+        }
+      }
+
+      showToast.successLoading(
+        toastId,
+        effectiveProdutoId && !effectiveIsCopyMode
+          ? 'Produto atualizado com sucesso!'
+          : 'Produto cadastrado com sucesso!'
+      )
+      if (onSuccess) {
+        onSuccess()
+      } else {
+        setTimeout(() => {
+          router.push('/produtos')
+        }, 500)
       }
     } catch (error) {
       console.error('Erro ao salvar produto:', error)

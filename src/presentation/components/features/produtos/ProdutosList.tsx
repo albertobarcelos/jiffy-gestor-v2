@@ -437,13 +437,13 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
-  const [limitFilter, setLimitFilter] = useState(10)
+  // Limite máximo permitido pela API externa é 100
+  const [limitFilter, setLimitFilter] = useState(100)
   const [ativoLocalFilter, setAtivoLocalFilter] = useState<'Todos' | 'Sim' | 'Não'>('Todos')
   const [ativoDeliveryFilter, setAtivoDeliveryFilter] = useState<'Todos' | 'Sim' | 'Não'>('Todos')
   const [grupoProdutoFilter, setGrupoProdutoFilter] = useState('')
   const [grupoComplementoFilter, setGrupoComplementoFilter] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const loadMoreRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const [localProdutos, setLocalProdutos] = useState<Produto[]>([])
   const [savingValorMap, setSavingValorMap] = useState<Record<string, boolean>>({})
@@ -727,8 +727,25 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
   } = useProdutosInfinite(queryParams)
 
   // Achatando todas as páginas em uma única lista (memoizado)
+  // Usar Map para evitar duplicatas e garantir ordem consistente
   const produtos = useMemo(() => {
-    return data?.pages.flatMap((page) => page.produtos) || []
+    if (!data?.pages) return []
+    
+    const produtosMap = new Map<string, Produto>()
+    
+    // Processar todas as páginas em ordem
+    data.pages.forEach((page) => {
+      page.produtos.forEach((produto) => {
+        const id = produto.getId()
+        // Se o produto já existe, manter o primeiro (mais antigo)
+        // Isso garante que produtos não sejam substituídos por versões mais antigas
+        if (!produtosMap.has(id)) {
+          produtosMap.set(id, produto)
+        }
+      })
+    })
+    
+    return Array.from(produtosMap.values())
   }, [data])
 
   useEffect(() => {
@@ -737,6 +754,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
       return
     }
 
+    // Aplicar updates pendentes aos produtos
     const merged = produtos.map((produto) => {
       const pending = pendingUpdatesRef.current.get(produto.getId())
       if (!pending) {
@@ -745,9 +763,22 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
       return cloneProdutoWithChanges(produto, pending)
     })
 
-    const sorted = sortProdutosAlphabetically(merged)
+    // Remover duplicatas baseado no ID (pode acontecer se a mesma página for carregada múltiplas vezes)
+    const produtosUnicos = new Map<string, Produto>()
+    merged.forEach((produto) => {
+      const id = produto.getId()
+      // Manter o produto mais recente (com base na ordem de chegada)
+      if (!produtosUnicos.has(id)) {
+        produtosUnicos.set(id, produto)
+      }
+    })
+
+    // Converter de volta para array e ordenar
+    const produtosArray = Array.from(produtosUnicos.values())
+    const sorted = sortProdutosAlphabetically(produtosArray)
     setLocalProdutos(sorted)
 
+    // Limpar updates pendentes que já foram aplicados
     produtos.forEach((produto) => {
       const pending = pendingUpdatesRef.current.get(produto.getId())
       if (!pending) return
@@ -809,32 +840,13 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     })
   }, [produtosAgrupados])
 
-  // Intersection Observer para carregar 10 em 10
+  // Carregar automaticamente todas as páginas antes de exibir
   useEffect(() => {
-    const sentinel = loadMoreRef.current
-    if (!sentinel || !hasNextPage || isFetchingNextPage || isFetching) return
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && hasNextPage && !isFetchingNextPage && !isFetching) {
-            fetchNextPage()
-          }
-        })
-      },
-      {
-        root: scrollContainerRef.current,
-        rootMargin: '10px',
-        threshold: 0.1,
-      }
-    )
-
-    observer.observe(sentinel)
-
-    return () => {
-      observer.disconnect()
+    // Se ainda há páginas para carregar e não está carregando, carrega automaticamente
+    if (hasNextPage && !isFetchingNextPage && !isFetching && data) {
+      fetchNextPage()
     }
-  }, [hasNextPage, isFetchingNextPage, isFetching, fetchNextPage, produtos.length])
+  }, [hasNextPage, isFetchingNextPage, isFetching, fetchNextPage, data])
 
   // Notificar erro
   useEffect(() => {
@@ -1106,7 +1118,8 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     setAtivoDeliveryFilter('Todos')
     setGrupoProdutoFilter('')
     setGrupoComplementoFilter('')
-    setLimitFilter(10)
+    // Manter limit alto para carregar todos os produtos
+    // setLimitFilter(1000) - já está no valor padrão
   }, [])
 
   const handleOpenComplementosModal = useCallback(
@@ -1343,7 +1356,8 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
         className="flex-1 overflow-y-auto px-[30px] mt-4 space-y-6 scrollbar-hide"
         style={{ maxHeight: 'calc(100vh - 300px)' }}
       >
-        {(isLoading || (produtos.length === 0 && isFetching)) && (
+        {/* Mostrar loading enquanto está carregando ou ainda há páginas para carregar */}
+        {(isLoading || isFetching || isFetchingNextPage || hasNextPage) && (
           <div className="space-y-4">
             {[...Array(3)].map((_, index) => (
               <div key={`grupo-skeleton-${index}`} className="space-y-3">
@@ -1356,13 +1370,17 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
           </div>
         )}
 
-        {localProdutos.length === 0 && !isLoading && (
+        {/* Só exibir lista quando todos os produtos estiverem carregados */}
+        {localProdutos.length === 0 && !isLoading && !isFetching && !isFetchingNextPage && !hasNextPage && (
           <div className="flex items-center justify-center py-12">
             <p className="text-secondary-text">Nenhum produto encontrado.</p>
           </div>
         )}
 
-        {produtosAgrupados.map(([grupo, items]) => {
+        {/* Só renderizar grupos quando não estiver carregando mais páginas */}
+        {!isLoading && !isFetching && !isFetchingNextPage && !hasNextPage && localProdutos.length > 0 && (
+          <>
+            {produtosAgrupados.map(([grupo, items]) => {
           const primeiroProduto = items[0]
           const grupoId = primeiroProduto?.getGrupoId()
           const grupoVisual = grupoId ? grupoProdutoMap.get(grupoId) : undefined
@@ -1468,12 +1486,11 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
             </div>
           )
         })}
-
-        {hasNextPage && !isFetchingNextPage && (
-          <div ref={loadMoreRef} className="h-10" />
+          </>
         )}
 
-        {isFetchingNextPage && (
+        {/* Mostrar loading enquanto está carregando todas as páginas */}
+        {(isFetching || isFetchingNextPage) && (
           <div className="flex justify-center py-4">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
