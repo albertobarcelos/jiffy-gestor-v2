@@ -182,7 +182,11 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
     return true;
   }
 
-  async execute(periodo: string = 'hoje'): Promise<DashboardMetodoPagamento[]> {
+  async execute(
+    periodo: string = 'hoje',
+    periodoInicialCustom?: Date | null,
+    periodoFinalCustom?: Date | null
+  ): Promise<DashboardMetodoPagamento[]> {
     const { auth } = useAuthStore.getState();
     const token = auth?.getAccessToken();
     const baseUrl = process.env.NEXT_PUBLIC_EXTERNAL_API_BASE_URL;
@@ -196,7 +200,19 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
       'Authorization': `Bearer ${token}`,
     };
 
-    const { periodoInicial, periodoFinal } = getPeriodoDates(periodo);
+    // Se datas personalizadas foram fornecidas, usa elas
+    let periodoInicial: string;
+    let periodoFinal: string;
+    
+    if (periodoInicialCustom && periodoFinalCustom) {
+      periodoInicial = periodoInicialCustom.toISOString();
+      periodoFinal = periodoFinalCustom.toISOString();
+    } else {
+      // Caso contrário, usa a função de cálculo de período
+      const dates = getPeriodoDates(periodo);
+      periodoInicial = dates.periodoInicial;
+      periodoFinal = dates.periodoFinal;
+    }
 
     // Passo 1: Buscar TODAS as IDs das Vendas Finalizadas (com paginação completa)
     const vendaIds = await this.fetchAllVendasFinalizadas(

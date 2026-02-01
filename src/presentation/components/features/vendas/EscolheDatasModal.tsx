@@ -10,6 +10,7 @@ interface EscolheDatasModalProps {
   onConfirm: (dataInicial: Date | null, dataFinal: Date | null) => void
   dataInicial?: Date | null
   dataFinal?: Date | null
+  usePopover?: boolean // Se true, renderiza apenas o conteúdo sem Dialog
 }
 
 /**
@@ -51,25 +52,27 @@ const parseDateFromInput = (dateString: string): Date | null => {
 }
 
 /**
- * Converte string HH:mm para objeto com horas e minutos
+ * Converte string HH:mm para objeto { hours, minutes }
  */
 const parseTimeFromInput = (timeString: string): { hours: number; minutes: number } | null => {
   if (!timeString) return null
-  
   const [hours, minutes] = timeString.split(':').map(Number)
   return { hours, minutes }
 }
 
 /**
- * Combina data e hora em um objeto Date
+ * Combina uma data com hora
  */
-const combineDateAndTime = (date: Date | null, time: { hours: number; minutes: number } | null): Date | null => {
+const combineDateAndTime = (
+  date: Date | null,
+  time: { hours: number; minutes: number } | null
+): Date | null => {
   if (!date) return null
-  
+  if (!time) return date
+
   const combined = new Date(date)
-  if (time) {
-    combined.setHours(time.hours, time.minutes, 0, 0)
-  }
+  combined.setHours(time.hours, time.minutes, 0, 0)
+
   return combined
 }
 
@@ -83,6 +86,7 @@ export function EscolheDatasModal({
   onConfirm,
   dataInicial: initialDataInicial,
   dataFinal: initialDataFinal,
+  usePopover = false,
 }: EscolheDatasModalProps) {
   const [dataInicialStr, setDataInicialStr] = useState<string>(
     formatDateForInput(initialDataInicial)
@@ -139,6 +143,98 @@ export function EscolheDatasModal({
   // Calcular data mínima para data final (não pode ser anterior à data inicial)
   const minDataFinal = dataInicialStr || undefined
 
+  // Conteúdo do modal (reutilizado tanto para Dialog quanto para Popover)
+  const modalContent = (
+    <>
+      {/* Header */}
+      <div className="bg-white rounded-t-lg px-4 py-3 flex items-center justify-between border-b border-gray-200">
+        <h2 className="text-lg font-bold font-exo text-primary-text">Escolha as Datas</h2>
+        <button
+          onClick={handleClose}
+          className="w-8 h-8 flex items-center justify-center text-primary-text hover:bg-gray-100 rounded-full transition-colors"
+        >
+          <MdClose size={20} />
+        </button>
+      </div>
+
+      {/* Conteúdo */}
+      <div className="px-4 py-4 bg-white">
+        <div className="space-y-4">
+          {/* Data Inicial */}
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-nunito text-primary-text">Data Inicial</label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <MdCalendarToday className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text pointer-events-none" size={20} />
+                <input
+                  type="date"
+                  value={dataInicialStr}
+                  onChange={(e) => setDataInicialStr(e.target.value)}
+                  placeholder="Escolha..."
+                  className="w-full h-10 pl-10 pr-4 rounded-lg bg-white border border-gray-300 text-sm font-nunito text-primary-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+              <div className="relative flex-1">
+                <MdAccessTime className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text pointer-events-none" size={20} />
+                <input
+                  type="time"
+                  value={horaInicialStr}
+                  onChange={(e) => setHoraInicialStr(e.target.value)}
+                  placeholder="HH:mm"
+                  className="w-full h-10 pl-10 pr-4 rounded-lg bg-white border border-gray-300 text-sm font-nunito text-primary-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Data Final */}
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-nunito text-primary-text">Data Final</label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <MdCalendarToday className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text pointer-events-none" size={20} />
+                <input
+                  type="date"
+                  value={dataFinalStr}
+                  onChange={(e) => setDataFinalStr(e.target.value)}
+                  min={minDataFinal}
+                  placeholder="Escolha..."
+                  className="w-full h-10 pl-10 pr-4 rounded-lg bg-white border border-gray-300 text-sm font-nunito text-primary-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+              <div className="relative flex-1">
+                <MdAccessTime className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text pointer-events-none" size={20} />
+                <input
+                  type="time"
+                  value={horaFinalStr}
+                  onChange={(e) => setHoraFinalStr(e.target.value)}
+                  placeholder="HH:mm"
+                  className="w-full h-10 pl-10 pr-4 rounded-lg bg-white border border-gray-300 text-sm font-nunito text-primary-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer com botão Filtrar */}
+      <div className="px-4 py-3 bg-white rounded-b-lg border-t border-gray-200">
+        <button
+          onClick={handleConfirm}
+          className="w-full h-10 bg-primary text-white rounded-lg flex items-center justify-center text-sm font-nunito hover:bg-primary/90 transition-colors"
+        >
+          Filtrar
+        </button>
+      </div>
+    </>
+  )
+
+  // Se usar Popover, retorna apenas o conteúdo
+  if (usePopover) {
+    return <div className="flex flex-col">{modalContent}</div>
+  }
+
+  // Caso contrário, usa Dialog (comportamento padrão)
   return (
     <Dialog
       open={open}
@@ -166,88 +262,8 @@ export function EscolheDatasModal({
       }}
     >
       <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column' }}>
-        {/* Header */}
-        <div className="bg-white rounded-t-lg px-4 py-3 flex items-center justify-between border-b border-gray-200">
-          <h2 className="text-lg font-bold font-exo text-primary-text">Escolha as Datas</h2>
-          <button
-            onClick={handleClose}
-            className="w-8 h-8 flex items-center justify-center text-primary-text hover:bg-gray-100 rounded-full transition-colors"
-          >
-            <MdClose size={20} />
-          </button>
-        </div>
-
-        {/* Conteúdo */}
-        <div className="px-4 py-4 bg-white">
-          <div className="space-y-4">
-            {/* Data Inicial */}
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-nunito text-primary-text">Data Inicial</label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <MdCalendarToday className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text pointer-events-none" size={20} />
-                  <input
-                    type="date"
-                    value={dataInicialStr}
-                    onChange={(e) => setDataInicialStr(e.target.value)}
-                    placeholder="Escolha..."
-                    className="w-full h-10 pl-10 pr-4 rounded-lg bg-white border border-gray-300 text-sm font-nunito text-primary-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                  />
-                </div>
-                <div className="relative flex-1">
-                  <MdAccessTime className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text pointer-events-none" size={20} />
-                  <input
-                    type="time"
-                    value={horaInicialStr}
-                    onChange={(e) => setHoraInicialStr(e.target.value)}
-                    placeholder="HH:mm"
-                    className="w-full h-10 pl-10 pr-4 rounded-lg bg-white border border-gray-300 text-sm font-nunito text-primary-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Data Final */}
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-nunito text-primary-text">Data Final</label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <MdCalendarToday className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text pointer-events-none" size={20} />
-                  <input
-                    type="date"
-                    value={dataFinalStr}
-                    onChange={(e) => setDataFinalStr(e.target.value)}
-                    min={minDataFinal}
-                    placeholder="Escolha..."
-                    className="w-full h-10 pl-10 pr-4 rounded-lg bg-white border border-gray-300 text-sm font-nunito text-primary-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                  />
-                </div>
-                <div className="relative flex-1">
-                  <MdAccessTime className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text pointer-events-none" size={20} />
-                  <input
-                    type="time"
-                    value={horaFinalStr}
-                    onChange={(e) => setHoraFinalStr(e.target.value)}
-                    placeholder="HH:mm"
-                    className="w-full h-10 pl-10 pr-4 rounded-lg bg-white border border-gray-300 text-sm font-nunito text-primary-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer com botão Filtrar */}
-        <div className="px-4 py-3 bg-white rounded-b-lg border-t border-gray-200">
-          <button
-            onClick={handleConfirm}
-            className="w-full h-10 bg-primary text-white rounded-lg flex items-center justify-center text-sm font-nunito hover:bg-primary/90 transition-colors"
-          >
-            Filtrar
-          </button>
-        </div>
+        {modalContent}
       </DialogContent>
     </Dialog>
   )
 }
-

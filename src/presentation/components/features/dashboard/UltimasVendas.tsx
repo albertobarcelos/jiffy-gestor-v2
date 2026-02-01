@@ -241,8 +241,7 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
     <>
       <div className="bg-white h-[390px] rounded-lg shadow-sm shadow-primary/70 border border-gray-200 p-6 overflow-y-auto scrollbar-hide">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-primary">Últimas Vendas</h3>
-          <span className="text-sm text-primary/70">Última semana</span>
+          <h3 className="text-lg font-semibold text-primary">Vendas do Período</h3>
         </div>
 
         <div className="space-y-4">

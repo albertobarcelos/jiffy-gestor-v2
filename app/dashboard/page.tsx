@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic'
 import { Suspense, useState, useRef, useEffect } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'; // Importa os ícones
-import { Skeleton, FormControl, Select, MenuItem, FormGroup, FormControlLabel, Checkbox } from '@mui/material'
+import { Skeleton, FormControl, Select, MenuItem, FormGroup, FormControlLabel, Checkbox, Popover } from '@mui/material'
 import { motion } from 'framer-motion'; // Importar motion do Framer Motion
 import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto' // Importar a entidade
 import { EscolheDatasModal } from '@/src/presentation/components/features/vendas/EscolheDatasModal'
@@ -137,6 +137,8 @@ export default function DashboardPage() {
   const [periodoInicial, setPeriodoInicial] = useState<Date | null>(null); // Estado para data inicial personalizada
   const [periodoFinal, setPeriodoFinal] = useState<Date | null>(null); // Estado para data final personalizada
   const [isDatasModalOpen, setIsDatasModalOpen] = useState(false); // Estado para controlar o modal de datas
+  const [intervaloHora, setIntervaloHora] = useState<number>(30); // Estado para intervalo de tempo (15, 30 ou 60 minutos)
+  const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null); // Ref para posicionar o popover
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -174,6 +176,13 @@ export default function DashboardPage() {
     setSelectedStatuses((prev) =>
       checked ? [...prev, value] : prev.filter((status) => status !== value)
     );
+  };
+
+  const handleIntervaloHoraChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { value, checked } = event.target;
+    if (checked) {
+      setIntervaloHora(parseInt(value, 10));
+    }
   };
 
   /**
@@ -215,7 +224,7 @@ export default function DashboardPage() {
             value={periodo}
             onChange={(e) => handlePeriodoChange(e.target.value)}
             sx={{
-              height: '20px',
+              height: '24px',
               backgroundColor: 'var(--color-primary)',
               color: 'white',
               fontSize: '12px',
@@ -240,10 +249,13 @@ export default function DashboardPage() {
         
         {/* Botão Por Datas */}
         <button
-          onClick={() => setIsDatasModalOpen(true)}
-          className="h-8 px-4 bg-primary text-white rounded-lg flex items-center gap-2 text-sm font-nunito hover:bg-primary/90 transition-colors"
+          onClick={(e) => {
+            setAnchorEl(e.currentTarget)
+            setIsDatasModalOpen(true)
+          }}
+          className="h-6 px-4 bg-primary text-white rounded-lg flex items-center gap-2 text-sm font-nunito hover:bg-primary/90 transition-colors"
         >
-          <MdCalendarToday size={18} />
+          <MdCalendarToday size={10} />
           Por datas
         </button>
       </motion.div>
@@ -276,40 +288,96 @@ export default function DashboardPage() {
                       <h3 className="text-lg font-semibold text-primary">Evolução de Vendas</h3>
                       <p className="text-sm text-primary/70">{getPeriodoLabel(periodo, periodoInicial, periodoFinal)}</p>
                      </div>
-                     <FormGroup row>
-                       <FormControlLabel
-                         control={
-                           <Checkbox
-                             checked={selectedStatuses.includes('FINALIZADA')}
-                             onChange={handleStatusChange}
-                             value="FINALIZADA"
-                             sx={{
-                               color: '#4082b4', // Cor azul para Finalizadas
-                               '&.Mui-checked': {
-                                 color: '#4082b4',
-                               },
-                             }}
+                     <div className="flex flex-col gap-4">
+                       <FormGroup row>
+                         <FormControlLabel
+                           control={
+                             <Checkbox
+                               checked={selectedStatuses.includes('FINALIZADA')}
+                               onChange={handleStatusChange}
+                               value="FINALIZADA"
+                               sx={{
+                                 color: '#4082b4', // Cor azul para Finalizadas
+                                 '&.Mui-checked': {
+                                   color: '#4082b4',
+                                 },
+                               }}
+                             />
+                           }
+                           label="Finalizadas"
+                         />
+                         <FormControlLabel
+                           control={
+                             <Checkbox
+                               checked={selectedStatuses.includes('CANCELADA')}
+                               onChange={handleStatusChange}
+                               value="CANCELADA"
+                               sx={{
+                                 color: '#EF4444', // Cor vermelha para Canceladas
+                                 '&.Mui-checked': {
+                                   color: '#EF4444',
+                                 },
+                               }}
+                             />
+                           }
+                           label="Canceladas"
+                         />
+                       </FormGroup>
+                       {/* Checkboxes para intervalo de tempo (apenas quando for exibir por hora) */}
+                       {(periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) && (
+                         <FormGroup row>
+                           <span className="text-sm text-primary/70 mr-2">Intervalo:</span>
+                           <FormControlLabel
+                             control={
+                               <Checkbox
+                                 checked={intervaloHora === 15}
+                                 onChange={handleIntervaloHoraChange}
+                                 value="15"
+                                 sx={{
+                                   color: '#530CA3',
+                                   '&.Mui-checked': {
+                                     color: '#530CA3',
+                                   },
+                                 }}
+                               />
+                             }
+                             label="15 min"
                            />
-                         }
-                         label="Finalizadas"
-                       />
-                       <FormControlLabel
-                         control={
-                           <Checkbox
-                             checked={selectedStatuses.includes('CANCELADA')}
-                             onChange={handleStatusChange}
-                             value="CANCELADA"
-                             sx={{
-                               color: '#EF4444', // Cor vermelha para Canceladas
-                               '&.Mui-checked': {
-                                 color: '#EF4444',
-                               },
-                             }}
+                           <FormControlLabel
+                             control={
+                               <Checkbox
+                                 checked={intervaloHora === 30}
+                                 onChange={handleIntervaloHoraChange}
+                                 value="30"
+                                 sx={{
+                                   color: '#530CA3',
+                                   '&.Mui-checked': {
+                                     color: '#530CA3',
+                                   },
+                                 }}
+                               />
+                             }
+                             label="30 min"
                            />
-                         }
-                         label="Canceladas"
-                       />
-                     </FormGroup>
+                           <FormControlLabel
+                             control={
+                               <Checkbox
+                                 checked={intervaloHora === 60}
+                                 onChange={handleIntervaloHoraChange}
+                                 value="60"
+                                 sx={{
+                                   color: '#530CA3',
+                                   '&.Mui-checked': {
+                                     color: '#530CA3',
+                                   },
+                                 }}
+                               />
+                             }
+                             label="1h"
+                           />
+                         </FormGroup>
+                       )}
+                     </div>
                    </div>
             <Suspense fallback={<Skeleton variant="rectangular" height={300} />}>
               <GraficoVendasLinha 
@@ -317,6 +385,7 @@ export default function DashboardPage() {
                 selectedStatuses={selectedStatuses}
                 periodoInicial={periodoInicial}
                 periodoFinal={periodoFinal}
+                intervaloHora={intervaloHora}
               />
             </Suspense>
           </div>
@@ -407,14 +476,49 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Modal de Seleção de Datas */}
-      <EscolheDatasModal
+      {/* Popover de Seleção de Datas */}
+      <Popover
         open={isDatasModalOpen}
-        onClose={() => setIsDatasModalOpen(false)}
-        onConfirm={handleConfirmDatas}
-        dataInicial={periodoInicial}
-        dataFinal={periodoFinal}
-      />
+        anchorEl={anchorEl}
+        onClose={() => {
+          setIsDatasModalOpen(false)
+          setAnchorEl(null)
+        }}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+        sx={{
+          '& .MuiPaper-root': {
+            borderRadius: '12px',
+            maxWidth: '400px',
+            marginTop: '8px',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+          },
+        }}
+      >
+        <div className="p-0">
+          <EscolheDatasModal
+            open={isDatasModalOpen}
+            onClose={() => {
+              setIsDatasModalOpen(false)
+              setAnchorEl(null)
+            }}
+            onConfirm={(dataInicial, dataFinal) => {
+              handleConfirmDatas(dataInicial, dataFinal)
+              setIsDatasModalOpen(false)
+              setAnchorEl(null)
+            }}
+            dataInicial={periodoInicial}
+            dataFinal={periodoFinal}
+            usePopover={true}
+          />
+        </div>
+      </Popover>
     </motion.div>
   )
 }

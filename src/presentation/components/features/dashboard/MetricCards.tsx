@@ -180,6 +180,8 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         periodo={periodo}
+        periodoInicial={periodoInicial}
+        periodoFinal={periodoFinal}
       />
     </>
   )

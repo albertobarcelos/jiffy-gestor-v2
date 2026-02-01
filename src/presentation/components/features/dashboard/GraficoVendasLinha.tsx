@@ -19,12 +19,13 @@ interface GraficoVendasLinhaProps {
   selectedStatuses: string[];
   periodoInicial?: Date | null;
   periodoFinal?: Date | null;
+  intervaloHora?: number; // Intervalo em minutos (15, 30 ou 60)
 }
 
 /**
  * Gráfico de coluna para evolução de vendas
  */
-export function GraficoVendasLinha({ periodo, selectedStatuses, periodoInicial, periodoFinal }: GraficoVendasLinhaProps) {
+export function GraficoVendasLinha({ periodo, selectedStatuses, periodoInicial, periodoFinal, intervaloHora = 30 }: GraficoVendasLinhaProps) {
   const [data, setData] = useState<DashboardEvolucao[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -52,7 +53,13 @@ export function GraficoVendasLinha({ periodo, selectedStatuses, periodoInicial, 
         const mappedPeriodo = mapPeriodoToUseCaseFormat(periodo);
         // Se período for "Datas Personalizadas", usa as datas fornecidas
         const useCustomDates = periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal;
-        const evolucao = await useCase.execute(mappedPeriodo, selectedStatuses, useCustomDates ? periodoInicial : undefined, useCustomDates ? periodoFinal : undefined)
+        const evolucao = await useCase.execute(
+          mappedPeriodo, 
+          selectedStatuses, 
+          useCustomDates ? periodoInicial : undefined, 
+          useCustomDates ? periodoFinal : undefined,
+          useCustomDates ? intervaloHora : undefined
+        )
         setData(evolucao)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erro ao carregar dados')
@@ -62,7 +69,7 @@ export function GraficoVendasLinha({ periodo, selectedStatuses, periodoInicial, 
     }
 
     loadData()
-  }, [periodo, selectedStatuses, periodoInicial, periodoFinal])
+  }, [periodo, selectedStatuses, periodoInicial, periodoFinal, intervaloHora])
 
   const formatCurrency = (value: number) => {
     return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -154,7 +161,9 @@ export function GraficoVendasLinha({ periodo, selectedStatuses, periodoInicial, 
               return '';
             }}
             labelFormatter={(label) => {
-              return `Dia: ${label}`;
+              // Detecta se o label contém hora (formato "DD/MM HH:00")
+              const hasHour = /^\d{2}\/\d{2} \d{2}:\d{2}$/.test(label);
+              return hasHour ? `Hora: ${label}` : `Dia: ${label}`;
             }}
             contentStyle={{
               backgroundColor: '#FFFFFF',

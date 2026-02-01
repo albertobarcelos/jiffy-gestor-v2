@@ -24,6 +24,8 @@ interface ModalMetodosPagamentoProps {
   isOpen: boolean
   onClose: () => void
   periodo: string
+  periodoInicial?: Date | null
+  periodoFinal?: Date | null
 }
 
 const cores = [
@@ -67,6 +69,8 @@ export function ModalMetodosPagamento({
   isOpen,
   onClose,
   periodo = 'Mês Atual',
+  periodoInicial,
+  periodoFinal,
 }: ModalMetodosPagamentoProps) {
   const [data, setData] = useState<DashboardMetodoPagamento[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -84,7 +88,13 @@ export function ModalMetodosPagamento({
         console.log(`ModalMetodosPagamento: período original="${periodo}", mapeado="${mappedPeriodo}"`)
         
         const useCase = new BuscarMetodosPagamentoDetalhadoUseCase()
-        const metodos = await useCase.execute(mappedPeriodo)
+        // Se período for "Datas Personalizadas" e datas foram fornecidas, usa elas
+        const useCustomDates = periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal
+        const metodos = await useCase.execute(
+          mappedPeriodo,
+          useCustomDates ? periodoInicial : undefined,
+          useCustomDates ? periodoFinal : undefined
+        )
         setData(metodos)
       } catch (err) {
         console.error('Erro ao carregar métodos de pagamento:', err)
@@ -95,7 +105,7 @@ export function ModalMetodosPagamento({
     }
 
     loadData()
-  }, [isOpen, periodo])
+  }, [isOpen, periodo, periodoInicial, periodoFinal])
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
