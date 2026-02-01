@@ -17,12 +17,14 @@ import { DashboardEvolucao } from '@/src/domain/entities/DashboardEvolucao'
 interface GraficoVendasLinhaProps {
   periodo: string;
   selectedStatuses: string[];
+  periodoInicial?: Date | null;
+  periodoFinal?: Date | null;
 }
 
 /**
  * Gráfico de coluna para evolução de vendas
  */
-export function GraficoVendasLinha({ periodo, selectedStatuses }: GraficoVendasLinhaProps) {
+export function GraficoVendasLinha({ periodo, selectedStatuses, periodoInicial, periodoFinal }: GraficoVendasLinhaProps) {
   const [data, setData] = useState<DashboardEvolucao[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -48,7 +50,9 @@ export function GraficoVendasLinha({ periodo, selectedStatuses }: GraficoVendasL
       try {
         const useCase = new BuscarEvolucaoVendasUseCase()
         const mappedPeriodo = mapPeriodoToUseCaseFormat(periodo);
-        const evolucao = await useCase.execute(mappedPeriodo, selectedStatuses)
+        // Se período for "Datas Personalizadas", usa as datas fornecidas
+        const useCustomDates = periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal;
+        const evolucao = await useCase.execute(mappedPeriodo, selectedStatuses, useCustomDates ? periodoInicial : undefined, useCustomDates ? periodoFinal : undefined)
         setData(evolucao)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erro ao carregar dados')
@@ -58,7 +62,7 @@ export function GraficoVendasLinha({ periodo, selectedStatuses }: GraficoVendasL
     }
 
     loadData()
-  }, [periodo, selectedStatuses])
+  }, [periodo, selectedStatuses, periodoInicial, periodoFinal])
 
   const formatCurrency = (value: number) => {
     return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`

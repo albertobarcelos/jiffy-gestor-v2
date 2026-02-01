@@ -6,9 +6,23 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'; // Importa os ícones
 import { Skeleton, FormControl, Select, MenuItem, FormGroup, FormControlLabel, Checkbox } from '@mui/material'
 import { motion } from 'framer-motion'; // Importar motion do Framer Motion
 import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto' // Importar a entidade
+import { EscolheDatasModal } from '@/src/presentation/components/features/vendas/EscolheDatasModal'
+import { MdCalendarToday } from 'react-icons/md'
 
 // Função para obter o label do período
-const getPeriodoLabel = (periodo: string): string => {
+const getPeriodoLabel = (periodo: string, dataInicial?: Date | null, dataFinal?: Date | null): string => {
+  if (periodo === 'Datas Personalizadas' && dataInicial && dataFinal) {
+    const formatDate = (date: Date) => {
+      const day = date.getDate().toString().padStart(2, '0')
+      const month = (date.getMonth() + 1).toString().padStart(2, '0')
+      const year = date.getFullYear()
+      const hours = date.getHours().toString().padStart(2, '0')
+      const minutes = date.getMinutes().toString().padStart(2, '0')
+      return `${day}/${month}/${year} ${hours}:${minutes}`
+    }
+    return `${formatDate(dataInicial)} - ${formatDate(dataFinal)}`
+  }
+  
   switch (periodo) {
     case 'Todos':
       return 'Todos os Períodos';
@@ -24,6 +38,8 @@ const getPeriodoLabel = (periodo: string): string => {
       return 'Últimos 60 Dias';
     case 'Últimos 90 Dias':
       return 'Últimos 90 Dias';
+    case 'Datas Personalizadas':
+      return 'Datas Personalizadas';
     default:
       return 'Período Desconhecido';
   }
@@ -118,6 +134,9 @@ export default function DashboardPage() {
   const [periodo, setPeriodo] = useState('Últimos 7 Dias'); // Estado para o período
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['FINALIZADA']); // Estado para os status selecionados
   const [topProdutosData, setTopProdutosData] = useState<DashboardTopProduto[]>([]); // Novo estado para os top produtos
+  const [periodoInicial, setPeriodoInicial] = useState<Date | null>(null); // Estado para data inicial personalizada
+  const [periodoFinal, setPeriodoFinal] = useState<Date | null>(null); // Estado para data final personalizada
+  const [isDatasModalOpen, setIsDatasModalOpen] = useState(false); // Estado para controlar o modal de datas
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -157,6 +176,30 @@ export default function DashboardPage() {
     );
   };
 
+  /**
+   * Confirma seleção de datas e aplica filtro
+   */
+  const handleConfirmDatas = (dataInicial: Date | null, dataFinal: Date | null) => {
+    setPeriodoInicial(dataInicial)
+    setPeriodoFinal(dataFinal)
+    // Se pelo menos uma data foi selecionada, muda período para "Datas Personalizadas"
+    if (dataInicial || dataFinal) {
+      setPeriodo('Datas Personalizadas')
+    }
+  };
+
+  /**
+   * Handler para mudança de período no dropdown
+   */
+  const handlePeriodoChange = (novoPeriodo: string) => {
+    setPeriodo(novoPeriodo)
+    // Se não for "Datas Personalizadas", limpa as datas personalizadas
+    if (novoPeriodo !== 'Datas Personalizadas') {
+      setPeriodoInicial(null)
+      setPeriodoFinal(null)
+    }
+  };
+
   return (
     <motion.div
       variants={containerVariants}
@@ -170,7 +213,7 @@ export default function DashboardPage() {
         <FormControl size="small" sx={{ minWidth: 120 }}>
           <Select
             value={periodo}
-            onChange={(e) => setPeriodo(e.target.value)}
+            onChange={(e) => handlePeriodoChange(e.target.value)}
             sx={{
               height: '20px',
               backgroundColor: 'var(--color-primary)',
@@ -191,8 +234,18 @@ export default function DashboardPage() {
             <MenuItem value="Últimos 30 Dias">Últimos 30 Dias</MenuItem>
             <MenuItem value="Últimos 60 Dias">Últimos 60 Dias</MenuItem>
             <MenuItem value="Últimos 90 Dias">Últimos 90 Dias</MenuItem>
+            <MenuItem value="Datas Personalizadas">Datas Personalizadas</MenuItem>
           </Select>
         </FormControl>
+        
+        {/* Botão Por Datas */}
+        <button
+          onClick={() => setIsDatasModalOpen(true)}
+          className="h-8 px-4 bg-primary text-white rounded-lg flex items-center gap-2 text-sm font-nunito hover:bg-primary/90 transition-colors"
+        >
+          <MdCalendarToday size={18} />
+          Por datas
+        </button>
       </motion.div>
 
       {/* Cards de métricas */}
@@ -204,7 +257,11 @@ export default function DashboardPage() {
             ))}
           </div>
         }>
-          <MetricCards periodo={periodo} />
+          <MetricCards 
+            periodo={periodo}
+            periodoInicial={periodoInicial}
+            periodoFinal={periodoFinal}
+          />
         </Suspense>
       </motion.div>
 
@@ -217,7 +274,7 @@ export default function DashboardPage() {
                    <div className="mb-6 flex items-start gap-12">
                      <div className="flex flex-col items-start justify-start">
                       <h3 className="text-lg font-semibold text-primary">Evolução de Vendas</h3>
-                      <p className="text-sm text-primary/70">{getPeriodoLabel(periodo)}</p>
+                      <p className="text-sm text-primary/70">{getPeriodoLabel(periodo, periodoInicial, periodoFinal)}</p>
                      </div>
                      <FormGroup row>
                        <FormControlLabel
@@ -255,7 +312,12 @@ export default function DashboardPage() {
                      </FormGroup>
                    </div>
             <Suspense fallback={<Skeleton variant="rectangular" height={300} />}>
-              <GraficoVendasLinha periodo={periodo} selectedStatuses={selectedStatuses} />
+              <GraficoVendasLinha 
+                periodo={periodo} 
+                selectedStatuses={selectedStatuses}
+                periodoInicial={periodoInicial}
+                periodoFinal={periodoFinal}
+              />
             </Suspense>
           </div>
         </motion.div>
@@ -263,7 +325,11 @@ export default function DashboardPage() {
         {/* Coluna direita - Últimas Vendas */}
         <motion.div variants={slideFromRightVariants} initial="hidden" animate="visible" className="lg:col-span-1">
           <Suspense fallback={<Skeleton variant="rectangular" height={390} className="rounded-lg" />}>
-            <UltimasVendas periodo={periodo} />
+            <UltimasVendas 
+              periodo={periodo}
+              periodoInicial={periodoInicial}
+              periodoFinal={periodoFinal}
+            />
           </Suspense>
         </motion.div>
       </div>
@@ -297,7 +363,12 @@ export default function DashboardPage() {
                 <p className="text-sm text-primary/70">Os 10 mais vendidos</p>
               </div>
               <Suspense fallback={<Skeleton variant="rectangular" height={400} />}>
-                <TabelaTopProdutos periodo={periodo} onDataLoad={setTopProdutosData} />
+                <TabelaTopProdutos 
+                  periodo={periodo} 
+                  onDataLoad={setTopProdutosData}
+                  periodoInicial={periodoInicial}
+                  periodoFinal={periodoFinal}
+                />
               </Suspense>
             </div>
 
@@ -335,6 +406,15 @@ export default function DashboardPage() {
           </button>
         )}
       </div>
+
+      {/* Modal de Seleção de Datas */}
+      <EscolheDatasModal
+        open={isDatasModalOpen}
+        onClose={() => setIsDatasModalOpen(false)}
+        onConfirm={handleConfirmDatas}
+        dataInicial={periodoInicial}
+        dataFinal={periodoFinal}
+      />
     </motion.div>
   )
 }

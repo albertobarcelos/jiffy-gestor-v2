@@ -102,8 +102,27 @@ export class BuscarEvolucaoVendasUseCase {
     return allVendas;
   }
 
-  async execute(periodo: string = 'hoje', selectedStatuses: string[] = ['FINALIZADA']): Promise<DashboardEvolucao[]> {
-      const { periodoInicial, periodoFinal } = getPeriodoDates(periodo);
+  async execute(
+    periodo: string = 'hoje', 
+    selectedStatuses: string[] = ['FINALIZADA'],
+    periodoInicialCustom?: Date | null,
+    periodoFinalCustom?: Date | null
+  ): Promise<DashboardEvolucao[]> {
+      let periodoInicial: string;
+      let periodoFinal: string;
+      const isCustomDates = periodoInicialCustom && periodoFinalCustom;
+      
+      // Se datas personalizadas foram fornecidas, usa elas
+      if (isCustomDates) {
+        periodoInicial = periodoInicialCustom.toISOString();
+        periodoFinal = periodoFinalCustom.toISOString();
+      } else {
+        // Caso contrário, usa a função de cálculo de período
+        const dates = getPeriodoDates(periodo);
+        periodoInicial = dates.periodoInicial;
+        periodoFinal = dates.periodoFinal;
+      }
+      
       // Faz chamadas separadas para cada status selecionado
       const fetchPromises = selectedStatuses.map(status => 
         this.fetchAllVendas(periodoInicial, periodoFinal, status)
@@ -150,10 +169,15 @@ export class BuscarEvolucaoVendasUseCase {
     let effectiveStartDate: Date;
     let effectiveEndDate: Date;
 
+    // Prioriza datas personalizadas se fornecidas
     if (periodoInicial && periodoFinal) {
       effectiveStartDate = new Date(periodoInicial);
       effectiveEndDate = new Date(periodoFinal);
-      effectiveEndDate.setHours(23, 59, 59, 999);
+      // Se não foram datas personalizadas, ajusta para o final do dia
+      // Se foram datas personalizadas, mantém as horas definidas
+      if (!isCustomDates) {
+        effectiveEndDate.setHours(23, 59, 59, 999);
+      }
     } else if (allVendasData.length > 0) {
       // Se o período for 'todos', determina o intervalo de datas a partir dos dados obtidos
       const dates = allVendasData.map((venda: any) => new Date(venda.dataCriacao));
