@@ -581,7 +581,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         clearTimeout(debounceTimerRef.current)
       }
     }
-  }, [searchQuery, statusFilter, tipoVendaFilter, meioPagamentoFilter, usuarioAbertoPorFilter, terminalFilter, usuarioCancelouFilter, periodo, periodoInicial, periodoFinal, fetchVendas])
+  }, [searchQuery, valorMinimo, valorMaximo, statusFilter, tipoVendaFilter, meioPagamentoFilter, usuarioAbertoPorFilter, terminalFilter, usuarioCancelouFilter, periodo, periodoInicial, periodoFinal, fetchVendas])
 
   // Efeito para carregar dados auxiliares e iniciar a busca de vendas
   useEffect(() => {

@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { Suspense, useState, useRef, useEffect } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'; // Importa os ícones
+import { ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react'; // Importa os ícones
 import { Skeleton, FormControl, Select, MenuItem, FormGroup, FormControlLabel, Checkbox, Popover } from '@mui/material'
 import { motion } from 'framer-motion'; // Importar motion do Framer Motion
 import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto' // Importar a entidade
@@ -209,6 +209,17 @@ export default function DashboardPage() {
     }
   };
 
+  /**
+   * Limpa todos os filtros e retorna ao padrão (Últimos 7 Dias)
+   */
+  const handleLimparFiltros = () => {
+    setPeriodo('Últimos 7 Dias')
+    setPeriodoInicial(null)
+    setPeriodoFinal(null)
+    setIsDatasModalOpen(false)
+    setAnchorEl(null)
+  };
+
   return (
     <motion.div
       variants={containerVariants}
@@ -257,6 +268,16 @@ export default function DashboardPage() {
         >
           <MdCalendarToday size={10} />
           Por datas
+        </button>
+
+        {/* Botão Limpar Filtros */}
+        <button
+          onClick={handleLimparFiltros}
+          className="h-6 px-4 bg-gray-500 text-white rounded-lg flex items-center gap-2 text-sm font-nunito hover:bg-gray-600 transition-colors"
+          title="Limpar filtros e voltar ao padrão (Últimos 7 Dias)"
+        >
+          <RotateCcw size={12} />
+          Limpar
         </button>
       </motion.div>
 
