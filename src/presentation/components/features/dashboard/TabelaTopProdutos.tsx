@@ -8,13 +8,15 @@ import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto'
 interface TabelaTopProdutosProps {
   periodo: string;
   onDataLoad: (data: DashboardTopProduto[]) => void; // Nova prop
+  periodoInicial?: Date | null;
+  periodoFinal?: Date | null;
 }
 
 /**
  * Tabela de top produtos vendidos
  * Design clean e minimalista usando divs e flexbox
  */
-export function TabelaTopProdutos({ periodo, onDataLoad }: TabelaTopProdutosProps) {
+export function TabelaTopProdutos({ periodo, onDataLoad, periodoInicial, periodoFinal }: TabelaTopProdutosProps) {
   const [data, setData] = useState<DashboardTopProduto[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -40,7 +42,9 @@ export function TabelaTopProdutos({ periodo, onDataLoad }: TabelaTopProdutosProp
       try {
         const useCase = new BuscarTopProdutosDetalhadoUseCase()
         const mappedPeriodo = mapPeriodoToUseCaseFormat(periodo);
-        const produtos = await useCase.execute(mappedPeriodo, 10)
+        // Se período for "Datas Personalizadas", usa as datas fornecidas
+        const useCustomDates = periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal;
+        const produtos = await useCase.execute(mappedPeriodo, 10, useCustomDates ? periodoInicial : undefined, useCustomDates ? periodoFinal : undefined)
         setData(produtos)
         onDataLoad(produtos); 
       } catch (err) {
@@ -51,7 +55,7 @@ export function TabelaTopProdutos({ periodo, onDataLoad }: TabelaTopProdutosProp
     }
 
     loadData()
-  }, [periodo, onDataLoad])
+  }, [periodo, onDataLoad, periodoInicial, periodoFinal])
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {

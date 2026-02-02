@@ -85,7 +85,12 @@ function getPeriodoDates(periodo: string): PeriodoDates {
 }
 
 export class BuscarTopProdutosDetalhadoUseCase {
-  async execute(periodo: string = 'hoje', limit: number = 10): Promise<DashboardTopProduto[]> {
+  async execute(
+    periodo: string = 'hoje', 
+    limit: number = 10,
+    periodoInicialCustom?: Date | null,
+    periodoFinalCustom?: Date | null
+  ): Promise<DashboardTopProduto[]> {
     const { auth } = useAuthStore.getState();
     const token = auth?.getAccessToken();
     const baseUrl = process.env.NEXT_PUBLIC_EXTERNAL_API_BASE_URL;
@@ -99,12 +104,19 @@ export class BuscarTopProdutosDetalhadoUseCase {
       'Authorization': `Bearer ${token}`,
     };
 
-    const { periodoInicial, periodoFinal } = getPeriodoDates(periodo);
     const params = new URLSearchParams();
 
-    if (periodoInicial && periodoFinal) {
-      params.append('periodoInicial', periodoInicial);
-      params.append('periodoFinal', periodoFinal);
+    // Se datas personalizadas foram fornecidas, usa elas
+    if (periodoInicialCustom && periodoFinalCustom) {
+      params.append('periodoInicial', periodoInicialCustom.toISOString());
+      params.append('periodoFinal', periodoFinalCustom.toISOString());
+    } else {
+      // Caso contrário, usa a função de cálculo de período
+      const { periodoInicial, periodoFinal } = getPeriodoDates(periodo);
+      if (periodoInicial && periodoFinal) {
+        params.append('periodoInicial', periodoInicial);
+        params.append('periodoFinal', periodoFinal);
+      }
     }
     params.append('status', 'FINALIZADA'); // Apenas vendas finalizadas
     params.append('limit', '100'); // Adicionado para buscar todos os itens (ou um número grande o suficiente)
