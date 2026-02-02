@@ -11,13 +11,15 @@ import { calculatePeriodo } from '@/src/shared/utils/dateFilters' // Importar ca
 
 interface MetricCardsProps {
   periodo: string;
+  periodoInicial?: Date | null;
+  periodoFinal?: Date | null;
 }
 
 /**
  * Cards de métricas do dashboard
  * Design clean e minimalista com cantos arredondados
  */
-export function MetricCards({ periodo }: MetricCardsProps) {
+export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCardsProps) {
   const router = useRouter() // Obter instância do router
   const [dataTotal, setDataTotal] = useState<DashboardVendas | null>(null);
   const [dataFinalizadas, setDataFinalizadas] = useState<DashboardVendas | null>(null);
@@ -48,10 +50,12 @@ export function MetricCards({ periodo }: MetricCardsProps) {
       try {
         const useCase = new BuscarVendasDashboardUseCase();
         const mappedPeriodo = mapPeriodoToUseCaseFormat(periodo);
-        const total = await useCase.execute(mappedPeriodo, ['FINALIZADA', 'CANCELADA']);
-        const finalizadas = await useCase.execute(mappedPeriodo, ['FINALIZADA']);
-        const canceladas = await useCase.execute(mappedPeriodo, ['CANCELADA']);
-        const abertas = await useCase.execute(mappedPeriodo, ['ABERTA']);
+        // Se período for "Datas Personalizadas", usa as datas fornecidas
+        const useCustomDates = periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal;
+        const total = await useCase.execute(mappedPeriodo, ['FINALIZADA', 'CANCELADA'], useCustomDates ? periodoInicial : undefined, useCustomDates ? periodoFinal : undefined);
+        const finalizadas = await useCase.execute(mappedPeriodo, ['FINALIZADA'], useCustomDates ? periodoInicial : undefined, useCustomDates ? periodoFinal : undefined);
+        const canceladas = await useCase.execute(mappedPeriodo, ['CANCELADA'], useCustomDates ? periodoInicial : undefined, useCustomDates ? periodoFinal : undefined);
+        const abertas = await useCase.execute(mappedPeriodo, ['ABERTA'], useCustomDates ? periodoInicial : undefined, useCustomDates ? periodoFinal : undefined);
         
         setDataTotal(total);
         setDataFinalizadas(finalizadas);
@@ -66,7 +70,7 @@ export function MetricCards({ periodo }: MetricCardsProps) {
     };
 
     loadData();
-  }, [periodo]);
+  }, [periodo, periodoInicial, periodoFinal]);
 
   const formatCurrency = (value?: number) => {
     if (!value) return 'R$ 0,00'
@@ -176,6 +180,8 @@ export function MetricCards({ periodo }: MetricCardsProps) {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         periodo={periodo}
+        periodoInicial={periodoInicial}
+        periodoFinal={periodoFinal}
       />
     </>
   )

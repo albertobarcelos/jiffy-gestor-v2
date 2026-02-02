@@ -44,6 +44,8 @@ interface ProdutoLancado {
   lancadoPorId: string
   vendaId: string
   removido: boolean
+  removidoPorId?: string
+  dataRemocao?: string
 }
 
 interface Complemento {
@@ -60,6 +62,7 @@ interface Pagamento {
   realizadoPorId: string
   canceladoPorId?: string
   cancelado: boolean
+  dataCancelamento?: string
   isTefUsed?: boolean; // Adicionado
   isTefConfirmed?: boolean; // Adicionado
 }
@@ -302,9 +305,11 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
       if (data.ultimoResponsavelId) userIdsToFetch.add(data.ultimoResponsavelId)
       data.produtosLancados?.forEach((p) => {
         if (p.lancadoPorId) userIdsToFetch.add(p.lancadoPorId)
+        if (p.removidoPorId) userIdsToFetch.add(p.removidoPorId)
       })
       data.pagamentos?.forEach((p) => {
         if (p.realizadoPorId) userIdsToFetch.add(p.realizadoPorId)
+        if (p.canceladoPorId) userIdsToFetch.add(p.canceladoPorId)
       })
 
       // Coleta todos os IDs de meios de pagamento únicos que precisam ser buscados
@@ -466,8 +471,8 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                     <span>{nomesUsuarios[venda.abertoPorId] || venda.abertoPorId}</span>
                   </div>
 
-                  {/* Finalizado Por */}
-                  {venda.ultimoResponsavelId && (
+                  {/* Finalizado Por - Só exibe se a venda não foi cancelada */}
+                  {venda.ultimoResponsavelId && !venda.canceladoPorId && (
                     <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
                       <span>
                         Finalizado Por: 
@@ -478,11 +483,21 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
 
                   {/* Cancelado Por */}
                   {venda.canceladoPorId && (
-                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                    <div className="flex justify-between text-sm text-error font-nunito px-3 rounded-lg bg-white">
                       <span>
                         Cancelado Por: 
                       </span>
-                      <span>{nomesUsuarios[venda.canceladoPorId] || venda.canceladoPorId}</span>
+                      <span className="font-semibold">{nomesUsuarios[venda.canceladoPorId] || venda.canceladoPorId}</span>
+                    </div>
+                  )}
+
+                  {/* Data/Hora de Cancelamento */}
+                  {venda.dataCancelamento && (
+                    <div className="flex justify-between text-sm text-error font-nunito px-3 rounded-lg bg-white">
+                      <span>
+                        Cancelado em:
+                      </span>
+                      <span className="font-semibold">{formatDateTime(venda.dataCancelamento)}</span>
                     </div>
                   )}
 
@@ -545,6 +560,8 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                   {venda.produtosLancados?.map((produto, index) => {
                     const valorTotal = calcularValorProduto(produto)
                     const isRemovido = produto.removido
+                    // Se o produto foi removido, o valor total exibido deve ser R$ 0,00
+                    const valorExibir = isRemovido ? 0 : valorTotal
 
                     return (
                       <div
@@ -599,7 +616,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                               return null
                             })()}
                             <div className="flex-1 flex items-center justify-end text-sm font-semibold text-primary-text font-nunito">
-                              {formatCurrency(valorTotal)}
+                              {formatCurrency(valorExibir)}
                             </div>
                           </div>
 
@@ -633,6 +650,18 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                             Lançado: {formatDateTime(produto.dataLancamento)} | Usuário:{' '}
                             {nomesUsuarios[produto.lancadoPorId] || produto.lancadoPorId}
                           </div>
+
+                          {/* Informações de remoção (se produto foi removido) */}
+                          {isRemovido && produto.removidoPorId && (
+                            <div className="text-xs text-error mt-1 ml-7">
+                              Removido por: {nomesUsuarios[produto.removidoPorId] || produto.removidoPorId}
+                            </div>
+                          )}
+                          {isRemovido && produto.dataRemocao && (
+                            <div className="text-xs text-error ml-7">
+                              Removido em: {formatDateTime(produto.dataRemocao)}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )
@@ -662,27 +691,15 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                 <div className="space-y-2">
                   {venda.pagamentos
                     ?.filter((p) => {
-                      // Regra 1: Se `canceled` for `true`, NÃO exibir o meio de pagamento.
-                      if (p.cancelado === true) {
-                        return false;
-                      }
-
-                      // Regra 2: Se `isTefUsed` for `true` E `isTefConfirmed` for `false`, NÃO exibir.
-                      // Tratamos `isTefUsed` e `isTefConfirmed` como false se forem undefined/null para a comparação.
-                      const isUsed = p.isTefUsed === true;
-                      const isConfirmed = p.isTefConfirmed === true;
-                      if (isUsed && !isConfirmed) {
-                        return false;
-                      }
-
-                      // Regra 3: Em todos os outros casos, EXIBIR o meio de pagamento.
-                      // O campo 'tf' (representado por `isTefUsed`) não impede a exibição por si só quando falso,
-                      // desde que não caia nas regras de não exibição acima.
+                      // Exibe todos os pagamentos, exceto os cancelados (que são exibidos com cor vermelha)
+                      // Removida a regra que ocultava pagamentos TEF não confirmados
+                      // Todos os pagamentos serão exibidos, independentemente do status TEF
                       return true;
                     })
                     .map((pagamento, index) => {
                       const meio = nomesMeiosPagamento[pagamento.meioPagamentoId]
                       const formaPagamento = meio?.formaPagamentoFiscal || ''
+                      const isCancelado = pagamento.cancelado === true
 
                       const getIcon = () => {
                         if (formaPagamento.toLowerCase().includes('dinheiro')) return '💵'
@@ -692,13 +709,25 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                       }
 
                       return (
-                        <div key={index} className="px-3 py-2 rounded-lg bg-[#4BD08A] flex items-center gap-3">
-                          <div className="w-[68px] h-[62px] rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
+                        <div 
+                          key={index} 
+                          className={`px-3 py-2 rounded-lg flex items-center gap-3 ${
+                            isCancelado ? 'bg-error/20' : 'bg-[#4BD08A]'
+                          }`}
+                        >
+                          <div className={`w-[68px] h-[62px] rounded-lg flex items-center justify-center flex-shrink-0 ${
+                            isCancelado ? 'bg-error/30' : 'bg-primary'
+                          }`}>
                             <span className="text-white text-2xl">{getIcon()}</span>
                           </div>
                           <div className="flex-1">
                             <div className="text-sm font-bold text-primary-text font-nunito">
                               {meio?.nome || 'Meio de pagamento desconhecido'}
+                              {isCancelado && (
+                                <span className="ml-2 text-xs text-error font-semibold">
+                                  (CANCELADO)
+                                </span>
+                              )}
                             </div>
                             <div className="text-xs text-secondary-text font-nunito">
                               {formatDateTime(pagamento.dataCriacao)}
@@ -709,6 +738,16 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                             <div className="text-xs text-secondary-text font-nunito">
                               PDV Resp.: {nomesUsuarios[pagamento.realizadoPorId] || pagamento.realizadoPorId}
                             </div>
+                            {isCancelado && pagamento.canceladoPorId && (
+                              <div className="text-xs text-error font-nunito mt-1">
+                                Cancelado por: {nomesUsuarios[pagamento.canceladoPorId] || pagamento.canceladoPorId}
+                              </div>
+                            )}
+                            {isCancelado && pagamento.dataCancelamento && (
+                              <div className="text-xs text-error font-nunito">
+                                Cancelado em: {formatDateTime(pagamento.dataCancelamento)}
+                              </div>
+                            )}
                           </div>
                         </div>
                       )

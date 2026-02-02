@@ -27,6 +27,9 @@ export function ImpressorasTabsModal({
 }: ImpressorasTabsModalProps) {
   const impressoraId = state.impressoraId
 
+  // Debug: verificar se o modal está sendo renderizado
+  console.log('ImpressorasTabsModal renderizado - state:', state)
+
   return (
     <Dialog
       open={state.open}
@@ -38,10 +41,15 @@ export function ImpressorasTabsModal({
       fullWidth
       maxWidth="xl"
       sx={{
+        zIndex: '2000 !important', // z-index muito alto para aparecer sobre todos os modais
         '& .MuiDialog-container': {
           justifyContent: 'flex-end',
           alignItems: 'stretch',
           margin: 0,
+          zIndex: 2000,
+        },
+        '& .MuiBackdrop-root': {
+          zIndex: '1999 !important', // backdrop um nível abaixo do modal
         },
       }}
       PaperProps={{
@@ -53,6 +61,7 @@ export function ImpressorasTabsModal({
           borderRadius: 0,
           display: 'flex',
           flexDirection: 'column',
+          zIndex: '2000 !important', // z-index muito alto para o Paper também
         },
       }}
     >
