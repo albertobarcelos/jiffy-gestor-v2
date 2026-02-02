@@ -64,13 +64,25 @@ function getPeriodoDates(periodo: string): PeriodoDates {
 }
 
 export class BuscarVendasDashboardUseCase {
-  async execute(periodo: string = 'hoje', statuses: string[] = []): Promise<DashboardVendas> {
-    const { periodoInicial, periodoFinal } = getPeriodoDates(periodo);
+  async execute(
+    periodo: string = 'hoje', 
+    statuses: string[] = [],
+    periodoInicialCustom?: Date | null,
+    periodoFinalCustom?: Date | null
+  ): Promise<DashboardVendas> {
     const params = new URLSearchParams();
     
-    if (periodoInicial && periodoFinal) {
-      params.append('periodoInicial', periodoInicial);
-      params.append('periodoFinal', periodoFinal);
+    // Se datas personalizadas foram fornecidas, usa elas
+    if (periodoInicialCustom && periodoFinalCustom) {
+      params.append('periodoInicial', periodoInicialCustom.toISOString());
+      params.append('periodoFinal', periodoFinalCustom.toISOString());
+    } else {
+      // Caso contrário, usa a função de cálculo de período
+      const { periodoInicial, periodoFinal } = getPeriodoDates(periodo);
+      if (periodoInicial && periodoFinal) {
+        params.append('periodoInicial', periodoInicial);
+        params.append('periodoFinal', periodoFinal);
+      }
     }
 
     statuses.forEach(status => params.append('status', status));

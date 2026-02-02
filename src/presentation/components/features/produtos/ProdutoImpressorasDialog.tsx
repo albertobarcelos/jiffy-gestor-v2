@@ -13,6 +13,10 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { MdAdd, MdClose, MdDelete, MdPrint, MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
+import {
+  ImpressorasTabsModal,
+  ImpressorasTabsModalState,
+} from '@/src/presentation/components/features/impressoras/ImpressorasTabsModal'
 
 interface ProdutoImpressora {
   id: string
@@ -55,6 +59,11 @@ export function ProdutoImpressorasDialog({
   const [selectSearch, setSelectSearch] = useState('')
   const [tempSelection, setTempSelection] = useState<string[]>([])
   const [isSavingSelection, setIsSavingSelection] = useState(false)
+  const [impressorasModalState, setImpressorasModalState] = useState<ImpressorasTabsModalState>({
+    open: false,
+    tab: 'impressora',
+    mode: 'create',
+  })
 
   const loadImpressoras = useCallback(async () => {
     if (!open || !produtoId) return
@@ -174,6 +183,11 @@ export function ProdutoImpressorasDialog({
     }
   }, [open, loadImpressoras])
 
+  // Debug: monitorar mudanças no estado do modal de impressoras
+  useEffect(() => {
+    console.log('impressorasModalState atualizado:', impressorasModalState)
+  }, [impressorasModalState])
+
   const filteredImpressoras = useMemo(() => {
     if (!searchQuery.trim()) {
       return impressoras
@@ -222,6 +236,34 @@ export function ProdutoImpressorasDialog({
     setSelectSearch('')
     setTempSelection(impressoras.map((item) => item.id))
     setIsSelectDialogOpen(false)
+  }
+
+  const handleOpenNovaImpressora = () => {
+    console.log('handleOpenNovaImpressora chamado')
+    // Fechar o dialog de seleção antes de abrir o modal de criação
+    setIsSelectDialogOpen(false)
+    // Aguardar um pouco para garantir que o dialog foi fechado
+    setTimeout(() => {
+      setImpressorasModalState({
+        open: true,
+        tab: 'impressora',
+        mode: 'create',
+      })
+      console.log('Estado atualizado:', { open: true, tab: 'impressora', mode: 'create' })
+    }, 100)
+  }
+
+  const handleCloseImpressorasModal = () => {
+    setImpressorasModalState((prev) => ({ ...prev, open: false }))
+  }
+
+  const handleImpressorasModalReload = () => {
+    // Recarregar lista de impressoras disponíveis quando uma nova for criada
+    loadAllImpressoras()
+  }
+
+  const handleImpressorasTabChange = (tab: 'impressora') => {
+    setImpressorasModalState((prev) => ({ ...prev, tab }))
   }
 
   const handleToggleSelection = (id: string) => {
@@ -448,6 +490,7 @@ export function ProdutoImpressorasDialog({
         <div className="md:text-lg text-sm font-semibold text-primary-text">Selecionar impressoras</div>
         <button
           type="button"
+          onClick={handleOpenNovaImpressora}
           className="md:h-8 px-6 py-2 mb-2 md:mb-0 rounded-lg bg-primary text-info md:text-sm text-xs font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
           aria-label="Criar nova impressora"
         >
@@ -534,6 +577,20 @@ export function ProdutoImpressorasDialog({
       ? createPortal(selectionDialog, document.getElementById('modal-root') ?? document.body)
       : selectionDialog
 
+  const impressorasModalNode = impressorasModalState.open ? (
+    <ImpressorasTabsModal
+      state={impressorasModalState}
+      onClose={handleCloseImpressorasModal}
+      onReload={handleImpressorasModalReload}
+      onTabChange={handleImpressorasTabChange}
+    />
+  ) : null
+
+  const impressorasModalPortal =
+    typeof document !== 'undefined' && impressorasModalNode
+      ? createPortal(impressorasModalNode, document.body)
+      : impressorasModalNode
+
   if (isEmbedded) {
     return (
       <>
@@ -551,6 +608,7 @@ export function ProdutoImpressorasDialog({
           </div>
         </div>
         {selectionDialogNode}
+        {impressorasModalPortal}
       </>
     )
   }
@@ -609,6 +667,7 @@ export function ProdutoImpressorasDialog({
       </Dialog>
 
       {selectionDialogNode}
+      {impressorasModalPortal}
     </>
   )
 }

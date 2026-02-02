@@ -12,7 +12,12 @@ interface TopProdutoApiResponse {
 }
 
 export class BuscarTopProdutosDetalhadoUseCase {
-  async execute(periodo: string = 'hoje', limit: number = 10): Promise<DashboardTopProduto[]> {
+  async execute(
+    periodo: string = 'hoje',
+    limit: number = 10,
+    periodoInicialCustom?: Date | null,
+    periodoFinalCustom?: Date | null
+  ): Promise<DashboardTopProduto[]> {
     const { auth } = useAuthStore.getState()
     const token = auth?.getAccessToken()
 
@@ -23,6 +28,12 @@ export class BuscarTopProdutosDetalhadoUseCase {
     const params = new URLSearchParams()
     params.append('periodo', periodo)
     params.append('limit', limit.toString())
+
+    // Se datas personalizadas foram fornecidas, passa elas para a API
+    if (periodoInicialCustom && periodoFinalCustom) {
+      params.append('periodoInicial', periodoInicialCustom.toISOString())
+      params.append('periodoFinal', periodoFinalCustom.toISOString())
+    }
 
     const response = await fetch(`/api/dashboard/top-produtos?${params.toString()}`, {
       headers: {

@@ -16,6 +16,12 @@ interface TerminalData {
   rawData: any // Dados brutos da API para campos extras
 }
 
+interface TerminalPreferenceData {
+  compartilharMesas: boolean
+  impressoraFinalizacaoNome: string
+  impressoraFinalizacaoId?: string
+}
+
 export function TerminaisTab() {
   const { auth } = useAuthStore()
   const [terminais, setTerminais] = useState<TerminalData[]>([])
@@ -23,6 +29,11 @@ export function TerminaisTab() {
   const [searchQuery, setSearchQuery] = useState('')
   const [totalItems, setTotalItems] = useState(0)
   const [togglingStatus, setTogglingStatus] = useState<Record<string, boolean>>({})
+  const [preferencesMap, setPreferencesMap] = useState<Record<string, TerminalPreferenceData>>({})
+  const [updatingShare, setUpdatingShare] = useState<Record<string, boolean>>({})
+  const [updatingPrinter, setUpdatingPrinter] = useState<Record<string, boolean>>({})
+  const [impressoras, setImpressoras] = useState<Array<{ id: string; nome: string }>>([])
+  const [loadingImpressoras, setLoadingImpressoras] = useState(false)
   const [tabsModalState, setTabsModalState] = useState<TerminaisTabsModalState>({
     open: false,
     tab: 'terminal',
@@ -118,6 +129,70 @@ export function TerminaisTab() {
 
         setTerminais(allTerminais)
         setTotalItems(totalCount)
+
+        // Buscar preferências (compartilhar mesas e impressora) para cada terminal
+        try {
+          const prefsEntries = await Promise.all(
+            allTerminais.map(async (item) => {
+              try {
+                const resp = await fetch(`/api/preferencias-terminal/${item.terminal.getId()}`, {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                })
+
+                if (!resp.ok) {
+                  return null
+                }
+
+                const data = await resp.json()
+                const impressoraId =
+                  data.impressoraFinalizacaoId ||
+                  data.impressoraFinalizacao?.id ||
+                  data.impressoraFinalizacao?.impressoraId ||
+                  data.impressoraFinalizacao?.impressora?.id
+                const impressoraNome =
+                  data.impressoraFinalizacao?.name ||
+                  data.impressoraFinalizacao?.nome ||
+                  data.impressoraFinalizacaoNome ||
+                  data.impressoraFinalizacao?.impressora?.nome ||
+                  data.impressoraFinalizacao?.impressora?.name ||
+                  'Nenhuma'
+                return {
+                  terminalId: item.terminal.getId(),
+                  compartilharMesas: !!data.compartilharMesas,
+                  impressoraFinalizacaoNome: impressoraNome,
+                  impressoraFinalizacaoId: impressoraId,
+                }
+              } catch {
+                return null
+              }
+            })
+          )
+
+          const prefsMap = prefsEntries
+            .filter(
+              (p): p is {
+                terminalId: string
+                compartilharMesas: boolean
+                impressoraFinalizacaoNome: string
+                impressoraFinalizacaoId: string | undefined
+              } => !!p
+            )
+            .reduce<Record<string, TerminalPreferenceData>>((acc, curr) => {
+              acc[curr.terminalId] = {
+                compartilharMesas: curr.compartilharMesas,
+                impressoraFinalizacaoNome: curr.impressoraFinalizacaoNome,
+                impressoraFinalizacaoId: curr.impressoraFinalizacaoId,
+              }
+              return acc
+            }, {})
+
+          setPreferencesMap(prefsMap)
+        } catch (error) {
+          console.warn('Não foi possível carregar preferências dos terminais', error)
+        }
       } catch (error) {
         console.error('Erro ao carregar terminais:', error)
       } finally {
@@ -126,6 +201,55 @@ export function TerminaisTab() {
     },
     [auth]
   )
+
+  const loadAllImpressoras = useCallback(async () => {
+    const token = auth?.getAccessToken()
+    if (!token) return
+
+    setLoadingImpressoras(true)
+    try {
+      const all: Array<{ id: string; nome: string }> = []
+      let currentOffset = 0
+      let hasMore = true
+      const limit = 50
+
+      while (hasMore) {
+        const params = new URLSearchParams({
+          limit: limit.toString(),
+          offset: currentOffset.toString(),
+        })
+
+        const resp = await fetch(`/api/impressoras?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (!resp.ok) {
+          const errorData = await resp.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Erro ao buscar impressoras')
+        }
+
+        const data = await resp.json()
+        const list = (data.items || []).map((i: any) => ({
+          id: i.id,
+          nome: i.nome || 'Sem nome',
+        }))
+        all.push(...list)
+
+        hasMore = list.length === limit
+        currentOffset += list.length
+      }
+
+      setImpressoras(all)
+    } catch (error) {
+      console.error('Erro ao carregar impressoras:', error)
+      showToast.error('Erro ao carregar impressoras')
+    } finally {
+      setLoadingImpressoras(false)
+    }
+  }, [auth])
 
   // Debounce para busca
   useEffect(() => {
@@ -217,9 +341,136 @@ export function TerminaisTab() {
     [auth, terminais, loadAllTerminais]
   )
 
+  const handleToggleCompartilhar = useCallback(
+    async (terminalId: string, novoValor: boolean) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      setUpdatingShare((prev) => ({ ...prev, [terminalId]: true }))
+      setPreferencesMap((prev) => ({
+        ...prev,
+        [terminalId]: {
+          compartilharMesas: novoValor,
+          impressoraFinalizacaoNome: prev[terminalId]?.impressoraFinalizacaoNome || 'Nenhuma',
+        },
+      }))
+
+      try {
+        const response = await fetch(`/api/preferencias-terminal`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            terminaisId: terminalId,
+            fields: {
+              compartilharMesas: novoValor,
+            },
+          }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Erro ao atualizar preferências')
+        }
+
+        showToast.success('Preferência de compartilhamento atualizada!')
+      } catch (error: any) {
+        console.error('Erro ao atualizar compartilhamento:', error)
+        showToast.error(error.message || 'Erro ao atualizar compartilhamento')
+        setPreferencesMap((prev) => ({
+          ...prev,
+          [terminalId]: {
+            compartilharMesas: !novoValor,
+            impressoraFinalizacaoNome: prev[terminalId]?.impressoraFinalizacaoNome || 'Nenhuma',
+          },
+        }))
+      } finally {
+        setUpdatingShare((prev) => {
+          const { [terminalId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [auth]
+  )
+
+  const handleChangeImpressora = useCallback(
+    async (terminalId: string, impressoraId: string) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      setUpdatingPrinter((prev) => ({ ...prev, [terminalId]: true }))
+
+      const impressoraNome =
+        impressoras.find((i) => i.id === impressoraId)?.nome || 'Nenhuma'
+
+      setPreferencesMap((prev) => ({
+        ...prev,
+        [terminalId]: {
+          compartilharMesas: prev[terminalId]?.compartilharMesas ?? false,
+          impressoraFinalizacaoNome: impressoraNome,
+          impressoraFinalizacaoId: impressoraId || undefined,
+        },
+      }))
+
+      try {
+        const response = await fetch(`/api/preferencias-terminal`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            terminaisId: terminalId,
+            fields: {
+              impressoraFinalizacaoId: impressoraId || null,
+            },
+          }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Erro ao atualizar impressora de finalização')
+        }
+
+        showToast.success('Impressora de finalização atualizada!')
+      } catch (error: any) {
+        console.error('Erro ao atualizar impressora de finalização:', error)
+        showToast.error(error.message || 'Erro ao atualizar impressora de finalização')
+
+        // Reverte para o valor anterior
+        setPreferencesMap((prev) => ({
+          ...prev,
+          [terminalId]: {
+            compartilharMesas: prev[terminalId]?.compartilharMesas ?? false,
+            impressoraFinalizacaoNome:
+              impressoras.find((i) => i.id === prev[terminalId]?.impressoraFinalizacaoId)?.nome ||
+              'Nenhuma',
+            impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId,
+          },
+        }))
+      } finally {
+        setUpdatingPrinter((prev) => {
+          const { [terminalId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [auth, impressoras]
+  )
+
   // Carrega dados iniciais
   useEffect(() => {
     loadAllTerminais()
+    loadAllImpressoras()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -283,6 +534,12 @@ export function TerminaisTab() {
             <div className="flex-[1.5] font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Versão APK
             </div>
+            <div className="flex-[2] font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
+              Impressora Finalização
+            </div>
+            <div className="flex-[1.5] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
+              Compartilhar Mesas
+            </div>
             <div className="md:flex-[1.5] flex-[1] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Status
             </div>
@@ -304,6 +561,9 @@ export function TerminaisTab() {
           // Status: bloqueado = false significa ATIVO, bloqueado = true significa BLOQUEADO/INATIVO
           const bloqueado = rawData?.bloqueado ?? terminal.getBloqueado()
           const ativo = !bloqueado
+          const prefs = preferencesMap[terminal.getId()]
+          const compartilhamentoAtivo = prefs?.compartilharMesas ?? false
+          const impressoraFinalizacaoNome = prefs?.impressoraFinalizacaoNome ?? '—'
 
           return (
               <div
@@ -333,7 +593,51 @@ export function TerminaisTab() {
               <div className="flex-[1.5] md:text-sm text-[10px] text-secondary-text font-nunito">
                 {versao}
               </div>
-              <div className="md:flex-[1.5] flex-[1] justify-center">
+              <div className="flex-[2] md:text-sm text-[10px] text-secondary-text font-nunito">
+                {preferencesMap[terminal.getId()] ? (
+                  <select
+                    value={preferencesMap[terminal.getId()]?.impressoraFinalizacaoId ?? ''}
+                    onChange={(event) => {
+                      event.stopPropagation()
+                      handleChangeImpressora(terminal.getId(), event.target.value)
+                    }}
+                    onClick={(event) => event.stopPropagation()}
+                    disabled={updatingPrinter[terminal.getId()] || loadingImpressoras}
+                    className="w-full max-w-[220px] h-8 rounded-lg border border-gray-200 bg-white md:text-sm text-xs text-primary-text px-2 focus:outline-none focus:border-primary"
+                  >
+                    <option value="">Nenhuma</option>
+                    {impressoras.map((imp) => (
+                      <option key={imp.id} value={imp.id}>
+                        {imp.nome}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="md:text-xs text-[10px] text-secondary-text">Carregando...</div>
+                )}
+              </div>
+              <div className="flex-[1.5] flex justify-center">
+                <label
+                  className={`relative inline-flex h-4 w-10 md:h-5 md:w-12 items-center ${
+                    updatingShare[terminal.getId()] ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+                  }`}
+                  title={compartilhamentoAtivo ? 'Compartilhamento habilitado' : 'Compartilhamento desabilitado'}
+                >
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={compartilhamentoAtivo}
+                    onChange={(event) => {
+                      event.stopPropagation();
+                      handleToggleCompartilhar(terminal.getId(), event.target.checked)
+                    }}
+                    disabled={!!updatingShare[terminal.getId()]}
+                  />
+                  <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
+                  <span className="absolute left-[2px] top-1/2 block h-[14px] w-[14px] md:h-4 md:w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[18px] md:peer-checked:translate-x-[28px]" />
+                </label>
+              </div>
+              <div className="md:flex-[1.5] flex-[1] flex justify-center">
                 <label
                   className={`relative inline-flex h-4 w-10 md:h-5 md:w-12 items-center ${
                     togglingStatus[terminal.getId()]

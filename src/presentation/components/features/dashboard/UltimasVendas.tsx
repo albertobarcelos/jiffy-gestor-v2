@@ -19,6 +19,8 @@ interface UserPdvApiResponse {
 
 interface UltimasVendasProps {
   periodo: string;
+  periodoInicial?: Date | null;
+  periodoFinal?: Date | null;
 }
 
 const LAST_SALES_DISPLAY_LIMIT = 10; // Definir o limite de últimas vendas a serem exibidas
@@ -27,7 +29,7 @@ const LAST_SALES_DISPLAY_LIMIT = 10; // Definir o limite de últimas vendas a se
  * Componente de Últimas Vendas
  * Design clean inspirado no exemplo
  */
-export function UltimasVendas({ periodo }: UltimasVendasProps) {
+export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: UltimasVendasProps) {
   const [vendas, setVendas] = useState<Venda[]>([])
   const [userNames, setUserNames] = useState<UserNamesMap>({})
   const [isLoading, setIsLoading] = useState(true)
@@ -90,22 +92,26 @@ export function UltimasVendas({ periodo }: UltimasVendasProps) {
         // Buscar últimas vendas da API
         const baseUrl = process.env.NEXT_PUBLIC_EXTERNAL_API_BASE_URL || ''
 
-        // Calcular data com base na prop periodo
-        const mappedPeriodo = mapPeriodoToCalculateFormat(periodo);
-        const { inicio, fim } = calculatePeriodo(mappedPeriodo);
-
         // Buscar vendas finalizadas, ordenadas por data (mais recentes primeiro)
         const params = new URLSearchParams({
           limit: '100', // Aumentado para buscar mais vendas no período
           offset: '0',
         })
         
-        // Só adiciona parâmetros de data se não for "Todos"
-        if (mappedPeriodo !== 'Todos' && inicio && fim) {
-          const periodoInicial = inicio.toISOString();
-          const periodoFinal = fim.toISOString();
-          params.append('periodoInicial', periodoInicial);
-          params.append('periodoFinal', periodoFinal);
+        // Se período for "Datas Personalizadas" e datas foram fornecidas, usa elas
+        if (periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) {
+          params.append('periodoInicial', periodoInicial.toISOString());
+          params.append('periodoFinal', periodoFinal.toISOString());
+        } else {
+          // Caso contrário, calcula com base no período
+          const mappedPeriodo = mapPeriodoToCalculateFormat(periodo);
+          const { inicio, fim } = calculatePeriodo(mappedPeriodo);
+          
+          // Só adiciona parâmetros de data se não for "Todos"
+          if (mappedPeriodo !== 'Todos' && inicio && fim) {
+            params.append('periodoInicial', inicio.toISOString());
+            params.append('periodoFinal', fim.toISOString());
+          }
         }
         
         params.append('status', 'FINALIZADA');
@@ -215,7 +221,7 @@ export function UltimasVendas({ periodo }: UltimasVendasProps) {
     }
 
     loadVendas()
-  }, [auth, periodo])
+  }, [auth, periodo, periodoInicial, periodoFinal])
 
 
   if (isLoading) {
@@ -235,8 +241,7 @@ export function UltimasVendas({ periodo }: UltimasVendasProps) {
     <>
       <div className="bg-white h-[390px] rounded-lg shadow-sm shadow-primary/70 border border-gray-200 p-6 overflow-y-auto scrollbar-hide">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-primary">Últimas Vendas</h3>
-          <span className="text-sm text-primary/70">Última semana</span>
+          <h3 className="text-lg font-semibold text-primary">Vendas do Período</h3>
         </div>
 
         <div className="space-y-4">
