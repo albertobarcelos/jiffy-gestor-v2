@@ -224,8 +224,9 @@ export default function DashboardPage() {
       className="space-y-2 bg-custom-2/50 p-2 rounded-lg mt-2"
     >
       {/* Barra de seleção de período */}
-      <motion.div variants={itemVariants} className="flex items-center justify-start gap-2 mt-2">
+      <motion.div variants={itemVariants} className="flex flex-col md:flex-row items-center justify-start gap-2 mt-2">
         <span className="text-primary text-sm font-exo">Período:</span>
+        <div className="flex flex-row items-center justify-start gap-2">
         <FormControl size="small" sx={{ minWidth: 120 }}>
           <Select
             value={periodo}
@@ -265,7 +266,7 @@ export default function DashboardPage() {
           <MdCalendarToday size={10} />
           Por datas
         </button>
-
+        </div>
         {/* Botão Limpar Filtros */}
         <button
           onClick={handleLimparFiltros}

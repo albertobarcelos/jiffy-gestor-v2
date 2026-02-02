@@ -534,11 +534,11 @@ export function TerminaisTab() {
             <div className="flex-[1.5] font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Versão APK
             </div>
-            <div className="flex-[2] font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
-              Impressora Finalização
+            <div className="flex-[2] font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase hidden md:flex">
+              Imp. Finalização
             </div>
             <div className="flex-[1.5] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
-              Compartilhar Mesas
+              Comp. Mesas
             </div>
             <div className="md:flex-[1.5] flex-[1] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Status
@@ -593,7 +593,7 @@ export function TerminaisTab() {
               <div className="flex-[1.5] md:text-sm text-[10px] text-secondary-text font-nunito">
                 {versao}
               </div>
-              <div className="flex-[2] md:text-sm text-[10px] text-secondary-text font-nunito">
+              <div className="flex-[2] md:text-sm text-[10px] text-secondary-text font-nunito hidden md:flex">
                 {preferencesMap[terminal.getId()] ? (
                   <select
                     value={preferencesMap[terminal.getId()]?.impressoraFinalizacaoId ?? ''}

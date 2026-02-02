@@ -710,9 +710,9 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
               }
 
               const movimentoTooltip =
-                `# Últ. produto - ${formatDiffTooltip(minutosUltimoProduto)}` +
+                `# Últ. prod. - ${formatDiffTooltip(minutosUltimoProduto)}` +
                 (minutosUltimaMov !== null && minutosUltimaMov !== undefined
-                  ? `\n\n# Últ. movimentação - ${formatDiffTooltip(minutosUltimaMov)}`
+                  ? `\n\n# Últ. mov. - ${formatDiffTooltip(minutosUltimaMov)}`
                   : '')
 
               // Cor baseada no tempo de movimentação (15 min -> 2h)

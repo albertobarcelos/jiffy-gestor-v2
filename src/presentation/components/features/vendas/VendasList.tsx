@@ -1063,7 +1063,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         {/* Tabela de Vendas */}
         <div className="bg-info rounded-lg overflow-hidden">
           {/* Cabeçalho */}
-          <div className="bg-custom-2 text-primary-text text-sm font-semibold font-nunito rounded-t-lg px-3 py-2 flex items-center gap-2">
+          <div className="bg-custom-2 text-primary-text text-sm font-semibold font-nunito rounded-t-lg md:px-3 py-2 flex items-center gap-2">
             <div className="flex-1 uppercase hidden md:flex">
               Código Venda
             </div>
@@ -1082,7 +1082,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             <div className="flex-1 text-xs md:text-sm uppercase">
               VL. Faturado
             </div>
-            <div className="flex-1 text-xs md:text-sm uppercase">
+            <div className="flex-1 text-xs md:text-sm uppercase hidden md:flex">
               VL. Cancelado
             </div>
             <div className="flex-1 justify-end  uppercase hidden md:flex">
@@ -1122,7 +1122,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                 <div
                   key={venda.id}
                   onClick={() => setSelectedVendaId(venda.id)} // Adicionado onClick para abrir detalhes
-                  className={`cursor-pointer px-2 py-1 rounded-lg flex items-center  hover:bg-primary/10 transition-all ${(() => {
+                  className={`cursor-pointer md:px-2 py-1 rounded-lg flex items-center  hover:bg-primary/10 transition-all ${(() => {
                     let baseClasses = ''
                     if (venda.dataCancelamento) {
                       baseClasses = 'bg-red-100 hover:bg-red-200'
@@ -1162,12 +1162,12 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                   <div className="flex-[2] text-center">
                     <span className="text-xs md:text-sm text-primary-text font-nunito">{usuarioNome}</span>
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 text-end">
                     <span className="text-xs md:text-sm text-primary-text font-nunito">
                       {venda.dataCancelamento ? '-' : formatCurrency(venda.valorFinal)}
                     </span>
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 hidden md:flex">
                     <span className="text-xs md:text-sm text-primary-text font-nunito">
                       {venda.dataCancelamento ? formatCurrency(venda.valorFinal) : '-'}
                     </span>

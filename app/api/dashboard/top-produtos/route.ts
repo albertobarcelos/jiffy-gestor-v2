@@ -78,13 +78,22 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const periodo = searchParams.get('periodo') || 'hoje'
   const limit = Number(searchParams.get('limit') || '10')
+  const periodoInicialCustom = searchParams.get('periodoInicial')
+  const periodoFinalCustom = searchParams.get('periodoFinal')
 
-  const { periodoInicial, periodoFinal } = getPeriodoDates(periodo)
   const params = new URLSearchParams()
 
-  if (periodoInicial && periodoFinal) {
-    params.append('periodoInicial', periodoInicial)
-    params.append('periodoFinal', periodoFinal)
+  // Se datas personalizadas foram fornecidas, usa elas
+  if (periodoInicialCustom && periodoFinalCustom) {
+    params.append('periodoInicial', periodoInicialCustom)
+    params.append('periodoFinal', periodoFinalCustom)
+  } else {
+    // Caso contrário, usa a função de cálculo de período
+    const { periodoInicial, periodoFinal } = getPeriodoDates(periodo)
+    if (periodoInicial && periodoFinal) {
+      params.append('periodoInicial', periodoInicial)
+      params.append('periodoFinal', periodoFinal)
+    }
   }
 
   params.append('status', 'FINALIZADA')

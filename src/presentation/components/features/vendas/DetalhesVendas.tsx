@@ -394,24 +394,37 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
         }
       }}
       fullWidth
-      maxWidth="sm"
+      maxWidth={false}
       sx={{
         '& .MuiDialog-container': {
           justifyContent: 'center',
           alignItems: 'center',
+          padding: {
+            xs: 0, // Remove padding em telas muito pequenas
+            sm: '16px', // Adiciona padding em telas maiores
+          },
         },
       }}
       PaperProps={{
         sx: {
           borderRadius: '22px',
-          maxWidth: '620px',
-          maxHeight: '90vh',
+          width: '100vw',
+          maxWidth: {
+            xs: '95vw', // Em telas muito pequenas, ocupa 100% da largura
+            sm: '95vw', // Em telas pequenas, ocupa 95% da largura
+            md: '620px', // Em telas médias e maiores, limita a 620px
+          },
+          maxHeight: '95vh',
+          margin: {
+            xs: 0, // Remove margem em telas muito pequenas
+            sm: '16px', // Adiciona margem em telas maiores
+          },
         },
       }}
     >
       <DialogContent sx={{ p: 0, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {/* AppBar */}
-        <div className="bg-primary rounded-t-lg px-4 py-3 flex items-center gap-3">
+        <div className="bg-primary rounded-t-lg md:px-4 py-3 flex items-center gap-3">
           <div className="flex items-center gap-2 flex-1 justify-center">
             {venda && (
               <TipoVendaIcon
@@ -498,7 +511,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
 
                   {/* Data/Hora de Cancelamento */}
                   {venda.dataCancelamento && (
-                    <div className="flex justify-between text-sm text-error font-nunito px-3 rounded-lg bg-white">
+                    <div className="flex justify-between md:text-sm text-xs text-error font-nunito px-1 rounded-lg bg-white">
                       <span>
                         Cancelado em:
                       </span>
@@ -517,7 +530,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                   {/* Data/Hora de Criação */}
                   <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
                     <span>
-                      Data/Hora de Criação: 
+                      Data/Hora Criação: 
                     </span>
                     <span>{formatDateTime(venda.dataCriacao)}</span>
                   </div>
@@ -526,7 +539,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                   {venda.dataFinalizacao && (
                     <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
                       <span>
-                        Data/Hora de Finalização: 
+                        Data/Hora Finalização: 
                       </span>
                       <span>{formatDateTime(venda.dataFinalizacao)}</span>
                     </div>

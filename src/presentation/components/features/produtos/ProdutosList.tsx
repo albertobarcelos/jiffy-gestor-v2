@@ -608,8 +608,23 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
   const [ativoDeliveryFilter, setAtivoDeliveryFilter] = useState<'Todos' | 'Sim' | 'Não'>('Todos')
   const [grupoProdutoFilter, setGrupoProdutoFilter] = useState('')
   const [grupoComplementoFilter, setGrupoComplementoFilter] = useState('')
-  const [isMobile, setIsMobile] = useState(false)
-  const [filtrosVisiveis, setFiltrosVisiveis] = useState(true)
+  // Inicializa isMobile e filtrosVisiveis corretamente para evitar flash de conteúdo
+  // Filtros começam ocultos por padrão (assumindo mobile durante SSR)
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 768
+    }
+    // Durante SSR, assume mobile para evitar flash
+    return true
+  })
+  const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => {
+    if (typeof window !== 'undefined') {
+      // Em desktop, filtros são visíveis; em mobile, ocultos
+      return window.innerWidth >= 768
+    }
+    // Durante SSR, assume mobile (filtros ocultos)
+    return false
+  })
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const [localProdutos, setLocalProdutos] = useState<Produto[]>([])
@@ -1458,8 +1473,8 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
         </div>
 
         <div
-          className={`flex flex-wrap items-end gap-2 ${
-            isMobile && !filtrosVisiveis ? 'hidden' : ''
+          className={`hidden sm:flex flex-wrap items-end gap-2 ${
+            isMobile && filtrosVisiveis ? '!flex' : ''
           }`}
         >
           <div className="w-full sm:w-[160px]">
@@ -1555,22 +1570,20 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
         className="flex-1 overflow-y-auto md:px-[30px] px-1 md:mt-4 mt-2 space-y-6 scrollbar-hide"
         style={{ maxHeight: 'calc(100vh - 300px)' }}
       >
-        {/* Mostrar loading enquanto está carregando ou ainda há páginas para carregar */}
-        {(isLoading || isFetching || isFetchingNextPage || hasNextPage) && (
-          <div className="space-y-4">
-            {[...Array(3)].map((_, index) => (
-              <div key={`grupo-skeleton-${index}`} className="space-y-3">
-                <div className="h-5 w-40 rounded-full bg-gray-200 animate-pulse" />
-                {[...Array(3)].map((__, i) => (
-                  <div key={`grupo-skeleton-${index}-${i}`} className="h-[90px] bg-gray-100 rounded-2xl animate-pulse" />
-                ))}
-              </div>
-            ))}
+        {/* Mostrar loading quando está carregando e não há produtos ainda */}
+        {(isLoading || isFetching || isFetchingNextPage || (localProdutos.length === 0 && !data)) && (
+          <div className="flex flex-col items-center justify-center py-12 gap-2">
+            <img
+              src="/images/jiffy-loading.gif"
+              alt="Carregando..."
+              className="w-20 h-20"
+            />
+            <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
           </div>
         )}
 
-        {/* Só exibir lista quando todos os produtos estiverem carregados */}
-        {localProdutos.length === 0 && !isLoading && !isFetching && !isFetchingNextPage && !hasNextPage && (
+        {/* Só exibir mensagem de "nenhum produto" quando realmente não há produtos e não está carregando */}
+        {localProdutos.length === 0 && !isLoading && !isFetching && !isFetchingNextPage && data && (
           <div className="flex items-center justify-center py-12">
             <p className="text-secondary-text">Nenhum produto encontrado.</p>
           </div>
@@ -1686,13 +1699,6 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
           )
         })}
           </>
-        )}
-
-        {/* Mostrar loading enquanto está carregando todas as páginas */}
-        {(isFetching || isFetchingNextPage) && (
-          <div className="flex justify-center py-4">
-            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
         )}
       </div>
 

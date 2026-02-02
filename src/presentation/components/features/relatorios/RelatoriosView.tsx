@@ -40,13 +40,13 @@ export function RelatoriosView() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-1 py-2">
+      <div className="md:px-1 py-2">
         {/* Tabs */}
         <div className="bg-info rounded-lg">
           <div className="flex border-b-2 items-center justify-center md:justify-start border-primary/70">
             <button
               onClick={() => setActiveTab('vendas')}
-              className={`px-5 text-xl font-semibold font-exo transition-colors ${
+              className={`md:px-5 text-xl font-semibold font-exo transition-colors ${
                 activeTab === 'vendas'
                   ? 'text-primary'
                   : 'text-secondary-text hover:text-primary'

@@ -150,6 +150,8 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
           const status = item.cancelado ? 'Cancelada' :
                         item.status === 'CANCELADA' ? 'Cancelada' :
                         'Aprovada'
+          const dataUltimoProdutoLancado = item.dataUltimoProdutoLancado ? new Date(item.dataUltimoProdutoLancado) : null
+          const dataUltimaMovimentacao = item.dataUltimaMovimentacao ? new Date(item.dataUltimaMovimentacao) : null
           const dataCancelamento = item.dataCancelamento ? new Date(item.dataCancelamento) : null
 
           return Venda.create(
@@ -165,6 +167,8 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
             valorFaturado,
             metodoPagamento,
             status as 'Aprovada' | 'Cancelada',
+            dataUltimoProdutoLancado,
+            dataUltimaMovimentacao,
             dataCancelamento
           )
         })
@@ -240,7 +244,7 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
   return (
     <>
       <div className="bg-white h-[390px] rounded-lg shadow-sm shadow-primary/70 border border-gray-200 p-6 overflow-y-auto scrollbar-hide">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-center md:justify-between mb-2 md:mb-6">
           <h3 className="text-lg font-semibold text-primary">Vendas do Período</h3>
         </div>
 
@@ -253,11 +257,17 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
             vendas.map((venda) => {
               const displayUserId = venda.getUserId();
               const displayedName = userNames[displayUserId] || 'Usuário Desconhecido';
+              // Verifica se a venda foi cancelada através da data de cancelamento ou do status
+              const isCancelada = !!venda.getDataCancelamento() || venda.getStatus() === 'Cancelada';
 
               return (
                 <div
                   key={venda.getId()}
-                  className={`flex items-center justify-between p-4 rounded-lg transition-colors border border-primary/50 group cursor-pointer ${venda.getDataCancelamento() ? 'bg-red-100' : 'bg-white hover:bg-primary/10'}`}
+                  className={`flex flex-col md:flex-row items-center justify-between p-4 rounded-lg transition-colors border border-primary/50 group cursor-pointer ${
+                    isCancelada 
+                      ? 'bg-red-100 hover:bg-red-200' 
+                      : 'bg-white hover:bg-primary/10'
+                  }`}
                   onClick={() => handleOpenModal(venda.getId())}
                 >
                   <div className="flex items-center gap-4 flex-1">
@@ -267,26 +277,18 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold md:text-sm text-xs text-gray-900 truncate">{displayedName}</p>
+                      <p className="font-semibold text-sm text-gray-900 truncate">{displayedName}</p>
                       <p className="text-sm text-gray-500">{formatDate(venda.getData())}</p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 ">
-                    <div className="text-right">
-                      <p className="font-semibold text-green-600">
-                        +{formatCurrency(venda.getValorFaturado())}
+                  <div className="flex  items-center gap-3 ">
+                    <div className="flex md:flex-col flex-row items-center justify-between md:justify-end gap-2 text-right">
+                      <p className={`font-semibold text-sm md:text-base ${isCancelada ? 'text-red-600' : 'text-green-600'}`}>
+                        {isCancelada ? '-' : '+'}{formatCurrency(venda.getValorFaturado())}
                       </p>
                       <p className="text-xs text-gray-500">Venda #{venda.getNumeroVenda()}</p>
                     </div>
-
-                    {/* Ícone de olho para ver detalhes */}
-                    <button
-                      className="p-2 text-primary/70 hover:text-primary rounded-lg transition-colors flex-shrink-0"
-                      title="Ver detalhes da venda"
-                    >
-                      <MdVisibility className="w-5 h-5" />
-                    </button>
                   </div>
                 </div>
               );
