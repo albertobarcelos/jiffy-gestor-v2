@@ -627,21 +627,27 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     setPeriodoFinal(null)
 
     // Remove todos os parâmetros de filtro da URL
-    const currentSearchParams = new URLSearchParams(window.location.search)
-    currentSearchParams.delete('periodo')
-    currentSearchParams.delete('status')
-    currentSearchParams.delete('q')
-    currentSearchParams.delete('valorFinalMinimo')
-    currentSearchParams.delete('valorFinalMaximo')
-    currentSearchParams.delete('tipoVenda')
-    currentSearchParams.delete('meioPagamentoId')
-    currentSearchParams.delete('abertoPorId')
-    currentSearchParams.delete('terminalId')
-    currentSearchParams.delete('canceladoPorId')
-    currentSearchParams.delete('periodoInicial')
-    currentSearchParams.delete('periodoFinal')
+    // Verifica se estamos no cliente antes de usar window
+    if (typeof window !== 'undefined') {
+      const currentSearchParams = new URLSearchParams(window.location.search)
+      currentSearchParams.delete('periodo')
+      currentSearchParams.delete('status')
+      currentSearchParams.delete('q')
+      currentSearchParams.delete('valorFinalMinimo')
+      currentSearchParams.delete('valorFinalMaximo')
+      currentSearchParams.delete('tipoVenda')
+      currentSearchParams.delete('meioPagamentoId')
+      currentSearchParams.delete('abertoPorId')
+      currentSearchParams.delete('terminalId')
+      currentSearchParams.delete('canceladoPorId')
+      currentSearchParams.delete('periodoInicial')
+      currentSearchParams.delete('periodoFinal')
 
-    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+      router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+    } else {
+      // Se não estiver no cliente, apenas navega sem parâmetros
+      router.replace(pathname, { scroll: false })
+    }
     router.refresh() // Força a revalidação da rota para recarregar com os filtros limpos
   }, [router, pathname])
 
