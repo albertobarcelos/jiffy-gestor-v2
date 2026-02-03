@@ -348,18 +348,18 @@ export function NovoUsuario({
               <span className="text-2xl"><MdPerson /></span>
             </div>
             <h1 className="text-primary text-lg font-semibold font-exo">
-              {isEditing ? 'Editar Usuário' : 'Cadastrar Novo Usuário'}
+              {isEditing ? 'Editar Usuário' : 'Novo Usuário'}
             </h1>
           </div>
         </div>
       </div>
 
       {/* Formulário com scroll */}
-      <div className="flex-1 overflow-y-auto px-[30px] py-[30px]">
+      <div className="flex-1 overflow-y-auto md:px-[30px] px-1 md:py-[30px] py-2">
         <form onSubmit={handleSubmit} className="space-y-6" autoComplete="off">
           {/* Dados */}
-          <div className="bg-info rounded-[12px] p-5">
-            <h2 className="text-primary text-xl font-semibold font-exo mb-4">
+          <div className="bg-info rounded-[12px] md:p-5 p-1">
+            <h2 className="text-primary md:text-xl text-sm font-semibold font-exo md:mb-4">
               Dados do Usuário
             </h2>
             <div className="h-[2px] bg-primary/70  mb-4"></div>
@@ -395,7 +395,7 @@ export function NovoUsuario({
               />
 
               <div className="flex items-center justify-between">
-              <div className="flex flex-col min-w-[300px] gap-2">
+              <div className="flex flex-col md:min-w-[300px] gap-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Perfil PDV *
                 </label>
@@ -523,7 +523,7 @@ export function NovoUsuario({
                     onChange={(e) => setAtivo(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[16px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+                  <div className="w-10 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[14px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[6px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
                 </label>
               </div>
             </div>
@@ -531,7 +531,7 @@ export function NovoUsuario({
           </div>
 
           {/* Botões de ação */}
-          <div className="flex justify-end gap-4 pt-4">
+          <div className="flex justify-end gap-4 pt-4 px-2">
             <Button
               type="button"
               onClick={handleCancel}

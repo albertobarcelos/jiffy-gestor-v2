@@ -547,13 +547,13 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px] flex-shrink-0">
+      <div className="md:px-[30px] px-1 flex-shrink-0">
         <div className="flex items-start justify-between">
-          <div className="w-1/2 pl-5">
-            <p className="text-primary text-lg font-semibold font-nunito">
+          <div className="w-1/2 md:pl-5">
+            <p className="text-primary md:text-lg text-sm font-semibold font-nunito">
               Usuários Cadastrados
             </p>
-            <p className="text-tertiary text-[22px] font-medium font-nunito">
+            <p className="text-tertiary md:text-[22px] text-sm font-medium font-nunito">
               Total {usuarios.length} de {totalUsuarios}
             </p>
           </div>
@@ -573,7 +573,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
       </div>
 
       <div className="h-[4px] border-t-2 border-primary/70 flex-shrink-0"></div>
-      <div className="flex gap-3 px-[20px] pb-2 flex-shrink-0">
+      <div className="flex gap-3 md:px-[20px] px-1 pb-2 flex-shrink-0">
         <div className="flex-1 min-w-[180px] max-w-[360px]">
             <label
               htmlFor="complementos-search"
@@ -616,21 +616,21 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
       </div>
 
       {/* Cabeçalho da tabela */}
-      <div className="px-[30px] mt-0 flex-shrink-0">
-        <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px]">
-          <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text">
+      <div className="md:px-[30px] mt-0 flex-shrink-0">
+        <div className="h-10 bg-custom-2 rounded-lg md:px-4 px-1 flex items-center md:gap-[10px] gap-1">
+          <div className="md:flex-[3] flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Nome
           </div>
-          <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
+          <div className="md:flex-[2] flex-[1] font-nunito font-semibold md:text-sm text-xs text-primary-text hidden md:flex">
             Telefone
           </div>
-          <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
+          <div className="md:flex-[2] flex-[1] font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Perfil
           </div>
-          <div className="flex-[2] text-center font-nunito font-semibold text-sm text-primary-text">
+          <div className="md:flex-[2] flex-[1] md:text-center text-right font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Status
           </div>
-          <div className="flex-[2] text-right font-nunito font-semibold text-sm text-primary-text">
+          <div className="md:flex-[2] flex-[1] md:text-center text-right font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Ações
           </div>
         </div>
@@ -639,37 +639,54 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
       {/* Lista de usuários com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-[30px] mt-2 scrollbar-hide"
+        className="flex-1 overflow-y-auto md:px-[30px] px-1 mt-2 scrollbar-hide"
         style={{ maxHeight: 'calc(100vh - 300px)' }}
       >
-        {usuarios.length === 0 && !isLoading && (
+        {/* Mostrar loading quando está carregando ou ainda não houve tentativa de carregamento */}
+        {(isLoading || !hasLoadedInitialRef.current) && usuarios.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 gap-2">
+            <img
+              src="/images/jiffy-loading.gif"
+              alt="Carregando..."
+              className="w-20 h-20"
+            />
+            <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
+          </div>
+        )}
+
+        {/* Só exibir mensagem de "nenhum usuário" quando realmente não há usuários e já houve tentativa de carregamento */}
+        {usuarios.length === 0 && !isLoading && hasLoadedInitialRef.current && (
           <div className="flex items-center justify-center py-12">
             <p className="text-secondary-text">Nenhum usuário encontrado.</p>
           </div>
         )}
 
-        {usuarios.map((usuario) => {
+        {usuarios.map((usuario, index) => {
           // Handler para abrir edição ao clicar na linha
           const handleRowClick = () => {
             openTabsModal({ mode: 'edit', usuarioId: usuario.getId() })
           }
 
+          // Intercala cores de fundo: cinza-50 para pares, branco para ímpares
+          const isZebraEven = index % 2 === 0
+          const bgClass = isZebraEven ? 'bg-gray-50' : 'bg-white'
+
           return (
           <div
             key={usuario.getId()}
             onClick={handleRowClick}
-            className="bg-info rounded-lg mb-2 shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-colors cursor-pointer"
+            className={`${bgClass} rounded-lg mb-2 hover:bg-primary/10 transition-colors cursor-pointer`}
           >
-            <div className="h-[50px] px-4 flex items-center gap-[10px]">
-              <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text flex items-center gap-2">
+            <div className="h-[50px] md:px-4 flex items-center md:gap-[10px] gap-1">
+              <div className="md:flex-[3] flex-[2] font-nunito font-semibold md:text-sm text-[10px] text-primary-text flex items-center gap-2">
                 {usuario.getNome()}
               </div>
-              <div className="flex-[2] font-nunito text-sm text-secondary-text">
+              <div className="md:flex-[2] flex-[1] font-nunito md:text-sm text-[10px] text-secondary-text hidden md:flex">
                 {usuario.getTelefone() || '-'}
               </div>
-              <div className="flex-[2]" onClick={(e) => e.stopPropagation()}>
+              <div className="md:flex-[2] flex-[1]" onClick={(e) => e.stopPropagation()}>
                 {isLoadingPerfis ? (
-                  <div className="text-secondary-text text-sm">Carregando...</div>
+                  <div className="text-secondary-text md:text-sm text-[10px]">Carregando...</div>
                 ) : (
                   <Select
                     value={usuario.getPerfilPdvId() || undefined}
@@ -677,7 +694,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
                     disabled={!!updatingPerfil[usuario.getId()]}
                   >
                     <SelectTrigger
-                      className={`w-full px-2 py-1 h-auto rounded-lg border border-gray-300 bg-info text-sm text-primary-text focus:outline-none focus:border-primary ${
+                      className={`w-full px-2 md:py-1 h-auto rounded-lg border border-gray-300 bg-info md:text-sm text-[10px] text-primary-text focus:outline-none focus:border-primary ${
                         updatingPerfil[usuario.getId()]
                           ? 'opacity-60 cursor-not-allowed'
                           : 'cursor-pointer hover:border-primary'
@@ -704,7 +721,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
                               <SelectItem
                                 key={perfilAtual.id}
                                 value={perfilAtual.id}
-                                className="min-h-[32px] max-h-[40px] data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary transition-colors"
+                                className="md:min-h-[32px] min-h-[28px] md:max-h-[40px] max-h-[36px] data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary transition-colors"
                               >
                                 {perfilAtual.role}
                               </SelectItem>
@@ -713,13 +730,13 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
                               <SelectItem
                                 key={perfil.id}
                                 value={perfil.id}
-                                className="min-h-[32px] max-h-[40px] data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary transition-colors"
+                                className="md:min-h-[32px] min-h-[28px] md:max-h-[40px] max-h-[36px] data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary transition-colors"
                               >
                                 {perfil.role}
                               </SelectItem>
                             ))}
                             {!perfilAtual && allPerfisPDV.length === 0 && (
-                              <div className="px-2 py-1.5 text-sm text-secondary-text">
+                              <div className="px-2 py-1.5 md:text-sm text-[10px] text-secondary-text">
                                 Nenhum perfil disponível
                               </div>
                             )}
@@ -730,9 +747,9 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
                   </Select>
                 )}
               </div>
-              <div className="flex-[2] flex justify-center" onClick={(e) => e.stopPropagation()}>
+              <div className="md:flex-[2] flex-[1] flex md:justify-center justify-end" onClick={(e) => e.stopPropagation()}>
                 <label
-                  className={`relative inline-flex h-5 w-12 items-center ${
+                  className={`relative inline-flex md:h-5 h-4 md:w-12 w-8 items-center ${
                     togglingStatus[usuario.getId()]
                       ? 'cursor-not-allowed opacity-60'
                       : 'cursor-pointer'
@@ -753,10 +770,10 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
                     disabled={!!togglingStatus[usuario.getId()]}
                   />
                   <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                  <span className="absolute left-[2px] top-1/2 block h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[28px]" />
+                  <span className="absolute md:left-[2px] left-0.5 top-1/2 block md:h-4 h-2.5 md:w-4 w-2.5 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 md:peer-checked:translate-x-[28px] peer-checked:translate-x-[18px]" />
                 </label>
               </div>
-              <div className="flex-[2] flex justify-end" onClick={(e) => e.stopPropagation()}>
+              <div className="md:flex-[2] flex-[1] flex md:justify-center justify-end" onClick={(e) => e.stopPropagation()}>
                 <button
                   type="button"
                   onClick={(e) => {
@@ -773,12 +790,6 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
           </div>
           )
         })}
-
-        {isLoading && (
-          <div className="flex justify-center py-4">
-            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        )}
       </div>
 
       <UsuariosTabsModal
