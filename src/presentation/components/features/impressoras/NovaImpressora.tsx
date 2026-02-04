@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Impressora } from '@/src/domain/entities/Impressora'
 import { showToast } from '@/src/shared/utils/toast'
+import { MdArrowDropUp, MdArrowDropDown } from 'react-icons/md'
 
 interface TerminalConfig {
   terminalId: string
@@ -87,6 +88,8 @@ export function NovaImpressora({
   
   // Estado para seleção múltipla de terminais
   const [selectedTerminalIds, setSelectedTerminalIds] = useState<Set<string>>(new Set())
+  // Estado para controle de expansão no mobile
+  const [expandedTerminalIds, setExpandedTerminalIds] = useState<Set<string>>(new Set())
   
   // Estados para inputs da barra de ações em lote
   const [bulkModelo, setBulkModelo] = useState('')
@@ -605,6 +608,18 @@ export function NovaImpressora({
     return terminaisConfig.length > 0 && selectedTerminalIds.size === terminaisConfig.length
   }
 
+  const toggleTerminalExpanded = (terminalId: string) => {
+    setExpandedTerminalIds((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(terminalId)) {
+        newSet.delete(terminalId)
+      } else {
+        newSet.add(terminalId)
+      }
+      return newSet
+    })
+  }
+
   /**
    * Valida campo antes de aplicar
    */
@@ -1057,9 +1072,9 @@ export function NovaImpressora({
           </div>
 
           {/* Tabela Config. por Terminal */}
-          <div className="md:overflow-visible overflow-x-auto">
-            <div className="bg-info rounded-lg overflow-hidden md:w-full min-w-[800px]">
-              <div className="px-4 py-3 border-b border-primary">
+          <div className="md:overflow-visible overflow-x-visible">
+            <div className="bg-info rounded-lg overflow-hidden md:w-full md:min-w-[800px]">
+              <div className="px-4 py-1 border-b border-primary">
                 <h2 className="text-primary text-lg font-semibold font-exo">
                   Config. por Terminal
                 </h2>
@@ -1067,8 +1082,8 @@ export function NovaImpressora({
 
               {/* Barra de ações em lote */}
               {selectedTerminalIds.size > 0 && (
-                <div className="px-4 py-3 bg-primary/10 border-b border-primary">
-                  <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <div className="px-4 py-1 bg-primary/10 border-b border-primary">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <span className="font-nunito font-semibold text-sm text-primary-text">
                       {selectedTerminalIds.size} terminal(is) selecionado(s)
                     </span>
@@ -1079,7 +1094,7 @@ export function NovaImpressora({
                       Limpar seleção
                     </button>
                   </div>
-                  <div className="space-y-3">
+                  <div className="space-y-1">
                     {/* Primeira linha: Modelo, IP, Porta */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       {/* Aplicar Modelo */}
@@ -1216,8 +1231,8 @@ export function NovaImpressora({
                 </div>
               )}
 
-              {/* Cabeçalho da tabela */}
-              <div className="px-4 py-3 bg-custom-2 border-b border-primary">
+              {/* Cabeçalho da tabela (desktop) */}
+              <div className="hidden md:block px-4 py-3 bg-custom-2 border-b border-primary">
                 <div className="grid grid-cols-[auto_2fr_2fr_2fr_2fr_1fr_1fr] gap-4 items-center">
                   <div className="flex items-center justify-center">
                     <input
@@ -1260,6 +1275,7 @@ export function NovaImpressora({
               {terminaisConfig.map((config, index) => {
                 const isZebraEven = index % 2 === 0
                 const bgClass = isZebraEven ? 'bg-gray-50' : 'bg-white'
+                const isExpanded = expandedTerminalIds.has(config.terminalId)
 
                 return (
                 <div
@@ -1280,7 +1296,8 @@ export function NovaImpressora({
                     })
                   }}
                 >
-                  <div className={`${bgClass} ${isTerminalSelected(config.terminalId) ? 'ring-2 ring-primary' : ''} grid grid-cols-[auto_2fr_2fr_2fr_2fr_1fr_1fr] px-2 py-2 gap-2 items-center rounded-lg hover:bg-primary/10 transition-colors`}>
+                  {/* Desktop: linha em tabela */}
+                  <div className={`${bgClass} ${isTerminalSelected(config.terminalId) ? 'ring-2 ring-primary' : ''} hidden md:grid grid-cols-[auto_2fr_2fr_2fr_2fr_1fr_1fr] px-2 py-2 gap-2 items-center rounded-lg hover:bg-primary/10 transition-colors`}>
                     {/* Checkbox de seleção */}
                     <div className="flex items-center justify-center">
                       <input
@@ -1369,6 +1386,114 @@ export function NovaImpressora({
                         <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[28px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                       </label>
                     </div>
+                  </div>
+
+                  {/* Mobile: card expansível */}
+                  <div className={`${bgClass} ${isTerminalSelected(config.terminalId) ? 'ring-2 ring-primary' : ''} md:hidden rounded-lg border border-primary/20`}>
+                    <div className="flex items-center gap-2 px-3 py-2">
+                      <input
+                        type="checkbox"
+                        checked={isTerminalSelected(config.terminalId)}
+                        onChange={() => toggleTerminalSelection(config.terminalId)}
+                        className="w-4 h-4 text-primary bg-info border-primary rounded focus:ring-primary focus:ring-2 cursor-pointer"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleTerminalExpanded(config.terminalId)}
+                        className="flex-1 text-left font-nunito text-sm text-primary-text"
+                      >
+                        {config.nome}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleTerminalExpanded(config.terminalId)}
+                        className="text-primary text-xs font-semibold font-exo"
+                      >
+                        {isExpanded ? <MdArrowDropUp size={20}/> : <MdArrowDropDown size={20}/>}
+                      </button>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="px-3 pb-3 space-y-3">
+                        {/* Modelo */}
+                        <div className="space-y-1">
+                          <label className="font-nunito text-xs text-primary-text">Modelo</label>
+                          <select
+                            value={config.modeloDisplay}
+                            onChange={(e) => updateTerminalConfig(index, 'modeloDisplay', e.target.value)}
+                            className="w-full h-8 px-3 rounded-lg border border-primary bg-info text-primary-text focus:outline-none focus:border-primary font-nunito text-sm"
+                          >
+                            {MODELOS_OPTIONS.map((modelo) => (
+                              <option key={modelo} value={modelo}>
+                                {modelo}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* IP */}
+                        <div className="space-y-1">
+                          <label className="font-nunito text-xs text-primary-text">IP</label>
+                          <input
+                            type="text"
+                            value={config.ip}
+                            onChange={(e) => {
+                              // Apenas formata durante a digitação, sem validar
+                              const formatted = formatIP(e.target.value)
+                              updateTerminalConfig(index, 'ip', formatted)
+                            }}
+                            onBlur={(e) => {
+                              const ip = e.target.value
+                              if (ip && !validateIPOnBlur(ip)) {
+                                // Se inválido, mantém o valor mas mostra erro
+                              }
+                            }}
+                            placeholder="192.168.1.100"
+                            className="w-full h-8 px-3 rounded-lg border border-primary bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary font-nunito text-sm"
+                          />
+                        </div>
+
+                        {/* Porta */}
+                        <div className="space-y-1">
+                          <label className="font-nunito text-xs text-primary-text">Porta</label>
+                          <input
+                            type="text"
+                            value={config.porta}
+                            onChange={(e) => updateTerminalConfig(index, 'porta', e.target.value)}
+                            placeholder="9100"
+                            maxLength={5}
+                            className="w-full h-8 px-3 rounded-lg border border-primary bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary font-nunito text-sm"
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="font-nunito text-xs text-primary-text">Modo Ficha</span>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={config.modoFicha}
+                                onChange={(e) => updateTerminalConfig(index, 'modoFicha', e.target.checked)}
+                                className="sr-only peer"
+                              />
+                              <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[28px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                            </label>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-nunito text-xs text-primary-text">Ativo</span>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={config.ativo}
+                                onChange={(e) => updateTerminalConfig(index, 'ativo', e.target.checked)}
+                                className="sr-only peer"
+                              />
+                              <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[28px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 )
