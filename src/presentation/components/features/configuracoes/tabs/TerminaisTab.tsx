@@ -477,13 +477,13 @@ export function TerminaisTab() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header fixo */}
-      <div className="px-4 flex-shrink-0">
+      <div className="md:px-4 px-1 flex-shrink-0">
         <div className="flex items-center justify-between border-b-2 border-primary/70 pb-2">
           <div className="flex flex-col">
-            <span className="text-primary text-2xl font-semibold font-exo">
+            <span className="text-primary text-lg md:text-xl font-semibold font-exo">
               Terminais Cadastrados
             </span>
-            <span className="text-tertiary text-[20px] font-medium font-nunito">
+            <span className="text-tertiary text-sm md:text-[20px] font-medium font-nunito">
               Total {terminais.length} de {totalItems}
             </span>
           </div>
@@ -492,7 +492,7 @@ export function TerminaisTab() {
       </div>
 
       {/* Busca fixa */}
-      <div className="flex gap-3 px-[20px] pb-2 flex-shrink-0">
+      <div className="flex gap-3 md:px-[20px] px-1 pb-2 flex-shrink-0">
         <div className="flex-1 min-w-[180px] max-w-[360px]">
           <label
             htmlFor="terminais-search"
@@ -518,29 +518,29 @@ export function TerminaisTab() {
       </div>
 
       {/* Lista de terminais com scroll */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-[20px] scrollbar-hide">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden md:px-[20px] px-1 scrollbar-hide">
         {/* Barra de títulos das colunas - sticky dentro do scroll */}
         {terminais.length > 0 && (
           <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px] sticky top-0 z-10 mb-2">
-            <div className="flex-[2] font-nunito font-semibold text-xs text-primary-text uppercase">
+            <div className="flex-[2] font-nunito font-semibold text-xs text-primary-text uppercase hidden md:block">
               Código do Terminal
             </div>
-            <div className="flex-[2] font-nunito font-semibold text-xs text-primary-text uppercase">
+            <div className="flex-[2] font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Nome do Terminal
             </div>
-            <div className="flex-[2] font-nunito font-semibold text-xs text-primary-text uppercase">
+            <div className="flex-[2] font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Modelo Dispositivo
             </div>
-            <div className="flex-[1.5] font-nunito font-semibold text-xs text-primary-text uppercase">
+            <div className="flex-[1.5] font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Versão APK
             </div>
-            <div className="flex-[2] font-nunito font-semibold text-xs text-primary-text uppercase">
-              Impressora Finalização
+            <div className="flex-[2] font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase hidden md:flex">
+              Imp. Finalização
             </div>
-            <div className="flex-[1.5] text-center font-nunito font-semibold text-xs text-primary-text uppercase">
-              Compartilhar Mesas
+            <div className="flex-[1.5] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
+              Comp. Mesas
             </div>
-            <div className="flex-[1.5] text-center font-nunito font-semibold text-xs text-primary-text uppercase">
+            <div className="md:flex-[1.5] flex-[1] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Status
             </div>
           </div>
@@ -578,22 +578,22 @@ export function TerminaisTab() {
               }
               className=" px-4 py-2 flex items-center gap-[10px] bg-info rounded-lg my-2 shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-colors cursor-pointer"
             >
-              <div className="flex-[2] flex items-center gap-3">
+              <div className="flex-[2] hidden md:flex items-center gap-3">
                 
                 <span className="text-sm font-medium text-primary-text font-nunito">
                  # {codigo}
                 </span>
               </div>
-              <div className="flex-[2] flex items-center gap-1 text-sm text-primary-text font-nunito">
+              <div className="flex-[2] flex items-center gap-1 md:text-sm text-[10px] text-primary-text font-nunito">
                 {nome}
               </div>
-              <div className="flex-[2] text-sm text-secondary-text font-nunito">
+              <div className="flex-[2] md:text-sm text-[10px] text-secondary-text font-nunito">
                 {modelo}
               </div>
-              <div className="flex-[1.5] text-sm text-secondary-text font-nunito">
+              <div className="flex-[1.5] md:text-sm text-[10px] text-secondary-text font-nunito">
                 {versao}
               </div>
-              <div className="flex-[2] text-sm text-secondary-text font-nunito">
+              <div className="flex-[2] md:text-sm text-[10px] text-secondary-text font-nunito hidden md:flex">
                 {preferencesMap[terminal.getId()] ? (
                   <select
                     value={preferencesMap[terminal.getId()]?.impressoraFinalizacaoId ?? ''}
@@ -603,7 +603,7 @@ export function TerminaisTab() {
                     }}
                     onClick={(event) => event.stopPropagation()}
                     disabled={updatingPrinter[terminal.getId()] || loadingImpressoras}
-                    className="w-full max-w-[220px] h-8 rounded-lg border border-gray-200 bg-white text-sm text-primary-text px-2 focus:outline-none focus:border-primary"
+                    className="w-full max-w-[220px] h-8 rounded-lg border border-gray-200 bg-white md:text-sm text-xs text-primary-text px-2 focus:outline-none focus:border-primary"
                   >
                     <option value="">Nenhuma</option>
                     {impressoras.map((imp) => (
@@ -613,12 +613,12 @@ export function TerminaisTab() {
                     ))}
                   </select>
                 ) : (
-                  <div className="text-xs text-secondary-text">Carregando...</div>
+                  <div className="md:text-xs text-[10px] text-secondary-text">Carregando...</div>
                 )}
               </div>
               <div className="flex-[1.5] flex justify-center">
                 <label
-                  className={`relative inline-flex h-5 w-12 items-center ${
+                  className={`relative inline-flex h-4 w-10 md:h-5 md:w-12 items-center ${
                     updatingShare[terminal.getId()] ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
                   }`}
                   title={compartilhamentoAtivo ? 'Compartilhamento habilitado' : 'Compartilhamento desabilitado'}
@@ -634,12 +634,12 @@ export function TerminaisTab() {
                     disabled={!!updatingShare[terminal.getId()]}
                   />
                   <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                  <span className="absolute left-[2px] top-1/2 block h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[28px]" />
+                  <span className="absolute left-[2px] top-1/2 block h-[14px] w-[14px] md:h-4 md:w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[18px] md:peer-checked:translate-x-[28px]" />
                 </label>
               </div>
-              <div className="flex-[1.5] flex justify-center">
+              <div className="md:flex-[1.5] flex-[1] flex justify-center">
                 <label
-                  className={`relative inline-flex h-5 w-12 items-center ${
+                  className={`relative inline-flex h-4 w-10 md:h-5 md:w-12 items-center ${
                     togglingStatus[terminal.getId()]
                       ? 'cursor-not-allowed opacity-60'
                       : 'cursor-pointer'
@@ -657,7 +657,7 @@ export function TerminaisTab() {
                     disabled={!!togglingStatus[terminal.getId()]}
                   />
                   <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                  <span className="absolute left-[2px] top-1/2 block h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[28px]" />
+                  <span className="absolute left-[2px] top-1/2 block h-[14px] w-[14px] md:h-4 md:w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[18px] md:peer-checked:translate-x-[28px]" />
                 </label>
               </div>
             </div>
@@ -665,8 +665,13 @@ export function TerminaisTab() {
         })} 
 
         {isLoading && (
-          <div className="flex justify-center py-8">
-            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="flex flex-col items-center justify-center py-8">
+            <img
+              src="/images/jiffy-loading.gif"
+              alt="Carregando"
+              className="w-20 object-contain"
+            />
+            <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
           </div>
         )}
       </div>

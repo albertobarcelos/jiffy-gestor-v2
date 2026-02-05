@@ -163,7 +163,7 @@ export function EscolheDatasModal({
           {/* Data Inicial */}
           <div className="flex flex-col gap-1">
             <label className="text-sm font-nunito text-primary-text">Data Inicial</label>
-            <div className="flex gap-2">
+            <div className="flex md:flex-row flex-col gap-2">
               <div className="relative flex-1">
                 <MdCalendarToday className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text pointer-events-none" size={20} />
                 <input
@@ -190,7 +190,7 @@ export function EscolheDatasModal({
           {/* Data Final */}
           <div className="flex flex-col gap-1">
             <label className="text-sm font-nunito text-primary-text">Data Final</label>
-            <div className="flex gap-2">
+            <div className="flex md:flex-row flex-col gap-2">
               <div className="relative flex-1">
                 <MdCalendarToday className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text pointer-events-none" size={20} />
                 <input

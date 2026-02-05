@@ -349,21 +349,13 @@ export function ProdutoImpressorasDialog({
   const renderContent = () => {
     if (isLoading) {
       return (
-        <div className="space-y-3">
-          {[...Array(4)].map((_, index) => (
-            <div
-              key={`printer-skeleton-${index}`}
-              className="rounded-2xl border border-gray-200 bg-white px-4 py-3"
-            >
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-10 w-10 rounded-full" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-48" />
-                  <Skeleton className="h-3 w-32" />
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="flex flex-col items-center justify-center py-8 gap-2">
+          <img
+            src="/images/jiffy-loading.gif"
+            alt="Carregando"
+            className="w-20 object-contain"
+          />
+          <p className="text-sm text-secondary-text text-center">Carregando impressoras...</p>
         </div>
       )
     }
@@ -396,10 +388,12 @@ export function ProdutoImpressorasDialog({
 
     return (
       <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
-        {filteredImpressoras.map((impressora) => (
+        {filteredImpressoras.map((impressora, index) => (
           <div
             key={impressora.id}
-            className="rounded-lg border border-gray-200 bg-white px-4 py-3 flex flex-col gap-2"
+            className={`rounded-lg md:px-4 py-3 px-2 flex flex-col gap-2 ${
+              index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+            }`}
           >
             <div className="flex items-center gap-3">
               <button
@@ -439,9 +433,9 @@ export function ProdutoImpressorasDialog({
   }
 
   const header = (
-    <div className="pr-8 flex flex-row items-center justify-between gap-2">
+    <div className="flex flex-row items-center justify-between gap-2">
       <div className="flex flex-col gap-1">
-        <h3 className="text-lg font-semibold text-primary-text">
+        <h3 className="md:text-lg text-sm font-semibold text-primary-text">
           {produtoNome ? `Impressoras de ${produtoNome}` : 'Impressoras vinculadas'}
         </h3>
         <p className="text-xs text-secondary-text">
@@ -453,7 +447,7 @@ export function ProdutoImpressorasDialog({
           type="button"
           onClick={handleOpenSelectDialog}
           disabled={isUpdating}
-          className="h-8 px-4 rounded-lg bg-primary text-white text-sm font-semibold flex items-center gap-2 transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="md:h-8 px-2 py-1 md:px-4 md:py-0 rounded-lg bg-primary text-white text-sm font-semibold flex items-center md:gap-2 transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           <MdAdd size={16} />
           Vincular impressoras
@@ -489,22 +483,22 @@ export function ProdutoImpressorasDialog({
         }
       }}
       fullWidth
-      maxWidth="sm"
+      maxWidth="xs"
     >
       <DialogHeader>
-        <div className="flex h-16 items-top justify-between border-b-2 border-primary/70">
-        <DialogTitle>Selecionar impressoras</DialogTitle>
+        <div className="flex md:flex-row flex-col md:h-16 items-top md:justify-between items-center border-b-2 border-primary/70">
+        <div className="md:text-lg text-sm font-semibold text-primary-text">Selecionar impressoras</div>
         <button
           type="button"
           onClick={handleOpenNovaImpressora}
-          className="h-8 px-6 rounded-lg bg-primary text-info text-sm font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="md:h-8 px-6 py-2 mb-2 md:mb-0 rounded-lg bg-primary text-info md:text-sm text-xs font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
           aria-label="Criar nova impressora"
         >
           Criar nova impressora
         </button>
         </div>
       </DialogHeader>
-      <DialogContent sx={{ padding: '4px 24px' }}>
+      <DialogContent sx={{ padding: '4px 4px' }}>
         <div className="relative mb-4">
           <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={18} />
           <input
@@ -517,15 +511,24 @@ export function ProdutoImpressorasDialog({
         </div>
         <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
           {isLoadingAllImpressoras ? (
-            <p className="text-center text-secondary-text text-sm py-6">Carregando impressoras...</p>
+            <div className="flex flex-col items-center justify-center py-6 gap-2">
+              <img
+                src="/images/jiffy-loading.gif"
+                alt="Carregando"
+                className="w-20 object-contain"
+              />
+              <p className="text-center text-secondary-text text-sm">Carregando impressoras...</p>
+            </div>
           ) : filteredSelectableImpressoras.length ? (
-            filteredSelectableImpressoras.map((impressora) => {
+            filteredSelectableImpressoras.map((impressora, index) => {
               const isSelected = tempSelection.includes(impressora.id)
               return (
                 <label
                   key={impressora.id}
-                  className={`flex items-center gap-3 rounded-2xl border px-4 py-3 cursor-pointer transition-colors ${
-                    isSelected ? 'border-primary bg-primary/5' : 'border-gray-200 bg-gray-50'
+                  className={`flex items-center gap-3 rounded-2xl px-4 py-3 cursor-pointer transition-colors ${
+                    isSelected
+                      ? 'border-primary bg-primary/5'
+                      : `border-gray-200 ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`
                   }`}
                 >
                   <input
@@ -535,12 +538,12 @@ export function ProdutoImpressorasDialog({
                     className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                   />
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-primary-text">{impressora.nome}</p>
+                    <p className="md:text-sm text-xs font-semibold text-primary-text">{impressora.nome}</p>
                     {impressora.local && (
                       <p className="text-xs text-secondary-text">{impressora.local}</p>
                     )}
                   </div>
-                  {isSelected && <span className="text-xs font-semibold text-primary">Selecionada</span>}
+                  {isSelected && <span className="md:text-xs text-[10px] font-semibold text-primary">Selecionada</span>}
                 </label>
               )
             })
@@ -561,7 +564,7 @@ export function ProdutoImpressorasDialog({
           type="button"
           onClick={handleApplySelection}
           disabled={isSavingSelection || isUpdating}
-          className="h-8 px-6 rounded-lg bg-primary text-info text-sm font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="md:h-8 px-6 py-2 rounded-lg bg-primary text-info md:text-sm text-xs font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isSavingSelection ? 'Aplicando...' : 'Aplicar seleção'}
         </button>

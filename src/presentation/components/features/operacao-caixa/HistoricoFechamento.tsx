@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { MdSearch, MdCalendarToday, MdFilterAltOff, MdClose } from 'react-icons/md'
+import { MdSearch, MdCalendarToday, MdFilterAltOff, MdFilterList, MdClose } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import {
   FormControl,
@@ -66,6 +66,10 @@ export function HistoricoFechamento() {
   const [isLoadingTerminais, setIsLoadingTerminais] = useState(false)
   const [selectedOperacaoId, setSelectedOperacaoId] = useState<string | null>(null)
   const [isDetalhesModalOpen, setIsDetalhesModalOpen] = useState(false)
+  const [filtrosVisiveis, setFiltrosVisiveis] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true
+    return window.innerWidth >= 768 // md breakpoint
+  })
 
   const pageSize = 10
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -562,17 +566,28 @@ export function HistoricoFechamento() {
   return (
     <div className="flex flex-col h-full">
       {/* Container principal */}
-      <div className="bg-primary-background rounded-t-lg rounded-b-lg px-2">
+      <div className="bg-primary-background rounded-t-lg rounded-b-lg md:px-2">
         {/* Título */}
-        <div className="px-4 pt-1">
-          <h1 className="text-xl font-exo font-semibold text-primary">Histórico de Fechamento de Caixa</h1>
+        <div className="md:px-4 py-1 flex flex-col md:flex-row items-center justify-between">
+          <h1 className="md:text-xl text-lg font-exo font-semibold text-primary">Histórico - Fechamento de Caixa</h1>
+          <div className="flex w-full md:w-auto flex-row items-end justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setFiltrosVisiveis((prev) => !prev)}
+            className="flex items-center gap-2 px-3 py-1 rounded-md bg-primary text-white text-xs md:text-sm font-nunito shadow-sm"
+            aria-expanded={filtrosVisiveis}
+          >
+            {filtrosVisiveis ? <MdFilterAltOff size={18} /> : <MdFilterList size={18} />}
+            <span>{filtrosVisiveis ? 'Ocultar filtros' : 'Mostrar filtros'}</span>
+          </button>
+          </div>
         </div>
         {/* Filtros Avançados */}
-        <div className="bg-custom-2 rounded-t-lg px-2 pt-1 pb-2 flex flex-wrap items-end gap-x-2 gap-y-4">
+        <div className={`bg-custom-2 rounded-t-lg px-2 pt-1 pb-2 flex flex-wrap justify-center items-end md:justify-start gap-x-2 gap-y-2 ${filtrosVisiveis ? 'flex' : 'hidden'}`}>
           {/* Status */}
           <div className="flex flex-col gap-1">
             <label className="text-xs text-secondary-text font-nunito">Status</label>
-            <FormControl size="small" sx={{ minWidth: 180 }}>
+            <FormControl size="small" sx={{ minWidth: 200 }}>
               <Select
                 value={statusFilter || ''}
                 onChange={(e) => setStatusFilter(e.target.value || null)}
@@ -595,7 +610,7 @@ export function HistoricoFechamento() {
           {/* Terminal */}
           <div className="flex flex-col gap-1">
             <label className="text-xs text-secondary-text font-nunito">Terminal</label>
-            <FormControl size="small" sx={{ minWidth: 180 }}>
+            <FormControl size="small" sx={{ minWidth: 200 }}>
               <Select
                 value={terminalFilter || ''}
                 onChange={(e) => setTerminalFilter(e.target.value || null)}
@@ -709,7 +724,7 @@ export function HistoricoFechamento() {
                     }
                   }
                 }}
-                className="w-[180px] h-8 pl-10 pr-8 rounded-lg bg-white border border-gray-300 text-sm font-nunito text-primary-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-[200px] h-8 pl-10 pr-8 rounded-lg bg-white border border-gray-300 text-sm font-nunito text-primary-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               />
               {dataAberturaFilter && (
                 <button
@@ -726,12 +741,13 @@ export function HistoricoFechamento() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col items-center gap-1">
           {/* Label Período */}
-          <span className="text-primary text-xs font-exo">Período:</span>
+          <span className="text-primary text-sm font-exo">Período:</span>
 
           {/* Dropdown Período */}
-          <FormControl size="small" sx={{ minWidth: 150 }}>
+          <div className="flex flex-row gap-1">
+          <FormControl size="small" sx={{ minWidth: 120 }}>
             <Select
               value={periodo}
               onChange={(e) => setPeriodo(e.target.value)}
@@ -759,7 +775,7 @@ export function HistoricoFechamento() {
               <MenuItem value="Últimos 90 Dias">Últimos 90 Dias</MenuItem>
             </Select>
           </FormControl>
-          </div>
+          
 
           {/* Botão Por Datas */}
           <button
@@ -769,21 +785,22 @@ export function HistoricoFechamento() {
             <MdCalendarToday size={18} />
             Por datas
           </button>
-
+          </div>
+          </div>
           {/* Botão Limpar Filtros */}
           <button
             onClick={handleClearFilters}
-            className="h-8 px-4 bg-primary text-white rounded-lg flex items-center gap-2 text-sm font-nunito hover:bg-primary/90 transition-colors mt-6"
+            className="h-8 px-4 bg-primary text-white rounded-lg flex items-center gap-2 text-sm font-nunito hover:bg-primary/90 transition-colors md:mt-6"
           >
             <MdFilterAltOff size={18} />
             Limpar Filtros
           </button>
         </div>
          {/* Filtros Superiores */}
-         <div className="flex items-center h-10 py-1">
+         <div className="flex flex-col md:flex-row items-center md:h-10 py-1">
           <span className="text-primary text-xs font-exo pr-2.5">Pesquisar por Código ou Nome do Terminal: </span>
           {/* Campo de Pesquisa */}
-          <div className="flex-1 relative max-w-[300px]">
+          <div className="flex-1 relative w-full md:max-w-[300px]">
             <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
             <input
               type="text"
@@ -797,13 +814,13 @@ export function HistoricoFechamento() {
 
         {/* Cabeçalho da Tabela */}
         <div className="bg-custom-2 px-3 py-2 flex items-center rounded-t-lg text-primary-text text-sm font-nunito font-semibold">
-          <div className="flex-1">Cód. Terminal</div>
-          <div className="flex-[1.5]">Terminal</div>
-          <div className="flex-[2]">Fechado por</div>
-          <div className="flex-1">Dt. Abertura</div>
-          <div className="flex-1">Dt. Fechamento</div>
-          <div className="flex-1 text-center">Período Aberto</div>
-          <div className="flex-1 text-center">Status</div>
+          <div className="flex-1 hidden md:flex">Cód. Terminal</div>
+          <div className="flex-[1.5] text-[11px] md:text-sm">Terminal</div>
+          <div className="flex-[2] hidden md:block">Fechado por</div>
+          <div className="flex-1 text-[11px] md:text-sm">Dt. Aberto</div>
+          <div className="flex-1 text-[11px] md:text-sm">Dt. Fechado</div>
+          <div className="flex-1 text-center hidden md:block">Período Aberto</div>
+          <div className="flex-1 md:text-center text-right text-[11px] md:text-sm">Status</div>
         </div>
 
         {/* Lista de Operações */}
@@ -813,8 +830,13 @@ export function HistoricoFechamento() {
           style={{ maxHeight: 'calc(100vh - 300px)' }}
         >
           {isLoading && operacoesCaixa.length === 0 ? (
-            <div className="flex justify-center items-center py-12">
-              <CircularProgress />
+            <div className="flex flex-col items-center justify-center py-12">
+              <img
+                src="/images/jiffy-loading.gif"
+                alt="Carregando"
+                className="w-20 object-contain"
+              />
+              <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
             </div>
           ) : operacoesCaixa.length === 0 ? (
             <div className="flex justify-center items-center py-12">
@@ -822,10 +844,11 @@ export function HistoricoFechamento() {
             </div>
           ) : (
             <>
-              {operacoesCaixa.map((operacao) => {
+              {operacoesCaixa.map((operacao, index) => {
                 const dataAbertura = formatDateList(operacao.dataAbertura)
                 const dataFechamento = operacao.dataFechamento ? formatDateList(operacao.dataFechamento) : null
                 const periodoAberto = calcularPeriodoAberto(operacao.dataAbertura, operacao.dataFechamento)
+                const isZebraEven = index % 2 === 0
 
                 return (
                   <div
@@ -834,22 +857,24 @@ export function HistoricoFechamento() {
                       setSelectedOperacaoId(operacao.id)
                       setIsDetalhesModalOpen(true)
                     }}
-                    className="mx-2 my-2 px-3 py-2 rounded-lg bg-info cursor-pointer transition-all hover:bg-primary/10 shadow-md shadow-primary-text/50"
+                    className={`md:mx-2 md:p-3 p-2 rounded-lg cursor-pointer transition-all ${isZebraEven ? 'bg-white hover:bg-primary/10' : 'bg-gray-50 hover:bg-primary/10'}`}
                   >
                     <div className="flex items-center text-sm font-nunito text-primary-text">
-                      <div className="flex-1">{operacao.codigoTerminal || '-'}</div>
-                      <div className="flex-[1.5]">{operacao.nomeTerminal || '-'}</div>
-                      <div className="flex-[2]">{operacao.nomeResponsavelFechamento || '-'}</div>
-                      <div className="flex-1">
-                        {dataAbertura.date} - {dataAbertura.time}
+                      <div className="flex-1 hidden md:block">{operacao.codigoTerminal || '-'}</div>
+                      <div className="flex-[1.5] text-[11px] md:text-sm">{operacao.nomeTerminal || '-'}</div>
+                      <div className="flex-[2] hidden md:block">{operacao.nomeResponsavelFechamento || '-'}</div>
+                      <div className="flex-1 flex flex-col items-center md:items-start text-[11px] md:text-sm text-center md:text-left">
+                        <span className="">{dataAbertura.date}</span>
+                        <span className="">{dataAbertura.time}</span>
                       </div>
-                      <div className="flex-1">
-                        {dataFechamento ? `${dataFechamento.date} - ${dataFechamento.time}` : '-'}
+                      <div className="flex-1 flex flex-col items-center md:items-start text-[11px] md:text-sm text-center md:text-left">
+                        <span className="">{dataFechamento ? dataFechamento.date : '-'}</span>
+                        <span className="">{dataFechamento ? dataFechamento.time : ''}</span>
                       </div>
-                      <div className="flex-1 text-center">{periodoAberto}</div>
-                      <div className="flex-1 flex items-center justify-center">
+                      <div className="flex-1 text-center hidden md:block">{periodoAberto}</div>
+                      <div className="flex-1 flex items-end md:justify-center justify-end">
                         <span
-                          className={`px-3 py-1 rounded text-xs font-semibold ${
+                          className={`md:px-3 px-1 py-1 rounded md:text-xs text-[10px] md:font-semibold ${
                             operacao.status === 'aberto'
                               ? 'bg-warning text-white'
                               : 'bg-success text-white'

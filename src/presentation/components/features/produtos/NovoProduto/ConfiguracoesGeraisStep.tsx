@@ -277,7 +277,7 @@ export function ConfiguracoesGeraisStep({
 
   return (
     <>
-      <div className="rounded-lg border border-[#E5E7F2] bg-white p-4 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
+      <div className="rounded-lg border border-[#E5E7F2] bg-white md:p-4 p-2 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
         {/* Título */}
         <div className="flex flex-col gap-2 mb-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
@@ -293,7 +293,7 @@ export function ConfiguracoesGeraisStep({
 
         <div className="grid gap-3 xl:grid-cols-3">
           {/* Cartão Geral */}
-          <div className="col-span-full xl:col-span-1 rounded-lg border border-[#E6E9F4] bg-gradient-to-b from-[#F9FAFF] to-white shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
+          <div className="p-2 col-span-full xl:col-span-1 rounded-lg border border-[#E6E9F4] bg-gradient-to-b from-[#F9FAFF] to-white shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
             <h4 className="text-primary-text font-semibold font-exo text-base mb-2">
               Geral
             </h4>
@@ -369,7 +369,7 @@ export function ConfiguracoesGeraisStep({
           </div>
 
           {/* Cartão de Grupos */}
-          <div className="col-span-full xl:col-span-1 rounded-lg border border-[#E6E9F4] bg-white shadow-[0_10px_30px_rgba(15,23,42,0.08)] px-5 py-2">
+          <div className="p-2 col-span-full xl:col-span-1 rounded-lg border border-[#E6E9F4] bg-white shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
             <div className="flex flex-col gap-2 mb-1">
               <p className="text-primary-text font-semibold font-exo text-base">
                 Grupos de Complementos
@@ -415,7 +415,7 @@ export function ConfiguracoesGeraisStep({
           </div>
 
           {/* Cartão de Impressoras */}
-          <div className="col-span-full xl:col-span-1 rounded-lg border border-[#E6E9F4] bg-info shadow-[0_10px_30px_rgba(15,23,42,0.08)] px-5 py-2">
+          <div className="p-2 col-span-full xl:col-span-1 rounded-lg border border-[#E6E9F4] bg-info shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
             <div className="flex flex-col gap-2 mb-1">
               <p className="text-primary-text font-semibold font-exo text-base">
                 Impressoras

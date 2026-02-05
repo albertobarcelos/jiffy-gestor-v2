@@ -98,6 +98,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
 
   // Estados de UI
   const [isLoading, setIsLoading] = useState(false)
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [canLoadMore, setCanLoadMore] = useState(true)
   const [currentPage, setCurrentPage] = useState(0)
@@ -491,6 +492,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
       } finally {
         setIsLoading(false)
         setIsLoadingMore(false)
+        setHasLoadedOnce(true)
       }
     },
     [auth, apenasSemMovimentacao]
@@ -560,11 +562,11 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
   return (
     <div className="flex flex-col h-full max-h-[calc(100vh-100px)] overflow-hidden">
       {/* Container principal */}
-      <div className="bg-primary-background rounded-t-lg rounded-b-lg px-2 flex flex-col h-full min-h-0 overflow-hidden">
+      <div className="bg-primary-background rounded-t-lg rounded-b-lg md:px-2 flex flex-col h-full min-h-0 overflow-hidden">
 
         {/* Filtro por tempo sem movimentação */}
         <div className="flex items-center justify-end gap-2 py-2">
-          <label className="text-sm text-primary-text font-nunito flex items-center gap-2">
+          <label className="md:text-sm text-xs text-primary-text font-nunito flex items-center gap-2">
             <input
               type="checkbox"
               checked={apenasSemMovimentacao}
@@ -575,14 +577,14 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
               }}
               className="h-4 w-4"
             />
-            Mostrar apenas mesas com +15 min sem movimentação
+            Mostrar mesas com +15 min sem movimentação
           </label>
         </div>
 
         {/* Cards de Métricas */}
-        <div className="flex gap-2 m-1 flex-shrink-0 sticky top-0 z-10 bg-primary-background">
+        <div className="flex md:gap-2 gap-1 my-1 flex-shrink-0 sticky top-0 z-10 bg-primary-background">
           {/* Vendas em Aberto (fixo) */}
-          <div className="flex-1 border-2 rounded-lg p-1 flex items-center gap-3">
+          <div className="flex-1 border-2 rounded-lg p-1 flex md:flex-row flex-col items-center justify-center md:gap-3 gap-1">
             <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0">
               <TipoVendaIcon
                 tipoVenda="mesa"
@@ -592,38 +594,37 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
                 corTexto="var(--color-info)"
               />
             </div>
-            <div className="flex flex-col items-end flex-1">
-              <span className="text-xs text-secondary-text font-nunito">
+            <div className="flex flex-col items-center md:items-end justify-between flex-1">
+              <span className="md:text-xs text-[10px] text-secondary-text text-center md:text-end font-nunito">
                 Mesas Abertas
               </span>
-              <span className="text-[22px] text-primary font-exo">
+              <span className="md:text-[22px] text-lg text-primary font-exo">
                 {metricas?.countVendasEfetivadas || 0}
               </span>
             </div>
           </div>
 
-          {/* Vendas Canceladas - REMOVIDO */}
           {/* Total de Produtos Vendidos */}
-          <div className="flex-1 rounded-lg border-2 p-1 flex items-center gap-3">
+          <div className="flex-1 rounded-lg border-2 p-1 flex md:flex-row flex-col items-center justify-center md:gap-3 gap-1">
             <div className="w-10 h-10 rounded-full bg-warning flex items-center justify-center flex-shrink-0">
               <span className="text-info text-xl"><MdRestaurant /></span>
             </div>
-            <div className="flex flex-col items-end flex-1">
-              <span className="text-xs text-secondary-text font-nunito">Total de Produtos vendidos</span>
-              <span className="text-[22px] text-primary font-exo">
+            <div className="flex flex-col items-center md:items-end justify-between flex-1">
+              <span className="md:text-xs text-[10px] text-secondary-text text-center font-nunito">Total de Produtos vendidos</span>
+              <span className="md:text-[22px] text-lg text-primary font-exo">
                 {metricas?.countProdutosVendidos || 0}
               </span>
             </div>
           </div>
 
           {/* Total Faturado */}
-          <div className="flex-1 rounded-lg border-2 p-1 flex items-center gap-3">
+          <div className="flex-1 rounded-lg border-2 p-1 flex md:flex-row flex-col items-center justify-center md:gap-3 gap-1">
             <div className="w-10 h-10 rounded-full bg-accent1 flex items-center justify-center flex-shrink-0">
               <span className="text-info text-xl"><MdAttachMoney /></span>
             </div>
-            <div className="flex flex-col items-end flex-1">
-              <span className="text-xs text-secondary-text font-nunito">Total à faturar</span>
-              <span className="text-[22px] text-primary font-exo">
+            <div className="flex flex-col items-center md:items-end justify-between flex-1">
+              <span className="md:text-xs text-[10px] text-secondary-text text-center font-nunito">Total à faturar</span>
+              <span className="md:text-[22px] text-lg text-primary font-exo">
                 {metricas?.totalFaturado ? formatCurrency(metricas.totalFaturado) : 'R$ 0,00'}
               </span>
             </div>
@@ -631,14 +632,25 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
         </div>
 
         {/* Tabela de Vendas */}
-        <div className="bg-info rounded-lg flex-1 min-h-0 flex flex-col overflow-hidden">
+        <div className="bg-info rounded-lg min-h-0 flex flex-col overflow-hidden">
           {/* Lista com scroll */}
           <div
             ref={scrollContainerRef}
-            className="h-full overflow-y-auto px-1 py-2 scrollbar-hide grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4"
+            className="h-full overflow-y-auto overflow-x-hidden px-1 py-2 scrollbar-hide grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2"
           >
-            {vendas.length === 0 && !isLoading && (
-              <div className="flex items-center justify-center py-12 col-span-full">
+            {isLoading && vendas.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-12 col-span-full">
+                <img
+                  src="/images/jiffy-loading.gif"
+                  alt="Carregando"
+                  className="w-20 object-contain"
+                />
+                <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
+              </div>
+            )}
+
+            {vendas.length === 0 && !isLoading && hasLoadedOnce && (
+              <div className="flex items-center justify-center md:py-12 col-span-full">
                 <p className="text-secondary-text">Nenhuma mesa em aberto encontrada.</p>
               </div>
             )}
@@ -698,9 +710,9 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
               }
 
               const movimentoTooltip =
-                `# Últ. produto - ${formatDiffTooltip(minutosUltimoProduto)}` +
+                `# Últ. prod. - ${formatDiffTooltip(minutosUltimoProduto)}` +
                 (minutosUltimaMov !== null && minutosUltimaMov !== undefined
-                  ? `\n\n# Últ. movimentação - ${formatDiffTooltip(minutosUltimaMov)}`
+                  ? `\n\n# Últ. mov. - ${formatDiffTooltip(minutosUltimaMov)}`
                   : '')
 
               // Cor baseada no tempo de movimentação (15 min -> 2h)
@@ -717,7 +729,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
                 <div
                   key={venda.id}
                   onClick={() => setSelectedVendaId(venda.id)}
-                  className="cursor-pointer px-2 rounded-lg flex flex-col items-center justify-between shadow-sm shadow-primary-text/50 hover:bg-primary/5 transition-all w-[200px] h-[220px] relative bg-info">
+                  className="cursor-pointer md:px-2 rounded-lg flex flex-col items-center justify-between shadow-sm shadow-primary-text/50 hover:bg-primary/5 transition-all md:w-[200px] h-[200px] md:h-[220px] relative bg-info">
 
                   <div className="flex flex-col items-center justify-center flex-grow">
                     <TipoVendaIcon
@@ -737,7 +749,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
                   </div>
 
                   <div className="w-full flex flex-col items-start px-2 mb-4">
-                    <span className="text-xs text-primary-text font-nunito font-semibold">Usuário: <span className="font-normal">{usuarioNome}</span></span>
+                    <div className="flex flex-col md:flex-row items-start md:items-center"><span className="text-xs text-primary-text font-nunito font-semibold">Usuário:</span> <span className="font-normal text-xs">{usuarioNome}</span></div>
                     <div className="flex justify-between w-full text-xs text-primary-text font-nunito mt-1">
                       <div className="flex flex-col items-start"><span className="font-semibold">Valor atual</span><span>{formatCurrency(venda.valorFinal)}</span></div>
                       <div className="flex flex-col items-start"><span className="font-semibold">Aberta há</span><span>{elapsedTime}</span></div>

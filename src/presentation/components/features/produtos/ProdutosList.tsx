@@ -256,6 +256,9 @@ const ProdutoListItem = function ProdutoListItem({
     []
   )
 
+  const firstRowActions = useMemo(() => actionIcons.slice(0, 3), [actionIcons])
+  const secondRowActions = useMemo(() => actionIcons.slice(3), [actionIcons])
+
   // Handler para abrir edição ao clicar na linha
   const handleRowClick = useCallback(() => {
     onEditProduto?.(produto.getId())
@@ -264,7 +267,7 @@ const ProdutoListItem = function ProdutoListItem({
   return (
     <div 
       onClick={handleRowClick}
-      className="bg-white border border-gray-100 hover:bg-secondary-text/10 rounded-2xl px-4 py-2 mb-2 shadow-sm shadow-primary-text/50 flex items-center gap-4 cursor-pointer"
+      className="bg-white border border-gray-100 hover:bg-secondary-text/10 rounded-2xl md:px-4 px-2 md:py-2 py-1 mb-2 shadow-sm shadow-primary-text/50 flex items-center gap-4 cursor-pointer"
     >
       {/*<div className="w-14 h-14 rounded-xl bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-2xl">
         <MdImage />
@@ -272,16 +275,20 @@ const ProdutoListItem = function ProdutoListItem({
 
       <div className="flex-1">
         <div className="flex items-center gap-3 flex-wrap">
-          <p className="text-primary-text font-semibold font-nunito text-base flex items-center gap-2">
+          <p className="text-primary-text font-semibold font-nunito md:text-base text-sm flex flex-col-reverse md:flex-row md:items-center items-start md:gap-2">
             {produto.getNome()}
-            <span className="text-sm text-secondary-text ml-2 inline-flex items-center gap-1">
+            <span className="text-sm text-secondary-text md:ml-2 inline-flex items-center gap-1">
               <span className="text-xs">Cód. </span>
               <span className="font-semibold">{produto.getCodigoProduto()}</span>
             </span>
           </p>
         </div>
-        <div className="flex items-center gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
-          {actionIcons.map(({ key, label, Icon, field, modal }) => {
+        {/* Mobile: 3 ícones na primeira linha, 4 na segunda */}
+        <div
+          className="mt-2 inline-grid grid-cols-3 gap-2 w-fit md:hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {firstRowActions.map(({ key, label, Icon, field, modal }) => {
             if (field) {
               const isActive = toggleStates[field]
               const isLoading = Boolean(savingToggleState?.[field])
@@ -354,9 +361,168 @@ const ProdutoListItem = function ProdutoListItem({
             )
           })}
         </div>
+        <div
+          className="mt-2 inline-grid grid-cols-4 gap-2 w-fit md:hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {secondRowActions.map(({ key, label, Icon, field, modal }) => {
+            if (field) {
+              const isActive = toggleStates[field]
+              const isLoading = Boolean(savingToggleState?.[field])
+              const iconColor = isActive ? 'text-primary' : 'text-white'
+              const bgColor = isActive
+                ? 'bg-primary text-white border border-primary'
+                : 'bg-gray-300 border border-transparent'
+
+              return (
+                <button
+                  key={`${produto.getId()}-${key}`}
+                  type="button"
+                  title={label}
+                  disabled={isLoading}
+                  onClick={() => onToggleBoolean?.(field, !isActive)}
+                  className={`w-5 h-5 rounded-full flex items-center justify-center text-sm transition-all ${bgColor} ${iconColor} ${
+                    isLoading
+                      ? 'opacity-60 cursor-not-allowed'
+                      : 'hover:bg-primary/80 hover:text-white  focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/80'
+                  }`}
+                >
+                  <Icon />
+                </button>
+              )
+            }
+
+            if (modal) {
+              const handleModalClick =
+                modal === 'complementos'
+                  ? onOpenComplementosModal
+                  : modal === 'impressoras'
+                    ? onOpenImpressorasModal
+                    : undefined
+
+              return (
+                <button
+                  key={`${produto.getId()}-${key}`}
+                  type="button"
+                  title={label}
+                  disabled={!handleModalClick}
+                  onClick={() => handleModalClick?.()}
+                  className={`w-5 h-5 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                    !handleModalClick ? 'opacity-60 cursor-not-allowed' : 'hover:bg-primary/10'
+                  }`}
+                >
+                  <Icon />
+                </button>
+              )
+            }
+
+            if (key === 'copiar') {
+              return (
+                <button
+                  key={`${produto.getId()}-${key}`}
+                  type="button"
+                  title={label}
+                  onClick={() => onCopyProduto?.(produto.getId())}
+                  className="w-5 h-5 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-sm hover:bg-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <Icon />
+                </button>
+              )
+            }
+
+            return (
+              <span
+                key={`${produto.getId()}-${key}`}
+                title={label}
+                className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-sm"
+              >
+                <Icon />
+              </span>
+            )
+          })}
+        </div>
+
+        {/* Desktop: linha única */}
+        <div className="hidden md:flex items-center gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
+          {actionIcons.map(({ key, label, Icon, field, modal }) => {
+            if (field) {
+              const isActive = toggleStates[field]
+              const isLoading = Boolean(savingToggleState?.[field])
+              const iconColor = isActive ? 'text-primary' : 'text-white'
+              const bgColor = isActive
+                ? 'bg-primary text-white border border-primary'
+                : 'bg-gray-300 border border-transparent'
+
+              return (
+                <button
+                  key={`${produto.getId()}-${key}`}
+                  type="button"
+                  title={label}
+                  disabled={isLoading}
+                  onClick={() => onToggleBoolean?.(field, !isActive)}
+                  className={`w-5 h-5 rounded-full flex items-center justify-center text-sm transition-all ${bgColor} ${iconColor} ${
+                    isLoading
+                      ? 'opacity-60 cursor-not-allowed'
+                      : 'hover:bg-primary/80 hover:text-white  focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/80'
+                  }`}
+                >
+                  <Icon />
+                </button>
+              )
+            }
+
+            if (modal) {
+              const handleModalClick =
+                modal === 'complementos'
+                  ? onOpenComplementosModal
+                  : modal === 'impressoras'
+                    ? onOpenImpressorasModal
+                    : undefined
+
+              return (
+                <button
+                  key={`${produto.getId()}-${key}`}
+                  type="button"
+                  title={label}
+                  disabled={!handleModalClick}
+                  onClick={() => handleModalClick?.()}
+                  className={`w-5 h-5 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                    !handleModalClick ? 'opacity-60 cursor-not-allowed' : 'hover:bg-primary/10'
+                  }`}
+                >
+                  <Icon />
+                </button>
+              )
+            }
+
+            if (key === 'copiar') {
+              return (
+                <button
+                  key={`${produto.getId()}-${key}`}
+                  type="button"
+                  title={label}
+                  onClick={() => onCopyProduto?.(produto.getId())}
+                  className="w-5 h-5 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-sm hover:bg-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <Icon />
+                </button>
+              )
+            }
+
+            return (
+              <span
+                key={`${produto.getId()}-${key}`}
+                title={label}
+                className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-sm"
+              >
+                <Icon />
+              </span>
+            )
+          })}
+        </div>
       </div>
 
-      <div className="flex md:mr-16 items-center gap-4 flex-wrap justify-end" onClick={(e) => e.stopPropagation()}>
+      <div className="flex flex-col-reverse md:flex-row md:mr-16 items-end gap-4 flex-wrap justify-end md:items-center" onClick={(e) => e.stopPropagation()}>
         <div className="flex flex-col">
           <label className="text-xs text-secondary-text font-nunito mb-1">Valor (R$)</label>
           <div className="relative">
@@ -387,10 +553,9 @@ const ProdutoListItem = function ProdutoListItem({
                 }
               }}
               disabled={isSavingValor}
-              className=" p-2 rounded-xl border border-gray-200 focus:border-primary focus:outline-none text-sm font-semibold text-primary-text w-32 disabled:opacity-60 disabled:cursor-not-allowed"
+              className=" p-2 rounded-xl border border-gray-200 focus:border-primary focus:outline-none md:text-sm text-xs font-semibold text-primary-text w-32 disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
-          <span className="text-[11px] text-secondary-text mt-1">{valorFormatado}</span>
         </div>
         <div className="flex items-center">
           <label
@@ -443,6 +608,23 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
   const [ativoDeliveryFilter, setAtivoDeliveryFilter] = useState<'Todos' | 'Sim' | 'Não'>('Todos')
   const [grupoProdutoFilter, setGrupoProdutoFilter] = useState('')
   const [grupoComplementoFilter, setGrupoComplementoFilter] = useState('')
+  // Inicializa isMobile e filtrosVisiveis corretamente para evitar flash de conteúdo
+  // Filtros começam ocultos por padrão (assumindo mobile durante SSR)
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 768
+    }
+    // Durante SSR, assume mobile para evitar flash
+    return true
+  })
+  const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => {
+    if (typeof window !== 'undefined') {
+      // Em desktop, filtros são visíveis; em mobile, ocultos
+      return window.innerWidth >= 768
+    }
+    // Durante SSR, assume mobile (filtros ocultos)
+    return false
+  })
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const [localProdutos, setLocalProdutos] = useState<Produto[]>([])
@@ -502,6 +684,19 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     ativo: null,
   })
   const token = auth?.getAccessToken()
+
+  // Exibe toggle de filtros apenas em telas menores
+  useEffect(() => {
+    const updateIsMobile = () => {
+      const mobile = window.innerWidth < 768
+      setIsMobile(mobile)
+      setFiltrosVisiveis(!mobile)
+    }
+    updateIsMobile()
+    window.addEventListener('resize', updateIsMobile)
+    return () => window.removeEventListener('resize', updateIsMobile)
+  }, [])
+
   const invalidateProdutosQueries = useCallback(async () => {
     await queryClient.invalidateQueries({
       queryKey: ['produtos', 'infinite'],
@@ -1212,21 +1407,21 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px] flex-shrink-0">
+      <div className="md:px-[30px] px-1 flex-shrink-0">
         <div className="flex flex-col gap-4">
           <div className="flex items-start justify-between flex-wrap gap-4">
-            <div className="pl-5">
+            <div className="md:pl-5 mb-2">
               <p className="text-primary text-sm font-semibold font-nunito">
                 Produtos Cadastrados
               </p>
-              <p className="text-tertiary text-[22px] font-medium font-nunito">
+              <p className="text-tertiary md:text-[22px] text-sm font-medium font-nunito">
                 Total {localProdutos.length} de {totalProdutos}
               </p>
             </div>
-            <div className="flex items-center justify-end flex-1 gap-4">
+            <div className="flex flex-col md:flex-row mb-2 items-center justify-end flex-1 md:gap-4 gap-1">
             <Link
               href="/produtos/atualizar-preco"
-              className="h-8 px-[30px] bg-info text-primary-text border border-primary/50 rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/10 transition-colors"
+              className="md:h-8 h-6 md:px-4 px-2 bg-info text-primary-text border border-primary/50 rounded-lg font-semibold font-exo md:text-sm text-xs flex items-center gap-2 hover:bg-primary/10 transition-colors"
             >
               Atualizar Preços
             </Link>
@@ -1238,7 +1433,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
                     produto: undefined,
                   })
                 }
-                className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+                className="md:h-8 h-6 px-[30px] bg-primary text-info rounded-lg font-semibold font-exo md:text-sm text-xs flex items-center gap-2 hover:bg-primary/90 transition-colors"
               >
                 Novo
                 <span className="text-lg">+</span>
@@ -1248,8 +1443,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
         </div>
       </div>
       <div className="h-[4px] border-t-2 border-primary/50 flex-shrink-0"></div>
-      <div className="bg-white px-[20px] py-2 border-b border-gray-100 flex-shrink-0">
-        <div className="flex flex-wrap items-end gap-2">
+      <div className="bg-white md:px-[20px] px-1 md:py-2 border-b border-gray-100 flex-shrink-0">
           <div className="flex-1 min-w-[180px]">
             <label htmlFor="produtos-search" className="text-xs font-semibold text-secondary-text mb-1 block">
                Buscar produto...
@@ -1266,7 +1460,23 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
               />
             </div>
           </div>
+        {/* Toggle de filtros apenas no mobile */}
+        <div className="flex w-full sm:hidden justify-end items-center mt-2">
+          <button
+            type="button"
+            onClick={() => setFiltrosVisiveis((prev) => !prev)}
+            className="px-3 py-1 rounded-md bg-primary text-white text-xs font-nunito shadow-sm"
+            aria-expanded={filtrosVisiveis}
+          >
+            {filtrosVisiveis ? 'Ocultar filtros' : 'Mostrar filtros'}
+          </button>
+        </div>
 
+        <div
+          className={`hidden sm:flex flex-wrap items-end gap-2 ${
+            isMobile && filtrosVisiveis ? '!flex' : ''
+          }`}
+        >
           <div className="w-full sm:w-[160px]">
             <label className="text-xs font-semibold text-secondary-text mb-1 block">Status</label>
             <select
@@ -1357,25 +1567,23 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
       {/* Lista de produtos com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-[30px] mt-4 space-y-6 scrollbar-hide"
+        className="flex-1 overflow-y-auto md:px-[30px] px-1 md:mt-4 mt-2 space-y-6 scrollbar-hide"
         style={{ maxHeight: 'calc(100vh - 300px)' }}
       >
-        {/* Mostrar loading enquanto está carregando ou ainda há páginas para carregar */}
-        {(isLoading || isFetching || isFetchingNextPage || hasNextPage) && (
-          <div className="space-y-4">
-            {[...Array(3)].map((_, index) => (
-              <div key={`grupo-skeleton-${index}`} className="space-y-3">
-                <div className="h-5 w-40 rounded-full bg-gray-200 animate-pulse" />
-                {[...Array(3)].map((__, i) => (
-                  <div key={`grupo-skeleton-${index}-${i}`} className="h-[90px] bg-gray-100 rounded-2xl animate-pulse" />
-                ))}
-              </div>
-            ))}
+        {/* Mostrar loading quando está carregando e não há produtos ainda */}
+        {(isLoading || isFetching || isFetchingNextPage || (localProdutos.length === 0 && !data)) && (
+          <div className="flex flex-col items-center justify-center py-12 gap-2">
+            <img
+              src="/images/jiffy-loading.gif"
+              alt="Carregando..."
+              className="w-20 h-20"
+            />
+            <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
           </div>
         )}
 
-        {/* Só exibir lista quando todos os produtos estiverem carregados */}
-        {localProdutos.length === 0 && !isLoading && !isFetching && !isFetchingNextPage && !hasNextPage && (
+        {/* Só exibir mensagem de "nenhum produto" quando realmente não há produtos e não está carregando */}
+        {localProdutos.length === 0 && !isLoading && !isFetching && !isFetchingNextPage && data && (
           <div className="flex items-center justify-center py-12">
             <p className="text-secondary-text">Nenhum produto encontrado.</p>
           </div>
@@ -1440,19 +1648,18 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end flex-1">
+                <div className="flex flex-col-reverse md:flex-row items-center justify-end flex-1 md:gap-4 gap-2">
                   <button
                     onClick={() => handleCreateProdutoForGroup(grupo)}
-                    className="h-8 px-[20px] bg-info border border-primary/50 text-primary rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/10 transition-colors"
+                    className="h-8 md:px-[20px] px-2 bg-info border border-primary/50 text-primary rounded-lg font-semibold font-exo md:text-sm text-xs flex items-center md:gap-2 hover:bg-primary/10 transition-colors"
                   >
                     Adicionar produto
                     <span className="text-sm">+</span>
                   </button>
-                </div>
                 <button
                   type="button"
                   onClick={() => handleToggleGroup(grupo)}
-                  className="flex items-center gap-1 text-primary text-sm font-semibold hover:text-primary/80 transition-colors"
+                  className="flex items-center gap-1 text-primary md:text-sm text-xs font-semibold hover:text-primary/80 transition-colors"
                   aria-expanded={expandedGroups[grupo] !== false}
                 >
                   <span>{expandedGroups[grupo] === false ? 'Exibir' : 'Ocultar'}</span>
@@ -1460,6 +1667,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
                     className={`text-lg transition-transform ${expandedGroups[grupo] === false ? '-rotate-90' : 'rotate-0'}`}
                   />
                 </button>
+              </div>
               </div>
 
               {expandedGroups[grupo] === false ? (
@@ -1491,13 +1699,6 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
           )
         })}
           </>
-        )}
-
-        {/* Mostrar loading enquanto está carregando todas as páginas */}
-        {(isFetching || isFetchingNextPage) && (
-          <div className="flex justify-center py-4">
-            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
         )}
       </div>
 

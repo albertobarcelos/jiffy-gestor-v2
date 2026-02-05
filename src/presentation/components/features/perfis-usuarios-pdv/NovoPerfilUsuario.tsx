@@ -249,13 +249,13 @@ export function NovoPerfilUsuario({
   return (
     <div className="flex flex-col h-full">
       {/* Header fixo */}
-      <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[30px] shadow-md px-[30px] py-2">
+      <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[30px] shadow-md md:px-[30px] px-2 py-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-primary/25 text-primary flex items-center justify-center">
-              <span className="text-2xl"><MdPerson /></span>
+            <div className="md:w-12 w-10 md:h-12 h-10 rounded-full bg-primary/25 text-primary flex items-center justify-center">
+              <span className="md:text-2xl text-xl"><MdPerson /></span>
             </div>
-            <h1 className="text-primary text-lg font-semibold font-exo">
+            <h1 className="text-primary md:text-lg text-sm font-semibold font-exo">
               {isEditing ? 'Editar Perfil de Usuário' : 'Novo Perfil de Usuário'}
             </h1>
           </div>
@@ -275,11 +275,11 @@ export function NovoPerfilUsuario({
       </div>
 
       {/* Formulário com scroll */}
-      <div className="flex-1 overflow-y-auto px-[30px] py-2">
+      <div className="flex-1 overflow-y-auto md:px-[30px] px-1 py-2">
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Dados */}
           <div className="bg-info">
-            <h2 className="text-primary text-xl font-semibold font-exo mb-1">
+            <h2 className="text-primary md:text-xl text-sm font-semibold font-exo mb-1">
               Dados do Perfil
             </h2>
             <div className="h-[2px] bg-primary/70 mb-4"></div>
@@ -298,11 +298,11 @@ export function NovoPerfilUsuario({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Meios de Pagamento *
                 </label>
-                <div className="flex gap-2">
+                <div className="flex md:flex-row flex-col gap-2">
                   <button
                     type="button"
                     onClick={() => setShowMeiosPagamentoModal(true)}
-                    className="flex-1 px-4 py-3 rounded-lg border border-gray-400 bg-info text-left text-gray-900 focus:outline-none focus:border-2 focus:border-primary"
+                    className="flex-1 md:px-4 px-2 md:py-3 py-2 rounded-lg border border-gray-400 bg-info text-left text-gray-900 focus:outline-none focus:border-2 focus:border-primary"
                   >
                     {isLoadingMeiosPagamento ? (
                       <div className="flex items-center gap-2">
@@ -316,7 +316,7 @@ export function NovoPerfilUsuario({
                         {selectedMeiosPagamento.map((mp) => (
                           <span
                             key={mp.id}
-                            className="px-3 py-1 bg-primary-bg rounded-full text-sm border border-primary flex items-center gap-2"
+                            className="md:px-3 px-2 py-1 bg-primary-bg rounded-full md:text-sm text-xs border border-primary flex items-center gap-2"
                           >
                             {mp.nome}
                             <button
@@ -327,7 +327,7 @@ export function NovoPerfilUsuario({
                                   prev.filter((p) => p.id !== mp.id)
                                 )
                               }}
-                              className="text-secondary-text hover:text-primary text-sm"
+                              className="text-secondary-text hover:text-primary md:text-sm text-xs"
                             >
                               <MdClose />
                             </button>
@@ -350,7 +350,7 @@ export function NovoPerfilUsuario({
 
           {/* Permissões */}
           <div className="bg-info">
-            <h2 className="text-primary text-xl font-semibold font-exo mb-1">
+            <h2 className="text-primary md:text-xl text-sm font-semibold font-exo mb-1">
               Permissões
             </h2>
             <div className="h-[2px] bg-primary/70 mb-2"></div>
@@ -358,7 +358,7 @@ export function NovoPerfilUsuario({
             <div className="space-y-2">
               {/* Toggle Cancelar Venda */}
               <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
-                <span className="text-primary-text font-medium">Pode Cancelar Venda?</span>
+                <span className="text-primary-text font-medium text-sm md:text-base">Pode Cancelar Venda?</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
@@ -372,7 +372,7 @@ export function NovoPerfilUsuario({
 
               {/* Toggle Cancelar Produto */}
               <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
-                <span className="text-primary-text font-medium">Pode Cancelar Produto?</span>
+                <span className="text-primary-text font-medium text-sm md:text-base">Pode Cancelar Produto?</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
@@ -386,7 +386,7 @@ export function NovoPerfilUsuario({
 
               {/* Toggle Aplicar Desconto Produto */}
               <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
-                <span className="text-primary-text font-medium">Pode Aplicar Desconto no Produto?</span>
+                <span className="text-primary-text font-medium text-sm md:text-base">Pode Aplicar Desconto no Produto?</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
@@ -400,7 +400,7 @@ export function NovoPerfilUsuario({
 
               {/* Toggle Aplicar Desconto Venda */}
               <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
-                <span className="text-primary-text font-medium">Pode Aplicar Desconto na Venda?</span>
+                <span className="text-primary-text font-medium text-sm md:text-base">Pode Aplicar Desconto na Venda?</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
@@ -414,7 +414,7 @@ export function NovoPerfilUsuario({
 
               {/* Toggle Aplicar Acréscimo Produto */}
               <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
-                <span className="text-primary-text font-medium">Pode Aplicar Acréscimo no Produto?</span>
+                <span className="text-primary-text font-medium text-sm md:text-base">Pode Aplicar Acréscimo no Produto?</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
@@ -428,7 +428,7 @@ export function NovoPerfilUsuario({
 
               {/* Toggle Aplicar Acréscimo Venda */}
               <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
-                <span className="text-primary-text font-medium">Pode Aplicar Acréscimo na Venda?</span>
+                <span className="text-primary-text font-medium text-sm md:text-base">Pode Aplicar Acréscimo na Venda?</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"

@@ -126,7 +126,7 @@ export function IconPickerModal({
       onClick={onClose}
     >
       <div
-        className="bg-info rounded-2xl w-[95vw] max-w-6xl h-[85vh] max-h-[700px] flex flex-col shadow-2xl border border-secondary/20"
+        className="bg-info rounded-2xl w-[95vw] max-w-6xl h-[85vh] max-h-[700px] flex flex-col shadow-2xl border border-primary/20"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header com busca e fechar */}
@@ -138,7 +138,7 @@ export function IconPickerModal({
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               placeholder="Buscar ícone..."
-              className="w-full pl-12 pr-4 py-3 bg-primary-bg border-2 border-alternate rounded-lg text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary font-nunito"
+              className="w-full pl-12 pr-4 py-2 bg-primary-bg border-2 border-primary rounded-lg text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary font-nunito"
             />
           </div>
           <button
@@ -157,7 +157,7 @@ export function IconPickerModal({
                 key={group}
                 onClick={() => setActiveTab(index)}
                 className={`
-                  px-6 py-4 font-nunito font-semibold text-sm
+                  md:px-6 px-2 py-4 font-nunito font-semibold md:text-sm text-xs
                   transition-colors whitespace-nowrap
                   relative
                   ${
@@ -176,8 +176,13 @@ export function IconPickerModal({
         {/* Grid de ícones */}
         <div className="flex-1 overflow-y-auto p-4">
           {isLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            <div className="flex flex-col items-center justify-center h-full gap-2">
+              <img
+                src="/images/jiffy-loading.gif"
+                alt="Carregando"
+                className="w-16 h-16 object-contain"
+              />
+              <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
             </div>
           ) : filteredIcons.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center">
@@ -191,7 +196,7 @@ export function IconPickerModal({
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
+            <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-8 md:gap-3 gap-2">
               {filteredIcons.map((icon) => (
                 <IconCard
                   key={icon.name}

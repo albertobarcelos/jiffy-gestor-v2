@@ -151,7 +151,6 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         }
 
         acumulado.push(...newComplementos)
-        setComplementos([...acumulado])
 
         if (totalFromApi !== null) {
           setTotalComplementos(totalFromApi)
@@ -529,13 +528,13 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px] py-2 flex-shrink-0">
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="min-w-[220px] flex-1 pl-5">
+      <div className="md:px-[30px] px-1 py-2 flex-shrink-0">
+        <div className="flex flex-wrap md:items-end gap-4">
+          <div className="md:min-w-[220px] flex-1 pl-5">
             <p className="text-primary text-sm font-semibold font-nunito">
               Complementos Cadastrados
             </p>
-            <p className="text-tertiary text-[22px] font-medium font-nunito">
+            <p className="text-tertiary md:text-[22px] text-sm font-medium font-nunito">
               Total {complementos.length} de {totalComplementos}
             </p>
           </div>
@@ -555,7 +554,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
       </div>
 
       <div className="h-[4px] border-t-2 border-primary/70 flex-shrink-0"></div>
-      <div className="flex gap-3 px-[20px] flex-shrink-0">
+      <div className="flex gap-3 md:px-[20px] px-1 flex-shrink-0">
         <div className="flex-1 min-w-[180px] max-w-[360px]">
             <label
               htmlFor="complementos-search"
@@ -598,21 +597,21 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
           </div>
 
       {/* Cabeçalho da tabela */}
-      <div className="px-[30px] py-2 flex-shrink-0">
-        <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px]">
-          <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text">
+      <div className="md:px-[30px] py-2 flex-shrink-0">
+        <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center md:gap-[10px]">
+          <div className="md:flex-[3] flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Nome
           </div>
-          <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text">
+          <div className="flex-[3] font-nunito font-semibold md:text-sm text-xs text-primary-text hidden md:flex">
             Descrição
           </div>
-          <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
+          <div className="flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Valor
           </div>
-          <div className="flex-1 font-nunito font-semibold text-sm text-primary-text text-center">
-            Tipo Impacto
+          <div className="flex-[1] font-nunito font-semibold md:text-sm text-xs text-primary-text text-center">
+            Impacto
           </div>
-          <div className="flex-[2] text-center font-nunito font-semibold text-sm text-primary-text">
+          <div className="md:flex-[2] flex-[1] md:text-center text-right font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Status
           </div>
         </div>
@@ -621,16 +620,29 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
       {/* Lista de complementos com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-[30px] mt-2 scrollbar-hide"
+        className="flex-1 overflow-y-auto md:px-[30px] mt-2 scrollbar-hide"
         style={{ maxHeight: 'calc(100vh - 300px)' }}
       >
-        {complementos.length === 0 && !isLoading && (
+        {/* Mostrar loading apenas quando está carregando e não há complementos ainda */}
+        {(isLoading || !hasLoadedInitialRef.current) && complementos.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 gap-2">
+            <img
+              src="/images/jiffy-loading.gif"
+              alt="Carregando..."
+              className="w-20 h-20"
+            />
+            <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
+          </div>
+        )}
+
+        {/* Só exibir mensagem de "nenhum complemento" quando realmente não há complementos e já houve tentativa de carregamento */}
+        {complementos.length === 0 && !isLoading && hasLoadedInitialRef.current && (
           <div className="flex items-center justify-center py-12">
             <p className="text-secondary-text">Nenhum complemento encontrado.</p>
           </div>
         )}
 
-        {complementos.map((complemento) => {
+        {complementos.map((complemento, index) => {
           // Handler para abrir edição ao clicar na linha
           const handleRowClick = () => {
             openTabsModal({
@@ -639,21 +651,25 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
             })
           }
 
+          // Intercala cores de fundo: cinza-50 para pares, branco para ímpares
+          const isZebraEven = index % 2 === 0
+          const bgClass = isZebraEven ? 'bg-gray-50' : 'bg-white'
+
           return (
           <div
             key={complemento.getId()}
             onClick={handleRowClick}
-            className=" bg-info rounded-lg px-4 mb-2 flex items-center gap-[10px] shadow-xl hover:shadow-md transition-shadow hover:bg-secondary-bg/15 cursor-pointer"
+            className={`${bgClass} rounded-lg md:px-4 px-1 py-3 flex items-center md:gap-[10px] gap-1 hover:bg-secondary-bg/15 cursor-pointer`}
           >
-            <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text flex items-center gap-1">
+            <div className="md:flex-[3] flex-[2] font-nunito font-semibold md:text-sm text-[10px] text-primary-text flex items-center gap-1">
               <span># {complemento.getNome()}</span>
             </div>
-            <div className="flex-[3] font-nunito text-sm text-secondary-text">
+            <div className="flex-[3] font-nunito text-sm text-secondary-text hidden md:flex">
               {complemento.getDescricao() || 'Nenhuma'}
             </div>
 
             <div className="flex-[2]" onClick={(e) => e.stopPropagation()}>
-              <div className="flex flex-col mt-2 items-start gap-1">
+              <div className="flex flex-col items-start gap-1">
                  <div className="flex items-center justify-end gap-2 px-3 py-1 rounded-lg border border-gray-300 bg-white max-w-[140px]">
                  
                    <input
@@ -673,18 +689,15 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
                     }}
                     onClick={(e) => e.stopPropagation()}
                     disabled={!!savingValorMap[complemento.getId()]}
-                    className={`w-full bg-transparent text-left text-sm font-semibold text-primary-text focus:outline-none ${
+                    className={`w-full bg-transparent text-left md:text-sm text-[10px] font-semibold text-primary-text focus:outline-none ${
                       savingValorMap[complemento.getId()] ? 'opacity-70 cursor-not-allowed' : ''
                     }`}
                   />
                 </div>
-                <span className="text-xs text-secondary-text font-semibold mb-2">
-                  R$ {complemento.getValor().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </span>
               </div>
             </div>
 
-            <div className="flex-1 font-nunito text-sm text-secondary-text text-center" onClick={(e) => e.stopPropagation()}>
+            <div className="flex-1 font-nunito md:text-sm text-[10px] text-secondary-text text-center" onClick={(e) => e.stopPropagation()}>
               <select
                 value={(complemento.getTipoImpactoPreco() || 'nenhum').toLowerCase()}
                 onChange={(e) =>
@@ -695,7 +708,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
                 }
                 onClick={(e) => e.stopPropagation()}
                 disabled={!!savingTipoMap[complemento.getId()]}
-                className={`w-full px-0 py-1 rounded-lg border border-gray-300 bg-white text-sm font-semibold text-primary-text focus:outline-none focus:border-primary text-center ${
+                className={`w-full px-0 py-1 rounded-lg border border-gray-300 bg-white md:text-sm text-[10px] font-semibold text-primary-text focus:outline-none focus:border-primary text-center ${
                   savingTipoMap[complemento.getId()] ? 'opacity-70 cursor-not-allowed' : ''
                 }`}
               >
@@ -704,9 +717,9 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
                 <option value="diminui">Diminui</option>
               </select>
             </div>
-            <div className="flex-[2] flex justify-center" onClick={(e) => e.stopPropagation()}>
+            <div className="md:flex-[2] flex-[1] flex md:justify-center justify-end" onClick={(e) => e.stopPropagation()}>
               <label
-                className={`relative inline-flex h-5 w-12 items-center ${
+                className={`relative inline-flex md:h-5 h-4 md:w-12 w-8 items-center ${
                   togglingStatus[complemento.getId()]
                     ? 'cursor-not-allowed opacity-60'
                     : 'cursor-pointer'
@@ -727,18 +740,12 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
                   disabled={!!togglingStatus[complemento.getId()]}
                 />
                 <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                <span className="absolute left-1 top-1/2 block h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-6" />
+                <span className="absolute md:left-1 left-0.5 top-1/2 block md:h-3 h-2.5 md:w-3 w-2.5 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 md:peer-checked:translate-x-6 peer-checked:translate-x-[18px]" />
               </label>
             </div>
           </div>
           )
         })}
-
-        {isLoading && (
-          <div className="flex justify-center py-4">
-            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        )}
       </div>
 
       <ComplementosTabsModal
