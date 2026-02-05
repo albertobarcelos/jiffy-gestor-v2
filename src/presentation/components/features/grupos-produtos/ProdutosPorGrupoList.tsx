@@ -6,6 +6,7 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
@@ -56,8 +57,21 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
   const listRef = useRef<HTMLDivElement>(null)
   const loadMoreRef = useRef<HTMLDivElement>(null)
 
+  // Sensores para drag and drop
+  // TouchSensor para mobile - delay curto para melhor UX, tolerance para evitar conflito com scroll
+  // PointerSensor para desktop com constraint de distância para evitar drag acidental
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 100, // Delay de 100ms em touch para evitar conflito com scroll
+        tolerance: 8, // Tolerância de 8px - permite pequeno movimento antes de ativar
+      },
+    }),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Requer movimento de 8px para ativar (evita drag acidental em desktop)
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -366,12 +380,14 @@ function ProdutoItem({
       </div>
       <div className="col-span-3 md:text-sm text-xs text-primary-text">{formatCurrency(produto.valor)}</div>
       <div
-        className="col-span-2 flex justify-end pr-2 cursor-grab active:cursor-grabbing text-secondary-text hover:text-primary transition"
+        className="col-span-2 flex justify-end pr-2 cursor-grab active:cursor-grabbing text-secondary-text hover:text-primary active:text-primary transition touch-manipulation min-h-[35px] items-center"
         {...attributes}
         {...listeners}
+        style={{ touchAction: 'none' }}
+        title="Arraste para reordenar"
       >
         <svg
-          className="md:w-5 md:h-5 w-3 h-3"
+          className="md:w-5 md:h-5 w-4 h-4"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"

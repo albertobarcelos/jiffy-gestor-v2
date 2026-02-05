@@ -6,6 +6,7 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   DragEndEvent,
@@ -68,10 +69,18 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
 
   // Sensores para drag and drop
+  // TouchSensor para mobile - delay curto para melhor UX, tolerance para evitar conflito com scroll
+  // PointerSensor para desktop com constraint de distância para evitar drag acidental
   const sensors = useSensors(
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 100, // Delay de 100ms em touch para evitar conflito com scroll
+        tolerance: 8, // Tolerância de 8px - permite pequeno movimento antes de ativar
+      },
+    }),
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8, // Requer movimento de 8px para ativar (evita drag acidental)
+        distance: 8, // Requer movimento de 8px para ativar (evita drag acidental em desktop)
       },
     }),
     useSensor(KeyboardSensor, {
@@ -503,7 +512,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
               <img
                 src="/images/jiffy-loading.gif"
                 alt="Carregando"
-                className="w-16 h-16 object-contain"
+                className="w-20 h-20 object-contain"
               />
               <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
             </div>

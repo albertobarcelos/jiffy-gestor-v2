@@ -76,20 +76,25 @@ export const GrupoItem = memo(function GrupoItem({
     )
   }, [corHex, iconName, grupo, onEdit])
 
+  const bgColor = useMemo(() => {
+    return index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+  }, [index])
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className="h-[50px] bg-info rounded-lg md:px-4 px-1 mb-2 flex items-center gap-[10px] hover:bg-[var(--color-primary-background)] transition-colors cursor-default shadow-md  hover:shadow-md"
+      className={`md:h-[50px] py-2 ${bgColor} rounded-lg md:px-4 px-1 mb-2 flex items-center gap-[10px] hover:bg-[var(--color-primary-background)] transition-colors cursor-default hover:shadow-md`}
     >
       {/* Handle de arrastar - apenas esta área é arrastável */}
       <div
         {...attributes}
         {...listeners}
-        className="flex-[1] font-nunito font-semibold text-sm text-primary-text flex items-center gap-2 cursor-grab active:cursor-grabbing select-none hover:bg-primary-bg/30 rounded-lg md:px-2 px-1 py-1 transition-colors"
+        className="flex-[1] font-nunito font-semibold text-sm text-primary-text flex items-center gap-2 cursor-grab active:cursor-grabbing select-none hover:bg-primary-bg/30 active:bg-primary-bg/50 rounded-lg md:px-2 px-2 py-2 min-h-[44px] touch-manipulation"
         title="Arraste para reordenar"
+        style={{ touchAction: 'none' }}
       >
-        <span className="text-secondary-text md:text-lg text-sm leading-none">☰</span>
+        <span className="text-secondary-text md:text-lg text-base leading-none">☰</span>
         <span>{index + 1}</span>
       </div>
 
