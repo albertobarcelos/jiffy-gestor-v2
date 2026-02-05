@@ -221,7 +221,7 @@ export default function DashboardPage() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="space-y-2 bg-custom-2/50 p-2 rounded-lg mt-2"
+      className="space-y-2 bg-custom-2/50 py-2 px-1 rounded-lg mt-2"
     >
       {/* Barra de seleção de período */}
       <motion.div variants={itemVariants} className="flex flex-col md:flex-row items-center justify-start gap-2 mt-2">
@@ -300,16 +300,16 @@ export default function DashboardPage() {
         {/* Coluna esquerda - 2 colunas */}
         <motion.div variants={slideFromLeftVariants} initial="hidden" animate="visible" className="lg:col-span-2 space-y-6">
           {/* Gráfico de evolução */}
-          <div className="bg-white rounded-lg shadow-sm shadow-primary/70 border border-gray-200 px-2 md:px-6 py-2">
-                   <div className="mb-6 flex items-start gap-4 md:gap-12">
+          <div className="bg-white md:h-[440px] h-[600px] rounded-lg shadow-sm shadow-primary/70 border border-gray-200 px-2 md:px-6 py-2 flex flex-col">
+                   <div className="mb-1 flex md:flex-row flex-col items-start gap-4 md:gap-12 flex-shrink-0">
                      <div className="flex flex-col items-start justify-start">
                       <h3 className="md:text-lg text-sm font-semibold text-primary">Evolução de Vendas</h3>
                       <p className="md:text-sm text-xs text-primary/70">{getPeriodoLabel(periodo, periodoInicial, periodoFinal)}</p>
                      </div>
-                     <div className="flex flex-col gap-4">
+                     <div className="flex flex-col">
                        <FormGroup
                          sx={{
-                           flexDirection: { xs: 'column', md: 'row' },
+                           flexDirection: { xs: 'row', md: 'row' },
                            alignItems: { xs: 'flex-start', md: 'center' },
                            gap: { xs: 0, md: 0 },
                          }}
@@ -350,15 +350,17 @@ export default function DashboardPage() {
                          />
                        </FormGroup>
                        {/* Checkboxes para intervalo de tempo (apenas quando for exibir por hora) */}
-                       {(periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) && (
+                       {(periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) ? (
                          <FormGroup
                            sx={{
-                             flexDirection: { xs: 'column', md: 'row' },
+                             flexDirection: { xs: 'row', md: 'row' },
                              alignItems: { xs: 'flex-start', md: 'center' },
                              gap: { xs: 0, md: 0 },
                            }}
                          >
+                          <div className="flex flex-col">
                            <span className="md:text-sm text-xs text-primary/70 mr-2">Intervalo:</span>
+                           <div className="flex flex-row">
                            <FormControlLabel
                              control={
                                <Checkbox
@@ -410,19 +412,26 @@ export default function DashboardPage() {
                              }
                              label={<span className="md:text-sm text-xs">1h</span>}
                            />
+                         </div>
+                         </div>
                          </FormGroup>
+                         
+                       ) : (
+                         <div className="h-[32px]"></div>
                        )}
                      </div>
                    </div>
-            <Suspense fallback={<Skeleton variant="rectangular" height={300} />}>
-              <GraficoVendasLinha 
-                periodo={periodo} 
-                selectedStatuses={selectedStatuses}
-                periodoInicial={periodoInicial}
-                periodoFinal={periodoFinal}
-                intervaloHora={intervaloHora}
-              />
-            </Suspense>
+            <div className="flex-1 min-h-0">
+              <Suspense fallback={<Skeleton variant="rectangular" height={300} />}>
+                <GraficoVendasLinha 
+                  periodo={periodo} 
+                  selectedStatuses={selectedStatuses}
+                  periodoInicial={periodoInicial}
+                  periodoFinal={periodoFinal}
+                  intervaloHora={intervaloHora}
+                />
+              </Suspense>
+            </div>
           </div>
         </motion.div>
 
@@ -445,7 +454,7 @@ export default function DashboardPage() {
           variants={slideFromLeftVariants}
           initial="hidden"
           animate="visible"
-          className="flex md:flex-row flex-col md:space-x-2 space-y-2 bg-transparent overflow-x-hidden md:overflow-x-auto border border-primary/50 rounded-lg md:px-2 px-1 pt-2 md:cursor-grab md:active:cursor-grabbing select-none"
+          className="flex md:flex-row flex-col md:space-x-2 space-y- bg-transparent overflow-x-hidden md:overflow-x-auto border border-primary/50 rounded-lg md:px-2 px-1 pt-2 md:cursor-grab md:active:cursor-grabbing select-none"
           ref={scrollContainerRef}
           style={{ scrollBehavior: 'smooth' }}
           onMouseDown={handleDragStart}
@@ -491,7 +500,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Gráfico de top produtos (por quantidade) */}
-            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 md:p-6 p-3 w-full md:flex-1 xl:min-w-[500px] md:w-auto">
+            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 md:px-6 px-1 py-2 w-full md:min-w-[500px] md:w-auto">
               <div className="mb-4">
                 <h3 className="text-base md:text-lg font-semibold text-primary">Quantidade de Produtos Vendidos</h3>
                 <p className="text-xs md:text-sm text-primary/70">Distribuição dos Top Produtos</p>
@@ -502,7 +511,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Novo Gráfico de top produtos (por valor total) */}
-            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 md:p-6 p-3 w-full md:flex-1 xl:min-w-[600px] md:w-auto">
+            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 md:px-6 px-1 py-2 w-full md:min-w-[500px] md:w-auto">
               <div className="mb-4">
                 <h3 className="text-base md:text-lg font-semibold text-primary">Valor Total dos Produtos Vendidos</h3>
                 <p className="text-xs md:text-sm text-primary/70">Distribuição por Valor</p>

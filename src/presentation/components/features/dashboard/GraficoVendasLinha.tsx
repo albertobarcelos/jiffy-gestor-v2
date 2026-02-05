@@ -77,7 +77,7 @@ export function GraficoVendasLinha({ periodo, selectedStatuses, periodoInicial, 
 
   if (isLoading) {
     return (
-      <div className="h-[300px] flex items-center justify-center">
+      <div className="h-full min-h-[300px] flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
       </div>
     )
@@ -85,7 +85,7 @@ export function GraficoVendasLinha({ periodo, selectedStatuses, periodoInicial, 
 
   if (error) {
     return (
-      <div className="h-[300px] flex items-center justify-center">
+      <div className="h-full min-h-[300px] flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-600 mb-4">{error}</p>
           <button
@@ -101,7 +101,7 @@ export function GraficoVendasLinha({ periodo, selectedStatuses, periodoInicial, 
 
   if (!data || data.length === 0) {
     return (
-      <div className="h-[300px] flex items-center justify-center">
+      <div className="h-full min-h-[300px] flex items-center justify-center">
         <p className="text-gray-500">Nenhum dado disponível</p>
       </div>
     )
@@ -133,10 +133,10 @@ export function GraficoVendasLinha({ periodo, selectedStatuses, periodoInicial, 
   const finalMaxDomain = currentMax * 1.1;
 
   return (
-    <div className="w-full min-w-0" style={{ height: '300px' }}>
-      <ResponsiveContainer width="100%" height={300}>
+    <div className="w-full min-w-0 h-full" style={{ minHeight: '300px' }}>
+      <ResponsiveContainer width="100%" height="100%">
         <LineChart data={chartData} margin={{
-          top: 5, right: 30, left: 0, bottom: 5, // Aumenta a margem esquerda para o eixo Y
+          top: 5, right: 10, left: -25, bottom: 5, // Aumenta a margem esquerda para o eixo Y
         }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" opacity={0.5} />
           <XAxis

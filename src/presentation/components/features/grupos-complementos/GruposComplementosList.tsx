@@ -81,9 +81,9 @@ const GrupoItem = memo(function GrupoItem({
           rowIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'
         }`}
       >
-        <div className="w-16 flex-col items-center text-center text-xs text-secondary-text hidden md:flex">
+        <div className="w-16 flex-col items-start text-xs text-secondary-text hidden md:flex">
           
-          <span className="text-sm font-semibold text-primary-text/70">
+          <span className="text-sm text-left font-semibold text-primary-text/70">
             {ordemPosicional}
           </span>
         </div>
@@ -585,13 +585,13 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
       {/* Cabeçalho da tabela */}
       <div className="md:px-[30px] px-1 flex-shrink-0">
         <div className="h-10 bg-custom-2 rounded-lg md:px-4 px-1 flex items-center gap-[10px]">
-          <div className="w-16 font-nunito font-semibold text-sm text-primary-text text-center hidden md:flex">
+          <div className="w-16 font-nunito font-semibold text-sm text-primary-text justify-start hidden md:flex">
             Ordem
           </div>
           <div className="md:flex-[3] flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Nome
           </div>
-          <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text text-center hidden md:flex">
+          <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text justify-center hidden md:flex">
             Qtd de Complementos
           </div>
           <div className="flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text">

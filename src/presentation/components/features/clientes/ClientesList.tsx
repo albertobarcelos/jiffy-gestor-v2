@@ -408,7 +408,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
           <div
             key={cliente.getId()}
             onClick={handleRowClick}
-            className={`${bgClass} rounded-lg md:px-4 py-1 mb-1 flex items-center hover:bg-secondary-bg/15 cursor-pointer`}
+            className={`${bgClass} rounded-lg md:px-4 py-2 mb-1 flex items-center hover:bg-secondary-bg/15 cursor-pointer`}
           >
             <div className="flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text flex items-center">
               <span>{cliente.getNome()}</span>

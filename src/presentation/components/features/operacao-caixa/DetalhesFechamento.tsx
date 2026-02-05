@@ -215,8 +215,8 @@ export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesF
       PaperProps={{
         sx: {
           borderRadius: '12px',
-          width: { xs: '95vw', sm: '88vw', md: '80vw' },
-          maxWidth: { xs: '95vw', sm: '720px', md: '820px' },
+          width: { xs: '95vw', md: '620px' },
+          maxWidth: { xs: '95vw', md: '620px' },
           margin: { xs: 0, sm: '0 auto' },
           maxHeight: '90vh',
           backgroundColor: '#FFFFD9',
