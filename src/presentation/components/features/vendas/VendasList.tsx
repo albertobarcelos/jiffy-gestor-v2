@@ -1073,16 +1073,16 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             <div className="flex-1 text-xs md:text-sm text-center uppercase">
               Tipo Venda
             </div>
-            <div className="flex-1 text-center uppercase hidden md:flex">
+            <div className="flex-1 justify-center uppercase hidden md:flex">
               Cód. Terminal
             </div>
             <div className="flex-[2] text-xs md:text-sm text-center uppercase">
               Usuário PDV
             </div>
-            <div className="flex-1 text-xs md:text-sm uppercase">
+            <div className="flex-1 text-xs md:text-sm text-right uppercase">
               VL. Faturado
             </div>
-            <div className="flex-1 text-xs md:text-sm uppercase hidden md:flex">
+            <div className="flex-1 text-xs md:text-sm justify-end uppercase hidden md:flex">
               VL. Cancelado
             </div>
             <div className="flex-1 justify-end  uppercase hidden md:flex">
@@ -1136,7 +1136,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                     return baseClasses
                   })()}`}>
                 
-                  <div className="flex-1 hidden md:flex">
+                  <div className="flex-1 hidden md:block">
                     <span className="text-sm font-semibold text-primary-text font-nunito">
                       #{venda.codigoVenda}
                     </span>
@@ -1154,7 +1154,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                     size={isMobileViewport ? 45 : 60}
                   />
                   </div>
-                  <div className="flex-1 text-center hidden md:flex">
+                  <div className="flex-1 text-center hidden md:block">
                     <span className="text-sm text-primary-text font-nunito">
                       #{venda.codigoTerminal}
                     </span>
@@ -1167,7 +1167,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                       {venda.dataCancelamento ? '-' : formatCurrency(venda.valorFinal)}
                     </span>
                   </div>
-                  <div className="flex-1 hidden md:flex">
+                  <div className="flex-1 hidden md:block text-right">
                     <span className="text-xs md:text-sm text-primary-text font-nunito">
                       {venda.dataCancelamento ? formatCurrency(venda.valorFinal) : '-'}
                     </span>
