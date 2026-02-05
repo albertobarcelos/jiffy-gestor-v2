@@ -23,7 +23,7 @@ interface UltimasVendasProps {
   periodoFinal?: Date | null;
 }
 
-const LAST_SALES_DISPLAY_LIMIT = 10; // Definir o limite de últimas vendas a serem exibidas
+// Removido limite de exibição - agora exibe todas as vendas retornadas (até 100)
 
 /**
  * Componente de Últimas Vendas
@@ -173,10 +173,9 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
           )
         })
 
-        // Ordenar as vendas pela data mais recente e limitar ao número desejado
+        // Ordenar as vendas pela data mais recente (exibe todas as vendas retornadas, até 100)
         const ultimasVendas = vendasMapeadas
           .sort((a, b) => b.getData().getTime() - a.getData().getTime())
-          .slice(0, LAST_SALES_DISPLAY_LIMIT);
 
         setVendas(ultimasVendas)
 
