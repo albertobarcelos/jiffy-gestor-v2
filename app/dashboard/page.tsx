@@ -439,28 +439,46 @@ export default function DashboardPage() {
       </div>
 
       {/* Top Produtos - Container com botões de rolagem */}
-      <div className="relative w-full">
+      <div className="relative w-full max-w-full overflow-x-hidden">
         {/* Conteúdo rolável com drag-to-scroll */}
         <motion.div
           variants={slideFromLeftVariants}
           initial="hidden"
           animate="visible"
-          className="flex md:flex-row flex-col md:space-x-2 space-y-2 bg-transparent overflow-x-hidden border border-primary/50 rounded-lg px-2 pt-2 cursor-grab active:cursor-grabbing select-none"
+          className="flex md:flex-row flex-col md:space-x-2 space-y-2 bg-transparent overflow-x-hidden md:overflow-x-auto border border-primary/50 rounded-lg md:px-2 px-1 pt-2 md:cursor-grab md:active:cursor-grabbing select-none"
           ref={scrollContainerRef}
           style={{ scrollBehavior: 'smooth' }}
           onMouseDown={handleDragStart}
           onMouseMove={handleDragMove}
           onMouseUp={handleDragEnd}
           onMouseLeave={handleDragEnd}
-          onTouchStart={handleDragStart}
-          onTouchMove={handleDragMove}
-          onTouchEnd={handleDragEnd}
+          onTouchStart={(e) => {
+            // Desabilitar drag-to-scroll em mobile
+            if (window.innerWidth < 768) {
+              return
+            }
+            handleDragStart(e)
+          }}
+          onTouchMove={(e) => {
+            // Desabilitar drag-to-scroll em mobile
+            if (window.innerWidth < 768) {
+              return
+            }
+            handleDragMove(e)
+          }}
+          onTouchEnd={() => {
+            // Desabilitar drag-to-scroll em mobile
+            if (window.innerWidth < 768) {
+              return
+            }
+            handleDragEnd()
+          }}
         >
             {/* Tabela de top produtos */}
-            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 px-6 py-2 min-w-[500px]">
+            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 md:px-6 px-1 py-2 w-full md:min-w-[500px] md:w-auto">
               <div className="mb-2">
-                <h3 className="text-lg font-semibold text-primary">Top Produtos</h3>
-                <p className="text-sm text-primary/70">Os 10 mais vendidos</p>
+                <h3 className="text-base md:text-lg font-semibold text-primary">Top Produtos</h3>
+                <p className="text-xs md:text-sm text-primary/70">Os 10 mais vendidos</p>
               </div>
               <Suspense fallback={<Skeleton variant="rectangular" height={400} />}>
                 <TabelaTopProdutos 
@@ -473,10 +491,10 @@ export default function DashboardPage() {
             </div>
 
             {/* Gráfico de top produtos (por quantidade) */}
-            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 md:p-6 p-4 flex-1 xl:min-w-[500px]">
+            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 md:p-6 p-3 w-full md:flex-1 xl:min-w-[500px] md:w-auto">
               <div className="mb-4">
-                <h3 className="text-lg font-semibold text-primary">Quantidade de Produtos Vendidos</h3>
-                <p className="text-sm text-primary/70">Distribuição dos Top Produtos</p>
+                <h3 className="text-base md:text-lg font-semibold text-primary">Quantidade de Produtos Vendidos</h3>
+                <p className="text-xs md:text-sm text-primary/70">Distribuição dos Top Produtos</p>
               </div>
               <Suspense fallback={<Skeleton variant="rectangular" height={400} />}>
                 <GraficoTopProdutos data={topProdutosData} />
@@ -484,10 +502,10 @@ export default function DashboardPage() {
             </div>
 
             {/* Novo Gráfico de top produtos (por valor total) */}
-            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 p-6 flex-1 xl:min-w-[600px]">
+            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 md:p-6 p-3 w-full md:flex-1 xl:min-w-[600px] md:w-auto">
               <div className="mb-4">
-                <h3 className="text-lg font-semibold text-primary">Valor Total dos Produtos Vendidos</h3>
-                <p className="text-sm text-primary/70">Distribuição por Valor</p>
+                <h3 className="text-base md:text-lg font-semibold text-primary">Valor Total dos Produtos Vendidos</h3>
+                <p className="text-xs md:text-sm text-primary/70">Distribuição por Valor</p>
               </div>
               <Suspense fallback={<Skeleton variant="rectangular" height={400} />}>
                 <GraficoTopProdutosValor data={topProdutosData} />
