@@ -458,13 +458,13 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px] pt-2 flex-shrink-0">
+      <div className="md:px-[30px] px-1 pt-2 flex-shrink-0">
         <div className="flex items-start justify-between">
-          <div className="w-1/2 pl-5">
+          <div className="w-1/2 md:pl-5">
             <p className="text-primary text-sm font-semibold font-nunito">
               Meios de Pagamento Cadastrados
             </p>
-            <p className="text-tertiary text-[22px] font-medium font-nunito">
+            <p className="text-tertiary md:text-[22px] text-sm font-medium font-nunito">
               Total {meiosPagamento.length} de {totalMeiosPagamento}
             </p>
           </div>
@@ -479,22 +479,22 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
       </div>
 
       <div className="h-[4px] border-t-2 border-primary/70 flex-shrink-0"></div>
-      <div className="bg-white px-[20px] py-2 border-b border-gray-100 flex-shrink-0">
-        <div className="flex flex-wrap items-end gap-2">
+      <div className="bg-white md:px-[20px] px-1 py-2 border-b border-gray-100 flex-shrink-0">
+        <div className="flex flex-row items-start gap-2">
           {/* Barra de pesquisa */}
           <div className="flex-1 min-w-[180px] max-w-[360px]">
             <label htmlFor="meios-pagamentos-search" className="text-xs font-semibold text-secondary-text mb-1 block">
               Buscar meio de pagamento...
             </label>
             <div className="relative h-8">
-              <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text" size={18} />
+              <MdSearch className="absolute md:left-4 left-1 top-1/2 -translate-y-1/2 text-secondary-text" size={18} />
               <input
                 id="meios-pagamentos-search"
                 type="text"
                 placeholder="Pesquisar..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+                className="w-full h-full md:pl-11 pl-5 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
               />
             </div>
           </div>
@@ -520,21 +520,21 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
       </div>
 
       {/* Cabeçalho da tabela */}
-      <div className="px-[30px] mt-0 flex-shrink-0">
-        <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px]">
-          <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text">
+      <div className="md:px-[30px] px-1 mt-0 flex-shrink-0">
+        <div className="h-10 bg-custom-2 rounded-lg md:px-4 px-1 flex items-center gap-[10px]">
+          <div className="flex-[3] font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Nome
           </div>
-          <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
+          <div className="flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text hidden md:flex">
             Forma Fiscal
           </div>
-          <div className="flex-[2] text-center font-nunito font-semibold text-sm text-primary-text">
+          <div className="md:flex-[2] flex-[1] text-center font-nunito font-semibold md:text-sm text-xs text-primary-text">
             TEF Ativo
           </div>
-          <div className="flex-[2] text-center font-nunito font-semibold text-sm text-primary-text">
+          <div className="md:flex-[2] flex-[1] text-center font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Status
           </div>
-          <div className="flex-[2] text-right font-nunito font-semibold text-sm text-primary-text">
+          <div className="md:flex-[2] flex-[1] text-right font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Ações
           </div>
         </div>
@@ -543,7 +543,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
       {/* Lista de meios de pagamento com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-[30px] mt-2 scrollbar-hide"
+        className="flex-1 overflow-y-auto md:px-[30px] px-1 mt-2 scrollbar-hide"
         style={{ maxHeight: 'calc(100vh - 300px)' }}
       >
         {meiosPagamento.length === 0 && !isLoading && (
@@ -552,7 +552,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
           </div>
         )}
 
-        {meiosPagamento.map((meioPagamento) => {
+        {meiosPagamento.map((meioPagamento, index) => {
           // Handler para abrir edição ao clicar na linha
           const handleRowClick = () => {
             openTabsModal({
@@ -565,18 +565,18 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
           <div
             key={meioPagamento.getId()}
             onClick={handleRowClick}
-            className="bg-info rounded-lg mb-2 shadow-lg hover:bg-secondary-bg/15 transition-colors cursor-pointer"
+            className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} rounded-lg mb-2 hover:bg-secondary-bg/15 transition-colors cursor-pointer`}
           >
-            <div className="h-[50px] px-4 flex items-center gap-[10px]">
-              <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text flex items-center gap-2">
+            <div className="h-[50px] md:px-4 px-1 flex items-center gap-[10px]">
+              <div className="flex-[3] font-nunito font-semibold md:text-sm text-xs text-primary-text flex items-center gap-2">
                 # <span>{meioPagamento.getNome()}</span>
               </div>
-              <div className="flex-[2] font-nunito text-sm text-secondary-text">
+              <div className="flex-[2] font-nunito text-sm text-secondary-text hidden md:flex">
                 {formatarFormaPagamentoFiscal(meioPagamento.getFormaPagamentoFiscal())}
               </div>
-              <div className="flex-[2] flex justify-center" onClick={(e) => e.stopPropagation()}>
+              <div className="md:flex-[2] flex-[1] flex justify-center" onClick={(e) => e.stopPropagation()}>
                 <label
-                  className={`relative inline-flex h-5 w-12 items-center ${
+                  className={`relative inline-flex h-4 w-8 md:h-5 md:w-12 items-center ${
                     updatingTefAtivo[meioPagamento.getId()]
                       ? 'cursor-not-allowed opacity-60'
                       : 'cursor-pointer'
@@ -597,12 +597,12 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
                     disabled={!!updatingTefAtivo[meioPagamento.getId()]}
                   />
                   <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                  <span className="absolute left-1 top-1/2 block h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-6" />
+                  <span className="absolute left-1 top-1/2 block h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 md:h-3 md:w-3 peer-checked:translate-x-4 md:peer-checked:translate-x-6" />
                 </label>
               </div>
-              <div className="flex-[2] flex justify-center" onClick={(e) => e.stopPropagation()}>
+              <div className="md:flex-[2] flex-[1] flex justify-center" onClick={(e) => e.stopPropagation()}>
                 <label
-                  className={`relative inline-flex h-5 w-12 items-center ${
+                  className={`relative inline-flex h-4 w-8 md:h-5 md:w-12 items-center ${
                     updatingAtivo[meioPagamento.getId()]
                       ? 'cursor-not-allowed opacity-60'
                       : 'cursor-pointer'
@@ -623,10 +623,10 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
                     disabled={!!updatingAtivo[meioPagamento.getId()]}
                   />
                   <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                  <span className="absolute left-1 top-1/2 block h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-6" />
+                  <span className="absolute left-1 top-1/2 block h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 md:h-3 md:w-3 peer-checked:translate-x-4 md:peer-checked:translate-x-6" />
                 </label>
               </div>
-              <div className="flex-[2] flex justify-end" onClick={(e) => e.stopPropagation()}>
+              <div className="md:flex-[2] flex-[1] flex justify-end" onClick={(e) => e.stopPropagation()}>
                 <button
                   type="button"
                   onClick={(e) => {
