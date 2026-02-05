@@ -177,14 +177,14 @@ export function PainelContadorView() {
       </div>
 
       {/* Painel Direito - Cards com stepper vertical */}
-      <div className="flex w-[42%] flex-col gap-4 p-2 sm:p-3 lg:min-h-full lg:overflow-auto">
+      <div className="flex md:w-[42%] flex-col gap-4 p-2 sm:p-3 lg:min-h-full lg:overflow-auto">
         {[
           {
             id: 1,
             title: 'Configurar Certificado Digital',
             content: (
               <>
-              <div className="flex flex-row w-full mb-2 items-center rounded-[10px] px-3 py-1 gap-2">
+              <div className="flex flex-row w-full mb-2 items-center rounded-[10px] md:px-3 py-1 md:gap-2">
                 <div className="flex flex-col gap-1">
                 <p className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
                   Cadastre o certificado digital da empresa e deixe sua comunicação com a SEFAZ funcionando
@@ -196,10 +196,10 @@ export function PainelContadorView() {
                     Validade: 22/12/2025
                   </span>
                 </div>
-                <div className="flex flex-col w-full mb-2 items-center rounded-[10px] px-3 py-1 gap-2">
+                <div className="flex flex-col w-full mb-2 items-center rounded-[10px] md:px-3 py-1 gap-2">
                   <Button
                     onClick={handleOpenCertificadoConfig}
-                    className="rounded-lg px-3 py-2 text-white text-sm font-medium"
+                    className="rounded-lg md:px-3 md:py-2 py-1 text-white text-sm font-medium"
                     sx={{
                       backgroundColor: 'var(--color-secondary)',
                       '&:hover': { backgroundColor: 'var(--color-alternate)' },
@@ -207,7 +207,7 @@ export function PainelContadorView() {
                   >
                     Cadastrar Certificado
                   </Button>
-                  <span className="font-inter font-medium text-[#f6f8fc] text-sm bg-accent1 rounded-lg px-3 py-1">
+                  <span className="font-inter font-medium text-[#f6f8fc] text-sm bg-accent1 rounded-lg md:px-3 px-1 md:py-1 py-1">
                     Expira em 27 dias
                   </span>
                   </div>
@@ -220,15 +220,15 @@ export function PainelContadorView() {
             title: 'Mapear NCM, Cest e CFOP',
             content: (
               <>
-              <div className="flex flex-row w-full mb-2 items-center rounded-[10px] px-3 py-1 gap-2">
+              <div className="flex flex-row w-full mb-2 items-center rounded-[10px] md:px-3 py-1 md:gap-2">
                 <div className="flex flex-row justify-between gap-1">
                 <p className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
                   Classifique produtos para que notas e impostos sejam calculados corretamente
                 </p>
-                <div className="flex flex-col w-full mb-2 items-center rounded-[10px] px-3 py-1 gap-2">
+                <div className="flex flex-col w-full mb-2 items-center rounded-[10px] md:px-3 py-1 gap-2">
                   <Button
                     onClick={handleOpenNCMConfig}
-                    className="rounded-lg px-3 py-2 text-white text-sm font-medium"
+                    className="rounded-lg md:px-3 md:py-2 py-1 text-white text-sm font-medium"
                     sx={{
                       backgroundColor: 'var(--color-secondary)',
                       '&:hover': { backgroundColor: 'var(--color-alternate)' },
@@ -236,7 +236,7 @@ export function PainelContadorView() {
                   >
                     Mapear Produtos
                   </Button>
-                  <div className="inline-flex items-center rounded-lg bg-[#ffa3a3] px-3 py-1 h-[26px] sm:h-[28px] lg:h-[30px] w-fit">
+                  <div className="inline-flex items-center rounded-lg bg-[#ffa3a3] px-3 py-2 sm:h-[28px] lg:h-[30px] w-fit">
                     <span className="font-inter font-medium text-[#dd1717] text-[11px] sm:text-[12px] leading-[1.4]">
                       8 PRODUTOS PENDENTES
                     </span>
@@ -252,8 +252,8 @@ export function PainelContadorView() {
             title: 'Configurar Impostos',
             content: (
               <>
-              <div className="flex flex-row w-full mb-2 items-center rounded-[10px] px-3 py-1 gap-2">
-                <div className="flex flex-col w-full mb-2 items-start rounded-[10px] px-3 py-1 gap-2">
+              <div className="flex flex-row w-full mb-2 items-center rounded-[10px] md:px-3 py-1 md:gap-2">
+                <div className="flex flex-col w-full mb-2 items-start rounded-[10px] md:px-3 py-1 gap-2">
                 <p className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
                   Configure os cenários fiscais e defina as regras de impostos para sua empresa
                 </p>
@@ -264,10 +264,10 @@ export function PainelContadorView() {
                     Status: Ativo
                   </span>
                 </div>
-                <div className="flex flex-col w-full mb-2 items-center rounded-[10px] px-3 py-1 gap-2">
+                <div className="flex flex-col w-full mb-2 items-center rounded-[10px] md:px-3 py-1 gap-2">
                   <Button
                     onClick={handleOpenImpostosConfig}
-                    className="rounded-lg px-3 py-2 text-white text-sm font-medium"
+                    className="rounded-lg md:px-3 md:py-2 py-1 text-white text-sm font-medium"
                     sx={{
                       backgroundColor: 'var(--color-secondary)',
                       '&:hover': { backgroundColor: 'var(--color-alternate)' },
