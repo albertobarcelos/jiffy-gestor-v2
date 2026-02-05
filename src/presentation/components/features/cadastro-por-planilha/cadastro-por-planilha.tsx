@@ -359,20 +359,20 @@ export function CadastroPorPlanilha() {
     <div className="flex flex-col h-full">
       {/* Header fixo com título */}
       <div className="sticky top-0 z-10 bg-primary-bg/90 backdrop-blur-sm rounded-tl-lg shadow-md">
-        <div className="px-[30px] py-[4px]">
-          <div className="rounded-lg border border-[#E0E4F3] bg-gradient-to-br from-[#F6F7FF] to-[#EEF1FB] px-6 py-3 shadow-[0_15px_45px_rgba(15,23,42,0.08)]">
-            <div className="flex items-start gap-4">
-              <div className="h-14 w-14 rounded-lg bg-white flex items-center justify-center shadow-inner text-primary">
-                <MdUpload className="text-2xl" />
+        <div className="md:px-[30px] px-2 py-[4px]">
+          <div className="rounded-lg border border-[#E0E4F3] bg-gradient-to-br from-[#F6F7FF] to-[#EEF1FB] md:px-6 px-3 md:py-3 py-2 shadow-[0_15px_45px_rgba(15,23,42,0.08)]">
+            <div className="flex items-start gap-2 md:gap-4">
+              <div className="h-10 w-10 md:h-14 md:w-14 rounded-lg bg-white flex items-center justify-center shadow-inner text-primary flex-shrink-0">
+                <MdUpload className="text-lg md:text-2xl" />
               </div>
-              <div>
-                <p className="text-sm font-semibold text-primary font-exo uppercase tracking-wide">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs md:text-sm font-semibold text-primary font-exo uppercase tracking-wide">
                   Cadastro em Massa
                 </p>
-                <h2 className="text-xl font-bold text-primary font-exo leading-tight">
+                <h2 className="text-base md:text-xl font-bold text-primary font-exo leading-tight">
                   Importar por Planilha
                 </h2>
-                <p className="text-sm text-secondary-text font-nunito">
+                <p className="text-xs md:text-sm text-secondary-text font-nunito">
                   {selectedStep === 0 && 'Baixe a planilha modelo e preencha os dados'}
                   {selectedStep === 1 && 'Faça upload da planilha preenchida'}
                   {selectedStep === 2 && 'Revise os resultados da importação'}
@@ -385,12 +385,12 @@ export function CadastroPorPlanilha() {
       </div>
 
       {/* Indicador de steps */}
-      <div className="px-5 py-1">
-        <div className="flex items-center justify-center gap-4">
+      <div className="md:px-5 px-2 py-1">
+        <div className="flex items-center justify-center gap-1 md:gap-4 overflow-x-auto scrollbar-hide">
           {[0, 1, 2, 3].map((step) => (
-            <div key={step} className="flex items-center">
+            <div key={step} className="flex items-center flex-shrink-0">
               <div
-                className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-bold font-exo transition-colors ${
+                className={`w-7 h-7 md:w-9 md:h-9 rounded-full flex items-center justify-center text-xs md:text-base font-bold font-exo transition-colors ${
                   selectedStep === step
                     ? 'bg-[#B7E246] text-primary'
                     : selectedStep > step
@@ -402,7 +402,7 @@ export function CadastroPorPlanilha() {
               </div>
               {step < 3 && (
                 <div
-                  className={`h-[2px] w-28 transition-colors ${
+                  className={`h-[2px] w-12 md:w-28 transition-colors ${
                     selectedStep > step ? 'bg-[#B7E246]' : 'bg-[#CEDCF8]'
                   }`}
                 />
@@ -413,7 +413,7 @@ export function CadastroPorPlanilha() {
       </div>
 
       {/* Conteúdo das etapas */}
-      <div className="flex-1 overflow-y-auto px-5 pb-5">
+      <div className="flex-1 overflow-y-auto md:px-5 px-2 pb-5">
         {selectedStep === 0 && (
           <Step1Download
             onDownloadModelo={handleDownloadModelo}
@@ -465,44 +465,44 @@ function Step1Download({
   onNext: () => void
 }) {
   return (
-    <div className="rounded-[24px] border border-[#E5E7F2] bg-white p-4 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
+    <div className="rounded-[24px] border border-[#E5E7F2] bg-white md:p-4 p-3 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
       {/* Título */}
       <div className="flex flex-col gap-2 mb-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <h3 className="text-primary text-xl font-semibold font-exo">
+          <h3 className="text-primary text-base md:text-xl font-semibold font-exo">
             Download da Planilha Modelo
           </h3>
-          <div className="flex-1 h-[2px] bg-primary/50" />
+          <div className="hidden md:flex flex-1 h-[2px] bg-primary/50" />
         </div>
-        <p className="text-sm text-secondary-text font-nunito">
+        <p className="text-xs md:text-sm text-secondary-text font-nunito">
           Baixe a planilha modelo e a planilha de descrição para entender o formato dos dados
         </p>
       </div>
 
       {/* Botões de download */}
-      <div className="grid gap-4 md:grid-cols-2 mb-6">
+      <div className="grid gap-3 md:gap-4 md:grid-cols-2 mb-6">
         <button
           onClick={onDownloadModelo}
-          className="flex items-center justify-center gap-3 h-14 px-6 rounded-lg bg-primary text-white font-semibold font-nunito text-sm shadow-[0_8px_20px_rgba(10,57,122,0.35)] transition-all hover:bg-primary/90"
+          className="flex items-center justify-center gap-2 md:gap-3 h-12 md:h-14 px-4 md:px-6 rounded-lg bg-primary text-white font-semibold font-nunito text-xs md:text-sm shadow-[0_8px_20px_rgba(10,57,122,0.35)] transition-all hover:bg-primary/90"
         >
-          <MdDownload size={20} />
-          Download Planilha Modelo
+          <MdDownload size={18} className="md:w-5 md:h-5" />
+          <span className="truncate">Download Planilha Modelo</span>
         </button>
         <button
           onClick={onDownloadDescricao}
-          className="flex items-center justify-center gap-3 h-14 px-6 rounded-lg border-2 border-primary bg-white text-primary font-semibold font-nunito text-sm transition-all hover:bg-primary/10"
+          className="flex items-center justify-center gap-2 md:gap-3 h-12 md:h-14 px-4 md:px-6 rounded-lg border-2 border-primary bg-white text-primary font-semibold font-nunito text-xs md:text-sm transition-all hover:bg-primary/10"
         >
-          <MdDownload size={20} />
-          Download Planilha de Descrição
+          <MdDownload size={18} className="md:w-5 md:h-5" />
+          <span className="truncate">Download Planilha de Descrição</span>
         </button>
       </div>
 
       {/* Área de texto explicativo */}
-      <div className="rounded-lg border border-[#E6E9F4] bg-gradient-to-br from-[#F9FAFF] to-white p-6 mb-6">
-        <h4 className="text-primary-text font-semibold font-exo text-base mb-3">
+      <div className="rounded-lg border border-[#E6E9F4] bg-gradient-to-br from-[#F9FAFF] to-white md:p-6 p-4 mb-6">
+        <h4 className="text-primary-text font-semibold font-exo text-sm md:text-base mb-3">
           Como funciona o sistema de importação
         </h4>
-        <div className="space-y-2 text-sm text-secondary-text font-nunito">
+        <div className="space-y-2 text-xs md:text-sm text-secondary-text font-nunito">
           <p>
             <strong className="text-primary-text">1. Download:</strong> Baixe a planilha modelo e a
             planilha de descrição para entender o formato dos dados.
@@ -528,13 +528,13 @@ function Step1Download({
       </div>
 
       {/* Botão Próximo */}
-      <div className="flex justify-end pt-6 border-t border-dashed border-[#E4E7F4] mt-4">
+      <div className="flex justify-end pt-4 md:pt-6 border-t border-dashed border-[#E4E7F4] mt-4">
         <button
           onClick={onNext}
-          className="h-8 px-10 rounded-lg bg-primary text-white font-semibold font-exo text-sm hover:bg-primary/90 transition-colors flex items-center gap-2"
+          className="h-8 px-6 md:px-10 rounded-lg bg-primary text-white font-semibold font-exo text-xs md:text-sm hover:bg-primary/90 transition-colors flex items-center gap-2"
         >
           Próximo
-          <MdArrowForward size={18} />
+          <MdArrowForward size={16} className="md:w-[18px] md:h-[18px]" />
         </button>
       </div>
     </div>
@@ -558,24 +558,24 @@ function Step2Upload({
   onBack: () => void
 }) {
   return (
-    <div className="rounded-[24px] border border-[#E5E7F2] bg-white p-4 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
+    <div className="rounded-[24px] border border-[#E5E7F2] bg-white md:p-4 p-3 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
       {/* Título */}
       <div className="flex flex-col gap-2 mb-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <h3 className="text-primary text-xl font-semibold font-exo">Upload do Arquivo</h3>
-          <div className="flex-1 h-[2px] bg-primary/50" />
+          <h3 className="text-primary text-base md:text-xl font-semibold font-exo">Upload do Arquivo</h3>
+          <div className="hidden md:flex flex-1 h-[2px] bg-primary/50" />
         </div>
-        <p className="text-sm text-secondary-text font-nunito">
+        <p className="text-xs md:text-sm text-secondary-text font-nunito">
           Faça upload da planilha preenchida com os dados para cadastro
         </p>
       </div>
 
       {/* Área de upload */}
       <div className="mb-6">
-        <label className="block text-sm font-semibold font-nunito mb-2 text-primary-text">
+        <label className="block text-xs md:text-sm font-semibold font-nunito mb-2 text-primary-text">
           Arquivo XLSX
         </label>
-        <div className="border-2 border-dashed border-[#CBD0E3] rounded-lg p-8 text-center hover:border-primary transition-colors">
+        <div className="border-2 border-dashed border-[#CBD0E3] rounded-lg md:p-8 p-4 text-center hover:border-primary transition-colors">
           <input
             type="file"
             accept=".xlsx,.xls"
@@ -591,13 +591,13 @@ function Step2Upload({
           />
           <label
             htmlFor="file-upload"
-            className={`cursor-pointer flex flex-col items-center gap-3 ${
+            className={`cursor-pointer flex flex-col items-center gap-2 md:gap-3 ${
               isUploading ? 'opacity-50 cursor-not-allowed' : ''
             }`}
           >
-            <MdDescription className="text-4xl text-secondary-text" />
+            <MdDescription className="text-3xl md:text-4xl text-secondary-text" />
             <div>
-              <p className="text-sm font-semibold text-primary-text font-nunito">
+              <p className="text-xs md:text-sm font-semibold text-primary-text font-nunito break-words">
                 {arquivo ? arquivo.name : 'Clique para selecionar ou arraste o arquivo'}
               </p>
               <p className="text-xs text-secondary-text font-nunito mt-1">
@@ -607,11 +607,11 @@ function Step2Upload({
           </label>
         </div>
         {arquivo && (
-          <div className="mt-3 flex items-center justify-between gap-2 text-sm text-primary-text bg-gray-50 rounded-lg p-3 border border-[#E6E9F4]">
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <span className="font-semibold whitespace-nowrap">Arquivo selecionado:</span>
-              <span className="truncate">{arquivo.name}</span>
-              <span className="text-secondary-text whitespace-nowrap">
+          <div className="mt-3 flex items-center justify-between gap-2 text-xs md:text-sm text-primary-text bg-gray-50 rounded-lg md:p-3 p-2 border border-[#E6E9F4]">
+            <div className="flex items-center gap-1 md:gap-2 flex-1 min-w-0">
+              <span className="font-semibold whitespace-nowrap text-xs md:text-sm">Arquivo:</span>
+              <span className="truncate text-xs md:text-sm">{arquivo.name}</span>
+              <span className="text-secondary-text whitespace-nowrap text-xs md:text-sm">
                 ({(arquivo.size / 1024).toFixed(2)} KB)
               </span>
             </div>
@@ -626,38 +626,38 @@ function Step2Upload({
                 }
               }}
               disabled={isUploading}
-              className="flex items-center justify-center w-8 h-8 rounded-lg text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center justify-center w-7 h-7 md:w-8 md:h-8 rounded-lg text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
               title="Remover arquivo"
             >
-              <MdClose size={20} />
+              <MdClose size={18} className="md:w-5 md:h-5" />
             </button>
           </div>
         )}
       </div>
 
       {/* Botões de ação */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between pt-6 border-t border-dashed border-[#E4E7F4] mt-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between pt-4 md:pt-6 border-t border-dashed border-[#E4E7F4] mt-4">
         <button
           onClick={onBack}
-          className="h-8 px-10 rounded-lg border-2 border-primary bg-white text-primary font-semibold font-exo text-sm hover:bg-primary/10 transition-colors flex items-center gap-2"
+          className="h-8 px-6 md:px-10 rounded-lg border-2 border-primary bg-white text-primary font-semibold font-exo text-xs md:text-sm hover:bg-primary/10 transition-colors flex items-center justify-center gap-2"
         >
-          <MdArrowBack size={18} />
+          <MdArrowBack size={16} className="md:w-[18px] md:h-[18px]" />
           Voltar
         </button>
         <button
           onClick={onUpload}
           disabled={!arquivo || isUploading}
-          className="h-8 px-10 rounded-lg bg-primary text-white font-semibold font-exo text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          className="h-8 px-6 md:px-10 rounded-lg bg-primary text-white font-semibold font-exo text-xs md:text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {isUploading ? (
             <>
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Enviando...
+              <span>Enviando...</span>
             </>
           ) : (
             <>
-              Enviar Arquivo
-              <MdArrowForward size={18} />
+              <span>Enviar Arquivo</span>
+              <MdArrowForward size={16} className="md:w-[18px] md:h-[18px]" />
             </>
           )}
         </button>
@@ -866,22 +866,22 @@ function Step3Resultado({
   }
 
   return (
-    <div className="rounded-[24px] border border-[#E5E7F2] bg-white p-4 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
+    <div className="rounded-[24px] border border-[#E5E7F2] bg-white md:p-4 p-3 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
       {/* Título */}
       <div className="flex flex-col gap-2 mb-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <h3 className="text-primary text-xl font-semibold font-exo">Resultado da Análise</h3>
-          <div className="flex-1 h-[2px] bg-primary/50" />
+          <h3 className="text-primary text-base md:text-xl font-semibold font-exo">Resultado da Análise</h3>
+          <div className="hidden md:flex flex-1 h-[2px] bg-primary/50" />
         </div>
-        <p className="text-sm text-secondary-text font-nunito">
+        <p className="text-xs md:text-sm text-secondary-text font-nunito">
           Revise os resultados da importação e os erros encontrados
         </p>
       </div>
 
       {/* Resumo por Worksheet com Tabelas Expansíveis */}
       {resultadoAnalise.worksheetResults && resultadoAnalise.worksheetResults.length > 0 && (
-        <div className="mb-6 rounded-lg border border-[#E6E9F4] bg-gradient-to-br from-[#F9FAFF] to-white p-4">
-          <h4 className="text-primary-text font-semibold font-exo text-base mb-3">
+        <div className="mb-6 rounded-lg border border-[#E6E9F4] bg-gradient-to-br from-[#F9FAFF] to-white md:p-4 p-3">
+          <h4 className="text-primary-text font-semibold font-exo text-sm md:text-base mb-3">
             Resumo por Worksheet
           </h4>
           <div className="space-y-3">
@@ -898,36 +898,36 @@ function Step3Resultado({
                 >
                   {/* Header do Worksheet */}
                   <div
-                    className={`p-3 ${hasSuccessfulRecords ? 'cursor-pointer hover:bg-gray-50' : 'cursor-default'} transition-colors`}
+                    className={`md:p-3 p-2 ${hasSuccessfulRecords ? 'cursor-pointer hover:bg-gray-50' : 'cursor-default'} transition-colors`}
                     onClick={() => {
                       if (hasSuccessfulRecords) {
                         toggleWorksheet(worksheet.worksheet)
                       }
                     }}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1 md:gap-2 min-w-0 flex-1">
                         {hasSuccessfulRecords && (
-                          <div className="text-primary-text flex items-center justify-center">
+                          <div className="text-primary-text flex items-center justify-center flex-shrink-0">
                             {isExpanded ? (
-                              <MdExpandLess className="text-xl" />
+                              <MdExpandLess className="text-lg md:text-xl" />
                             ) : (
-                              <MdExpandMore className="text-xl" />
+                              <MdExpandMore className="text-lg md:text-xl" />
                             )}
                           </div>
                         )}
-                        <span className="font-semibold text-primary-text font-exo text-sm">
+                        <span className="font-semibold text-primary-text font-exo text-xs md:text-sm truncate">
                           {worksheet.worksheet}
                         </span>
                       </div>
-                      <div className="flex gap-4 text-xs font-nunito">
+                      <div className="flex flex-col md:flex-row gap-1 md:gap-4 text-xs font-nunito flex-shrink-0">
                         {worksheet.successCount > 0 && (
-                          <span className="text-green-600 font-semibold">
+                          <span className="text-green-600 font-semibold whitespace-nowrap">
                             ✓ {worksheet.successCount} sucesso(s)
                           </span>
                         )}
                         {worksheet.errorCount > 0 && (
-                          <span className="text-red-600 font-semibold">
+                          <span className="text-red-600 font-semibold whitespace-nowrap">
                             ✗ {worksheet.errorCount} erro(s)
                           </span>
                         )}
@@ -937,27 +937,27 @@ function Step3Resultado({
 
                   {/* Tabela de Dados Cadastrados (quando expandido) */}
                   {isExpanded && hasSuccessfulRecords && (
-                    <div className="border-t border-[#E6E9F4] p-3 bg-gray-50">
+                    <div className="border-t border-[#E6E9F4] md:p-3 p-2 bg-gray-50">
                       {loadingWorksheets.has(worksheet.worksheet) ? (
-                        <div className="text-center py-8">
-                          <div className="inline-block w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-2" />
-                          <p className="text-sm text-secondary-text font-nunito">
+                        <div className="text-center py-6 md:py-8">
+                          <div className="inline-block w-5 h-5 md:w-6 md:h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-2" />
+                          <p className="text-xs md:text-sm text-secondary-text font-nunito">
                             Carregando dados do arquivo...
                           </p>
                         </div>
                       ) : worksheetData[worksheet.worksheet] && worksheetData[worksheet.worksheet].length > 0 ? (
                         <>
-                          <div className="overflow-x-auto max-h-96 overflow-y-auto scrollbar-hide">
-                            <table className="w-full text-sm font-nunito border-collapse">
+                          <div className="overflow-x-auto max-h-64 md:max-h-96 overflow-y-auto scrollbar-hide">
+                            <table className="w-full text-xs md:text-sm font-nunito border-collapse min-w-full">
                               <thead className="sticky top-0 bg-white z-10">
                                 <tr className="border-b-2 border-[#E6E9F4]">
-                                  <th className="text-left py-2 px-3 font-semibold text-primary-text text-xs uppercase whitespace-nowrap">
+                                  <th className="text-left py-1 md:py-2 px-2 md:px-3 font-semibold text-primary-text text-[10px] md:text-xs uppercase whitespace-nowrap">
                                     Linha
                                   </th>
                                   {Object.keys(worksheetData[worksheet.worksheet][0] || {}).map((key) => (
                                     <th
                                       key={key}
-                                      className="text-left py-2 px-3 font-semibold text-primary-text text-xs uppercase whitespace-nowrap"
+                                      className="text-left py-1 md:py-2 px-2 md:px-3 font-semibold text-primary-text text-[10px] md:text-xs uppercase whitespace-nowrap"
                                     >
                                       {key}
                                     </th>
@@ -970,7 +970,7 @@ function Step3Resultado({
                                     key={rowIndex}
                                     className="border-b border-[#E6E9F4] hover:bg-white transition-colors even:bg-gray-50/50"
                                   >
-                                    <td className="py-2 px-3 text-secondary-text text-xs whitespace-nowrap font-semibold">
+                                    <td className="py-1 md:py-2 px-2 md:px-3 text-secondary-text text-[10px] md:text-xs whitespace-nowrap font-semibold">
                                       {rowIndex + 2}
                                     </td>
                                     {Object.keys(row).map((key) => {
@@ -978,7 +978,7 @@ function Step3Resultado({
                                       return (
                                         <td
                                           key={key}
-                                          className="py-2 px-3 text-secondary-text text-xs whitespace-nowrap"
+                                          className="py-1 md:py-2 px-2 md:px-3 text-secondary-text text-[10px] md:text-xs break-words max-w-[150px] md:max-w-none md:whitespace-nowrap"
                                         >
                                           {value !== null && value !== undefined && value !== ''
                                             ? typeof value === 'object'
@@ -993,16 +993,16 @@ function Step3Resultado({
                               </tbody>
                             </table>
                           </div>
-                          <div className="mt-2 text-xs text-secondary-text font-nunito text-center">
+                          <div className="mt-2 text-[10px] md:text-xs text-secondary-text font-nunito text-center">
                             Total: {worksheetData[worksheet.worksheet].length} registro(s) exibido(s)
                           </div>
                         </>
                       ) : (
-                        <div className="text-center py-4 text-secondary-text font-nunito text-sm">
+                        <div className="text-center py-4 text-secondary-text font-nunito text-xs md:text-sm">
                           <p className="mb-2">
                             {worksheet.successCount} registro(s) cadastrado(s) com sucesso.
                           </p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-[10px] md:text-xs text-gray-500">
                             Não foi possível carregar os dados do arquivo XLSX.
                           </p>
                         </div>
@@ -1018,28 +1018,28 @@ function Step3Resultado({
 
       {/* Mensagens de sucesso ou erro geral */}
       {resultadoAnalise.mensagens.length > 0 && (
-        <div className={`mb-6 rounded-lg border p-4 ${
+        <div className={`mb-6 rounded-lg border md:p-4 p-3 ${
           resultadoAnalise.sucesso 
             ? 'border-green-200 bg-green-50' 
             : 'border-red-200 bg-red-50'
         }`}>
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-2 md:gap-3">
             {resultadoAnalise.sucesso ? (
-              <MdCheckCircle className="text-green-600 text-2xl flex-shrink-0 mt-0.5" />
+              <MdCheckCircle className="text-green-600 text-xl md:text-2xl flex-shrink-0 mt-0.5" />
             ) : (
-              <MdError className="text-red-600 text-2xl flex-shrink-0 mt-0.5" />
+              <MdError className="text-red-600 text-xl md:text-2xl flex-shrink-0 mt-0.5" />
             )}
-            <div className="flex-1">
-              <h4 className={`font-semibold font-exo text-sm mb-2 ${
+            <div className="flex-1 min-w-0">
+              <h4 className={`font-semibold font-exo text-xs md:text-sm mb-2 ${
                 resultadoAnalise.sucesso ? 'text-green-800' : 'text-red-800'
               }`}>
                 {resultadoAnalise.sucesso ? 'Processamento Concluído' : 'Erro no Processamento'}
               </h4>
-              <ul className={`space-y-1 text-sm font-nunito ${
+              <ul className={`space-y-1 text-xs md:text-sm font-nunito ${
                 resultadoAnalise.sucesso ? 'text-green-700' : 'text-red-700'
               }`}>
                 {resultadoAnalise.mensagens.map((msg, index) => (
-                  <li key={index}>• {msg}</li>
+                  <li key={index} className="break-words">• {msg}</li>
                 ))}
               </ul>
             </div>
@@ -1049,28 +1049,28 @@ function Step3Resultado({
 
       {/* Lista de erros */}
       {resultadoAnalise.erros.length > 0 && (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
-          <div className="flex items-start gap-3">
-            <MdError className="text-red-600 text-2xl flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <h4 className="text-red-800 font-semibold font-exo text-sm mb-2">
+        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 md:p-4 p-3">
+          <div className="flex items-start gap-2 md:gap-3">
+            <MdError className="text-red-600 text-xl md:text-2xl flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <h4 className="text-red-800 font-semibold font-exo text-xs md:text-sm mb-2">
                 Erros Encontrados ({resultadoAnalise.erros.length})
                 {resultadoAnalise.totalErrorCount !== undefined && (
-                  <span className="text-xs font-normal ml-2">
+                  <span className="text-[10px] md:text-xs font-normal ml-1 md:ml-2">
                     (Total: {resultadoAnalise.totalErrorCount})
                   </span>
                 )}
               </h4>
-              <div className="space-y-2 max-h-96 overflow-y-auto scrollbar-hide">
+              <div className="space-y-2 max-h-64 md:max-h-96 overflow-y-auto scrollbar-hide">
                 {resultadoAnalise.erros.map((erro, index) => (
                   <div
                     key={index}
-                    className="text-sm text-red-700 font-nunito bg-white rounded p-2 border border-red-100"
+                    className="text-xs md:text-sm text-red-700 font-nunito bg-white rounded md:p-2 p-1.5 border border-red-100"
                   >
-                    <p className="font-semibold">
+                    <p className="font-semibold break-words">
                       Linha {erro.linha} - Campo: {erro.campo}
                     </p>
-                    <p className="text-xs mt-1">{erro.mensagem}</p>
+                    <p className="text-[10px] md:text-xs mt-1 break-words">{erro.mensagem}</p>
                   </div>
                 ))}
               </div>
@@ -1080,20 +1080,20 @@ function Step3Resultado({
       )}
 
       {/* Botões de ação */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between pt-6 border-t border-dashed border-[#E4E7F4] mt-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between pt-4 md:pt-6 border-t border-dashed border-[#E4E7F4] mt-4">
         <button
           onClick={onBack}
-          className="h-8 px-10 rounded-lg border-2 border-primary bg-white text-primary font-semibold font-exo text-sm hover:bg-primary/10 transition-colors flex items-center gap-2"
+          className="h-8 px-6 md:px-10 rounded-lg border-2 border-primary bg-white text-primary font-semibold font-exo text-xs md:text-sm hover:bg-primary/10 transition-colors flex items-center justify-center gap-2"
         >
-          <MdArrowBack size={18} />
+          <MdArrowBack size={16} className="md:w-[18px] md:h-[18px]" />
           Voltar
         </button>
         <button
           onClick={onNext}
-          className="h-8 px-10 rounded-lg bg-primary text-white font-semibold font-exo text-sm hover:bg-primary/90 transition-colors flex items-center gap-2"
+          className="h-8 px-6 md:px-10 rounded-lg bg-primary text-white font-semibold font-exo text-xs md:text-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
         >
           Continuar
-          <MdArrowForward size={18} />
+          <MdArrowForward size={16} className="md:w-[18px] md:h-[18px]" />
         </button>
       </div>
     </div>
@@ -1116,25 +1116,25 @@ function Step4Finalizacao({
   onFinalizar: () => void
 }) {
   return (
-    <div className="rounded-[24px] border border-[#E5E7F2] bg-white p-4 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
+    <div className="rounded-[24px] border border-[#E5E7F2] bg-white md:p-4 p-3 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
       {/* Título */}
-      <div className="flex flex-col gap-2 mb-6">
+      <div className="flex flex-col gap-2 mb-4 md:mb-6">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <h3 className="text-primary text-xl font-semibold font-exo">Processo Finalizado</h3>
-          <div className="flex-1 h-[2px] bg-primary/50" />
+          <h3 className="text-primary text-base md:text-xl font-semibold font-exo">Processo Finalizado</h3>
+          <div className="hidden md:flex flex-1 h-[2px] bg-primary/50" />
         </div>
-        <p className="text-sm text-secondary-text font-nunito">
+        <p className="text-xs md:text-sm text-secondary-text font-nunito">
           O processo de importação foi concluído com sucesso
         </p>
       </div>
 
       {/* Mensagem de sucesso */}
-      <div className="rounded-lg border border-green-200 bg-green-50 p-6 mb-6 text-center">
-        <MdCheckCircle className="text-green-600 text-5xl mx-auto mb-4" />
-        <h4 className="text-green-800 font-semibold font-exo text-lg mb-2">
+      <div className="rounded-lg border border-green-200 bg-green-50 md:p-6 p-4 mb-6 text-center">
+        <MdCheckCircle className="text-green-600 text-4xl md:text-5xl mx-auto mb-3 md:mb-4" />
+        <h4 className="text-green-800 font-semibold font-exo text-base md:text-lg mb-2">
           Importação Concluída!
         </h4>
-        <p className="text-sm text-green-700 font-nunito">
+        <p className="text-xs md:text-sm text-green-700 font-nunito break-words">
           {resultadoAnalise?.mensagens.join(' ') ||
             'Os dados foram processados e cadastrados no sistema.'}
         </p>
@@ -1143,11 +1143,11 @@ function Step4Finalizacao({
       {/* Listagem de dados cadastrados (se houver) */}
       {resultadoAnalise?.dadosCadastrados && resultadoAnalise.dadosCadastrados.length > 0 && (
         <div className="mb-6">
-          <h4 className="text-primary-text font-semibold font-exo text-base mb-3">
+          <h4 className="text-primary-text font-semibold font-exo text-sm md:text-base mb-3">
             Dados Cadastrados
           </h4>
-          <div className="rounded-lg border border-[#E6E9F4] bg-gray-50 p-4 max-h-96 overflow-y-auto">
-            <p className="text-sm text-secondary-text font-nunito">
+          <div className="rounded-lg border border-[#E6E9F4] bg-gray-50 md:p-4 p-3 max-h-64 md:max-h-96 overflow-y-auto">
+            <p className="text-xs md:text-sm text-secondary-text font-nunito">
               Listagem de dados cadastrados será implementada aqui
             </p>
           </div>
@@ -1155,10 +1155,10 @@ function Step4Finalizacao({
       )}
 
       {/* Botão Finalizar */}
-      <div className="flex justify-center pt-6 border-t border-dashed border-[#E4E7F4] mt-4">
+      <div className="flex justify-center pt-4 md:pt-6 border-t border-dashed border-[#E4E7F4] mt-4">
         <button
           onClick={onFinalizar}
-          className="h-8 px-10 rounded-lg bg-primary text-white font-semibold font-exo text-sm hover:bg-primary/90 transition-colors"
+          className="h-8 px-6 md:px-10 rounded-lg bg-primary text-white font-semibold font-exo text-xs md:text-sm hover:bg-primary/90 transition-colors"
         >
           Finalizar
         </button>

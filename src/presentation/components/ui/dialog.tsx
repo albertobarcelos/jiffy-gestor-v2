@@ -36,7 +36,7 @@ Dialog.displayName = 'Dialog'
 export const DialogHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, children, ...props }, ref) => {
     return (
-      <Box ref={ref} sx={{ p: 3, pb: 2 }} {...props}>
+      <Box ref={ref} sx={{ p: 1, pb: 1.5 }} {...props}>
         {children}
       </Box>
     )
@@ -91,7 +91,7 @@ export interface DialogContentProps extends React.HTMLAttributes<HTMLDivElement>
 export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
   ({ className, children, sx, ...props }, ref) => {
     return (
-      <MuiDialogContent ref={ref} sx={{ p: 3, ...sx }} {...props}>
+      <MuiDialogContent ref={ref} sx={{ p: 1, ...sx }} {...props}>
         {children}
       </MuiDialogContent>
     )
@@ -107,7 +107,7 @@ export interface DialogFooterProps extends React.HTMLAttributes<HTMLDivElement> 
 export const DialogFooter = React.forwardRef<HTMLDivElement, DialogFooterProps>(
   ({ className, children, sx, ...props }, ref) => {
     return (
-      <MuiDialogActions ref={ref} sx={{ p: 3, pt: 2, ...sx }} {...props}>
+      <MuiDialogActions ref={ref} sx={{ p: 1, pt: 1.5, ...sx }} {...props}>
         {children}
       </MuiDialogActions>
     )

@@ -141,34 +141,30 @@ export default function DashboardPage() {
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null); // Ref para posicionar o popover
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
+  const isDraggingRef = useRef(false);
+  const dragStartXRef = useRef(0);
+  const scrollStartRef = useRef(0);
 
-  // Função para verificar se os botões de rolagem devem ser exibidos
-  const checkScrollability = () => {
-    if (scrollContainerRef.current) {
-      const { scrollWidth, clientWidth, scrollLeft } = scrollContainerRef.current;
-      setCanScrollLeft(scrollLeft > 0);
-      setCanScrollRight(scrollLeft < scrollWidth - clientWidth);
-    }
+  const getPageX = (event: React.MouseEvent | React.TouchEvent) =>
+    'touches' in event ? event.touches[0].pageX : event.pageX;
+
+  const handleDragStart = (event: React.MouseEvent | React.TouchEvent) => {
+    if (!scrollContainerRef.current) return;
+    isDraggingRef.current = true;
+    dragStartXRef.current = getPageX(event) - scrollContainerRef.current.offsetLeft;
+    scrollStartRef.current = scrollContainerRef.current.scrollLeft;
   };
 
-  // Efeito para adicionar listener de scroll e verificar scrollabilidade inicial
-  useEffect(() => {
-    checkScrollability();
-    scrollContainerRef.current?.addEventListener('scroll', checkScrollability);
-    window.addEventListener('resize', checkScrollability);
-    return () => {
-      scrollContainerRef.current?.removeEventListener('scroll', checkScrollability);
-      window.removeEventListener('resize', checkScrollability);
-    };
-  }, []);
+  const handleDragMove = (event: React.MouseEvent | React.TouchEvent) => {
+    if (!isDraggingRef.current || !scrollContainerRef.current) return;
+    event.preventDefault();
+    const x = getPageX(event) - scrollContainerRef.current.offsetLeft;
+    const walk = x - dragStartXRef.current;
+    scrollContainerRef.current.scrollLeft = scrollStartRef.current - walk;
+  };
 
-  // Função para rolagem dos itens
-  const scroll = (scrollOffset: number) => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollLeft += scrollOffset;
-    }
+  const handleDragEnd = () => {
+    isDraggingRef.current = false;
   };
 
   const handleStatusChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -228,8 +224,9 @@ export default function DashboardPage() {
       className="space-y-2 bg-custom-2/50 p-2 rounded-lg mt-2"
     >
       {/* Barra de seleção de período */}
-      <motion.div variants={itemVariants} className="flex items-center justify-start gap-2 mt-2">
+      <motion.div variants={itemVariants} className="flex flex-col md:flex-row items-center justify-start gap-2 mt-2">
         <span className="text-primary text-sm font-exo">Período:</span>
+        <div className="flex flex-row items-center justify-start gap-2">
         <FormControl size="small" sx={{ minWidth: 120 }}>
           <Select
             value={periodo}
@@ -269,7 +266,7 @@ export default function DashboardPage() {
           <MdCalendarToday size={10} />
           Por datas
         </button>
-
+        </div>
         {/* Botão Limpar Filtros */}
         <button
           onClick={handleLimparFiltros}
@@ -303,14 +300,20 @@ export default function DashboardPage() {
         {/* Coluna esquerda - 2 colunas */}
         <motion.div variants={slideFromLeftVariants} initial="hidden" animate="visible" className="lg:col-span-2 space-y-6">
           {/* Gráfico de evolução */}
-          <div className="bg-white rounded-lg shadow-sm shadow-primary/70 border border-gray-200 px-6 py-2">
-                   <div className="mb-6 flex items-start gap-12">
+          <div className="bg-white rounded-lg shadow-sm shadow-primary/70 border border-gray-200 px-2 md:px-6 py-2">
+                   <div className="mb-6 flex items-start gap-4 md:gap-12">
                      <div className="flex flex-col items-start justify-start">
-                      <h3 className="text-lg font-semibold text-primary">Evolução de Vendas</h3>
-                      <p className="text-sm text-primary/70">{getPeriodoLabel(periodo, periodoInicial, periodoFinal)}</p>
+                      <h3 className="md:text-lg text-sm font-semibold text-primary">Evolução de Vendas</h3>
+                      <p className="md:text-sm text-xs text-primary/70">{getPeriodoLabel(periodo, periodoInicial, periodoFinal)}</p>
                      </div>
                      <div className="flex flex-col gap-4">
-                       <FormGroup row>
+                       <FormGroup
+                         sx={{
+                           flexDirection: { xs: 'column', md: 'row' },
+                           alignItems: { xs: 'flex-start', md: 'center' },
+                           gap: { xs: 0, md: 0 },
+                         }}
+                       >
                          <FormControlLabel
                            control={
                              <Checkbox
@@ -322,10 +325,11 @@ export default function DashboardPage() {
                                  '&.Mui-checked': {
                                    color: '#4082b4',
                                  },
+                                 size: 'small',
                                }}
                              />
                            }
-                           label="Finalizadas"
+                           label={<span className="md:text-sm text-xs">Finalizadas</span>}
                          />
                          <FormControlLabel
                            control={
@@ -338,16 +342,23 @@ export default function DashboardPage() {
                                  '&.Mui-checked': {
                                    color: '#EF4444',
                                  },
+                                 size: 'small',
                                }}
                              />
                            }
-                           label="Canceladas"
+                           label={<span className="md:text-sm text-xs">Canceladas</span>}
                          />
                        </FormGroup>
                        {/* Checkboxes para intervalo de tempo (apenas quando for exibir por hora) */}
                        {(periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) && (
-                         <FormGroup row>
-                           <span className="text-sm text-primary/70 mr-2">Intervalo:</span>
+                         <FormGroup
+                           sx={{
+                             flexDirection: { xs: 'column', md: 'row' },
+                             alignItems: { xs: 'flex-start', md: 'center' },
+                             gap: { xs: 0, md: 0 },
+                           }}
+                         >
+                           <span className="md:text-sm text-xs text-primary/70 mr-2">Intervalo:</span>
                            <FormControlLabel
                              control={
                                <Checkbox
@@ -359,10 +370,11 @@ export default function DashboardPage() {
                                    '&.Mui-checked': {
                                      color: '#530CA3',
                                    },
+                                   size: 'small',
                                  }}
                                />
                              }
-                             label="15 min"
+                             label={<span className="md:text-sm text-xs">15 min</span>}
                            />
                            <FormControlLabel
                              control={
@@ -375,10 +387,11 @@ export default function DashboardPage() {
                                    '&.Mui-checked': {
                                      color: '#530CA3',
                                    },
+                                   size: 'small',
                                  }}
                                />
                              }
-                             label="30 min"
+                             label={<span className="md:text-sm text-xs">30 min</span>}
                            />
                            <FormControlLabel
                              control={
@@ -391,10 +404,11 @@ export default function DashboardPage() {
                                    '&.Mui-checked': {
                                      color: '#530CA3',
                                    },
+                                   size: 'small',
                                  }}
                                />
                              }
-                             label="1h"
+                             label={<span className="md:text-sm text-xs">1h</span>}
                            />
                          </FormGroup>
                        )}
@@ -425,32 +439,46 @@ export default function DashboardPage() {
       </div>
 
       {/* Top Produtos - Container com botões de rolagem */}
-      <div className="relative w-full px-9">
-        {/* Botão de rolagem para a esquerda */}
-        {canScrollLeft && (
-          <button
-            onClick={() => scroll(-300)} // Rola 300px para a esquerda
-            className="absolute left-0 top-1/2 -translate-y-1/2 bg-white rounded-full p-1 shadow-md z-10  border-2 border-primary"
-            aria-label="Scroll left"
-          >
-            <ChevronLeft size={20} className="text-primary" />
-          </button>
-        )}
-
-        {/* Conteúdo rolável */}
+      <div className="relative w-full max-w-full overflow-x-hidden">
+        {/* Conteúdo rolável com drag-to-scroll */}
         <motion.div
           variants={slideFromLeftVariants}
           initial="hidden"
           animate="visible"
-          className="flex space-x-2 bg-transparent overflow-x-hidden border border-primary/50 rounded-lg px-2 pt-2" // Esconde a barra de rolagem nativa
-          ref={scrollContainerRef} // Adiciona ref para controlar a rolagem
-          style={{ scrollBehavior: 'smooth' }} // Garante rolagem suave
+          className="flex md:flex-row flex-col md:space-x-2 space-y-2 bg-transparent overflow-x-hidden md:overflow-x-auto border border-primary/50 rounded-lg md:px-2 px-1 pt-2 md:cursor-grab md:active:cursor-grabbing select-none"
+          ref={scrollContainerRef}
+          style={{ scrollBehavior: 'smooth' }}
+          onMouseDown={handleDragStart}
+          onMouseMove={handleDragMove}
+          onMouseUp={handleDragEnd}
+          onMouseLeave={handleDragEnd}
+          onTouchStart={(e) => {
+            // Desabilitar drag-to-scroll em mobile
+            if (window.innerWidth < 768) {
+              return
+            }
+            handleDragStart(e)
+          }}
+          onTouchMove={(e) => {
+            // Desabilitar drag-to-scroll em mobile
+            if (window.innerWidth < 768) {
+              return
+            }
+            handleDragMove(e)
+          }}
+          onTouchEnd={() => {
+            // Desabilitar drag-to-scroll em mobile
+            if (window.innerWidth < 768) {
+              return
+            }
+            handleDragEnd()
+          }}
         >
             {/* Tabela de top produtos */}
-            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 px-6 py-2 min-w-[500px]">
+            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 md:px-6 px-1 py-2 w-full md:min-w-[500px] md:w-auto">
               <div className="mb-2">
-                <h3 className="text-lg font-semibold text-primary">Top Produtos</h3>
-                <p className="text-sm text-primary/70">Os 10 mais vendidos</p>
+                <h3 className="text-base md:text-lg font-semibold text-primary">Top Produtos</h3>
+                <p className="text-xs md:text-sm text-primary/70">Os 10 mais vendidos</p>
               </div>
               <Suspense fallback={<Skeleton variant="rectangular" height={400} />}>
                 <TabelaTopProdutos 
@@ -463,10 +491,10 @@ export default function DashboardPage() {
             </div>
 
             {/* Gráfico de top produtos (por quantidade) */}
-            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 p-6 flex-1 xl:min-w-[450px]">
+            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 md:p-6 p-3 w-full md:flex-1 xl:min-w-[500px] md:w-auto">
               <div className="mb-4">
-                <h3 className="text-lg font-semibold text-primary">Quantidade de Produtos Vendidos</h3>
-                <p className="text-sm text-primary/70">Distribuição dos Top Produtos</p>
+                <h3 className="text-base md:text-lg font-semibold text-primary">Quantidade de Produtos Vendidos</h3>
+                <p className="text-xs md:text-sm text-primary/70">Distribuição dos Top Produtos</p>
               </div>
               <Suspense fallback={<Skeleton variant="rectangular" height={400} />}>
                 <GraficoTopProdutos data={topProdutosData} />
@@ -474,27 +502,16 @@ export default function DashboardPage() {
             </div>
 
             {/* Novo Gráfico de top produtos (por valor total) */}
-            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 p-6 flex-1 xl:min-w-[600px]">
+            <div className="bg-white mb-3 rounded-lg shadow-sm shadow-primary/70 border border-gray-200 md:p-6 p-3 w-full md:flex-1 xl:min-w-[600px] md:w-auto">
               <div className="mb-4">
-                <h3 className="text-lg font-semibold text-primary">Valor Total dos Produtos Vendidos</h3>
-                <p className="text-sm text-primary/70">Distribuição por Valor</p>
+                <h3 className="text-base md:text-lg font-semibold text-primary">Valor Total dos Produtos Vendidos</h3>
+                <p className="text-xs md:text-sm text-primary/70">Distribuição por Valor</p>
               </div>
               <Suspense fallback={<Skeleton variant="rectangular" height={400} />}>
                 <GraficoTopProdutosValor data={topProdutosData} />
               </Suspense>
             </div>
           </motion.div>
-
-        {/* Botão de rolagem para a direita */}
-        {canScrollRight && (
-          <button
-            onClick={() => scroll(300)} // Rola 300px para a direita
-            className="absolute right-0 top-1/2 -translate-y-1/2 bg-white rounded-full p-1 shadow-md z-10  border-2 border-primary"
-            aria-label="Scroll right"
-          >
-            <ChevronRight size={20} className="text-primary" />
-          </button>
-        )}
       </div>
 
       {/* Popover de Seleção de Datas */}

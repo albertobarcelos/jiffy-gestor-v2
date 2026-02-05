@@ -89,12 +89,12 @@ export function PainelContadorView() {
   }
 
   return (
-    <div className=" pb-2 flex h-full w-full flex-col items-stretch bg-info overflow-y-auto lg:flex-row lg:overflow-hidden">
+    <div className="pb-2 flex h-full w-full flex-col items-stretch bg-info overflow-y-auto lg:flex-row lg:overflow-hidden">
       {/* Painel Esquerdo - Roxo */}
-      <div className="flex min-h-full flex-1 w-[58%] flex-col overflow-hidden rounded-tr-none rounded-br-none bg-secondary lg:rounded-tr-[48px] lg:rounded-br-[48px]">
+      <div className="flex min-h-[350px] md:min-h-full flex-1 md:w-[58%] w-full flex-col overflow-hidden rounded-tr-none rounded-br-none bg-secondary lg:rounded-tr-[48px] lg:rounded-br-[48px]">
         {/* Seção Superior com Título e Ilustração */}
-        <div className="flex flex-col gap-3 sm:gap-4 lg:gap-6 border-b border-[#330468] bg-[rgba(131,56,236,0.4)] rounded-tr-[16px] sm:rounded-tr-[24px] md:rounded-tr-[32px] lg:rounded-tr-[48px] p-3 sm:p-4">
-          <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 sm:gap-6">
+        <div className="flex flex-col gap-3 sm:gap-4 lg:gap-6 border-b border-[#330468] bg-[rgba(131,56,236,0.4)] sm:rounded-tr-[24px] md:rounded-tr-[32px] lg:rounded-tr-[48px] p-3 sm:p-4">
+          <div className="flex flex-row items-center gap-4 sm:gap-6">
             {/* Ilustração */}
             <div className="flex-shrink-0 w-[30%] sm:w-[35%] md:w-[38%] lg:w-[280px] max-w-[319px] aspect-square">
               <img
@@ -107,33 +107,33 @@ export function PainelContadorView() {
             {/* Título e infos */}
             <div className="flex-1 flex flex-col gap-3 sm:gap-4">
               <h1 className="font-manrope font-bold text-white text-2xl sm:text-3xl md:text-4xl lg:text-6xl">
-                Portal do <p className='py-2'>Contador</p>
+                Portal do <p className='md:py-2'>Contador</p>
               </h1>
 
               <div className="flex flex-col">
                 <div className="flex flex-wrap items-start sm:items-center gap-2">
-                  <span className="font-exo font-semibold text-white text-sm sm:text-lg md:text-xl lg:text-2xl">
+                  <span className="font-exo font-semibold text-white text-xs sm:text-lg md:text-xl lg:text-2xl">
                     Empresa:
                   </span>
-                  <span className="font-exo font-normal text-white text-sm sm:text-lg md:text-xl lg:text-2xl">
+                  <span className="font-exo font-normal text-white text-xs sm:text-lg md:text-xl lg:text-2xl">
                     {empresaNome}
                   </span>
                 </div>
 
                 <div className="flex flex-wrap items-start sm:items-center gap-2">
-                  <span className="font-exo font-medium text-white text-sm sm:text-lg md:text-xl lg:text-2xl">
+                  <span className="font-exo font-medium text-white text-xs sm:text-lg md:text-xl lg:text-2xl">
                     CNPJ:
                   </span>
-                  <span className="font-exo font-normal text-white text-sm sm:text-lg md:text-xl lg:text-2xl">
+                  <span className="font-exo font-normal text-white text-xs sm:text-lg md:text-xl lg:text-2xl">
                     {empresaCnpj}
                   </span>
                 </div>
 
                 <div className="flex flex-wrap items-start sm:items-center gap-2">
-                  <span className="font-exo font-medium text-white text-sm sm:text-lg md:text-xl lg:text-2xl">
+                  <span className="font-exo font-medium text-white text-xs sm:text-lg md:text-xl lg:text-2xl">
                     Regime:
                   </span>
-                  <span className="font-exo font-normal text-white text-sm sm:text-lg md:text-xl lg:text-2xl">
+                  <span className="font-exo font-normal text-white text-xs sm:text-lg md:text-xl lg:text-2xl">
                     Simples Nacional
                   </span>
                 </div>
@@ -154,7 +154,7 @@ export function PainelContadorView() {
         </div>
 
         {/* Barra de Progresso */}
-        <div className="mx-4 mt-4 flex-1 flex flex-col">
+        <div className="h-auto md:h-full mx-4 mt-4 flex-1 flex flex-col">
           <h2 className="font-manrope font-bold text-white text-[clamp(12px,2.5vw,16px)] sm:text-[clamp(14px,3vw,18px)] md:text-[clamp(16px,3.5vw,22px)] lg:text-[24px] tracking-[-0.32px] leading-[1.4] md:leading-[1.3] mb-1.5 sm:mb-1.75 md:mb-2 break-words">
             Configuração Contábil: 3 de 5 Etapas concluídas
           </h2>
@@ -163,7 +163,7 @@ export function PainelContadorView() {
             <div className="h-full w-[60%] max-w-[422px] bg-accent1 rounded-xl" />
           </div>
 
-          <div className="flex flex-col px-4 gap-[0.75rem] sm:gap-1 md:gap-[1.25rem] lg:gap-[1.5rem]">
+          <div className="flex flex-col py-4 px-2 gap-[0.75rem] sm:gap-1 md:gap-[1.25rem] lg:gap-[1.5rem]">
             {['Certificado Cadastrado', 'Regime Tributário Definido', 'Mapeamento dos NCMs'].map((etapa) => (
               <div key={etapa} className="flex items-center gap-[0.5rem] sm:gap-[0.75rem]">
                 <MdCheckCircle className="flex-shrink-0 text-white" size={20} />
@@ -177,14 +177,14 @@ export function PainelContadorView() {
       </div>
 
       {/* Painel Direito - Cards com stepper vertical */}
-      <div className="flex w-[42%] flex-col gap-4 p-2 sm:p-3 lg:min-h-full lg:overflow-auto">
+      <div className="flex md:w-[42%] flex-col gap-4 p-2 sm:p-3 lg:min-h-full lg:overflow-auto">
         {[
           {
             id: 1,
             title: 'Configurar Certificado Digital',
             content: (
               <>
-              <div className="flex flex-row w-full mb-2 items-center rounded-[10px] px-3 py-1 gap-2">
+              <div className="flex flex-row w-full mb-2 items-center rounded-[10px] md:px-3 py-1 md:gap-2">
                 <div className="flex flex-col gap-1">
                 <p className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
                   Cadastre o certificado digital da empresa e deixe sua comunicação com a SEFAZ funcionando
@@ -196,10 +196,10 @@ export function PainelContadorView() {
                     Validade: 22/12/2025
                   </span>
                 </div>
-                <div className="flex flex-col w-full mb-2 items-center rounded-[10px] px-3 py-1 gap-2">
+                <div className="flex flex-col w-full mb-2 items-center rounded-[10px] md:px-3 py-1 gap-2">
                   <Button
                     onClick={handleOpenCertificadoConfig}
-                    className="rounded-lg px-3 py-2 text-white text-sm font-medium"
+                    className="rounded-lg md:px-3 md:py-2 py-1 text-white text-sm font-medium"
                     sx={{
                       backgroundColor: 'var(--color-secondary)',
                       '&:hover': { backgroundColor: 'var(--color-alternate)' },
@@ -207,7 +207,7 @@ export function PainelContadorView() {
                   >
                     Cadastrar Certificado
                   </Button>
-                  <span className="font-inter font-medium text-[#f6f8fc] text-sm bg-accent1 rounded-lg px-3 py-1">
+                  <span className="font-inter font-medium text-[#f6f8fc] text-sm bg-accent1 rounded-lg md:px-3 px-1 md:py-1 py-1">
                     Expira em 27 dias
                   </span>
                   </div>
@@ -220,15 +220,15 @@ export function PainelContadorView() {
             title: 'Mapear NCM, Cest e CFOP',
             content: (
               <>
-              <div className="flex flex-row w-full mb-2 items-center rounded-[10px] px-3 py-1 gap-2">
+              <div className="flex flex-row w-full mb-2 items-center rounded-[10px] md:px-3 py-1 md:gap-2">
                 <div className="flex flex-row justify-between gap-1">
                 <p className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
                   Classifique produtos para que notas e impostos sejam calculados corretamente
                 </p>
-                <div className="flex flex-col w-full mb-2 items-center rounded-[10px] px-3 py-1 gap-2">
+                <div className="flex flex-col w-full mb-2 items-center rounded-[10px] md:px-3 py-1 gap-2">
                   <Button
                     onClick={handleOpenNCMConfig}
-                    className="rounded-lg px-3 py-2 text-white text-sm font-medium"
+                    className="rounded-lg md:px-3 md:py-2 py-1 text-white text-sm font-medium"
                     sx={{
                       backgroundColor: 'var(--color-secondary)',
                       '&:hover': { backgroundColor: 'var(--color-alternate)' },
@@ -236,7 +236,7 @@ export function PainelContadorView() {
                   >
                     Mapear Produtos
                   </Button>
-                  <div className="inline-flex items-center rounded-lg bg-[#ffa3a3] px-3 py-1 h-[26px] sm:h-[28px] lg:h-[30px] w-fit">
+                  <div className="inline-flex items-center rounded-lg bg-[#ffa3a3] px-3 py-2 sm:h-[28px] lg:h-[30px] w-fit">
                     <span className="font-inter font-medium text-[#dd1717] text-[11px] sm:text-[12px] leading-[1.4]">
                       8 PRODUTOS PENDENTES
                     </span>
@@ -252,8 +252,8 @@ export function PainelContadorView() {
             title: 'Configurar Impostos',
             content: (
               <>
-              <div className="flex flex-row w-full mb-2 items-center rounded-[10px] px-3 py-1 gap-2">
-                <div className="flex flex-col w-full mb-2 items-start rounded-[10px] px-3 py-1 gap-2">
+              <div className="flex flex-row w-full mb-2 items-center rounded-[10px] md:px-3 py-1 md:gap-2">
+                <div className="flex flex-col w-full mb-2 items-start rounded-[10px] md:px-3 py-1 gap-2">
                 <p className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
                   Configure os cenários fiscais e defina as regras de impostos para sua empresa
                 </p>
@@ -264,10 +264,10 @@ export function PainelContadorView() {
                     Status: Ativo
                   </span>
                 </div>
-                <div className="flex flex-col w-full mb-2 items-center rounded-[10px] px-3 py-1 gap-2">
+                <div className="flex flex-col w-full mb-2 items-center rounded-[10px] md:px-3 py-1 gap-2">
                   <Button
                     onClick={handleOpenImpostosConfig}
-                    className="rounded-lg px-3 py-2 text-white text-sm font-medium"
+                    className="rounded-lg md:px-3 md:py-2 py-1 text-white text-sm font-medium"
                     sx={{
                       backgroundColor: 'var(--color-secondary)',
                       '&:hover': { backgroundColor: 'var(--color-alternate)' },

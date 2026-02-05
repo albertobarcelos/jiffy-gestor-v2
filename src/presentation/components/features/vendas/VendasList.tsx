@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation' // Importar useRouter e usePathname
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { MdSearch, MdAttachMoney, MdCalendarToday, MdFilterAltOff, MdRestaurant, MdPrint } from 'react-icons/md'
+import { MdSearch, MdAttachMoney, MdCalendarToday, MdFilterAltOff, MdRestaurant, MdPrint, MdFilterList } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { DetalhesVendas } from './DetalhesVendas'
 import { EscolheDatasModal } from './EscolheDatasModal'
@@ -108,6 +108,8 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   const [isLoadingMeiosPagamento, setIsLoadingMeiosPagamento] = useState(false)
   const [isLoadingTerminais, setIsLoadingTerminais] = useState(false)
   const [isDatasModalOpen, setIsDatasModalOpen] = useState(false)
+  const [filtrosVisiveisMobile, setFiltrosVisiveisMobile] = useState(false)
+  const [isMobileViewport, setIsMobileViewport] = useState(false)
 
   const pageSize = 100 // Aumentado para buscar mais itens por página
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -157,6 +159,18 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     periodoInicial,
     periodoFinal,
   ])
+
+  // Detecta viewport mobile para ajustes responsivos (ex: tamanho do ícone)
+  useEffect(() => {
+    const updateViewport = () => {
+      if (typeof window !== 'undefined') {
+        setIsMobileViewport(window.innerWidth < 640)
+      }
+    }
+    updateViewport()
+    window.addEventListener('resize', updateViewport)
+    return () => window.removeEventListener('resize', updateViewport)
+  }, [])
 
   /**
    * Formata valor como moeda brasileira
@@ -684,14 +698,26 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Container principal */}
-      <div className="bg-primary-background rounded-t-lg rounded-b-lg px-2">
+      <div className="bg-primary-background rounded-t-lg rounded-b-lg md:px-2">
        
+        {/* Toggle de filtros no mobile */}
+        <div className="sm:hidden flex justify-end py-2">
+          <button
+            type="button"
+            onClick={() => setFiltrosVisiveisMobile((prev) => !prev)}
+            className="flex items-center gap-2 px-3 py-1 rounded-md bg-primary text-white text-sm font-nunito shadow-sm"
+            aria-expanded={filtrosVisiveisMobile}
+          >
+            {filtrosVisiveisMobile ? <MdFilterAltOff size={18} /> : <MdFilterList size={18} />}
+            <span>{filtrosVisiveisMobile ? 'Ocultar filtros' : 'Mostrar filtros'}</span>
+          </button>
+        </div>
 
         {/* Filtros Superiores */}
-        <div className="flex items-center gap-3 py-2">
+        <div className={`flex flex-col sm:flex-row items-center gap-3 py-2 ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}>
           {/* Campo de Pesquisa */}
-          <div className="flex-[2] relative">
-            <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
+          <div className="flex-[2] w-full px-4 relative">
+            <MdSearch className="absolute left-8 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
             <input
               type="text"
               placeholder="Pesquisar por Código ou Identificação da Venda"
@@ -707,6 +733,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           </div>
 
           {/* Valor Mínimo */}
+          <div className="flex flex-row items-center gap-3">
           <div className="relative">
             <MdAttachMoney className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
             <input
@@ -737,10 +764,11 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               className="w-32 h-8 pl-10 pr-4 rounded-lg bg-info border shadow-sm text-sm font-nunito"
             />
           </div>
-
+          </div>
+          
           {/* Label Período */}
           <span className="text-primary text-sm font-exo">Período:</span>
-
+          <div className="flex flex-row items-center gap-3">
           {/* Dropdown Período */}
           <FormControl size="small" sx={{ minWidth: 150 }}>
             <Select
@@ -781,9 +809,9 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             Por datas
           </button>
         </div>
-
+        </div>
         {/* Filtros Avançados */}
-        <div className="bg-custom-2 rounded-t-lg px-2 pt-1.5 pb-2 flex flex-wrap items-end gap-x-2 gap-y-4">
+        <div className={`bg-custom-2 rounded-t-lg px-2 pt-1.5 pb-2 justify-center md:justify-start flex flex-wrap items-end gap-x-2 gap-y-4 ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}>
           {/* Status da Venda */}
           <div className="flex flex-col gap-1">
             <label className="text-xs text-secondary-text font-nunito">Status da Venda</label>
@@ -976,7 +1004,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         </div>
 
         {/* Cards de Métricas */}
-        <div className="flex gap-2 m-1">
+        <div className="flex gap-2 m-1 overflow-x-auto pb-2 scrollbar-thin">
           {/* Vendas Finalizadas/Em Aberto */}
           <div className="flex-1 border-2 rounded-lg p-1 flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-alternate flex items-center justify-center flex-shrink-0">
@@ -1011,7 +1039,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               <span className="text-info text-xl"><MdRestaurant /></span>
             </div>
             <div className="flex flex-col items-end flex-1">
-              <span className="text-xs text-secondary-text font-nunito">Total de Produtos Vendidos</span>
+              <span className="text-xs text-secondary-text font-nunito">Produtos Vendidos</span>
               <span className="text-[22px] text-primary font-exo">
                 {metricas?.countProdutosVendidos || 0}
               </span>
@@ -1035,29 +1063,29 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         {/* Tabela de Vendas */}
         <div className="bg-info rounded-lg overflow-hidden">
           {/* Cabeçalho */}
-          <div className="bg-custom-2 text-primary-text text-sm font-semibold font-nunito rounded-t-lg px-3 py-2 flex items-center gap-2">
-            <div className="flex-1 uppercase">
+          <div className="bg-custom-2 text-primary-text text-sm font-semibold font-nunito rounded-t-lg md:px-3 py-2 flex items-center gap-2">
+            <div className="flex-1 uppercase hidden md:flex">
               Código Venda
             </div>
-            <div className="flex-1 text-center uppercase">
-              Data/Hora
+            <div className="flex-1 text-xs md:text-sm text-center uppercase">
+              Data/ Hora
             </div>
-            <div className="flex-1 text-center uppercase">
+            <div className="flex-1 text-xs md:text-sm text-center uppercase">
               Tipo Venda
             </div>
-            <div className="flex-1 text-center uppercase">
+            <div className="flex-1 text-center uppercase hidden md:flex">
               Cód. Terminal
             </div>
-            <div className="flex-[2] text-center uppercase">
+            <div className="flex-[2] text-xs md:text-sm text-center uppercase">
               Usuário PDV
             </div>
-            <div className="flex-1 uppercase">
+            <div className="flex-1 text-xs md:text-sm uppercase">
               VL. Faturado
             </div>
-            <div className="flex-1 uppercase">
+            <div className="flex-1 text-xs md:text-sm uppercase hidden md:flex">
               VL. Cancelado
             </div>
-            <div className="flex-1 flex justify-end  uppercase">
+            <div className="flex-1 justify-end  uppercase hidden md:flex">
               Cupom
             </div>
           </div>
@@ -1067,69 +1095,84 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             ref={scrollContainerRef}
             className="max-h-[calc(100vh-350px)] overflow-y-auto px-1 py-2 scrollbar-hide"
           >
+            {isLoading && (
+              <div className="flex flex-col items-center justify-center py-12">
+                <img
+                  src="/images/jiffy-loading.gif"
+                  alt="Carregando"
+                  className="w-20 object-contain"
+                />
+                <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
+              </div>
+            )}
+
             {vendas.length === 0 && !isLoading && (
               <div className="flex items-center justify-center py-12">
                 <p className="text-secondary-text">Nenhuma venda encontrada.</p>
               </div>
             )}
 
-            {vendas.map((venda) => {
+            {vendas.map((venda, index) => {
               const { date, time } = formatDateList(venda.dataCriacao)
               const usuarioNome =
                 usuariosPDV.find((u) => u.id === venda.abertoPorId)?.nome || venda.abertoPorId
+              const isZebraEven = index % 2 === 0
 
               return (
                 <div
                   key={venda.id}
                   onClick={() => setSelectedVendaId(venda.id)} // Adicionado onClick para abrir detalhes
-                  className={`cursor-pointer px-2 py-1 mb-2 rounded-lg flex items-center shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-all ${(() => {
+                  className={`cursor-pointer md:px-2 py-1 rounded-lg flex items-center  hover:bg-primary/10 transition-all ${(() => {
                     let baseClasses = ''
                     if (venda.dataCancelamento) {
                       baseClasses = 'bg-red-100 hover:bg-red-200'
                     } else if (!venda.dataCancelamento && !venda.dataFinalizacao) {
                       baseClasses = 'bg-yellow-100 hover:bg-yellow-200'
                     } else {
-                      baseClasses = 'bg-info hover:bg-info/80'
+                      baseClasses = isZebraEven
+                        ? 'bg-white hover:bg-gray-100'
+                        : 'bg-gray-50 hover:bg-gray-200'
                     }
                     return baseClasses
                   })()}`}>
                 
-                  <div className="flex-1">
+                  <div className="flex-1 hidden md:flex">
                     <span className="text-sm font-semibold text-primary-text font-nunito">
                       #{venda.codigoVenda}
                     </span>
                   </div>
                   <div className="flex-1 flex flex-col items-center">
-                    <span className="text-sm text-primary-text font-nunito">{date}</span>
-                    <span className="text-sm text-primary-text font-nunito">{time}</span>
+                    <span className="text-xs md:text-sm text-primary-text font-nunito">{date}</span>
+                    <span className="text-xs md:text-sm text-primary-text font-nunito">{time}</span>
                   </div>
-                  <div className="flex-1 flex flex-col items-center">
+                  <div className="flex-1 flex flex-col items-center justify-center">
                   <TipoVendaIcon
                     tipoVenda={venda.tipoVenda}
                     numeroMesa={venda.numeroMesa}
                     corTexto="var(--color-info)" // Garante que o número da mesa seja visível
                     containerScale={0.90}
+                    size={isMobileViewport ? 45 : 60}
                   />
                   </div>
-                  <div className="flex-1 text-center">
+                  <div className="flex-1 text-center hidden md:flex">
                     <span className="text-sm text-primary-text font-nunito">
                       #{venda.codigoTerminal}
                     </span>
                   </div>
                   <div className="flex-[2] text-center">
-                    <span className="text-sm text-primary-text font-nunito">{usuarioNome}</span>
+                    <span className="text-xs md:text-sm text-primary-text font-nunito">{usuarioNome}</span>
                   </div>
-                  <div className="flex-1">
-                    <span className="text-sm text-primary-text font-nunito">
+                  <div className="flex-1 text-end">
+                    <span className="text-xs md:text-sm text-primary-text font-nunito">
                       {venda.dataCancelamento ? '-' : formatCurrency(venda.valorFinal)}
                     </span>
                   </div>
-                  <div className="flex-1">
-                    <span className="text-sm text-primary-text font-nunito">
+                  <div className="flex-1 hidden md:flex">
+                    <span className="text-xs md:text-sm text-primary-text font-nunito">
                       {venda.dataCancelamento ? formatCurrency(venda.valorFinal) : '-'}
                     </span>
                   </div>
-                  <div className="flex-1 flex justify-end">
+                  <div className="flex-1 justify-end hidden md:flex">
                     <button
                       onClick={(e) => {
                         e.stopPropagation() // Impede que o clique no botão acione o clique da linha

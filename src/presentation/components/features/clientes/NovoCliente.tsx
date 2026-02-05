@@ -464,8 +464,13 @@ export function NovoCliente({
 
   if (isLoadingCliente) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="flex flex-col items-center justify-center h-full gap-2">
+        <img
+          src="/images/jiffy-loading.gif"
+          alt="Carregando..."
+          className="w-20 h-20"
+        />
+        <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
       </div>
     )
   }
@@ -473,7 +478,7 @@ export function NovoCliente({
   return (
     <div className="flex flex-col h-full">
       {/* Header fixo */}
-      <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[30px] shadow-md px-[30px] py-4">
+      <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[30px] shadow-md md:px-[30px] px-1 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div
@@ -486,7 +491,7 @@ export function NovoCliente({
               <span className="text-2xl"><MdPerson/></span>
             </div>
             <h1 className="text-primary text-lg font-semibold font-exo">
-              {isEditing ? 'Editar Cliente' : 'Cadastrar Novo Cliente'}
+              {isEditing ? 'Editar Cliente' : 'Novo Cliente'}
             </h1>
           </div>
           <Button
@@ -508,10 +513,10 @@ export function NovoCliente({
       </div>
 
       {/* Formulário com scroll */}
-      <div className="flex-1 overflow-y-auto px-[30px]">
+      <div className="flex-1 overflow-y-auto md:px-[30px] px-1">
         <form onSubmit={handleSubmit} className="">
           {/* Toggle Pessoa Física/Jurídica */}
-          <div className="flex items-center border-b border-primary/70 justify-between px-5 py-3 bg-info">
+          <div className="flex items-center border-b border-primary/70 justify-between md:px-5 px-1 py-3 bg-info">
             <div className="flex flex-col items-start">
                 <p className="text-lg font-medium text-primary-text">
                   {nome || 'Nome do Cliente'}
@@ -532,12 +537,12 @@ export function NovoCliente({
           </div>
 
           {/* Dados Pessoais */}
-          <div className="bg-info rounded-lg px-5 py-2 space-y-4">
+          <div className="bg-info rounded-lg md:px-5 py-2 space-y-4">
             <h2 className="text-primary text-base font-semibold font-nunito mb-2">
               Dados Pessoais
             </h2>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 md:gap-2 gap-1">
               <Input
                 label="Nome"
                 value={nome}
@@ -577,7 +582,7 @@ export function NovoCliente({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid md:grid-cols-2 grid-cols-1 gap-2">
               <Input
                 label="CPF"
                 value={cpf}
@@ -618,12 +623,12 @@ export function NovoCliente({
                 }}
                   InputProps={{
                     endAdornment: (
-                      <div className="flex items-center gap-1 pr-1">
+                      <div className="flex items-center gap-1 md:pr-1">
                         {cnpj && (
                           <button
                             type="button"
                             onClick={handleClearCNPJ}
-                            className="p-1 hover:bg-gray-200 rounded transition-colors"
+                            className="md:p-1 hover:bg-gray-200 rounded transition-colors"
                             aria-label="Limpar CNPJ"
                           >
                             <MdClear className="text-gray-500" size={18} />
@@ -633,7 +638,7 @@ export function NovoCliente({
                           type="button"
                           onClick={handleBuscarCNPJ}
                           disabled={isLoadingCNPJ || !cnpj}
-                          className="p-1 hover:bg-primary/10 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="md:p-1 hover:bg-primary/10 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           aria-label="Buscar CNPJ"
                         >
                           {isLoadingCNPJ ? (
@@ -649,7 +654,7 @@ export function NovoCliente({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid md:grid-cols-2 grid-cols-1 gap-3">
               <Input
                 label="Telefone"
                 value={telefone}
@@ -731,12 +736,12 @@ export function NovoCliente({
 
           {/* Endereço */}
           {incluirEndereco && (
-            <div className="bg-info px-5 py-1 space-y-4">
+            <div className="bg-info md:px-5 py-1 space-y-4">
               <h2 className="text-primary text-base font-semibold font-nunito mb-4">
                 Endereço
               </h2>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-2 grid-cols-1 gap-3">
                 <div className="relative">
                   <Input
                     label="CEP"
@@ -846,7 +851,7 @@ export function NovoCliente({
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid md:grid-cols-3 grid-cols-1 gap-3">
                 <Input
                   label="Cidade"
                   value={cidade}
@@ -907,7 +912,7 @@ export function NovoCliente({
           )}
 
           {/* Botões de ação */}
-          <div className="flex justify-end gap-4 pt-4">
+          <div className="flex justify-end gap-4 py-4">
             <Button
               type="button"
               onClick={handleCancel}

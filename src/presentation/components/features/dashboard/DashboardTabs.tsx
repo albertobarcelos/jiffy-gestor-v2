@@ -86,7 +86,7 @@ function VendasPdvTab({
       </div>
 
       {/* Gráficos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 md:gap-6 gap-2">
         <GraficoVendasLinha periodo={periodo} selectedStatuses={selectedStatuses} />
         <GraficoVendasTerminal periodo={periodo} />
         

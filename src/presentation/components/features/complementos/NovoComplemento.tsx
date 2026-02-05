@@ -185,14 +185,14 @@ export function NovoComplemento({
   return (
     <div className="flex flex-col h-full">
       {/* Header fixo */}
-      <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[20px] shadow-md px-[30px] py-4">
+      <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[20px] shadow-md md:px-[30px] px-2 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             
-            <h1 className="text-primary text-lg font-semibold font-exo">
+            <h1 className="text-primary md:text-lg text-sm font-semibold font-exo">
               {isEditing
                 ? `Editar Complemento: ${nome || ''}`
-                : `Cadastrar Novo Complemento: ${nome || ''}`}
+                : `Novo Complemento: ${nome || ''}`}
             </h1>
           </div>
           <Button
@@ -206,7 +206,7 @@ export function NovoComplemento({
       </div>
 
       {/* Formulário com scroll */}
-      <div className="flex-1 overflow-y-auto px-[30px] py-[30px]">
+      <div className="flex-1 overflow-y-auto md:px-[30px] px-1 py-[30px]">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Dados */}
           <div className="bg-info rounded-[10px] p-2">
@@ -272,7 +272,7 @@ export function NovoComplemento({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tipo Impacto Preço
+                    Tipo Impacto
                   </label>
                   <select
                     value={tipoImpactoPreco}

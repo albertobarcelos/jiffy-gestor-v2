@@ -12,7 +12,7 @@ import { Checkbox } from '@/src/presentation/components/ui/checkbox'
 import Link from 'next/link'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
-import { MdSearch } from 'react-icons/md'
+import { MdSearch, MdExpandMore, MdExpandLess } from 'react-icons/md'
 /**
  * Componente para atualizar preço de múltiplos produtos em lote
  * Replica a funcionalidade do Flutter update_price_produtos_widget.dart
@@ -32,6 +32,7 @@ export function AtualizarPrecoLote() {
   const [adjustMode, setAdjustMode] = useState<'valor' | 'percentual'>('valor')
   const [adjustAmount, setAdjustAmount] = useState('')
   const [adjustDirection, setAdjustDirection] = useState<'increase' | 'decrease'>('increase')
+  const [filtersExpanded, setFiltersExpanded] = useState(false)
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const { auth } = useAuthStore()
   const {
@@ -315,11 +316,11 @@ export function AtualizarPrecoLote() {
   return (
     <div className="flex flex-col h-full bg-info">
       {/* Header */}
-      <div className="flex items-center justify-between bg-primary-bg border-b border-primary/70 px-6 py-2">
+      <div className="flex items-center justify-between bg-primary-bg border-b border-primary/70 md:px-6 px-1 py-2 md:gap-4 gap-2">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-primary">Atualizar Preços em Lote</h1>
-            <p className="text-sm text-secondary-text">
+            <h1 className="md:text-2xl text-sm font-bold text-primary">Atualizar Preços em Lote</h1>
+            <p className="md:text-sm text-xs text-secondary-text">
               Total de itens: {total} | Selecionados: {produtosSelecionados.size}
             </p>
           </div>
@@ -332,8 +333,8 @@ export function AtualizarPrecoLote() {
         </Link>
       </div>
 
-      <div className="bg-primary-bg border-b border-primary/70 px-6 py-2">
-        <div className="flex flex-wrap gap-4 items-end">
+      <div className="bg-primary-bg border-b border-primary/70 md:px-6 px-1 py-2">
+        <div className="flex flex-wrap md:gap-4 gap-1 items-end">
           <div className="w-full sm:w-[150px]">
             <label className="block text-xs font-semibold text-secondary-text mb-1">
               Tipo de ajuste
@@ -377,9 +378,10 @@ export function AtualizarPrecoLote() {
             </label>
           </div>
 
-          <div className="flex-1 min-w-[200px]">
+          <div className="flex-1 flex flex-row justify-between items-end gap-2 w-full md:max-w-[350px]">
+            <div className="flex flex-col gap-1 w-full">
             <label className="block text-xs font-semibold text-secondary-text">
-              {adjustDirection === 'increase' ? 'Aumentar mais' : 'Diminuir mais'} (
+              {adjustDirection === 'increase' ? 'Aumentar' : 'Diminuir'} (
               {adjustMode === 'valor' ? 'R$' : '%'})
             </label>
             <Input className="rounded-lg"
@@ -415,13 +417,13 @@ export function AtualizarPrecoLote() {
             />
           </div>
 
-          <div className="w-full h-8 rounded-lg sm:w-auto flex gap-2 items-end">
+          <div className="w-full h-8 rounded-lg flex gap-2 items-end">
             <Button
               onClick={atualizarPrecos}
               disabled={
                 isUpdating || produtosSelecionados.size === 0 || !adjustAmount.trim()
               }
-              className="min-w-[180px] h-8 hover:bg-primary/90"
+              className="md:min-w-[180px] h-8 hover:bg-primary/90"
               sx={{
                 color: 'var(--color-info)',
                 backgroundColor: 'var(--color-primary)',
@@ -433,6 +435,8 @@ export function AtualizarPrecoLote() {
             </Button>
           </div>
         </div>
+
+        </div>
         {produtosSelecionados.size > 0 && (
           <p className="text-xs text-secondary-text mt-2">
             O ajuste será aplicado aos {produtosSelecionados.size} produto(s) selecionado(s).
@@ -441,119 +445,146 @@ export function AtualizarPrecoLote() {
       </div>
 
       <div className="h-[4px] border-t-2 border-primary/70"></div>
-      <div className="bg-white px-[20px] py-2 border-b border-gray-100">
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="flex-1 min-w-[180px]">
-            <label htmlFor="precos-search" className="text-xs font-semibold text-secondary-text mb-1 block">
-              Buscar produto...
-            </label>
-            <div className="relative h-8">
-              <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text" size={18} />
-              <input
-                id="precos-search"
-                type="text"
-                placeholder="Pesquisar produto..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
-              />
+      <div className="bg-white md:px-[20px] py-2 border-b border-gray-100">
+        <div className="flex flex-col gap-2">
+          {/* Primeira linha: Busca e botão de expandir (mobile) */}
+          <div className="flex items-end gap-2">
+            <div className="flex-1 min-w-0">
+              <label htmlFor="precos-search" className="text-xs font-semibold text-secondary-text mb-1 block">
+                Buscar produto...
+              </label>
+              <div className="relative h-8">
+                <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text" size={18} />
+                <input
+                  id="precos-search"
+                  type="text"
+                  placeholder="Pesquisar produto..."
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+                />
+              </div>
             </div>
-          </div>
-
-          <div className="w-full sm:w-[160px]">
-            <label className="text-xs font-semibold text-secondary-text mb-1 block">Status</label>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')}
-              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
-            >
-              <option value="Todos">Todos</option>
-              <option value="Ativo">Ativo</option>
-              <option value="Desativado">Desativado</option>
-            </select>
-          </div>
-
-          <div className="w-full sm:w-[160px]">
-            <label className="text-xs font-semibold text-secondary-text mb-1 block">Ativo no local</label>
-            <select
-              value={ativoLocalFilter}
-              onChange={(e) => setAtivoLocalFilter(e.target.value as 'Todos' | 'Sim' | 'Não')}
-              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
-            >
-              <option value="Todos">Todos</option>
-              <option value="Sim">Sim</option>
-              <option value="Não">Não</option>
-            </select>
-          </div>
-
-          <div className="w-full sm:w-[160px]">
-            <label className="text-xs font-semibold text-secondary-text mb-1 block">Ativo no delivery</label>
-            <select
-              value={ativoDeliveryFilter}
-              onChange={(e) => setAtivoDeliveryFilter(e.target.value as 'Todos' | 'Sim' | 'Não')}
-              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
-            >
-              <option value="Todos">Todos</option>
-              <option value="Sim">Sim</option>
-              <option value="Não">Não</option>
-            </select>
-          </div>
-
-          <div className="w-full sm:w-[220px]">
-            <label className="text-xs font-semibold text-secondary-text mb-1 block">Grupo de produtos</label>
-            <select
-              value={grupoProdutoFilter}
-              onChange={(e) => setGrupoProdutoFilter(e.target.value)}
-              disabled={isLoadingGruposProdutos}
-              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <option value="">{isLoadingGruposProdutos ? 'Carregando...' : 'Todos'}</option>
-              {!isLoadingGruposProdutos &&
-                gruposProdutos.map((grupo) => (
-                  <option key={grupo.getId()} value={grupo.getId()}>
-                    {grupo.getNome()}
-                  </option>
-                ))}
-            </select>
-          </div>
-
-          <div className="w-full sm:w-[220px]">
-            <label className="text-xs font-semibold text-secondary-text mb-1 block">Grupo de complementos</label>
-            <select
-              value={grupoComplementoFilter}
-              onChange={(e) => setGrupoComplementoFilter(e.target.value)}
-              disabled={isLoadingGruposComplementos}
-              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <option value="">{isLoadingGruposComplementos ? 'Carregando...' : 'Todos'}</option>
-              {!isLoadingGruposComplementos &&
-                gruposComplementos.map((grupo) => (
-                  <option key={grupo.getId()} value={grupo.getId()}>
-                    {grupo.getNome()}
-                  </option>
-                ))}
-            </select>
-          </div>
-
-          <div className="w-full sm:w-auto">
+            {/* Botão para expandir/ocultar filtros (apenas mobile) */}
             <button
               type="button"
-              onClick={handleClearFilters}
-              className="h-8 px-5 rounded-lg border border-gray-300 text-sm font-semibold text-primary-text bg-white hover:bg-gray-50 transition-colors"
+              onClick={() => setFiltersExpanded(!filtersExpanded)}
+              className="md:hidden h-8 px-3 rounded-lg border border-gray-300 text-sm font-semibold text-primary-text bg-white hover:bg-gray-50 transition-colors flex items-center gap-1"
             >
-              Limpar filtros
+              {filtersExpanded ? (
+                <>
+                  <span className="text-xs">Ocultar</span>
+                  <MdExpandLess size={20} />
+                </>
+              ) : (
+                <>
+                  <span className="text-xs">Filtros</span>
+                  <MdExpandMore size={20} />
+                </>
+              )}
             </button>
+          </div>
+
+          {/* Filtros - ocultos em mobile por padrão, visíveis quando expandidos */}
+          <div className={`flex flex-wrap items-end gap-2 ${filtersExpanded ? 'block' : 'hidden'} md:flex`}>
+            <div className="w-full sm:w-[160px]">
+              <label className="text-xs font-semibold text-secondary-text mb-1 block">Status</label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')}
+                className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              >
+                <option value="Todos">Todos</option>
+                <option value="Ativo">Ativo</option>
+                <option value="Desativado">Desativado</option>
+              </select>
+            </div>
+
+            <div className="w-full sm:w-[160px]">
+              <label className="text-xs font-semibold text-secondary-text mb-1 block">Ativo no local</label>
+              <select
+                value={ativoLocalFilter}
+                onChange={(e) => setAtivoLocalFilter(e.target.value as 'Todos' | 'Sim' | 'Não')}
+                className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              >
+                <option value="Todos">Todos</option>
+                <option value="Sim">Sim</option>
+                <option value="Não">Não</option>
+              </select>
+            </div>
+
+            <div className="w-full sm:w-[160px]">
+              <label className="text-xs font-semibold text-secondary-text mb-1 block">Ativo no delivery</label>
+              <select
+                value={ativoDeliveryFilter}
+                onChange={(e) => setAtivoDeliveryFilter(e.target.value as 'Todos' | 'Sim' | 'Não')}
+                className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              >
+                <option value="Todos">Todos</option>
+                <option value="Sim">Sim</option>
+                <option value="Não">Não</option>
+              </select>
+            </div>
+
+            <div className="w-full sm:w-[220px]">
+              <label className="text-xs font-semibold text-secondary-text mb-1 block">Grupo de produtos</label>
+              <select
+                value={grupoProdutoFilter}
+                onChange={(e) => setGrupoProdutoFilter(e.target.value)}
+                disabled={isLoadingGruposProdutos}
+                className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <option value="">{isLoadingGruposProdutos ? 'Carregando...' : 'Todos'}</option>
+                {!isLoadingGruposProdutos &&
+                  gruposProdutos.map((grupo) => (
+                    <option key={grupo.getId()} value={grupo.getId()}>
+                      {grupo.getNome()}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div className="w-full sm:w-[220px]">
+              <label className="text-xs font-semibold text-secondary-text mb-1 block">Grupo de complementos</label>
+              <select
+                value={grupoComplementoFilter}
+                onChange={(e) => setGrupoComplementoFilter(e.target.value)}
+                disabled={isLoadingGruposComplementos}
+                className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <option value="">{isLoadingGruposComplementos ? 'Carregando...' : 'Todos'}</option>
+                {!isLoadingGruposComplementos &&
+                  gruposComplementos.map((grupo) => (
+                    <option key={grupo.getId()} value={grupo.getId()}>
+                      {grupo.getNome()}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div className="w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                className="h-8 px-5 rounded-lg border border-gray-300 text-sm font-semibold text-primary-text bg-white hover:bg-gray-50 transition-colors"
+              >
+                Limpar filtros
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Conteúdo */}
-      <div className="flex-1 overflow-auto p-2">
+      <div className="flex-1 overflow-auto py-2">
         {isLoading ? (
-          <div className="space-y-2">
-            {[...Array(5)].map((_, i) => (
-              <Skeleton key={i} className="h-8 w-full" />
-            ))}
+          <div className="flex flex-col items-center justify-center py-12 gap-2">
+            <img
+              src="/images/jiffy-loading.gif"
+              alt="Carregando..."
+              className="w-20 h-20"
+            />
+            <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
           </div>
         ) : produtos.length === 0 ? (
           <div className="text-center py-12">
@@ -561,8 +592,8 @@ export function AtualizarPrecoLote() {
           </div>
         ) : (
           <div className="bg-info rounded-lg overflow-hidden">
-            <div className="flex items-center h-11 gap-2 px-4 text-xs font-semibold text-primary-text uppercase tracking-wide bg-custom-2">
-              <div className="flex-none w-10 flex justify-center">
+            <div className="flex items-center h-11 gap-2 md:px-4 text-xs font-semibold text-primary-text uppercase tracking-wide bg-custom-2">
+              <div className="flex-none md:w-10 w-6 flex justify-center">
                 <Checkbox
                   checked={todosSelecionados}
                   onChange={(e) => {
@@ -575,19 +606,19 @@ export function AtualizarPrecoLote() {
                   className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                 />
               </div>
-              <div className="flex-1 w-14">Código</div>
-              <div className="flex-[1.5]">Nome</div>
-              <div className="flex-[1.4] text-center">Grupo de produtos</div>
-              <div className="flex-[1.2] text-center">Grupo de complementos</div>
-              <div className="flex-1 text-center">Status</div>
-              <div className="flex-1 text-right">Valor atual</div>
+              <div className="flex-1 md:w-14 text-xs">Código</div>
+              <div className="flex-[1.5] text-xs">Nome</div>
+              <div className="flex-[1.4] text-center hidden md:flex">Grupo de produtos</div>
+              <div className="flex-[1.2] text-center hidden md:flex">Grupo de complementos</div>
+              <div className="flex-1 text-center hidden md:flex">Status</div>
+              <div className="flex-1 text-right text-xs">Valor atual</div>
             </div>
 
             <div className="flex flex-col gap-2 mt-2">
               {produtos
                 .slice()
                 .sort((a, b) => a.getNome().localeCompare(b.getNome(), 'pt-BR'))
-                .map((produto) => {
+                .map((produto, index) => {
                 const isSelected = produtosSelecionados.has(produto.getId())
                 const gruposComplementos = produto.getGruposComplementos()
                 const gruposLabels = gruposComplementos.map((grupo) => {
@@ -595,15 +626,19 @@ export function AtualizarPrecoLote() {
                   const qtdComplementos = grupo.complementos?.length ?? 0
                   return `${nomeGrupo} (${qtdComplementos} complemento${qtdComplementos === 1 ? '' : 's'})`
                 })
+                // Cor de fundo alternada: se selecionado usa primary/20, senão alterna entre gray-50 e white
+                const bgColor = isSelected 
+                  ? 'bg-primary/20' 
+                  : index % 2 === 0 
+                    ? 'bg-gray-50' 
+                    : 'bg-white'
                 return (
                   <div
                     key={produto.getId()}
-                    className={`flex rounded-lg items-center px-4 gap-2 ${isSelected ? 'bg-primary/20' : 'bg-info'} hover:bg-primary-bg transition-colors cursor-default shadow-md  hover:shadow-md`}
+                    className={`flex rounded-lg items-center md:px-4 gap-2 ${bgColor} hover:bg-primary-bg transition-colors cursor-default`}
                     style={{ minHeight: '36px' }}
                   >
-{//                          className="h-[50px] bg-info rounded-lg px-4 mb-2 flex items-center gap-[10px] hover:bg-[var(--color-primary-background)] transition-colors cursor-default shadow-md  hover:shadow-md"
-}
-                    <div className="flex-none w-10 flex justify-center">
+                    <div className="flex-none md:w-10 w-6 flex justify-center">
                       <Checkbox
                         checked={isSelected}
                         onChange={(checked) => {
@@ -614,16 +649,16 @@ export function AtualizarPrecoLote() {
                         className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                       />
                     </div>
-                    <div className="flex-1 w-24 font-mono text-xs text-secondary-text">
+                    <div className="flex-1 md:w-24 font-mono text-xs text-secondary-text">
                       {produto.getCodigoProduto() || '-'}
                     </div>
-                    <div className="flex-[1.5] text-sm font-semibold text-primary-text truncate pr-4">
+                    <div className="md:flex-[1.5] flex-[2] md:text-sm text-xs font-semibold text-primary-text break-words md:pr-4">
                       {produto.getNome()}
                     </div>
-                    <div className="flex-[1.4] text-center text-xs text-primary-text">
+                    <div className="flex-[1.4] text-center text-xs text-primary-text hidden md:flex">
                       {produto.getNomeGrupo() || 'Sem grupo'}
                     </div>
-                    <div className="flex-[1.2] flex justify-center">
+                    <div className="flex-[1.2] justify-center hidden md:flex">
                       {gruposLabels.length === 0 ? (
                         <span className="text-xs text-secondary-text">Nenhum</span>
                       ) : (
@@ -645,7 +680,7 @@ export function AtualizarPrecoLote() {
                         </select>
                       )}
                     </div>
-                    <div className="flex-1 flex justify-center">
+                    <div className="flex-1 justify-center hidden md:flex">
                       <span
                         className={`px-4 py-1 rounded-lg text-[11px] font-medium border ${
                           produto.isAtivo() ? 'border-primary/50 text-success' : ' border-error text-error'
@@ -654,7 +689,7 @@ export function AtualizarPrecoLote() {
                         {produto.isAtivo() ? 'Ativo' : 'Desativado'}
                       </span>
                     </div>
-                    <div className="flex-1 text-right font-semibold text-sm text-primary-text">
+                    <div className="flex-1 text-right font-semibold md:text-sm text-xs text-primary-text">
                       {transformarParaReal(produto.getValor())}
                     </div>
                   </div>

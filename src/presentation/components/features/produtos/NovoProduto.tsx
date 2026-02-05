@@ -361,21 +361,21 @@ function NovoProdutoContent({
     <div className="flex flex-col h-full">
       {/* Header fixo com título e botões */}
       <div className="sticky top-0 z-10 bg-primary-bg/90 backdrop-blur-sm rounded-tl-lg shadow-md">
-        <div className="px-[30px] py-[4px]">
+        <div className="md:px-[30px] px-1 py-[4px]">
           <div className="rounded-lg border border-[#E0E4F3] bg-gradient-to-br from-[#F6F7FF] to-[#EEF1FB] px-6 py-3 shadow-[0_15px_45px_rgba(15,23,42,0.08)]">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-start gap-4">
-                <div className="h-14 w-14 rounded-lg bg-white flex items-center justify-center shadow-inner text-primary">
+                {/*<div className="h-14 w-14 rounded-lg bg-white flex items-center justify-center shadow-inner text-primary">
                   <MdImage className="text-2xl" />
-                </div>
+                </div>*/}
                 <div>
                   <p className="text-sm font-semibold text-primary font-exo uppercase tracking-wide">
                     {getPageTitle()}
                   </p>
-                  <h2 className="text-xl font-bold text-primary font-exo leading-tight">
+                  <h2 className="md:text-xl text-lg font-bold text-primary font-exo leading-tight">
                     {displayNome}
                   </h2>
-                  <p className="text-sm text-secondary-text font-nunito">
+                  <p className="md:text-sm text-xs text-secondary-text font-nunito">
                     {displayDescricao}
                   </p>
                 </div>
@@ -386,9 +386,9 @@ function NovoProdutoContent({
                   <button
                     type="button"
                     onClick={() => setAtivo((prev) => !prev)}
-                    className="flex h-8 items-center gap-2 rounded-lg border border-[#D4D8EB] bg-info px-3 py-1 shadow-sm hover:border-primary/40 transition-colors"
+                    className="flex h-8 items-center gap-1 rounded-lg border border-[#D4D8EB] bg-info md:px-3 px-1.5 py-1 shadow-sm hover:border-primary/40 transition-colors"
                   >
-                    <span className="text-sm font-semibold text-secondary-text">
+                    <span className="md:text-sm text-xs font-semibold text-secondary-text">
                       Visível no PDV
                     </span>
                     <span
@@ -406,7 +406,7 @@ function NovoProdutoContent({
                 )}
                 <button
                   onClick={handleCancel}
-                  className="h-8 px-8 rounded-lg bg-white text-primary font-semibold font-exo text-sm border border-[#D7DBEC] shadow-sm hover:bg-[#f4f6ff] transition-colors"
+                  className="h-8 md:px-8 px-4 rounded-lg bg-white text-primary font-semibold font-exo md:text-sm text-xs border border-[#D7DBEC] shadow-sm hover:bg-[#f4f6ff] transition-colors"
                 >
                   Cancelar
                 </button>
@@ -442,7 +442,7 @@ function NovoProdutoContent({
       </div>
 
       {/* Conteúdo das etapas */}
-      <div className="flex-1 overflow-y-auto px-5 pb-5">
+      <div className="flex-1 overflow-y-auto md:px-5 px-1 pb-5">
         {selectedPage === 0 ? (
           <InformacoesProdutoStep
             nomeProduto={nomeProduto}

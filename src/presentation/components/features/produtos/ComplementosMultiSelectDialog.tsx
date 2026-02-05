@@ -391,20 +391,13 @@ export function ComplementosMultiSelectDialog({
   const renderContent = () => {
     if (isLoading) {
       return (
-        <div className="space-y-3">
-          {[...Array(4)].map((_, index) => (
-            <div key={`group-skeleton-${index}`} className="rounded-lg border-2 border-gray-200 bg-white">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                <Skeleton className="h-4 w-40" />
-                <Skeleton className="h-4 w-16" />
-              </div>
-              <div className="space-y-2 px-4 py-3">
-                {[...Array(3)].map((__, subIndex) => (
-                  <div key={`item-skeleton-${index}-${subIndex}`} className="h-10 rounded-lg bg-gray-100" />
-                ))}
-              </div>
-            </div>
-          ))}
+        <div className="flex flex-col items-center justify-center py-12 gap-2">
+          <img
+            src="/images/jiffy-loading.gif"
+            alt="Carregando"
+            className="w-16 h-16 object-contain"
+          />
+          <p className="text-secondary-text text-sm text-center">Carregando complementos...</p>
         </div>
       )
     }
@@ -436,13 +429,16 @@ export function ComplementosMultiSelectDialog({
 
     return (
       <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
-        {filteredGroups.map((grupo) => {
+        {filteredGroups.map((grupo, groupIndex) => {
           const maxLabel = grupo.qtdMaxima ? `máx ${grupo.qtdMaxima}` : 'sem limite'
           const minLabel = grupo.qtdMinima ? `mín ${grupo.qtdMinima}` : 'mín 0'
           const isExpanded = expandedGroups[grupo.id] !== false
 
           return (
-            <div key={grupo.id} className="rounded-lg border border-gray-200 bg-white">
+            <div
+              key={grupo.id}
+              className={`rounded-lg ${groupIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}
+            >
               <div
                 role="button"
                 tabIndex={0}
@@ -453,7 +449,7 @@ export function ComplementosMultiSelectDialog({
                     toggleGroupVisibility(grupo.id)
                   }
                 }}
-                className="w-full flex items-center justify-between px-4 py-3 text-left cursor-pointer"
+                className="w-full flex items-center justify-between md:px-4 px-1.5 py-3 text-left cursor-pointer"
               >
                 <div className="flex items-center gap-3">
                   <button
@@ -489,11 +485,13 @@ export function ComplementosMultiSelectDialog({
               </div>
               {isExpanded && (
                 <div className="px-4 pb-4 space-y-2">
-                  {grupo.complementos.map((complemento) => {
+                  {grupo.complementos.map((complemento, index) => {
                     return (
                       <div
                         key={complemento.getId()}
-                        className="w-full flex items-center gap-3 rounded-lg border px-4 py-3 text-left border-gray-200 bg-gray-50"
+                        className={`w-full flex items-center gap-3 rounded-lg px-4 py-3 text-left ${
+                          index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+                        }`}
                       >
                         <MdCheck size={20} className="text-primary" />
                         <div className="flex-1">
@@ -549,22 +547,20 @@ export function ComplementosMultiSelectDialog({
         }
       }}
       fullWidth
-      maxWidth="sm"
+      maxWidth="xs"
     >
-      <DialogHeader>
-        <div className="flex h-16 items-top justify-between border-b-2 border-primary/70">
-        <DialogTitle>Selecionar grupos de complementos</DialogTitle>
+        <div className="flex flex-col md:flex-row md:h-16 py-4 px-2 md:px-4 items-top justify-between border-b-2 border-primary/70">
+        <span className="text-sm font-semibold text-primary-text">Selecionar grupos de complementos</span>
         <button
           type="button"
           onClick={handleOpenNovoGrupoModal}
-          className="h-8 px-6 rounded-lg bg-primary text-info text-sm font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="md:h-8 md:px-4 px-2 py-1 mt-2 md:mt-0 rounded-lg bg-primary text-info md:text-sm text-xs font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
           aria-label="Criar novo grupo"
         >
           Criar novo grupo
         </button>
         </div>
-      </DialogHeader>
-      <DialogContent sx={{ padding: '4px 24px' }}>
+      <DialogContent sx={{ padding: '4px 4px' }}>
         <div className="relative mb-4">
           <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={18} />
           <input
@@ -577,15 +573,24 @@ export function ComplementosMultiSelectDialog({
         </div>
         <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
           {isLoadingSelectableGroups ? (
-            <p className="text-center text-secondary-text text-sm py-6">Carregando grupos...</p>
+            <div className="flex flex-col items-center justify-center py-6 gap-2">
+              <img
+                src="/images/jiffy-loading.gif"
+                alt="Carregando"
+                className="w-16 h-16 object-contain"
+              />
+              <p className="text-secondary-text text-sm text-center">Carregando grupos...</p>
+            </div>
           ) : filteredSelectableGroups.length ? (
-            filteredSelectableGroups.map((grupo) => {
+            filteredSelectableGroups.map((grupo, index) => {
               const isSelected = tempSelection.includes(grupo.id)
               return (
                 <label
                   key={grupo.id}
-                  className={`flex items-center gap-3 rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
-                    isSelected ? 'border-primary bg-primary/5' : 'border-gray-200 bg-gray-50'
+                  className={`flex items-center md:gap-3 gap-1 rounded-lg md:px-4 px-1.5 py-3 cursor-pointer transition-colors ${
+                    isSelected
+                      ? 'border-primary bg-primary/5'
+                      : `border-gray-200 ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`
                   }`}
                 >
                   <input
@@ -595,9 +600,11 @@ export function ComplementosMultiSelectDialog({
                     className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                   />
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-primary-text">{grupo.nome}</p>
+                    <p className="md:text-sm text-xs font-semibold text-primary-text break-words whitespace-normal">
+                      {grupo.nome}
+                    </p>
                   </div>
-                  {isSelected && <span className="text-xs font-semibold text-primary">Selecionado</span>}
+                  {isSelected && <span className="md:text-xs text-[10px] font-semibold text-primary">Selecionado</span>}
                 </label>
               )
             })
@@ -606,7 +613,7 @@ export function ComplementosMultiSelectDialog({
           )}
         </div>
       </DialogContent>
-      <DialogFooter sx={{ justifyContent: 'space-between' }}>
+      <div className="flex items-center justify-between md:px-4 px-1.5 py-3">
         <button
           type="button"
           onClick={handleCloseSelectDialog}
@@ -618,11 +625,11 @@ export function ComplementosMultiSelectDialog({
           type="button"
           onClick={handleApplySelection}
           disabled={isSavingSelection || isUpdating}
-          className="h-8 px-6 rounded-lg bg-primary text-info text-sm font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="h-8 px-6 rounded-lg bg-primary text-info md:text-sm text-xs font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isSavingSelection ? 'Aplicando...' : 'Aplicar seleção'}
         </button>
-      </DialogFooter>
+      </div>
     </Dialog>
   )
 
@@ -637,7 +644,7 @@ export function ComplementosMultiSelectDialog({
         <div className="h-full flex flex-col overflow-hidden">
           <div className="px-6 py-4 border-b-2 border-primary/70 flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-primary-text">
+              <h3 className="md:text-lg text-sm font-semibold text-primary-text">
                 {produtoNome ? `Complementos de ${produtoNome}` : 'Complementos'}
               </h3>
               <p className="text-xs text-secondary-text">
@@ -648,13 +655,13 @@ export function ComplementosMultiSelectDialog({
           type="button"
           onClick={handleOpenSelectDialog}
           disabled={isUpdating}
-          className="h-8 px-4 rounded-lg border border-primary bg-primary text-white font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          className="md:h-8 px-4 py-1 rounded-lg border border-primary bg-primary text-white font-semibold md:text-sm text-xs flex items-center md:gap-2 hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         >
           <MdAdd size={18} />
           Vincular grupo
         </button>
           </div>
-          <div className="flex-1 overflow-y-auto px-6 py-4">{renderDialogBody()}</div>
+          <div className="flex-1 overflow-y-auto md:px-6 px-2 py-4">{renderDialogBody()}</div>
           <div className="px-6 py-12 border-t border-gray-100 flex justify-end">
             <button
               type="button"
