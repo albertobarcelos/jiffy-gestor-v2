@@ -216,10 +216,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     }
   }, [error])
 
-  const handleStatusChange = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['grupos-produtos'] })
-    onReload?.()
-  }, [queryClient, onReload])
+  // Função removida - não é mais necessária pois usamos atualização otimista
 
   const handleTabsModalReload = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['grupos-produtos'] })
@@ -230,6 +227,27 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     async (grupoId: string, novoStatus: boolean) => {
       const token = auth?.getAccessToken()
       if (!token) return
+
+      // Atualização otimista: atualiza UI imediatamente
+      const previousState = [...localGrupos]
+      setLocalGrupos((prev) =>
+        prev.map((grupo) => {
+          if (grupo.getId() === grupoId) {
+            // Criar novo grupo com status atualizado
+            return GrupoProduto.create({
+              id: grupo.getId(),
+              nome: grupo.getNome(),
+              corHex: grupo.getCorHex(),
+              iconName: grupo.getIconName(),
+              ativo: novoStatus,
+              ativoDelivery: grupo.isAtivoDelivery(),
+              ativoLocal: grupo.isAtivoLocal(),
+              ordem: grupo.getOrdem(),
+            })
+          }
+          return grupo
+        })
+      )
 
       try {
         const response = await fetch(`/api/grupos-produtos/${grupoId}`, {
@@ -246,13 +264,19 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
           throw new Error(error.message || 'Erro ao atualizar grupo')
         }
 
-        handleStatusChange()
+        showToast.success(
+          novoStatus ? 'Grupo ativado com sucesso!' : 'Grupo desativado com sucesso!'
+        )
+        // Não invalidar cache imediatamente - a atualização otimista já atualizou a UI
+        // O cache será invalidado apenas quando necessário (ex: ao fechar modal, mudar filtros, etc)
       } catch (error) {
         console.error('Erro ao atualizar status do grupo:', error)
+        // Reverter atualização otimista em caso de erro
+        setLocalGrupos(previousState)
         showToast.error('Não foi possível atualizar o status do grupo.')
       }
     },
-    [auth, handleStatusChange]
+    [auth, localGrupos]
   )
 
   const openTabsModal = useCallback(
@@ -392,10 +416,8 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       }
 
       showToast.success('Ordem atualizada com sucesso!')
-      // Recarrega a página por completo para buscar a nova ordem direto do backend
-      setTimeout(() => {
-        window.location.reload()
-      }, 800)
+      // Não recarregar página - a atualização otimista já atualizou a UI
+      // O cache será invalidado apenas quando necessário (ex: ao fechar modal, mudar filtros, etc)
     } catch (error: any) {
       console.error('Erro ao reordenar grupo:', error)
       // Reverte feedback otimista
@@ -539,7 +561,6 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
                 key={grupo.getId()}
                 grupo={grupo}
                 index={index}
-                onStatusChanged={handleStatusChange}
                 onToggleStatus={handleToggleGrupoStatus}
                 onCreateProduto={(grupoId) => handleOpenProdutoModal(grupoId)}
                 onEdit={(g) =>
@@ -585,7 +606,15 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     <ProdutosTabsModal
       state={produtoTabsState}
       onClose={handleCloseProdutoModal}
-      onReload={onReload}
+      onReload={(produtoId?: string, produtoData?: any) => {
+        // Se temos dados do produto, podemos atualizar o cache
+        // Caso contrário, apenas chama o onReload original
+        if (produtoId && produtoData) {
+          // Aqui poderia atualizar o cache se necessário
+          // Por enquanto, apenas chama o onReload original
+        }
+        onReload?.()
+      }}
       onTabChange={handleProdutoTabChange}
     />
     </>

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Impressora } from '@/src/domain/entities/Impressora'
 import { showToast } from '@/src/shared/utils/toast'
-import { MdArrowDropUp, MdArrowDropDown } from 'react-icons/md'
+import { MdArrowDropUp, MdArrowDropDown, MdPhone } from 'react-icons/md'
 
 interface TerminalConfig {
   terminalId: string
@@ -273,18 +273,25 @@ export function NovaImpressora({
     setCurrentPage(0)
     setHasMoreTerminals(true)
 
-    // Carrega primeira página
-    await loadTerminais(0, true)
+    const token = auth?.getAccessToken()
+    if (!token) {
+      setIsLoadingTerminais(false)
+      hasLoadedTerminaisRef.current = true
+      return
+    }
 
-    // Carrega páginas restantes sequencialmente
-    let offset = pageSize
-    let hasMore = true
-    
-    while (hasMore) {
-      const token = auth?.getAccessToken()
-      if (!token) break
+    try {
+      // Carrega primeira página
+      let offset = 0
+      let hasMore = true
+      let firstRequest = true
+      let totalLoaded = 0
+      const maxIterations = 1000 // Proteção contra loop infinito
+      let iterations = 0
 
-      try {
+      while (hasMore && iterations < maxIterations) {
+        iterations++
+
         const params = new URLSearchParams({
           limit: pageSize.toString(),
           offset: offset.toString(),
@@ -297,11 +304,15 @@ export function NovaImpressora({
           },
         })
 
-        if (!response.ok) break
+        if (!response.ok) {
+          hasMore = false
+          break
+        }
 
         const data = await response.json()
         const terminais = data.items || []
 
+        // Se não retornou nenhum terminal e já fez pelo menos uma requisição, para
         if (terminais.length === 0) {
           hasMore = false
           break
@@ -329,20 +340,30 @@ export function NovaImpressora({
           return combined
         })
 
+        totalLoaded += terminais.length
         hasMore = terminais.length === pageSize
         if (hasMore) {
           offset += terminais.length
         }
-      } catch (error) {
-        console.error('Erro ao carregar terminais:', error)
+
+        firstRequest = false
+      }
+
+      // Proteção: se atingiu o limite de iterações, força parada
+      if (iterations >= maxIterations) {
+        console.warn('Limite de iterações atingido ao carregar terminais')
         hasMore = false
       }
-    }
 
-    setHasMoreTerminals(false)
-    setIsLoadingTerminais(false)
-    hasLoadedTerminaisRef.current = true
-  }, [isEditing, auth])
+      setHasMoreTerminals(false)
+    } catch (error) {
+      console.error('Erro ao carregar terminais:', error)
+      setHasMoreTerminals(false)
+    } finally {
+      setIsLoadingTerminais(false)
+      hasLoadedTerminaisRef.current = true
+    }
+  }, [isEditing, auth, pageSize])
 
   /**
    * Carrega dados da impressora (para edição ou cópia)
@@ -1267,8 +1288,12 @@ export function NovaImpressora({
                 </div>
               )}
               {terminaisConfig.length === 0 && !isLoadingTerminais && hasLoadedTerminaisRef.current && !isLoadingMore && (
-                <div className="flex items-center justify-center py-12">
-                  <p className="text-secondary-text">Nenhum terminal encontrado.</p>
+                <div className="flex flex-col items-center justify-center py-12 gap-4">
+                  <MdPhone className="text-secondary-text" size={48} />
+                  <p className="text-lg font-semibold text-primary-text">Nenhum terminal cadastrado</p>
+                  <p className="text-sm text-secondary-text text-center max-w-xs">
+                    Parece que você ainda não tem nenhum terminal cadastrado. Cadastre um terminal na seção de configurações para começar a configurar impressoras.
+                  </p>
                 </div>
               )}
 

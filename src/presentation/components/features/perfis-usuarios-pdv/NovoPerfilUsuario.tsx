@@ -240,8 +240,13 @@ export function NovoPerfilUsuario({
 
   if (isLoadingPerfil) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="flex flex-col items-center justify-center h-full">
+        <img
+          src="/images/jiffy-loading.gif"
+          alt="Carregando"
+          className="w-20 h-20 object-contain"
+        />
+        <span className="text-sm font-medium text-primary-text font-nunito mt-2">Carregando...</span>
       </div>
     )
   }

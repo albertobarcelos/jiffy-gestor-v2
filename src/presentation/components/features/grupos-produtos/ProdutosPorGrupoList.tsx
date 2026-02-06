@@ -341,7 +341,18 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
       <ProdutosTabsModal
         state={tabsModalState}
         onClose={handleCloseTabsModal}
-        onReload={refetch}
+        onReload={(produtoId?: string, produtoData?: any) => {
+          // Se temos dados do produto, podemos atualizar o cache local
+          // Caso contrário, apenas refaz a requisição
+          if (produtoId && produtoData) {
+            // Atualizar produto na lista local se estiver presente
+            setLocalProdutos((prev) =>
+              prev.map((p) => (p.id === produtoId ? { ...p, ...produtoData } : p))
+            )
+          }
+          // Sempre refaz a requisição para garantir sincronização
+          refetch()
+        }}
         onTabChange={handleTabsModalTabChange}
       />
     </>

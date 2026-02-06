@@ -22,7 +22,7 @@ export interface ProdutosTabsModalState {
 interface ProdutosTabsModalProps {
   state: ProdutosTabsModalState
   onClose: () => void
-  onReload?: () => void
+  onReload?: (produtoId?: string, produtoData?: any) => void
   onTabChange: (tab: TabKey) => void
 }
 
@@ -116,8 +116,9 @@ export function ProdutosTabsModal({ state, onClose, onReload, onTabChange }: Pro
                 isCopyMode={state.mode === 'copy'}
                 defaultGrupoProdutoId={state.mode === 'create' ? state.prefillGrupoProdutoId : undefined}
                 onClose={onClose}
-                onSuccess={() => {
-                  onReload?.()
+                onSuccess={(produtoData) => {
+                  // Passar dados do produto para atualização otimista do cache
+                  onReload?.(produtoData?.produtoId, produtoData?.produtoData)
                   onClose()
                 }}
               />
@@ -168,7 +169,8 @@ export function ProdutosTabsModal({ state, onClose, onReload, onTabChange }: Pro
                   isEmbedded
                   onClose={onClose}
                   onSaved={() => {
-                    // Não chamar onReload aqui, pois NovoGrupo já fará a invalidação e o onClose.
+                    // NovoGrupo já faz invalidação internamente de grupos e produtos
+                    // Não precisamos chamar onReload aqui, pois o NovoGrupo já gerencia as invalidações
                     onClose()
                   }}
                 />
