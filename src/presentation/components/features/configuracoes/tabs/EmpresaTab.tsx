@@ -12,7 +12,7 @@ export function EmpresaTab() {
   const { auth } = useAuthStore()
   const [empresa, setEmpresa] = useState<Cliente | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isEditing, setIsEditing] = useState(false)
+  const [isEditing, setIsEditing] = useState(true)
 
   // Campos do formulário
   const [cnpj, setCnpj] = useState('')

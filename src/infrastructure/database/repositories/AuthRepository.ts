@@ -32,6 +32,13 @@ export class AuthRepository implements IAuthRepository {
 
       const { accessToken, user } = response.data
 
+      // Debug: Verificar resposta da API
+      console.log('🔍 [AuthRepository] Resposta completa da API:', {
+        accessToken: accessToken ? 'Token recebido' : 'Token ausente',
+        user: user,
+        responseData: response.data
+      })
+
       if (!accessToken) {
         throw new Error('Token de acesso não recebido')
       }
@@ -50,12 +57,34 @@ export class AuthRepository implements IAuthRepository {
       }
 
       // Cria usuário a partir dos dados recebidos ou usa dados mínimos
+      console.log('🔍 [AuthRepository] Criando entidade User com:', {
+        hasUser: !!user,
+        userId: user?.id,
+        userEmail: user?.email,
+        userName: user?.name,
+        username: username
+      })
+
       const userEntity = user
         ? User.create(user.id, user.email, user.name)
         : User.create('unknown', username)
 
+      console.log('🔍 [AuthRepository] User criado:', {
+        userId: userEntity.getId(),
+        userEmail: userEntity.getEmail(),
+        userName: userEntity.getName(),
+        userJSON: userEntity.toJSON()
+      })
+
       // Cria Auth com expiração real do token JWT
-      return Auth.createWithExpiration(accessToken, userEntity, expiresAt)
+      const auth = Auth.createWithExpiration(accessToken, userEntity, expiresAt)
+      
+      console.log('🔍 [AuthRepository] Auth criado:', {
+        hasToken: !!auth.getAccessToken(),
+        userFromAuth: auth.getUser().toJSON()
+      })
+
+      return auth
     } catch (error) {
       if (error instanceof ApiError) {
         throw new Error(error.message || 'Erro ao realizar login')
