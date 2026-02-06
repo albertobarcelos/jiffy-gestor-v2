@@ -14,7 +14,7 @@ interface NovoProdutoProps {
   isCopyMode?: boolean
   defaultGrupoProdutoId?: string
   onClose?: () => void
-  onSuccess?: () => void
+  onSuccess?: (produtoData?: { produtoId: string; produtoData: any }) => void
 }
 
 /**
@@ -322,6 +322,25 @@ function NovoProdutoContent({
         }
       }
 
+      // Buscar o produto atualizado para atualizar o cache
+      let produtoAtualizado = null
+      if (isEditMode) {
+        try {
+          const produtoResponse = await fetch(`/api/produtos/${effectiveProdutoId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          })
+          if (produtoResponse.ok) {
+            produtoAtualizado = await produtoResponse.json()
+          }
+        } catch (error) {
+          console.error('Erro ao buscar produto atualizado:', error)
+          // Continua mesmo se falhar ao buscar
+        }
+      }
+
       showToast.successLoading(
         toastId,
         effectiveProdutoId && !effectiveIsCopyMode
@@ -329,7 +348,8 @@ function NovoProdutoContent({
           : 'Produto cadastrado com sucesso!'
       )
       if (onSuccess) {
-        onSuccess()
+        // Passar dados do produto para atualização otimista do cache
+        onSuccess(isEditMode && produtoAtualizado ? { produtoId: effectiveProdutoId, produtoData: produtoAtualizado } : undefined)
       } else {
         setTimeout(() => {
           router.push('/produtos')

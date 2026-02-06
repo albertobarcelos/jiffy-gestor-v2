@@ -738,22 +738,67 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
       prefillGrupoProdutoId: undefined,
       grupoId: undefined,
     }))
-    invalidateProdutosQueries()
-    invalidateGruposProdutosQueries()
-    onReload?.()
 
-    // Remover o parâmetro da URL para forçar o recarregamento da rota
+    // Remover o parâmetro da URL
     const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
     currentSearchParams.delete('modalOpen')
     router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
-    router.refresh() // Força a revalidação da rota principal
-  }, [invalidateProdutosQueries, invalidateGruposProdutosQueries, onReload, router, searchParams, pathname])
+    // Não fazer router.refresh() aqui para evitar recarregamento desnecessário
+    // As invalidações e reloads devem ser feitas apenas quando há mudanças (via handleTabsModalReload)
+  }, [router, searchParams, pathname])
 
-  const handleTabsModalReload = useCallback(() => {
-    invalidateProdutosQueries()
-    invalidateGruposProdutosQueries()
-    onReload?.()
-  }, [invalidateProdutosQueries, invalidateGruposProdutosQueries, onReload])
+  /**
+   * Atualiza o cache do React Query diretamente ao invés de invalidar e refazer requisição
+   * Isso evita requisições desnecessárias quando editamos um produto existente
+   */
+  const updateProdutoInCache = useCallback((produtoId: string, produtoData: any) => {
+    // Atualizar todas as queries infinitas de produtos
+    queryClient.setQueriesData(
+      { queryKey: ['produtos', 'infinite'], exact: false },
+      (oldData: any) => {
+        if (!oldData?.pages) return oldData
+
+        // Percorrer todas as páginas e atualizar o produto se encontrado
+        const updatedPages = oldData.pages.map((page: any) => {
+          const updatedProdutos = page.produtos.map((produto: Produto) => {
+            if (produto.getId() === produtoId) {
+              // Criar novo produto com dados atualizados
+              try {
+                return Produto.fromJSON(produtoData)
+              } catch (error) {
+                console.error('Erro ao atualizar produto no cache:', error)
+                return produto // Retorna o produto original em caso de erro
+              }
+            }
+            return produto
+          })
+          return {
+            ...page,
+            produtos: updatedProdutos,
+          }
+        })
+
+        return {
+          ...oldData,
+          pages: updatedPages,
+        }
+      }
+    )
+  }, [queryClient])
+
+  const handleTabsModalReload = useCallback((produtoId?: string, produtoData?: any) => {
+    // Se temos dados do produto editado, atualizar o cache diretamente
+    if (produtoId && produtoData) {
+      updateProdutoInCache(produtoId, produtoData)
+    } else {
+      // Se for criação de novo produto, invalidar para buscar a lista atualizada
+      queryClient.invalidateQueries({
+        queryKey: ['produtos', 'infinite'],
+        exact: false,
+        refetchType: 'active',
+      })
+    }
+  }, [queryClient, updateProdutoInCache])
 
   const handleTabsModalTabChange = useCallback((tab: 'produto' | 'complementos' | 'impressoras' | 'grupo') => {
     setTabsModalState((prev) => ({
