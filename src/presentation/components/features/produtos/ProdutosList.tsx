@@ -1104,8 +1104,8 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
         }
 
         showToast.success('Valor atualizado com sucesso!')
-        onReload?.()
-        await invalidateProdutosQueries()
+        // Não invalidar cache imediatamente - a atualização otimista já atualizou a UI
+        // O cache será invalidado apenas quando necessário (ex: ao fechar modal, mudar filtros, etc)
       } catch (error: any) {
         console.error('Erro ao atualizar valor do produto:', error)
         setLocalProdutos((prev) => {
@@ -1132,7 +1132,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
         })
       }
     },
-    [token, onReload, localProdutos, setPendingUpdate, clearPendingUpdateField, invalidateProdutosQueries]
+    [token, localProdutos, setPendingUpdate, clearPendingUpdateField]
   )
 
   const handleStatusToggle = useCallback(
@@ -1190,8 +1190,8 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
         showToast.success(
           novoStatus ? 'Produto ativado com sucesso!' : 'Produto desativado com sucesso!'
         )
-        onReload?.()
-        await invalidateProdutosQueries()
+        // Não invalidar cache imediatamente - a atualização otimista já atualizou a UI
+        // O cache será invalidado apenas quando necessário (ex: ao fechar modal, mudar filtros, etc)
       } catch (error: any) {
         console.error('Erro ao atualizar status do produto:', error)
         setLocalProdutos((prev) => {
@@ -1218,7 +1218,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
         })
       }
     },
-    [token, filterStatus, onReload, localProdutos, setPendingUpdate, clearPendingUpdateField, invalidateProdutosQueries]
+    [token, filterStatus, localProdutos, setPendingUpdate, clearPendingUpdateField]
   )
 
   const handleToggleBooleanField = useCallback(
@@ -1269,8 +1269,8 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
         }
 
         showToast.success(novoValor ? config.successTrue : config.successFalse)
-        onReload?.()
-        await invalidateProdutosQueries()
+        // Não invalidar cache imediatamente - a atualização otimista já atualizou a UI
+        // O cache será invalidado apenas quando necessário (ex: ao fechar modal, mudar filtros, etc)
       } catch (error: any) {
         console.error('Erro ao atualizar produto:', error)
         setLocalProdutos((prev) => {
@@ -1296,11 +1296,9 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     },
     [
       token,
-      onReload,
       localProdutos,
       setPendingUpdate,
       clearPendingUpdateField,
-      invalidateProdutosQueries,
       setSavingToggleState,
     ]
   )

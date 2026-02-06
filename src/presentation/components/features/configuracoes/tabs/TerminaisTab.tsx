@@ -56,6 +56,7 @@ export function TerminaisTab() {
     async () => {
       const token = auth?.getAccessToken()
       if (!token) {
+        setIsLoading(false)
         return
       }
 
@@ -66,6 +67,7 @@ export function TerminaisTab() {
         let currentOffset = 0
         let hasMore = true
         let totalCount = 0
+        let firstRequest = true
 
         // Loop para carregar todas as páginas
         while (hasMore) {
@@ -98,6 +100,12 @@ export function TerminaisTab() {
             console.log('Resposta da API de terminais:', data)
           }
 
+          // Atualiza o total apenas na primeira requisição
+          if (firstRequest) {
+            totalCount = data.count || data.total || allTerminais.length || 0
+            firstRequest = false
+          }
+
           // Filtrar e mapear apenas itens válidos, mantendo dados brutos
           const newTerminais = (data.items || [])
             .map((t: any) => {
@@ -116,15 +124,15 @@ export function TerminaisTab() {
 
           allTerminais.push(...newTerminais)
 
-          // Atualiza o total apenas na primeira requisição
-          if (currentOffset === 0) {
-            totalCount = data.count || data.total || 0
-          }
-
           // Verifica se há mais páginas
           // Se retornou menos de 10 itens, não há mais páginas
           hasMore = newTerminais.length === 10
           currentOffset += newTerminais.length
+
+          // Proteção contra loop infinito: se não retornou nenhum item e já fez pelo menos uma requisição, para
+          if (newTerminais.length === 0 && !firstRequest) {
+            hasMore = false
+          }
         }
 
         setTerminais(allTerminais)
@@ -547,8 +555,14 @@ export function TerminaisTab() {
         )}
 
         {terminais.length === 0 && !isLoading && (
-          <div className="flex items-center justify-center py-12">
-            <p className="text-secondary-text">Nenhum terminal encontrado.</p>
+          <div className="flex flex-col items-center justify-center py-12">
+            <MdPhone className="text-secondary-text mb-4" size={48} />
+            <p className="text-primary-text font-semibold text-lg mb-2">
+              Nenhum terminal cadastrado
+            </p>
+            <p className="text-secondary-text text-sm text-center max-w-md">
+              Não há terminais cadastrados no sistema. Cadastre um terminal para começar a utilizá-lo.
+            </p>
           </div>
         )}
 
@@ -616,12 +630,13 @@ export function TerminaisTab() {
                   <div className="md:text-xs text-[10px] text-secondary-text">Carregando...</div>
                 )}
               </div>
-              <div className="flex-[1.5] flex justify-center">
+              <div className="flex-[1.5] flex justify-center" onClick={(e) => e.stopPropagation()}>
                 <label
                   className={`relative inline-flex h-4 w-10 md:h-5 md:w-12 items-center ${
                     updatingShare[terminal.getId()] ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
                   }`}
                   title={compartilhamentoAtivo ? 'Compartilhamento habilitado' : 'Compartilhamento desabilitado'}
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <input
                     type="checkbox"
@@ -631,13 +646,14 @@ export function TerminaisTab() {
                       event.stopPropagation();
                       handleToggleCompartilhar(terminal.getId(), event.target.checked)
                     }}
+                    onClick={(e) => e.stopPropagation()}
                     disabled={!!updatingShare[terminal.getId()]}
                   />
                   <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
                   <span className="absolute left-[2px] top-1/2 block h-[14px] w-[14px] md:h-4 md:w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[18px] md:peer-checked:translate-x-[28px]" />
                 </label>
               </div>
-              <div className="md:flex-[1.5] flex-[1] flex justify-center">
+              <div className="md:flex-[1.5] flex-[1] flex justify-center" onClick={(e) => e.stopPropagation()}>
                 <label
                   className={`relative inline-flex h-4 w-10 md:h-5 md:w-12 items-center ${
                     togglingStatus[terminal.getId()]
@@ -645,6 +661,7 @@ export function TerminaisTab() {
                       : 'cursor-pointer'
                   }`}
                   title={ativo ? 'Terminal Ativo' : 'Terminal Bloqueado'}
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <input
                     type="checkbox"
@@ -654,6 +671,7 @@ export function TerminaisTab() {
                       event.stopPropagation();
                       handleToggleTerminalStatus(terminal.getId(), !event.target.checked)
                     }}
+                    onClick={(e) => e.stopPropagation()}
                     disabled={!!togglingStatus[terminal.getId()]}
                   />
                   <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
