@@ -606,7 +606,15 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     <ProdutosTabsModal
       state={produtoTabsState}
       onClose={handleCloseProdutoModal}
-      onReload={onReload}
+      onReload={(produtoId?: string, produtoData?: any) => {
+        // Se temos dados do produto, podemos atualizar o cache
+        // Caso contrário, apenas chama o onReload original
+        if (produtoId && produtoData) {
+          // Aqui poderia atualizar o cache se necessário
+          // Por enquanto, apenas chama o onReload original
+        }
+        onReload?.()
+      }}
       onTabChange={handleProdutoTabChange}
     />
     </>
