@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
 import { MdClose, MdRestaurant, MdAttachMoney } from 'react-icons/md'
@@ -371,6 +371,42 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
   }, [open, vendaId, fetchVendaDetalhes])
 
   if (!open) return null
+
+  /**
+   * Calcula o troco baseado nos pagamentos válidos
+   * Exclui pagamentos cancelados e pagamentos com isTefConfirmed: false
+   */
+  const trocoCalculado = useMemo(() => {
+    if (!venda || !venda.pagamentos || venda.pagamentos.length === 0) {
+      return 0;
+    }
+
+    // Filtra pagamentos válidos (mesma lógica do filtro de exibição)
+    const pagamentosValidos = venda.pagamentos.filter((p) => {
+      // Exclui pagamentos cancelados
+      const isCancelado = p.cancelado === true || (p.dataCancelamento !== null && p.dataCancelamento !== undefined);
+      
+      // Verifica se o pagamento usa TEF e se está confirmado
+      const usaTef = p.isTefUsed === true;
+      if (usaTef) {
+        const tefConfirmado = p.isTefConfirmed === true;
+        if (!tefConfirmado) {
+          return false; // Exclui pagamentos TEF não confirmados
+        }
+      }
+      
+      return !isCancelado; // Apenas pagamentos não cancelados e (não usa TEF ou TEF confirmado)
+    });
+
+    // Soma o total pago pelos pagamentos válidos
+    const totalPago = pagamentosValidos.reduce((sum, pagamento) => sum + pagamento.valor, 0);
+
+    // Calcula o troco: total pago - total da venda
+    // Se der negativo, troco = 0 (não pode haver troco negativo)
+    const troco = Math.max(0, totalPago - venda.valorFinal);
+
+    return troco;
+  }, [venda]);
 
   const statusVenda = venda?.canceladoPorId
     ? 'CANCELADA'
@@ -783,11 +819,20 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                       )
                     })}
 
-                  {/* Troco */}
-                  {venda.troco != null && Number(venda.troco) > 0 && (
+                  {/* Troco - Código original comentado (vem da API) */}
+                  {/* {venda.troco != null && Number(venda.troco) > 0 && (
                     <div className="px-3 py-2 rounded-lg bg-white shadow-sm">
                       <span className="text-sm font-semibold text-primary-text font-nunito">
                         Troco: {formatCurrency(venda.troco)}
+                      </span>
+                    </div>
+                  )} */}
+
+                  {/* Troco calculado no frontend */}
+                  {trocoCalculado > 0 && (
+                    <div className="px-3 py-2 rounded-lg bg-white shadow-sm">
+                      <span className="text-sm font-semibold text-primary-text font-nunito">
+                        Troco: {formatCurrency(trocoCalculado)}
                       </span>
                     </div>
                   )}
