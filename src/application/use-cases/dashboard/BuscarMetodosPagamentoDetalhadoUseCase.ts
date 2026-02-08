@@ -14,6 +14,7 @@ interface VendaDetalhesApiResponse {
   dataFinalizacao?: string;
   dataCancelamento?: string | null;
   troco?: number;
+  valorFinal?: number; // Valor total da venda para cálculo do troco
   pagamentos: {
     id: string;
     valor: number;
@@ -326,7 +327,17 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
         return true; // Pagamento válido: não cancelado e (não usa TEF ou TEF confirmado)
       });
 
-      // Se houver troco, calcula o total de pagamentos em dinheiro para distribuir o troco
+      // Calcula o troco baseado nos pagamentos válidos (mesma lógica do DetalhesVendas.tsx)
+      // Exclui pagamentos cancelados e pagamentos com isTefConfirmed: false
+      const totalPagoValido = pagamentosValidos.reduce((sum, pagamento) => sum + pagamento.valor, 0);
+      
+      // Calcula o troco: total pago - total da venda
+      // Se der negativo, troco = 0 (não pode haver troco negativo)
+      const trocoCalculado = venda.valorFinal 
+        ? Math.max(0, totalPagoValido - venda.valorFinal)
+        : (venda.troco || 0); // Fallback para troco da API se valorFinal não estiver disponível
+
+      // Se houver troco calculado, calcula o total de pagamentos em dinheiro para distribuir o troco
       let totalPagamentosDinheiro = 0;
       const pagamentosComDados: Array<{
         pagamento: typeof pagamentosValidos[0];
@@ -364,15 +375,15 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
       for (const { pagamento, metodoNome, isDinheiro, valorOriginal } of pagamentosComDados) {
         let valorPagamento = valorOriginal;
 
-        // Se for pagamento em dinheiro e houver troco, subtrai o troco proporcionalmente
-        if (isDinheiro && venda.troco && venda.troco > 0 && totalPagamentosDinheiro > 0) {
+        // Se for pagamento em dinheiro e houver troco calculado, subtrai o troco proporcionalmente
+        if (isDinheiro && trocoCalculado > 0 && totalPagamentosDinheiro > 0) {
           // Calcula a proporção deste pagamento no total de dinheiro
           const proporcao = valorOriginal / totalPagamentosDinheiro;
-          const trocoProporcional = venda.troco * proporcao;
+          const trocoProporcional = trocoCalculado * proporcao;
           valorPagamento = Math.max(0, valorOriginal - trocoProporcional);
           
           console.log(
-            `Venda ${venda.id}: Pagamento em dinheiro - valor pago R$ ${valorOriginal.toFixed(2)}, troco proporcional R$ ${trocoProporcional.toFixed(2)}, valor líquido R$ ${valorPagamento.toFixed(2)}`
+            `Venda ${venda.id}: Pagamento em dinheiro - valor pago R$ ${valorOriginal.toFixed(2)}, troco calculado R$ ${trocoCalculado.toFixed(2)}, troco proporcional R$ ${trocoProporcional.toFixed(2)}, valor líquido R$ ${valorPagamento.toFixed(2)}`
           );
         }
 
