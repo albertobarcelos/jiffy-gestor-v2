@@ -24,6 +24,7 @@ interface VendaDetalhes {
   dataFinalizacao?: string
   canceladoPorId?: string
   ultimoResponsavelId?: string
+  statusMesa?: string
   clienteId?: string
   identificacao?: string
   troco?: number
@@ -295,7 +296,67 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
         throw new Error(errorData.error || 'Erro ao buscar detalhes da venda')
       }
 
-      const data: VendaDetalhes = await response.json()
+      const dataRaw = await response.json()
+      
+      // Mapeia os dados da API para o formato esperado, garantindo que campos sejam capturados corretamente
+      // Verifica diferentes possíveis estruturas do codigoTerminal na resposta da API
+      let codigoTerminal = dataRaw.codigoTerminal || 
+                          dataRaw.terminal?.codigo || 
+                          dataRaw.terminal?.codigoInterno ||
+                          dataRaw.terminal?.codigoTerminal ||
+                          dataRaw.terminal?.code ||
+                          dataRaw.terminalCodigo || 
+                          dataRaw.codigoInterno ||
+                          dataRaw.codigo ||
+                          dataRaw.code ||
+                          ''
+      
+      // Se não encontrou o codigoTerminal e temos terminalId, busca os detalhes do terminal
+      if (!codigoTerminal && dataRaw.terminalId) {
+        try {
+          const terminalResponse = await fetch(`/api/terminais/${dataRaw.terminalId}/detalhes`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          })
+          
+          if (terminalResponse.ok) {
+            const terminalData = await terminalResponse.json()
+            codigoTerminal = terminalData.codigo || 
+                           terminalData.codigoInterno ||
+                           terminalData.codigoTerminal || 
+                           terminalData.code ||
+                           String(dataRaw.terminalId) || 
+                           ''
+          }
+        } catch (error) {
+          console.warn('Erro ao buscar código do terminal:', error)
+          // Fallback: usa o terminalId como código se não conseguir buscar
+          codigoTerminal = String(dataRaw.terminalId)
+        }
+      }
+      
+      // Se ainda não tem código, usa terminalId como fallback
+      if (!codigoTerminal && dataRaw.terminalId) {
+        codigoTerminal = String(dataRaw.terminalId)
+      }
+      
+      const data: VendaDetalhes = {
+        ...dataRaw,
+        codigoTerminal: codigoTerminal,
+      }
+      
+      // Debug: log para verificar se o campo está sendo capturado
+      if (typeof window !== 'undefined' && !codigoTerminal) {
+        console.warn('DetalhesVendas: codigoTerminal não encontrado na resposta da API', {
+          vendaId,
+          dataRaw,
+          terminal: dataRaw.terminal,
+          terminalId: dataRaw.terminalId,
+        })
+      }
+      
       setVenda(data)
 
       // Coleta todos os IDs de usuários únicos que precisam ser buscados
@@ -526,8 +587,18 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                     <span>{nomesUsuarios[venda.abertoPorId] || venda.abertoPorId}</span>
                   </div>
 
-                  {/* Finalizado Por - Só exibe se a venda não foi cancelada */}
-                  {venda.ultimoResponsavelId && !venda.canceladoPorId && (
+                  {/* Última Alteração por - Só exibe quando statusMesa estiver aberta */}
+                  {venda.ultimoResponsavelId && venda.statusMesa === 'aberta' && (
+                    <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
+                      <span>
+                        Última Alteração por: 
+                      </span>
+                      <span>{nomesUsuarios[venda.ultimoResponsavelId] || venda.ultimoResponsavelId}</span>
+                    </div>
+                  )}
+
+                  {/* Finalizado Por - Só exibe se a venda não foi cancelada e statusMesa não estiver aberta */}
+                  {venda.ultimoResponsavelId && !venda.canceladoPorId && venda.statusMesa !== 'aberta' && (
                     <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
                       <span>
                         Finalizado Por: 
@@ -557,12 +628,14 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                   )}
 
                   {/* Código do Terminal */}
-                  <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
-                    <span>
-                      Código do Terminal: 
-                    </span>
-                    <span>#{venda.codigoTerminal}</span>
-                  </div>
+                  {venda.codigoTerminal && (
+                    <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
+                      <span>
+                        Código do Terminal: 
+                      </span>
+                      <span>#{venda.codigoTerminal}</span>
+                    </div>
+                  )}
 
                   {/* Data/Hora de Criação */}
                   <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
