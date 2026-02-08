@@ -370,11 +370,10 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
     }
   }, [open, vendaId, fetchVendaDetalhes])
 
-  if (!open) return null
-
   /**
    * Calcula o troco baseado nos pagamentos válidos
    * Exclui pagamentos cancelados e pagamentos com isTefConfirmed: false
+   * IMPORTANTE: Este hook deve ser chamado ANTES de qualquer return condicional
    */
   const trocoCalculado = useMemo(() => {
     if (!venda || !venda.pagamentos || venda.pagamentos.length === 0) {
@@ -407,6 +406,8 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
 
     return troco;
   }, [venda]);
+
+  if (!open) return null
 
   const statusVenda = venda?.canceladoPorId
     ? 'CANCELADA'
