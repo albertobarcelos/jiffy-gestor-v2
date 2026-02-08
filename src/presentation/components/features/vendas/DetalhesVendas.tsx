@@ -709,10 +709,22 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                 <div className="space-y-2">
                   {venda.pagamentos
                     ?.filter((p) => {
-                      // Exibe todos os pagamentos, exceto os cancelados (que são exibidos com cor vermelha)
-                      // Removida a regra que ocultava pagamentos TEF não confirmados
-                      // Todos os pagamentos serão exibidos, independentemente do status TEF
-                      return true;
+                      // Exclui pagamentos cancelados (que são exibidos com cor vermelha em outro lugar se necessário)
+                      const isCancelado = p.cancelado === true || (p.dataCancelamento !== null && p.dataCancelamento !== undefined);
+                      
+                      // Verifica se o pagamento usa TEF e se está confirmado
+                      // Se isTefUsed === true, então isTefConfirmed deve ser === true
+                      // Se isTefUsed === false ou não existe, o pagamento é válido (não usa TEF)
+                      const usaTef = p.isTefUsed === true;
+                      if (usaTef) {
+                        const tefConfirmado = p.isTefConfirmed === true;
+                        if (!tefConfirmado) {
+                          return false; // Exclui pagamentos TEF não confirmados
+                        }
+                      }
+                      
+                      // Exibe pagamentos válidos: não cancelados e (não usa TEF ou TEF confirmado)
+                      return !isCancelado;
                     })
                     .map((pagamento, index) => {
                       const meio = nomesMeiosPagamento[pagamento.meioPagamentoId]

@@ -21,6 +21,8 @@ interface VendaDetalhesApiResponse {
     cancelado: boolean;
     canceladoPorId?: string | null;
     dataCancelamento?: string | null;
+    isTefUsed?: boolean;
+    isTefConfirmed?: boolean;
     // ... outras propriedades que não usaremos
   }[];
   // ... outras propriedades que não usaremos
@@ -285,10 +287,11 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
       `Processando ${detailedVendas.length} vendas finalizadas (${allDetailedVendas.length - detailedVendas.length} foram filtradas)`
     );
 
-    // Passo 4: Agregar os Dados apenas das vendas finalizadas e pagamentos não cancelados
+    // Passo 4: Agregar os Dados apenas das vendas finalizadas e pagamentos não cancelados e TEF confirmados
     const methodAggregation = new Map<string, { metodo: string; valor: number; quantidade: number }>();
     let totalSalesValue = 0;
     let totalPagamentosCancelados = 0;
+    let totalPagamentosTefNaoConfirmados = 0;
 
     for (const venda of detailedVendas) {
       // Garante que a venda tem pagamentos
@@ -296,8 +299,8 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
         continue;
       }
 
-      // Filtra apenas pagamentos não cancelados
-      const pagamentosNaoCancelados = venda.pagamentos.filter((pagamento) => {
+      // Filtra apenas pagamentos não cancelados e TEF confirmados (se aplicável)
+      const pagamentosValidos = venda.pagamentos.filter((pagamento) => {
         // Um pagamento está cancelado se:
         // 1. O campo cancelado é true, OU
         // 2. Tem dataCancelamento preenchida
@@ -305,22 +308,35 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
         
         if (isCancelado) {
           totalPagamentosCancelados++;
+          return false;
+        }
+
+        // Verifica se o pagamento usa TEF e se está confirmado
+        // Se isTefUsed === true, então isTefConfirmed deve ser === true
+        // Se isTefUsed === false ou não existe, o pagamento é válido (não usa TEF)
+        const usaTef = pagamento.isTefUsed === true;
+        if (usaTef) {
+          const tefConfirmado = pagamento.isTefConfirmed === true;
+          if (!tefConfirmado) {
+            totalPagamentosTefNaoConfirmados++;
+            return false; // Exclui pagamentos TEF não confirmados
+          }
         }
         
-        return !isCancelado;
+        return true; // Pagamento válido: não cancelado e (não usa TEF ou TEF confirmado)
       });
 
       // Se houver troco, calcula o total de pagamentos em dinheiro para distribuir o troco
       let totalPagamentosDinheiro = 0;
       const pagamentosComDados: Array<{
-        pagamento: typeof pagamentosNaoCancelados[0];
+        pagamento: typeof pagamentosValidos[0];
         metodoNome: string;
         isDinheiro: boolean;
         valorOriginal: number;
       }> = [];
 
       // Primeiro, identifica todos os pagamentos e calcula total de dinheiro
-      for (const pagamento of pagamentosNaoCancelados) {
+      for (const pagamento of pagamentosValidos) {
         const paymentMethodData = await getPaymentMethodData(pagamento.meioPagamentoId);
         const metodoNome = paymentMethodData?.nome || 'Desconhecido';
         
@@ -379,6 +395,9 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
 
     if (totalPagamentosCancelados > 0) {
       console.log(`Foram ignorados ${totalPagamentosCancelados} pagamento(s) cancelado(s) no cálculo do gráfico`);
+    }
+    if (totalPagamentosTefNaoConfirmados > 0) {
+      console.log(`Foram ignorados ${totalPagamentosTefNaoConfirmados} pagamento(s) TEF não confirmado(s) no cálculo do gráfico`);
     }
 
     // Passo 5: Retornar no Formato DashboardMetodoPagamento[]
