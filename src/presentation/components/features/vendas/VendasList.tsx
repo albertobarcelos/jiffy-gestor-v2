@@ -1046,6 +1046,23 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             </div>
           </div>
 
+          {/* Total Cancelado */}
+          <div className="flex-1 rounded-lg border-2 p-1 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-error/80 flex items-center justify-center flex-shrink-0">
+              <span className="text-info text-xl"><MdAttachMoney /></span>
+            </div>
+            <div className="flex flex-col items-end flex-1">
+              <span className="text-xs text-secondary-text font-nunito">Total Cancelado</span>
+              <span className="text-[22px] text-primary font-exo">
+                {formatCurrency(
+                  vendas
+                    .filter((v) => v.dataCancelamento)
+                    .reduce((total, v) => total + (v.valorFinal || 0), 0)
+                )}
+              </span>
+            </div>
+          </div>
+
           {/* Total Faturado */}
           <div className="flex-1 rounded-lg border-2 p-1 flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-accent1 flex items-center justify-center flex-shrink-0">

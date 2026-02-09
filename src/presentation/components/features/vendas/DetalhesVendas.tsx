@@ -629,12 +629,12 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
 
                   {/* Código do Terminal */}
                   {venda.codigoTerminal && (
-                    <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
-                      <span>
-                        Código do Terminal: 
-                      </span>
-                      <span>#{venda.codigoTerminal}</span>
-                    </div>
+                  <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
+                    <span>
+                      Código do Terminal: 
+                    </span>
+                    <span>#{venda.codigoTerminal}</span>
+                  </div>
                   )}
 
                   {/* Data/Hora de Criação */}

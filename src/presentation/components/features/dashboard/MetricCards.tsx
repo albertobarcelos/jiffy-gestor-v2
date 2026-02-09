@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation' // Importar useRouter
 import { MdAttachMoney, MdRestaurant, MdShoppingCart } from 'react-icons/md'
 import { LuDoorOpen } from "react-icons/lu";
+import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { BuscarVendasDashboardUseCase } from '@/src/application/use-cases/dashboard/BuscarVendasDashboardUseCase'
 import { DashboardVendas } from '@/src/domain/entities/DashboardVendas'
 import { ModalMetodosPagamento } from './ModalMetodosPagamento'
@@ -21,10 +22,12 @@ interface MetricCardsProps {
  */
 export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCardsProps) {
   const router = useRouter() // Obter instância do router
+  const { auth } = useAuthStore()
   const [dataTotal, setDataTotal] = useState<DashboardVendas | null>(null);
   const [dataFinalizadas, setDataFinalizadas] = useState<DashboardVendas | null>(null);
   const [dataCanceladas, setDataCanceladas] = useState<DashboardVendas | null>(null);
   const [dataAbertas, setDataAbertas] = useState<DashboardVendas | null>(null);
+  const [totalCancelado, setTotalCancelado] = useState<number>(0); // Estado para armazenar a soma das vendas canceladas
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -42,6 +45,99 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
       default: return 'todos'; // Valor padrão seguro
     }
   };
+
+  /**
+   * Calcula o período para as datas personalizadas ou usa a função calculatePeriodo
+   */
+  const getPeriodoDates = (): { inicio: Date | null; fim: Date | null } => {
+    if (periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) {
+      return { inicio: periodoInicial, fim: periodoFinal }
+    }
+    
+    if (periodo === 'Todos') {
+      return { inicio: null, fim: null }
+    }
+    
+    const mappedPeriodo = mapPeriodoToUseCaseFormat(periodo)
+    const { inicio, fim } = calculatePeriodo(periodo)
+    return { inicio, fim }
+  }
+
+  /**
+   * Busca todas as vendas canceladas e calcula a soma dos valores
+   */
+  const calcularTotalCancelado = useCallback(async (): Promise<number> => {
+    const token = auth?.getAccessToken()
+    if (!token) return 0
+
+    try {
+      const { inicio, fim } = getPeriodoDates()
+      const baseParams = new URLSearchParams()
+      
+      // Adiciona filtro de status CANCELADA
+      baseParams.append('status', 'CANCELADA')
+      
+      // Adiciona filtros de período se disponíveis
+      if (inicio) {
+        baseParams.append('periodoInicial', inicio.toISOString())
+      }
+      if (fim) {
+        baseParams.append('periodoFinal', fim.toISOString())
+      }
+
+      let total = 0
+      let currentPage = 0
+      let totalPages = 1
+      const pageSize = 100
+
+      while (currentPage < totalPages) {
+        const params = new URLSearchParams(baseParams.toString())
+        params.append('limit', pageSize.toString())
+        params.append('offset', (currentPage * pageSize).toString())
+
+        const response = await fetch(`/api/vendas?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (!response.ok) {
+          console.error('Erro ao buscar vendas canceladas:', response.status)
+          break
+        }
+
+        const data = await response.json()
+        const items = data.items || []
+
+        // Soma os valores de valorFinal de todas as vendas canceladas
+        const somaPagina = items.reduce((acc: number, venda: any) => {
+          const valorFinal = venda.valorFinal || venda.valorTotal || venda.valor || 0
+          return acc + (typeof valorFinal === 'number' ? valorFinal : 0)
+        }, 0)
+
+        total += somaPagina
+
+        // Calcula total de páginas na primeira requisição
+        if (currentPage === 0) {
+          if (data.totalPages) {
+            totalPages = data.totalPages
+          } else if (data.count && data.limit) {
+            totalPages = Math.ceil(data.count / data.limit)
+          } else if (items.length < pageSize) {
+            totalPages = 1
+          }
+        }
+
+        currentPage++
+      }
+
+      return total
+    } catch (error) {
+      console.error('Erro ao calcular total cancelado:', error)
+      return 0
+    }
+  }, [auth, periodo, periodoInicial, periodoFinal])
 
   useEffect(() => {
     const loadData = async () => {
@@ -62,6 +158,10 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
         setDataCanceladas(canceladas);
         setDataAbertas(abertas);
 
+        // Calcula o total cancelado somando os valores das vendas canceladas
+        const totalCanceladoCalculado = await calcularTotalCancelado();
+        setTotalCancelado(totalCanceladoCalculado);
+
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erro ao carregar dados');
       } finally {
@@ -70,7 +170,7 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
     };
 
     loadData();
-  }, [periodo, periodoInicial, periodoFinal]);
+  }, [periodo, periodoInicial, periodoFinal, auth, calcularTotalCancelado]);
 
   const formatCurrency = (value?: number) => {
     if (!value) return 'R$ 0,00'
@@ -87,11 +187,11 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[...Array(4)].map((_, i) => (
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1">
+        {[...Array(6)].map((_, i) => (
           <div
             key={i}
-            className="h-32 bg-white rounded-xl border border-gray-200 animate-pulse"
+            className="h-20 bg-white rounded-lg border border-gray-200 animate-pulse"
           />
         ))}
       </div>
@@ -114,7 +214,8 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
 
   return (
     <>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 md:gap-6 gap-1">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1">
+       
         {/* Total Faturado */}
         <MetricCard className=" border hover:border-primary/50"
           title="Total Faturado"
@@ -139,12 +240,25 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
           }}
         />
 
+         {/* Total Cancelado */}
+         <MetricCard className=" border hover:border-error/50"
+          title="Total Cancelado"
+          value={formatCurrency(totalCancelado)}
+          icon={<MdAttachMoney size={20} color="var(--color-error)" />}
+          bgColorClass="bg-error/15 border-2 border-error"
+          iconColorClass="text-primary"
+          isPositive={false}
+          onClick={() => {
+            router.push(`/relatorios?periodo=${periodo}&status=Cancelada`)
+          }}
+        />
+
         {/* Vendas Canceladas */}
-        <MetricCard className=" border hover:border-primary/50"
+        <MetricCard className=" border hover:border-error/50"
           title="Vendas Canceladas"
           value={formatNumber(dataCanceladas?.getCountVendasCanceladas())}
-          icon={<span className="text-primary">✕</span>}
-          bgColorClass="bg-info border-2 border-primary"
+          icon={<span className="text-error">✕</span>}
+          bgColorClass="bg-error/15 border-2 border-error"
           iconColorClass="text-info"
           isPositive={false}
           onClick={() => {
