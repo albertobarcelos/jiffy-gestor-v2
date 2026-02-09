@@ -71,7 +71,7 @@ export function NovoPerfilGestor({
           setAcessoDashboard(perfil.hasAcessoDashboard())
         }
       } catch (error) {
-        console.error('Erro ao carregar perfil gestor:', error)
+        // Erro ao carregar perfil gestor
       } finally {
         setIsLoadingPerfil(false)
       }
@@ -131,7 +131,6 @@ export function NovoPerfilGestor({
         router.push('/cadastros/perfis-gestor')
       }
     } catch (error) {
-      console.error('Erro ao salvar perfil gestor:', error)
       alert(error instanceof Error ? error.message : 'Erro ao salvar perfil gestor')
     } finally {
       setIsLoading(false)

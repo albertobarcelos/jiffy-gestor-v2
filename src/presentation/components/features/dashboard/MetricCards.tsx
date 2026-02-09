@@ -275,7 +275,7 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
           iconColorClass="text-info"
           isPositive={true} // Consideramos vendas em aberto como um ponto positivo para o fluxo
           onClick={() => {
-            router.push(`/relatorios?periodo=${periodo}&status=Aberta`)
+            router.push('/vendas/abertas')
           }}
         />
 
@@ -325,7 +325,7 @@ function MetricCard({
   return (
     <div
       className={`
-        bg-white flex items-center justify-between rounded-lg p-2
+        bg-white flex items-center justify-between rounded-lg py-2 px-1
         shadow-sm hover:shadow-md transition-all duration-200
         ${onClick ? 'cursor-pointer' : ''}
         ${className || ''}
@@ -334,10 +334,10 @@ function MetricCard({
     >
       <div className="flex flex-col items-start justify-between mb-2">
         <h3 className="md:text-sm text-xs font-medium text-gray-600">{title}</h3>
-        <p className="md:text-2xl text-lg font-bold text-gray-900">{value}</p>
+        <p className="md:text-xl text-sm font-bold text-gray-900">{value}</p>
       </div>
-      <div className={`md:w-12 md:h-12 w-10 h-10 rounded-full ${bgColorClass} flex items-center justify-center flex-shrink-0`}>
-          <span className={`${iconColorClass} md:text-xl text-lg`}>{icon}</span>
+      <div className={`md:w-12 md:h-12 w-8 h-8 rounded-full ${bgColorClass} flex items-center justify-center flex-shrink-0`}>
+          <span className={`${iconColorClass} md:text-xl text-sm`}>{icon}</span>
       </div>
     </div>
   );

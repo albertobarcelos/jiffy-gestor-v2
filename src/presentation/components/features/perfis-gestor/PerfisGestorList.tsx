@@ -220,8 +220,6 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
           ...bodyData,
           [permission]: newValue,
         }
-
-        console.log('🔍 [perfis-gestor] Atualizando permissão:', { perfilId, permission, newValue, requestBody })
         
         const response = await fetch(`/api/pessoas/perfis-gestor/${perfilId}`, {
           method: 'PATCH',
@@ -234,7 +232,6 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}))
-          console.error('❌ [perfis-gestor] Erro na resposta:', { status: response.status, errorData })
           throw new Error(errorData.error || `Erro ${response.status}: ${response.statusText}`)
         }
 

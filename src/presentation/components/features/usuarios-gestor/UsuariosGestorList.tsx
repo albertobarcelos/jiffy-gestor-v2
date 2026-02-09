@@ -77,8 +77,6 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
           if (searchTextRef.current) {
             params.append('q', searchTextRef.current)
           }
-          
-          console.log('🔍 [usuarios-gestor] URL final:', `/api/pessoas/usuarios-gestor?${params.toString()}`)
 
           const response = await fetch(`/api/pessoas/usuarios-gestor?${params.toString()}`, {
             headers: {
@@ -90,41 +88,23 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
           if (!response.ok) {
             const errorData = await response.json().catch(() => ({}))
             const errorMessage = errorData.error || `Erro ${response.status}: ${response.statusText}`
-            console.error('❌ [usuarios-gestor] Erro na requisição:', { status: response.status, errorData })
             throw new Error(errorMessage)
           }
 
           const data = await response.json()
-          console.log('🔍 [usuarios-gestor] Dados recebidos (offset', currentOffset, '):', {
-            data,
-            items: data.items,
-            itemsLength: data.items?.length,
-            itemsType: Array.isArray(data.items),
-            count: data.count
-          })
-
           const items = data.items || []
-          console.log('🔍 [usuarios-gestor] Processando', items.length, 'itens...')
 
           const newUsuarios = items
-            .map((item: any, index: number) => {
+            .map((item: any) => {
               try {
-                console.log(`🔍 [usuarios-gestor] Processando item ${index + 1}/${items.length}:`, item)
                 const usuario = UsuarioGestor.fromJSON(item)
-                console.log(`✅ [usuarios-gestor] Item ${index + 1} criado com sucesso:`, usuario.getId())
                 return usuario
               } catch (error) {
-                console.error(`❌ [usuarios-gestor] Erro ao criar UsuarioGestor item ${index + 1} (será ignorado):`, {
-                  item,
-                  error: error instanceof Error ? error.message : error,
-                  errorStack: error instanceof Error ? error.stack : undefined
-                })
-                return null // Retorna null para filtrar depois
+                // Item inválido será ignorado
+                return null
               }
             })
-            .filter((usuario: UsuarioGestor | null): usuario is UsuarioGestor => usuario !== null) // Remove itens inválidos
-
-          console.log('🔍 [usuarios-gestor] Itens válidos criados:', newUsuarios.length, 'de', items.length)
+            .filter((usuario: UsuarioGestor | null): usuario is UsuarioGestor => usuario !== null)
           allUsuarios.push(...newUsuarios)
 
           // Atualiza o total apenas na primeira requisição
@@ -136,13 +116,6 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
           // Usa hasNext da API se disponível, senão verifica se retornou 10 itens
           hasMore = data.hasNext !== undefined ? data.hasNext : newUsuarios.length === 10
           currentOffset += newUsuarios.length
-          
-          console.log('🔍 [usuarios-gestor] Paginação:', { 
-            currentOffset, 
-            newUsuariosLength: newUsuarios.length, 
-            hasMore, 
-            hasNext: data.hasNext 
-          })
         }
 
         // Coleta todos os perfilGestorId únicos
@@ -174,7 +147,6 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
                   perfisMapTemp[perfilId] = '-'
                 }
               } catch (error) {
-                console.error(`Erro ao buscar perfil gestor ${perfilId}:`, error)
                 perfisMapTemp[perfilId] = '-'
               }
             })
@@ -182,23 +154,10 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
         }
 
         // Atualiza o estado com todos os itens carregados e o mapa de perfis
-        console.log('🔍 [usuarios-gestor] Finalizando carregamento:', {
-          allUsuariosLength: allUsuarios.length,
-          totalCount,
-          perfisMapKeys: Object.keys(perfisMapTemp).length
-        })
-
         setUsuarios(allUsuarios)
         setTotalUsuarios(totalCount)
         setPerfisMap(perfisMapTemp)
-        
-        console.log('✅ [usuarios-gestor] Usuários carregados com sucesso:', { 
-          total: allUsuarios.length, 
-          totalCount,
-          perfisMapSize: Object.keys(perfisMapTemp).length
-        })
       } catch (error) {
-        console.error('❌ [usuarios-gestor] Erro ao carregar usuários gestor:', error)
         const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido ao carregar usuários gestor'
         showToast.error(errorMessage)
         setUsuarios([])
@@ -232,13 +191,8 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
   useEffect(() => {
     const token = auth?.getAccessToken()
     if (!token) {
-      console.log('⚠️ [usuarios-gestor] Token não disponível, não carregando usuários')
       return
     }
-
-    console.log('🔄 [usuarios-gestor] Iniciando carregamento de usuários...', {
-      debouncedSearch
-    })
     
     loadAllUsuarios()
   }, [debouncedSearch, auth, loadAllUsuarios])
@@ -250,7 +204,6 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
     const token = auth?.getAccessToken()
     if (!token) return
 
-    console.log('🔄 [usuarios-gestor] Carregamento inicial')
     hasLoadedInitialRef.current = true
     loadAllUsuarios()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -295,16 +248,6 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
     setTabsModalState((prev) => ({ ...prev, tab }))
   }, [])
 
-  // Log quando o estado de usuários mudar
-  useEffect(() => {
-    console.log('🔄 [usuarios-gestor] Estado de usuários atualizado:', {
-      usuariosLength: usuarios.length,
-      totalUsuarios,
-      isLoading,
-      hasLoadedInitial: hasLoadedInitialRef.current
-    })
-  }, [usuarios, totalUsuarios, isLoading])
-
   /**
    * Atualiza o status do usuário diretamente na lista
    */
@@ -345,11 +288,6 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
           bodyData.perfilGestorId = perfilGestorId
         }
 
-        console.log('🔍 [usuarios-gestor] Enviando atualização de status:', {
-          usuarioId,
-          bodyData
-        })
-
         const response = await fetch(`/api/pessoas/usuarios-gestor/${usuarioId}`, {
           method: 'PATCH',
           headers: {
@@ -377,7 +315,6 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
           novoStatus ? 'Usuário ativado com sucesso!' : 'Usuário desativado com sucesso!'
         )
       } catch (error: any) {
-        console.error('Erro ao atualizar status do usuário:', error)
         showToast.error(error.message || 'Erro ao atualizar status do usuário')
 
         // Reverte a atualização otimista em caso de erro
@@ -486,13 +423,7 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
           </div>
         )}
 
-        {(() => {
-          console.log('🎨 [usuarios-gestor] Renderizando lista:', {
-            usuariosLength: usuarios.length,
-            isLoading,
-            hasLoadedInitial: hasLoadedInitialRef.current
-          })
-          return usuarios.map((usuario, index) => {
+        {usuarios.map((usuario, index) => {
             // Handler para abrir edição ao clicar na linha do usuário
             const handleUsuarioRowClick = () => {
               openTabsModal({ mode: 'edit', usuarioId: usuario.getId() })
@@ -597,8 +528,7 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
               </div>
             </div>
           )
-          })
-        })()}
+        })}
       </div>
 
       <UsuariosGestorTabsModal

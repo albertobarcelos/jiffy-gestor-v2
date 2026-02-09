@@ -350,7 +350,7 @@ export default function DashboardPage() {
                          />
                        </FormGroup>
                        {/* Checkboxes para intervalo de tempo (apenas quando for exibir por hora) */}
-                       {(periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) ? (
+                       {((periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) || periodo === 'Hoje') ? (
                          <FormGroup
                            sx={{
                              flexDirection: { xs: 'row', md: 'row' },

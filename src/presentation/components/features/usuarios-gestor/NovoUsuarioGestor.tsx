@@ -71,7 +71,6 @@ export function NovoUsuarioGestor({
   const loadPerfisGestor = useCallback(async () => {
     const token = auth?.getAccessToken()
     if (!token) {
-      console.log('⚠️ [NovoUsuarioGestor] Token não disponível para carregar perfis gestor')
       return
     }
 
@@ -83,16 +82,12 @@ export function NovoUsuarioGestor({
       let maxIterations = 100 // Proteção contra loop infinito
       let iterations = 0
 
-      console.log('🔄 [NovoUsuarioGestor] Iniciando carregamento de perfis gestor...')
-
       while (hasMore && iterations < maxIterations) {
         iterations++
         const params = new URLSearchParams({
           limit: '10',
           offset: currentOffset.toString(),
         })
-
-        console.log(`🔍 [NovoUsuarioGestor] Buscando perfis gestor (offset: ${currentOffset})...`)
 
         const response = await fetch(`/api/pessoas/perfis-gestor?${params.toString()}`, {
           headers: {
@@ -104,26 +99,15 @@ export function NovoUsuarioGestor({
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}))
           const errorMessage = errorData.error || `Erro ${response.status}: ${response.statusText}`
-          console.error('❌ [NovoUsuarioGestor] Erro na resposta:', { status: response.status, errorData })
           throw new Error(errorMessage)
         }
 
         const data = await response.json()
-        console.log('🔍 [NovoUsuarioGestor] Dados recebidos (raw):', data)
 
         // A API pode retornar { items: [...] } ou diretamente um array
         const items = Array.isArray(data) ? data : (data.items || [])
         
-        console.log('🔍 [NovoUsuarioGestor] Dados processados:', {
-          items,
-          itemsLength: items.length,
-          count: data.count,
-          hasNext: data.hasNext,
-          isArray: Array.isArray(data)
-        })
-        
         if (items.length === 0) {
-          console.log('⚠️ [NovoUsuarioGestor] Nenhum item retornado, parando carregamento')
           hasMore = false
           break
         }
@@ -135,32 +119,17 @@ export function NovoUsuarioGestor({
           }))
           .filter((perfil: PerfilGestor) => perfil.id && perfil.role)
 
-        console.log(`✅ [NovoUsuarioGestor] ${newPerfis.length} perfis válidos processados nesta página`)
-
         allPerfis.push(...newPerfis)
         
         // Usa hasNext da API se disponível, senão verifica se retornou 10 itens
         hasMore = data.hasNext !== undefined ? data.hasNext : newPerfis.length === 10
         currentOffset += newPerfis.length
-
-        console.log('🔍 [NovoUsuarioGestor] Paginação:', {
-          currentOffset,
-          newPerfisLength: newPerfis.length,
-          hasMore,
-          hasNext: data.hasNext,
-          totalCarregados: allPerfis.length
-        })
       }
 
-      if (iterations >= maxIterations) {
-        console.warn('⚠️ [NovoUsuarioGestor] Limite de iterações atingido, parando carregamento')
-      }
-
-      console.log(`✅ [NovoUsuarioGestor] Total de perfis gestor carregados: ${allPerfis.length}`)
       setPerfisGestor(allPerfis)
     } catch (error) {
-      console.error('❌ [NovoUsuarioGestor] Erro ao carregar perfis gestor:', error)
-      showToast.error('Erro ao carregar perfis gestor')
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao carregar perfis gestor'
+      showToast.error(errorMessage)
       setPerfisGestor([])
     } finally {
       setIsLoadingPerfis(false)
@@ -181,7 +150,6 @@ export function NovoUsuarioGestor({
     }
 
     try {
-      console.log('🔍 [NovoUsuarioGestor] Carregando perfil gestor completo:', perfilId)
       const response = await fetch(`/api/pessoas/perfis-gestor/${perfilId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -192,14 +160,11 @@ export function NovoUsuarioGestor({
       if (response.ok) {
         const data = await response.json()
         const perfil = PerfilGestorEntity.fromJSON(data)
-        console.log('✅ [NovoUsuarioGestor] Perfil gestor carregado:', perfil.getRole())
         setPerfilGestorCompleto(perfil)
       } else {
-        console.error('❌ [NovoUsuarioGestor] Erro ao carregar perfil gestor:', response.status)
         setPerfilGestorCompleto(null)
       }
     } catch (error) {
-      console.error('❌ [NovoUsuarioGestor] Erro ao carregar perfil gestor completo:', error)
       setPerfilGestorCompleto(null)
     }
   }, [auth])
@@ -260,7 +225,8 @@ export function NovoUsuarioGestor({
           // setModulosAcesso(usuario.getModulosAcesso() || [])
         }
       } catch (error) {
-        console.error('Erro ao carregar usuário gestor:', error)
+        const errorMessage = error instanceof Error ? error.message : 'Erro ao carregar usuário gestor'
+        showToast.error(errorMessage)
       } finally {
         setIsLoadingUsuario(false)
       }
@@ -348,7 +314,6 @@ export function NovoUsuarioGestor({
         router.push('/cadastros/usuarios-gestor')
       }
     } catch (error) {
-      console.error('Erro ao salvar usuário gestor:', error)
       showToast.error(error instanceof Error ? error.message : 'Erro ao salvar usuário gestor')
     } finally {
       setIsLoading(false)
@@ -479,7 +444,6 @@ export function NovoUsuarioGestor({
                   <Select
                     value={perfilGestorId || undefined}
                     onValueChange={(value) => {
-                      console.log('🔍 [NovoUsuarioGestor] Perfil selecionado:', value)
                       setPerfilGestorId(value)
                       // O perfil completo será carregado pelo useEffect
                     }}
@@ -491,31 +455,21 @@ export function NovoUsuarioGestor({
                       className="max-h-[200px] z-[9999] overflow-y-auto !bg-info border border-gray-300 shadow-lg" 
                       style={{ backgroundColor: '#FFFFFF' }}
                     >
-                      {(() => {
-                        console.log('🎨 [NovoUsuarioGestor] Renderizando SelectContent - perfisGestor:', perfisGestor.length, perfisGestor)
-                        if (perfisGestor.length === 0) {
-                          return (
-                            <div className="px-2 py-1.5 text-sm text-secondary-text">
-                              Nenhum perfil gestor disponível
-                            </div>
-                          )
-                        }
-                        return perfisGestor.map((perfil: PerfilGestor) => {
-                          const isSelected = perfil.id === perfilGestorId
-                          if (isSelected) {
-                            console.log('✅ [NovoUsuarioGestor] Perfil selecionado encontrado:', perfil.role, perfil.id)
-                          }
-                          return (
-                            <SelectItem
-                              key={perfil.id}
-                              value={perfil.id}
-                              className="min-h-[32px] max-h-[40px] data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary transition-colors"
-                            >
-                              {perfil.role}
-                            </SelectItem>
-                          )
-                        })
-                      })()}
+                      {perfisGestor.length === 0 ? (
+                        <div className="px-2 py-1.5 text-sm text-secondary-text">
+                          Nenhum perfil gestor disponível
+                        </div>
+                      ) : (
+                        perfisGestor.map((perfil: PerfilGestor) => (
+                          <SelectItem
+                            key={perfil.id}
+                            value={perfil.id}
+                            className="min-h-[32px] max-h-[40px] data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary transition-colors"
+                          >
+                            {perfil.role}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 )}
