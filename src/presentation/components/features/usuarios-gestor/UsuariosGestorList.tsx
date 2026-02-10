@@ -6,6 +6,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { MdSearch } from 'react-icons/md'
+import { Select, MenuItem, FormControl } from '@mui/material'
 import {
   UsuariosGestorTabsModal,
   UsuariosGestorTabsModalState,
@@ -26,7 +27,9 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [totalUsuarios, setTotalUsuarios] = useState(0)
   const [perfisMap, setPerfisMap] = useState<Record<string, string>>({}) // Mapa de perfilGestorId -> role
+  const [allPerfis, setAllPerfis] = useState<Array<{ id: string; role: string }>>([]) // Lista de todos os perfis disponíveis
   const [togglingStatus, setTogglingStatus] = useState<Record<string, boolean>>({})
+  const [updatingPerfil, setUpdatingPerfil] = useState<Record<string, boolean>>({})
   const [tabsModalState, setTabsModalState] = useState<UsuariosGestorTabsModalState>({
     open: false,
     tab: 'usuario',
@@ -47,6 +50,74 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
   useEffect(() => {
     searchTextRef.current = debouncedSearch
   }, [debouncedSearch])
+
+  /**
+   * Carrega todos os perfis gestor disponíveis
+   */
+  const loadAllPerfis = useCallback(async () => {
+    const token = auth?.getAccessToken()
+    if (!token) {
+      return
+    }
+
+    try {
+      const allPerfisList: Array<{ id: string; role: string }> = []
+      let currentOffset = 0
+      let hasMore = true
+      let maxIterations = 100 // Proteção contra loop infinito
+      let iterations = 0
+
+      while (hasMore && iterations < maxIterations) {
+        iterations++
+        const params = new URLSearchParams({
+          limit: '10',
+          offset: currentOffset.toString(),
+        })
+
+        const response = await fetch(`/api/pessoas/perfis-gestor?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (!response.ok) {
+          break
+        }
+
+        const data = await response.json()
+        const items = data.items || []
+
+        if (items.length === 0) {
+          hasMore = false
+          break
+        }
+
+        const newPerfis = items
+          .map((item: any) => ({
+            id: item.id?.toString() || '',
+            role: item.role?.toString() || '',
+          }))
+          .filter((perfil: { id: string; role: string }) => perfil.id && perfil.role)
+
+        allPerfisList.push(...newPerfis)
+
+        hasMore = data.hasNext !== undefined ? data.hasNext : newPerfis.length === 10
+        currentOffset += newPerfis.length
+      }
+
+      setAllPerfis(allPerfisList)
+    } catch (error) {
+      console.error('Erro ao carregar perfis gestor:', error)
+    }
+  }, [auth])
+
+  // Carrega todos os perfis quando autenticado
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadAllPerfis()
+    }
+  }, [isAuthenticated, loadAllPerfis])
 
   /**
    * Carrega todos os usuários gestor fazendo requisições sequenciais
@@ -247,6 +318,95 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
   const handleTabChange = useCallback((tab: 'usuario') => {
     setTabsModalState((prev) => ({ ...prev, tab }))
   }, [])
+
+  /**
+   * Atualiza o perfil do usuário diretamente na lista
+   */
+  const handlePerfilChange = useCallback(
+    async (usuarioId: string, novoPerfilId: string) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      setUpdatingPerfil((prev) => ({ ...prev, [usuarioId]: true }))
+
+      // Atualização otimista
+      const usuario = usuarios.find((u) => u.getId() === usuarioId)
+      if (!usuario) {
+        setUpdatingPerfil((prev) => {
+          const { [usuarioId]: _, ...rest } = prev
+          return rest
+        })
+        return
+      }
+
+      const perfilNome = allPerfis.find((p) => p.id === novoPerfilId)?.role || '-'
+      setPerfisMap((prev) => ({ ...prev, [novoPerfilId]: perfilNome }))
+
+      setUsuarios((prev) =>
+        prev.map((u) =>
+          u.getId() === usuarioId
+            ? UsuarioGestor.fromJSON({ ...u.toJSON(), perfilGestorId: novoPerfilId })
+            : u
+        )
+      )
+
+      try {
+        const bodyData: any = {
+          perfilGestorId: novoPerfilId,
+        }
+
+        // Mantém o status atual
+        if (usuario.isAtivo() !== undefined) {
+          bodyData.ativo = usuario.isAtivo()
+        }
+
+        const response = await fetch(`/api/pessoas/usuarios-gestor/${usuarioId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(bodyData),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Erro ao atualizar perfil do usuário')
+        }
+
+        const updatedData = await response.json()
+
+        // Atualiza com os dados do servidor
+        setUsuarios((prev) =>
+          prev.map((u) =>
+            u.getId() === usuarioId ? UsuarioGestor.fromJSON(updatedData) : u
+          )
+        )
+
+        // Atualiza o mapa de perfis
+        if (updatedData.perfilGestorId) {
+          const updatedPerfilNome = allPerfis.find((p) => p.id === updatedData.perfilGestorId)?.role || '-'
+          setPerfisMap((prev) => ({ ...prev, [updatedData.perfilGestorId]: updatedPerfilNome }))
+        }
+
+        showToast.success('Perfil atualizado com sucesso!')
+      } catch (error: any) {
+        showToast.error(error.message || 'Erro ao atualizar perfil do usuário')
+
+        // Reverte a atualização otimista em caso de erro
+        loadAllUsuarios()
+      } finally {
+        setUpdatingPerfil((prev) => {
+          const { [usuarioId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [auth, usuarios, allPerfis, loadAllUsuarios]
+  )
 
   /**
    * Atualiza o status do usuário diretamente na lista
@@ -481,8 +641,54 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
                 <div className="md:flex-[1.5] font-nunito md:text-sm text-secondary-text">
                   {usuario.getUsername()}
                 </div>
-                <div className="md:flex-[1.5] font-nunito md:text-sm text-secondary-text">
-                  {perfilNome}
+                <div 
+                  className="md:flex-[1.5] font-nunito md:text-sm text-secondary-text"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <FormControl size="small" sx={{ minWidth: 120, width: '100%' }}>
+                    <Select
+                      value={usuario.getPerfilGestorId() || ''}
+                      onChange={(e) => {
+                        e.stopPropagation()
+                        handlePerfilChange(usuario.getId(), e.target.value)
+                      }}
+                      disabled={!!updatingPerfil[usuario.getId()] || allPerfis.length === 0}
+                      displayEmpty
+                      sx={{
+                        fontSize: '14px',
+                        height: '32px',
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: 'transparent',
+                        },
+                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                          borderColor: 'var(--color-primary)',
+                        },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                          borderColor: 'var(--color-primary)',
+                        },
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      renderValue={(selected) => {
+                        if (!selected) {
+                          return <span className="text-secondary-text">-</span>
+                        }
+                        const perfil = allPerfis.find((p) => p.id === selected)
+                        return perfil ? perfil.role : perfilNome
+                      }}
+                    >
+                      {allPerfis.length === 0 ? (
+                        <MenuItem disabled value="">
+                          <em>Carregando perfis...</em>
+                        </MenuItem>
+                      ) : (
+                        allPerfis.map((perfil) => (
+                          <MenuItem key={perfil.id} value={perfil.id}>
+                            {perfil.role}
+                          </MenuItem>
+                        ))
+                      )}
+                    </Select>
+                  </FormControl>
                 </div>
                 <div className="md:flex-[1] flex justify-center" onClick={(e) => e.stopPropagation()}>
                   <StatusSwitch />
@@ -516,10 +722,54 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
                       {usuario.getUsername()}
                     </span>
                   </div>
-                  <div className="flex-1.5 text-left min-w-0">
-                    <span className="text-xs text-secondary-text font-nunito break-words">
-                      {perfilNome}
-                    </span>
+                  <div 
+                    className="flex-1.5 text-left min-w-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <FormControl size="small" sx={{ minWidth: 100, width: '100%' }}>
+                      <Select
+                        value={usuario.getPerfilGestorId() || ''}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          handlePerfilChange(usuario.getId(), e.target.value)
+                        }}
+                        disabled={!!updatingPerfil[usuario.getId()] || allPerfis.length === 0}
+                        displayEmpty
+                        sx={{
+                          fontSize: '12px',
+                          height: '28px',
+                          '& .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'transparent',
+                          },
+                          '&:hover .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'var(--color-primary)',
+                          },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'var(--color-primary)',
+                          },
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        renderValue={(selected) => {
+                          if (!selected) {
+                            return <span className="text-secondary-text text-xs">-</span>
+                          }
+                          const perfil = allPerfis.find((p) => p.id === selected)
+                          return <span className="text-xs">{perfil ? perfil.role : perfilNome}</span>
+                        }}
+                      >
+                        {allPerfis.length === 0 ? (
+                          <MenuItem disabled value="">
+                            <em>Carregando perfis...</em>
+                          </MenuItem>
+                        ) : (
+                          allPerfis.map((perfil) => (
+                            <MenuItem key={perfil.id} value={perfil.id}>
+                              {perfil.role}
+                            </MenuItem>
+                          ))
+                        )}
+                      </Select>
+                    </FormControl>
                   </div>
                   <div className="w-12 flex flex-1 justify-end flex-shrink-0">
                     <StatusSwitch />

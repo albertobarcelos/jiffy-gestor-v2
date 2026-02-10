@@ -5,7 +5,7 @@ import { PerfilGestor } from '@/src/domain/entities/PerfilGestor'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { MdSearch, MdPersonAdd } from 'react-icons/md'
+import { MdSearch, MdPersonAdd, MdKeyboardArrowRight, MdPerson, MdEdit } from 'react-icons/md'
 import {
   PerfisGestorTabsModal,
   PerfisGestorTabsModalState,
@@ -30,6 +30,10 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [totalPerfis, setTotalPerfis] = useState(0)
+  const [expandedPerfis, setExpandedPerfis] = useState<Set<string>>(new Set())
+  const [usuariosPorPerfil, setUsuariosPorPerfil] = useState<Record<string, any[]>>({})
+  const [contagemUsuariosPorPerfil, setContagemUsuariosPorPerfil] = useState<Record<string, number>>({})
+  const [togglingStatus, setTogglingStatus] = useState<Record<string, boolean>>({})
   const [updatingPermissions, setUpdatingPermissions] = useState<Record<string, Set<string>>>({})
   const [tabsModalState, setTabsModalState] = useState<PerfisGestorTabsModalState>({
     open: false,
@@ -58,6 +62,70 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
   useEffect(() => {
     searchTextRef.current = debouncedSearch
   }, [debouncedSearch])
+
+  /**
+   * Carrega a contagem de usuários gestor para cada perfil
+   */
+  const loadContagemUsuariosPorPerfil = useCallback(
+    async (perfilIds: string[]) => {
+      const token = auth?.getAccessToken()
+      if (!token || perfilIds.length === 0) return
+
+      try {
+        // Busca a contagem de usuários para cada perfil em paralelo
+        const contagens = await Promise.all(
+          perfilIds.map(async (perfilId) => {
+            try {
+              // Busca todos os usuários do perfil (com limit alto) para contar corretamente
+              const response = await fetch(`/api/pessoas/usuarios-gestor?perfilGestorId=${perfilId}&limit=100&offset=0`, {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+              })
+
+              if (response.ok) {
+                const data = await response.json()
+                const items = data.items || []
+                
+                // Filtra no frontend para garantir que só conta usuários deste perfil específico
+                const usuariosFiltrados = items.filter((usuario: any) => {
+                  const usuarioPerfilId = usuario.perfilGestorId?.toString() || usuario.perfilGestor?.id?.toString() || ''
+                  return usuarioPerfilId === perfilId.toString()
+                })
+                
+                // Remove duplicatas baseado no ID do usuário
+                const usuariosUnicos = usuariosFiltrados.reduce((acc: any[], usuario: any) => {
+                  const existe = acc.find((u: any) => u.id?.toString() === usuario.id?.toString())
+                  if (!existe) {
+                    acc.push(usuario)
+                  }
+                  return acc
+                }, [])
+                
+                return { perfilId, count: usuariosUnicos.length }
+              }
+              return { perfilId, count: 0 }
+            } catch (error) {
+              console.error(`Erro ao buscar contagem de usuários gestor para perfil ${perfilId}:`, error)
+              return { perfilId, count: 0 }
+            }
+          })
+        )
+
+        // Cria um objeto com as contagens
+        const contagensMap: Record<string, number> = {}
+        contagens.forEach(({ perfilId, count }) => {
+          contagensMap[perfilId] = count
+        })
+
+        setContagemUsuariosPorPerfil(contagensMap)
+      } catch (error) {
+        console.error('Erro ao carregar contagem de usuários gestor:', error)
+      }
+    },
+    [auth]
+  )
 
   /**
    * Carrega todos os perfis fazendo requisições sequenciais
@@ -123,6 +191,13 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
 
         setPerfis(allPerfis)
         setTotalPerfis(totalCount)
+        setExpandedPerfis(new Set())
+        setUsuariosPorPerfil({})
+
+        // Carrega a contagem de usuários para cada perfil em paralelo
+        if (allPerfis.length > 0) {
+          await loadContagemUsuariosPorPerfil(allPerfis.map((p) => p.getId()))
+        }
       } catch (error) {
         console.error('Erro ao carregar perfis gestor:', error)
         showToast.error('Erro ao carregar perfis gestor')
@@ -170,6 +245,142 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
     loadAllPerfis()
     onReload?.()
   }
+
+  const loadUsuariosPorPerfil = useCallback(
+    async (perfilId: string) => {
+      const token = auth?.getAccessToken()
+      if (!token || usuariosPorPerfil[perfilId]) return
+
+      try {
+        const response = await fetch(`/api/pessoas/usuarios-gestor?perfilGestorId=${perfilId}&limit=100&offset=0`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          const items = data.items || []
+          
+          // Filtra no frontend também como garantia (caso a API não filtre corretamente)
+          const usuariosFiltrados = items.filter((usuario: any) => {
+            // Verifica se o usuário tem o perfilGestorId correspondente
+            // Pode estar em diferentes formatos: perfilGestorId, perfilGestor.id, perfilGestorId (string ou number)
+            const usuarioPerfilId = usuario.perfilGestorId?.toString() || usuario.perfilGestor?.id?.toString() || ''
+            return usuarioPerfilId === perfilId.toString()
+          })
+          
+          console.log(`🔍 [PerfisGestorList] Perfil ${perfilId}: ${items.length} usuários retornados, ${usuariosFiltrados.length} filtrados`)
+          
+          setUsuariosPorPerfil((prev) => ({
+            ...prev,
+            [perfilId]: usuariosFiltrados,
+          }))
+        }
+      } catch (error) {
+        console.error('Erro ao carregar usuários gestor do perfil:', error)
+      }
+    },
+    [auth, usuariosPorPerfil]
+  )
+
+  const toggleExpand = (perfilId: string) => {
+    const newExpanded = new Set(expandedPerfis)
+    if (newExpanded.has(perfilId)) {
+      newExpanded.delete(perfilId)
+    } else {
+      newExpanded.add(perfilId)
+      loadUsuariosPorPerfil(perfilId)
+    }
+    setExpandedPerfis(newExpanded)
+  }
+
+  /**
+   * Atualiza o status do usuário gestor diretamente na lista
+   */
+  const handleToggleUsuarioStatus = useCallback(
+    async (usuarioId: string, novoStatus: boolean, perfilId: string) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      setTogglingStatus((prev) => ({ ...prev, [usuarioId]: true }))
+
+      // Atualização otimista
+      setUsuariosPorPerfil((prev) => {
+        const usuarios = prev[perfilId] || []
+        return {
+          ...prev,
+          [perfilId]: usuarios.map((u: any) =>
+            u.id === usuarioId ? { ...u, ativo: novoStatus } : u
+          ),
+        }
+      })
+
+      try {
+        const response = await fetch(`/api/pessoas/usuarios-gestor/${usuarioId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ ativo: novoStatus }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Erro ao atualizar usuário gestor')
+        }
+
+        showToast.success(
+          novoStatus ? 'Usuário gestor ativado com sucesso!' : 'Usuário gestor desativado com sucesso!'
+        )
+
+        // Recarrega os usuários do perfil para garantir sincronização
+        await loadUsuariosPorPerfil(perfilId)
+      } catch (error: any) {
+        console.error('Erro ao atualizar status do usuário gestor:', error)
+        showToast.error(error.message || 'Erro ao atualizar status do usuário gestor')
+
+        // Reverte a atualização otimista em caso de erro
+        const response = await fetch(`/api/pessoas/usuarios-gestor?perfilGestorId=${perfilId}&limit=100&offset=0`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          const items = data.items || []
+          
+          // Filtra no frontend também como garantia (caso a API não filtre corretamente)
+          const usuariosFiltrados = items.filter((usuario: any) => {
+            // Verifica se o usuário tem o perfilGestorId correspondente
+            // Pode estar em diferentes formatos: perfilGestorId, perfilGestor.id, perfilGestorId (string ou number)
+            const usuarioPerfilId = usuario.perfilGestorId?.toString() || usuario.perfilGestor?.id?.toString() || ''
+            return usuarioPerfilId === perfilId.toString()
+          })
+          
+          console.log(`🔍 [PerfisGestorList] Perfil ${perfilId}: ${items.length} usuários retornados, ${usuariosFiltrados.length} filtrados`)
+          
+          setUsuariosPorPerfil((prev) => ({
+            ...prev,
+            [perfilId]: usuariosFiltrados,
+          }))
+        }
+      } finally {
+        setTogglingStatus((prev) => {
+          const { [usuarioId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [auth, loadUsuariosPorPerfil]
+  )
 
   /**
    * Atualiza uma permissão específica do perfil
@@ -391,6 +602,7 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
       {perfis.length > 0 && (
         <div className="hidden md:block md:px-[30px] px-1 flex-shrink-0">
           <div className="h-10 bg-custom-2 rounded-lg md:px-4 pr-1 flex items-center gap-2">
+            <div className="w-8"></div>
             <div className="md:flex-[3] font-nunito font-semibold text-left md:text-sm text-primary-text uppercase">
               Perfil
             </div>
@@ -436,6 +648,10 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
         )}
 
         {perfis.map((perfil, index) => {
+          const isExpanded = expandedPerfis.has(perfil.getId())
+          const usuarios = usuariosPorPerfil[perfil.getId()] || []
+          const contagemUsuarios = contagemUsuariosPorPerfil[perfil.getId()] ?? 0
+
           // Handler para abrir edição ao clicar na linha do perfil
           const handlePerfilRowClick = () => {
             openTabsModal({ mode: 'edit', perfilId: perfil.getId() })
@@ -492,6 +708,18 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
                 onClick={handlePerfilRowClick}
                 className="hidden md:flex h-[50px] md:px-4 items-center md:gap-[10px] relative overflow-visible cursor-pointer"
               >
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleExpand(perfil.getId())
+                  }}
+                  className="md:w-8 w-6 md:h-8 h-6 flex items-center justify-center text-primary-text hover:bg-secondary-bg/20 rounded transition-colors"
+                >
+                  <span title="Exibir usuários gestor do perfil" 
+                  className={`text-lg transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
+                    <MdKeyboardArrowRight size={18} />
+                  </span>
+                </button>
                 <div className="md:flex-[3] font-nunito font-semibold text-left md:text-sm text-primary-text flex items-center gap-2">
                   {perfil.getRole()}
                   <button
@@ -544,9 +772,21 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
                 onClick={handlePerfilRowClick}
                 className="md:hidden p-3 cursor-pointer"
               >
-                {/* Cabeçalho com Perfil e ícone */}
+                {/* Cabeçalho com seta, Perfil e ícone na mesma linha */}
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleExpand(perfil.getId())
+                      }}
+                      className="w-6 h-6 flex items-center justify-center text-primary-text hover:bg-secondary-bg/20 rounded transition-colors"
+                    >
+                      <span title="Exibir usuários gestor do perfil" 
+                      className={`text-lg transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
+                        <MdKeyboardArrowRight size={18} />
+                      </span>
+                    </button>
                     <span className="text-base font-semibold text-secondary-text">Perfil:</span>
                     <span className="font-nunito font-semibold text-base text-primary-text">
                       {perfil.getRole()}
@@ -599,7 +839,168 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
                     title={perfil.hasAcessoDashboard() ? 'Acesso Dashboard habilitado' : 'Acesso Dashboard desabilitado'}
                   />
                 </div>
+                <div className="text-center mt-2">
+                  <span className="font-nunito text-xs text-secondary-text">
+                    {contagemUsuarios} usuário(s)
+                  </span>
+                </div>
               </div>
+
+              {/* Lista de usuários gestor expandida - Desktop e Mobile */}
+              {isExpanded && (
+                <div className="hidden md:block px-4 pb-4 border-t border-primary/20 overflow-hidden">
+                  {usuarios.length === 0 ? (
+                    <p className="text-secondary-text text-sm py-4 text-center">
+                      Nenhum usuário gestor associado a este perfil
+                    </p>
+                  ) : (
+                    <div className="space-y-2 pt-4">
+                      {usuarios.map((usuario: any) => (
+                        <div
+                          key={usuario.id}
+                          className="flex items-center gap-3 p-3 bg-primary-bg rounded-lg"
+                        >
+                          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                            <span className="text-primary"><MdPerson size={22} /></span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-nunito font-semibold text-sm text-primary-text">
+                                {usuario.nome}
+                              </p>
+                              <button
+                                onClick={() => {
+                                  setUsuariosTabsModalState({
+                                    open: true,
+                                    tab: 'usuario',
+                                    mode: 'edit',
+                                    usuarioId: usuario.id,
+                                    initialPerfilGestorId: undefined,
+                                  })
+                                  const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+                                  currentSearchParams.set('modalUsuarioGestorOpen', 'true')
+                                  router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+                                }}
+                                className="w-5 h-5 flex items-center justify-center text-primary hover:bg-primary/20 rounded-full transition-colors flex-shrink-0"
+                                title="Editar usuário gestor"
+                              >
+                                <MdEdit size={14} />
+                              </button>
+                              <div className="flex items-center">
+                                <label
+                                  className={`relative inline-flex h-5 w-12 items-center ${
+                                    togglingStatus[usuario.id]
+                                      ? 'cursor-not-allowed opacity-60'
+                                      : 'cursor-pointer'
+                                  }`}
+                                  title={usuario.ativo ? 'Usuário Gestor Ativo' : 'Usuário Gestor Desativado'}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="sr-only peer"
+                                    checked={usuario.ativo}
+                                    onChange={(event) =>
+                                      handleToggleUsuarioStatus(
+                                        usuario.id,
+                                        event.target.checked,
+                                        perfil.getId()
+                                      )
+                                    }
+                                    disabled={!!togglingStatus[usuario.id]}
+                                  />
+                                  <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
+                                  <span className="absolute left-[2px] top-1/2 block h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[28px]" />
+                                </label>
+                              </div>
+                            </div>
+                            <p className="font-nunito text-xs text-secondary-text mt-1">
+                              {usuario.username || 'Sem e-mail'}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Lista de usuários gestor expandida - Mobile */}
+              {isExpanded && (
+                <div className="md:hidden px-4 pb-4 border-t border-primary/20 overflow-hidden">
+                  {usuarios.length === 0 ? (
+                    <p className="text-secondary-text text-sm py-4 text-center">
+                      Nenhum usuário gestor associado a este perfil
+                    </p>
+                  ) : (
+                    <div className="space-y-2 pt-4">
+                      {usuarios.map((usuario: any) => (
+                        <div
+                          key={usuario.id}
+                          className="flex items-center gap-3 p-3 bg-primary-bg rounded-lg"
+                        >
+                          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                            <span className="text-primary"><MdPerson size={22} /></span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-nunito font-semibold text-sm text-primary-text">
+                                {usuario.nome}
+                              </p>
+                              <button
+                                onClick={() => {
+                                  setUsuariosTabsModalState({
+                                    open: true,
+                                    tab: 'usuario',
+                                    mode: 'edit',
+                                    usuarioId: usuario.id,
+                                    initialPerfilGestorId: undefined,
+                                  })
+                                  const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+                                  currentSearchParams.set('modalUsuarioGestorOpen', 'true')
+                                  router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+                                }}
+                                className="w-5 h-5 flex items-center justify-center text-primary hover:bg-primary/20 rounded-full transition-colors flex-shrink-0"
+                                title="Editar usuário gestor"
+                              >
+                                <MdEdit size={14} />
+                              </button>
+                              <div className="flex items-center">
+                                <label
+                                  className={`relative inline-flex h-5 w-12 items-center ${
+                                    togglingStatus[usuario.id]
+                                      ? 'cursor-not-allowed opacity-60'
+                                      : 'cursor-pointer'
+                                  }`}
+                                  title={usuario.ativo ? 'Usuário Gestor Ativo' : 'Usuário Gestor Desativado'}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="sr-only peer"
+                                    checked={usuario.ativo}
+                                    onChange={(event) =>
+                                      handleToggleUsuarioStatus(
+                                        usuario.id,
+                                        event.target.checked,
+                                        perfil.getId()
+                                      )
+                                    }
+                                    disabled={!!togglingStatus[usuario.id]}
+                                  />
+                                  <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
+                                  <span className="absolute left-[2px] top-1/2 block h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[28px]" />
+                                </label>
+                              </div>
+                            </div>
+                            <p className="font-nunito text-xs text-secondary-text mt-1">
+                              {usuario.username || 'Sem e-mail'}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )
         })}
@@ -616,7 +1017,20 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
         state={usuariosTabsModalState}
         onClose={closeUsuariosTabsModal}
         onTabChange={handleUsuariosTabChange}
-        onReload={handleStatusChange}
+        onReload={() => {
+          // Recarrega os usuários de todos os perfis expandidos quando um usuário é editado
+          expandedPerfis.forEach((perfilId) => {
+            setUsuariosPorPerfil((prev) => {
+              const updated = { ...prev }
+              delete updated[perfilId]
+              return updated
+            })
+            loadUsuariosPorPerfil(perfilId)
+          })
+          // Recarrega a contagem de usuários e a lista de perfis
+          loadAllPerfis()
+          handleStatusChange()
+        }}
       />
     </div>
   )

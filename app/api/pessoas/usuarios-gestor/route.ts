@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
     const q = searchParams.get('q') || ''
     const ativoParam = searchParams.get('ativo')
     const ativo = ativoParam !== null ? ativoParam === 'true' : null
+    const perfilGestorId = searchParams.get('perfilGestorId') || ''
 
     console.log('🔍 [API/usuarios-gestor] Parâmetros recebidos:', {
       limit,
@@ -43,6 +44,11 @@ export async function GET(request: NextRequest) {
       console.log('✅ [API/usuarios-gestor] Filtro ativo aplicado:', ativo)
     } else {
       console.log('⚠️ [API/usuarios-gestor] Filtro ativo não especificado - retornando todos')
+    }
+
+    if (perfilGestorId) {
+      params.append('perfilGestorId', perfilGestorId)
+      console.log('✅ [API/usuarios-gestor] Filtro perfilGestorId aplicado:', perfilGestorId)
     }
 
     const apiClient = new ApiClient()
