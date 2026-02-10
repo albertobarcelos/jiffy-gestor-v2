@@ -133,10 +133,10 @@ export class BuscarEvolucaoVendasUseCase {
     // Combina os resultados de todas as chamadas
     const allVendasData: any[] = results.flat();
 
-    // Detecta se deve agrupar por hora (quando há datas personalizadas com horários específicos)
+    // Detecta se deve agrupar por hora (quando há datas personalizadas com horários específicos OU quando período é "hoje" com intervalo)
     // Agrupa por hora se:
-    // 1. São datas personalizadas
-    // 2. E (o intervalo é menor que 48 horas OU há horários específicos definidos)
+    // 1. São datas personalizadas E (o intervalo é menor que 48 horas OU há horários específicos definidos)
+    // 2. OU período é "hoje" E intervaloHora foi fornecido
     let shouldGroupByHour = false;
     if (isCustomDates && periodoInicialCustom && periodoFinalCustom) {
       const diffInHours = (periodoFinalCustom.getTime() - periodoInicialCustom.getTime()) / (1000 * 60 * 60);
@@ -144,6 +144,9 @@ export class BuscarEvolucaoVendasUseCase {
                                 periodoFinalCustom.getHours() !== 23 || periodoFinalCustom.getMinutes() !== 59;
       // Se o intervalo for menor que 48 horas OU houver horários específicos, agrupa por hora
       shouldGroupByHour = diffInHours < 48 || hasSpecificHours;
+    } else if (periodo === 'hoje' && intervaloHora) {
+      // Quando período é "hoje" e há intervalo definido, sempre agrupa por hora
+      shouldGroupByHour = true;
     }
     
     // Define o intervalo padrão se não foi fornecido (30 minutos)
