@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { PerfilUsuario } from '@/src/domain/entities/PerfilUsuario'
@@ -65,6 +65,8 @@ export function NovoPerfilUsuario({
     })
   const hasLoadedPerfilRef = useRef(false)
   const lastMeioPagamentoErrorToastRef = useRef<string | null>(null)
+  const perfilMeiosPagamentoNomesRef = useRef<string[]>([])
+  const [perfilLoaded, setPerfilLoaded] = useState(false)
 
   // Carregar lista de meios de pagamento usando React Query (com cache)
   const {
@@ -82,6 +84,11 @@ export function NovoPerfilUsuario({
       nome: meio.getNome(),
     }))
   ) || []
+
+  // Cria uma string serializada dos IDs dos meios de pagamento para usar como dependência estável
+  const meiosPagamentoIds = useMemo(() => {
+    return meiosPagamento.map((mp) => mp.id).sort().join(',')
+  }, [meiosPagamento])
 
   // Carregar dados do perfil se estiver editando
   useEffect(() => {
@@ -114,9 +121,14 @@ export function NovoPerfilUsuario({
           setAplicarAcrescimoProduto(perfil.canAplicarAcrescimoProduto())
           setAplicarAcrescimoVenda(perfil.canAplicarAcrescimoVenda())
 
-          // Carregar meios de pagamento selecionados
+          // Guarda os nomes dos meios de pagamento do perfil para usar depois
           const nomesMeios = perfil.getAcessoMeiosPagamento()
-          // Sempre atualiza o estado, mesmo se o array estiver vazio
+          perfilMeiosPagamentoNomesRef.current = nomesMeios
+          
+          // Marca que o perfil foi carregado
+          setPerfilLoaded(true)
+          
+          // Tenta atualizar os meios de pagamento selecionados se já estiverem carregados
           if (meiosPagamento.length > 0) {
             const selecionados = meiosPagamento.filter((mp) =>
               nomesMeios.includes(mp.nome)
@@ -136,7 +148,36 @@ export function NovoPerfilUsuario({
 
     loadPerfil()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditing, perfilId, meiosPagamento.length])
+  }, [isEditing, perfilId])
+
+  // Atualiza os meios de pagamento selecionados quando os meios de pagamento são carregados
+  // Isso resolve o problema de race condition quando a página é recarregada
+  useEffect(() => {
+    if (!isEditing || !perfilLoaded) return
+    if (meiosPagamento.length === 0) return
+    
+    const nomesMeios = perfilMeiosPagamentoNomesRef.current
+    if (nomesMeios.length === 0) {
+      setSelectedMeiosPagamento([])
+      return
+    }
+    
+    // Atualiza os meios de pagamento selecionados
+    const selecionados = meiosPagamento.filter((mp) =>
+      nomesMeios.includes(mp.nome)
+    )
+    
+    // Só atualiza se houver diferença para evitar loops infinitos
+    setSelectedMeiosPagamento((prev) => {
+      const prevIds = prev.map((p) => p.id).sort().join(',')
+      const newIds = selecionados.map((s) => s.id).sort().join(',')
+      if (prevIds !== newIds) {
+        return selecionados
+      }
+      return prev
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing, perfilLoaded, meiosPagamentoIds, meiosPagamento.length])
 
   // Limpa toasts quando o componente desmonta ou quando o modal fecha
   useEffect(() => {
@@ -144,6 +185,9 @@ export function NovoPerfilUsuario({
       // Limpa todos os toasts ao desmontar o componente
       showToast.dismissAll()
       lastMeioPagamentoErrorToastRef.current = null
+      perfilMeiosPagamentoNomesRef.current = []
+      hasLoadedPerfilRef.current = false
+      setPerfilLoaded(false)
     }
   }, [])
 
@@ -277,6 +321,10 @@ export function NovoPerfilUsuario({
     // Limpa todos os toasts ao fechar o modal
     showToast.dismissAll()
     lastMeioPagamentoErrorToastRef.current = null
+    // Reseta a referência dos meios de pagamento do perfil
+    perfilMeiosPagamentoNomesRef.current = []
+    hasLoadedPerfilRef.current = false
+    setPerfilLoaded(false)
     
     if (isEmbedded) {
       onCancel?.()
