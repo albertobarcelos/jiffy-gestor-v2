@@ -66,6 +66,13 @@ export const showToast = {
       id: toastId,
     })
   },
+
+  /**
+   * Limpa todos os toasts ativos
+   */
+  dismissAll: () => {
+    toast.dismiss()
+  },
 }
 
 /**
