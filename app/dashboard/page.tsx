@@ -77,9 +77,9 @@ const MetricCards = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[...Array(4)].map((_, i) => (
-          <Skeleton key={i} variant="rectangular" height={120} className="rounded-xl" />
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1">
+        {[...Array(6)].map((_, i) => (
+          <Skeleton key={i} variant="rectangular" height={80} className="rounded-lg" />
         ))}
       </div>
     ),
@@ -281,9 +281,9 @@ export default function DashboardPage() {
       {/* Cards de métricas */}
       <motion.div variants={itemVariants}>
         <Suspense fallback={
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} variant="rectangular" height={120} className="rounded-xl" />
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1">
+            {[...Array(6)].map((_, i) => (
+              <Skeleton key={i} variant="rectangular" height={80} className="rounded-lg" />
             ))}
           </div>
         }>
@@ -350,7 +350,7 @@ export default function DashboardPage() {
                          />
                        </FormGroup>
                        {/* Checkboxes para intervalo de tempo (apenas quando for exibir por hora) */}
-                       {(periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) ? (
+                       {((periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) || periodo === 'Hoje') ? (
                          <FormGroup
                            sx={{
                              flexDirection: { xs: 'row', md: 'row' },

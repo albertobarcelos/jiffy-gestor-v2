@@ -137,13 +137,28 @@ export class PerfilUsuarioRepository implements IPerfilUsuarioRepository {
       const requestBody: any = {}
 
       if (data.role) requestBody.role = data.role
-      if (data.acessoMeiosPagamento !== undefined) requestBody.acessoMeiosPagamento = data.acessoMeiosPagamento
+      // Sempre inclui acessoMeiosPagamento se estiver definido, mesmo que seja array vazio
+      // Isso garante que arrays vazios sejam enviados explicitamente para limpar os meios de pagamento
+      if (data.acessoMeiosPagamento !== undefined) {
+        requestBody.acessoMeiosPagamento = Array.isArray(data.acessoMeiosPagamento) 
+          ? data.acessoMeiosPagamento 
+          : []
+      }
       if (data.cancelarVenda !== undefined) requestBody.cancelarVenda = data.cancelarVenda
       if (data.cancelarProduto !== undefined) requestBody.cancelarProduto = data.cancelarProduto
       if (data.aplicarDescontoProduto !== undefined) requestBody.aplicarDescontoProduto = data.aplicarDescontoProduto
       if (data.aplicarDescontoVenda !== undefined) requestBody.aplicarDescontoVenda = data.aplicarDescontoVenda
       if (data.aplicarAcrescimoProduto !== undefined) requestBody.aplicarAcrescimoProduto = data.aplicarAcrescimoProduto
       if (data.aplicarAcrescimoVenda !== undefined) requestBody.aplicarAcrescimoVenda = data.aplicarAcrescimoVenda
+
+      // Log para debug
+      console.log('📤 [PerfilUsuarioRepository] Enviando para API externa:', {
+        id,
+        requestBody,
+        acessoMeiosPagamento: requestBody.acessoMeiosPagamento,
+        acessoMeiosPagamentoIsArray: Array.isArray(requestBody.acessoMeiosPagamento),
+        acessoMeiosPagamentoLength: Array.isArray(requestBody.acessoMeiosPagamento) ? requestBody.acessoMeiosPagamento.length : 'N/A',
+      })
 
       const response = await this.apiClient.request<any>(
         `/api/v1/pessoas/perfis-pdv/${id}`,
@@ -162,6 +177,13 @@ export class PerfilUsuarioRepository implements IPerfilUsuarioRepository {
           body: JSON.stringify(requestBody),
         }
       )
+
+      // Log da resposta
+      console.log('📥 [PerfilUsuarioRepository] Resposta da API externa:', {
+        responseData: response.data,
+        acessoMeiosPagamento: response.data?.acessoMeiosPagamento || [],
+        acessoMeiosPagamentoLength: (response.data?.acessoMeiosPagamento || []).length,
+      })
 
       return PerfilUsuario.fromJSON(response.data)
     } catch (error) {

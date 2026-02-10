@@ -1,12 +1,14 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { PerfilUsuario } from '@/src/domain/entities/PerfilUsuario'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
+import { showToast } from '@/src/shared/utils/toast'
+import toast from 'react-hot-toast'
 import { MdPerson, MdClose, MdSearch } from 'react-icons/md'
 import {
   MeiosPagamentosTabsModal,
@@ -62,6 +64,9 @@ export function NovoPerfilUsuario({
       meioPagamentoId: undefined,
     })
   const hasLoadedPerfilRef = useRef(false)
+  const lastMeioPagamentoErrorToastRef = useRef<string | null>(null)
+  const perfilMeiosPagamentoNomesRef = useRef<string[]>([])
+  const [perfilLoaded, setPerfilLoaded] = useState(false)
 
   // Carregar lista de meios de pagamento usando React Query (com cache)
   const {
@@ -79,6 +84,11 @@ export function NovoPerfilUsuario({
       nome: meio.getNome(),
     }))
   ) || []
+
+  // Cria uma string serializada dos IDs dos meios de pagamento para usar como dependência estável
+  const meiosPagamentoIds = useMemo(() => {
+    return meiosPagamento.map((mp) => mp.id).sort().join(',')
+  }, [meiosPagamento])
 
   // Carregar dados do perfil se estiver editando
   useEffect(() => {
@@ -111,13 +121,22 @@ export function NovoPerfilUsuario({
           setAplicarAcrescimoProduto(perfil.canAplicarAcrescimoProduto())
           setAplicarAcrescimoVenda(perfil.canAplicarAcrescimoVenda())
 
-          // Carregar meios de pagamento selecionados
+          // Guarda os nomes dos meios de pagamento do perfil para usar depois
           const nomesMeios = perfil.getAcessoMeiosPagamento()
-          if (nomesMeios.length > 0 && meiosPagamento.length > 0) {
+          perfilMeiosPagamentoNomesRef.current = nomesMeios
+          
+          // Marca que o perfil foi carregado
+          setPerfilLoaded(true)
+          
+          // Tenta atualizar os meios de pagamento selecionados se já estiverem carregados
+          if (meiosPagamento.length > 0) {
             const selecionados = meiosPagamento.filter((mp) =>
               nomesMeios.includes(mp.nome)
             )
             setSelectedMeiosPagamento(selecionados)
+          } else if (nomesMeios.length === 0) {
+            // Se não há meios de pagamento e a lista está vazia, limpa o estado
+            setSelectedMeiosPagamento([])
           }
         }
       } catch (error) {
@@ -129,29 +148,77 @@ export function NovoPerfilUsuario({
 
     loadPerfil()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditing, perfilId, meiosPagamento.length])
+  }, [isEditing, perfilId])
+
+  // Atualiza os meios de pagamento selecionados quando os meios de pagamento são carregados
+  // Isso resolve o problema de race condition quando a página é recarregada
+  useEffect(() => {
+    if (!isEditing || !perfilLoaded) return
+    if (meiosPagamento.length === 0) return
+    
+    const nomesMeios = perfilMeiosPagamentoNomesRef.current
+    if (nomesMeios.length === 0) {
+      setSelectedMeiosPagamento([])
+      return
+    }
+    
+    // Atualiza os meios de pagamento selecionados
+    const selecionados = meiosPagamento.filter((mp) =>
+      nomesMeios.includes(mp.nome)
+    )
+    
+    // Só atualiza se houver diferença para evitar loops infinitos
+    setSelectedMeiosPagamento((prev) => {
+      const prevIds = prev.map((p) => p.id).sort().join(',')
+      const newIds = selecionados.map((s) => s.id).sort().join(',')
+      if (prevIds !== newIds) {
+        return selecionados
+      }
+      return prev
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing, perfilLoaded, meiosPagamentoIds, meiosPagamento.length])
+
+  // Limpa toasts quando o componente desmonta ou quando o modal fecha
+  useEffect(() => {
+    return () => {
+      // Limpa todos os toasts ao desmontar o componente
+      showToast.dismissAll()
+      lastMeioPagamentoErrorToastRef.current = null
+      perfilMeiosPagamentoNomesRef.current = []
+      hasLoadedPerfilRef.current = false
+      setPerfilLoaded(false)
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const token = auth?.getAccessToken()
     if (!token) {
-      alert('Token não encontrado')
+      showToast.error('Token não encontrado. Faça login novamente.')
       return
     }
 
     if (!role) {
-      alert('Nome do perfil é obrigatório')
+      showToast.error('Nome do perfil é obrigatório')
+      return
+    }
+
+    // Validação: não permite salvar perfil sem pelo menos 1 meio de pagamento
+    if (selectedMeiosPagamento.length === 0) {
+      showToast.error('É necessário selecionar pelo menos um meio de pagamento para o perfil')
       return
     }
 
     setIsLoading(true)
 
     try {
+      // Garante que sempre enviamos um array, mesmo que vazio
       const acessoMeiosPagamento = selectedMeiosPagamento.map((mp) => mp.nome)
 
       const body: any = {
         role,
-        acessoMeiosPagamento,
+        acessoMeiosPagamento: acessoMeiosPagamento || [], // Garante que sempre seja um array
         cancelarVenda,
         cancelarProduto,
         aplicarDescontoProduto,
@@ -159,6 +226,13 @@ export function NovoPerfilUsuario({
         aplicarAcrescimoProduto,
         aplicarAcrescimoVenda,
       }
+
+      // Debug: log do body antes de enviar
+      console.log('📤 [NovoPerfilUsuario] Enviando dados:', {
+        ...body,
+        acessoMeiosPagamentoLength: body.acessoMeiosPagamento.length,
+        acessoMeiosPagamentoIsArray: Array.isArray(body.acessoMeiosPagamento),
+      })
 
       const url = isEditing
         ? `/api/perfis-usuarios-pdv/${perfilId}`
@@ -176,24 +250,82 @@ export function NovoPerfilUsuario({
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Erro ao salvar perfil')
+        console.error('❌ [NovoPerfilUsuario] Erro na resposta:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData,
+        })
+        throw new Error(errorData.error || `Erro ao salvar perfil (${response.status})`)
+      }
+
+      // Log da resposta de sucesso para debug
+      const responseData = await response.json().catch(() => ({}))
+      console.log('✅ [NovoPerfilUsuario] Perfil salvo com sucesso:', {
+        responseData,
+        acessoMeiosPagamento: responseData.acessoMeiosPagamento || [],
+        acessoMeiosPagamentoLength: (responseData.acessoMeiosPagamento || []).length,
+      })
+
+      // Se estiver editando, recarrega os dados do perfil para garantir sincronização
+      if (isEditing && perfilId) {
+        hasLoadedPerfilRef.current = false
+        const token = auth?.getAccessToken()
+        if (token) {
+          try {
+            const reloadResponse = await fetch(`/api/perfis-usuarios-pdv/${perfilId}`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            })
+            if (reloadResponse.ok) {
+              const reloadData = await reloadResponse.json()
+              const perfil = PerfilUsuario.fromJSON(reloadData)
+              const nomesMeios = perfil.getAcessoMeiosPagamento()
+              console.log('🔄 [NovoPerfilUsuario] Dados recarregados:', {
+                acessoMeiosPagamento: nomesMeios,
+                acessoMeiosPagamentoLength: nomesMeios.length,
+              })
+              
+              // Atualiza os meios de pagamento selecionados
+              if (meiosPagamento.length > 0) {
+                const selecionados = meiosPagamento.filter((mp) =>
+                  nomesMeios.includes(mp.nome)
+                )
+                setSelectedMeiosPagamento(selecionados)
+              } else if (nomesMeios.length === 0) {
+                setSelectedMeiosPagamento([])
+              }
+            }
+          } catch (reloadError) {
+            console.error('Erro ao recarregar perfil após salvar:', reloadError)
+          }
+        }
       }
 
       if (isEmbedded) {
         onSaved?.()
       } else {
-        alert(isEditing ? 'Perfil atualizado com sucesso!' : 'Perfil criado com sucesso!')
+        showToast.success(isEditing ? 'Perfil atualizado com sucesso!' : 'Perfil criado com sucesso!')
         router.push('/cadastros/perfis-usuarios-pdv')
       }
     } catch (error) {
       console.error('Erro ao salvar perfil:', error)
-      alert(error instanceof Error ? error.message : 'Erro ao salvar perfil')
+      showToast.error(error instanceof Error ? error.message : 'Erro ao salvar perfil')
     } finally {
       setIsLoading(false)
     }
   }
 
   const handleCancel = () => {
+    // Limpa todos os toasts ao fechar o modal
+    showToast.dismissAll()
+    lastMeioPagamentoErrorToastRef.current = null
+    // Reseta a referência dos meios de pagamento do perfil
+    perfilMeiosPagamentoNomesRef.current = []
+    hasLoadedPerfilRef.current = false
+    setPerfilLoaded(false)
+    
     if (isEmbedded) {
       onCancel?.()
     } else {
@@ -205,8 +337,30 @@ export function NovoPerfilUsuario({
     setSelectedMeiosPagamento((prev) => {
       const exists = prev.find((mp) => mp.id === meio.id)
       if (exists) {
+        // Validação: não permite remover se for o último meio de pagamento
+        if (prev.length === 1) {
+          // Sempre exibe o toast quando tenta remover o último item
+          // O ID garante que substitui o toast anterior se ainda estiver visível
+          const toastId = 'meio-pagamento-error'
+          toast.error('É necessário manter pelo menos um meio de pagamento selecionado', {
+            id: toastId,
+            duration: 5000,
+          })
+          lastMeioPagamentoErrorToastRef.current = toastId
+          return prev
+        }
+        // Limpa o toast de erro se a remoção for bem-sucedida
+        if (lastMeioPagamentoErrorToastRef.current) {
+          toast.dismiss(lastMeioPagamentoErrorToastRef.current)
+          lastMeioPagamentoErrorToastRef.current = null
+        }
         return prev.filter((mp) => mp.id !== meio.id)
       } else {
+        // Limpa o toast de erro se adicionar um meio de pagamento
+        if (lastMeioPagamentoErrorToastRef.current) {
+          toast.dismiss(lastMeioPagamentoErrorToastRef.current)
+          lastMeioPagamentoErrorToastRef.current = null
+        }
         return [...prev, meio]
       }
     })
@@ -328,9 +482,26 @@ export function NovoPerfilUsuario({
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation()
-                                setSelectedMeiosPagamento((prev) =>
-                                  prev.filter((p) => p.id !== mp.id)
-                                )
+                                setSelectedMeiosPagamento((prev) => {
+                                  // Validação: não permite remover se for o último meio de pagamento
+                                  if (prev.length === 1) {
+                                    // Sempre exibe o toast quando tenta remover o último item
+                                    // O ID garante que substitui o toast anterior se ainda estiver visível
+                                    const toastId = 'meio-pagamento-error'
+                                    toast.error('É necessário manter pelo menos um meio de pagamento selecionado', {
+                                      id: toastId,
+                                      duration: 5000,
+                                    })
+                                    lastMeioPagamentoErrorToastRef.current = toastId
+                                    return prev
+                                  }
+                                  // Limpa o toast de erro se a remoção for bem-sucedida
+                                  if (lastMeioPagamentoErrorToastRef.current) {
+                                    toast.dismiss(lastMeioPagamentoErrorToastRef.current)
+                                    lastMeioPagamentoErrorToastRef.current = null
+                                  }
+                                  return prev.filter((p) => p.id !== mp.id)
+                                })
                               }}
                               className="text-secondary-text hover:text-primary md:text-sm text-xs"
                             >

@@ -53,12 +53,14 @@ export function GraficoVendasLinha({ periodo, selectedStatuses, periodoInicial, 
         const mappedPeriodo = mapPeriodoToUseCaseFormat(periodo);
         // Se período for "Datas Personalizadas", usa as datas fornecidas
         const useCustomDates = periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal;
+        // Se período for "Hoje", também usa o intervalo de hora
+        const useIntervaloHora = periodo === 'Hoje' || useCustomDates;
         const evolucao = await useCase.execute(
           mappedPeriodo, 
           selectedStatuses, 
           useCustomDates ? periodoInicial : undefined, 
           useCustomDates ? periodoFinal : undefined,
-          useCustomDates ? intervaloHora : undefined
+          useIntervaloHora ? intervaloHora : undefined
         )
         setData(evolucao)
       } catch (err) {

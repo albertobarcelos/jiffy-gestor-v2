@@ -3,8 +3,8 @@ import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 
 /**
- * GET /api/pessoas/usuarios-gestor/[id]
- * Busca um usuário gestor por ID
+ * GET /api/pessoas/perfis-gestor/[id]
+ * Busca um perfil gestor por ID
  */
 export async function GET(
   request: NextRequest,
@@ -19,26 +19,23 @@ export async function GET(
 
     const { id } = await params
     if (!id) {
-      return NextResponse.json({ error: 'ID do usuário gestor é obrigatório' }, { status: 400 })
+      return NextResponse.json({ error: 'ID do perfil gestor é obrigatório' }, { status: 400 })
     }
 
-    console.log('🔍 [usuarios-gestor] Buscando usuário gestor com ID:', id)
-
     const apiClient = new ApiClient()
-    const response = await apiClient.request<any>(`/api/v1/pessoas/usuarios-gestor/${id}`, {
+    const response = await apiClient.request<any>(`/api/v1/pessoas/perfis-gestor/${id}`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${tokenInfo.token}`,
       },
     })
 
-    console.log('🔍 [usuarios-gestor] Resposta recebida:', response.data)
     return NextResponse.json(response.data)
   } catch (error) {
-    console.error('Erro ao buscar usuário gestor:', error)
+    console.error('Erro ao buscar perfil gestor:', error)
     if (error instanceof ApiError) {
       return NextResponse.json(
-        { error: error.message || 'Erro ao buscar usuário gestor' },
+        { error: error.message || 'Erro ao buscar perfil gestor' },
         { status: error.status }
       )
     }
@@ -50,8 +47,8 @@ export async function GET(
 }
 
 /**
- * PATCH /api/pessoas/usuarios-gestor/[id]
- * Atualiza um usuário gestor
+ * PATCH /api/pessoas/perfis-gestor/[id]
+ * Atualiza um perfil gestor
  */
 export async function PATCH(
   request: NextRequest,
@@ -66,14 +63,14 @@ export async function PATCH(
 
     const { id } = await params
     if (!id) {
-      return NextResponse.json({ error: 'ID do usuário gestor é obrigatório' }, { status: 400 })
+      return NextResponse.json({ error: 'ID do perfil gestor é obrigatório' }, { status: 400 })
     }
 
     const body = await request.json()
-    console.log('🔍 [usuarios-gestor] Atualizando usuário gestor:', { id, body })
+    console.log('🔍 [perfis-gestor] Atualizando perfil gestor:', { id, body })
 
     const apiClient = new ApiClient()
-    const response = await apiClient.request<any>(`/api/v1/pessoas/usuarios-gestor/${id}`, {
+    const response = await apiClient.request<any>(`/api/v1/pessoas/perfis-gestor/${id}`, {
       method: 'PATCH',
       headers: {
         Authorization: `Bearer ${tokenInfo.token}`,
@@ -82,13 +79,13 @@ export async function PATCH(
       body: JSON.stringify(body),
     })
 
-    console.log('🔍 [usuarios-gestor] Resposta da atualização:', response.data)
+    console.log('✅ [perfis-gestor] Resposta da atualização:', response.data)
     return NextResponse.json(response.data)
   } catch (error) {
-    console.error('Erro ao atualizar usuário gestor:', error)
+    console.error('Erro ao atualizar perfil gestor:', error)
     if (error instanceof ApiError) {
       return NextResponse.json(
-        { error: error.message || 'Erro ao atualizar usuário gestor' },
+        { error: error.message || 'Erro ao atualizar perfil gestor' },
         { status: error.status }
       )
     }
@@ -100,8 +97,8 @@ export async function PATCH(
 }
 
 /**
- * DELETE /api/pessoas/usuarios-gestor/[id]
- * Deleta um usuário gestor
+ * DELETE /api/pessoas/perfis-gestor/[id]
+ * Deleta um perfil gestor
  */
 export async function DELETE(
   request: NextRequest,
@@ -116,23 +113,23 @@ export async function DELETE(
 
     const { id } = await params
     if (!id) {
-      return NextResponse.json({ error: 'ID do usuário gestor é obrigatório' }, { status: 400 })
+      return NextResponse.json({ error: 'ID do perfil gestor é obrigatório' }, { status: 400 })
     }
 
     const apiClient = new ApiClient()
-    await apiClient.request<any>(`/api/v1/pessoas/usuarios-gestor/${id}`, {
+    await apiClient.request<any>(`/api/v1/pessoas/perfis-gestor/${id}`, {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${tokenInfo.token}`,
       },
     })
 
-    return NextResponse.json({ message: 'Usuário gestor deletado com sucesso' }, { status: 200 })
+    return NextResponse.json({ message: 'Perfil gestor deletado com sucesso' }, { status: 200 })
   } catch (error) {
-    console.error('Erro ao deletar usuário gestor:', error)
+    console.error('Erro ao deletar perfil gestor:', error)
     if (error instanceof ApiError) {
       return NextResponse.json(
-        { error: error.message || 'Erro ao deletar usuário gestor' },
+        { error: error.message || 'Erro ao deletar perfil gestor' },
         { status: error.status }
       )
     }

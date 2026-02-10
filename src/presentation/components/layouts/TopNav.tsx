@@ -163,6 +163,8 @@ export function TopNav() {
         { name: 'Complementos', path: '/cadastros/complementos', icon: MdAddCircle },
         { name: 'Usuários', path: '/cadastros/usuarios', icon: MdPerson },
         { name: 'Perfis de Usuários', path: '/cadastros/perfis-usuarios-pdv', icon: MdGroup },
+        { name: 'Perfis Gestor', path: '/cadastros/perfis-gestor', icon: MdAccountBalance },
+        { name: 'Usuários Gestor', path: '/cadastros/usuarios-gestor', icon: MdPerson },
         { name: 'Clientes', path: '/cadastros/clientes', icon: MdPeople },
         { name: 'Impressoras', path: '/cadastros/impressoras', icon: MdPrint },
         { name: 'Meios de Pagamentos', path: '/cadastros/meios-pagamentos', icon: MdPayment },
