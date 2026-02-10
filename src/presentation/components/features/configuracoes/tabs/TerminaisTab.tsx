@@ -363,6 +363,7 @@ export function TerminaisTab() {
         [terminalId]: {
           compartilharMesas: novoValor,
           impressoraFinalizacaoNome: prev[terminalId]?.impressoraFinalizacaoNome || 'Nenhuma',
+          impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId, // Preserva o ID da impressora
         },
       }))
 
@@ -386,6 +387,45 @@ export function TerminaisTab() {
           throw new Error(errorData.error || 'Erro ao atualizar preferências')
         }
 
+        // Busca as preferências atualizadas do backend para garantir sincronização
+        try {
+          const prefsResponse = await fetch(`/api/preferencias-terminal/${terminalId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          })
+
+          if (prefsResponse.ok) {
+            const prefsData = await prefsResponse.json()
+            const impressoraId =
+              prefsData.impressoraFinalizacaoId ||
+              prefsData.impressoraFinalizacao?.id ||
+              prefsData.impressoraFinalizacao?.impressoraId ||
+              prefsData.impressoraFinalizacao?.impressora?.id
+            const impressoraNome =
+              prefsData.impressoraFinalizacao?.name ||
+              prefsData.impressoraFinalizacao?.nome ||
+              prefsData.impressoraFinalizacaoNome ||
+              prefsData.impressoraFinalizacao?.impressora?.nome ||
+              prefsData.impressoraFinalizacao?.impressora?.name ||
+              'Nenhuma'
+
+            // Atualiza o estado com os dados confirmados do backend
+            setPreferencesMap((prev) => ({
+              ...prev,
+              [terminalId]: {
+                compartilharMesas: !!prefsData.compartilharMesas,
+                impressoraFinalizacaoNome: impressoraNome,
+                impressoraFinalizacaoId: impressoraId,
+              },
+            }))
+          }
+        } catch (prefsError) {
+          console.warn('Erro ao buscar preferências atualizadas:', prefsError)
+          // Mesmo com erro ao buscar, mantém a atualização otimista já que a API confirmou sucesso
+        }
+
         showToast.success('Preferência de compartilhamento atualizada!')
       } catch (error: any) {
         console.error('Erro ao atualizar compartilhamento:', error)
@@ -395,6 +435,7 @@ export function TerminaisTab() {
           [terminalId]: {
             compartilharMesas: !novoValor,
             impressoraFinalizacaoNome: prev[terminalId]?.impressoraFinalizacaoNome || 'Nenhuma',
+            impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId, // Preserva o ID da impressora
           },
         }))
       } finally {
