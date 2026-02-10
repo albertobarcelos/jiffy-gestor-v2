@@ -97,7 +97,12 @@ export function LoginForm() {
 
       console.log('🔍 [LoginForm] Auth salvo no store')
 
+      // Aguarda um momento para garantir que as permissões comecem a ser carregadas
+      // O PermissionsLoader no layout principal completará o carregamento
+      await new Promise(resolve => setTimeout(resolve, 100))
+
       // Redireciona para dashboard
+      // As permissões serão aplicadas automaticamente pelo PermissionsLoader
       window.location.href = '/dashboard'
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao fazer login'

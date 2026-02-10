@@ -8,6 +8,7 @@ import { motion } from 'framer-motion'; // Importar motion do Framer Motion
 import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto' // Importar a entidade
 import { EscolheDatasModal } from '@/src/presentation/components/features/vendas/EscolheDatasModal'
 import { MdCalendarToday } from 'react-icons/md'
+import { useRequirePermission } from '@/src/presentation/hooks/useRequirePermission'
 
 // Função para obter o label do período
 const getPeriodoLabel = (periodo: string, dataInicial?: Date | null, dataFinal?: Date | null): string => {
@@ -131,6 +132,9 @@ const UltimasVendas = dynamic(
  * Otimizada com code-splitting e Suspense
  */
 export default function DashboardPage() {
+  // Protege a página exigindo permissão de DASHBOARD
+  useRequirePermission({ permission: 'DASHBOARD' })
+
   const [periodo, setPeriodo] = useState('Últimos 7 Dias'); // Estado para o período
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['FINALIZADA']); // Estado para os status selecionados
   const [topProdutosData, setTopProdutosData] = useState<DashboardTopProduto[]>([]); // Novo estado para os top produtos

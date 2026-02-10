@@ -25,6 +25,8 @@ import {
 } from 'react-icons/md'
 import type { IconType } from 'react-icons'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
+import { usePermissions } from '@/src/presentation/hooks/usePermissions'
+import type { PermissionType } from '@/src/shared/types/permissions'
 
 /**
  * Navegação superior minimalista e clean
@@ -45,6 +47,9 @@ export function TopNav() {
   
   // Obter dados do usuário
   const user = getUser()
+  
+  // Obter permissões do usuário
+  const { hasAccess } = usePermissions()
 
   // Marcar como hidratado apenas no cliente
   useEffect(() => {
@@ -137,6 +142,7 @@ export function TopNav() {
     path: string
     icon?: IconType
     renderIcon?: () => ReactNode
+    requiredPermission?: PermissionType
   }
   type MenuItem = {
     name: string
@@ -144,23 +150,80 @@ export function TopNav() {
     icon?: IconType
     renderIcon?: () => ReactNode
     children?: ChildMenuItem[]
+    requiredPermission?: PermissionType
+  }
+
+  // Função auxiliar para filtrar itens do menu baseado em permissões
+  const filterMenuItems = (items: MenuItem[]): MenuItem[] => {
+    return items
+      .filter(item => {
+        // Se o item requer permissão, verifica se o usuário tem
+        if (item.requiredPermission) {
+          return hasAccess(item.requiredPermission)
+        }
+        return true
+      })
+      .map(item => {
+        // Filtra children também
+        if (item.children) {
+          const filteredChildren = item.children.filter(child => {
+            if (child.requiredPermission) {
+              return hasAccess(child.requiredPermission)
+            }
+            return true
+          })
+          
+          // Se não há children visíveis, remove o item pai também
+          if (filteredChildren.length === 0) {
+            return null
+          }
+          
+          return {
+            ...item,
+            children: filteredChildren,
+          }
+        }
+        return item
+      })
+      .filter((item): item is MenuItem => item !== null)
   }
 
   const menuItems: MenuItem[] = [
     { 
       name: 'Dashboard', 
       path: '/dashboard', 
-      icon: MdDashboard 
+      icon: MdDashboard,
+      requiredPermission: 'DASHBOARD',
     },
     {
       name: 'Cadastros',
       path: '#',
       icon: MdInventory2,
       children: [
-        { name: 'Grupo Produtos', path: '/cadastros/grupos-produtos', icon: MdCategory },
-        { name: 'Produtos', path: '/produtos', icon: MdShoppingBag },
-        { name: 'Grupo Complementos', path: '/cadastros/grupos-complementos', icon: MdCategory },
-        { name: 'Complementos', path: '/cadastros/complementos', icon: MdAddCircle },
+        { 
+          name: 'Grupo Produtos', 
+          path: '/cadastros/grupos-produtos', 
+          icon: MdCategory,
+          requiredPermission: 'ESTOQUE',
+        },
+        { 
+          name: 'Produtos', 
+          path: '/produtos', 
+          icon: MdShoppingBag,
+          requiredPermission: 'ESTOQUE',
+        },
+        { 
+          name: 'Grupo Complementos', 
+          path: '/cadastros/grupos-complementos', 
+          icon: MdCategory,
+          requiredPermission: 'ESTOQUE',
+        },
+        { 
+          name: 'Complementos', 
+          path: '/cadastros/complementos', 
+          icon: MdAddCircle,
+          requiredPermission: 'ESTOQUE',
+        },
         { name: 'Usuários', path: '/cadastros/usuarios', icon: MdPerson },
         { name: 'Perfis de Usuários', path: '/cadastros/perfis-usuarios-pdv', icon: MdGroup },
         { name: 'Perfis Gestor', path: '/cadastros/perfis-gestor', icon: MdAccountBalance },
@@ -171,7 +234,12 @@ export function TopNav() {
         { name: 'Cadastro por Planilha', path: '/cadastro-por-planilha', icon: MdAirplaneTicket },
       ],
     },
-    //{ name: 'Estoque', path: '/estoque', icon: MdInventory },
+    {
+      name: 'Estoque',
+      path: '/estoque',
+      icon: MdInventory2,
+      requiredPermission: 'ESTOQUE',
+    },
     {
       name: 'Vendas',
       path: '#',
@@ -194,16 +262,27 @@ export function TopNav() {
             />
           ),
         },
-        //{ name: 'Meu Caixa', path: '/meu-caixa', icon: MdPointOfSale },
         { name: 'Hist. Fechamento', path: '/historico-fechamento', icon: MdHistory },
-        { name: 'Relatórios', path: '/relatorios', icon: MdAssessment },
-
+        { 
+          name: 'Relatórios', 
+          path: '/relatorios', 
+          icon: MdAssessment,
+          requiredPermission: 'FINANCEIRO',
+        },
       ],
     },
     { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: MdReceipt },
-    { name: 'Painel do Contador', path: '/painel-contador', icon: MdAccountBalance },
+    { 
+      name: 'Painel do Contador', 
+      path: '/painel-contador', 
+      icon: MdAccountBalance,
+      requiredPermission: 'FINANCEIRO',
+    },
     { name: 'Configurações', path: '/configuracoes', icon: MdSettings },
   ]
+
+  // Filtra itens do menu baseado em permissões
+  const filteredMenuItems = useMemo(() => filterMenuItems(menuItems), [hasAccess])
 
   const isMenuActive = (item: typeof menuItems[0]) => {
     if (item.path !== '#') {
@@ -295,7 +374,7 @@ export function TopNav() {
           </button>
         </div>
         <div className="flex flex-col gap-2">
-          {menuItems.map((item) => {
+          {filteredMenuItems.map((item) => {
             const isActive = isMenuActive(item)
             const Icon = item.icon
             const renderedIcon = item.renderIcon
@@ -417,7 +496,7 @@ export function TopNav() {
           ref={menuRef}
           className="hidden sm:flex flex-1 items-center justify-start gap-1 pl-2"
         >
-          {menuItems.map((item) => {
+          {filteredMenuItems.map((item) => {
             const isActive = isMenuActive(item)
             const isExpanded = expandedMenus.has(item.name)
             const Icon = item.icon

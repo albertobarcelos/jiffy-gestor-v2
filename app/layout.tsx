@@ -3,6 +3,7 @@ import { Exo_2, Manrope } from 'next/font/google'
 import { Toaster } from 'react-hot-toast'
 import { ThemeProvider } from '@/src/presentation/providers/ThemeProvider'
 import { QueryProvider } from '@/src/presentation/providers/QueryProvider'
+import { PermissionsLoader } from '@/src/presentation/components/auth/PermissionsLoader'
 import './globals.css'
 
 // Exo 2 - Fonte para textos normais (corpo do texto)
@@ -36,6 +37,7 @@ export default function RootLayout({
       <body className={`${exo2.variable} ${manrope.variable} ${exo2.className}`}>
         <QueryProvider>
           <ThemeProvider>
+            <PermissionsLoader />
             {children}
             <Toaster
             position="top-right"

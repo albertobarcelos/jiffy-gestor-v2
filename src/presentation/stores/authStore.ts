@@ -4,17 +4,22 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { Auth } from '@/src/domain/entities/Auth'
 import { User } from '@/src/domain/entities/User'
+import type { UserPermissions } from '@/src/shared/types/permissions'
+import { perfilGestorToPermissions } from '@/src/shared/types/permissions'
 
 interface AuthState {
   auth: Auth | null
   isAuthenticated: boolean
   isLoading: boolean
   error: string | null
+  permissions: UserPermissions | null
   login: (auth: Auth) => void
   logout: () => Promise<void>
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
   getUser: () => User | null
+  setPermissions: (permissions: UserPermissions | null) => void
+  loadPermissions: () => Promise<void>
 }
 
 interface AuthStorage {
@@ -28,6 +33,7 @@ interface AuthStorage {
     expiresAt: string
   } | null
   isAuthenticated: boolean
+  permissions: UserPermissions | null
 }
 
 /**
@@ -41,6 +47,7 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isLoading: false,
       error: null,
+      permissions: null,
 
       login: (auth: Auth) => {
         // Verifica se o token não expirou
@@ -54,6 +61,9 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: true,
           error: null,
         })
+
+        // Carrega permissões após login
+        get().loadPermissions()
       },
 
       logout: async () => {
@@ -72,6 +82,7 @@ export const useAuthStore = create<AuthState>()(
           auth: null,
           isAuthenticated: false,
           error: null,
+          permissions: null,
         })
 
         // Limpar localStorage (Zustand persist faz isso automaticamente, mas garantimos)
@@ -96,6 +107,66 @@ export const useAuthStore = create<AuthState>()(
         const { auth } = get()
         return auth?.getUser() || null
       },
+
+      setPermissions: (permissions: UserPermissions | null) => {
+        set({ permissions })
+      },
+
+      loadPermissions: async () => {
+        const { auth } = get()
+        
+        if (!auth || !auth.getAccessToken()) {
+          set({ permissions: null })
+          return
+        }
+
+        try {
+          // 1. Buscar dados do usuário autenticado
+          const meResponse = await fetch('/api/auth/me', {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${auth.getAccessToken()}`,
+              'Content-Type': 'application/json',
+            },
+          })
+
+          if (!meResponse.ok) {
+            set({ permissions: null })
+            return
+          }
+
+          const meData = await meResponse.json()
+          const userId = meData.sub || meData.userId
+
+          if (!userId) {
+            set({ permissions: null })
+            return
+          }
+
+          // 2. Buscar dados completos do usuário gestor
+          const gestorResponse = await fetch(`/api/pessoas/usuarios-gestor/${userId}`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${auth.getAccessToken()}`,
+              'Content-Type': 'application/json',
+            },
+          })
+
+          if (!gestorResponse.ok) {
+            set({ permissions: null })
+            return
+          }
+
+          const gestorData = await gestorResponse.json()
+
+          // 3. Extrair permissões do perfil gestor
+          const permissions = perfilGestorToPermissions(gestorData.perfilGestor)
+          set({ permissions })
+        } catch (error) {
+          console.error('Erro ao carregar permissões:', error)
+          set({ permissions: null })
+        }
+      },
     }),
     {
       name: 'auth-storage',
@@ -103,6 +174,7 @@ export const useAuthStore = create<AuthState>()(
       partialize: (state) => ({
         auth: state.auth ? (state.auth.toJSON() as unknown as AuthStorage['auth']) : null,
         isAuthenticated: state.isAuthenticated,
+        permissions: state.permissions,
       }),
       onRehydrateStorage: () => (state) => {
         // Reconstrói Auth a partir do JSON salvo
