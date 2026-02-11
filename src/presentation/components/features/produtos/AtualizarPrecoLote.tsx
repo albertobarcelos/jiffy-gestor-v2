@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Produto } from '@/src/domain/entities/Produto'
+import { Impressora } from '@/src/domain/entities/Impressora'
 import { transformarParaReal, brToEUA } from '@/src/shared/utils/formatters'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
@@ -33,6 +34,10 @@ export function AtualizarPrecoLote() {
   const [adjustAmount, setAdjustAmount] = useState('')
   const [adjustDirection, setAdjustDirection] = useState<'increase' | 'decrease'>('increase')
   const [filtersExpanded, setFiltersExpanded] = useState(false)
+  const [impressorasSelecionadas, setImpressorasSelecionadas] = useState<Set<string>>(new Set())
+  const [impressorasDisponiveis, setImpressorasDisponiveis] = useState<Impressora[]>([])
+  const [isLoadingImpressoras, setIsLoadingImpressoras] = useState(false)
+  const [activeTab, setActiveTab] = useState<'precos' | 'impressoras'>('precos')
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const { auth } = useAuthStore()
   const {
@@ -44,20 +49,78 @@ export function AtualizarPrecoLote() {
     isLoading: isLoadingGruposComplementos,
   } = useGruposComplementos({ limit: 100, ativo: null })
 
+  // Carregar impressoras disponíveis
+  const loadAllImpressoras = useCallback(async () => {
+    const token = auth?.getAccessToken()
+    if (!token) {
+      setImpressorasDisponiveis([])
+      return
+    }
+
+    setIsLoadingImpressoras(true)
+    try {
+      const allImpressoras: Impressora[] = []
+      let currentOffset = 0
+      let hasMore = true
+      const limit = 50
+
+      while (hasMore) {
+        const params = new URLSearchParams({
+          limit: limit.toString(),
+          offset: currentOffset.toString(),
+        })
+
+        const response = await fetch(`/api/impressoras?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Erro ao buscar impressoras')
+        }
+
+        const data = await response.json()
+        const impressoras = (data.items || []).map((item: any) => Impressora.fromJSON(item))
+        allImpressoras.push(...impressoras)
+
+        hasMore = impressoras.length === limit
+        currentOffset += impressoras.length
+      }
+
+      setImpressorasDisponiveis(allImpressoras)
+    } catch (error) {
+      showToast.error('Erro ao carregar impressoras')
+    } finally {
+      setIsLoadingImpressoras(false)
+    }
+  }, [auth])
+
+  useEffect(() => {
+    if (activeTab === 'impressoras') {
+      loadAllImpressoras()
+    }
+  }, [activeTab, loadAllImpressoras])
+
   // Buscar produtos
   const buscarProdutos = useCallback(async () => {
     const token = auth?.getAccessToken()
     if (!token) return
 
-    const limit = 10
     setIsLoading(true)
     setProdutos([])
     setProdutosSelecionados(new Set())
 
     try {
+      // ============================================
+      // ETAPA 1: Buscar TODOS os IDs dos produtos da listagem
+      // ============================================
+      const limit = 50 // Limite por página para reduzir número de requisições
       let hasMorePages = true
       let currentOffset = 0
-      const acumulado: Produto[] = []
+      const produtosIds: string[] = []
       let totalFromApi: number | null = null
 
       const ativoFilter =
@@ -67,6 +130,7 @@ export function AtualizarPrecoLote() {
       const ativoDeliveryBoolean =
         ativoDeliveryFilter === 'Sim' ? true : ativoDeliveryFilter === 'Não' ? false : null
 
+      // Buscar todas as páginas para coletar todos os IDs
       while (hasMorePages) {
         const params = new URLSearchParams({
           name: searchText,
@@ -100,7 +164,6 @@ export function AtualizarPrecoLote() {
         }
 
         const data = await response.json()
-        // A API retorna { success: true, items: [...], count: number }
         const produtosList = Array.isArray(data.items)
           ? data.items
           : Array.isArray(data.produtos)
@@ -109,34 +172,75 @@ export function AtualizarPrecoLote() {
               ? data
               : []
 
-        const produtosParsed = produtosList
-          .map((p: any) => {
-            try {
-              return Produto.fromJSON(p)
-            } catch (error) {
-              console.error('Erro ao parsear produto:', error, p)
-              return null
-            }
-          })
-          .filter((p: Produto | null): p is Produto => p !== null)
-
-        acumulado.push(...produtosParsed)
         if (typeof data.count === 'number') {
           totalFromApi = data.count
         }
 
-        currentOffset += produtosParsed.length
-        hasMorePages = produtosParsed.length === limit && (totalFromApi ? currentOffset < totalFromApi : true)
+        // Coletar todos os IDs
+        produtosList.forEach((p: any) => {
+          if (p?.id) {
+            produtosIds.push(p.id.toString())
+          }
+        })
 
-        if (produtosParsed.length === 0) {
+        currentOffset += produtosList.length
+
+        // Verificar se há mais páginas
+        hasMorePages = produtosList.length === limit && (totalFromApi ? currentOffset < totalFromApi : true)
+
+        // Parar se não há mais produtos
+        if (produtosList.length === 0) {
           hasMorePages = false
         }
       }
 
-      setProdutos(acumulado)
-      setTotal(totalFromApi ?? acumulado.length)
+      setTotal(totalFromApi ?? produtosIds.length)
+
+      // ============================================
+      // ETAPA 2: Buscar cada produto individualmente usando os IDs
+      // ============================================
+      if (produtosIds.length === 0) {
+        setProdutos([])
+        return
+      }
+
+      const batchSize = 20
+      const todosProdutos: Produto[] = []
+
+      for (let i = 0; i < produtosIds.length; i += batchSize) {
+        const batchIds = produtosIds.slice(i, i + batchSize)
+
+        // Buscar cada produto do lote em paralelo
+        const produtosDoLote = await Promise.all(
+          batchIds.map(async (produtoId) => {
+            try {
+              const response = await fetch(`/api/produtos/${produtoId}`, {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+              })
+
+              if (response.ok) {
+                const produtoCompleto = await response.json()
+                return Produto.fromJSON(produtoCompleto)
+              }
+            } catch (error) {
+              // Erro silencioso - produto será ignorado na lista
+            }
+            return null
+          })
+        )
+
+        // Filtrar produtos válidos
+        const produtosValidos = produtosDoLote.filter((p): p is Produto => p !== null)
+        todosProdutos.push(...produtosValidos)
+
+        // Atualizar progressivamente
+        setProdutos([...todosProdutos])
+      }
     } catch (error: any) {
-      console.error('Erro ao buscar produtos', error)
+      showToast.error('Erro ao buscar produtos. Tente novamente.')
     } finally {
       setIsLoading(false)
     }
@@ -150,7 +254,7 @@ export function AtualizarPrecoLote() {
     grupoComplementoFilter,
   ])
 
-  // Debounce na busca
+  // Debounce na busca - unificar com filtros para evitar chamadas duplicadas
   useEffect(() => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current)
@@ -165,12 +269,7 @@ export function AtualizarPrecoLote() {
         clearTimeout(debounceTimerRef.current)
       }
     }
-  }, [searchText, buscarProdutos])
-
-  useEffect(() => {
-    buscarProdutos()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterStatus, ativoLocalFilter, ativoDeliveryFilter, grupoProdutoFilter, grupoComplementoFilter])
+  }, [searchText, filterStatus, ativoLocalFilter, ativoDeliveryFilter, grupoProdutoFilter, grupoComplementoFilter, buscarProdutos])
 
   // Toggle seleção de produto
   const toggleSelecao = (produtoId: string) => {
@@ -180,6 +279,19 @@ export function AtualizarPrecoLote() {
         novo.delete(produtoId)
       } else {
         novo.add(produtoId)
+      }
+      return novo
+    })
+  }
+
+  // Toggle seleção de impressora
+  const toggleImpressora = (impressoraId: string) => {
+    setImpressorasSelecionadas((prev) => {
+      const novo = new Set(prev)
+      if (novo.has(impressoraId)) {
+        novo.delete(impressoraId)
+      } else {
+        novo.add(impressoraId)
       }
       return novo
     })
@@ -276,7 +388,6 @@ export function AtualizarPrecoLote() {
 
           sucesso++
         } catch (error) {
-          console.error(`Erro ao atualizar produto ${produtoId}:`, error)
           erros++
         }
       }
@@ -294,8 +405,87 @@ export function AtualizarPrecoLote() {
         )
       }
     } catch (error: any) {
-      // showToast.dismiss(toastId)
-      console.error('Erro ao atualizar preços', error)
+      showToast.error(error.message || 'Erro ao atualizar preços. Tente novamente.')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  // Atualizar impressoras
+  const atualizarImpressoras = async () => {
+    if (produtosSelecionados.size === 0) {
+      showToast.error('Selecione pelo menos um produto')
+      return
+    }
+
+    if (impressorasSelecionadas.size === 0) {
+      showToast.error('Selecione pelo menos uma impressora')
+      return
+    }
+
+    const token = auth?.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado')
+      return
+    }
+
+    setIsUpdating(true)
+    showToast.loading('Atualizando impressoras...')
+
+    try {
+      // Para cada produto selecionado, combinar impressoras existentes com as novas
+      const payload = Array.from(produtosSelecionados).map((produtoId) => {
+        // Buscar o produto na lista
+        const produto = produtos.find((p) => p.getId() === produtoId)
+        
+        // Pegar IDs das impressoras existentes do produto
+        const impressorasExistentesIds = produto
+          ? produto.getImpressoras().map((imp) => imp.id)
+          : []
+        
+        // Pegar IDs das novas impressoras selecionadas
+        const novasImpressorasIds = Array.from(impressorasSelecionadas)
+        
+        // Combinar ambos os arrays e remover duplicatas
+        const todasImpressorasIds = [
+          ...impressorasExistentesIds,
+          ...novasImpressorasIds,
+        ].filter((id, index, self) => self.indexOf(id) === index) // Remove duplicatas
+        
+        return {
+          produtoId,
+          impressorasIds: todasImpressorasIds,
+        }
+      })
+
+      const response = await fetch('/api/produtos/bulk-update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `Erro ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      showToast.success(
+        `Impressoras atualizadas com sucesso! (${data.totalUpdated || produtosSelecionados.size} produtos)`
+      )
+
+      // Limpar seleções
+      setProdutosSelecionados(new Set())
+      setImpressorasSelecionadas(new Set())
+
+      // Recarregar lista de produtos
+      buscarProdutos()
+    } catch (error: any) {
+      showToast.error(error.message || 'Erro ao atualizar impressoras. Tente novamente.')
     } finally {
       setIsUpdating(false)
     }
@@ -313,134 +503,270 @@ export function AtualizarPrecoLote() {
     setGrupoComplementoFilter('')
   }, [])
 
+  const todasImpressorasSelecionadas =
+    impressorasDisponiveis.length > 0 &&
+    impressorasSelecionadas.size === impressorasDisponiveis.length
+  const algumasImpressorasSelecionadas =
+    impressorasSelecionadas.size > 0 &&
+    impressorasSelecionadas.size < impressorasDisponiveis.length
+
   return (
     <div className="flex flex-col h-full bg-info">
       {/* Header */}
       <div className="flex items-center justify-between bg-primary-bg border-b border-primary/70 md:px-6 px-1 py-2 md:gap-4 gap-2">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="md:text-2xl text-sm font-bold text-primary">Atualizar Preços em Lote</h1>
+            <h1 className="md:text-2xl text-sm font-bold text-primary">
+              {activeTab === 'precos' ? 'Atualizar Preços em Lote' : 'Atualizar Impressoras em Lote'}
+            </h1>
             <p className="md:text-sm text-xs text-secondary-text">
               Total de itens: {total} | Selecionados: {produtosSelecionados.size}
             </p>
           </div>
         </div>
-        <Link
-          href="/produtos"
-          className="h-8 px-8 rounded-lg bg-info text-primary font-semibold font-exo text-sm border border-primary shadow-sm hover:bg-primary/20 transition-colors flex items-center"
-        >
-          Cancelar
-        </Link>
+        <div className="flex items-center gap-2">
+          {/* Tabs */}
+          <div className="flex gap-1 bg-info rounded-lg p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('precos')
+                setImpressorasSelecionadas(new Set())
+              }}
+              className={`px-4 py-1 rounded text-sm font-semibold transition-colors ${
+                activeTab === 'precos'
+                  ? 'bg-primary text-info'
+                  : 'text-secondary-text hover:bg-primary/10'
+              }`}
+            >
+              Preços
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('impressoras')
+                setAdjustAmount('')
+              }}
+              className={`px-4 py-1 rounded text-sm font-semibold transition-colors ${
+                activeTab === 'impressoras'
+                  ? 'bg-primary text-info'
+                  : 'text-secondary-text hover:bg-primary/10'
+              }`}
+            >
+              Impressoras
+            </button>
+          </div>
+          <Link
+            href="/produtos"
+            className="h-8 px-8 rounded-lg bg-info text-primary font-semibold font-exo text-sm border border-primary shadow-sm hover:bg-primary/20 transition-colors flex items-center"
+          >
+            Cancelar
+          </Link>
+        </div>
       </div>
 
       <div className="bg-primary-bg border-b border-primary/70 md:px-6 px-1 py-2">
-        <div className="flex flex-wrap md:gap-4 gap-1 items-end">
-          <div className="w-full sm:w-[150px]">
-            <label className="block text-xs font-semibold text-secondary-text mb-1">
-              Tipo de ajuste
-            </label>
-            <select
-              value={adjustMode}
-              onChange={(e) => setAdjustMode(e.target.value as 'valor' | 'percentual')}
-              className="w-full h-8 px-4 rounded-lg border border-primary/70 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
-            >
-              <option value="valor">Valor (R$)</option>
-              <option value="percentual">Porcent. (%)</option>
-            </select>
-          </div>
+        {activeTab === 'precos' ? (
+          <>
+            <div className="flex flex-wrap md:gap-4 gap-1 items-end">
+              <div className="w-full sm:w-[150px]">
+                <label className="block text-xs font-semibold text-secondary-text mb-1">
+                  Tipo de ajuste
+                </label>
+                <select
+                  value={adjustMode}
+                  onChange={(e) => setAdjustMode(e.target.value as 'valor' | 'percentual')}
+                  className="w-full h-8 px-4 rounded-lg border border-primary/70 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
+                >
+                  <option value="valor">Valor (R$)</option>
+                  <option value="percentual">Porcent. (%)</option>
+                </select>
+              </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <label className="flex items-center gap-1 text-sm font-semibold text-primary-text">
-              <Checkbox
-                checked={adjustDirection === 'increase'}
-                onChange={() => setAdjustDirection('increase')}
-                sx={{
-                  color: 'var(--color-primary)',
-                  '&.Mui-checked': {
-                    color: 'var(--color-primary)',
-                  },
-                }}
-              />
-              ( + )
-            </label>
-            <label className="flex items-center gap-1 text-sm font-semibold text-primary-text">
-              <Checkbox
-                checked={adjustDirection === 'decrease'}
-                onChange={() => setAdjustDirection('decrease')}
-                sx={{
-                  color: 'var(--color-primary)',
-                  '&.Mui-checked': {
-                    color: 'var(--color-primary)',
-                  },
-                }}
-              />
-              ( - )
-            </label>
-          </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <label className="flex items-center gap-1 text-sm font-semibold text-primary-text">
+                  <Checkbox
+                    checked={adjustDirection === 'increase'}
+                    onChange={() => setAdjustDirection('increase')}
+                    sx={{
+                      color: 'var(--color-primary)',
+                      '&.Mui-checked': {
+                        color: 'var(--color-primary)',
+                      },
+                    }}
+                  />
+                  ( + )
+                </label>
+                <label className="flex items-center gap-1 text-sm font-semibold text-primary-text">
+                  <Checkbox
+                    checked={adjustDirection === 'decrease'}
+                    onChange={() => setAdjustDirection('decrease')}
+                    sx={{
+                      color: 'var(--color-primary)',
+                      '&.Mui-checked': {
+                        color: 'var(--color-primary)',
+                      },
+                    }}
+                  />
+                  ( - )
+                </label>
+              </div>
 
-          <div className="flex-1 flex flex-row justify-between items-end gap-2 w-full md:max-w-[350px]">
-            <div className="flex flex-col gap-1 w-full">
-            <label className="block text-xs font-semibold text-secondary-text">
-              {adjustDirection === 'increase' ? 'Aumentar' : 'Diminuir'} (
-              {adjustMode === 'valor' ? 'R$' : '%'})
-            </label>
-            <Input className="rounded-lg"
-              type="text"
-              value={adjustAmount}
-              onChange={(e) => {
-                const value = e.target.value.replace(/[^\d,.-]/g, '')
-                setAdjustAmount(value)
-              }}
-              placeholder={adjustMode === 'valor' ? '0,00' : '0'}
-              InputProps={{
-                sx: {
-                  border: '1px solid',
-                  borderColor: 'var(--color-primary)',
-                  backgroundColor: 'var(--color-info)',
-                  height: 32,
-                  '&.Mui-focused': {
-                    borderColor: 'var(--color-primary)',
-                    borderWidth: '1px',
-                  },
-                  '&:hover': {
-                    borderColor: 'var(--color-primary)',
-                  },
-                  '& input': {
-                    padding: '6px 10px',
-                    fontSize: '0.875rem',
-                  },
-                  '& fieldset': {
-                    border: 'none',
-                  },
-                },
-              }}
-            />
-          </div>
+              <div className="flex-1 flex flex-row justify-between items-end gap-2 w-full md:max-w-[350px]">
+                <div className="flex flex-col gap-1 w-full">
+                  <label className="block text-xs font-semibold text-secondary-text">
+                    {adjustDirection === 'increase' ? 'Aumentar' : 'Diminuir'} (
+                    {adjustMode === 'valor' ? 'R$' : '%'})
+                  </label>
+                  <Input
+                    className="rounded-lg"
+                    type="text"
+                    value={adjustAmount}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^\d,.-]/g, '')
+                      setAdjustAmount(value)
+                    }}
+                    placeholder={adjustMode === 'valor' ? '0,00' : '0'}
+                    InputProps={{
+                      sx: {
+                        border: '1px solid',
+                        borderColor: 'var(--color-primary)',
+                        backgroundColor: 'var(--color-info)',
+                        height: 32,
+                        '&.Mui-focused': {
+                          borderColor: 'var(--color-primary)',
+                          borderWidth: '1px',
+                        },
+                        '&:hover': {
+                          borderColor: 'var(--color-primary)',
+                        },
+                        '& input': {
+                          padding: '6px 10px',
+                          fontSize: '0.875rem',
+                        },
+                        '& fieldset': {
+                          border: 'none',
+                        },
+                      },
+                    }}
+                  />
+                </div>
 
-          <div className="w-full h-8 rounded-lg flex gap-2 items-end">
-            <Button
-              onClick={atualizarPrecos}
-              disabled={
-                isUpdating || produtosSelecionados.size === 0 || !adjustAmount.trim()
-              }
-              className="md:min-w-[180px] h-8 hover:bg-primary/90"
-              sx={{
-                color: 'var(--color-info)',
-                backgroundColor: 'var(--color-primary)',
-              }}
-            >
-              {isUpdating
-                ? 'Aplicando ajuste...'
-                : `Aplicar ajuste (${produtosSelecionados.size})`}
-            </Button>
-          </div>
-        </div>
-
-        </div>
-        {produtosSelecionados.size > 0 && (
-          <p className="text-xs text-secondary-text mt-2">
-            O ajuste será aplicado aos {produtosSelecionados.size} produto(s) selecionado(s).
-          </p>
+                <div className="w-full h-8 rounded-lg flex gap-2 items-end">
+                  <Button
+                    onClick={atualizarPrecos}
+                    disabled={
+                      isUpdating || produtosSelecionados.size === 0 || !adjustAmount.trim()
+                    }
+                    className="md:min-w-[180px] h-8 hover:bg-primary/90"
+                    sx={{
+                      color: 'var(--color-info)',
+                      backgroundColor: 'var(--color-primary)',
+                    }}
+                  >
+                    {isUpdating
+                      ? 'Aplicando ajuste...'
+                      : `Aplicar ajuste (${produtosSelecionados.size})`}
+                  </Button>
+                </div>
+              </div>
+            </div>
+            {produtosSelecionados.size > 0 && (
+              <p className="text-xs text-secondary-text mt-2">
+                O ajuste será aplicado aos {produtosSelecionados.size} produto(s) selecionado(s).
+              </p>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold text-secondary-text">
+                  Selecionar Impressoras ({impressorasSelecionadas.size} selecionada{impressorasSelecionadas.size !== 1 ? 's' : ''})
+                </label>
+                {impressorasDisponiveis.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (todasImpressorasSelecionadas) {
+                        setImpressorasSelecionadas(new Set())
+                      } else {
+                        setImpressorasSelecionadas(
+                          new Set(impressorasDisponiveis.map((i) => i.getId()))
+                        )
+                      }
+                    }}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    {todasImpressorasSelecionadas ? 'Desmarcar todas' : 'Selecionar todas'}
+                  </button>
+                )}
+              </div>
+              {isLoadingImpressoras ? (
+                <div className="flex items-center justify-center py-4">
+                  <span className="text-sm text-secondary-text">Carregando impressoras...</span>
+                </div>
+              ) : impressorasDisponiveis.length === 0 ? (
+                <div className="flex items-center justify-center py-4">
+                  <span className="text-sm text-secondary-text">Nenhuma impressora disponível</span>
+                </div>
+              ) : (
+                <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-white">
+                  <div className="flex flex-wrap gap-2">
+                    {impressorasDisponiveis.map((impressora) => {
+                      const isSelected = impressorasSelecionadas.has(impressora.getId())
+                      return (
+                        <label
+                          key={impressora.getId()}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                            isSelected
+                              ? 'bg-primary/10 border-primary'
+                              : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                          }`}
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            onChange={() => toggleImpressora(impressora.getId())}
+                            className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                          />
+                          <span className="text-sm font-medium text-primary-text">
+                            {impressora.getNome()}
+                          </span>
+                          {!impressora.isAtivo() && (
+                            <span className="text-xs text-error">(Inativa)</span>
+                          )}
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+              <div className="flex justify-end">
+                <Button
+                  onClick={atualizarImpressoras}
+                  disabled={
+                    isUpdating ||
+                    produtosSelecionados.size === 0 ||
+                    impressorasSelecionadas.size === 0
+                  }
+                  className="md:min-w-[180px] h-8 hover:bg-primary/90"
+                  sx={{
+                    color: 'var(--color-info)',
+                    backgroundColor: 'var(--color-primary)',
+                  }}
+                >
+                  {isUpdating
+                    ? 'Atualizando...'
+                    : `Aplicar a ${produtosSelecionados.size} produto(s)`}
+                </Button>
+              </div>
+            </div>
+            {produtosSelecionados.size > 0 && impressorasSelecionadas.size > 0 && (
+              <p className="text-xs text-secondary-text mt-2">
+                {impressorasSelecionadas.size} impressora{impressorasSelecionadas.size !== 1 ? 's' : ''} será{impressorasSelecionadas.size === 1 ? '' : 'ão'} aplicada{impressorasSelecionadas.size === 1 ? '' : 's'} aos {produtosSelecionados.size} produto(s) selecionado(s).
+              </p>
+            )}
+          </>
         )}
       </div>
 
@@ -608,9 +934,7 @@ export function AtualizarPrecoLote() {
               </div>
               <div className="flex-1 md:w-14 text-xs">Código</div>
               <div className="flex-[1.5] text-xs">Nome</div>
-              <div className="flex-[1.4] text-center hidden md:flex">Grupo de produtos</div>
-              <div className="flex-[1.2] text-center hidden md:flex">Grupo de complementos</div>
-              <div className="flex-1 text-center hidden md:flex">Status</div>
+              <div className="flex-[1.2] text-center hidden md:flex">Impressoras</div>
               <div className="flex-1 text-right text-xs">Valor atual</div>
             </div>
 
@@ -620,12 +944,8 @@ export function AtualizarPrecoLote() {
                 .sort((a, b) => a.getNome().localeCompare(b.getNome(), 'pt-BR'))
                 .map((produto, index) => {
                 const isSelected = produtosSelecionados.has(produto.getId())
-                const gruposComplementos = produto.getGruposComplementos()
-                const gruposLabels = gruposComplementos.map((grupo) => {
-                  const nomeGrupo = grupo.nome || 'Grupo sem nome'
-                  const qtdComplementos = grupo.complementos?.length ?? 0
-                  return `${nomeGrupo} (${qtdComplementos} complemento${qtdComplementos === 1 ? '' : 's'})`
-                })
+                // Usar diretamente as impressoras que vêm do produto (já têm id, nome e ativo)
+                const impressorasDoProduto = produto.getImpressoras()
                 // Cor de fundo alternada: se selecionado usa primary/20, senão alterna entre gray-50 e white
                 const bgColor = isSelected 
                   ? 'bg-primary/20' 
@@ -655,39 +975,29 @@ export function AtualizarPrecoLote() {
                     <div className="md:flex-[1.5] flex-[2] md:text-sm text-xs font-semibold text-primary-text break-words md:pr-4">
                       {produto.getNome()}
                     </div>
-                    <div className="flex-[1.4] text-center text-xs text-primary-text hidden md:flex">
-                      {produto.getNomeGrupo() || 'Sem grupo'}
-                    </div>
                     <div className="flex-[1.2] justify-center hidden md:flex">
-                      {gruposLabels.length === 0 ? (
-                        <span className="text-xs text-secondary-text">Nenhum</span>
+                      {impressorasDoProduto.length === 0 ? (
+                        <span className="text-xs text-secondary-text">Nenhuma</span>
                       ) : (
                         <select
-                          className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary"
+                          className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
                           defaultValue=""
                           onChange={(event) => {
                             event.currentTarget.value = ''
                           }}
+                          onClick={(e) => e.stopPropagation()}
                         >
                           <option value="" disabled>
-                            {gruposLabels.length} grupo(s)
+                            {impressorasDoProduto.length} impressora{impressorasDoProduto.length !== 1 ? 's' : ''}
                           </option>
-                          {gruposLabels.map((label, index) => (
-                            <option key={`${produto.getId()}-grupo-${index}`} value={label}>
-                              {label}
+                          {impressorasDoProduto.map((impressora) => (
+                            <option key={impressora.id} value={impressora.id}>
+                              {impressora.nome}
+                              {impressora.ativo === false ? ' (Inativa)' : ''}
                             </option>
                           ))}
                         </select>
                       )}
-                    </div>
-                    <div className="flex-1 justify-center hidden md:flex">
-                      <span
-                        className={`px-4 py-1 rounded-lg text-[11px] font-medium border ${
-                          produto.isAtivo() ? 'border-primary/50 text-success' : ' border-error text-error'
-                        }`}
-                      >
-                        {produto.isAtivo() ? 'Ativo' : 'Desativado'}
-                      </span>
                     </div>
                     <div className="flex-1 text-right font-semibold md:text-sm text-xs text-primary-text">
                       {transformarParaReal(produto.getValor())}

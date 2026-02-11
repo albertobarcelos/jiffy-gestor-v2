@@ -58,6 +58,9 @@ export class ProdutoRepository implements IProdutoRepository {
       if (grupoComplementosId) {
         url += `&grupoComplementosId=${encodeURIComponent(grupoComplementosId)}`
       }
+      // Tentar incluir impressoras na resposta (algumas APIs usam include ou expand)
+      // Se a API não suportar, será ignorado
+      url += `&include=impressoras`
 
       const response = await this.apiClient.request<{
         items: any[]
