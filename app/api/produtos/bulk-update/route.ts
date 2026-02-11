@@ -9,8 +9,9 @@ import { ApiClient } from '@/src/infrastructure/api/apiClient'
  * Request Body:
  * Array<{
  *   produtoId: string;
- *   valor?: number;           // Opcional - preço do produto
- *   impressorasIds?: string[]; // Opcional - array de IDs das impressoras
+ *   valor?: number;                    // Opcional - preço do produto
+ *   impressorasIds?: string[];         // Opcional - array de IDs das impressoras para adicionar
+ *   impressorasIdsToRemove?: string[]; // Opcional - array de IDs das impressoras para remover
  * }>
  * 
  * Response:
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Validação: cada item deve ter produtoId e pelo menos um campo (valor ou impressorasIds)
+    // Validação: cada item deve ter produtoId e pelo menos um campo (valor, impressorasIds ou impressorasIdsToRemove)
     for (const item of body) {
       if (!item.produtoId) {
         return NextResponse.json(
@@ -47,10 +48,11 @@ export async function POST(req: NextRequest) {
 
       const hasValor = 'valor' in item
       const hasImpressorasIds = 'impressorasIds' in item
+      const hasImpressorasIdsToRemove = 'impressorasIdsToRemove' in item
 
-      if (!hasValor && !hasImpressorasIds) {
+      if (!hasValor && !hasImpressorasIds && !hasImpressorasIdsToRemove) {
         return NextResponse.json(
-          { message: 'Cada item deve ter pelo menos um campo: valor ou impressorasIds' },
+          { message: 'Cada item deve ter pelo menos um campo: valor, impressorasIds ou impressorasIdsToRemove' },
           { status: 400 }
         )
       }
@@ -59,6 +61,14 @@ export async function POST(req: NextRequest) {
       if (hasImpressorasIds && !Array.isArray(item.impressorasIds)) {
         return NextResponse.json(
           { message: 'impressorasIds deve ser um array de strings' },
+          { status: 400 }
+        )
+      }
+
+      // Validação: impressorasIdsToRemove deve ser array de strings
+      if (hasImpressorasIdsToRemove && !Array.isArray(item.impressorasIdsToRemove)) {
+        return NextResponse.json(
+          { message: 'impressorasIdsToRemove deve ser um array de strings' },
           { status: 400 }
         )
       }

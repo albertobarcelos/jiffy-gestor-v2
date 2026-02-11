@@ -12,7 +12,6 @@ import { Input } from '@/src/presentation/components/ui/input'
 import { Checkbox } from '@/src/presentation/components/ui/checkbox'
 import Link from 'next/link'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
-import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
 import { MdSearch, MdExpandMore, MdExpandLess } from 'react-icons/md'
 /**
  * Componente para atualizar preço de múltiplos produtos em lote
@@ -29,7 +28,6 @@ export function AtualizarPrecoLote() {
   const [ativoLocalFilter, setAtivoLocalFilter] = useState<'Todos' | 'Sim' | 'Não'>('Todos')
   const [ativoDeliveryFilter, setAtivoDeliveryFilter] = useState<'Todos' | 'Sim' | 'Não'>('Todos')
   const [grupoProdutoFilter, setGrupoProdutoFilter] = useState('')
-  const [grupoComplementoFilter, setGrupoComplementoFilter] = useState('')
   const [adjustMode, setAdjustMode] = useState<'valor' | 'percentual'>('valor')
   const [adjustAmount, setAdjustAmount] = useState('')
   const [adjustDirection, setAdjustDirection] = useState<'increase' | 'decrease'>('increase')
@@ -38,16 +36,13 @@ export function AtualizarPrecoLote() {
   const [impressorasDisponiveis, setImpressorasDisponiveis] = useState<Impressora[]>([])
   const [isLoadingImpressoras, setIsLoadingImpressoras] = useState(false)
   const [activeTab, setActiveTab] = useState<'precos' | 'impressoras'>('precos')
+  const [modoImpressora, setModoImpressora] = useState<'adicionar' | 'remover'>('adicionar')
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const { auth } = useAuthStore()
   const {
     data: gruposProdutos = [],
     isLoading: isLoadingGruposProdutos,
   } = useGruposProdutos({ limit: 100, ativo: null })
-  const {
-    data: gruposComplementos = [],
-    isLoading: isLoadingGruposComplementos,
-  } = useGruposComplementos({ limit: 100, ativo: null })
 
   // Carregar impressoras disponíveis
   const loadAllImpressoras = useCallback(async () => {
@@ -114,13 +109,10 @@ export function AtualizarPrecoLote() {
     setProdutosSelecionados(new Set())
 
     try {
-      // ============================================
-      // ETAPA 1: Buscar TODOS os IDs dos produtos da listagem
-      // ============================================
-      const limit = 50 // Limite por página para reduzir número de requisições
+      const limit = 50
       let hasMorePages = true
       let currentOffset = 0
-      const produtosIds: string[] = []
+      const todosProdutos: Produto[] = []
       let totalFromApi: number | null = null
 
       const ativoFilter =
@@ -130,7 +122,7 @@ export function AtualizarPrecoLote() {
       const ativoDeliveryBoolean =
         ativoDeliveryFilter === 'Sim' ? true : ativoDeliveryFilter === 'Não' ? false : null
 
-      // Buscar todas as páginas para coletar todos os IDs
+      // Buscar todas as páginas de produtos (já vêm com impressoras na resposta)
       while (hasMorePages) {
         const params = new URLSearchParams({
           name: searchText,
@@ -148,9 +140,6 @@ export function AtualizarPrecoLote() {
         }
         if (grupoProdutoFilter) {
           params.append('grupoProdutoId', grupoProdutoFilter)
-        }
-        if (grupoComplementoFilter) {
-          params.append('grupoComplementosId', grupoComplementoFilter)
         }
 
         const response = await fetch(`/api/produtos?${params.toString()}`, {
@@ -176,12 +165,22 @@ export function AtualizarPrecoLote() {
           totalFromApi = data.count
         }
 
-        // Coletar todos os IDs
-        produtosList.forEach((p: any) => {
-          if (p?.id) {
-            produtosIds.push(p.id.toString())
-          }
-        })
+        // Mapear produtos diretamente da listagem (já incluem impressoras)
+        const produtosMapeados = produtosList
+          .map((item: any) => {
+            try {
+              return Produto.fromJSON(item)
+            } catch (error) {
+              // Ignorar produtos com erro de mapeamento
+              return null
+            }
+          })
+          .filter((p: Produto | null): p is Produto => p !== null)
+
+        todosProdutos.push(...produtosMapeados)
+
+        // Atualizar progressivamente
+        setProdutos([...todosProdutos])
 
         currentOffset += produtosList.length
 
@@ -194,51 +193,7 @@ export function AtualizarPrecoLote() {
         }
       }
 
-      setTotal(totalFromApi ?? produtosIds.length)
-
-      // ============================================
-      // ETAPA 2: Buscar cada produto individualmente usando os IDs
-      // ============================================
-      if (produtosIds.length === 0) {
-        setProdutos([])
-        return
-      }
-
-      const batchSize = 20
-      const todosProdutos: Produto[] = []
-
-      for (let i = 0; i < produtosIds.length; i += batchSize) {
-        const batchIds = produtosIds.slice(i, i + batchSize)
-
-        // Buscar cada produto do lote em paralelo
-        const produtosDoLote = await Promise.all(
-          batchIds.map(async (produtoId) => {
-            try {
-              const response = await fetch(`/api/produtos/${produtoId}`, {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                  'Content-Type': 'application/json',
-                },
-              })
-
-              if (response.ok) {
-                const produtoCompleto = await response.json()
-                return Produto.fromJSON(produtoCompleto)
-              }
-            } catch (error) {
-              // Erro silencioso - produto será ignorado na lista
-            }
-            return null
-          })
-        )
-
-        // Filtrar produtos válidos
-        const produtosValidos = produtosDoLote.filter((p): p is Produto => p !== null)
-        todosProdutos.push(...produtosValidos)
-
-        // Atualizar progressivamente
-        setProdutos([...todosProdutos])
-      }
+      setTotal(totalFromApi ?? todosProdutos.length)
     } catch (error: any) {
       showToast.error('Erro ao buscar produtos. Tente novamente.')
     } finally {
@@ -251,7 +206,6 @@ export function AtualizarPrecoLote() {
     ativoLocalFilter,
     ativoDeliveryFilter,
     grupoProdutoFilter,
-    grupoComplementoFilter,
   ])
 
   // Debounce na busca - unificar com filtros para evitar chamadas duplicadas
@@ -269,7 +223,7 @@ export function AtualizarPrecoLote() {
         clearTimeout(debounceTimerRef.current)
       }
     }
-  }, [searchText, filterStatus, ativoLocalFilter, ativoDeliveryFilter, grupoProdutoFilter, grupoComplementoFilter, buscarProdutos])
+  }, [searchText, filterStatus, ativoLocalFilter, ativoDeliveryFilter, grupoProdutoFilter, buscarProdutos])
 
   // Toggle seleção de produto
   const toggleSelecao = (produtoId: string) => {
@@ -411,8 +365,8 @@ export function AtualizarPrecoLote() {
     }
   }
 
-  // Atualizar impressoras
-  const atualizarImpressoras = async () => {
+  // Adicionar impressoras
+  const adicionarImpressoras = async () => {
     if (produtosSelecionados.size === 0) {
       showToast.error('Selecione pelo menos um produto')
       return
@@ -430,7 +384,7 @@ export function AtualizarPrecoLote() {
     }
 
     setIsUpdating(true)
-    showToast.loading('Atualizando impressoras...')
+    showToast.loading('Adicionando impressoras...')
 
     try {
       // Para cada produto selecionado, combinar impressoras existentes com as novas
@@ -475,7 +429,7 @@ export function AtualizarPrecoLote() {
       const data = await response.json()
 
       showToast.success(
-        `Impressoras atualizadas com sucesso! (${data.totalUpdated || produtosSelecionados.size} produtos)`
+        `Impressoras adicionadas com sucesso! (${data.totalUpdated || produtosSelecionados.size} produtos)`
       )
 
       // Limpar seleções
@@ -485,9 +439,81 @@ export function AtualizarPrecoLote() {
       // Recarregar lista de produtos
       buscarProdutos()
     } catch (error: any) {
-      showToast.error(error.message || 'Erro ao atualizar impressoras. Tente novamente.')
+      showToast.error(error.message || 'Erro ao adicionar impressoras. Tente novamente.')
     } finally {
       setIsUpdating(false)
+    }
+  }
+
+  // Remover impressoras
+  const removerImpressoras = async () => {
+    if (produtosSelecionados.size === 0) {
+      showToast.error('Selecione pelo menos um produto')
+      return
+    }
+
+    if (impressorasSelecionadas.size === 0) {
+      showToast.error('Selecione pelo menos uma impressora para remover')
+      return
+    }
+
+    const token = auth?.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado')
+      return
+    }
+
+    setIsUpdating(true)
+    showToast.loading('Removendo impressoras...')
+
+    try {
+      // Para cada produto selecionado, remover as impressoras selecionadas
+      const payload = Array.from(produtosSelecionados).map((produtoId) => {
+        return {
+          produtoId,
+          impressorasIdsToRemove: Array.from(impressorasSelecionadas),
+        }
+      })
+
+      const response = await fetch('/api/produtos/bulk-update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `Erro ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      showToast.success(
+        `Impressoras removidas com sucesso! (${data.totalUpdated || produtosSelecionados.size} produtos atualizados)`
+      )
+
+      // Limpar seleções
+      setProdutosSelecionados(new Set())
+      setImpressorasSelecionadas(new Set())
+
+      // Recarregar lista de produtos
+      buscarProdutos()
+    } catch (error: any) {
+      showToast.error(error.message || 'Erro ao remover impressoras. Tente novamente.')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  // Função unificada que decide qual ação executar
+  const atualizarImpressoras = () => {
+    if (modoImpressora === 'adicionar') {
+      adicionarImpressoras()
+    } else {
+      removerImpressoras()
     }
   }
 
@@ -500,7 +526,6 @@ export function AtualizarPrecoLote() {
     setAtivoLocalFilter('Todos')
     setAtivoDeliveryFilter('Todos')
     setGrupoProdutoFilter('')
-    setGrupoComplementoFilter('')
   }, [])
 
   const todasImpressorasSelecionadas =
@@ -546,6 +571,8 @@ export function AtualizarPrecoLote() {
               onClick={() => {
                 setActiveTab('impressoras')
                 setAdjustAmount('')
+                setModoImpressora('adicionar')
+                setImpressorasSelecionadas(new Set())
               }}
               className={`px-4 py-1 rounded text-sm font-semibold transition-colors ${
                 activeTab === 'impressoras'
@@ -680,9 +707,45 @@ export function AtualizarPrecoLote() {
         ) : (
           <>
             <div className="flex flex-col gap-3">
+              {/* Modo de operação: Adicionar ou Remover */}
+              <div className="flex items-center gap-2">
+                <label className="block text-xs font-semibold text-secondary-text">
+                  Modo de operação:
+                </label>
+                <div className="flex gap-1 bg-info rounded-lg p-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModoImpressora('adicionar')
+                      setImpressorasSelecionadas(new Set())
+                    }}
+                    className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                      modoImpressora === 'adicionar'
+                        ? 'bg-primary text-info'
+                        : 'text-secondary-text hover:bg-primary/10'
+                    }`}
+                  >
+                    Vincular
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModoImpressora('remover')
+                      setImpressorasSelecionadas(new Set())
+                    }}
+                    className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                      modoImpressora === 'remover'
+                        ? 'bg-primary text-info'
+                        : 'text-secondary-text hover:bg-primary/10'
+                    }`}
+                  >
+                    Desvincular
+                  </button>
+                </div>
+              </div>
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-semibold text-secondary-text">
-                  Selecionar Impressoras ({impressorasSelecionadas.size} selecionada{impressorasSelecionadas.size !== 1 ? 's' : ''})
+                  {modoImpressora === 'adicionar' ? 'Selecionar Impressoras' : 'Selecionar Impressoras para Remover'} ({impressorasSelecionadas.size} selecionada{impressorasSelecionadas.size !== 1 ? 's' : ''})
                 </label>
                 {impressorasDisponiveis.length > 0 && (
                   <button
@@ -732,9 +795,6 @@ export function AtualizarPrecoLote() {
                           <span className="text-sm font-medium text-primary-text">
                             {impressora.getNome()}
                           </span>
-                          {!impressora.isAtivo() && (
-                            <span className="text-xs text-error">(Inativa)</span>
-                          )}
                         </label>
                       )
                     })}
@@ -756,14 +816,24 @@ export function AtualizarPrecoLote() {
                   }}
                 >
                   {isUpdating
-                    ? 'Atualizando...'
-                    : `Aplicar a ${produtosSelecionados.size} produto(s)`}
+                    ? modoImpressora === 'adicionar' ? 'Adicionando...' : 'Removendo...'
+                    : modoImpressora === 'adicionar'
+                      ? `Vincular a ${produtosSelecionados.size} produto(s)`
+                      : `Desvincular de ${produtosSelecionados.size} produto(s)`}
                 </Button>
               </div>
             </div>
             {produtosSelecionados.size > 0 && impressorasSelecionadas.size > 0 && (
               <p className="text-xs text-secondary-text mt-2">
-                {impressorasSelecionadas.size} impressora{impressorasSelecionadas.size !== 1 ? 's' : ''} será{impressorasSelecionadas.size === 1 ? '' : 'ão'} aplicada{impressorasSelecionadas.size === 1 ? '' : 's'} aos {produtosSelecionados.size} produto(s) selecionado(s).
+                {modoImpressora === 'adicionar' ? (
+                  <>
+                    {impressorasSelecionadas.size} impressora{impressorasSelecionadas.size !== 1 ? 's' : ''} será{impressorasSelecionadas.size === 1 ? '' : 'ão'} vinculada{impressorasSelecionadas.size === 1 ? '' : 's'} aos {produtosSelecionados.size} produto(s) selecionado(s).
+                  </>
+                ) : (
+                  <>
+                    {impressorasSelecionadas.size} impressora{impressorasSelecionadas.size !== 1 ? 's' : ''} será{impressorasSelecionadas.size === 1 ? '' : 'ão'} desvinculada{impressorasSelecionadas.size === 1 ? '' : 's'} dos {produtosSelecionados.size} produto(s) selecionado(s). A impressora será removida apenas dos produtos que a possuem.
+                  </>
+                )}
               </p>
             )}
           </>
@@ -863,24 +933,6 @@ export function AtualizarPrecoLote() {
                 <option value="">{isLoadingGruposProdutos ? 'Carregando...' : 'Todos'}</option>
                 {!isLoadingGruposProdutos &&
                   gruposProdutos.map((grupo) => (
-                    <option key={grupo.getId()} value={grupo.getId()}>
-                      {grupo.getNome()}
-                    </option>
-                  ))}
-              </select>
-            </div>
-
-            <div className="w-full sm:w-[220px]">
-              <label className="text-xs font-semibold text-secondary-text mb-1 block">Grupo de complementos</label>
-              <select
-                value={grupoComplementoFilter}
-                onChange={(e) => setGrupoComplementoFilter(e.target.value)}
-                disabled={isLoadingGruposComplementos}
-                className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                <option value="">{isLoadingGruposComplementos ? 'Carregando...' : 'Todos'}</option>
-                {!isLoadingGruposComplementos &&
-                  gruposComplementos.map((grupo) => (
                     <option key={grupo.getId()} value={grupo.getId()}>
                       {grupo.getNome()}
                     </option>

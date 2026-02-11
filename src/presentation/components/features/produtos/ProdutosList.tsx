@@ -1466,7 +1466,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
               href="/produtos/atualizar-preco"
               className="md:h-8 h-6 md:px-4 px-2 bg-info text-primary-text border border-primary/50 rounded-lg font-semibold font-exo md:text-sm text-xs flex items-center gap-2 hover:bg-primary/10 transition-colors"
             >
-              Atualizar Preços
+              Alterar Produtos em Lote
             </Link>
               <button
                 onClick={() =>
