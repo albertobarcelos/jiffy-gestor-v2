@@ -33,6 +33,7 @@ export function AtualizarPrecoLote() {
   const [adjustAmount, setAdjustAmount] = useState('')
   const [adjustDirection, setAdjustDirection] = useState<'increase' | 'decrease'>('increase')
   const [filtersExpanded, setFiltersExpanded] = useState(false)
+  const [produtosExpandidos, setProdutosExpandidos] = useState<Set<string>>(new Set())
   const [impressorasSelecionadas, setImpressorasSelecionadas] = useState<Set<string>>(new Set())
   const [impressorasDisponiveis, setImpressorasDisponiveis] = useState<Impressora[]>([])
   const [isLoadingImpressoras, setIsLoadingImpressoras] = useState(false)
@@ -235,6 +236,19 @@ export function AtualizarPrecoLote() {
   // Toggle seleção de produto
   const toggleSelecao = (produtoId: string) => {
     setProdutosSelecionados((prev) => {
+      const novo = new Set(prev)
+      if (novo.has(produtoId)) {
+        novo.delete(produtoId)
+      } else {
+        novo.add(produtoId)
+      }
+      return novo
+    })
+  }
+
+  // Toggle expansão de produto (mobile)
+  const toggleExpansao = (produtoId: string) => {
+    setProdutosExpandidos((prev) => {
       const novo = new Set(prev)
       if (novo.has(produtoId)) {
         novo.delete(produtoId)
@@ -717,7 +731,7 @@ export function AtualizarPrecoLote() {
   return (
     <div className="flex flex-col h-full bg-info">
       {/* Header */}
-      <div className="flex items-center justify-between bg-primary-bg border-b border-primary/70 md:px-6 px-1 py-2 md:gap-4 gap-2">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between bg-primary-bg border-b border-primary/70 md:px-6 px-1 py-2 md:gap-4 gap-2">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="md:text-2xl text-sm font-bold text-primary">
@@ -732,9 +746,9 @@ export function AtualizarPrecoLote() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col md:flex-row md:items-center gap-2">
           {/* Tabs */}
-          <div className="flex gap-1 bg-info rounded-lg p-1">
+          <div className="flex flex-row gap-1 bg-info rounded-lg p-1">
             <button
               type="button"
               onClick={() => {
@@ -785,7 +799,7 @@ export function AtualizarPrecoLote() {
           </div>
           <Link
             href="/produtos"
-            className="h-8 px-8 rounded-lg bg-info text-primary font-semibold font-exo text-sm border border-primary shadow-sm hover:bg-primary/20 transition-colors flex items-center"
+            className="h-8 px-8 rounded-lg bg-info text-primary justify-center font-semibold font-exo text-sm border border-primary shadow-sm hover:bg-primary/20 transition-colors flex items-center"
           >
             Cancelar
           </Link>
@@ -981,7 +995,7 @@ export function AtualizarPrecoLote() {
                       return (
                         <label
                           key={impressora.getId()}
-                          className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                          className={`flex items-center gap-2 px-1 rounded-lg border cursor-pointer transition-colors ${
                             isSelected
                               ? 'bg-primary/10 border-primary'
                               : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
@@ -992,7 +1006,7 @@ export function AtualizarPrecoLote() {
                             onChange={() => toggleImpressora(impressora.getId())}
                             className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                           />
-                          <span className="text-sm font-medium text-primary-text">
+                          <span className="md:text-sm text-xs font-medium text-primary-text">
                             {impressora.getNome()}
                           </span>
                         </label>
@@ -1114,7 +1128,7 @@ export function AtualizarPrecoLote() {
                       return (
                         <label
                           key={grupo.getId()}
-                          className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                          className={`flex items-center gap-2 px-1 rounded-lg border cursor-pointer transition-colors ${
                             isSelected
                               ? 'bg-primary/10 border-primary'
                               : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
@@ -1125,7 +1139,7 @@ export function AtualizarPrecoLote() {
                             onChange={() => toggleGrupoComplemento(grupo.getId())}
                             className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                           />
-                          <span className="text-sm font-medium text-primary-text">
+                          <span className="md:text-sm text-xs font-medium text-primary-text">
                             {grupo.getNome()}
                           </span>
                         </label>
@@ -1303,7 +1317,7 @@ export function AtualizarPrecoLote() {
           </div>
         ) : (
           <div className="bg-info rounded-lg overflow-hidden">
-            <div className="flex items-center h-11 gap-2 md:px-4 text-xs font-semibold text-primary-text uppercase tracking-wide bg-custom-2">
+            <div className="flex items-center h-11 gap-2 md:px-4 px-2 text-xs font-semibold text-primary-text uppercase tracking-wide bg-custom-2">
               <div className="flex-none md:w-10 w-6 flex justify-center">
                 <Checkbox
                   checked={todosSelecionados}
@@ -1340,79 +1354,155 @@ export function AtualizarPrecoLote() {
                   : index % 2 === 0 
                     ? 'bg-gray-50' 
                     : 'bg-white'
+                const isExpanded = produtosExpandidos.has(produto.getId())
                 return (
-                  <div
-                    key={produto.getId()}
-                    className={`flex rounded-lg items-center md:px-4 gap-2 ${bgColor} hover:bg-primary-bg transition-colors cursor-default`}
-                    style={{ minHeight: '36px' }}
-                  >
-                    <div className="flex-none md:w-10 w-6 flex justify-center">
-                      <Checkbox
-                        checked={isSelected}
-                        onChange={(checked) => {
-                          if (checked !== undefined) {
-                            toggleSelecao(produto.getId())
-                          }
+                  <div key={produto.getId()} className="flex flex-col">
+                    {/* Linha principal do produto */}
+                    <div
+                      className={`flex rounded-lg items-center md:px-4 px-2 gap-2 ${bgColor} hover:bg-primary-bg transition-colors cursor-default`}
+                      style={{ minHeight: '36px' }}
+                    >
+                      <div className="flex-none md:w-10 w-6 flex justify-center">
+                        <Checkbox
+                          checked={isSelected}
+                          onChange={(checked) => {
+                            if (checked !== undefined) {
+                              toggleSelecao(produto.getId())
+                            }
+                          }}
+                          className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                        />
+                      </div>
+                      <div className="flex-1 md:w-24 font-mono text-xs text-secondary-text">
+                        {produto.getCodigoProduto() || '-'}
+                      </div>
+                      <div className="md:flex-[1.5] flex-[2] md:text-sm text-xs font-semibold text-primary-text break-words md:pr-4">
+                        {produto.getNome()}
+                      </div>
+                      {/* Colunas de impressoras e grupos (apenas desktop) */}
+                      <div className="flex-[1.2] justify-center hidden md:flex">
+                        {impressorasDoProduto.length === 0 ? (
+                          <span className="text-xs text-secondary-text">Nenhuma</span>
+                        ) : (
+                          <select
+                            className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
+                            defaultValue=""
+                            onChange={(event) => {
+                              event.currentTarget.value = ''
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <option value="" disabled>
+                              {impressorasDoProduto.length} impressora{impressorasDoProduto.length !== 1 ? 's' : ''}
+                            </option>
+                            {impressorasDoProduto.map((impressora) => (
+                              <option key={impressora.id} value={impressora.id}>
+                                {impressora.nome}
+                                {impressora.ativo === false ? ' (Inativa)' : ''}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                      <div className="flex-[1.2] justify-center hidden md:flex">
+                        {gruposComplementosDoProduto.length === 0 ? (
+                          <span className="text-xs text-secondary-text">Nenhum</span>
+                        ) : (
+                          <select
+                            className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
+                            defaultValue=""
+                            onChange={(event) => {
+                              event.currentTarget.value = ''
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <option value="" disabled>
+                              {gruposComplementosDoProduto.length} grupo{gruposComplementosDoProduto.length !== 1 ? 's' : ''}
+                            </option>
+                            {gruposComplementosDoProduto.map((grupo) => (
+                              <option key={grupo.id} value={grupo.id}>
+                                {grupo.nome}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                      <div className="flex-1 text-right font-semibold md:text-sm text-xs text-primary-text">
+                        {transformarParaReal(produto.getValor())}
+                      </div>
+                      {/* Botão para expandir/ocultar (apenas mobile) */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleExpansao(produto.getId())
                         }}
-                        className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                      />
+                        className="md:hidden flex items-center justify-center w-8 h-8 rounded-lg hover:bg-primary/10 transition-colors"
+                        aria-label={isExpanded ? 'Ocultar detalhes' : 'Expandir detalhes'}
+                      >
+                        {isExpanded ? (
+                          <MdExpandLess size={20} className="text-primary-text" />
+                        ) : (
+                          <MdExpandMore size={20} className="text-primary-text" />
+                        )}
+                      </button>
                     </div>
-                    <div className="flex-1 md:w-24 font-mono text-xs text-secondary-text">
-                      {produto.getCodigoProduto() || '-'}
-                    </div>
-                    <div className="md:flex-[1.5] flex-[2] md:text-sm text-xs font-semibold text-primary-text break-words md:pr-4">
-                      {produto.getNome()}
-                    </div>
-                    <div className="flex-[1.2] justify-center hidden md:flex">
-                      {impressorasDoProduto.length === 0 ? (
-                        <span className="text-xs text-secondary-text">Nenhuma</span>
-                      ) : (
-                        <select
-                          className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
-                          defaultValue=""
-                          onChange={(event) => {
-                            event.currentTarget.value = ''
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <option value="" disabled>
-                            {impressorasDoProduto.length} impressora{impressorasDoProduto.length !== 1 ? 's' : ''}
-                          </option>
-                          {impressorasDoProduto.map((impressora) => (
-                            <option key={impressora.id} value={impressora.id}>
-                              {impressora.nome}
-                              {impressora.ativo === false ? ' (Inativa)' : ''}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                    <div className="flex-[1.2] justify-center hidden md:flex">
-                      {gruposComplementosDoProduto.length === 0 ? (
-                        <span className="text-xs text-secondary-text">Nenhum</span>
-                      ) : (
-                        <select
-                          className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
-                          defaultValue=""
-                          onChange={(event) => {
-                            event.currentTarget.value = ''
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <option value="" disabled>
-                            {gruposComplementosDoProduto.length} grupo{gruposComplementosDoProduto.length !== 1 ? 's' : ''}
-                          </option>
-                          {gruposComplementosDoProduto.map((grupo) => (
-                            <option key={grupo.id} value={grupo.id}>
-                              {grupo.nome}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                    <div className="flex-1 text-right font-semibold md:text-sm text-xs text-primary-text">
-                      {transformarParaReal(produto.getValor())}
-                    </div>
+                    {/* Área expansível com impressoras e grupos (apenas mobile) */}
+                    {isExpanded && (
+                      <div className="md:hidden px-2 pb-2 pt-1 bg-gray-50 border-b border-gray-200">
+                        <div className="flex flex-col gap-3">
+                          <div className="flex flex-col gap-1">
+                            <label className="text-xs font-semibold text-secondary-text">Impressoras</label>
+                            {impressorasDoProduto.length === 0 ? (
+                              <span className="text-xs text-secondary-text">Nenhuma</span>
+                            ) : (
+                              <select
+                                className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
+                                defaultValue=""
+                                onChange={(event) => {
+                                  event.currentTarget.value = ''
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <option value="" disabled>
+                                  {impressorasDoProduto.length} impressora{impressorasDoProduto.length !== 1 ? 's' : ''}
+                                </option>
+                                {impressorasDoProduto.map((impressora) => (
+                                  <option key={impressora.id} value={impressora.id}>
+                                    {impressora.nome}
+                                    {impressora.ativo === false ? ' (Inativa)' : ''}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-xs font-semibold text-secondary-text">Grupos de Complementos</label>
+                            {gruposComplementosDoProduto.length === 0 ? (
+                              <span className="text-xs text-secondary-text">Nenhum</span>
+                            ) : (
+                              <select
+                                className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
+                                defaultValue=""
+                                onChange={(event) => {
+                                  event.currentTarget.value = ''
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <option value="" disabled>
+                                  {gruposComplementosDoProduto.length} grupo{gruposComplementosDoProduto.length !== 1 ? 's' : ''}
+                                </option>
+                                {gruposComplementosDoProduto.map((grupo) => (
+                                  <option key={grupo.id} value={grupo.id}>
+                                    {grupo.nome}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )
               })}
