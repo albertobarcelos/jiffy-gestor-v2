@@ -12,6 +12,7 @@ import { Input } from '@/src/presentation/components/ui/input'
 import { Checkbox } from '@/src/presentation/components/ui/checkbox'
 import Link from 'next/link'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
+import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
 import { MdSearch, MdExpandMore, MdExpandLess } from 'react-icons/md'
 /**
  * Componente para atualizar preço de múltiplos produtos em lote
@@ -35,14 +36,20 @@ export function AtualizarPrecoLote() {
   const [impressorasSelecionadas, setImpressorasSelecionadas] = useState<Set<string>>(new Set())
   const [impressorasDisponiveis, setImpressorasDisponiveis] = useState<Impressora[]>([])
   const [isLoadingImpressoras, setIsLoadingImpressoras] = useState(false)
-  const [activeTab, setActiveTab] = useState<'precos' | 'impressoras'>('precos')
+  const [gruposComplementosSelecionados, setGruposComplementosSelecionados] = useState<Set<string>>(new Set())
+  const [activeTab, setActiveTab] = useState<'precos' | 'impressoras' | 'gruposComplementos'>('precos')
   const [modoImpressora, setModoImpressora] = useState<'adicionar' | 'remover'>('adicionar')
+  const [modoGrupoComplemento, setModoGrupoComplemento] = useState<'adicionar' | 'remover'>('adicionar')
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const { auth } = useAuthStore()
   const {
     data: gruposProdutos = [],
     isLoading: isLoadingGruposProdutos,
   } = useGruposProdutos({ limit: 100, ativo: null })
+  const {
+    data: gruposComplementos = [],
+    isLoading: isLoadingGruposComplementos,
+  } = useGruposComplementos({ limit: 100, ativo: null })
 
   // Carregar impressoras disponíveis
   const loadAllImpressoras = useCallback(async () => {
@@ -517,6 +524,171 @@ export function AtualizarPrecoLote() {
     }
   }
 
+  // Toggle seleção de grupo de complementos
+  const toggleGrupoComplemento = (grupoId: string) => {
+    setGruposComplementosSelecionados((prev) => {
+      const novo = new Set(prev)
+      if (novo.has(grupoId)) {
+        novo.delete(grupoId)
+      } else {
+        novo.add(grupoId)
+      }
+      return novo
+    })
+  }
+
+  // Vincular grupos de complementos
+  const vincularGruposComplementos = async () => {
+    if (produtosSelecionados.size === 0) {
+      showToast.error('Selecione pelo menos um produto')
+      return
+    }
+
+    if (gruposComplementosSelecionados.size === 0) {
+      showToast.error('Selecione pelo menos um grupo de complementos')
+      return
+    }
+
+    const token = auth?.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado')
+      return
+    }
+
+    setIsUpdating(true)
+    showToast.loading('Vinculando grupos de complementos...')
+
+    try {
+      // Para cada produto selecionado, combinar grupos existentes com os novos
+      const payload = Array.from(produtosSelecionados).map((produtoId) => {
+        // Buscar o produto na lista
+        const produto = produtos.find((p) => p.getId() === produtoId)
+        
+        // Pegar IDs dos grupos existentes do produto
+        const gruposExistentesIds = produto
+          ? produto.getGruposComplementos().map((grupo) => grupo.id)
+          : []
+        
+        // Pegar IDs dos novos grupos selecionados
+        const novosGruposIds = Array.from(gruposComplementosSelecionados)
+        
+        // Combinar ambos os arrays e remover duplicatas
+        const todosGruposIds = [
+          ...gruposExistentesIds,
+          ...novosGruposIds,
+        ].filter((id, index, self) => self.indexOf(id) === index) // Remove duplicatas
+        
+        return {
+          produtoId,
+          gruposComplementosIds: todosGruposIds,
+        }
+      })
+
+      const response = await fetch('/api/produtos/bulk-update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `Erro ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      showToast.success(
+        `Grupos de complementos vinculados com sucesso! (${data.totalUpdated || produtosSelecionados.size} produtos)`
+      )
+
+      // Limpar seleções
+      setProdutosSelecionados(new Set())
+      setGruposComplementosSelecionados(new Set())
+
+      // Recarregar lista de produtos
+      buscarProdutos()
+    } catch (error: any) {
+      showToast.error(error.message || 'Erro ao vincular grupos de complementos. Tente novamente.')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  // Desvincular grupos de complementos
+  const desvincularGruposComplementos = async () => {
+    if (produtosSelecionados.size === 0) {
+      showToast.error('Selecione pelo menos um produto')
+      return
+    }
+
+    if (gruposComplementosSelecionados.size === 0) {
+      showToast.error('Selecione pelo menos um grupo de complementos para remover')
+      return
+    }
+
+    const token = auth?.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado')
+      return
+    }
+
+    setIsUpdating(true)
+    showToast.loading('Desvinculando grupos de complementos...')
+
+    try {
+      // Para cada produto selecionado, remover os grupos selecionados
+      const payload = Array.from(produtosSelecionados).map((produtoId) => {
+        return {
+          produtoId,
+          gruposComplementosIdsToRemove: Array.from(gruposComplementosSelecionados),
+        }
+      })
+
+      const response = await fetch('/api/produtos/bulk-update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `Erro ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      showToast.success(
+        `Grupos de complementos desvinculados com sucesso! (${data.totalUpdated || produtosSelecionados.size} produtos atualizados)`
+      )
+
+      // Limpar seleções
+      setProdutosSelecionados(new Set())
+      setGruposComplementosSelecionados(new Set())
+
+      // Recarregar lista de produtos
+      buscarProdutos()
+    } catch (error: any) {
+      showToast.error(error.message || 'Erro ao desvincular grupos de complementos. Tente novamente.')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  // Função unificada que decide qual ação executar para grupos de complementos
+  const atualizarGruposComplementos = () => {
+    if (modoGrupoComplemento === 'adicionar') {
+      vincularGruposComplementos()
+    } else {
+      desvincularGruposComplementos()
+    }
+  }
+
   const todosSelecionados = produtos.length > 0 && produtosSelecionados.size === produtos.length
   const algunsSelecionados = produtosSelecionados.size > 0 && produtosSelecionados.size < produtos.length
 
@@ -535,6 +707,13 @@ export function AtualizarPrecoLote() {
     impressorasSelecionadas.size > 0 &&
     impressorasSelecionadas.size < impressorasDisponiveis.length
 
+  const todosGruposComplementosSelecionados =
+    gruposComplementos.length > 0 &&
+    gruposComplementosSelecionados.size === gruposComplementos.length
+  const algunsGruposComplementosSelecionados =
+    gruposComplementosSelecionados.size > 0 &&
+    gruposComplementosSelecionados.size < gruposComplementos.length
+
   return (
     <div className="flex flex-col h-full bg-info">
       {/* Header */}
@@ -542,7 +721,11 @@ export function AtualizarPrecoLote() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="md:text-2xl text-sm font-bold text-primary">
-              {activeTab === 'precos' ? 'Atualizar Preços em Lote' : 'Atualizar Impressoras em Lote'}
+              {activeTab === 'precos'
+                ? 'Atualizar Preços em Lote'
+                : activeTab === 'impressoras'
+                  ? 'Atualizar Impressoras em Lote'
+                  : 'Atualizar Grupos de Complementos em Lote'}
             </h1>
             <p className="md:text-sm text-xs text-secondary-text">
               Total de itens: {total} | Selecionados: {produtosSelecionados.size}
@@ -557,6 +740,7 @@ export function AtualizarPrecoLote() {
               onClick={() => {
                 setActiveTab('precos')
                 setImpressorasSelecionadas(new Set())
+                setGruposComplementosSelecionados(new Set())
               }}
               className={`px-4 py-1 rounded text-sm font-semibold transition-colors ${
                 activeTab === 'precos'
@@ -581,6 +765,22 @@ export function AtualizarPrecoLote() {
               }`}
             >
               Impressoras
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('gruposComplementos')
+                setAdjustAmount('')
+                setModoGrupoComplemento('adicionar')
+                setGruposComplementosSelecionados(new Set())
+              }}
+              className={`px-4 py-1 rounded text-sm font-semibold transition-colors ${
+                activeTab === 'gruposComplementos'
+                  ? 'bg-primary text-info'
+                  : 'text-secondary-text hover:bg-primary/10'
+              }`}
+            >
+              Grupos
             </button>
           </div>
           <Link
@@ -704,7 +904,7 @@ export function AtualizarPrecoLote() {
               </p>
             )}
           </>
-        ) : (
+        ) : activeTab === 'impressoras' ? (
           <>
             <div className="flex flex-col gap-3">
               {/* Modo de operação: Adicionar ou Remover */}
@@ -832,6 +1032,139 @@ export function AtualizarPrecoLote() {
                 ) : (
                   <>
                     {impressorasSelecionadas.size} impressora{impressorasSelecionadas.size !== 1 ? 's' : ''} será{impressorasSelecionadas.size === 1 ? '' : 'ão'} desvinculada{impressorasSelecionadas.size === 1 ? '' : 's'} dos {produtosSelecionados.size} produto(s) selecionado(s). A impressora será removida apenas dos produtos que a possuem.
+                  </>
+                )}
+              </p>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="flex flex-col gap-3">
+              {/* Modo de operação: Adicionar ou Remover */}
+              <div className="flex items-center gap-2">
+                <label className="block text-xs font-semibold text-secondary-text">
+                  Modo de operação:
+                </label>
+                <div className="flex gap-1 bg-info rounded-lg p-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModoGrupoComplemento('adicionar')
+                      setGruposComplementosSelecionados(new Set())
+                    }}
+                    className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                      modoGrupoComplemento === 'adicionar'
+                        ? 'bg-primary text-info'
+                        : 'text-secondary-text hover:bg-primary/10'
+                    }`}
+                  >
+                    Vincular
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModoGrupoComplemento('remover')
+                      setGruposComplementosSelecionados(new Set())
+                    }}
+                    className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                      modoGrupoComplemento === 'remover'
+                        ? 'bg-primary text-info'
+                        : 'text-secondary-text hover:bg-primary/10'
+                    }`}
+                  >
+                    Desvincular
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold text-secondary-text">
+                  {modoGrupoComplemento === 'adicionar' ? 'Selecionar Grupos de Complementos' : 'Selecionar Grupos de Complementos para Remover'} ({gruposComplementosSelecionados.size} selecionado{gruposComplementosSelecionados.size !== 1 ? 's' : ''})
+                </label>
+                {gruposComplementos.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (todosGruposComplementosSelecionados) {
+                        setGruposComplementosSelecionados(new Set())
+                      } else {
+                        setGruposComplementosSelecionados(
+                          new Set(gruposComplementos.map((g) => g.getId()))
+                        )
+                      }
+                    }}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    {todosGruposComplementosSelecionados ? 'Desmarcar todos' : 'Selecionar todos'}
+                  </button>
+                )}
+              </div>
+              {isLoadingGruposComplementos ? (
+                <div className="flex items-center justify-center py-4">
+                  <span className="text-sm text-secondary-text">Carregando grupos de complementos...</span>
+                </div>
+              ) : gruposComplementos.length === 0 ? (
+                <div className="flex items-center justify-center py-4">
+                  <span className="text-sm text-secondary-text">Nenhum grupo de complementos disponível</span>
+                </div>
+              ) : (
+                <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-white">
+                  <div className="flex flex-wrap gap-2">
+                    {gruposComplementos.map((grupo) => {
+                      const isSelected = gruposComplementosSelecionados.has(grupo.getId())
+                      return (
+                        <label
+                          key={grupo.getId()}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                            isSelected
+                              ? 'bg-primary/10 border-primary'
+                              : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                          }`}
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            onChange={() => toggleGrupoComplemento(grupo.getId())}
+                            className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                          />
+                          <span className="text-sm font-medium text-primary-text">
+                            {grupo.getNome()}
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+              <div className="flex justify-end">
+                <Button
+                  onClick={atualizarGruposComplementos}
+                  disabled={
+                    isUpdating ||
+                    produtosSelecionados.size === 0 ||
+                    gruposComplementosSelecionados.size === 0
+                  }
+                  className="md:min-w-[180px] h-8 hover:bg-primary/90"
+                  sx={{
+                    color: 'var(--color-info)',
+                    backgroundColor: 'var(--color-primary)',
+                  }}
+                >
+                  {isUpdating
+                    ? modoGrupoComplemento === 'adicionar' ? 'Vinculando...' : 'Desvinculando...'
+                    : modoGrupoComplemento === 'adicionar'
+                      ? `Vincular a ${produtosSelecionados.size} produto(s)`
+                      : `Desvincular de ${produtosSelecionados.size} produto(s)`}
+                </Button>
+              </div>
+            </div>
+            {produtosSelecionados.size > 0 && gruposComplementosSelecionados.size > 0 && (
+              <p className="text-xs text-secondary-text mt-2">
+                {modoGrupoComplemento === 'adicionar' ? (
+                  <>
+                    {gruposComplementosSelecionados.size} grupo{gruposComplementosSelecionados.size !== 1 ? 's' : ''} de complementos será{gruposComplementosSelecionados.size === 1 ? '' : 'ão'} vinculado{gruposComplementosSelecionados.size === 1 ? '' : 's'} aos {produtosSelecionados.size} produto(s) selecionado(s).
+                  </>
+                ) : (
+                  <>
+                    {gruposComplementosSelecionados.size} grupo{gruposComplementosSelecionados.size !== 1 ? 's' : ''} de complementos será{gruposComplementosSelecionados.size === 1 ? '' : 'ão'} desvinculado{gruposComplementosSelecionados.size === 1 ? '' : 's'} dos {produtosSelecionados.size} produto(s) selecionado(s). O grupo será removido apenas dos produtos que o possuem.
                   </>
                 )}
               </p>
@@ -987,6 +1320,7 @@ export function AtualizarPrecoLote() {
               <div className="flex-1 md:w-14 text-xs">Código</div>
               <div className="flex-[1.5] text-xs">Nome</div>
               <div className="flex-[1.2] text-center hidden md:flex">Impressoras</div>
+              <div className="flex-[1.2] text-center hidden md:flex">Grupos</div>
               <div className="flex-1 text-right text-xs">Valor atual</div>
             </div>
 
@@ -998,6 +1332,8 @@ export function AtualizarPrecoLote() {
                 const isSelected = produtosSelecionados.has(produto.getId())
                 // Usar diretamente as impressoras que vêm do produto (já têm id, nome e ativo)
                 const impressorasDoProduto = produto.getImpressoras()
+                // Usar diretamente os grupos de complementos que vêm do produto
+                const gruposComplementosDoProduto = produto.getGruposComplementos()
                 // Cor de fundo alternada: se selecionado usa primary/20, senão alterna entre gray-50 e white
                 const bgColor = isSelected 
                   ? 'bg-primary/20' 
@@ -1046,6 +1382,29 @@ export function AtualizarPrecoLote() {
                             <option key={impressora.id} value={impressora.id}>
                               {impressora.nome}
                               {impressora.ativo === false ? ' (Inativa)' : ''}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                    <div className="flex-[1.2] justify-center hidden md:flex">
+                      {gruposComplementosDoProduto.length === 0 ? (
+                        <span className="text-xs text-secondary-text">Nenhum</span>
+                      ) : (
+                        <select
+                          className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
+                          defaultValue=""
+                          onChange={(event) => {
+                            event.currentTarget.value = ''
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <option value="" disabled>
+                            {gruposComplementosDoProduto.length} grupo{gruposComplementosDoProduto.length !== 1 ? 's' : ''}
+                          </option>
+                          {gruposComplementosDoProduto.map((grupo) => (
+                            <option key={grupo.id} value={grupo.id}>
+                              {grupo.nome}
                             </option>
                           ))}
                         </select>

@@ -9,9 +9,11 @@ import { ApiClient } from '@/src/infrastructure/api/apiClient'
  * Request Body:
  * Array<{
  *   produtoId: string;
- *   valor?: number;                    // Opcional - preço do produto
- *   impressorasIds?: string[];         // Opcional - array de IDs das impressoras para adicionar
- *   impressorasIdsToRemove?: string[]; // Opcional - array de IDs das impressoras para remover
+ *   valor?: number;                              // Opcional - preço do produto
+ *   impressorasIds?: string[];                   // Opcional - array de IDs das impressoras para adicionar
+ *   impressorasIdsToRemove?: string[];           // Opcional - array de IDs das impressoras para remover
+ *   gruposComplementosIds?: string[];            // Opcional - array de IDs dos grupos de complementos para adicionar
+ *   gruposComplementosIdsToRemove?: string[];    // Opcional - array de IDs dos grupos de complementos para remover
  * }>
  * 
  * Response:
@@ -49,10 +51,12 @@ export async function POST(req: NextRequest) {
       const hasValor = 'valor' in item
       const hasImpressorasIds = 'impressorasIds' in item
       const hasImpressorasIdsToRemove = 'impressorasIdsToRemove' in item
+      const hasGruposComplementosIds = 'gruposComplementosIds' in item
+      const hasGruposComplementosIdsToRemove = 'gruposComplementosIdsToRemove' in item
 
-      if (!hasValor && !hasImpressorasIds && !hasImpressorasIdsToRemove) {
+      if (!hasValor && !hasImpressorasIds && !hasImpressorasIdsToRemove && !hasGruposComplementosIds && !hasGruposComplementosIdsToRemove) {
         return NextResponse.json(
-          { message: 'Cada item deve ter pelo menos um campo: valor, impressorasIds ou impressorasIdsToRemove' },
+          { message: 'Cada item deve ter pelo menos um campo: valor, impressorasIds, impressorasIdsToRemove, gruposComplementosIds ou gruposComplementosIdsToRemove' },
           { status: 400 }
         )
       }
@@ -69,6 +73,22 @@ export async function POST(req: NextRequest) {
       if (hasImpressorasIdsToRemove && !Array.isArray(item.impressorasIdsToRemove)) {
         return NextResponse.json(
           { message: 'impressorasIdsToRemove deve ser um array de strings' },
+          { status: 400 }
+        )
+      }
+
+      // Validação: gruposComplementosIds deve ser array de strings
+      if (hasGruposComplementosIds && !Array.isArray(item.gruposComplementosIds)) {
+        return NextResponse.json(
+          { message: 'gruposComplementosIds deve ser um array de strings' },
+          { status: 400 }
+        )
+      }
+
+      // Validação: gruposComplementosIdsToRemove deve ser array de strings
+      if (hasGruposComplementosIdsToRemove && !Array.isArray(item.gruposComplementosIdsToRemove)) {
+        return NextResponse.json(
+          { message: 'gruposComplementosIdsToRemove deve ser um array de strings' },
           { status: 400 }
         )
       }
