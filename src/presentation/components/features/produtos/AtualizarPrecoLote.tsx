@@ -319,66 +319,71 @@ export function AtualizarPrecoLote() {
     }
 
     setIsUpdating(true)
-    showToast.loading('Atualizando preços...')
+    showToast.loading(`Atualizando preços de ${produtosSelecionados.size} produto(s)...`)
 
     try {
-      const produtosIds = Array.from(produtosSelecionados)
-      let sucesso = 0
-      let erros = 0
+      // Preparar payload para bulk update
+      const payload = produtosSelecionadosDados
+        .map((produto) => {
+          const valorAtual = produto.getValor()
+          const directionSign = adjustDirection === 'increase' ? 1 : -1
+          let novoValor =
+            adjustMode === 'valor'
+              ? valorAtual + directionSign * adjustValue
+              : valorAtual * (1 + (directionSign * adjustValue) / 100)
+          novoValor = Number(novoValor.toFixed(2))
 
-      // Atualizar cada produto sequencialmente
-      for (const produtoId of produtosIds) {
-        const produtoBase = produtos.find((produto) => produto.getId() === produtoId)
-        if (!produtoBase) {
-          erros++
-          continue
-        }
-
-        const valorAtual = produtoBase.getValor()
-        const directionSign = adjustDirection === 'increase' ? 1 : -1
-        let novoValor =
-          adjustMode === 'valor'
-            ? valorAtual + directionSign * adjustValue
-            : valorAtual * (1 + (directionSign * adjustValue) / 100)
-        novoValor = Number(novoValor.toFixed(2))
-
-        if (novoValor <= 0) {
-          erros++
-          continue
-        }
-
-        try {
-          const response = await fetch(`/api/produtos/${produtoId}`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ valor: novoValor }),
-          })
-
-          if (!response.ok) {
-            throw new Error(`Erro ${response.status}`)
+          // Validar se o novo valor é válido
+          if (novoValor <= 0) {
+            return null
           }
 
-          sucesso++
-        } catch (error) {
-          erros++
-        }
+          return {
+            produtoId: produto.getId(),
+            valor: novoValor,
+          }
+        })
+        .filter((item): item is { produtoId: string; valor: number } => item !== null)
+
+      if (payload.length === 0) {
+        showToast.error('Nenhum produto válido para atualizar')
+        setIsUpdating(false)
+        return
       }
 
-      // showToast.dismiss(toastId)
+      // Fazer uma única requisição bulk update
+      const response = await fetch('/api/produtos/bulk-update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
 
-      if (erros === 0) {
-        showToast.success(`Preços atualizados com sucesso! (${sucesso} produtos)`)
-        setProdutosSelecionados(new Set())
-        setAdjustAmount('')
-        buscarProdutos() // Recarregar lista
-      } else {
-        showToast.warning(
-          `Atualizados: ${sucesso} | Erros: ${erros}`
-        )
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `Erro ${response.status}`)
       }
+
+      const data = await response.json()
+      const totalUpdated = data.totalUpdated || payload.length
+
+      // Atualizar mensagem de loading para indicar que está recarregando a lista
+      showToast.loading('Atualizando lista de produtos...')
+
+      // Aguardar um pequeno delay para garantir que o backend processou todas as atualizações
+      await new Promise((resolve) => setTimeout(resolve, 800))
+
+      // Recarregar lista de produtos e aguardar conclusão
+      await buscarProdutos()
+
+      // Aguardar um pouco mais para garantir que o estado foi atualizado
+      await new Promise((resolve) => setTimeout(resolve, 500))
+
+      showToast.success(`Preços atualizados com sucesso! (${totalUpdated} produtos)`)
+      setProdutosSelecionados(new Set())
+      setAdjustAmount('')
     } catch (error: any) {
       showToast.error(error.message || 'Erro ao atualizar preços. Tente novamente.')
     } finally {
@@ -957,7 +962,7 @@ export function AtualizarPrecoLote() {
                   </button>
                 </div>
               </div>
-              <div className="flex flex-col md:flex-row md:items-center justify-between max-w-4xl gap-2">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
                 <label className="block text-xs font-semibold text-secondary-text">
                   {modoImpressora === 'adicionar' ? 'Selecionar Impressoras' : 'Selecionar Impressoras para Remover'} ({impressorasSelecionadas.size} selecionada{impressorasSelecionadas.size !== 1 ? 's' : ''})
                 </label>
@@ -1011,15 +1016,15 @@ export function AtualizarPrecoLote() {
                   <span className="text-sm text-secondary-text">Nenhuma impressora disponível</span>
                 </div>
               ) : (
-                <div className="w-full md:max-w-4xl">
+                <div className="w-full">
                   <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-1 bg-white ">
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                       {impressorasDisponiveis.map((impressora) => {
                         const isSelected = impressorasSelecionadas.has(impressora.getId())
                         return (
                           <label
                             key={impressora.getId()}
-                            className={`flex items-center gap-1 px-3 rounded-lg border cursor-pointer transition-colors min-h-[40px] ${
+                            className={`flex items-center rounded-lg border cursor-pointer transition-colors min-h-[40px] ${
                               isSelected
                                 ? 'bg-primary/10 border-primary'
                                 : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
@@ -1083,7 +1088,7 @@ export function AtualizarPrecoLote() {
                   </button>
                 </div>
               </div>
-              <div className="flex flex-col md:flex-row md:items-center justify-between max-w-4xl gap-2">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
                 <label className="block text-xs font-semibold text-secondary-text">
                   {modoGrupoComplemento === 'adicionar' ? 'Selecionar Grupos de Complementos' : 'Selecionar Grupos de Complementos para Remover'} ({gruposComplementosSelecionados.size} selecionado{gruposComplementosSelecionados.size !== 1 ? 's' : ''})
                 </label>
@@ -1137,15 +1142,15 @@ export function AtualizarPrecoLote() {
                   <span className="text-sm text-secondary-text">Nenhum grupo de complementos disponível</span>
                 </div>
               ) : (
-                <div className="w-full md:max-w-4xl">
+                <div className="w-full">
                   <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-1 bg-white">
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-1">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-1">
                       {gruposComplementos.map((grupo) => {
                         const isSelected = gruposComplementosSelecionados.has(grupo.getId())
                         return (
                           <label
                             key={grupo.getId()}
-                            className={`flex items-center gap-1 px-3 rounded-lg border cursor-pointer transition-colors min-h-[40px] ${
+                            className={`flex items-center rounded-lg border cursor-pointer transition-colors min-h-[40px] ${
                               isSelected
                                 ? 'bg-primary/10 border-primary'
                                 : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
