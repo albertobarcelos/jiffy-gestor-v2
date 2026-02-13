@@ -941,7 +941,8 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
       ativoLocal: ativoLocalBoolean,
       ativoDelivery: ativoDeliveryBoolean,
       grupoProdutoId: grupoProdutoFilter || undefined,
-      grupoComplementosId: grupoComplementoFilter || undefined,
+      // Se for "__none__", não passa o parâmetro para a API (filtrará no frontend)
+      grupoComplementosId: grupoComplementoFilter === '__none__' ? undefined : grupoComplementoFilter || undefined,
       limit: limitFilter,
     }),
     [
@@ -985,8 +986,18 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
       })
     })
     
-    return Array.from(produtosMap.values())
-  }, [data])
+    let produtosList = Array.from(produtosMap.values())
+    
+    // Filtrar produtos sem grupo de complementos se o filtro "Nenhum" estiver ativo
+    if (grupoComplementoFilter === '__none__') {
+      produtosList = produtosList.filter((produto) => {
+        const gruposComplementos = produto.getGruposComplementos()
+        return !gruposComplementos || gruposComplementos.length === 0
+      })
+    }
+    
+    return produtosList
+  }, [data, grupoComplementoFilter])
 
   const totalProdutos = useMemo(() => {
     return data?.pages?.[0]?.count ?? 0
@@ -1586,6 +1597,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
               className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <option value="">{isLoadingGruposComplementos ? 'Carregando...' : 'Todos'}</option>
+              <option value="__none__">Nenhum</option>
               {!isLoadingGruposComplementos &&
                 gruposComplementos.map((grupo) => (
                   <option key={grupo.getId()} value={grupo.getId()}>
