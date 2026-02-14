@@ -8,6 +8,7 @@ import { MdReceipt, MdAdd, MdVisibility, MdSchedule, MdRefresh, MdCheckCircle, M
 import { EmitirNfeModal } from './EmitirNfeModal'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Badge } from '@/src/presentation/components/ui/badge'
+import { StatusFiscalBadge } from './StatusFiscalBadge'
 import { DetalhesVendas } from '@/src/presentation/components/features/vendas/DetalhesVendas'
 import { NovoPedidoModal } from './NovoPedidoModal'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
@@ -82,33 +83,34 @@ export function FiscalFlowKanban() {
       console.error('Erro ao decodificar token:', e)
     }
   }
+
   
-  // Obter mês e ano atual
+  // Calcular período do mês atual (formato ISO para o backend)
   const agora = new Date()
-  const mesAtual = agora.getMonth() + 1
-  const anoAtual = agora.getFullYear()
+  const periodoInicial = new Date(agora.getFullYear(), agora.getMonth(), 1).toISOString()
+  const periodoFinal = new Date(agora.getFullYear(), agora.getMonth() + 1, 0, 23, 59, 59, 999).toISOString()
   
-  // Mapear filtros de tipo de venda para origem
-  const getOrigemFiltro = (): 'TODOS' | 'PDV' | 'GESTOR' | 'DELIVERY' | undefined => {
-    if (todosFiltrosSelecionados || tipoVendaFiltros.length === 0) return 'TODOS'
+  // Mapear filtros de tipo de venda para origem (sem "TODOS" — undefined = backend retorna tudo)
+  const getOrigemFiltro = (): 'PDV' | 'GESTOR' | 'DELIVERY' | undefined => {
+    if (todosFiltrosSelecionados || tipoVendaFiltros.length === 0) return undefined
     if (tipoVendaFiltros.includes('delivery')) return 'DELIVERY'
     if (tipoVendaFiltros.includes('balcao') || tipoVendaFiltros.includes('mesa')) return 'PDV'
-    return 'TODOS'
+    return undefined
   }
   
   // Buscar vendas unificadas (PDV + Gestor)
   const { data: vendasUnificadasData, isLoading, refetch } = useVendasUnificadas({
-    empresaId,
     origem: getOrigemFiltro(),
-    mes: mesAtual,
-    ano: anoAtual,
+    periodoInicial,
+    periodoFinal,
+    offset: 0,
     limit: 100,
   })
   
   const marcarEmissaoFiscal = useMarcarEmissaoFiscal()
   
   // Todas as vendas unificadas
-  const todasVendas: Venda[] = vendasUnificadasData?.vendas || []
+  const todasVendas: Venda[] = vendasUnificadasData?.items || []
   
   // Filtrar vendas por coluna usando os métodos auxiliares do DTO
   const vendasFinalizadas: Venda[] = todasVendas.filter(v => v.getEtapaKanban() === 'FINALIZADAS')
@@ -578,7 +580,7 @@ export function FiscalFlowKanban() {
       {/* Header - Design mais clean */}
       <div className="bg-white border-b border-gray-200 px-6 py-3 flex-shrink-0">
         <div className="flex items-center justify-between mb-3">
-          <div>
+          <div className="flex items-center gap-3">
             <h1 className="text-xl font-semibold text-gray-900">Pedidos e Clientes</h1>
           </div>
           <div className="flex items-center gap-2">
@@ -709,11 +711,9 @@ export function FiscalFlowKanban() {
                           {/* Status Fiscal e Número da Nota */}
                           {venda.statusFiscal && (
                             <div className="mb-1">
-                              <p className="text-xs text-gray-600 mb-1">
-                                Status: {venda.statusFiscal}
-                              </p>
+                              <StatusFiscalBadge status={venda.statusFiscal} />
                               {venda.numeroFiscal && venda.statusFiscal === 'EMITIDA' && (
-                                <div className="inline-flex items-center gap-1 bg-green-100 text-green-800 px-2 py-0.5 rounded-md">
+                                <div className="mt-1 inline-flex items-center gap-1 bg-green-100 text-green-800 px-2 py-0.5 rounded-md">
                                   <MdCheckCircle className="w-3.5 h-3.5" />
                                   <span className="text-xs font-semibold">
                                     {venda.tipoDocFiscal || 'NFe'} Nº {venda.numeroFiscal}
@@ -766,8 +766,13 @@ export function FiscalFlowKanban() {
                                 variant="contained"
                                 className="flex-1"
                                 onClick={() => handleEmitirNfe(venda)}
+                                disabled={
+                                  venda.statusFiscal === 'EMITINDO' || 
+                                  venda.statusFiscal === 'PENDENTE_AUTORIZACAO' ||
+                                  venda.statusFiscal === 'EMITIDA'
+                                }
                               >
-                                Emitir NFe
+                                {venda.statusFiscal === 'REJEITADA' ? 'Reemitir NFe' : 'Emitir NFe'}
                               </Button>
                             )}
 

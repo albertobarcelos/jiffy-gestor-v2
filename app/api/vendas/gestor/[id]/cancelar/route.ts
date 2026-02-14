@@ -34,7 +34,7 @@ export async function POST(
 
     const apiClient = new ApiClient()
     const response = await apiClient.request<any>(
-      `/api/v1/operacao-pdv/vendas/gestor/${id}/cancelar`,
+      `/api/v1/gestor/vendas/${id}/cancelar`,
       {
         method: 'POST',
         headers: {

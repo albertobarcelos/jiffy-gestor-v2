@@ -25,7 +25,7 @@ export class VendaUnificadaDTO {
             cpfCnpj?: string;
         },
         public readonly solicitarEmissaoFiscal: boolean,
-        public readonly statusFiscal: 'PENDENTE_EMISSAO' | 'EMITIDA' | 'CANCELADA' | null,
+        public readonly statusFiscal: 'PENDENTE_EMISSAO' | 'EMITINDO' | 'PENDENTE_AUTORIZACAO' | 'CONTINGENCIA' | 'EMITIDA' | 'REJEITADA' | 'CANCELADA' | null,
         public readonly documentoFiscalId: string | null,
         public readonly abertoPor: {
             id: string;
@@ -70,22 +70,30 @@ export class VendaUnificadaDTO {
     }
 }
 
+/**
+ * Parâmetros alinhados ao contrato do backend:
+ * - Filtros: origem, statusFiscal, periodoInicial, periodoFinal
+ * - Paginação: offset, limit
+ * - empresaId vem do JWT (backend extrai de req.user)
+ */
 interface VendasUnificadasQueryParams {
-    empresaId: string
-    origem?: 'TODOS' | 'PDV' | 'GESTOR' | 'DELIVERY'
-    statusFiscal?: 'PENDENTE_EMISSAO' | 'EMITIDA' | 'CANCELADA'
-    mes?: number
-    ano?: number
-    page?: number
+    origem?: 'PDV' | 'GESTOR' | 'DELIVERY'
+    statusFiscal?: string
+    periodoInicial?: string // ISO date string
+    periodoFinal?: string   // ISO date string
+    offset?: number
     limit?: number
 }
 
+/** Resposta do backend: PaginationResult<VendaUnificadaDTO> */
 interface VendasUnificadasResponse {
-    vendas: VendaUnificadaDTO[]
-    total: number
+    count: number
     page: number
     limit: number
     totalPages: number
+    hasNext: boolean
+    hasPrevious: boolean
+    items: VendaUnificadaDTO[]
 }
 
 /**
@@ -104,13 +112,13 @@ export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
                 throw new Error('Token não encontrado')
             }
 
+            // Monta query params no formato do backend
             const searchParams = new URLSearchParams()
-            searchParams.append('empresaId', params.empresaId)
             if (params.origem) searchParams.append('origem', params.origem)
             if (params.statusFiscal) searchParams.append('statusFiscal', params.statusFiscal)
-            if (params.mes) searchParams.append('mes', params.mes.toString())
-            if (params.ano) searchParams.append('ano', params.ano.toString())
-            if (params.page) searchParams.append('page', params.page.toString())
+            if (params.periodoInicial) searchParams.append('periodoInicial', params.periodoInicial)
+            if (params.periodoFinal) searchParams.append('periodoFinal', params.periodoFinal)
+            if (params.offset != null) searchParams.append('offset', params.offset.toString())
             if (params.limit) searchParams.append('limit', params.limit.toString())
 
             const response = await fetch(`/api/vendas/unificado?${searchParams.toString()}`, {
@@ -130,7 +138,7 @@ export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
             const data = await response.json()
 
             // Converter objetos JSON para instâncias de VendaUnificadaDTO
-            const vendas = (data.vendas || []).map((v: any) => new VendaUnificadaDTO(
+            const items = (data.items || []).map((v: any) => new VendaUnificadaDTO(
                 v.id,
                 v.numeroVenda,
                 v.codigoVenda,
@@ -154,14 +162,16 @@ export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
             ))
 
             return {
-                vendas,
-                total: data.total || 0,
+                items,
+                count: data.count || 0,
                 page: data.page || 1,
-                limit: data.limit || 50,
+                limit: data.limit || 10,
                 totalPages: data.totalPages || 1,
+                hasNext: data.hasNext ?? false,
+                hasPrevious: data.hasPrevious ?? false,
             }
         },
-        enabled: !!token && !!params.empresaId,
+        enabled: !!token,
         staleTime: 1000 * 30, // 30 segundos
         refetchOnWindowFocus: true,
         refetchOnReconnect: true,

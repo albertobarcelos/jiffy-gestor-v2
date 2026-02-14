@@ -93,7 +93,8 @@ export function ConfigurarNcmModal({
           return
         }
 
-        const response = await fetch(`/api/v1/fiscal/empresas-fiscais/${empresaId}/todas`, {
+        // Segurança: empresaId é extraído do JWT pelo backend
+        const response = await fetch(`/api/v1/fiscal/empresas-fiscais/me/todas`, {
           headers: { Authorization: `Bearer ${token}` },
         })
 

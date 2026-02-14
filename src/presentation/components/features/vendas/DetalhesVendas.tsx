@@ -16,6 +16,7 @@ import {
 import { showToast } from '@/src/shared/utils/toast'
 import { TipoVendaIcon } from './TipoVendaIcon'
 import { useCancelarVendaGestor } from '@/src/presentation/hooks/useVendas'
+import { StatusFiscalBadge } from '@/src/presentation/components/features/nfe/StatusFiscalBadge'
 
 // Tipos
 interface VendaDetalhes {
@@ -598,18 +599,11 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
 
                   {/* Status Fiscal */}
                   {venda.statusFiscal && (
-                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                    <div className="flex justify-between items-center text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
                       <span>
                         Status Fiscal: 
                       </span>
-                      <span className={`font-semibold ${
-                        venda.statusFiscal === 'EMITIDA' ? 'text-green-600' :
-                        venda.statusFiscal === 'PENDENTE_EMISSAO' ? 'text-yellow-600' :
-                        venda.statusFiscal === 'ERRO' ? 'text-red-600' :
-                        'text-gray-600'
-                      }`}>
-                        {venda.statusFiscal}
-                      </span>
+                      <StatusFiscalBadge status={venda.statusFiscal} />
                     </div>
                   )}
 

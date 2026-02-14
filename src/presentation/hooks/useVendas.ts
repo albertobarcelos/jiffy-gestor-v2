@@ -530,7 +530,7 @@ export function useEmitirNfeGestor() {
         throw new Error('Token não encontrado')
       }
 
-      // Mapear modelo para tipoDocumento
+      // Backend espera tipoDocumento (string) E modelo (number)
       const tipoDocumento = modelo === 55 ? 'NFE' : 'NFCE'
 
       const response = await fetch(`/api/vendas/gestor/${id}/emitir-nfe`, {
@@ -541,6 +541,7 @@ export function useEmitirNfeGestor() {
         },
         body: JSON.stringify({
           tipoDocumento,
+          modelo,
           serie,
           ambiente,
           crt,
@@ -565,23 +566,22 @@ export function useEmitirNfeGestor() {
       }
 
       const result = await response.json()
-      
-      // Verificar se a nota foi rejeitada mesmo com status 200
-      if (result.status === 'REJEITADA' && result.xmlRetorno) {
-        const xMotivo = extrairMotivoRejeicao(result.xmlRetorno)
-        const errorMessage = xMotivo 
-          ? `Nota fiscal rejeitada: ${xMotivo}`
-          : 'Nota fiscal rejeitada pela SEFAZ'
-        throw new Error(errorMessage)
-      }
-
       return result
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
       queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
       queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id] })
-      showToast.success('NFe emitida com sucesso!')
+
+      // Microserviço fiscal retorna status e mensagemAmigavel
+      if (data.status === 'REJEITADA') {
+        const motivo = data.mensagemAmigavel || 'Nota fiscal rejeitada pela SEFAZ'
+        showToast.error(motivo)
+      } else if (data.status === 'EMITIDA') {
+        showToast.success('NFe emitida com sucesso!')
+      } else {
+        showToast.success(`NFe processada (status: ${data.status})`)
+      }
     },
     onError: (error: Error) => {
       showToast.error(error.message || 'Erro ao emitir NFe')

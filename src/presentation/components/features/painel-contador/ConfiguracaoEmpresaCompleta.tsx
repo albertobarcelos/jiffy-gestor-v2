@@ -148,13 +148,10 @@ export function ConfiguracaoEmpresaCompleta() {
         })
       }
 
-      // Buscar configuração fiscal
-      const tokenInfo = auth?.getAccessToken() ? extractTokenInfo(auth.getAccessToken()) : null
-      const empresaId = tokenInfo?.empresaId
-      
-      if (empresaId) {
+      // Buscar configuração fiscal (empresaId é extraído do JWT pelo backend)
+      {
         const fiscalResponse = await fetch(
-          `/api/v1/fiscal/empresas-fiscais/${empresaId}`,
+          `/api/v1/fiscal/empresas-fiscais/me`,
           { headers: { Authorization: `Bearer ${token}` } }
         )
 

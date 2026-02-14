@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
     const apiClient = new ApiClient()
     // Usar rota específica para gestor quando origem = "GESTOR"
     const endpoint = body.origem === 'GESTOR' 
-      ? `/api/v1/operacao-pdv/vendas/gestor`
+      ? `/api/v1/gestor/vendas`
       : `/api/v1/operacao-pdv/vendas`
     
     const response = await apiClient.request<any>(

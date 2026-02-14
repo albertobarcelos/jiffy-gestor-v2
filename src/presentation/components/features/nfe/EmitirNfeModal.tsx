@@ -26,22 +26,36 @@ export function EmitirNfeModal({ open, onClose, vendaId, vendaNumero, tabelaOrig
     ambiente: 'PRODUCAO' as 'HOMOLOGACAO' | 'PRODUCAO',
     crt: 1 as 1 | 2 | 3, // 1=Simples Nacional, 2=Simples Excesso, 3=Regime Normal
   })
+  
+  // Estado para controlar se está processando (desabilita botão imediatamente)
+  const [emissaoEmProcessamento, setEmissaoEmProcessamento] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    // Desabilitar botão imediatamente
+    if (emissaoEmProcessamento) return
+    
+    setEmissaoEmProcessamento(true)
+
     try {
-      await emitirNfe.mutateAsync({
+      const result = await emitirNfe.mutateAsync({
         id: vendaId,
         modelo: formData.modelo,
         serie: formData.serie,
         ambiente: formData.ambiente,
         crt: formData.crt,
       })
-      onClose()
+
+      // Só fecha o modal se emitida com sucesso; rejeitada mantém aberto para o usuário ver o toast
+      if (result?.status === 'EMITIDA') {
+        onClose()
+      }
     } catch (error) {
-      // Erro já é tratado pelo hook com toast
+      // Erro de rede/servidor já é tratado pelo hook com toast
       console.error('Erro ao emitir NFe:', error)
+    } finally {
+      setEmissaoEmProcessamento(false)
     }
   }
 
@@ -125,11 +139,21 @@ export function EmitirNfeModal({ open, onClose, vendaId, vendaNumero, tabelaOrig
           </div>
 
           <DialogFooter sx={{ mt: 3 }}>
-            <Button type="button" variant="outlined" onClick={onClose}>
+            <Button 
+              type="button" 
+              variant="outlined" 
+              onClick={onClose}
+              disabled={emissaoEmProcessamento || emitirNfe.isPending}
+            >
               Cancelar
             </Button>
-            <Button type="submit" variant="contained" isLoading={emitirNfe.isPending}>
-              Emitir NFe
+            <Button 
+              type="submit" 
+              variant="contained" 
+              isLoading={emissaoEmProcessamento || emitirNfe.isPending}
+              disabled={emissaoEmProcessamento || emitirNfe.isPending}
+            >
+              {emissaoEmProcessamento || emitirNfe.isPending ? 'Emitindo...' : 'Emitir NFe'}
             </Button>
           </DialogFooter>
         </form>

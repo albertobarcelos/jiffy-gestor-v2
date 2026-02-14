@@ -24,7 +24,7 @@ export async function GET(
 
     const apiClient = new ApiClient()
     const response = await apiClient.request<any>(
-      `/api/v1/operacao-pdv/vendas/gestor/${id}`,
+      `/api/v1/gestor/vendas/${id}`,
       {
         method: 'GET',
         headers: {

@@ -214,9 +214,9 @@ export async function DELETE(req: NextRequest) {
     })
 
     // ✅ Arquitetura correta: Frontend → Next.js API Route → jiffy-backend → App-Services → FiscalGateway → FiscalService
-    // Remover do jiffy-backend
+    // Segurança: empresaId é extraído do JWT pelo backend, não mais passado na URL
     const response = await fetch(
-      `${BACKEND_URL}/api/v1/fiscal/certificados/${tokenInfo.empresaId}?ambiente=${ambiente}`,
+      `${BACKEND_URL}/api/v1/fiscal/certificados/me?ambiente=${ambiente}`,
       {
         method: 'DELETE',
         headers: {

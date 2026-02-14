@@ -16,11 +16,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     
     console.log('📤 [API Route] Criando venda gestor:', {
-      url: `${BACKEND_URL}/api/v1/operacao-pdv/vendas/gestor`,
+      url: `${BACKEND_URL}/api/v1/gestor/vendas`,
       body: JSON.stringify(body, null, 2),
     })
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/operacao-pdv/vendas/gestor`, {
+    const response = await fetch(`${BACKEND_URL}/api/v1/gestor/vendas`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

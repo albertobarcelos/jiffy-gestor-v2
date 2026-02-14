@@ -2,11 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 
-/**
- * GET /api/vendas/unificado
- * Proxy passthrough para GET /api/v1/vendas/unificado do backend.
- * Parâmetros são repassados diretamente (frontend já envia no formato correto).
- */
 export async function GET(request: NextRequest) {
   try {
     const validation = validateRequest(request)
@@ -15,27 +10,24 @@ export async function GET(request: NextRequest) {
     }
     const { tokenInfo } = validation
 
-    // Repassa query params diretamente ao backend
-    const { searchParams } = new URL(request.url)
-
     const apiClient = new ApiClient()
+    // Segurança: empresaId é extraído do JWT pelo backend, não mais passado na URL
     const response = await apiClient.request<any>(
-      `/api/v1/vendas/unificado?${searchParams.toString()}`,
+      `/api/v1/fiscal/empresas-fiscais/me`,
       {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${tokenInfo.token}`,
-          'Content-Type': 'application/json',
         },
       }
     )
 
-    return NextResponse.json(response.data || {})
+    return NextResponse.json(response.data)
   } catch (error) {
-    console.error('Erro ao buscar vendas unificadas:', error)
+    console.error('Erro ao buscar configuração fiscal:', error)
     if (error instanceof ApiError) {
       return NextResponse.json(
-        { error: error.message || 'Erro ao buscar vendas unificadas' },
+        { error: error.message || 'Erro ao buscar configuração fiscal' },
         { status: error.status }
       )
     }
