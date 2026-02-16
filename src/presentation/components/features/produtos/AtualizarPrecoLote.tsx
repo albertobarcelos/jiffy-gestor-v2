@@ -1325,7 +1325,7 @@ export function AtualizarPrecoLote() {
               <div className="flex-1 md:w-14 text-xs">Código</div>
               <div className="flex-[1.5] text-xs">Nome</div>
               <div className="flex-[1.2] text-center hidden md:flex">Impressoras</div>
-              <div className="flex-[1.2] text-center hidden md:flex">Grupos</div>
+              <div className="flex-[1.2] text-center hidden md:flex">Grupos Complementos</div>
               <div className="md:flex-1 text-right text-xs">Valor atual</div>
             </div>
 
