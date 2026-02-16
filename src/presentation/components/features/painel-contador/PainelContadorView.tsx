@@ -1,11 +1,19 @@
 'use client'
 
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { MdCheckCircle } from 'react-icons/md'
 import { Button } from '@/src/presentation/components/ui/button'
 import { useTabsStore } from '@/src/presentation/stores/tabsStore'
 import { ConfiguracaoImpostosView } from '@/src/presentation/components/features/impostos/ConfiguracaoImpostosView'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { CertificadoUploadModal } from './CertificadoUploadModal'
+import { showToast } from '@/src/shared/utils/toast'
+import { MapearProdutosView } from './MapearProdutosView'
+import { Etapa1DadosFiscaisEmpresa } from './Etapa1DadosFiscaisEmpresa'
+import { Etapa3EmissorFiscal } from './Etapa3EmissorFiscal'
+import { Etapa4CenarioFiscal } from './Etapa4CenarioFiscal'
+import { Etapa5TabelaIbpt } from './Etapa5TabelaIbpt'
+import { ConfiguracaoEmpresaCompleta } from './ConfiguracaoEmpresaCompleta'
 
 /**
  * Página principal do Portal do Contador (conteúdo completo).
@@ -13,9 +21,12 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
  */
 export function PainelContadorView() {
   const { addTab, activeTabId, setActiveTab: setActiveTabStore } = useTabsStore()
-  const { auth } = useAuthStore()
-  const [empresaNome, setEmpresaNome] = React.useState<string>('Empresa')
-  const [empresaCnpj, setEmpresaCnpj] = React.useState<string>('--')
+  const { auth, isRehydrated } = useAuthStore()
+  const [empresaNome, setEmpresaNome] = useState<string>('Empresa')
+  const [empresaCnpj, setEmpresaCnpj] = useState<string>('--')
+  const [certificado, setCertificado] = useState<any>(null)
+  const [isLoadingCertificado, setIsLoadingCertificado] = useState(true)
+  const [showUploadModal, setShowUploadModal] = useState(false)
 
   useEffect(() => {
     addTab({
@@ -34,6 +45,9 @@ export function PainelContadorView() {
 
   // Busca dados da empresa para exibir nome e CNPJ
   useEffect(() => {
+    // Aguardar reidratação do Zustand antes de fazer requisições
+    if (!isRehydrated) return
+    
     const loadEmpresa = async () => {
       const token = auth?.getAccessToken()
       if (!token) return
@@ -59,16 +73,120 @@ export function PainelContadorView() {
     loadEmpresa()
   }, [auth])
 
+  // Busca dados do certificado
+  const loadCertificado = async () => {
+    const token = auth?.getAccessToken()
+    if (!token) return
+
+    setIsLoadingCertificado(true)
+    try {
+      const response = await fetch('/api/certificado', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) {
+        setCertificado(null)
+        return
+      }
+      const result = await response.json()
+      setCertificado(result.data)
+    } catch (error) {
+      console.error('Erro ao carregar certificado:', error)
+      setCertificado(null)
+    } finally {
+      setIsLoadingCertificado(false)
+    }
+  }
+
+  useEffect(() => {
+    if (isRehydrated) {
+      loadCertificado()
+    }
+  }, [auth, isRehydrated])
+
+  // Calcula dias restantes até expiração
+  const calcularDiasRestantes = (dataValidade: string | null | undefined): number | null => {
+    if (!dataValidade) return null
+    const hoje = new Date()
+    const validade = new Date(dataValidade)
+    const diffTime = validade.getTime() - hoje.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    return diffDays
+  }
+
+  // Formata data para exibição
+  const formatarData = (dataISO: string): string => {
+    const data = new Date(dataISO)
+    return data.toLocaleDateString('pt-BR')
+  }
+
   if (activeTabId === 'impostos') {
     return <ConfiguracaoImpostosView />
   }
 
+  if (activeTabId === 'config-ncm-cest') {
+    return <MapearProdutosView />
+  }
+
+  if (activeTabId === 'config-empresa-completa') {
+    return <ConfiguracaoEmpresaCompleta />
+  }
+
   const handleOpenCertificadoConfig = () => {
-    addTab({
-      id: 'config-certificado',
-      label: 'Configurar Certificado',
-      path: '/painel-contador/config/certificado',
-    })
+    setShowUploadModal(true)
+  }
+
+  const handleRemoverCertificado = async () => {
+    if (!certificado) return
+
+    // Confirmação antes de remover
+    const confirmar = window.confirm(
+      `Tem certeza que deseja remover o certificado digital?\n\n` +
+      `Ambiente: ${certificado.ambiente === 'HOMOLOGACAO' ? 'Homologação' : 'Produção'}\n\n` +
+      `Após a remoção, não será mais possível emitir notas fiscais até que um novo certificado seja cadastrado.`
+    )
+
+    if (!confirmar) return
+
+    const token = auth?.getAccessToken()
+    if (!token) {
+      showToast.error('Sessão expirada. Faça login novamente.')
+      return
+    }
+
+    const toastId = showToast.loading('Removendo certificado...')
+
+    try {
+      // UF não é mais necessária - uma empresa tem apenas UMA configuração por ambiente
+      const response = await fetch(
+        `/api/certificado?ambiente=${certificado.ambiente}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      )
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Erro ao remover certificado')
+      }
+
+      showToast.successLoading(toastId, 'Certificado removido com sucesso!')
+      
+      // Recarregar dados (agora não terá certificado)
+      await loadCertificado()
+    } catch (error: any) {
+      console.error('Erro ao remover certificado:', error)
+      showToast.errorLoading(toastId, error.message || 'Erro ao remover certificado')
+    }
+  }
+
+  const handleCertificadoSuccess = async () => {
+    // Aguardar um pouco para garantir que o certificado foi salvo no banco
+    await new Promise(resolve => setTimeout(resolve, 500))
+    // Recarregar dados do certificado
+    await loadCertificado()
   }
 
   const handleOpenNCMConfig = () => {
@@ -89,7 +207,14 @@ export function PainelContadorView() {
   }
 
   return (
-    <div className="pb-2 flex h-full w-full flex-col items-stretch bg-info overflow-y-auto lg:flex-row lg:overflow-hidden">
+    <>
+      <CertificadoUploadModal 
+        open={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        onSuccess={handleCertificadoSuccess}
+      />
+      
+      <div className=" pb-2 flex h-full w-full flex-col items-stretch bg-info overflow-y-auto lg:flex-row lg:overflow-hidden">
       {/* Painel Esquerdo - Roxo */}
       <div className="flex min-h-[350px] md:min-h-full flex-1 md:w-[58%] w-full flex-col overflow-hidden rounded-tr-none rounded-br-none bg-secondary lg:rounded-tr-[48px] lg:rounded-br-[48px]">
         {/* Seção Superior com Título e Ilustração */}
@@ -156,15 +281,15 @@ export function PainelContadorView() {
         {/* Barra de Progresso */}
         <div className="h-auto md:h-full mx-4 mt-4 flex-1 flex flex-col">
           <h2 className="font-manrope font-bold text-white text-[clamp(12px,2.5vw,16px)] sm:text-[clamp(14px,3vw,18px)] md:text-[clamp(16px,3.5vw,22px)] lg:text-[24px] tracking-[-0.32px] leading-[1.4] md:leading-[1.3] mb-1.5 sm:mb-1.75 md:mb-2 break-words">
-            Configuração Contábil: 3 de 5 Etapas concluídas
+            Configuração Contábil: 4 de 5 Etapas concluídas
           </h2>
 
           <div className="w-full max-w-[947px] h-[18px] sm:h-[20px] md:h-[22px] lg:h-[26px] bg-[#f5f8fa] rounded-xl relative overflow-hidden mb-2 sm:mb-2.25 md:mb-2.5 lg:mb-3">
             <div className="h-full w-[60%] max-w-[422px] bg-accent1 rounded-xl" />
           </div>
 
-          <div className="flex flex-col py-4 px-2 gap-[0.75rem] sm:gap-1 md:gap-[1.25rem] lg:gap-[1.5rem]">
-            {['Certificado Cadastrado', 'Regime Tributário Definido', 'Mapeamento dos NCMs'].map((etapa) => (
+          <div className="flex flex-col px-4 gap-[0.75rem] sm:gap-1 md:gap-[1.25rem] lg:gap-[1.5rem]">
+            {['Dados Fiscais Configurados', 'Certificado Cadastrado', 'Emissor Fiscal Configurado', 'Mapeamento dos NCMs'].map((etapa) => (
               <div key={etapa} className="flex items-center gap-[0.5rem] sm:gap-[0.75rem]">
                 <MdCheckCircle className="flex-shrink-0 text-white" size={20} />
                 <span className="font-manrope font-bold text-white text-[clamp(11px,2.2vw,14px)] sm:text-[clamp(12px,2.5vw,16px)] md:text-[clamp(14px,3vw,16px)] lg:text-[18px] tracking-[-0.2px] leading-[1.4] md:leading-[1.3]">
@@ -181,107 +306,103 @@ export function PainelContadorView() {
         {[
           {
             id: 1,
-            title: 'Configurar Certificado Digital',
+            title: 'Dados Fiscais da Empresa',
+            content: <Etapa1DadosFiscaisEmpresa />,
+          },
+          {
+            id: 2,
+            title: 'Certificado Digital',
             content: (
               <>
               <div className="flex flex-row w-full mb-2 items-center rounded-[10px] md:px-3 py-1 md:gap-2">
                 <div className="flex flex-col gap-1">
                 <p className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
-                  Cadastre o certificado digital da empresa e deixe sua comunicação com a SEFAZ funcionando
+                  {certificado 
+                    ? 'Certificado digital cadastrado e ativo' 
+                    : 'Cadastre o certificado digital da empresa e deixe sua comunicação com a SEFAZ funcionando'}
                 </p>
-                  <span className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
-                    Tipo: A1
-                  </span>
-                  <span className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
-                    Validade: 22/12/2025
-                  </span>
+                  {certificado && (
+                    <>
+                      <span className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
+                        Tipo: A1
+                      </span>
+                      <span className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
+                        Validade: {certificado.validadeCertificado ? formatarData(certificado.validadeCertificado) : '--'}
+                      </span>
+                      <span className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
+                        Ambiente: {certificado.ambiente === 'HOMOLOGACAO' ? 'Homologação' : 'Produção'}
+                      </span>
+                    </>
+                  )}
                 </div>
-                <div className="flex flex-col w-full mb-2 items-center rounded-[10px] md:px-3 py-1 gap-2">
-                  <Button
-                    onClick={handleOpenCertificadoConfig}
-                    className="rounded-lg md:px-3 md:py-2 py-1 text-white text-sm font-medium"
-                    sx={{
-                      backgroundColor: 'var(--color-secondary)',
-                      '&:hover': { backgroundColor: 'var(--color-alternate)' },
-                    }}
-                  >
-                    Cadastrar Certificado
-                  </Button>
-                  <span className="font-inter font-medium text-[#f6f8fc] text-sm bg-accent1 rounded-lg md:px-3 px-1 md:py-1 py-1">
-                    Expira em 27 dias
-                  </span>
+                <div className="flex flex-col w-full mb-2 items-center rounded-[10px] px-3 py-1 gap-2">
+                  {certificado ? (
+                    <Button
+                      onClick={handleRemoverCertificado}
+                      className="rounded-lg px-3 py-2 text-white text-sm font-medium"
+                      disabled={isLoadingCertificado}
+                      sx={{
+                        backgroundColor: '#dc2626',
+                        '&:hover': { backgroundColor: '#b91c1c' },
+                      }}
+                    >
+                      Remover Certificado
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleOpenCertificadoConfig}
+                      className="rounded-lg px-3 py-2 text-white text-sm font-medium"
+                      disabled={isLoadingCertificado}
+                      sx={{
+                        backgroundColor: 'var(--color-secondary)',
+                        '&:hover': { backgroundColor: 'var(--color-alternate)' },
+                      }}
+                    >
+                      Cadastrar Certificado
+                    </Button>
+                  )}
+                  {certificado && certificado.validadeCertificado && (() => {
+                    const diasRestantes = calcularDiasRestantes(certificado.validadeCertificado)
+                    if (diasRestantes === null) return null
+                    
+                    const isExpiringSoon = diasRestantes <= 30
+                    const isExpired = diasRestantes < 0
+                    
+                    return (
+                      <span 
+                        className={`font-inter font-medium text-sm rounded-lg px-3 py-1 ${
+                          isExpired 
+                            ? 'bg-[#ffa3a3] text-[#dd1717]' 
+                            : isExpiringSoon 
+                            ? 'bg-[#fff3cd] text-[#856404]' 
+                            : 'bg-accent1 text-[#f6f8fc]'
+                        }`}
+                      >
+                        {isExpired 
+                          ? 'Expirado' 
+                          : `Expira em ${diasRestantes} dia${diasRestantes !== 1 ? 's' : ''}`}
+                      </span>
+                    )
+                  })()}
                   </div>
                 </div>
-              </>
-            ),
-          },
-          {
-            id: 2,
-            title: 'Mapear NCM, Cest e CFOP',
-            content: (
-              <>
-              <div className="flex flex-row w-full mb-2 items-center rounded-[10px] md:px-3 py-1 md:gap-2">
-                <div className="flex flex-row justify-between gap-1">
-                <p className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
-                  Classifique produtos para que notas e impostos sejam calculados corretamente
-                </p>
-                <div className="flex flex-col w-full mb-2 items-center rounded-[10px] md:px-3 py-1 gap-2">
-                  <Button
-                    onClick={handleOpenNCMConfig}
-                    className="rounded-lg md:px-3 md:py-2 py-1 text-white text-sm font-medium"
-                    sx={{
-                      backgroundColor: 'var(--color-secondary)',
-                      '&:hover': { backgroundColor: 'var(--color-alternate)' },
-                    }}
-                  >
-                    Mapear Produtos
-                  </Button>
-                  <div className="inline-flex items-center rounded-lg bg-[#ffa3a3] px-3 py-2 sm:h-[28px] lg:h-[30px] w-fit">
-                    <span className="font-inter font-medium text-[#dd1717] text-[11px] sm:text-[12px] leading-[1.4]">
-                      8 PRODUTOS PENDENTES
-                    </span>
-                  </div>
-                </div>
-                </div>
-              </div>
               </>
             ),
           },
           {
             id: 3,
-            title: 'Configurar Impostos',
-            content: (
-              <>
-              <div className="flex flex-row w-full mb-2 items-center rounded-[10px] md:px-3 py-1 md:gap-2">
-                <div className="flex flex-col w-full mb-2 items-start rounded-[10px] md:px-3 py-1 gap-2">
-                <p className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
-                  Configure os cenários fiscais e defina as regras de impostos para sua empresa
-                </p>
-                  <span className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
-                    Cenário: Padrão
-                  </span>
-                  <span className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
-                    Status: Ativo
-                  </span>
-                </div>
-                <div className="flex flex-col w-full mb-2 items-center rounded-[10px] md:px-3 py-1 gap-2">
-                  <Button
-                    onClick={handleOpenImpostosConfig}
-                    className="rounded-lg md:px-3 md:py-2 py-1 text-white text-sm font-medium"
-                    sx={{
-                      backgroundColor: 'var(--color-secondary)',
-                      '&:hover': { backgroundColor: 'var(--color-alternate)' },
-                    }}
-                  >
-                    Configurar Impostos
-                  </Button>
-                  <span className="font-inter font-medium text-[#f6f8fc] text-sm bg-accent1 rounded-lg px-3 py-1">
-                    Configurado
-                  </span>
-                </div>
-                </div>
-              </>
-            ),
+            title: 'Emissor Fiscal',
+            content: <Etapa3EmissorFiscal />,
+          },
+          {
+            id: 4,
+            title: 'Cenário Fiscal',
+            content: <Etapa4CenarioFiscal />,
+          },
+          {
+            id: 5,
+            title: 'Tabela IBPT',
+            content: <Etapa5TabelaIbpt />,
           },
         ].map((step, index, arr) => (
           <div key={step.id} className="flex items-stretch gap-3">
@@ -308,5 +429,6 @@ export function PainelContadorView() {
         ))}
       </div>
     </div>
+    </>
   )
 }

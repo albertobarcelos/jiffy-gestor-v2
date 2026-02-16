@@ -3,10 +3,20 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
-import { MdClose, MdRestaurant, MdAttachMoney } from 'react-icons/md'
-import { CircularProgress } from '@mui/material'
+import { MdClose, MdRestaurant, MdAttachMoney, MdCancel } from 'react-icons/md'
+import { 
+  CircularProgress, 
+  TextField, 
+  Button, 
+  Dialog as MuiDialog,
+  DialogTitle,
+  DialogContent as MuiDialogContent,
+  DialogActions
+} from '@mui/material'
 import { showToast } from '@/src/shared/utils/toast'
 import { TipoVendaIcon } from './TipoVendaIcon'
+import { useCancelarVendaGestor } from '@/src/presentation/hooks/useVendas'
+import { StatusFiscalBadge } from '@/src/presentation/components/features/nfe/StatusFiscalBadge'
 
 // Tipos
 interface VendaDetalhes {
@@ -30,6 +40,12 @@ interface VendaDetalhes {
   troco?: number
   produtosLancados: ProdutoLancado[]
   pagamentos: Pagamento[]
+  // Campos fiscais
+  statusVenda?: string | null
+  origem?: string | null
+  solicitarEmissaoFiscal?: boolean | null
+  statusFiscal?: string | null
+  documentoFiscalId?: string | null
 }
 
 interface ProdutoLancado {
@@ -88,19 +104,25 @@ interface DetalhesVendasProps {
   vendaId: string
   open: boolean
   onClose: () => void
+  tabelaOrigem?: 'venda' | 'venda_gestor' // Indica de qual tabela buscar
 }
 
 /**
  * Modal de detalhes da venda
  * Exibe informações completas da venda, produtos lançados e pagamentos
  */
-export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) {
+export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' }: DetalhesVendasProps) {
   const { auth } = useAuthStore()
   const [venda, setVenda] = useState<VendaDetalhes | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [nomesUsuarios, setNomesUsuarios] = useState<Record<string, string>>({})
   const [nomesMeiosPagamento, setNomesMeiosPagamento] = useState<Record<string, MeioPagamentoDetalhes>>({})
   const [nomeCliente, setNomeCliente] = useState<string | null>(null)
+  
+  // Estados para modal de cancelamento
+  const [isCancelarModalOpen, setIsCancelarModalOpen] = useState(false)
+  const [justificativa, setJustificativa] = useState('')
+  const cancelarVenda = useCancelarVendaGestor()
 
   /**
    * Formata valor como moeda brasileira
@@ -284,7 +306,12 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
     setNomesMeiosPagamento({}) // Limpa meios de pagamento anteriores
 
     try {
-      const response = await fetch(`/api/vendas/${vendaId}`, {
+      // Determinar endpoint baseado na tabela de origem
+      const endpoint = tabelaOrigem === 'venda_gestor'
+        ? `/api/vendas/gestor/${vendaId}`
+        : `/api/vendas/${vendaId}`
+
+      const response = await fetch(endpoint, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -417,7 +444,33 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
     } finally {
       setIsLoading(false)
     }
-  }, [vendaId, open, auth, fetchUsuarioNome, fetchMeioPagamento, fetchClienteNome, onClose])
+  }, [vendaId, open, auth, fetchUsuarioNome, fetchMeioPagamento, fetchClienteNome, onClose, tabelaOrigem])
+
+  /**
+   * Confirma cancelamento da venda
+   */
+  const handleConfirmarCancelamento = async () => {
+    if (!venda) return
+
+    if (justificativa.trim().length < 15) {
+      showToast.error('Justificativa deve ter no mínimo 15 caracteres')
+      return
+    }
+
+    try {
+      await cancelarVenda.mutateAsync({
+        id: venda.id,
+        motivo: justificativa.trim(),
+      })
+      
+      setIsCancelarModalOpen(false)
+      setJustificativa('')
+      onClose() // Fecha o modal de detalhes após cancelamento bem-sucedido
+    } catch (error) {
+      // Erro já tratado pelo hook
+      console.error('Erro ao cancelar venda:', error)
+    }
+  }
 
   useEffect(() => {
     if (open && vendaId) {
@@ -428,6 +481,8 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
       setNomeCliente(null)
       setNomesUsuarios({}) // Limpa cache de usuários
       setNomesMeiosPagamento({}) // Limpa cache de meios de pagamento
+      setIsCancelarModalOpen(false)
+      setJustificativa('')
     }
   }, [open, vendaId, fetchVendaDetalhes])
 
@@ -674,6 +729,46 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                       <span>{venda.identificacao}</span>
                     </div>
                   )}
+
+                  {/* Origem da Venda */}
+                  {venda.origem && (
+                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                      <span>
+                        Origem: 
+                      </span>
+                      <span>{venda.origem}</span>
+                    </div>
+                  )}
+
+                  {/* Status Fiscal */}
+                  {venda.statusFiscal && (
+                    <div className="flex justify-between items-center text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                      <span>
+                        Status Fiscal: 
+                      </span>
+                      <StatusFiscalBadge status={venda.statusFiscal} />
+                    </div>
+                  )}
+
+                  {/* Solicitar Emissão Fiscal */}
+                  {venda.solicitarEmissaoFiscal && (
+                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-yellow-50">
+                      <span>
+                        Solicitar Emissão Fiscal: 
+                      </span>
+                      <span className="font-semibold text-yellow-600">Sim</span>
+                    </div>
+                  )}
+
+                  {/* Documento Fiscal ID */}
+                  {venda.documentoFiscalId && (
+                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-green-50">
+                      <span>
+                        Documento Fiscal ID: 
+                      </span>
+                      <span className="font-mono text-xs">{venda.documentoFiscalId}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -912,6 +1007,19 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                   )}
                 </div>
               </div>
+
+              {/* Botão de Cancelamento - apenas para vendas do gestor finalizadas e não canceladas */}
+              {tabelaOrigem === 'venda_gestor' && venda.dataFinalizacao && !venda.dataCancelamento && (
+                <div className="mb-4 px-2">
+                  <button
+                    onClick={() => setIsCancelarModalOpen(true)}
+                    className="w-full py-3 bg-error text-white rounded-lg flex items-center justify-center gap-2 font-nunito hover:bg-error/90 transition-colors"
+                  >
+                    <MdCancel size={20} />
+                    Cancelar Venda
+                  </button>
+                </div>
+              )}
             </>
           ) : (
             <div className="flex justify-center items-center py-12">
@@ -920,6 +1028,65 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
           )}
         </div>
       </DialogContent>
+
+      {/* Modal de Justificativa de Cancelamento */}
+      <MuiDialog
+        open={isCancelarModalOpen}
+        onClose={() => setIsCancelarModalOpen(false)}
+        maxWidth="sm"
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            maxWidth: '500px',
+          },
+        }}
+      >
+        <DialogTitle sx={{ backgroundColor: 'var(--color-error)', color: 'white', fontFamily: 'Exo, sans-serif' }}>
+          Cancelar Venda
+        </DialogTitle>
+        <MuiDialogContent sx={{ p: 3, backgroundColor: 'var(--color-info)' }}>
+          <div className="space-y-4 pt-4">
+            <p className="text-sm text-secondary-text font-nunito">
+              Esta ação cancelará a venda e, se houver nota fiscal emitida, também a cancelará na SEFAZ.
+            </p>
+            <p className="text-sm font-bold text-error font-nunito">
+              Esta ação não pode ser desfeita!
+            </p>
+            <TextField
+              label="Justificativa do Cancelamento"
+              multiline
+              rows={4}
+              fullWidth
+              value={justificativa}
+              onChange={(e) => setJustificativa(e.target.value)}
+              placeholder="Digite o motivo do cancelamento (mínimo 15 caracteres)"
+              helperText={`${justificativa.length}/15 caracteres mínimos`}
+              error={justificativa.length > 0 && justificativa.length < 15}
+            />
+          </div>
+        </MuiDialogContent>
+        <DialogActions sx={{ p: 2, backgroundColor: 'var(--color-info)' }}>
+          <Button
+            onClick={() => {
+              setIsCancelarModalOpen(false)
+              setJustificativa('')
+            }}
+            variant="outlined"
+            disabled={cancelarVenda.isPending}
+          >
+            Voltar
+          </Button>
+          <Button
+            onClick={handleConfirmarCancelamento}
+            variant="contained"
+            color="error"
+            disabled={cancelarVenda.isPending || justificativa.trim().length < 15}
+            startIcon={cancelarVenda.isPending ? <CircularProgress size={20} /> : <MdCancel />}
+          >
+            {cancelarVenda.isPending ? 'Cancelando...' : 'Confirmar Cancelamento'}
+          </Button>
+        </DialogActions>
+      </MuiDialog>
     </Dialog>
   )
 }

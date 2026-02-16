@@ -12,7 +12,7 @@ export default function PainelContadorLayout({
     <div className="flex flex-col h-screen overflow-hidden">
       <TopNav />
       <TabBar />
-      <main className="flex-1 overflow-hidden min-h-0">{children}</main>
+      <main className="flex-1 overflow-y-auto min-h-0">{children}</main>
     </div>
   )
 }
