@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
 import { MdClose, MdRestaurant, MdAttachMoney, MdCancel } from 'react-icons/md'
@@ -34,6 +34,7 @@ interface VendaDetalhes {
   dataFinalizacao?: string
   canceladoPorId?: string
   ultimoResponsavelId?: string
+  statusMesa?: string
   clienteId?: string
   identificacao?: string
   troco?: number
@@ -60,6 +61,8 @@ interface ProdutoLancado {
   lancadoPorId: string
   vendaId: string
   removido: boolean
+  removidoPorId?: string
+  dataRemocao?: string
 }
 
 interface Complemento {
@@ -76,6 +79,7 @@ interface Pagamento {
   realizadoPorId: string
   canceladoPorId?: string
   cancelado: boolean
+  dataCancelamento?: string
   isTefUsed?: boolean; // Adicionado
   isTefConfirmed?: boolean; // Adicionado
 }
@@ -319,7 +323,67 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
         throw new Error(errorData.error || 'Erro ao buscar detalhes da venda')
       }
 
-      const data: VendaDetalhes = await response.json()
+      const dataRaw = await response.json()
+      
+      // Mapeia os dados da API para o formato esperado, garantindo que campos sejam capturados corretamente
+      // Verifica diferentes possíveis estruturas do codigoTerminal na resposta da API
+      let codigoTerminal = dataRaw.codigoTerminal || 
+                          dataRaw.terminal?.codigo || 
+                          dataRaw.terminal?.codigoInterno ||
+                          dataRaw.terminal?.codigoTerminal ||
+                          dataRaw.terminal?.code ||
+                          dataRaw.terminalCodigo || 
+                          dataRaw.codigoInterno ||
+                          dataRaw.codigo ||
+                          dataRaw.code ||
+                          ''
+      
+      // Se não encontrou o codigoTerminal e temos terminalId, busca os detalhes do terminal
+      if (!codigoTerminal && dataRaw.terminalId) {
+        try {
+          const terminalResponse = await fetch(`/api/terminais/${dataRaw.terminalId}/detalhes`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          })
+          
+          if (terminalResponse.ok) {
+            const terminalData = await terminalResponse.json()
+            codigoTerminal = terminalData.codigo || 
+                           terminalData.codigoInterno ||
+                           terminalData.codigoTerminal || 
+                           terminalData.code ||
+                           String(dataRaw.terminalId) || 
+                           ''
+          }
+        } catch (error) {
+          console.warn('Erro ao buscar código do terminal:', error)
+          // Fallback: usa o terminalId como código se não conseguir buscar
+          codigoTerminal = String(dataRaw.terminalId)
+        }
+      }
+      
+      // Se ainda não tem código, usa terminalId como fallback
+      if (!codigoTerminal && dataRaw.terminalId) {
+        codigoTerminal = String(dataRaw.terminalId)
+      }
+      
+      const data: VendaDetalhes = {
+        ...dataRaw,
+        codigoTerminal: codigoTerminal,
+      }
+      
+      // Debug: log para verificar se o campo está sendo capturado
+      if (typeof window !== 'undefined' && !codigoTerminal) {
+        console.warn('DetalhesVendas: codigoTerminal não encontrado na resposta da API', {
+          vendaId,
+          dataRaw,
+          terminal: dataRaw.terminal,
+          terminalId: dataRaw.terminalId,
+        })
+      }
+      
       setVenda(data)
 
       // Coleta todos os IDs de usuários únicos que precisam ser buscados
@@ -329,9 +393,11 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
       if (data.ultimoResponsavelId) userIdsToFetch.add(data.ultimoResponsavelId)
       data.produtosLancados?.forEach((p) => {
         if (p.lancadoPorId) userIdsToFetch.add(p.lancadoPorId)
+        if (p.removidoPorId) userIdsToFetch.add(p.removidoPorId)
       })
       data.pagamentos?.forEach((p) => {
         if (p.realizadoPorId) userIdsToFetch.add(p.realizadoPorId)
+        if (p.canceladoPorId) userIdsToFetch.add(p.canceladoPorId)
       })
 
       // Coleta todos os IDs de meios de pagamento únicos que precisam ser buscados
@@ -420,6 +486,43 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
     }
   }, [open, vendaId, fetchVendaDetalhes])
 
+  /**
+   * Calcula o troco baseado nos pagamentos válidos
+   * Exclui pagamentos cancelados e pagamentos com isTefConfirmed: false
+   * IMPORTANTE: Este hook deve ser chamado ANTES de qualquer return condicional
+   */
+  const trocoCalculado = useMemo(() => {
+    if (!venda || !venda.pagamentos || venda.pagamentos.length === 0) {
+      return 0;
+    }
+
+    // Filtra pagamentos válidos (mesma lógica do filtro de exibição)
+    const pagamentosValidos = venda.pagamentos.filter((p) => {
+      // Exclui pagamentos cancelados
+      const isCancelado = p.cancelado === true || (p.dataCancelamento !== null && p.dataCancelamento !== undefined);
+      
+      // Verifica se o pagamento usa TEF e se está confirmado
+      const usaTef = p.isTefUsed === true;
+      if (usaTef) {
+        const tefConfirmado = p.isTefConfirmed === true;
+        if (!tefConfirmado) {
+          return false; // Exclui pagamentos TEF não confirmados
+        }
+      }
+      
+      return !isCancelado; // Apenas pagamentos não cancelados e (não usa TEF ou TEF confirmado)
+    });
+
+    // Soma o total pago pelos pagamentos válidos
+    const totalPago = pagamentosValidos.reduce((sum, pagamento) => sum + pagamento.valor, 0);
+
+    // Calcula o troco: total pago - total da venda
+    // Se der negativo, troco = 0 (não pode haver troco negativo)
+    const troco = Math.max(0, totalPago - venda.valorFinal);
+
+    return troco;
+  }, [venda]);
+
   if (!open) return null
 
   const statusVenda = venda?.canceladoPorId
@@ -444,24 +547,37 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
         }
       }}
       fullWidth
-      maxWidth="sm"
+      maxWidth={false}
       sx={{
         '& .MuiDialog-container': {
           justifyContent: 'center',
           alignItems: 'center',
+          padding: {
+            xs: 0, // Remove padding em telas muito pequenas
+            sm: '16px', // Adiciona padding em telas maiores
+          },
         },
       }}
       PaperProps={{
         sx: {
           borderRadius: '22px',
-          maxWidth: '620px',
-          maxHeight: '90vh',
+          width: '100vw',
+          maxWidth: {
+            xs: '95vw', // Em telas muito pequenas, ocupa 100% da largura
+            sm: '95vw', // Em telas pequenas, ocupa 95% da largura
+            md: '620px', // Em telas médias e maiores, limita a 620px
+          },
+          maxHeight: '95vh',
+          margin: {
+            xs: 0, // Remove margem em telas muito pequenas
+            sm: '16px', // Adiciona margem em telas maiores
+          },
         },
       }}
     >
       <DialogContent sx={{ p: 0, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {/* AppBar */}
-        <div className="bg-primary rounded-t-lg px-4 py-3 flex items-center gap-3">
+        <div className="bg-primary rounded-t-lg md:px-4 py-3 flex items-center gap-3">
           <div className="flex items-center gap-2 flex-1 justify-center">
             {venda && (
               <TipoVendaIcon
@@ -493,10 +609,15 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
         </div>
 
         {/* Conteúdo */}
-        <div className="flex-1 overflow-y-auto px-4 py-2 bg-info">
+        <div className="flex-1 overflow-y-auto md:px-2 py-2 bg-info">
           {isLoading ? (
-            <div className="flex justify-center items-center py-12">
-              <CircularProgress />
+            <div className="flex flex-col items-center justify-center py-12">
+              <img
+                src="/images/jiffy-loading.gif"
+                alt="Carregando"
+                className="w-20 object-contain"
+              />
+              <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
             </div>
           ) : venda ? (
             <>
@@ -507,23 +628,33 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
                 </h2>
                 <div className="border-t border-dashed border-gray-400 mb-2"></div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 md:px-2">
                   {/* Status */}
-                  <div className={`flex justify-between px-3 py-2 rounded-lg ${statusColor} text-white text-sm font-nunito`}>
+                  <div className={`flex justify-between px-3 py-2 rounded-lg ${statusColor} text-white md:text-sm text-xs font-nunito`}>
                     Status: <span className="font-semibold">{statusVenda}</span>
                   </div>
 
                   {/* Aberto por */}
-                  <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                  <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
                     <span>
                       Aberto por: 
                     </span>
                     <span>{nomesUsuarios[venda.abertoPorId] || venda.abertoPorId}</span>
                   </div>
 
-                  {/* Finalizado Por */}
-                  {venda.ultimoResponsavelId && (
-                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                  {/* Última Alteração por - Só exibe quando statusMesa estiver aberta */}
+                  {venda.ultimoResponsavelId && venda.statusMesa === 'aberta' && (
+                    <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
+                      <span>
+                        Última Alteração por: 
+                      </span>
+                      <span>{nomesUsuarios[venda.ultimoResponsavelId] || venda.ultimoResponsavelId}</span>
+                    </div>
+                  )}
+
+                  {/* Finalizado Por - Só exibe se a venda não foi cancelada e statusMesa não estiver aberta */}
+                  {venda.ultimoResponsavelId && !venda.canceladoPorId && venda.statusMesa !== 'aberta' && (
+                    <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
                       <span>
                         Finalizado Por: 
                       </span>
@@ -533,35 +664,47 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
 
                   {/* Cancelado Por */}
                   {venda.canceladoPorId && (
-                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                    <div className="flex justify-between md:text-sm text-xs text-error font-nunito px-1 rounded-lg bg-white">
                       <span>
                         Cancelado Por: 
                       </span>
-                      <span>{nomesUsuarios[venda.canceladoPorId] || venda.canceladoPorId}</span>
+                      <span className="font-semibold">{nomesUsuarios[venda.canceladoPorId] || venda.canceladoPorId}</span>
+                    </div>
+                  )}
+
+                  {/* Data/Hora de Cancelamento */}
+                  {venda.dataCancelamento && (
+                    <div className="flex justify-between md:text-sm text-xs text-error font-nunito px-1 rounded-lg bg-white">
+                      <span>
+                        Cancelado em:
+                      </span>
+                      <span className="font-semibold">{formatDateTime(venda.dataCancelamento)}</span>
                     </div>
                   )}
 
                   {/* Código do Terminal */}
-                  <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                  {venda.codigoTerminal && (
+                  <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
                     <span>
                       Código do Terminal: 
                     </span>
                     <span>#{venda.codigoTerminal}</span>
                   </div>
+                  )}
 
                   {/* Data/Hora de Criação */}
-                  <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                  <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
                     <span>
-                      Data/Hora de Criação: 
+                      Data/Hora Criação: 
                     </span>
                     <span>{formatDateTime(venda.dataCriacao)}</span>
                   </div>
 
                   {/* Data/Hora de Finalização */}
                   {venda.dataFinalizacao && (
-                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                    <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
                       <span>
-                        Data/Hora de Finalização: 
+                        Data/Hora Finalização: 
                       </span>
                       <span>{formatDateTime(venda.dataFinalizacao)}</span>
                     </div>
@@ -569,7 +712,7 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
 
                   {/* Cliente Vinculado */}
                   {venda.clienteId && nomeCliente && (
-                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                    <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
                       <span>
                         Cliente Vinculado: 
                       </span>
@@ -579,7 +722,7 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
 
                   {/* Identificação da Venda */}
                   {venda.identificacao && (
-                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                    <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
                       <span>
                         Identificação da Venda: 
                       </span>
@@ -640,11 +783,13 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
                   {venda.produtosLancados?.map((produto, index) => {
                     const valorTotal = calcularValorProduto(produto)
                     const isRemovido = produto.removido
+                    // Se o produto foi removido, o valor total exibido deve ser R$ 0,00
+                    const valorExibir = isRemovido ? 0 : valorTotal
 
                     return (
                       <div
                         key={index}
-                        className={`px-3 rounded-lg ${
+                        className={`md:px-3 px-1 rounded-lg ${
                           isRemovido ? 'bg-error/20' : 'bg-white'
                         }`}
                       >
@@ -652,7 +797,7 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
                           {/* Linha do produto principal */}
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex-2 items-center gap-2">
-                              <span className="text-sm font-semibold text-primary-text font-nunito">
+                              <span className="md:text-sm text-xs font-semibold text-primary-text font-nunito">
                                 {produto.quantidade}x {produto.nomeProduto} ({formatNumber(produto.valorUnitario)})
                               </span>
                             </div>
@@ -670,7 +815,7 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
                                   ? `${Math.round(acrescimoValue * 100)}%` 
                                   : formatNumber(acrescimoValue)
                                 return (
-                                  <div className="flex-1 flex justify-start text-xs text-secondary-text font-nunito">
+                                  <div className="flex-1 flex justify-start md:text-sm text-xs text-secondary-text font-nunito">
                                     <span className="text-success">
                                       Acresc. +{valorExibir}
                                     </span>
@@ -694,13 +839,13 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
                               return null
                             })()}
                             <div className="flex-1 flex items-center justify-end text-sm font-semibold text-primary-text font-nunito">
-                              {formatCurrency(valorTotal)}
+                              {formatCurrency(valorExibir)}
                             </div>
                           </div>
 
                           {/* Linhas dos complementos */}
                           {produto.complementos && produto.complementos.length > 0 && (
-                            <div className="space-y-1 ml-7">
+                            <div className="space-y-1 md:ml-7 ml-2">
                               {produto.complementos.map((complemento, compIndex) => {
                                 const valorTotalComplemento = calcularValorComplemento(complemento)
                                 const temImpactoPreco = complemento.tipoImpactoPreco !== 'nenhum'
@@ -724,10 +869,22 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
                           )}
 
                           {/* Informações de lançamento */}
-                          <div className="text-xs text-secondary-text mt-1 ml-7">
-                            Lançado: {formatDateTime(produto.dataLancamento)} | Usuário:{' '}
-                            {nomesUsuarios[produto.lancadoPorId] || produto.lancadoPorId}
+                          <div className="flex flex-col md:flex-row text-xs text-secondary-text mt-1 md:ml-7">
+                            <span>Lançado: {formatDateTime(produto.dataLancamento)} |</span> <span>Usuário: {' '}
+                            {nomesUsuarios[produto.lancadoPorId] || produto.lancadoPorId}</span>
                           </div>
+
+                          {/* Informações de remoção (se produto foi removido) */}
+                          {isRemovido && produto.removidoPorId && (
+                            <div className="text-xs text-error mt-1 ml-7">
+                              Removido por: {nomesUsuarios[produto.removidoPorId] || produto.removidoPorId}
+                            </div>
+                          )}
+                          {isRemovido && produto.dataRemocao && (
+                            <div className="text-xs text-error ml-7">
+                              Removido em: {formatDateTime(produto.dataRemocao)}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )
@@ -748,7 +905,7 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
               </div>
 
               {/* Card Pagamentos Realizados */}
-              <div className="mb-4">
+              <div className="px-2 mb-4">
                 <h2 className="text-lg font-bold font-exo text-primary-text mb-2">
                   Pagamentos Realizados
                 </h2>
@@ -757,27 +914,27 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
                 <div className="space-y-2">
                   {venda.pagamentos
                     ?.filter((p) => {
-                      // Regra 1: Se `canceled` for `true`, NÃO exibir o meio de pagamento.
-                      if (p.cancelado === true) {
-                        return false;
+                      // Exclui pagamentos cancelados (que são exibidos com cor vermelha em outro lugar se necessário)
+                      const isCancelado = p.cancelado === true || (p.dataCancelamento !== null && p.dataCancelamento !== undefined);
+                      
+                      // Verifica se o pagamento usa TEF e se está confirmado
+                      // Se isTefUsed === true, então isTefConfirmed deve ser === true
+                      // Se isTefUsed === false ou não existe, o pagamento é válido (não usa TEF)
+                      const usaTef = p.isTefUsed === true;
+                      if (usaTef) {
+                        const tefConfirmado = p.isTefConfirmed === true;
+                        if (!tefConfirmado) {
+                          return false; // Exclui pagamentos TEF não confirmados
+                        }
                       }
-
-                      // Regra 2: Se `isTefUsed` for `true` E `isTefConfirmed` for `false`, NÃO exibir.
-                      // Tratamos `isTefUsed` e `isTefConfirmed` como false se forem undefined/null para a comparação.
-                      const isUsed = p.isTefUsed === true;
-                      const isConfirmed = p.isTefConfirmed === true;
-                      if (isUsed && !isConfirmed) {
-                        return false;
-                      }
-
-                      // Regra 3: Em todos os outros casos, EXIBIR o meio de pagamento.
-                      // O campo 'tf' (representado por `isTefUsed`) não impede a exibição por si só quando falso,
-                      // desde que não caia nas regras de não exibição acima.
-                      return true;
+                      
+                      // Exibe pagamentos válidos: não cancelados e (não usa TEF ou TEF confirmado)
+                      return !isCancelado;
                     })
                     .map((pagamento, index) => {
                       const meio = nomesMeiosPagamento[pagamento.meioPagamentoId]
                       const formaPagamento = meio?.formaPagamentoFiscal || ''
+                      const isCancelado = pagamento.cancelado === true
 
                       const getIcon = () => {
                         if (formaPagamento.toLowerCase().includes('dinheiro')) return '💵'
@@ -787,13 +944,25 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
                       }
 
                       return (
-                        <div key={index} className="px-3 py-2 rounded-lg bg-[#4BD08A] flex items-center gap-3">
-                          <div className="w-[68px] h-[62px] rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
+                        <div 
+                          key={index} 
+                          className={`px-3 py-2 rounded-lg flex items-center gap-3 ${
+                            isCancelado ? 'bg-error/20' : 'bg-[#4BD08A]'
+                          }`}
+                        >
+                          <div className={`w-[68px] h-[62px] rounded-lg flex items-center justify-center flex-shrink-0 ${
+                            isCancelado ? 'bg-error/30' : 'bg-primary'
+                          }`}>
                             <span className="text-white text-2xl">{getIcon()}</span>
                           </div>
                           <div className="flex-1">
                             <div className="text-sm font-bold text-primary-text font-nunito">
                               {meio?.nome || 'Meio de pagamento desconhecido'}
+                              {isCancelado && (
+                                <span className="ml-2 text-xs text-error font-semibold">
+                                  (CANCELADO)
+                                </span>
+                              )}
                             </div>
                             <div className="text-xs text-secondary-text font-nunito">
                               {formatDateTime(pagamento.dataCriacao)}
@@ -804,16 +973,35 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
                             <div className="text-xs text-secondary-text font-nunito">
                               PDV Resp.: {nomesUsuarios[pagamento.realizadoPorId] || pagamento.realizadoPorId}
                             </div>
+                            {isCancelado && pagamento.canceladoPorId && (
+                              <div className="text-xs text-error font-nunito mt-1">
+                                Cancelado por: {nomesUsuarios[pagamento.canceladoPorId] || pagamento.canceladoPorId}
+                              </div>
+                            )}
+                            {isCancelado && pagamento.dataCancelamento && (
+                              <div className="text-xs text-error font-nunito">
+                                Cancelado em: {formatDateTime(pagamento.dataCancelamento)}
+                              </div>
+                            )}
                           </div>
                         </div>
                       )
                     })}
 
-                  {/* Troco */}
-                  {venda.troco != null && Number(venda.troco) > 0 && (
+                  {/* Troco - Código original comentado (vem da API) */}
+                  {/* {venda.troco != null && Number(venda.troco) > 0 && (
                     <div className="px-3 py-2 rounded-lg bg-white shadow-sm">
                       <span className="text-sm font-semibold text-primary-text font-nunito">
                         Troco: {formatCurrency(venda.troco)}
+                      </span>
+                    </div>
+                  )} */}
+
+                  {/* Troco calculado no frontend */}
+                  {trocoCalculado > 0 && (
+                    <div className="px-3 py-2 rounded-lg bg-white shadow-sm">
+                      <span className="text-sm font-semibold text-primary-text font-nunito">
+                        Troco: {formatCurrency(trocoCalculado)}
                       </span>
                     </div>
                   )}

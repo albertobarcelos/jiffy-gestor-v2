@@ -316,8 +316,13 @@ export function EditarTerminais({
       {/* Conteúdo com scroll */}
       <div className="flex-1 overflow-y-auto px-[30px] pt-2 pb-0">
           {isLoadingTerminal ? (
-            <div className="flex justify-center items-center">
-              <CircularProgress />
+            <div className="flex flex-col justify-center items-center py-6">
+              <img
+                src="/images/jiffy-loading.gif"
+                alt="Carregando"
+                className="w-16 h-16 object-contain"
+              />
+              <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
             </div>
           ) : (
             <>
@@ -359,7 +364,7 @@ export function EditarTerminais({
                 </div>
 
                 {/* Campos lado a lado: Modelo e Versão APK */}
-                <div className="flex gap-4">
+                <div className="flex flex-col md:flex-row gap-4">
                   <div className="flex-1">
                     <label className="block text-sm font-semibold text-primary-text mb-2 font-nunito">
                       Modelo do Dispositivo
@@ -410,7 +415,7 @@ export function EditarTerminais({
                   Preferências do Terminal
                 </h3>
 
-                <div className="flex gap-6">
+                <div className="flex flex-col md:flex-row gap-6">
                   {/* Switch de Compartilhamento (Lado Esquerdo) */}
                   <div className="flex-1">
                     <Box

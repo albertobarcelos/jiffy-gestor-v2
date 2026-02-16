@@ -17,12 +17,15 @@ import { DashboardEvolucao } from '@/src/domain/entities/DashboardEvolucao'
 interface GraficoVendasLinhaProps {
   periodo: string;
   selectedStatuses: string[];
+  periodoInicial?: Date | null;
+  periodoFinal?: Date | null;
+  intervaloHora?: number; // Intervalo em minutos (15, 30 ou 60)
 }
 
 /**
  * Gráfico de coluna para evolução de vendas
  */
-export function GraficoVendasLinha({ periodo, selectedStatuses }: GraficoVendasLinhaProps) {
+export function GraficoVendasLinha({ periodo, selectedStatuses, periodoInicial, periodoFinal, intervaloHora = 30 }: GraficoVendasLinhaProps) {
   const [data, setData] = useState<DashboardEvolucao[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -48,7 +51,17 @@ export function GraficoVendasLinha({ periodo, selectedStatuses }: GraficoVendasL
       try {
         const useCase = new BuscarEvolucaoVendasUseCase()
         const mappedPeriodo = mapPeriodoToUseCaseFormat(periodo);
-        const evolucao = await useCase.execute(mappedPeriodo, selectedStatuses)
+        // Se período for "Datas Personalizadas", usa as datas fornecidas
+        const useCustomDates = periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal;
+        // Se período for "Hoje", também usa o intervalo de hora
+        const useIntervaloHora = periodo === 'Hoje' || useCustomDates;
+        const evolucao = await useCase.execute(
+          mappedPeriodo, 
+          selectedStatuses, 
+          useCustomDates ? periodoInicial : undefined, 
+          useCustomDates ? periodoFinal : undefined,
+          useIntervaloHora ? intervaloHora : undefined
+        )
         setData(evolucao)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erro ao carregar dados')
@@ -58,7 +71,7 @@ export function GraficoVendasLinha({ periodo, selectedStatuses }: GraficoVendasL
     }
 
     loadData()
-  }, [periodo, selectedStatuses])
+  }, [periodo, selectedStatuses, periodoInicial, periodoFinal, intervaloHora])
 
   const formatCurrency = (value: number) => {
     return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -66,7 +79,7 @@ export function GraficoVendasLinha({ periodo, selectedStatuses }: GraficoVendasL
 
   if (isLoading) {
     return (
-      <div className="h-[300px] flex items-center justify-center">
+      <div className="h-full min-h-[300px] flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
       </div>
     )
@@ -74,7 +87,7 @@ export function GraficoVendasLinha({ periodo, selectedStatuses }: GraficoVendasL
 
   if (error) {
     return (
-      <div className="h-[300px] flex items-center justify-center">
+      <div className="h-full min-h-[300px] flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-600 mb-4">{error}</p>
           <button
@@ -90,7 +103,7 @@ export function GraficoVendasLinha({ periodo, selectedStatuses }: GraficoVendasL
 
   if (!data || data.length === 0) {
     return (
-      <div className="h-[300px] flex items-center justify-center">
+      <div className="h-full min-h-[300px] flex items-center justify-center">
         <p className="text-gray-500">Nenhum dado disponível</p>
       </div>
     )
@@ -122,22 +135,22 @@ export function GraficoVendasLinha({ periodo, selectedStatuses }: GraficoVendasL
   const finalMaxDomain = currentMax * 1.1;
 
   return (
-    <div className="w-full min-w-0" style={{ height: '300px' }}>
-      <ResponsiveContainer width="100%" height={300}>
+    <div className="w-full min-w-0 h-full" style={{ minHeight: '300px' }}>
+      <ResponsiveContainer width="100%" height="100%">
         <LineChart data={chartData} margin={{
-          top: 5, right: 30, left: 30, bottom: 5, // Aumenta a margem esquerda para o eixo Y
+          top: 5, right: 10, left: -25, bottom: 5, // Aumenta a margem esquerda para o eixo Y
         }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" opacity={0.5} />
           <XAxis
             dataKey="label"
-            tick={{ fontSize: '12px', fill: '#6B7280' }}
+            tick={{ fontSize: '10px', fill: '#6B7280' }}
             height={40}
             tickMargin={10}
           />
           <YAxis
             tickFormatter={formatCurrency}
-            tick={{ fontSize: '12px', fill: '#6B7280' }}
-            tickMargin={10}
+            tick={{ fontSize: '10px', fill: '#6B7280' }}
+            tickMargin={4}
             width={100} // Aumenta a largura do eixo Y
             domain={[finalMinDomain, finalMaxDomain]}
           />
@@ -150,7 +163,9 @@ export function GraficoVendasLinha({ periodo, selectedStatuses }: GraficoVendasL
               return '';
             }}
             labelFormatter={(label) => {
-              return `Dia: ${label}`;
+              // Detecta se o label contém hora (formato "DD/MM HH:00")
+              const hasHour = /^\d{2}\/\d{2} \d{2}:\d{2}$/.test(label);
+              return hasHour ? `Hora: ${label}` : `Dia: ${label}`;
             }}
             contentStyle={{
               backgroundColor: '#FFFFFF',

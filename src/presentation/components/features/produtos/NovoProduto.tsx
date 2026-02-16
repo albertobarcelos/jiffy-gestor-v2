@@ -15,7 +15,7 @@ interface NovoProdutoProps {
   isCopyMode?: boolean
   defaultGrupoProdutoId?: string
   onClose?: () => void
-  onSuccess?: () => void
+  onSuccess?: (produtoData?: { produtoId: string; produtoData: any }) => void
 }
 
 /**
@@ -48,6 +48,8 @@ function NovoProdutoContent({
   const [ativo, setAtivo] = useState(true)
   const [grupoComplementosIds, setGrupoComplementosIds] = useState<string[]>([])
   const [impressorasIds, setImpressorasIds] = useState<string[]>([])
+  // Guardar os grupos originais para comparar na remoção
+  const [originalGrupoComplementosIds, setOriginalGrupoComplementosIds] = useState<string[]>([])
 
   // Estados fiscais
   const [ncm, setNcm] = useState('')
@@ -212,9 +214,9 @@ function NovoProdutoContent({
           setPermiteAcrescimo(produto.permiteAcrescimo || false)
           setAbreComplementos(produto.abreComplementos || false)
           setAtivo(produto.ativo ?? true)
-          setGrupoComplementosIds(
-            produto.gruposComplementos?.map((g: any) => g.id) || []
-          )
+          const gruposIds = produto.gruposComplementos?.map((g: any) => g.id) || []
+          setGrupoComplementosIds(gruposIds)
+          setOriginalGrupoComplementosIds(gruposIds) // Guardar os grupos originais
           setImpressorasIds(produto.impressoras?.map((i: any) => i.id) || [])
           
           // Preenche os campos fiscais (busca primeiro em produto.fiscal, depois em produto para compatibilidade)
@@ -699,33 +701,99 @@ function NovoProdutoContent({
 
       const method = effectiveProdutoId && !effectiveIsCopyMode ? 'PATCH' : 'POST'
 
+      const isEditMode = effectiveProdutoId && !effectiveIsCopyMode
+      
+      // Se for edição e gruposComplementosIds estiver vazio, precisamos remover
+      // os grupos individualmente usando DELETE, pois a API externa não processa array vazio
+      const shouldRemoveGruposIndividually = isEditMode && 
+        Array.isArray(grupoComplementosIds) && 
+        grupoComplementosIds.length === 0 &&
+        originalGrupoComplementosIds.length > 0
+
+      // Primeiro, salvar o produto (sem gruposComplementosIds se for remoção individual)
+      const bodyToSend = shouldRemoveGruposIndividually
+        ? { ...body, gruposComplementosIds: undefined }
+        : body
+
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify(bodyToSend),
       })
 
-      if (response.ok) {
-        showToast.successLoading(
-          toastId,
-          effectiveProdutoId && !effectiveIsCopyMode
-            ? 'Produto atualizado com sucesso!'
-            : 'Produto cadastrado com sucesso!'
-        )
-        if (onSuccess) {
-          onSuccess()
-        } else {
-          setTimeout(() => {
-            router.push('/produtos')
-          }, 500)
-        }
-      } else {
+      if (!response.ok) {
         const error = await response.json().catch(() => ({}))
         const errorMessage = error.message || 'Erro ao salvar produto'
         showToast.errorLoading(toastId, errorMessage)
+        return
+      }
+
+      // Se precisar remover grupos individualmente (quando array está vazio)
+      if (shouldRemoveGruposIndividually) {
+        try {
+          // Remover cada grupo individualmente usando DELETE
+          const deletePromises = originalGrupoComplementosIds.map((grupoId) =>
+            fetch(`/api/produtos/${effectiveProdutoId}/grupos-complementos/${grupoId}`, {
+              method: 'DELETE',
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            })
+          )
+
+          const deleteResults = await Promise.allSettled(deletePromises)
+          
+          // Verificar se alguma remoção falhou
+          const failedDeletes = deleteResults.filter(
+            (result) => result.status === 'rejected' || 
+            (result.status === 'fulfilled' && !result.value.ok)
+          )
+
+          if (failedDeletes.length > 0) {
+            console.error('Alguns grupos não puderam ser removidos:', failedDeletes)
+            // Não falha o salvamento, apenas loga o erro
+          }
+        } catch (error) {
+          console.error('Erro ao remover grupos de complementos:', error)
+          // Não falha o salvamento, apenas loga o erro
+        }
+      }
+
+      // Buscar o produto atualizado para atualizar o cache
+      let produtoAtualizado = null
+      if (isEditMode) {
+        try {
+          const produtoResponse = await fetch(`/api/produtos/${effectiveProdutoId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          })
+          if (produtoResponse.ok) {
+            produtoAtualizado = await produtoResponse.json()
+          }
+        } catch (error) {
+          console.error('Erro ao buscar produto atualizado:', error)
+          // Continua mesmo se falhar ao buscar
+        }
+      }
+
+      showToast.successLoading(
+        toastId,
+        effectiveProdutoId && !effectiveIsCopyMode
+          ? 'Produto atualizado com sucesso!'
+          : 'Produto cadastrado com sucesso!'
+      )
+      if (onSuccess) {
+        // Passar dados do produto para atualização otimista do cache
+        onSuccess(isEditMode && produtoAtualizado ? { produtoId: effectiveProdutoId, produtoData: produtoAtualizado } : undefined)
+      } else {
+        setTimeout(() => {
+          router.push('/produtos')
+        }, 500)
       }
     } catch (error) {
       console.error('Erro ao salvar produto:', error)
@@ -753,21 +821,21 @@ function NovoProdutoContent({
     <div className="flex flex-col h-full">
       {/* Header fixo com título e botões */}
       <div className="sticky top-0 z-10 bg-primary-bg/90 backdrop-blur-sm rounded-tl-lg shadow-md">
-        <div className="px-[30px] py-[4px]">
+        <div className="md:px-[30px] px-1 py-[4px]">
           <div className="rounded-lg border border-[#E0E4F3] bg-gradient-to-br from-[#F6F7FF] to-[#EEF1FB] px-6 py-3 shadow-[0_15px_45px_rgba(15,23,42,0.08)]">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-start gap-4">
-                <div className="h-14 w-14 rounded-lg bg-white flex items-center justify-center shadow-inner text-primary">
+                {/*<div className="h-14 w-14 rounded-lg bg-white flex items-center justify-center shadow-inner text-primary">
                   <MdImage className="text-2xl" />
-                </div>
+                </div>*/}
                 <div>
                   <p className="text-sm font-semibold text-primary font-exo uppercase tracking-wide">
                     {getPageTitle()}
                   </p>
-                  <h2 className="text-xl font-bold text-primary font-exo leading-tight">
+                  <h2 className="md:text-xl text-lg font-bold text-primary font-exo leading-tight">
                     {displayNome}
                   </h2>
-                  <p className="text-sm text-secondary-text font-nunito">
+                  <p className="md:text-sm text-xs text-secondary-text font-nunito">
                     {displayDescricao}
                   </p>
                 </div>
@@ -778,9 +846,9 @@ function NovoProdutoContent({
                   <button
                     type="button"
                     onClick={() => setAtivo((prev) => !prev)}
-                    className="flex h-8 items-center gap-2 rounded-lg border border-[#D4D8EB] bg-info px-3 py-1 shadow-sm hover:border-primary/40 transition-colors"
+                    className="flex h-8 items-center gap-1 rounded-lg border border-[#D4D8EB] bg-info md:px-3 px-1.5 py-1 shadow-sm hover:border-primary/40 transition-colors"
                   >
-                    <span className="text-sm font-semibold text-secondary-text">
+                    <span className="md:text-sm text-xs font-semibold text-secondary-text">
                       Visível no PDV
                     </span>
                     <span
@@ -798,7 +866,7 @@ function NovoProdutoContent({
                 )}
                 <button
                   onClick={handleCancel}
-                  className="h-8 px-8 rounded-lg bg-white text-primary font-semibold font-exo text-sm border border-[#D7DBEC] shadow-sm hover:bg-[#f4f6ff] transition-colors"
+                  className="h-8 md:px-8 px-4 rounded-lg bg-white text-primary font-semibold font-exo md:text-sm text-xs border border-[#D7DBEC] shadow-sm hover:bg-[#f4f6ff] transition-colors"
                 >
                   Cancelar
                 </button>
@@ -846,7 +914,7 @@ function NovoProdutoContent({
       </div>
 
       {/* Conteúdo das etapas */}
-      <div className="flex-1 overflow-y-auto px-5 pb-5">
+      <div className="flex-1 overflow-y-auto md:px-5 px-1 pb-5">
         {selectedPage === 0 ? (
           <InformacoesProdutoStep
             nomeProduto={nomeProduto}

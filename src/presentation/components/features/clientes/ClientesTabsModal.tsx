@@ -44,17 +44,27 @@ export function ClientesTabsModal({
       maxWidth="xl"
       sx={{
         '& .MuiDialog-container': {
-          justifyContent: 'flex-end',
+          justifyContent: {
+            xs: 'center', // Centraliza em mobile
+            md: 'flex-end', // Alinha à direita em desktop
+          },
           alignItems: 'stretch',
           margin: 0,
         },
       }}
       PaperProps={{
         sx: {
-          m: 0,
           height: '100vh',
           maxHeight: '100vh',
-          width: 'min(900px, 60vw)',
+          width: {
+            xs: '95vw', // Em telas muito pequenas (mobile), ocupa 95% da largura
+            sm: '90vw', // Em telas pequenas, ocupa 90% da largura
+            md: 'min(900px, 60vw)', // Em telas médias e maiores, mantém o comportamento original
+          },
+          margin: {
+            xs: 'auto', // Centraliza em mobile (com width 95vw, deixa 2.5% de cada lado)
+            md: 0, // Sem margin em desktop
+          },
           borderRadius: 0,
           display: 'flex',
           flexDirection: 'column',

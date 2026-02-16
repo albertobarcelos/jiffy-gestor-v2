@@ -6,6 +6,7 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   DragEndEvent,
@@ -65,12 +66,21 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     prefillGrupoProdutoId: undefined,
     grupoId: undefined,
   })
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
 
   // Sensores para drag and drop
+  // TouchSensor para mobile - delay curto para melhor UX, tolerance para evitar conflito com scroll
+  // PointerSensor para desktop com constraint de distância para evitar drag acidental
   const sensors = useSensors(
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 100, // Delay de 100ms em touch para evitar conflito com scroll
+        tolerance: 8, // Tolerância de 8px - permite pequeno movimento antes de ativar
+      },
+    }),
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8, // Requer movimento de 8px para ativar (evita drag acidental)
+        distance: 8, // Requer movimento de 8px para ativar (evita drag acidental em desktop)
       },
     }),
     useSensor(KeyboardSensor, {
@@ -115,7 +125,6 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     limit: 10,
   })
 
-
   // Lista vinda do servidor (React Query)
   const serverGrupos = useMemo(() => {
     return data?.pages.flatMap((page) => page.grupos) || []
@@ -123,6 +132,15 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
 
   // Estado local para feedback imediato (optimistic UI)
   const [localGrupos, setLocalGrupos] = useState<GrupoProduto[]>([])
+
+  const showInitialLoading =
+    !hasLoadedOnce || ((isLoading || isFetching) && localGrupos.length === 0)
+
+  useEffect(() => {
+    if (!isLoading && !isFetching && !isFetchingNextPage) {
+      setHasLoadedOnce(true)
+    }
+  }, [isLoading, isFetching, isFetchingNextPage])
 
   // Sempre que a lista do servidor mudar, sincroniza o estado local
   useEffect(() => {
@@ -198,10 +216,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     }
   }, [error])
 
-  const handleStatusChange = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['grupos-produtos'] })
-    onReload?.()
-  }, [queryClient, onReload])
+  // Função removida - não é mais necessária pois usamos atualização otimista
 
   const handleTabsModalReload = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['grupos-produtos'] })
@@ -212,6 +227,27 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     async (grupoId: string, novoStatus: boolean) => {
       const token = auth?.getAccessToken()
       if (!token) return
+
+      // Atualização otimista: atualiza UI imediatamente
+      const previousState = [...localGrupos]
+      setLocalGrupos((prev) =>
+        prev.map((grupo) => {
+          if (grupo.getId() === grupoId) {
+            // Criar novo grupo com status atualizado
+            return GrupoProduto.create({
+              id: grupo.getId(),
+              nome: grupo.getNome(),
+              corHex: grupo.getCorHex(),
+              iconName: grupo.getIconName(),
+              ativo: novoStatus,
+              ativoDelivery: grupo.isAtivoDelivery(),
+              ativoLocal: grupo.isAtivoLocal(),
+              ordem: grupo.getOrdem(),
+            })
+          }
+          return grupo
+        })
+      )
 
       try {
         const response = await fetch(`/api/grupos-produtos/${grupoId}`, {
@@ -228,13 +264,19 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
           throw new Error(error.message || 'Erro ao atualizar grupo')
         }
 
-        handleStatusChange()
+        showToast.success(
+          novoStatus ? 'Grupo ativado com sucesso!' : 'Grupo desativado com sucesso!'
+        )
+        // Não invalidar cache imediatamente - a atualização otimista já atualizou a UI
+        // O cache será invalidado apenas quando necessário (ex: ao fechar modal, mudar filtros, etc)
       } catch (error) {
         console.error('Erro ao atualizar status do grupo:', error)
+        // Reverter atualização otimista em caso de erro
+        setLocalGrupos(previousState)
         showToast.error('Não foi possível atualizar o status do grupo.')
       }
     },
-    [auth, handleStatusChange]
+    [auth, localGrupos]
   )
 
   const openTabsModal = useCallback(
@@ -374,10 +416,8 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       }
 
       showToast.success('Ordem atualizada com sucesso!')
-      // Recarrega a página por completo para buscar a nova ordem direto do backend
-      setTimeout(() => {
-        window.location.reload()
-      }, 800)
+      // Não recarregar página - a atualização otimista já atualizou a UI
+      // O cache será invalidado apenas quando necessário (ex: ao fechar modal, mudar filtros, etc)
     } catch (error: any) {
       console.error('Erro ao reordenar grupo:', error)
       // Reverte feedback otimista
@@ -390,14 +430,14 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     <>
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px] pt-1 pb-[6px]">
+      <div className="md:px-[30px] px-1 pt-1 pb-[6px]">
         <div className="flex flex-col gap-2">
           <div className="flex items-start justify-between flex-wrap gap-4">
-            <div className="pl-5">
-              <p className="text-primary text-sm font-semibold font-nunito mb-1">
+            <div className="md:pl-5">
+              <p className="text-primary text-sm md:text-lg font-semibold font-nunito mb-1">
                 Grupos Cadastrados
               </p>
-              <p className="text-tertiary text-[22px] font-medium font-nunito">
+              <p className="text-tertiary md:text-[22px] text-sm font-medium font-nunito">
                 Total {localGrupos.length} de {totalGrupos}
               </p>
             </div>
@@ -422,7 +462,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       </div>
       <div className="h-[2px] border-t-2 border-primary/70"></div>
 
-      <div className="flex gap-3 px-[20px] py-2">
+      <div className="flex gap-3 md:px-[20px] px-1 py-2">
         <div className="flex-1 min-w-[180px] max-w-[360px]">
             <label
               htmlFor="grupos-complementos-search"
@@ -464,18 +504,18 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       </div>
 
       {/* Cabeçalho da tabela */}
-      <div className="px-[30px] mt-1">
+      <div className="md:px-[30px] px-1 mt-1">
         <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px]">
-          <div className="flex-[1] font-nunito font-semibold text-sm text-primary-text">
+          <div className="flex-[1] font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
             Ordem
           </div>
-          <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
+          <div className="flex-[2] font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
             Ícones do Grupo
           </div>
-          <div className="flex-[4] font-nunito font-semibold text-sm text-primary-text">
+          <div className="flex-[4] font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
             Nome
           </div>
-          <div className="flex-[2] text-center font-nunito font-semibold text-sm text-primary-text">
+          <div className="flex-[2] md:text-center text-right font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
             Status
           </div>
         </div>
@@ -484,27 +524,24 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       {/* Lista de grupos com scroll e drag and drop */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-[30px] mt-2 scrollbar-hide"
+        className="flex-1 overflow-y-auto md:px-[30px] px-1 mt-2 scrollbar-hide"
         style={{ maxHeight: 'calc(100vh - 300px)' }}
       >
         {/* Skeleton loaders para carregamento inicial - sempre mostra durante loading */}
-        {(isLoading || (localGrupos.length === 0 && isFetching)) && (
-          <div className="space-y-2">
-            {[...Array(8)].map((_, i) => (
-              <div
-                key={i}
-                className="h-[50px] bg-info rounded-lg px-4 flex items-center gap-[10px] animate-pulse"
-              >
-                <Skeleton className="flex-[1] h-4" />
-                <Skeleton className="flex-[2] h-10 w-10" />
-                <Skeleton className="flex-[4] h-4" />
-                <Skeleton className="flex-[2] h-6 w-20 mx-auto" />
-              </div>
-            ))}
+        {showInitialLoading && (
+          <div className="flex items-center justify-center py-8">
+            <div className="flex flex-col items-center gap-2">
+              <img
+                src="/images/jiffy-loading.gif"
+                alt="Carregando"
+                className="w-20 h-20 object-contain"
+              />
+              <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
+            </div>
           </div>
         )}
 
-        {localGrupos.length === 0 && !isLoading && (
+        {localGrupos.length === 0 && !isLoading && !isFetching && hasLoadedOnce && (
           <div className="flex items-center justify-center py-12">
             <p className="text-secondary-text">Nenhum grupo encontrado.</p>
           </div>
@@ -524,7 +561,6 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
                 key={grupo.getId()}
                 grupo={grupo}
                 index={index}
-                onStatusChanged={handleStatusChange}
                 onToggleStatus={handleToggleGrupoStatus}
                 onCreateProduto={(grupoId) => handleOpenProdutoModal(grupoId)}
                 onEdit={(g) =>
@@ -570,7 +606,15 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     <ProdutosTabsModal
       state={produtoTabsState}
       onClose={handleCloseProdutoModal}
-      onReload={onReload}
+      onReload={(produtoId?: string, produtoData?: any) => {
+        // Se temos dados do produto, podemos atualizar o cache
+        // Caso contrário, apenas chama o onReload original
+        if (produtoId && produtoData) {
+          // Aqui poderia atualizar o cache se necessário
+          // Por enquanto, apenas chama o onReload original
+        }
+        onReload?.()
+      }}
       onTabChange={handleProdutoTabChange}
     />
     </>

@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePrefetch } from '@/src/presentation/hooks/usePrefetch'
-import { MdDashboard, MdInventory, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose, MdAirplaneTicket } from 'react-icons/md'
+import { MdDashboard, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose, MdAirplaneTicket } from 'react-icons/md'
 import { 
   MdInventory2, 
   MdShoppingBag, 
@@ -19,8 +20,11 @@ import {
   MdCategory,
   MdAddCircle,
   MdReceipt,
-  MdAccountBalance
+  MdAccountBalance,
+  MdHistory
 } from 'react-icons/md'
+import type { IconType } from 'react-icons'
+import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 
 /**
  * Navegação superior minimalista e clean
@@ -82,8 +86,10 @@ export function TopNav() {
     [router]
   )
 
-  // Fechar dropdown ao clicar fora
+  // Fechar dropdown ao clicar fora (somente desktop; mobile usa drawer)
   useEffect(() => {
+    if (isMobileMenuOpen) return
+
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setExpandedMenus(new Set())
@@ -97,7 +103,7 @@ export function TopNav() {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [expandedMenus])
+  }, [expandedMenus, isMobileMenuOpen])
 
   // Fechar dropdown ao mudar de rota
   useEffect(() => {
@@ -126,7 +132,21 @@ export function TopNav() {
     [expandedMenus]
   )
 
-  const menuItems = [
+  type ChildMenuItem = {
+    name: string
+    path: string
+    icon?: IconType
+    renderIcon?: () => ReactNode
+  }
+  type MenuItem = {
+    name: string
+    path: string
+    icon?: IconType
+    renderIcon?: () => ReactNode
+    children?: ChildMenuItem[]
+  }
+
+  const menuItems: MenuItem[] = [
     { 
       name: 'Dashboard', 
       path: '/dashboard', 
@@ -143,17 +163,45 @@ export function TopNav() {
         { name: 'Complementos', path: '/cadastros/complementos', icon: MdAddCircle },
         { name: 'Usuários', path: '/cadastros/usuarios', icon: MdPerson },
         { name: 'Perfis de Usuários', path: '/cadastros/perfis-usuarios-pdv', icon: MdGroup },
+        { name: 'Perfis Gestor', path: '/cadastros/perfis-gestor', icon: MdAccountBalance },
+        { name: 'Usuários Gestor', path: '/cadastros/usuarios-gestor', icon: MdPerson },
         { name: 'Clientes', path: '/cadastros/clientes', icon: MdPeople },
         { name: 'Impressoras', path: '/cadastros/impressoras', icon: MdPrint },
         { name: 'Meios de Pagamentos', path: '/cadastros/meios-pagamentos', icon: MdPayment },
         { name: 'Cadastro por Planilha', path: '/cadastro-por-planilha', icon: MdAirplaneTicket },
       ],
     },
-    { name: 'Estoque', path: '/estoque', icon: MdInventory },
-    { name: 'Meu Caixa', path: '/meu-caixa', icon: MdPointOfSale },
+    //{ name: 'Estoque', path: '/estoque', icon: MdInventory },
+    {
+      name: 'Vendas',
+      path: '#',
+      icon: MdInventory2,
+      children: [
+        {
+          name: 'Mesas Abertas',
+          path: '/vendas/abertas',
+          renderIcon: () => (
+            <TipoVendaIcon
+              tipoVenda="mesa"
+              numeroMesa="#"
+              size={32}
+              containerScale={0.9}
+              corTexto="#FFFFFF"
+              corCirculoInterno="#4b5563"
+              corBorda="#4b5563"
+              corFundo="#4b5563"
+              corPrincipal="#4b5563"
+            />
+          ),
+        },
+        //{ name: 'Meu Caixa', path: '/meu-caixa', icon: MdPointOfSale },
+        { name: 'Hist. Fechamento', path: '/historico-fechamento', icon: MdHistory },
+        { name: 'Relatórios', path: '/relatorios', icon: MdAssessment },
+
+      ],
+    },
     { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: MdReceipt },
     { name: 'Painel do Contador', path: '/painel-contador', icon: MdAccountBalance },
-    { name: 'Relatórios', path: '/relatorios', icon: MdAssessment },
     { name: 'Configurações', path: '/configuracoes', icon: MdSettings },
   ]
 
@@ -171,7 +219,37 @@ export function TopNav() {
     return pathname === childPath || pathname?.startsWith(childPath + '/')
   }
 
-  const closeMobileMenu = () => setIsMobileMenuOpen(false)
+  const closeSubmenus = useCallback(() => setExpandedMenus(new Set()), [])
+
+  const closeMobileMenu = useCallback(() => {
+    setIsMobileMenuOpen(false)
+    closeSubmenus()
+  }, [closeSubmenus])
+
+  const handleMobileNavigate = useCallback(
+    (path: string) => {
+      closeSubmenus()
+      setIsMobileMenuOpen(false)
+      setTimeout(() => {
+        router.push(path)
+      }, 80)
+    },
+    [closeSubmenus, router]
+  )
+
+  const handleMobileChildNavigate = useCallback(
+    (child: ChildMenuItem) => {
+      if (child.name === 'Mesas Abertas') {
+        console.log('Clique mobile Mesas Abertas', {
+          path: child.path,
+          expandedMenus: Array.from(expandedMenus),
+          isMobileMenuOpen,
+        })
+      }
+      handleMobileNavigate(child.path)
+    },
+    [expandedMenus, handleMobileNavigate, isMobileMenuOpen]
+  )
 
   useEffect(() => {
     if (isMobileMenuOpen) {
@@ -194,15 +272,15 @@ export function TopNav() {
         className="absolute inset-0 bg-black/40"
         onClick={closeMobileMenu}
       />
-      <div className="absolute inset-y-0 left-0 w-11/12 max-w-xs bg-white shadow-xl p-5 overflow-y-auto flex flex-col gap-4">
+      <div className="absolute inset-y-0 left-0 w-11/12 max-w-xs bg-white shadow-xl p-5 overflow-y-auto flex flex-col gap-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="relative w-10 h-10">
+            <div className="relative w-14 h-14">
               <Image
-                src="/images/jiffy-head.png"
+                src="/images/jiffy-100x100.gif"
                 alt="Jiffy"
                 fill
-                sizes="40px"
+                sizes="50px"
                 className="object-contain"
               />
             </div>
@@ -216,11 +294,15 @@ export function TopNav() {
             <MdClose className="w-5 h-5" />
           </button>
         </div>
-
         <div className="flex flex-col gap-2">
           {menuItems.map((item) => {
             const isActive = isMenuActive(item)
             const Icon = item.icon
+            const renderedIcon = item.renderIcon
+              ? item.renderIcon()
+              : Icon
+              ? <Icon className="w-5 h-5" />
+              : null
 
             if (item.children) {
               return (
@@ -228,12 +310,12 @@ export function TopNav() {
                   <button
                     type="button"
                     onClick={() => toggleMenu(item.name)}
-                    className={`flex items-center justify-between px-2 py-2 rounded-lg text-sm font-medium ${
+                    className={`flex items-center justify-between px-4 py-2 rounded-lg text-sm font-medium ${
                       isActive ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
                     <span className="flex items-center gap-2">
-                      <Icon className="w-5 h-5" />
+                      {renderedIcon}
                       {item.name}
                     </span>
                     <MdExpandMore
@@ -246,21 +328,26 @@ export function TopNav() {
                     <div className="pl-6 py-2 flex flex-col gap-1">
                       {item.children.map((child) => {
                         const ChildIcon = child.icon
+                        const renderedChildIcon = child.renderIcon
+                          ? child.renderIcon()
+                          : ChildIcon
+                          ? <ChildIcon className="w-4 h-4" />
+                          : null
                         const activeChild = isChildActive(child.path)
                         return (
-                          <Link
+                          <button
                             key={child.path}
-                            href={child.path}
-                            onClick={closeMobileMenu}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${
+                            type="button"
+                            onClick={() => handleMobileChildNavigate(child)}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left ${
                               activeChild
                                 ? 'bg-primary/10 text-primary font-semibold'
                                 : 'text-gray-600 hover:bg-gray-50'
                             }`}
                           >
-                            <ChildIcon className="w-4 h-4" />
+                            {renderedChildIcon}
                             <span>{child.name}</span>
-                          </Link>
+                          </button>
                         )
                       })}
                     </div>
@@ -270,17 +357,17 @@ export function TopNav() {
             }
 
             return (
-              <Link
+              <button
                 key={item.path}
-                href={item.path}
-                onClick={closeMobileMenu}
-                className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium ${
+                type="button"
+                onClick={() => handleMobileNavigate(item.path)}
+                className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium text-left ${
                   isActive ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
-                <Icon className="w-5 h-5" />
+                {renderedIcon}
                 {item.name}
-              </Link>
+              </button>
             )
           })}
         </div>
@@ -308,13 +395,13 @@ export function TopNav() {
 
   return (
     <nav className="h-16 bg-white border-b border-gray-200 shadow-sm relative">
-      <div className="h-full flex items-center justify-between">
+      <div className="h-full flex items-center justify-between xl:px-4">
         {/* Logo */}
         <div className="flex items-center">
           <Link href="/dashboard" className="flex items-center">
-            <div className="relative w-12 h-12 sm:w-20 sm:h-14">
+            <div className="relative ml-6 md:ml-0 w-12 h-12 sm:w-20 sm:h-16">
               <Image
-                src="/images/jiffy-head.png"
+                src="/images/jiffy-100x100.gif"
                 alt="Jiffy"
                 fill
                 sizes="(max-width: 640px) 176px, 208px"
@@ -328,26 +415,31 @@ export function TopNav() {
         {/* Menu Items */}
         <div
           ref={menuRef}
-          className="hidden sm:flex flex-1 items-center justify-between gap-1 pl-2"
+          className="hidden sm:flex flex-1 items-center justify-start gap-1 pl-2"
         >
           {menuItems.map((item) => {
             const isActive = isMenuActive(item)
             const isExpanded = expandedMenus.has(item.name)
             const Icon = item.icon
+            const renderedIcon = item.renderIcon
+              ? item.renderIcon()
+              : Icon
+              ? <Icon className="w-5 h-5" />
+              : null
 
             if (item.children) {
               return (
                 <div key={item.name} className="relative group">
                   <button
                     onClick={() => toggleMenu(item.name)}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    className={`flex items-center gap-1.5 xl:px-4 px-1 py-2 rounded-lg text-xs lg:text-sm font-medium transition-all duration-200 ${
                       isActive
                         ? 'bg-gray-100 text-gray-900'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`}
                   >
-                    <Icon className="w-5 h-5" />
-                    <span>{item.name}</span>
+                    {renderedIcon}
+                    <span >{item.name}</span>
                     <MdExpandMore 
                       className={`w-4 h-4 transition-transform duration-200 ${
                         isExpanded ? 'rotate-180' : ''
@@ -360,6 +452,11 @@ export function TopNav() {
                     <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
                       {item.children.map((child) => {
                         const ChildIcon = child.icon
+                        const renderedChildIcon = child.renderIcon
+                          ? child.renderIcon()
+                          : ChildIcon
+                          ? <ChildIcon className="w-4 h-4" />
+                          : null
                         const childIsActive = isChildActive(child.path)
                         return (
                           <Link
@@ -374,7 +471,7 @@ export function TopNav() {
                                 : 'text-gray-700 hover:bg-gray-50'
                             }`}
                           >
-                            <ChildIcon className="w-4 h-4" />
+                            {renderedChildIcon}
                             <span>{child.name}</span>
                             {childIsActive && (
                               <MdChevronRight className="w-4 h-4 ml-auto text-gray-400" />
@@ -394,15 +491,15 @@ export function TopNav() {
                 href={item.path}
                 onMouseEnter={() => handleLinkHover(item.path)}
                 prefetch={true}
-                className={`flex items-center gap-1.5 px-2 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                className={`flex items-center gap-1.5 xl:px-4 px-1 py-2 rounded-lg text-xs lg:text-sm font-medium transition-all duration-200 ${
                   isActive
                     ? 'bg-gray-100 text-gray-900'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`}
                 title={item.name === 'Configurações' ? item.name : undefined}
               >
-                <Icon className="w-5 h-5" />
-                {item.name !== 'Configurações' && <span>{item.name}</span>}
+                {renderedIcon}
+                {item.name !== 'Configurações' && <span className="text-xs lg:text-sm">{item.name}</span>}
               </Link>
             )
           })}
@@ -418,13 +515,8 @@ export function TopNav() {
         </button>
 
         {/* User Actions */}
-        <div className="hidden sm:flex items-center gap-3">
-          {/* Search Icon */}
-          <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </button>
+        <div className="hidden sm:flex items-center gap-2">
+          
           {/* Notifications */}
           <button className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -438,6 +530,11 @@ export function TopNav() {
             href="/perfil"
             onMouseEnter={() => handleLinkHover('/perfil')}
             className="flex items-center gap-2 pl-3 border-l border-gray-200 hover:bg-gray-50 rounded-lg px-2 py-1 transition-colors cursor-pointer"
+            title={
+              isHydrated
+                ? `${user?.getName() || 'Usuário'}${user?.getEmail() ? ` • ${user.getEmail()}` : ''}`
+                : 'Usuário'
+            }
           >
             <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center">
               <span className="text-xs font-semibold text-white">
@@ -446,7 +543,7 @@ export function TopNav() {
                   : 'U'}
               </span>
             </div>
-            <div className="hidden md:block">
+            <div className="hidden xl:block">
               <p className="text-sm font-medium text-gray-900">
                 {isHydrated ? user?.getName() || user?.getEmail() || 'Usuário' : 'Usuário'}
               </p>

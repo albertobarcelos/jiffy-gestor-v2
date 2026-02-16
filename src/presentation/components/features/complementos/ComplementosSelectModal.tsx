@@ -116,7 +116,18 @@ export function ComplementosSelectModal({
                   />
                   <div className="flex-1">
                     <div className="flex items-start justify-between gap-3">
-                      <p className="text-sm font-semibold text-primary-text">{item.getNome()}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-primary-text">{item.getNome()}</p>
+                        <span
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded uppercase ${
+                            item.isAtivo()
+                              ? ' text-green-700'
+                              : ' text-gray-600'
+                          }`}
+                        >
+                          {item.isAtivo() ? 'Ativo' : 'Inativo'}
+                        </span>
+                      </div>
                       <div className="text-right">
                         {item.getValor() > 0 && (
                           <p className="text-xs font-semibold text-primary-text">

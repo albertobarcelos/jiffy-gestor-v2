@@ -22,7 +22,7 @@ export interface ProdutosTabsModalState {
 interface ProdutosTabsModalProps {
   state: ProdutosTabsModalState
   onClose: () => void
-  onReload?: () => void
+  onReload?: (produtoId?: string, produtoData?: any) => void
   onTabChange: (tab: TabKey) => void
 }
 
@@ -72,7 +72,8 @@ export function ProdutosTabsModal({ state, onClose, onReload, onTabChange }: Pro
           m: 0,
           height: '100vh',
           maxHeight: '100vh',
-          width: 'min(850px, 58vw)',
+          width: { xs: '95vw', md: 'min(850px, 58vw)' },
+          maxWidth: { xs: '95vw', md: 'min(850px, 58vw)' },
           borderRadius: 0,
           display: 'flex',
           flexDirection: 'column',
@@ -82,7 +83,7 @@ export function ProdutosTabsModal({ state, onClose, onReload, onTabChange }: Pro
       <DialogContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
         
 
-        <div className="px-6 pt-4 flex gap-1 border-b border-gray-200">
+        <div className="md:px-6 px-1 pt-4 flex gap-1 border-b border-gray-200">
           {(
             [
               { key: 'produto', label: 'Produto', disabled: false },
@@ -96,7 +97,7 @@ export function ProdutosTabsModal({ state, onClose, onReload, onTabChange }: Pro
               type="button"
               disabled={tab.disabled}
               onClick={() => !tab.disabled && onTabChange(tab.key)}
-              className={`px-4 py-2 rounded-t-lg text-sm font-semibold transition-colors ${
+              className={`md:px-4 px-1.5 py-2 rounded-t-lg md:text-sm text-xs font-semibold transition-colors ${
                 state.tab === tab.key
                   ? 'bg-primary text-white'
                   : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
@@ -115,8 +116,9 @@ export function ProdutosTabsModal({ state, onClose, onReload, onTabChange }: Pro
                 isCopyMode={state.mode === 'copy'}
                 defaultGrupoProdutoId={state.mode === 'create' ? state.prefillGrupoProdutoId : undefined}
                 onClose={onClose}
-                onSuccess={() => {
-                  onReload?.()
+                onSuccess={(produtoData) => {
+                  // Passar dados do produto para atualização otimista do cache
+                  onReload?.(produtoData?.produtoId, produtoData?.produtoData)
                   onClose()
                 }}
               />
@@ -167,7 +169,8 @@ export function ProdutosTabsModal({ state, onClose, onReload, onTabChange }: Pro
                   isEmbedded
                   onClose={onClose}
                   onSaved={() => {
-                    // Não chamar onReload aqui, pois NovoGrupo já fará a invalidação e o onClose.
+                    // NovoGrupo já faz invalidação internamente de grupos e produtos
+                    // Não precisamos chamar onReload aqui, pois o NovoGrupo já gerencia as invalidações
                     onClose()
                   }}
                 />

@@ -13,7 +13,7 @@ export default function UsuariosLayout({
   return (
     <div className="min-h-screen bg-gray-50">
       <TopNav />
-      <main className='px-6 py-2'>
+      <main className='md:px-6 px-1 py-2'>
         {children}
       </main>
     </div>

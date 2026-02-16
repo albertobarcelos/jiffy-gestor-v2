@@ -5,6 +5,7 @@ import { z } from 'zod'
  */
 export const AtualizarPerfilUsuarioSchema = z.object({
   role: z.string().min(1, 'Role é obrigatório').optional(),
+  // Aceita array vazio explicitamente
   acessoMeiosPagamento: z.array(z.string()).optional(),
   cancelarVenda: z.boolean().optional(),
   cancelarProduto: z.boolean().optional(),

@@ -243,8 +243,13 @@ export function NovoGrupoComplemento({
 
   if (isLoadingGrupo) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="flex flex-col items-center justify-center h-full gap-2">
+        <img
+          src="/images/jiffy-loading.gif"
+          alt="Carregando"
+          className="w-16 h-16 object-contain"
+        />
+        <p className="text-sm text-secondary-text text-center">Carregando grupo...</p>
       </div>
     )
   }
@@ -273,12 +278,12 @@ export function NovoGrupoComplemento({
 
       {/* Formulário com scroll */}
       <div
-        className={`flex-1 overflow-y-auto ${isEmbedded ? 'px-6 py-6 bg-info' : 'px-[30px] py-[30px]'}`}
+        className={`flex-1 overflow-y-auto ${isEmbedded ? 'md:px-6 px-2 md:py-6 py-2 bg-info' : 'md:px-[30px] px-2 md:py-[30px] py-2'}`}
       >
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Informações */}
-            <div className="bg-info rounded-[12px] p-5">
-              <h2 className="text-primary text-xl font-semibold font-exo mb-4">
+            <div className="bg-info rounded-[12px] md:p-5">
+              <h2 className="text-primary md:text-xl text-sm font-semibold font-exo md:mb-4 mb-2">
                 {nome?.trim().length
                   ? `Grupo de Complementos: ${nome.trim()}`
                   : isEditing
@@ -312,7 +317,7 @@ export function NovoGrupoComplemento({
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block md:text-sm text-xs font-medium text-gray-700 mb-2">
                     Quantidade Mínima *
                   </label>
                   <input
@@ -327,7 +332,7 @@ export function NovoGrupoComplemento({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block md:text-sm text-xs font-medium text-gray-700 mb-2">
                     Quantidade Máxima *
                   </label>
                   <input
@@ -351,9 +356,9 @@ export function NovoGrupoComplemento({
                   <button
                     type="button"
                     onClick={() => setShowComplementosModal(true)}
-                    className="inline-flex items-center h-8 gap-2 px-5 py-2 rounded-lg bg-primary text-info font-semibold shadow hover:bg-primary/90 transition-colors"
+                    className="inline-flex items-center h-8 text-sm md:text-lg gap-2 px-5 py-2 rounded-lg bg-primary text-info font-semibold shadow hover:bg-primary/90 transition-colors"
                   >
-                    <MdPlaylistAdd className="text-lg" />
+                    <MdPlaylistAdd className="md:text-lg text-sm" />
                     Vincular complementos
                   </button>
                   

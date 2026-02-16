@@ -164,47 +164,23 @@ export function NovoMeioPagamento({
   if (isLoadingMeioPagamento) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <img src="/images/jiffy-loading.gif" alt="Carregando..." className="w-20 h-20" />
       </div>
     )
   }
 
   return (
     <div className="flex flex-col h-full">
-      {!isEmbedded && (
-        <>
-          {/* Header fixo */}
-          <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-lg shadow-md px-[30px] py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-primary/25 text-primary flex items-center justify-center">
-                <span className="text-2xl">💳</span>
-              </div>
-              <h1 className="text-primary text-lg font-semibold font-exo">
-                {isEditing ? 'Editar Meio de Pagamento' : 'Novo Meio de Pagamento'}
-              </h1>
-            </div>
-            <Button
-              onClick={handleCancel}
-              variant="outlined"
-              className="h-9 px-[26px] rounded-lg border-primary/15 text-primary bg-primary/10 hover:bg-primary/20"
-            >
-              Cancelar
-            </Button>
-          </div>
-        </div>
-        </>
-      )}
 
       {/* Formulário com scroll */}
-      <div className="flex-1 overflow-y-auto px-[30px] py-[30px]">
+      <div className="flex-1 overflow-y-auto md:px-[30px] px-1 md:py-4 py-2">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Dados */}
-          <div className="bg-info rounded-lg p-5">
+          <div className="bg-info rounded-lg md:p-5 p-2">
             <h2 className="text-primary text-xl font-semibold font-exo mb-4">
               {isEditing && nome ? `Editar meio de pagamento: ${nome}` : `Novo meio de pagamento: ${nome}`}
             </h2>
-            <div className="h-px bg-primary/70 mb-4"></div>
+            <div className="h-[2px] bg-primary/70 mb-4"></div>
 
             <div className="space-y-4">
               <Input
@@ -244,7 +220,7 @@ export function NovoMeioPagamento({
                     onChange={(e) => setTefAtivo(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[12px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[20px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[5px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                 </label>
               </div>
 
@@ -258,14 +234,14 @@ export function NovoMeioPagamento({
                     onChange={(e) => setAtivo(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[12px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                    <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[20px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[5px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                 </label>
               </div>
             </div>
           </div>
 
           {/* Botões de ação */}
-          <div className="flex justify-end gap-4 pt-4">
+          <div className="flex justify-end gap-4 pt-4 pr-2">
             <Button
               type="button"
               onClick={handleCancel}

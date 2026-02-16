@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Cliente } from '@/src/domain/entities/Cliente'
-import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { ClientesTabsModal, ClientesTabsModalState } from './ClientesTabsModal'
 import { MdSearch, MdVisibility } from 'react-icons/md'
@@ -283,13 +282,13 @@ export function ClientesList({ onReload }: ClientesListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px] py-1 flex-shrink-0">
+      <div className="md:px-[30px] px-1 py-1 flex-shrink-0">
         <div className="flex items-start justify-between">
-          <div className="w-1/2 pl-5">
-            <p className="text-primary text-lg font-semibold font-nunito">
+          <div className="w-1/2 md:pl-5">
+            <p className="text-primary md:text-lg text-sm font-semibold font-nunito">
               Clientes Cadastrados
             </p>
-            <p className="text-tertiary text-[22px] font-medium font-nunito">
+            <p className="text-tertiary md:text-[22px] text-sm font-medium font-nunito">
               Total {clientes.length} de {totalClientes}
             </p>
           </div>
@@ -306,7 +305,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
       </div>
 
       <div className="h-[4px] border-t-2 border-primary/70 flex-shrink-0"></div>
-      <div className="flex gap-3 px-[20px] pb-2 flex-shrink-0">
+      <div className="flex gap-3 md:px-[20px] px-1 pb-2 flex-shrink-0">
         <div className="flex-1 min-w-[180px] max-w-[360px]">
             <label
               htmlFor="clientes-search"
@@ -349,24 +348,24 @@ export function ClientesList({ onReload }: ClientesListProps) {
           </div>
 
       {/* Cabeçalho da tabela */}
-      <div className="px-[30px] mt-0 flex-shrink-0">
+      <div className="md:px-[30px] mt-0 flex-shrink-0">
         <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-2">
-          <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
+          <div className="flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Nome
           </div>
-          <div className="flex-[1.5] font-nunito font-semibold text-sm text-primary-text">
+          <div className="flex-[1.5] font-nunito font-semibold text-sm text-primary-text hidden md:flex">
             CPF
           </div>
-          <div className="flex-[1.5] font-nunito font-semibold text-sm text-primary-text">
+          <div className="flex-[1.5] font-nunito font-semibold text-sm text-primary-text hidden md:flex">
             CNPJ
           </div>
-          <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
+          <div className="md:flex-[2] flex-[1.5] font-nunito font-semibold md:text-sm text-xs text-center md:text-start text-primary-text">
             Telefone
           </div>
-          <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
+          <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text hidden md:flex">
             Email
           </div>
-          <div className="flex-[2] text-center font-nunito font-semibold text-sm text-primary-text">
+          <div className="md:flex-[2] flex-[1] md:text-center text-end font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Status
           </div>
         </div>
@@ -375,47 +374,43 @@ export function ClientesList({ onReload }: ClientesListProps) {
       {/* Lista de clientes com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-[30px] mt-1 scrollbar-hide"
+        className="flex-1 overflow-y-auto md:px-[30px] px-1 mt-1 scrollbar-hide"
         style={{ maxHeight: 'calc(100vh - 300px)' }}
       >
-        {/* Skeleton loaders para carregamento inicial */}
-        {clientes.length === 0 && isLoading && (
-          <div className="space-y-2">
-            {[...Array(5)].map((_, i) => (
-              <div
-                key={i}
-                className=" bg-info rounded-lg px-4 flex items-center gap-2 shadow-xl hover:shadow-md transition-shadow hover:bg-secondary-bg/15"
-                >
-                <Skeleton className="flex-[2] h-4" />
-                <Skeleton className="flex-[1.5] h-4" />
-                <Skeleton className="flex-[1.5] h-4" />
-                <Skeleton className="flex-[2] h-4" />
-                <Skeleton className="flex-[2] h-4" />
-                <Skeleton className="flex-[2] h-5 w-12 mx-auto" />
-              </div>
-            ))}
+        {/* Loading inicial */}
+        {(isLoading || !hasLoadedInitialRef.current) && clientes.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 gap-2">
+            <img
+              src="/images/jiffy-loading.gif"
+              alt="Carregando..."
+              className="w-20 h-20"
+            />
+            <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
           </div>
         )}
 
-        {clientes.length === 0 && !isLoading && (
+        {clientes.length === 0 && !isLoading && hasLoadedInitialRef.current && (
           <div className="flex items-center justify-center py-12">
             <p className="text-secondary-text">Nenhum cliente encontrado.</p>
           </div>
         )}
 
-        {clientes.map((cliente) => {
+        {clientes.map((cliente, index) => {
           // Handler para abrir edição ao clicar na linha
           const handleRowClick = () => {
             handleEdit(cliente.getId())
           }
 
+          const isZebraEven = index % 2 === 0
+          const bgClass = isZebraEven ? 'bg-gray-50' : 'bg-white'
+
           return (
           <div
             key={cliente.getId()}
             onClick={handleRowClick}
-            className=" bg-info rounded-lg px-4 py-1 mb-1 flex items-center shadow-xl hover:shadow-md transition-shadow hover:bg-secondary-bg/15 cursor-pointer"
+            className={`${bgClass} rounded-lg md:px-4 py-2 mb-1 flex items-center hover:bg-secondary-bg/15 cursor-pointer`}
           >
-            <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text flex items-center">
+            <div className="flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text flex items-center">
               <span>{cliente.getNome()}</span>
                <button
                 onClick={(e) => {
@@ -429,21 +424,21 @@ export function ClientesList({ onReload }: ClientesListProps) {
                 <MdVisibility className="text-primary text-base" />
               </button>
             </div>
-            <div className="flex-[1.5] font-nunito text-sm text-secondary-text">
+            <div className="flex-[1.5] font-nunito text-sm text-secondary-text hidden md:flex">
               {cliente.getCpf() || '-'}
             </div>
-            <div className="flex-[1.5] font-nunito text-sm text-secondary-text">
+            <div className="flex-[1.5] font-nunito text-sm text-secondary-text hidden md:flex">
               {cliente.getCnpj() || '-'}
             </div>
-            <div className="flex-[2] font-nunito text-sm text-secondary-text">
+            <div className="md:flex-[2] flex-[1.5] font-nunito md:text-sm text-xs text-center md:text-start text-secondary-text">
               {cliente.getTelefone() || '-'}
             </div>
-            <div className="flex-[2] font-nunito text-sm text-secondary-text">
+            <div className="flex-[2] font-nunito text-sm text-secondary-text hidden md:flex">
               {cliente.getEmail() || '-'}
             </div>
-            <div className="flex-[2] flex justify-center" onClick={(e) => e.stopPropagation()}>
+            <div className="md:flex-[2] flex-[1] flex md:justify-center justify-end" onClick={(e) => e.stopPropagation()}>
               <label
-                className={`relative inline-flex h-5 w-12 items-center ${
+                className={`relative inline-flex md:h-5 h-4 md:w-12 w-8 items-center ${
                   togglingStatus[cliente.getId()]
                     ? 'cursor-not-allowed opacity-60'
                     : 'cursor-pointer'
@@ -464,7 +459,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
                   disabled={!!togglingStatus[cliente.getId()]}
                 />
                 <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                <span className="absolute left-1 top-1/2 block h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-6" />
+                <span className="absolute md:left-1 left-0.5 top-1/2 block md:h-3 h-2.5 md:w-3 w-2.5 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 md:peer-checked:translate-x-6 peer-checked:translate-x-[18px]" />
               </label>
             </div>
           </div>

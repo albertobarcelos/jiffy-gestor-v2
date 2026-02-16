@@ -420,13 +420,13 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px] pt-1 flex-shrink-0">
+      <div className="md:px-[30px] px-1 pt-1 flex-shrink-0">
         <div className="flex items-start justify-between">
-          <div className="flex flex-col w-1/2 pl-5">
-            <span className="text-primary text-lg font-semibold font-nunito">
+          <div className="flex flex-col w-1/2 md:pl-5">
+            <span className="text-primary md:text-lg text-sm font-semibold font-nunito">
               Perfis Cadastrados
             </span>
-            <span className="text-tertiary text-[22px] font-medium font-nunito">
+            <span className="text-tertiary md:text-[22px] text-sm font-medium font-nunito">
               Total {perfis.length} de {totalPerfis}
             </span>
           </div>
@@ -441,7 +441,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
       </div>
 
       <div className="h-[4px] border-t-2 border-primary/70 flex-shrink-0"></div>
-      <div className="flex gap-3 px-[20px] pb-2 flex-shrink-0">
+      <div className="flex gap-3 md:px-[20px] px-1 pb-2 flex-shrink-0">
         <div className="flex-1 min-w-[180px] max-w-[360px]">
             <label
               htmlFor="complementos-search"
@@ -468,13 +468,13 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
 
       {/* Cabeçalho da tabela */}
       {perfis.length > 0 && (
-        <div className="px-[30px] flex-shrink-0">
-          <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-2">
+        <div className="md:px-[30px] px-1 flex-shrink-0">
+          <div className="h-10 bg-custom-2 rounded-lg md:px-4 pr-1 flex items-center gap-2">
             <div className="w-8"></div>
-            <div className="flex-[3] font-nunito font-semibold text-xs text-primary-text uppercase">
+            <div className="md:flex-[3] flex-[2] font-nunito font-semibold text-left md:text-sm text-xs text-primary-text uppercase">
               Perfil
             </div>
-            <div className="flex-[2] text-center font-nunito font-semibold text-xs text-primary-text uppercase">
+            <div className="md:flex-[2] flex-[1] md:text-center mr-3 text-right font-nunito font-semibold md:text-sm text-xs text-primary-text uppercase">
               Qtd Usuários
             </div>
           </div>
@@ -484,17 +484,29 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
       {/* Lista de perfis com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-[30px] scrollbar-hide"
+        className="flex-1 overflow-y-auto md:px-[30px] px-1 scrollbar-hide"
         style={{ maxHeight: 'calc(100vh - 250px)' }}
       >
+        {/* Mostrar loading quando está carregando ou ainda não houve tentativa de carregamento */}
+        {(isLoading || !hasLoadedInitialRef.current) && perfis.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 gap-2">
+            <img
+              src="/images/jiffy-loading.gif"
+              alt="Carregando..."
+              className="w-20 h-20"
+            />
+            <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
+          </div>
+        )}
 
-        {perfis.length === 0 && !isLoading && (
+        {/* Só exibir mensagem de "nenhum perfil" quando realmente não há perfis e já houve tentativa de carregamento */}
+        {perfis.length === 0 && !isLoading && hasLoadedInitialRef.current && (
           <div className="flex items-center justify-center py-12">
             <p className="text-secondary-text">Nenhum perfil encontrado.</p>
           </div>
         )}
 
-        {perfis.map((perfil) => {
+        {perfis.map((perfil, index) => {
           const isExpanded = expandedPerfis.has(perfil.getId())
           const usuarios = usuariosPorPerfil[perfil.getId()] || []
           const contagemUsuarios = contagemUsuariosPorPerfil[perfil.getId()] ?? 0
@@ -504,29 +516,33 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
             openTabsModal({ mode: 'edit', perfilId: perfil.getId() })
           }
 
+          // Intercala cores de fundo: cinza-50 para pares, branco para ímpares
+          const isZebraEven = index % 2 === 0
+          const bgClass = isZebraEven ? 'bg-gray-50' : 'bg-white'
+
           return (
             <div
               key={perfil.getId()}
-              className="bg-info rounded-xl my-2 overflow-visible shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-colors"
+              className={`${bgClass} rounded-lg my-2 overflow-visible hover:bg-primary/10 transition-colors`}
             >
               {/* Cabeçalho do perfil */}
               <div 
                 onClick={handlePerfilRowClick}
-                className="h-[50px] px-4 flex items-center gap-[10px] relative overflow-visible cursor-pointer"
+                className="h-[50px] md:px-4 px-1 flex items-center md:gap-[10px] gap-1 relative overflow-visible cursor-pointer"
               >
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
                     toggleExpand(perfil.getId())
                   }}
-                  className="w-8 h-8 flex items-center justify-center text-primary-text hover:bg-secondary-bg/20 rounded transition-colors"
+                  className="md:w-8 w-6 md:h-8 h-6 flex items-center justify-center text-primary-text hover:bg-secondary-bg/20 rounded transition-colors"
                 >
                   <span title="Exibir usuários do perfil" 
                   className={`text-lg transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
                     <MdKeyboardArrowRight size={18} />
                   </span>
                 </button>
-                <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text flex items-center gap-2">
+                <div className="md:flex-[3] flex-[2] font-nunito font-semibold text-left md:text-sm text-xs text-primary-text flex items-center gap-2">
                   {perfil.getRole()}
                   <button
                     onClick={(e) => {
@@ -536,10 +552,10 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
                     className="w-5 h-5 flex items-center justify-center border border-primary/70 text-primary hover:bg-primary/20 rounded-full transition-colors"
                     title="Adicionar novo usuário ao perfil"
                   >
-                    <MdAdd size={16} />
+                    <MdAdd />
                   </button>
                 </div>
-                <div className="flex-[2] text-center font-nunito text-sm text-secondary-text">
+                <div className="md:flex-[2] flex-[1] mr-3 md:text-center text-right font-nunito md:text-sm text-xs text-secondary-text">
                   {contagemUsuarios} usuário(s)
                 </div>
               </div>
@@ -613,12 +629,6 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
             </div>
           )
         })}
-
-        {isLoading && (
-          <div className="flex justify-center py-4">
-            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        )}
       </div>
 
       <PerfisUsuariosTabsModal

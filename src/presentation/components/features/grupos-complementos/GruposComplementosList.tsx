@@ -38,6 +38,7 @@ const GrupoItem = memo(function GrupoItem({
   onChangeQuantidade,
   isChangingQuantidade,
   ordemPosicional,
+  rowIndex,
 }: {
   grupo: GrupoComplemento
   onToggleStatus?: (grupoId: string, novoStatus: boolean) => void
@@ -47,6 +48,7 @@ const GrupoItem = memo(function GrupoItem({
   onChangeQuantidade?: (grupo: GrupoComplemento, tipo: 'min' | 'max', delta: number) => void
   isChangingQuantidade?: boolean
   ordemPosicional: number
+  rowIndex: number
 }) {
   const complementos = useMemo(() => grupo.getComplementos() || [], [grupo])
   const ordem = useMemo(() => {
@@ -75,18 +77,21 @@ const GrupoItem = memo(function GrupoItem({
       {/* Linha principal do grupo */}
       <div 
         onClick={handleRowClick}
-        className="px-4 py-2 flex items-center rounded-lg gap-[10px] shadow-lg hover:shadow-md transition-shadow hover:bg-secondary-bg/15 cursor-pointer"
+        className={`md:px-4 py-2 flex items-center rounded-lg gap-[10px] transition-shadow hover:bg-secondary-bg/15 cursor-pointer ${
+          rowIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+        }`}
       >
-        <div className="w-16 flex flex-col items-center text-center text-xs text-secondary-text">
+        <div className="w-16 flex-col items-start text-xs text-secondary-text hidden md:flex">
           
-          <span className="text-lg font-semibold text-primary-text/70">
+          <span className="text-sm text-left font-semibold text-primary-text/70">
             {ordemPosicional}
           </span>
         </div>
-        <div className="flex-[3] min-w-0 flex items-start gap-3 pl-3">
-          <div className="flex flex-col gap-1">
-            <span className="flex items-center gap-2 truncate font-nunito font-semibold text-lg text-primary-text">
+        <div className="md:flex-[3] flex-[2] min-w-0 flex items-start gap-3 pl-1 md:pl-3">
+          <div className="flex flex-col md:flex-row gap-1">
+            <span className="flex items-center gap-2 truncate font-nunito font-semibold md:text-sm text-xs text-primary-text">
               {grupo.getNome()}
+            </span>
               <button
                 type="button"
                 title="Editar complementos do grupo"
@@ -103,11 +108,10 @@ const GrupoItem = memo(function GrupoItem({
               >
                 <MdExtension className="text-sm" />
               </button>
-            </span>
           </div>
         </div>
-        <div className="flex-[3] flex justify-center" onClick={(e) => e.stopPropagation()}>
-          <div className="grid grid-cols-2 gap-4">
+        <div className="flex-[3] justify-center hidden md:flex" onClick={(e) => e.stopPropagation()}>
+          <div className="grid grid-cols-2 text-sm gap-4">
             {[
               {
                 label: 'Qtd mín.',
@@ -160,7 +164,7 @@ const GrupoItem = memo(function GrupoItem({
             <span className="text-sm font-nunito text-secondary-text">Nenhum complemento</span>
           ) : (
             <select
-              className="w-full px-3 py-1.5 rounded-xl border border-gray-300 bg-white text-sm font-semibold text-primary-text focus:outline-none focus:border-primary"
+              className="w-full md:px-3 py-1.5 rounded-xl border border-gray-300 bg-white md:text-sm text-xs font-semibold text-primary-text focus:outline-none focus:border-primary"
               defaultValue=""
               onChange={(event) => {
                 event.target.value = ''
@@ -178,9 +182,9 @@ const GrupoItem = memo(function GrupoItem({
             </select>
           )}
         </div>
-        <div className="flex-[2] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+        <div className="md:flex-[2] flex items-center md:justify-center justify-end" onClick={(e) => e.stopPropagation()}>
           <label 
-            className="relative inline-flex items-center h-5 w-12 cursor-pointer"
+            className="relative inline-flex items-center h-4 w-8 md:h-5 md:w-12 cursor-pointer"
             onMouseDown={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
           >
@@ -195,7 +199,7 @@ const GrupoItem = memo(function GrupoItem({
               onClick={(e) => e.stopPropagation()}
             />
             <div className="w-full h-full rounded-full bg-gray-300 peer-checked:bg-primary transition-colors" />
-            <span className="absolute left-1 top-1/2 block h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-6" />
+            <span className="absolute left-[2px] top-1/2 block h-[12px] w-[12px] md:h-3 md:w-3 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[14px] md:peer-checked:translate-x-6" />
           </label>
         </div>
       </div>
@@ -208,6 +212,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -249,6 +254,12 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
     ativo: ativoFilter,
     limit: 10,
   })
+
+  useEffect(() => {
+    if (!isLoading && !isFetching) {
+      setHasLoadedOnce(true)
+    }
+  }, [isLoading, isFetching])
 
   // Achatando todas as páginas em uma única lista (memoizado)
   const grupos = useMemo(() => {
@@ -504,13 +515,13 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
   return (
     <div className="flex flex-col h-full">
       {/* Header com título, filtros e botão */}
-      <div className="px-[30px] py-[4px] flex-shrink-0">
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="min-w-[220px] flex-1 pl-5">
+      <div className="md:px-[30px] px-2 py-[4px] flex-shrink-0">
+        <div className="flex flex-row items-center justify-between">
+          <div className="flex flex-col md:pl-5">
             <p className="text-primary text-sm font-semibold font-nunito">
               Grupos de Complementos Cadastrados
             </p>
-            <p className="text-tertiary text-[22px] font-medium font-nunito">
+            <p className="text-tertiary md:text-[22px] text-sm font-medium font-nunito">
               Total {grupos.length} de {filteredTotal}
             </p>
           </div>
@@ -522,7 +533,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
                 grupo: undefined,
               })
             }
-            className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+            className="h-8 md:px-[30px] px-4 bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
           >
             Novo
             <span className="text-lg">+</span>
@@ -530,7 +541,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
         </div>
       </div>
       <div className="h-[2px] border-t-2 border-primary/70 flex-shrink-0"></div>
-      <div className="flex gap-3 px-[20px] py-2 flex-shrink-0">
+      <div className="flex gap-3 md:px-[20px] px-2 py-2 flex-shrink-0">
       <div className="flex-1 min-w-[180px] max-w-[360px]">
             <label
               htmlFor="grupos-complementos-search"
@@ -572,21 +583,21 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
           </div>
 
       {/* Cabeçalho da tabela */}
-      <div className="px-[30px] flex-shrink-0">
-        <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px]">
-          <div className="w-16 font-nunito font-semibold text-sm text-primary-text text-center">
+      <div className="md:px-[30px] px-1 flex-shrink-0">
+        <div className="h-10 bg-custom-2 rounded-lg md:px-4 px-1 flex items-center gap-[10px]">
+          <div className="w-16 font-nunito font-semibold text-sm text-primary-text justify-start hidden md:flex">
             Ordem
           </div>
-          <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text">
+          <div className="md:flex-[3] flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Nome
           </div>
-          <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text text-center">
+          <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text justify-center hidden md:flex">
             Qtd de Complementos
           </div>
-          <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
+          <div className="flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Complementos
           </div>
-          <div className="flex-[2] text-center font-nunito font-semibold text-sm text-primary-text">
+          <div className="md:flex-[2] md:text-center text-right font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Status
           </div>
         </div>
@@ -595,46 +606,41 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
       {/* Lista de grupos com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-[30px] mt-2 scrollbar-hide"
+        className="flex-1 overflow-y-auto md:px-[30px] px-2 mt-2 scrollbar-hide"
         style={{ maxHeight: 'calc(100vh - 300px)' }}
       >
         {/* Skeleton loaders para carregamento inicial - sempre mostra durante loading */}
         {(isLoading || (grupos.length === 0 && isFetching)) && (
-          <div className="space-y-2">
-            {[...Array(8)].map((_, i) => (
-              <div
-                key={i}
-                className="h-[50px] bg-info rounded-xl px-4 flex items-center gap-[10px] animate-pulse"
-              >
-                <Skeleton className="w-10 h-4" />
-                <Skeleton className="flex-[3] h-4" />
-                <Skeleton className="flex-[2] h-4" />
-                <Skeleton className="flex-[2] h-4" />
-                <Skeleton className="flex-[2] h-6 w-20 mx-auto" />
-              </div>
-            ))}
+          <div className="flex flex-col items-center justify-center py-8 gap-2">
+            <img
+              src="/images/jiffy-loading.gif"
+              alt="Carregando"
+              className="w-16 h-16 object-contain"
+            />
+            <p className="text-sm text-secondary-text text-center">Carregando grupos...</p>
           </div>
         )}
 
-        {grupos.length === 0 && !isLoading && (
+        {grupos.length === 0 && !isLoading && !isFetching && hasLoadedOnce && (
           <div className="flex items-center justify-center py-12">
             <p className="text-secondary-text">Nenhum grupo de complementos encontrado.</p>
           </div>
         )}
 
         {grupos.map((grupo, index) => (
-            <GrupoItem
-              key={grupo.getId()}
-              grupo={grupo}
-              onToggleStatus={toggleGroupStatus}
-              onActionsChanged={handleActionsReload}
-              onOpenComplementosModal={handleOpenComplementosModal}
-              onEditGrupo={handleEditGrupo}
-              onChangeQuantidade={handleChangeQuantidade}
-              isChangingQuantidade={updatingQuantidadeId === grupo.getId()}
+          <GrupoItem
+            key={grupo.getId()}
+            grupo={grupo}
+            onToggleStatus={toggleGroupStatus}
+            onActionsChanged={handleActionsReload}
+            onOpenComplementosModal={handleOpenComplementosModal}
+            onEditGrupo={handleEditGrupo}
+            onChangeQuantidade={handleChangeQuantidade}
+            isChangingQuantidade={updatingQuantidadeId === grupo.getId()}
             ordemPosicional={index + 1}
-            />
-          ))}
+            rowIndex={index}
+          />
+        ))}
 
         {isFetchingNextPage && (
           <div className="flex justify-center py-4">
