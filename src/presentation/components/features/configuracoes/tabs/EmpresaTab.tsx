@@ -4,6 +4,38 @@ import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { showToast } from '@/src/shared/utils/toast'
+import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
+
+// Siglas dos estados brasileiros em ordem alfabética
+const ESTADOS_BRASILEIROS = [
+  { sigla: 'AC', nome: 'Acre' },
+  { sigla: 'AL', nome: 'Alagoas' },
+  { sigla: 'AP', nome: 'Amapá' },
+  { sigla: 'AM', nome: 'Amazonas' },
+  { sigla: 'BA', nome: 'Bahia' },
+  { sigla: 'CE', nome: 'Ceará' },
+  { sigla: 'DF', nome: 'Distrito Federal' },
+  { sigla: 'ES', nome: 'Espírito Santo' },
+  { sigla: 'GO', nome: 'Goiás' },
+  { sigla: 'MA', nome: 'Maranhão' },
+  { sigla: 'MT', nome: 'Mato Grosso' },
+  { sigla: 'MS', nome: 'Mato Grosso do Sul' },
+  { sigla: 'MG', nome: 'Minas Gerais' },
+  { sigla: 'PA', nome: 'Pará' },
+  { sigla: 'PB', nome: 'Paraíba' },
+  { sigla: 'PR', nome: 'Paraná' },
+  { sigla: 'PE', nome: 'Pernambuco' },
+  { sigla: 'PI', nome: 'Piauí' },
+  { sigla: 'RJ', nome: 'Rio de Janeiro' },
+  { sigla: 'RN', nome: 'Rio Grande do Norte' },
+  { sigla: 'RS', nome: 'Rio Grande do Sul' },
+  { sigla: 'RO', nome: 'Rondônia' },
+  { sigla: 'RR', nome: 'Roraima' },
+  { sigla: 'SC', nome: 'Santa Catarina' },
+  { sigla: 'SP', nome: 'São Paulo' },
+  { sigla: 'SE', nome: 'Sergipe' },
+  { sigla: 'TO', nome: 'Tocantins' },
+]
 
 /**
  * Tab de Empresa - Edição de dados da empresa
@@ -27,6 +59,7 @@ export function EmpresaTab() {
   const [bairro, setBairro] = useState('')
   const [cidade, setCidade] = useState('')
   const [estado, setEstado] = useState('')
+  const [cidadeValida, setCidadeValida] = useState<boolean | null>(null)
 
   useEffect(() => {
     loadEmpresa()
@@ -104,6 +137,25 @@ export function EmpresaTab() {
     if (!token || !empresa) {
       console.error('Token ou empresa não disponível')
       return
+    }
+
+    // Validar cidade antes de salvar
+    if (cidade && estado) {
+      try {
+        const response = await fetch(
+          `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(cidade)}&uf=${estado}`
+        )
+        if (response.ok) {
+          const data = await response.json()
+          if (!data.valido) {
+            showToast.error(`Cidade "${cidade}" não encontrada no estado ${estado}. Por favor, selecione uma cidade válida.`)
+            return
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao validar cidade:', error)
+        // Continuar mesmo se a validação falhar (pode ser problema de rede)
+      }
     }
 
     try {
@@ -196,7 +248,8 @@ export function EmpresaTab() {
           <div className="flex flex-col md:flex-row gap-2">
             <button
               onClick={handleSave}
-              className="h-8 px-6 bg-primary text-white rounded-lg text-sm font-medium font-exo hover:bg-primary/90 transition-colors flex items-center gap-2"
+              disabled={cidadeValida === false && cidade.length > 0}
+              className="h-8 px-6 bg-primary text-white rounded-lg text-sm font-medium font-exo hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span>✓</span> Salvar
             </button>
@@ -350,28 +403,38 @@ export function EmpresaTab() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-primary-text">
-                Cidade
-              </label>
-              <input
-                type="text"
+              <CidadeAutocomplete
                 value={cidade}
-                onChange={(e) => setCidade(e.target.value)}
-                disabled={!isEditing}
-                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                onChange={setCidade}
+                estado={estado}
+                label="Cidade"
+                placeholder="Digite o nome da cidade"
+                required={false}
+                disabled={!isEditing || !estado}
+                useNativeInput={true}
+                inputClassName="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                onValidationChange={(isValid) => {
+                  setCidadeValida(isValid)
+                }}
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-primary-text">
                 Estado
               </label>
-              <input
-                type="text"
+              <select
                 value={estado}
                 onChange={(e) => setEstado(e.target.value)}
                 disabled={!isEditing}
                 className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
-              />
+              >
+                <option value="">Selecione o estado</option>
+                {ESTADOS_BRASILEIROS.map((estadoOption) => (
+                  <option key={estadoOption.sigla} value={estadoOption.sigla}>
+                    {estadoOption.sigla} - {estadoOption.nome}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
