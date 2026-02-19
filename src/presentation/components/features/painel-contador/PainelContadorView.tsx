@@ -1,18 +1,15 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { MdCheckCircle, MdSettings } from 'react-icons/md'
-import { Button } from '@/src/presentation/components/ui/button'
+import { MdCheckCircle } from 'react-icons/md'
 import { useTabsStore } from '@/src/presentation/stores/tabsStore'
 import { ConfiguracaoImpostosView } from '@/src/presentation/components/features/impostos/ConfiguracaoImpostosView'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { CertificadoUploadModal } from './CertificadoUploadModal'
-import { showToast } from '@/src/shared/utils/toast'
 import { MapearProdutosView } from './MapearProdutosView'
 import { Etapa1DadosFiscaisEmpresa } from './Etapa1DadosFiscaisEmpresa'
-import { Etapa3EmissorFiscal } from './Etapa3EmissorFiscal'
-import { Etapa4CenarioFiscal } from './Etapa4CenarioFiscal'
-import { Etapa5TabelaIbpt } from './Etapa5TabelaIbpt'
+import { Etapa3EmissorFiscal } from './Etapa2EmissorFiscal'
+import { Etapa4CenarioFiscal } from './Etapa3CenarioFiscal'
+import { Etapa5TabelaIbpt } from './Etapa4TabelaIbpt'
 import { ConfiguracaoEmpresaCompleta } from './ConfiguracaoEmpresaCompleta'
 
 /**
@@ -24,9 +21,6 @@ export function PainelContadorView() {
   const { auth, isRehydrated } = useAuthStore()
   const [empresaNome, setEmpresaNome] = useState<string>('Empresa')
   const [empresaCnpj, setEmpresaCnpj] = useState<string>('--')
-  const [certificado, setCertificado] = useState<any>(null)
-  const [isLoadingCertificado, setIsLoadingCertificado] = useState(true)
-  const [showUploadModal, setShowUploadModal] = useState(false)
 
   useEffect(() => {
     addTab({
@@ -73,56 +67,6 @@ export function PainelContadorView() {
     loadEmpresa()
   }, [auth])
 
-  // Busca dados do certificado
-  const loadCertificado = async () => {
-    const token = auth?.getAccessToken()
-    if (!token) return
-
-    setIsLoadingCertificado(true)
-    try {
-      const response = await fetch('/api/certificado', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      
-      const result = await response.json()
-      
-      // Se a resposta indica sucesso (mesmo que data seja null), não há erro
-      if (result.success) {
-        setCertificado(result.data) // Pode ser null se não houver certificado
-      } else {
-        // Apenas logar erro se for um erro real (não "não encontrado")
-        console.error('Erro ao carregar certificado:', result.message)
-        setCertificado(null)
-      }
-    } catch (error) {
-      console.error('Erro ao carregar certificado:', error)
-      setCertificado(null)
-    } finally {
-      setIsLoadingCertificado(false)
-    }
-  }
-
-  useEffect(() => {
-    if (isRehydrated) {
-      loadCertificado()
-    }
-  }, [auth, isRehydrated])
-
-  // Calcula dias restantes até expiração
-  const calcularDiasRestantes = (dataValidade: string | null | undefined): number | null => {
-    if (!dataValidade) return null
-    const hoje = new Date()
-    const validade = new Date(dataValidade)
-    const diffTime = validade.getTime() - hoje.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays
-  }
-
-  // Formata data para exibição
-  const formatarData = (dataISO: string): string => {
-    const data = new Date(dataISO)
-    return data.toLocaleDateString('pt-BR')
-  }
 
   if (activeTabId === 'impostos') {
     return <ConfiguracaoImpostosView />
@@ -136,63 +80,6 @@ export function PainelContadorView() {
     return <ConfiguracaoEmpresaCompleta />
   }
 
-  const handleOpenCertificadoConfig = () => {
-    setShowUploadModal(true)
-  }
-
-  const handleRemoverCertificado = async () => {
-    if (!certificado) return
-
-    // Confirmação antes de remover
-    const confirmar = window.confirm(
-      `Tem certeza que deseja remover o certificado digital?\n\n` +
-      `Ambiente: ${certificado.ambiente === 'HOMOLOGACAO' ? 'Homologação' : 'Produção'}\n\n` +
-      `Após a remoção, não será mais possível emitir notas fiscais até que um novo certificado seja cadastrado.`
-    )
-
-    if (!confirmar) return
-
-    const token = auth?.getAccessToken()
-    if (!token) {
-      showToast.error('Sessão expirada. Faça login novamente.')
-      return
-    }
-
-    const toastId = showToast.loading('Removendo certificado...')
-
-    try {
-      // UF não é mais necessária - uma empresa tem apenas UMA configuração por ambiente
-      const response = await fetch(
-        `/api/certificado?ambiente=${certificado.ambiente}`,
-        {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      )
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Erro ao remover certificado')
-      }
-
-      showToast.successLoading(toastId, 'Certificado removido com sucesso!')
-      
-      // Recarregar dados (agora não terá certificado)
-      await loadCertificado()
-    } catch (error: any) {
-      console.error('Erro ao remover certificado:', error)
-      showToast.errorLoading(toastId, error.message || 'Erro ao remover certificado')
-    }
-  }
-
-  const handleCertificadoSuccess = async () => {
-    // Aguardar um pouco para garantir que o certificado foi salvo no banco
-    await new Promise(resolve => setTimeout(resolve, 500))
-    // Recarregar dados do certificado
-    await loadCertificado()
-  }
 
   const handleOpenNCMConfig = () => {
     addTab({
@@ -212,14 +99,7 @@ export function PainelContadorView() {
   }
 
   return (
-    <>
-      <CertificadoUploadModal 
-        open={showUploadModal}
-        onClose={() => setShowUploadModal(false)}
-        onSuccess={handleCertificadoSuccess}
-      />
-      
-      <div className="pb-2 flex w-full flex-col items-stretch bg-info lg:flex-row lg:h-full">
+    <div className="pb-2 flex w-full flex-col items-stretch bg-info lg:flex-row lg:h-full">
       {/* Painel Esquerdo - Roxo */}
       <div className="flex min-h-[350px] flex-1 md:w-[58%] w-full flex-col overflow-hidden rounded-tr-none rounded-br-none bg-secondary lg:h-full lg:rounded-tr-[48px] lg:rounded-br-[48px]">
         {/* Seção Superior com Título e Ilustração */}
@@ -312,111 +192,7 @@ export function PainelContadorView() {
           {
             id: 1,
             title: 'Dados Fiscais e Certificado Digital',
-            content: (
-              <div className="flex flex-col gap-2">
-                {/* Seção: Dados Fiscais */}
-                <div className="flex flex-row items-center justify-between gap-2">
-                  <h4 className="font-exo font-semibold text-primary text-sm md:text-base">
-                    Dados Fiscais da Empresa
-                  </h4>
-                  <div className="flex items-center justify-center p-2">
-                    <Button
-                      onClick={() => {
-                        addTab({
-                          id: 'config-empresa-completa',
-                          label: 'Configuração Completa',
-                          path: '/painel-contador/config/empresa-completa',
-                        })
-                      }}
-                      className="rounded-lg px-4 py-2 text-white text-sm font-medium flex items-center gap-2"
-                      sx={{
-                        backgroundColor: 'var(--color-secondary)',
-                        '&:hover': { backgroundColor: 'var(--color-alternate)' },
-                      }}
-                    >
-                      <MdSettings size={18} />
-                      Configurar
-                    </Button>
-                  </div>
-                </div>
-                {/* Seção: Certificado Digital */}
-                <div className="flex flex-col gap-2">
-                  <h4 className="font-exo font-semibold text-primary text-sm md:text-base border-b border-primary/20 pb-1">
-                    Certificado Digital
-                  </h4>
-                  <div className="flex flex-col gap-2">
-                    <p className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
-                      {certificado 
-                        ? 'Certificado digital cadastrado e ativo' 
-                        : 'Cadastre o certificado digital da empresa e deixe sua comunicação com a SEFAZ funcionando'}
-                    </p>
-                    {certificado && (
-                      <div className="flex flex-col gap-1">
-                        <span className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
-                          Tipo: A1
-                        </span>
-                        <span className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
-                          Validade: {certificado.validadeCertificado ? formatarData(certificado.validadeCertificado) : '--'}
-                        </span>
-                        <span className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
-                          Ambiente: {certificado.ambiente === 'HOMOLOGACAO' ? 'Homologação' : 'Produção'}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex flex-col items-center gap-2 mt-2">
-                      {certificado ? (
-                        <Button
-                          onClick={handleRemoverCertificado}
-                          className="rounded-lg px-3 py-2 text-white text-sm font-medium w-full"
-                          disabled={isLoadingCertificado}
-                          sx={{
-                            backgroundColor: '#dc2626',
-                            '&:hover': { backgroundColor: '#b91c1c' },
-                          }}
-                        >
-                          Remover Certificado
-                        </Button>
-                      ) : (
-                        <Button
-                          onClick={handleOpenCertificadoConfig}
-                          className="rounded-lg px-3 py-2 text-white text-sm font-medium w-full"
-                          disabled={isLoadingCertificado}
-                          sx={{
-                            backgroundColor: 'var(--color-secondary)',
-                            '&:hover': { backgroundColor: 'var(--color-alternate)' },
-                          }}
-                        >
-                          Cadastrar Certificado
-                        </Button>
-                      )}
-                      {certificado && certificado.validadeCertificado && (() => {
-                        const diasRestantes = calcularDiasRestantes(certificado.validadeCertificado)
-                        if (diasRestantes === null) return null
-                        
-                        const isExpiringSoon = diasRestantes <= 30
-                        const isExpired = diasRestantes < 0
-                        
-                        return (
-                          <span 
-                            className={`font-inter font-medium text-sm rounded-lg px-3 py-1 w-full text-center ${
-                              isExpired 
-                                ? 'bg-[#ffa3a3] text-[#dd1717]' 
-                                : isExpiringSoon 
-                                ? 'bg-[#fff3cd] text-[#856404]' 
-                                : 'bg-accent1 text-[#f6f8fc]'
-                            }`}
-                          >
-                            {isExpired 
-                              ? 'Expirado' 
-                              : `Expira em ${diasRestantes} dia${diasRestantes !== 1 ? 's' : ''}`}
-                          </span>
-                        )
-                      })()}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ),
+            content: <Etapa1DadosFiscaisEmpresa />,
           },
           {
             id: 2,
@@ -449,7 +225,7 @@ export function PainelContadorView() {
             </div>
             {/* card */}
             <div className="flex-1 rounded-[24px] border border-primary bg-[#f6f8fc] p-3 sm:p-3.5 md:p-4 shadow-sm">
-              <h3 className="text-center font-exo font-medium text-primary text-sm sm:text-lg md:text-xl lg:text-2xl mb-2">
+              <h3 className="text-center font-exo font-medium text-primary text-sm sm:text-lg md:text-xl mb-2">
                 {step.title}
               </h3>
               <div className="flex flex-col gap-2">{step.content}</div>
@@ -458,6 +234,5 @@ export function PainelContadorView() {
         ))}
       </div>
     </div>
-    </>
   )
 }
