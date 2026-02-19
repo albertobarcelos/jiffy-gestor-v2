@@ -132,6 +132,7 @@ export function ConfiguracaoEmpresaCompleta() {
       if (empresaResponse.ok) {
         const empresaData = await empresaResponse.json()
         setEmpresa(empresaData)
+        
         setFormDataEmpresa({
           cnpj: empresaData.cnpj || '',
           razaoSocial: empresaData.razaoSocial || empresaData.nome || '',
@@ -146,6 +147,9 @@ export function ConfiguracaoEmpresaCompleta() {
           cidade: empresaData.endereco?.cidade || '',
           estado: empresaData.endereco?.estado || empresaData.endereco?.uf || '',
         })
+        
+        // Resetar validação - o CidadeAutocomplete validará automaticamente quando receber os valores
+        setCidadeValida(null)
       }
 
       // Buscar configuração fiscal (empresaId é extraído do JWT pelo backend)
@@ -212,7 +216,7 @@ export function ConfiguracaoEmpresaCompleta() {
         return
       }
 
-      // Se ainda não foi validada, validar agora
+      // Se ainda não foi validada, validar agora antes de salvar
       if (cidadeValida === null) {
         try {
           const response = await fetch(
@@ -221,16 +225,25 @@ export function ConfiguracaoEmpresaCompleta() {
           if (response.ok) {
             const data = await response.json()
             if (!data.valido) {
+              setCidadeValida(false)
               showToast.error(
                 `Cidade "${formDataEmpresa.cidade}" não encontrada no estado ${formDataEmpresa.estado}. ` +
                 `Por favor, selecione uma cidade válida da lista de sugestões.`
               )
               return
+            } else {
+              // Marcar como válida após validação bem-sucedida
+              setCidadeValida(true)
             }
+          } else {
+            // Se a validação falhar (erro de rede, etc), permitir salvar (cidade já estava no banco)
+            console.warn('Não foi possível validar cidade antes de salvar, mas continuando...')
+            setCidadeValida(true)
           }
         } catch (error) {
           console.error('Erro ao validar cidade:', error)
-          // Continuar mesmo se a validação falhar (pode ser problema de rede)
+          // Se houver erro na validação, permitir salvar (cidade já estava no banco)
+          setCidadeValida(true)
         }
       }
     }
@@ -345,18 +358,18 @@ export function ConfiguracaoEmpresaCompleta() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-8 min-h-full">
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <div className="w-full px-6 pt-6 pb-4">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 px-6 pt-6 pb-4">
         <h2 className="text-2xl font-bold text-primary mb-6">Configuração Completa da Empresa</h2>
         
-        <form onSubmit={handleSubmit} className="space-y-8">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* Seção: Dados da Empresa */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
               Dados da Empresa
             </h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               <div className="space-y-2">
                 <Label htmlFor="cnpj">CNPJ *</Label>
                 <Input
@@ -493,26 +506,13 @@ export function ConfiguracaoEmpresaCompleta() {
               </div>
 
               <div className="space-y-2">
-                <CidadeAutocomplete
-                  value={formDataEmpresa.cidade}
-                  onChange={(cidade) =>
-                    setFormDataEmpresa({ ...formDataEmpresa, cidade })
-                  }
-                  estado={formDataEmpresa.estado}
-                  label="Cidade"
-                  placeholder="Digite o nome da cidade"
-                  required={false}
-                  disabled={!formDataEmpresa.estado}
-                  onValidationChange={setCidadeValida}
-                />
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="estado">Estado (UF) *</Label>
                 <Select
                   value={formDataEmpresa.estado}
                   onValueChange={(value) => {
-                    setFormDataEmpresa({ ...formDataEmpresa, estado: value })
+                    // Limpa a cidade ao trocar o estado para evitar inconsistência
+                    setFormDataEmpresa({ ...formDataEmpresa, estado: value, cidade: '' })
+                    setCidadeValida(null)
                   }}
                   required
                 >
@@ -528,6 +528,21 @@ export function ConfiguracaoEmpresaCompleta() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-2">
+                <CidadeAutocomplete
+                  value={formDataEmpresa.cidade}
+                  onChange={(cidade) =>
+                    setFormDataEmpresa({ ...formDataEmpresa, cidade })
+                  }
+                  estado={formDataEmpresa.estado}
+                  label="Cidade"
+                  placeholder="Digite o nome da cidade"
+                  required={false}
+                  disabled={!formDataEmpresa.estado}
+                  onValidationChange={setCidadeValida}
+                />
+              </div>
             </div>
           </div>
 
@@ -537,43 +552,44 @@ export function ConfiguracaoEmpresaCompleta() {
               Dados Fiscais
             </h3>
             
+            {/* Checkbox isento — fora do grid para ocupar largura total */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="isento"
+                checked={formDataFiscal.isento}
+                onChange={(e) => {
+                  setFormDataFiscal({
+                    ...formDataFiscal,
+                    isento: e.target.checked,
+                    inscricaoEstadual: '',
+                  })
+                }}
+                className="rounded"
+              />
+              <Label htmlFor="isento" className="cursor-pointer">
+                Empresa isenta de Inscrição Estadual
+              </Label>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Inscrição Estadual */}
+              {/* Inscrição Estadual — sempre visível, desabilitado quando isento */}
               <div className="space-y-2">
-                <div className="flex items-center gap-2 mb-2">
-                  <input
-                    type="checkbox"
-                    id="isento"
-                    checked={formDataFiscal.isento}
-                    onChange={(e) => {
-                      setFormDataFiscal({ 
-                        ...formDataFiscal, 
-                        isento: e.target.checked, 
-                        inscricaoEstadual: '' 
-                      })
-                    }}
-                    className="rounded"
-                  />
-                  <Label htmlFor="isento" className="cursor-pointer">
-                    Empresa isenta de Inscrição Estadual
-                  </Label>
-                </div>
-                {!formDataFiscal.isento && (
-                  <>
-                    <Label htmlFor="inscricaoEstadual">Inscrição Estadual (IE) *</Label>
-                    <Input
-                      id="inscricaoEstadual"
-                      value={formDataFiscal.inscricaoEstadual}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, '')
-                        setFormDataFiscal({ ...formDataFiscal, inscricaoEstadual: value })
-                      }}
-                      placeholder="123456789012"
-                      maxLength={15}
-                      required
-                    />
-                  </>
-                )}
+                <Label htmlFor="inscricaoEstadual">
+                  Inscrição Estadual (IE){!formDataFiscal.isento && ' *'}
+                </Label>
+                <Input
+                  id="inscricaoEstadual"
+                  value={formDataFiscal.inscricaoEstadual}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '')
+                    setFormDataFiscal({ ...formDataFiscal, inscricaoEstadual: value })
+                  }}
+                  placeholder={formDataFiscal.isento ? 'Isento de IE' : '123456789012'}
+                  inputProps={{ maxLength: 15 }}
+                  disabled={formDataFiscal.isento}
+                  required={!formDataFiscal.isento}
+                />
               </div>
 
               {/* Inscrição Municipal */}
@@ -617,7 +633,7 @@ export function ConfiguracaoEmpresaCompleta() {
           </div>
 
           {/* Botão Salvar */}
-          <div className="flex justify-end pt-4 border-t">
+          <div className="flex justify-end py-4 border-t">
             <Button
               type="submit"
               disabled={isSaving}

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getTokenInfo } from '@/src/shared/utils/getTokenInfo'
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000'
+const BACKEND_URL = process.env.NEXT_PUBLIC_EXTERNAL_API_BASE_URL || 'http://localhost:3000'
 
 /**
  * POST /api/certificado - Cadastrar certificado digital
@@ -125,18 +125,14 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    if (response.status === 404) {
-      // Nenhum certificado encontrado
-      return NextResponse.json({ success: true, data: null })
-    }
-
+    // Tratar "nenhum certificado encontrado" como sucesso (data: null)
+    // O fiscal service pode retornar 404 ou 503 com essa mensagem
+    let errorData: any = {}
+    let errorText = ''
+    
     if (!response.ok) {
-      let errorData: any = {}
-      let errorText = ''
-      
       try {
         errorText = await response.text()
-        console.error('[CERTIFICADO GET] ❌ Fiscal service resposta (texto):', errorText)
         
         if (errorText) {
           try {
@@ -147,9 +143,24 @@ export async function GET(req: NextRequest) {
         }
       } catch (e) {
         console.error('[CERTIFICADO GET] ❌ Erro ao ler resposta do fiscal service:', e)
-        errorData = { message: 'Erro ao processar resposta do servidor' }
       }
       
+      // Se a mensagem indica que não há certificado, tratar como sucesso (data: null)
+      const mensagem = errorData.message || errorData.error || ''
+      const isNenhumCertificado = 
+        response.status === 404 || 
+        (response.status === 503 && (
+          mensagem.toLowerCase().includes('nenhum certificado') ||
+          mensagem.toLowerCase().includes('não encontrado') ||
+          mensagem.toLowerCase().includes('not found')
+        ))
+      
+      if (isNenhumCertificado) {
+        // Nenhum certificado encontrado - não é um erro, apenas ausência de dados
+        return NextResponse.json({ success: true, data: null })
+      }
+      
+      // Outros erros são tratados como erro real
       console.error('[CERTIFICADO GET] ❌ Fiscal service erro:', {
         status: response.status,
         statusText: response.statusText,

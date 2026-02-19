@@ -2,6 +2,7 @@
 
 import { Suspense } from 'react'
 import { PainelContadorView } from '@/src/presentation/components/features/painel-contador/PainelContadorView'
+import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
 
 /**
  * Rota /painel-contador: apenas casca.
@@ -9,10 +10,8 @@ import { PainelContadorView } from '@/src/presentation/components/features/paine
  */
 export default function PainelContadorPage() {
   return (
-    <div className="h-full">
-      <Suspense fallback={<div>Carregando painel...</div>}>
-        <PainelContadorView />
-      </Suspense>
-    </div>
+    <Suspense fallback={<PageLoading />}>
+      <PainelContadorView />
+    </Suspense>
   )
 }

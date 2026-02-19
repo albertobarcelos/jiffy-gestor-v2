@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { MdCheckCircle } from 'react-icons/md'
+import { MdCheckCircle, MdSettings } from 'react-icons/md'
 import { Button } from '@/src/presentation/components/ui/button'
 import { useTabsStore } from '@/src/presentation/stores/tabsStore'
 import { ConfiguracaoImpostosView } from '@/src/presentation/components/features/impostos/ConfiguracaoImpostosView'
@@ -83,12 +83,17 @@ export function PainelContadorView() {
       const response = await fetch('/api/certificado', {
         headers: { Authorization: `Bearer ${token}` },
       })
-      if (!response.ok) {
-        setCertificado(null)
-        return
-      }
+      
       const result = await response.json()
-      setCertificado(result.data)
+      
+      // Se a resposta indica sucesso (mesmo que data seja null), não há erro
+      if (result.success) {
+        setCertificado(result.data) // Pode ser null se não houver certificado
+      } else {
+        // Apenas logar erro se for um erro real (não "não encontrado")
+        console.error('Erro ao carregar certificado:', result.message)
+        setCertificado(null)
+      }
     } catch (error) {
       console.error('Erro ao carregar certificado:', error)
       setCertificado(null)
@@ -214,9 +219,9 @@ export function PainelContadorView() {
         onSuccess={handleCertificadoSuccess}
       />
       
-      <div className=" pb-2 flex h-full w-full flex-col items-stretch bg-info overflow-y-auto lg:flex-row lg:overflow-hidden">
+      <div className="pb-2 flex w-full flex-col items-stretch bg-info lg:flex-row lg:h-full">
       {/* Painel Esquerdo - Roxo */}
-      <div className="flex min-h-[350px] md:min-h-full flex-1 md:w-[58%] w-full flex-col overflow-hidden rounded-tr-none rounded-br-none bg-secondary lg:rounded-tr-[48px] lg:rounded-br-[48px]">
+      <div className="flex min-h-[350px] flex-1 md:w-[58%] w-full flex-col overflow-hidden rounded-tr-none rounded-br-none bg-secondary lg:h-full lg:rounded-tr-[48px] lg:rounded-br-[48px]">
         {/* Seção Superior com Título e Ilustração */}
         <div className="flex flex-col gap-3 sm:gap-4 lg:gap-6 border-b border-[#330468] bg-[rgba(131,56,236,0.4)] sm:rounded-tr-[24px] md:rounded-tr-[32px] lg:rounded-tr-[48px] p-3 sm:p-4">
           <div className="flex flex-row items-center gap-4 sm:gap-6">
@@ -279,7 +284,7 @@ export function PainelContadorView() {
         </div>
 
         {/* Barra de Progresso */}
-        <div className="h-auto md:h-full mx-4 mt-4 flex-1 flex flex-col">
+        <div className="mx-4 mt-4 flex-1 flex flex-col min-h-0">
           <h2 className="font-manrope font-bold text-white text-[clamp(12px,2.5vw,16px)] sm:text-[clamp(14px,3vw,18px)] md:text-[clamp(16px,3.5vw,22px)] lg:text-[24px] tracking-[-0.32px] leading-[1.4] md:leading-[1.3] mb-1.5 sm:mb-1.75 md:mb-2 break-words">
             Configuração Contábil: 4 de 5 Etapas concluídas
           </h2>
@@ -302,105 +307,129 @@ export function PainelContadorView() {
       </div>
 
       {/* Painel Direito - Cards com stepper vertical */}
-      <div className="flex md:w-[42%] flex-col gap-4 p-2 sm:p-3 lg:min-h-full lg:overflow-auto">
+      <div className="flex md:w-[42%] flex-col gap-4 p-2 sm:p-3 lg:h-full lg:overflow-y-auto">
         {[
           {
             id: 1,
-            title: 'Dados Fiscais da Empresa',
-            content: <Etapa1DadosFiscaisEmpresa />,
-          },
-          {
-            id: 2,
-            title: 'Certificado Digital',
+            title: 'Dados Fiscais e Certificado Digital',
             content: (
-              <>
-              <div className="flex flex-row w-full mb-2 items-center rounded-[10px] md:px-3 py-1 md:gap-2">
-                <div className="flex flex-col gap-1">
-                <p className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
-                  {certificado 
-                    ? 'Certificado digital cadastrado e ativo' 
-                    : 'Cadastre o certificado digital da empresa e deixe sua comunicação com a SEFAZ funcionando'}
-                </p>
-                  {certificado && (
-                    <>
-                      <span className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
-                        Tipo: A1
-                      </span>
-                      <span className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
-                        Validade: {certificado.validadeCertificado ? formatarData(certificado.validadeCertificado) : '--'}
-                      </span>
-                      <span className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
-                        Ambiente: {certificado.ambiente === 'HOMOLOGACAO' ? 'Homologação' : 'Produção'}
-                      </span>
-                    </>
-                  )}
-                </div>
-                <div className="flex flex-col w-full mb-2 items-center rounded-[10px] px-3 py-1 gap-2">
-                  {certificado ? (
+              <div className="flex flex-col gap-2">
+                {/* Seção: Dados Fiscais */}
+                <div className="flex flex-row items-center justify-between gap-2">
+                  <h4 className="font-exo font-semibold text-primary text-sm md:text-base">
+                    Dados Fiscais da Empresa
+                  </h4>
+                  <div className="flex items-center justify-center p-2">
                     <Button
-                      onClick={handleRemoverCertificado}
-                      className="rounded-lg px-3 py-2 text-white text-sm font-medium"
-                      disabled={isLoadingCertificado}
-                      sx={{
-                        backgroundColor: '#dc2626',
-                        '&:hover': { backgroundColor: '#b91c1c' },
+                      onClick={() => {
+                        addTab({
+                          id: 'config-empresa-completa',
+                          label: 'Configuração Completa',
+                          path: '/painel-contador/config/empresa-completa',
+                        })
                       }}
-                    >
-                      Remover Certificado
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={handleOpenCertificadoConfig}
-                      className="rounded-lg px-3 py-2 text-white text-sm font-medium"
-                      disabled={isLoadingCertificado}
+                      className="rounded-lg px-4 py-2 text-white text-sm font-medium flex items-center gap-2"
                       sx={{
                         backgroundColor: 'var(--color-secondary)',
                         '&:hover': { backgroundColor: 'var(--color-alternate)' },
                       }}
                     >
-                      Cadastrar Certificado
+                      <MdSettings size={18} />
+                      Configurar
                     </Button>
-                  )}
-                  {certificado && certificado.validadeCertificado && (() => {
-                    const diasRestantes = calcularDiasRestantes(certificado.validadeCertificado)
-                    if (diasRestantes === null) return null
-                    
-                    const isExpiringSoon = diasRestantes <= 30
-                    const isExpired = diasRestantes < 0
-                    
-                    return (
-                      <span 
-                        className={`font-inter font-medium text-sm rounded-lg px-3 py-1 ${
-                          isExpired 
-                            ? 'bg-[#ffa3a3] text-[#dd1717]' 
-                            : isExpiringSoon 
-                            ? 'bg-[#fff3cd] text-[#856404]' 
-                            : 'bg-accent1 text-[#f6f8fc]'
-                        }`}
-                      >
-                        {isExpired 
-                          ? 'Expirado' 
-                          : `Expira em ${diasRestantes} dia${diasRestantes !== 1 ? 's' : ''}`}
-                      </span>
-                    )
-                  })()}
                   </div>
                 </div>
-              </>
+                {/* Seção: Certificado Digital */}
+                <div className="flex flex-col gap-2">
+                  <h4 className="font-exo font-semibold text-primary text-sm md:text-base border-b border-primary/20 pb-1">
+                    Certificado Digital
+                  </h4>
+                  <div className="flex flex-col gap-2">
+                    <p className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
+                      {certificado 
+                        ? 'Certificado digital cadastrado e ativo' 
+                        : 'Cadastre o certificado digital da empresa e deixe sua comunicação com a SEFAZ funcionando'}
+                    </p>
+                    {certificado && (
+                      <div className="flex flex-col gap-1">
+                        <span className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
+                          Tipo: A1
+                        </span>
+                        <span className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
+                          Validade: {certificado.validadeCertificado ? formatarData(certificado.validadeCertificado) : '--'}
+                        </span>
+                        <span className="font-inter font-medium text-secondary-text text-xs lg:text-sm">
+                          Ambiente: {certificado.ambiente === 'HOMOLOGACAO' ? 'Homologação' : 'Produção'}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex flex-col items-center gap-2 mt-2">
+                      {certificado ? (
+                        <Button
+                          onClick={handleRemoverCertificado}
+                          className="rounded-lg px-3 py-2 text-white text-sm font-medium w-full"
+                          disabled={isLoadingCertificado}
+                          sx={{
+                            backgroundColor: '#dc2626',
+                            '&:hover': { backgroundColor: '#b91c1c' },
+                          }}
+                        >
+                          Remover Certificado
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={handleOpenCertificadoConfig}
+                          className="rounded-lg px-3 py-2 text-white text-sm font-medium w-full"
+                          disabled={isLoadingCertificado}
+                          sx={{
+                            backgroundColor: 'var(--color-secondary)',
+                            '&:hover': { backgroundColor: 'var(--color-alternate)' },
+                          }}
+                        >
+                          Cadastrar Certificado
+                        </Button>
+                      )}
+                      {certificado && certificado.validadeCertificado && (() => {
+                        const diasRestantes = calcularDiasRestantes(certificado.validadeCertificado)
+                        if (diasRestantes === null) return null
+                        
+                        const isExpiringSoon = diasRestantes <= 30
+                        const isExpired = diasRestantes < 0
+                        
+                        return (
+                          <span 
+                            className={`font-inter font-medium text-sm rounded-lg px-3 py-1 w-full text-center ${
+                              isExpired 
+                                ? 'bg-[#ffa3a3] text-[#dd1717]' 
+                                : isExpiringSoon 
+                                ? 'bg-[#fff3cd] text-[#856404]' 
+                                : 'bg-accent1 text-[#f6f8fc]'
+                            }`}
+                          >
+                            {isExpired 
+                              ? 'Expirado' 
+                              : `Expira em ${diasRestantes} dia${diasRestantes !== 1 ? 's' : ''}`}
+                          </span>
+                        )
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              </div>
             ),
           },
           {
-            id: 3,
+            id: 2,
             title: 'Emissor Fiscal',
             content: <Etapa3EmissorFiscal />,
           },
           {
-            id: 4,
+            id: 3,
             title: 'Cenário Fiscal',
             content: <Etapa4CenarioFiscal />,
           },
           {
-            id: 5,
+            id: 4,
             title: 'Tabela IBPT',
             content: <Etapa5TabelaIbpt />,
           },
