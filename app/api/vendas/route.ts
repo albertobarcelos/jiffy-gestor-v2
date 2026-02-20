@@ -21,6 +21,14 @@ export async function GET(request: NextRequest) {
     const isUnificado = searchParams.get('unificado') === 'true' || request.url.includes('/unificado')
     
     if (isUnificado) {
+      // Validar empresaId
+      if (!tokenInfo.empresaId) {
+        return NextResponse.json(
+          { error: 'Empresa não identificada no token' },
+          { status: 401 }
+        )
+      }
+
       // Redirecionar para endpoint unificado
       const params = new URLSearchParams()
       params.append('empresaId', tokenInfo.empresaId)

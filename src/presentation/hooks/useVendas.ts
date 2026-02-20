@@ -422,6 +422,7 @@ export function useMarcarEmissaoFiscal() {
   })
 }
 
+
 /**
  * Hook para emitir NFe (NFC-e ou NF-e) para uma venda PDV
  */

@@ -117,6 +117,17 @@ function NovoProdutoContent({
   const loadedProdutoIdRef = useRef<string | null>(null)
   const lastProdutoIdRef = useRef<string | null | undefined>(null)
   const lastIsCopyModeRef = useRef<boolean>(false)
+  // Ref para armazenar dados fiscais do produto carregado (sem preencher campos ainda)
+  const fiscalDataFromProductRef = useRef<{
+    ncm?: string
+    cest?: string
+    origemMercadoria?: string
+    tipoProduto?: string
+    indicadorProducaoEscala?: string | null
+    fiscalStatus?: 'available' | 'unavailable' | undefined
+  } | null>(null)
+  // Ref para controlar se os dados fiscais já foram carregados no passo 3
+  const hasLoadedFiscalDataRef = useRef(false)
 
   // Carregar grupos de produtos usando React Query (com cache)
   const formatCurrency = useCallback((value: number | string) => {
@@ -219,29 +230,26 @@ function NovoProdutoContent({
           setOriginalGrupoComplementosIds(gruposIds) // Guardar os grupos originais
           setImpressorasIds(produto.impressoras?.map((i: any) => i.id) || [])
           
-          // Preenche os campos fiscais (busca primeiro em produto.fiscal, depois em produto para compatibilidade)
+          // IMPORTANTE: Não preencher campos fiscais imediatamente para evitar chamadas ao microserviço fiscal
+          // Os dados fiscais serão carregados apenas quando o usuário chegar no passo 3 (ConfiguracaoFiscalStep)
+          // Armazenar dados fiscais em uma ref para uso posterior
           const dadosFiscais = produto.fiscal || {}
-          setNcm(dadosFiscais.ncm || produto.ncm || '')
-          setCest(dadosFiscais.cest || '')
-          // Na edição, não aplica valores padrão - mantém vazio se não houver valor
-          setOrigemMercadoria(
-            dadosFiscais.origemMercadoria?.toString() || 
-            produto.origemMercadoria?.toString() || 
-            ''
-          )
-          setTipoProduto(
-            dadosFiscais.tipoProduto || 
-            produto.tipoProduto || 
-            ''
-          )
-          setIndicadorProducaoEscala(
-            dadosFiscais.indicadorProducaoEscala || 
-            produto.indicadorProducaoEscala || 
-            null
-          )
-
-          // Capturar status de disponibilidade do microsserviço fiscal
-          setFiscalStatus(produto.fiscalStatus || undefined)
+          fiscalDataFromProductRef.current = {
+            ncm: dadosFiscais.ncm || produto.ncm || '',
+            cest: dadosFiscais.cest || '',
+            origemMercadoria: dadosFiscais.origemMercadoria?.toString() || 
+              produto.origemMercadoria?.toString() || 
+              '',
+            tipoProduto: dadosFiscais.tipoProduto || 
+              produto.tipoProduto || 
+              '',
+            indicadorProducaoEscala: dadosFiscais.indicadorProducaoEscala || 
+              produto.indicadorProducaoEscala || 
+              null,
+            fiscalStatus: produto.fiscalStatus || undefined,
+          }
+          // Resetar flag de carregamento fiscal quando produto muda
+          hasLoadedFiscalDataRef.current = false
 
           if (currentEffectiveIsCopyMode) {
             const nomeOriginal = produto.nome || ''
@@ -270,9 +278,80 @@ function NovoProdutoContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [produtoId, isCopyMode]) // Apenas quando produtoId ou isCopyMode mudarem (valores estáveis das props)
 
+  // Carregar dados fiscais apenas quando o usuário chegar no passo 3 (ConfiguracaoFiscalStep)
+  // Isso evita chamadas desnecessárias ao microserviço fiscal durante o carregamento inicial
+  useEffect(() => {
+    // Só carregar dados fiscais se estivermos no passo 3 e ainda não carregamos
+    if (selectedPage !== 2 || hasLoadedFiscalDataRef.current) {
+      return
+    }
+
+    // Se temos dados fiscais armazenados do produto carregado, preencher os campos
+    if (fiscalDataFromProductRef.current) {
+      const fiscalData = fiscalDataFromProductRef.current
+      setNcm(fiscalData.ncm || '')
+      setCest(fiscalData.cest || '')
+      setOrigemMercadoria(fiscalData.origemMercadoria || '0')
+      setTipoProduto(fiscalData.tipoProduto || '00')
+      setIndicadorProducaoEscala(fiscalData.indicadorProducaoEscala || null)
+      setFiscalStatus(fiscalData.fiscalStatus || undefined)
+      hasLoadedFiscalDataRef.current = true
+    } else if (effectiveProdutoId) {
+      // Se não temos dados fiscais armazenados mas estamos editando, buscar do produto
+      // Isso pode acontecer se o usuário navegou diretamente para o passo 3
+      const token = auth?.getAccessToken()
+      if (!token) return
+
+      const loadFiscalData = async () => {
+        try {
+          const response = await fetch(`/api/produtos/${effectiveProdutoId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          })
+
+          if (response.ok) {
+            const produto = await response.json()
+            const dadosFiscais = produto.fiscal || {}
+            setNcm(dadosFiscais.ncm || produto.ncm || '')
+            setCest(dadosFiscais.cest || '')
+            setOrigemMercadoria(
+              dadosFiscais.origemMercadoria?.toString() || 
+              produto.origemMercadoria?.toString() || 
+              '0'
+            )
+            setTipoProduto(
+              dadosFiscais.tipoProduto || 
+              produto.tipoProduto || 
+              '00'
+            )
+            setIndicadorProducaoEscala(
+              dadosFiscais.indicadorProducaoEscala || 
+              produto.indicadorProducaoEscala || 
+              null
+            )
+            setFiscalStatus(produto.fiscalStatus || undefined)
+            hasLoadedFiscalDataRef.current = true
+          }
+        } catch (error) {
+          console.error('Erro ao carregar dados fiscais:', error)
+        }
+      }
+
+      loadFiscalData()
+    }
+  }, [selectedPage, effectiveProdutoId, auth])
+
   // Validação do NCM via API do backend (com debounce de 600ms)
+  // IMPORTANTE: Só valida se estivermos no passo 3 (ConfiguracaoFiscalStep) para evitar chamadas desnecessárias
   // Fluxo: Frontend → Backend → Microserviço Fiscal (frontend nunca se comunica diretamente com o fiscal)
   useEffect(() => {
+    // Não validar se não estivermos no passo fiscal
+    if (selectedPage !== 2) {
+      return
+    }
+
     // Limpar timer anterior
     if (ncmValidationTimerRef.current) {
       clearTimeout(ncmValidationTimerRef.current)
@@ -296,9 +375,19 @@ function NovoProdutoContent({
       return
     }
 
-    // Se já validamos esse mesmo NCM, não chamar API de novo
+    // Se já validamos esse mesmo NCM, verificar se o estado está sincronizado
     if (lastValidatedNcmRef.current === ncmTrimmed) {
-      return
+      // Se o estado ncmValidation não corresponde ao NCM atual, limpar e revalidar
+      // Isso pode acontecer se o usuário voltar para um NCM anteriormente validado
+      if (ncmValidation && ncmValidation.codigo !== ncmTrimmed) {
+        // Estado dessincronizado - limpar e permitir revalidação
+        setNcmValidation(null)
+        lastValidatedNcmRef.current = ''
+        // Continuar o fluxo para revalidar
+      } else if (ncmValidation && ncmValidation.codigo === ncmTrimmed) {
+        // Estado sincronizado - usar cache
+        return
+      }
     }
 
     // Debounce: aguardar 600ms após parar de digitar
@@ -310,6 +399,10 @@ function NovoProdutoContent({
         return
       }
 
+      // Timeout de 5 segundos para evitar espera longa se microserviço fiscal estiver off
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000)
+
       try {
         const response = await fetch(
           `/api/v1/fiscal/configuracoes/ncms/validar/${ncmTrimmed}`,
@@ -318,8 +411,11 @@ function NovoProdutoContent({
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
             },
+            signal: controller.signal,
           }
         )
+
+        clearTimeout(timeoutId)
 
         if (response.ok) {
           const result = await response.json()
@@ -330,8 +426,13 @@ function NovoProdutoContent({
           setNcmValidation(null)
           lastValidatedNcmRef.current = ''
         }
-      } catch {
-        // Erro de rede — não bloquear o usuário
+      } catch (error) {
+        clearTimeout(timeoutId)
+        // Erro de rede ou timeout — não bloquear o usuário
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          // Timeout: microserviço fiscal pode estar off
+          console.warn('Timeout ao validar NCM - microserviço fiscal pode estar indisponível')
+        }
         setNcmValidation(null)
         lastValidatedNcmRef.current = ''
       } finally {
@@ -345,15 +446,22 @@ function NovoProdutoContent({
         clearTimeout(ncmValidationTimerRef.current)
       }
     }
-  }, [ncm, auth])
+  }, [ncm, auth, selectedPage])
 
   // Buscar CESTs compatíveis quando o NCM é validado com sucesso
   // Fluxo: Frontend → Backend → Microserviço Fiscal (frontend nunca se comunica diretamente com o fiscal)
+  // IMPORTANTE: Só busca se estivermos no passo 3 (ConfiguracaoFiscalStep) para evitar chamadas desnecessárias
   useEffect(() => {
+    // Não buscar se não estivermos no passo fiscal
+    if (selectedPage !== 2) {
+      return
+    }
+
     const ncmTrimmed = ncm.trim()
 
     // Se NCM não está validado como válido, limpar lista de CESTs
-    if (!ncmValidation || !ncmValidation.valido || ncmTrimmed.length !== 8) {
+    // IMPORTANTE: Verificar se o código do NCM validado corresponde ao NCM atual
+    if (!ncmValidation || !ncmValidation.valido || ncmTrimmed.length !== 8 || ncmValidation.codigo !== ncmTrimmed) {
       setCestsDisponiveis([])
       setCestValidation(null)
       lastFetchedNcmForCestsRef.current = ''
@@ -370,6 +478,10 @@ function NovoProdutoContent({
       if (!token) return
 
       setIsLoadingCests(true)
+      // Timeout de 5 segundos para evitar espera longa se microserviço fiscal estiver off
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000)
+
       try {
         const response = await fetch(
           `/api/v1/fiscal/configuracoes/cests/por-ncm/${ncmTrimmed}`,
@@ -378,8 +490,11 @@ function NovoProdutoContent({
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
             },
+            signal: controller.signal,
           }
         )
+
+        clearTimeout(timeoutId)
 
         if (response.ok) {
           const result = await response.json()
@@ -390,8 +505,13 @@ function NovoProdutoContent({
           setCestsDisponiveis([])
           lastFetchedNcmForCestsRef.current = ''
         }
-      } catch {
-        // Erro de rede — não bloquear o usuário
+      } catch (error) {
+        clearTimeout(timeoutId)
+        // Erro de rede ou timeout — não bloquear o usuário
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          // Timeout: microserviço fiscal pode estar off
+          console.warn('Timeout ao buscar CESTs - microserviço fiscal pode estar indisponível')
+        }
         setCestsDisponiveis([])
         lastFetchedNcmForCestsRef.current = ''
       } finally {
@@ -400,12 +520,18 @@ function NovoProdutoContent({
     }
 
     fetchCests()
-  }, [ncmValidation, ncm, auth])
+  }, [ncmValidation, ncm, auth, selectedPage])
 
   // Validar CEST selecionado via API do backend (com debounce de 400ms)
   // Inclui validação de compatibilidade CEST x NCM quando o NCM está disponível.
   // Usa AbortController para cancelar requisições pendentes se o CEST/NCM mudar.
+  // IMPORTANTE: Só valida se estivermos no passo 3 (ConfiguracaoFiscalStep) para evitar chamadas desnecessárias
   useEffect(() => {
+    // Não validar se não estivermos no passo fiscal
+    if (selectedPage !== 2) {
+      return
+    }
+
     const cestTrimmed = cest.trim()
     const ncmTrimmed = ncm.trim()
 
@@ -448,6 +574,9 @@ function NovoProdutoContent({
         return
       }
 
+      // Timeout de 5 segundos para evitar espera longa se microserviço fiscal estiver off
+      const timeoutId = setTimeout(() => abortController.abort(), 5000)
+
       try {
         // Se temos um NCM válido, validar compatibilidade CEST x NCM diretamente
         const hasValidNcm = /^\d{8}$/.test(ncmTrimmed) && ncmValidation?.valido
@@ -462,6 +591,8 @@ function NovoProdutoContent({
           },
           signal: abortController.signal,
         })
+
+        clearTimeout(timeoutId)
 
         if (abortController.signal.aborted) return
 
@@ -488,8 +619,13 @@ function NovoProdutoContent({
           setCestValidation(null)
         }
       } catch (error) {
-        // Ignorar erros de abort (cancelamento intencional)
-        if (error instanceof DOMException && error.name === 'AbortError') return
+        clearTimeout(timeoutId)
+        // Ignorar erros de abort (cancelamento intencional ou timeout)
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          // Timeout: microserviço fiscal pode estar off
+          console.warn('Timeout ao validar CEST - microserviço fiscal pode estar indisponível')
+          return
+        }
         setCestValidation(null)
       } finally {
         if (!abortController.signal.aborted) {
@@ -502,7 +638,7 @@ function NovoProdutoContent({
       clearTimeout(timer)
       abortController.abort()
     }
-  }, [cest, ncm, ncmValidation, cestsDisponiveis, auth])
+  }, [cest, ncm, ncmValidation, cestsDisponiveis, auth, selectedPage])
 
   // Preencher automaticamente o Indicador de Produção em Escala Relevante quando CEST for preenchido
   useEffect(() => {

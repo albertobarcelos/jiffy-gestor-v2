@@ -140,7 +140,7 @@ export function Etapa1DadosFiscaisEmpresa() {
       <Dialog 
         open={showConfirmModal} 
         onOpenChange={setShowConfirmModal}
-        maxWidth="sm"
+        maxWidth="xs"
         fullWidth
       >
         <DialogContent sx={{ p: 3 }}>

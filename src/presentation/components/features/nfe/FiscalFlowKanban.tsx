@@ -112,29 +112,185 @@ export function FiscalFlowKanban() {
   // Todas as vendas unificadas
   const todasVendas: Venda[] = vendasUnificadasData?.items || []
   
-  // Filtrar vendas por coluna usando os métodos auxiliares do DTO
-  const vendasFinalizadas: Venda[] = todasVendas.filter(v => v.getEtapaKanban() === 'FINALIZADAS')
-  const vendasPendentes: Venda[] = todasVendas.filter(v => v.getEtapaKanban() === 'PENDENTE_EMISSAO')
-  const vendasComNfe: Venda[] = todasVendas.filter(v => v.getEtapaKanban() === 'COM_NFE')
+  // Filtrar vendas por tipo (se filtro ativo)
+  const filtrarPorTipo = (vendas: Venda[]): Venda[] => {
+    // Se todos os filtros estão selecionados ou nenhum, não filtrar
+    if (todosFiltrosSelecionados || tipoVendaFiltros.length === 0) return vendas
+    
+    // Filtrar por tipos selecionados
+    return vendas.filter(v => {
+      // Para vendas do gestor, não temos tipoVenda, usar origem
+      if (v.isVendaGestor() && !v.isDelivery()) {
+        // Vendas do gestor aparecem quando filtro inclui balcão ou mesa
+        return tipoVendaFiltros.includes('balcao') || tipoVendaFiltros.includes('mesa')
+      }
+      
+      // Para delivery
+      if (v.isDelivery()) {
+        return tipoVendaFiltros.includes('delivery')
+      }
+      
+      // Para vendas do PDV, usar tipoVenda
+      if (v.isVendaPdv()) {
+        const tipoVenda = v.tipoVenda?.toLowerCase()
+        return tipoVenda && tipoVendaFiltros.some(filtro => filtro.toLowerCase() === tipoVenda)
+      }
+      
+      return false
+    })
+  }
   
-  // Criar Sets para evitar duplicação
-  const vendasPendentesIds = new Set(vendasPendentes.map(v => v.id))
-  const vendasComNfeIds = new Set(vendasComNfe.map(v => v.id))
+  // Filtrar vendas por tipo (Mesa, Balcão, Delivery) - aplica filtros do frontend
+  const vendasFiltradasPorTipo: Venda[] = filtrarPorTipo(todasVendas)
 
   // Função para obter colunas baseadas no filtro de tipo de venda
   const getColumns = (): KanbanColumn[] => {
-    // Se todos os filtros estão selecionados ou nenhum, mostrar todas as colunas
-    const mostrarTodasColunas = todosFiltrosSelecionados || tipoVendaFiltros.length === 0
+    // Se nenhum filtro está selecionado, mostrar todas as colunas (incluindo delivery)
+    if (tipoVendaFiltros.length === 0) {
+      // Sem filtro: mostrar todas as colunas (delivery + finais)
+      return [
+        {
+          id: 'EM_ANALISE',
+          title: 'Em análise',
+          color: 'bg-blue-50',
+          borderColor: 'border-blue-400',
+          borderColorClass: 'border-l-blue-400',
+          icon: <MdSchedule className="w-4 h-4 text-blue-600" />,
+          placeholder: 'Pedidos em análise',
+        },
+        {
+          id: 'EM_PRODUCAO',
+          title: 'Em Produção',
+          color: 'bg-orange-50',
+          borderColor: 'border-orange-400',
+          borderColorClass: 'border-l-orange-400',
+          icon: <MdSchedule className="w-4 h-4 text-orange-600" />,
+          placeholder: 'Pedidos em produção',
+        },
+        {
+          id: 'PRONTOS_ENTREGA',
+          title: 'Prontos para Entrega',
+          color: 'bg-purple-50',
+          borderColor: 'border-purple-400',
+          borderColorClass: 'border-l-purple-400',
+          icon: <MdCheckCircle className="w-4 h-4 text-purple-600" />,
+          placeholder: 'Pedidos prontos para entrega',
+        },
+        {
+          id: 'COM_ENTREGADOR',
+          title: 'Com entregador',
+          color: 'bg-indigo-50',
+          borderColor: 'border-indigo-400',
+          borderColorClass: 'border-l-indigo-400',
+          icon: <MdSchedule className="w-4 h-4 text-indigo-600" />,
+          placeholder: 'Pedidos com entregador',
+        },
+        {
+          id: 'FINALIZADAS',
+          title: 'Finalizadas',
+          color: 'bg-gray-50',
+          borderColor: 'border-gray-400',
+          borderColorClass: 'border-l-gray-400',
+          icon: <MdReceipt className="w-4 h-4 text-gray-600" />,
+          placeholder: 'Vendas finalizadas aguardando ação',
+        },
+        {
+          id: 'PENDENTE_EMISSAO',
+          title: 'Pendente Emissão Fiscal',
+          color: 'bg-yellow-50',
+          borderColor: 'border-yellow-400',
+          borderColorClass: 'border-l-yellow-400',
+          icon: <MdSchedule className="w-4 h-4 text-yellow-600" />,
+          placeholder: 'Vendas aguardando emissão de NFe',
+        },
+        {
+          id: 'COM_NFE',
+          title: 'Com NFe Emitida',
+          color: 'bg-green-50',
+          borderColor: 'border-green-400',
+          borderColorClass: 'border-l-green-400',
+          icon: <MdCheckCircle className="w-4 h-4 text-green-600" />,
+          placeholder: 'Vendas com nota fiscal emitida',
+        },
+      ]
+    }
     
-    // Verificar se delivery está selecionado (ou todos)
-    const isDelivery = mostrarTodasColunas || tipoVendaFiltros.includes('delivery')
+    // Se todos os filtros estão selecionados, mostrar todas as colunas
+    if (todosFiltrosSelecionados) {
+      return [
+        {
+          id: 'EM_ANALISE',
+          title: 'Em análise',
+          color: 'bg-blue-50',
+          borderColor: 'border-blue-400',
+          borderColorClass: 'border-l-blue-400',
+          icon: <MdSchedule className="w-4 h-4 text-blue-600" />,
+          placeholder: 'Pedidos em análise',
+        },
+        {
+          id: 'EM_PRODUCAO',
+          title: 'Em Produção',
+          color: 'bg-orange-50',
+          borderColor: 'border-orange-400',
+          borderColorClass: 'border-l-orange-400',
+          icon: <MdSchedule className="w-4 h-4 text-orange-600" />,
+          placeholder: 'Pedidos em produção',
+        },
+        {
+          id: 'PRONTOS_ENTREGA',
+          title: 'Prontos para Entrega',
+          color: 'bg-purple-50',
+          borderColor: 'border-purple-400',
+          borderColorClass: 'border-l-purple-400',
+          icon: <MdCheckCircle className="w-4 h-4 text-purple-600" />,
+          placeholder: 'Pedidos prontos para entrega',
+        },
+        {
+          id: 'COM_ENTREGADOR',
+          title: 'Com entregador',
+          color: 'bg-indigo-50',
+          borderColor: 'border-indigo-400',
+          borderColorClass: 'border-l-indigo-400',
+          icon: <MdSchedule className="w-4 h-4 text-indigo-600" />,
+          placeholder: 'Pedidos com entregador',
+        },
+        {
+          id: 'FINALIZADAS',
+          title: 'Finalizadas',
+          color: 'bg-gray-50',
+          borderColor: 'border-gray-400',
+          borderColorClass: 'border-l-gray-400',
+          icon: <MdReceipt className="w-4 h-4 text-gray-600" />,
+          placeholder: 'Pedidos finalizados',
+        },
+        {
+          id: 'PENDENTE_EMISSAO',
+          title: 'Pendente Emissão Fiscal',
+          color: 'bg-yellow-50',
+          borderColor: 'border-yellow-400',
+          borderColorClass: 'border-l-yellow-400',
+          icon: <MdSchedule className="w-4 h-4 text-yellow-600" />,
+          placeholder: 'Pedidos aguardando emissão de NFe',
+        },
+        {
+          id: 'COM_NFE',
+          title: 'Com NFe Emitida',
+          color: 'bg-green-50',
+          borderColor: 'border-green-400',
+          borderColorClass: 'border-l-green-400',
+          icon: <MdCheckCircle className="w-4 h-4 text-green-600" />,
+          placeholder: 'Pedidos com nota fiscal emitida',
+        },
+      ]
+    }
+    
+    // Verificar se delivery está selecionado
+    const isDelivery = tipoVendaFiltros.includes('delivery')
     
     // Verificar se balcão ou mesa estão selecionados (mas não delivery)
-    const isBalcaoOuMesa = !mostrarTodasColunas && 
-      (tipoVendaFiltros.includes('balcao') || tipoVendaFiltros.includes('mesa')) &&
-      !tipoVendaFiltros.includes('delivery')
+    const isBalcaoOuMesa = (tipoVendaFiltros.includes('balcao') || tipoVendaFiltros.includes('mesa')) && !isDelivery
 
-    // Colunas para Delivery (com etapas adicionais)
+    // Colunas para Delivery (com etapas adicionais) - quando delivery está selecionado
     if (isDelivery) {
       return [
         {
@@ -203,7 +359,7 @@ export function FiscalFlowKanban() {
       ]
     }
 
-    // Colunas para Balcão e Mesa (apenas as 3 finais)
+    // Colunas para Balcão e Mesa (apenas as 3 finais) - quando Mesa ou Balcão estão selecionados (sem delivery)
     if (isBalcaoOuMesa) {
       return [
         {
@@ -236,7 +392,8 @@ export function FiscalFlowKanban() {
       ]
     }
 
-    // Sem filtro: mostrar todas as colunas (delivery + finais)
+    // Se chegou aqui, deve ser delivery (já tratado acima) ou combinação delivery + balcão/mesa
+    // Nesse caso, mostrar todas as colunas
     return [
       {
         id: 'EM_ANALISE',
@@ -382,34 +539,6 @@ export function FiscalFlowKanban() {
     setDetalhesVendaModalOpen(true)
   }
 
-  // Filtrar vendas por tipo (se filtro ativo)
-  const filtrarPorTipo = (vendas: Venda[]): Venda[] => {
-    // Se todos os filtros estão selecionados ou nenhum, não filtrar
-    if (todosFiltrosSelecionados || tipoVendaFiltros.length === 0) return vendas
-    
-    // Filtrar por tipos selecionados
-    return vendas.filter(v => {
-      // Para vendas do gestor, não temos tipoVenda, usar origem
-      if (v.isVendaGestor && !v.isDelivery()) {
-        // Vendas do gestor aparecem quando filtro inclui balcão ou mesa
-        return tipoVendaFiltros.includes('balcao') || tipoVendaFiltros.includes('mesa')
-      }
-      
-      // Para delivery
-      if (v.isDelivery && v.isDelivery()) {
-        return tipoVendaFiltros.includes('delivery')
-      }
-      
-      // Para vendas do PDV, usar tipoVenda
-      if (v.isVendaPdv && v.isVendaPdv()) {
-        const tipoVenda = v.tipoVenda?.toLowerCase()
-        return tipoVenda && tipoVendaFiltros.some(filtro => filtro.toLowerCase() === tipoVenda)
-      }
-      
-      return false
-    })
-  }
-
   // Obter vendas de delivery por status
   // NOTA: Para delivery, o backend retorna vendas finalizadas OU com status '4' sem dataFinalizacao (COM_ENTREGADOR)
   const getVendasDeliveryPorStatus = (status: string | number): Venda[] => {
@@ -458,98 +587,71 @@ export function FiscalFlowKanban() {
   const getVendasByColumn = (columnId: string): Venda[] => {
     let vendas: Venda[] = []
     
-    // Se todos os filtros estão selecionados ou nenhum, mostrar todas as colunas
-    const mostrarTodasColunas = todosFiltrosSelecionados || tipoVendaFiltros.length === 0
+    // Usar vendas já filtradas por tipo (Mesa, Balcão, Delivery)
+    const vendasParaFiltrar = vendasFiltradasPorTipo
     
-    // Verificar se delivery está selecionado (ou todos)
-    const isDelivery = mostrarTodasColunas || tipoVendaFiltros.includes('delivery')
+    // Verificar se delivery está selecionado
+    const isDelivery = tipoVendaFiltros.includes('delivery')
     
     // Verificar se balcão ou mesa estão selecionados (mas não delivery)
-    const isBalcaoOuMesa = !mostrarTodasColunas && 
-      (tipoVendaFiltros.includes('balcao') || tipoVendaFiltros.includes('mesa')) &&
-      !tipoVendaFiltros.includes('delivery')
+    const isBalcaoOuMesa = (tipoVendaFiltros.includes('balcao') || tipoVendaFiltros.includes('mesa')) && !isDelivery
     
     switch (columnId) {
-      // Colunas de Delivery
+      // Colunas de Delivery - apenas se delivery estiver selecionado
       case 'EM_ANALISE':
-        // Mostrar apenas se filtro for delivery ou sem filtro (mostra todas)
-        if (isDelivery) {
-          vendas = todasVendas.filter((v: Venda) => {
-            if (!v.isDelivery || !v.isDelivery()) return false
+        if (isDelivery || tipoVendaFiltros.length === 0 || todosFiltrosSelecionados) {
+          vendas = vendasParaFiltrar.filter((v: Venda) => {
+            if (!v.isDelivery()) return false
             // Delivery sem dataFinalizacao e sem status fiscal = em análise
             return !v.dataFinalizacao && !v.statusFiscal
           })
         }
         break
       case 'EM_PRODUCAO':
-        if (isDelivery) {
-          vendas = todasVendas.filter((v: Venda) => {
-            if (!v.isDelivery || !v.isDelivery()) return false
+        if (isDelivery || tipoVendaFiltros.length === 0 || todosFiltrosSelecionados) {
+          vendas = vendasParaFiltrar.filter((v: Venda) => {
+            if (!v.isDelivery()) return false
             // Similar - por enquanto usar mesma lógica
             return !v.dataFinalizacao && !v.statusFiscal
           })
         }
         break
       case 'PRONTOS_ENTREGA':
-        if (isDelivery) {
-          vendas = todasVendas.filter((v: Venda) => {
-            if (!v.isDelivery || !v.isDelivery()) return false
+        if (isDelivery || tipoVendaFiltros.length === 0 || todosFiltrosSelecionados) {
+          vendas = vendasParaFiltrar.filter((v: Venda) => {
+            if (!v.isDelivery()) return false
             return !v.dataFinalizacao && !v.statusFiscal
           })
         }
         break
       case 'COM_ENTREGADOR':
-        if (isDelivery) {
+        if (isDelivery || tipoVendaFiltros.length === 0 || todosFiltrosSelecionados) {
           // Delivery com dataFinalizacao mas sem status fiscal emitido
-          vendas = todasVendas.filter((v: Venda) => {
-            if (!v.isDelivery || !v.isDelivery()) return false
+          vendas = vendasParaFiltrar.filter((v: Venda) => {
+            if (!v.isDelivery()) return false
             return v.dataFinalizacao && v.statusFiscal !== 'EMITIDA'
           })
         }
         break
       
-      // Colunas comuns
+      // Colunas comuns (FINALIZADAS, PENDENTE_EMISSAO, COM_NFE)
       case 'FINALIZADAS':
         // Vendas finalizadas sem solicitação fiscal e sem NFe emitida
-        vendas = todasVendas.filter((v: Venda) => {
+        vendas = vendasParaFiltrar.filter((v: Venda) => {
           const etapa = v.getEtapaKanban()
-          if (etapa !== 'FINALIZADAS') return false
-          
-          // Filtrar por tipo se necessário
-          if (tipoVendaFiltros.length > 0 && !todosFiltrosSelecionados) {
-            if (isDelivery && !v.isDelivery()) return false
-            if (isBalcaoOuMesa && v.isDelivery()) return false
-          }
-          
-          return true
+          return etapa === 'FINALIZADAS'
         })
         break
       case 'PENDENTE_EMISSAO':
-        vendas = todasVendas.filter((v: Venda) => {
+        vendas = vendasParaFiltrar.filter((v: Venda) => {
           const etapa = v.getEtapaKanban()
-          if (etapa !== 'PENDENTE_EMISSAO') return false
-          
-          // Filtrar por tipo se necessário
-          if (tipoVendaFiltros.length > 0 && !todosFiltrosSelecionados) {
-            if (isDelivery && !v.isDelivery()) return false
-            if (isBalcaoOuMesa && v.isDelivery()) return false
-          }
-          
-          return true
+          return etapa === 'PENDENTE_EMISSAO'
         })
         break
       case 'COM_NFE':
-        vendas = todasVendas.filter((v: Venda) => {
+        vendas = vendasParaFiltrar.filter((v: Venda) => {
           const etapa = v.getEtapaKanban()
-          if (etapa !== 'COM_NFE') return false
-          
-          // Filtrar por tipo se necessário
-          if (tipoVendaFiltros.length > 0 && !todosFiltrosSelecionados) {
-            if (isDelivery && !v.isDelivery()) return false
-            if (isBalcaoOuMesa && v.isDelivery()) return false
-          }
-          
-          return true
+          return etapa === 'COM_NFE'
         })
         break
       default:

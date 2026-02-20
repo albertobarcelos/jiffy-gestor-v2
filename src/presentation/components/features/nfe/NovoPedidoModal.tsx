@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/presentation/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle, DialogFooter } from '@/src/presentation/components/ui/dialog'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Label } from '@/src/presentation/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/presentation/components/ui/select'
@@ -321,9 +321,9 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
           flexDirection: 'column' 
         }}
       >
-        <DialogHeader sx={{ padding: '24px 24px 16px 24px', flexShrink: 0 }}>
+        <div style={{ padding: '24px 24px 16px 24px', flexShrink: 0 }}>
           <DialogTitle>Novo Pedido</DialogTitle>
-        </DialogHeader>
+        </div>
 
         <div 
           style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 24px', minHeight: 0 }}
@@ -454,11 +454,12 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                   <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 max-h-64 overflow-y-auto border rounded-lg p-3 bg-gray-50">
                     {produtosList.map(produto => {
                       const jaAdicionado = produtos.find(p => p.produtoId === produto.getId())
+                      const isDisabled = !!jaAdicionado
                       return (
                         <button
                           key={produto.getId()}
                           onClick={() => !jaAdicionado && adicionarProduto(produto.getId())}
-                          disabled={jaAdicionado}
+                          disabled={isDisabled}
                           className={`aspect-square p-3 border-2 rounded-lg transition-all flex flex-col items-center justify-center text-center ${
                             jaAdicionado
                               ? 'border-green-500 bg-green-50 opacity-60 cursor-not-allowed'
@@ -493,18 +494,23 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                         <Label className="text-xs">Qtd:</Label>
                         <Input
                           type="number"
-                          min="1"
+                          inputProps={{ min: 1 }}
                           value={produto.quantidade}
-                          onChange={(e) => atualizarProduto(index, 'quantidade', parseInt(e.target.value) || 1)}
+                          onChange={(e) => {
+                            const valor = parseInt(e.target.value) || 1
+                            atualizarProduto(index, 'quantidade', Math.max(1, valor))
+                          }}
                           className="w-20 h-8"
                         />
                         <Label className="text-xs">Valor Unit.:</Label>
                         <Input
                           type="number"
-                          min="0"
-                          step="0.01"
+                          inputProps={{ min: 0, step: 0.01 }}
                           value={produto.valorUnitario}
-                          onChange={(e) => atualizarProduto(index, 'valorUnitario', parseFloat(e.target.value) || 0)}
+                          onChange={(e) => {
+                            const valor = parseFloat(e.target.value) || 0
+                            atualizarProduto(index, 'valorUnitario', Math.max(0, valor))
+                          }}
                           className="w-32 h-8"
                         />
                         <span className="text-sm font-semibold">
@@ -566,10 +572,12 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                             <Label className="text-xs">Valor:</Label>
                             <Input
                               type="number"
-                              min="0"
-                              step="0.01"
+                              inputProps={{ min: 0, step: 0.01 }}
                               value={pagamento.valor}
-                              onChange={(e) => atualizarPagamento(index, parseFloat(e.target.value) || 0)}
+                              onChange={(e) => {
+                                const valor = parseFloat(e.target.value) || 0
+                                atualizarPagamento(index, Math.max(0, valor))
+                              }}
                               className="w-32 h-8"
                             />
                           </div>

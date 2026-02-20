@@ -20,6 +20,7 @@ interface ProdutosResponse {
   items: any[]
   count: number
   message?: string
+  warning?: string
 }
 
 /**

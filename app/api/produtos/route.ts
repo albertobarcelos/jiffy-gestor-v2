@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { BuscarProdutosUseCase } from '@/src/application/use-cases/produtos/BuscarProdutosUseCase'
 import { ProdutoRepository } from '@/src/infrastructure/database/repositories/ProdutoRepository'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
+import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 import { getTokenInfo } from '@/src/shared/utils/getTokenInfo'
 
 /**
@@ -75,6 +75,38 @@ export async function GET(req: NextRequest) {
     )
   } catch (error: any) {
     console.error('Erro na API de produtos:', error)
+    
+    // Se for timeout (microserviço fiscal off), retorna lista vazia com sucesso
+    // Isso permite que a UI continue funcionando normalmente
+    if (error instanceof ApiError && error.status === 504 && error.data?.timeout) {
+      console.warn('Timeout ao buscar produtos - retornando lista vazia para não bloquear a UI')
+      return NextResponse.json(
+        {
+          success: true,
+          items: [],
+          count: 0,
+          warning: 'O serviço está temporariamente indisponível. A lista de produtos não pôde ser carregada.',
+        },
+        {
+          status: 200, // Retorna 200 para não quebrar a UI
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+          },
+        }
+      )
+    }
+    
+    // Se for ApiError com outro status, preserva o status code
+    if (error instanceof ApiError) {
+      return NextResponse.json(
+        { 
+          message: error.message || 'Erro ao buscar produtos',
+          timeout: error.data?.timeout || false
+        },
+        { status: error.status }
+      )
+    }
+    
     return NextResponse.json(
       { message: error.message || 'Erro interno do servidor' },
       { status: error.status || 500 }

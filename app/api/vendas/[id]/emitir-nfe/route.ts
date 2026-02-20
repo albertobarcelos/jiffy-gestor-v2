@@ -33,6 +33,17 @@ export async function POST(
     }
 
     const apiClient = new ApiClient()
+    
+    // Log para debug
+    console.log('[Emitir NFe] Tentando emitir NFe:', {
+      vendaId: id,
+      modelo: body.modelo,
+      serie: body.serie,
+      ambiente: body.ambiente,
+      crt: body.crt,
+      endpoint: `/api/v1/operacao-pdv/vendas/${id}/emitir-nfe`,
+    })
+    
     const response = await apiClient.request<any>(
       `/api/v1/operacao-pdv/vendas/${id}/emitir-nfe`,
       {
@@ -45,10 +56,35 @@ export async function POST(
       }
     )
 
+    console.log('[Emitir NFe] Resposta do backend:', {
+      vendaId: id,
+      status: 'success',
+      data: response.data,
+    })
+
     return NextResponse.json(response.data || {})
   } catch (error) {
-    console.error('Erro ao emitir NFe:', error)
+    console.error('[Emitir NFe] Erro ao emitir NFe:', {
+      vendaId: id,
+      error: error instanceof ApiError ? {
+        message: error.message,
+        status: error.status,
+        data: error.data,
+      } : error,
+    })
+    
     if (error instanceof ApiError) {
+      // Se for 404, retornar mensagem mais específica
+      if (error.status === 404) {
+        return NextResponse.json(
+          { 
+            error: 'Venda não encontrada ou endpoint não disponível. Verifique se a venda existe e está marcada para emissão fiscal.',
+            details: error.message 
+          },
+          { status: 404 }
+        )
+      }
+      
       return NextResponse.json(
         { error: error.message || 'Erro ao emitir NFe' },
         { status: error.status }

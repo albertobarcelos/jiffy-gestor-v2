@@ -19,17 +19,17 @@ export class VendaUnificadaDTO {
         public readonly totalAcrescimo: number,
         public readonly dataCriacao: string,
         public readonly dataFinalizacao: string | null,
-        public readonly cliente?: {
-            id: string;
-            nome: string;
-            cpfCnpj?: string;
-        },
         public readonly solicitarEmissaoFiscal: boolean,
         public readonly statusFiscal: 'PENDENTE_EMISSAO' | 'EMITINDO' | 'PENDENTE_AUTORIZACAO' | 'CONTINGENCIA' | 'EMITIDA' | 'REJEITADA' | 'CANCELADA' | null,
         public readonly documentoFiscalId: string | null,
         public readonly abertoPor: {
             id: string;
             nome: string;
+        },
+        public readonly cliente?: {
+            id: string;
+            nome: string;
+            cpfCnpj?: string;
         },
         public readonly numeroFiscal?: number | null,
         public readonly serieFiscal?: string | null,
@@ -150,11 +150,11 @@ export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
                 v.totalAcrescimo,
                 v.dataCriacao,
                 v.dataFinalizacao,
-                v.cliente,
                 v.solicitarEmissaoFiscal,
                 v.statusFiscal,
                 v.documentoFiscalId,
                 v.abertoPor,
+                v.cliente,
                 v.numeroFiscal,
                 v.serieFiscal,
                 v.dataEmissaoFiscal,

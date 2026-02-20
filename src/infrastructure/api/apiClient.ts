@@ -76,50 +76,92 @@ export class ApiClient {
       Accept: 'application/json',
     }
 
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        ...defaultHeaders,
-        ...options.headers,
-      },
-    })
-
-    if (!response.ok) {
-      const errorBody = await response.text().catch(() => '')
-      let errorData: ApiErrorResponse = {}
-      try {
-        errorData = errorBody ? (JSON.parse(errorBody) as ApiErrorResponse) : {}
-      } catch {
-        // Se não conseguir fazer parse, usa a mensagem do status
-        errorData = { message: `Erro ${response.status}: ${response.statusText}` }
-      }
-      throw new ApiError(
-        errorData.message || errorData.error || 'Erro na requisição',
-        response.status,
-        errorData
-      )
-    }
-
-    // Para respostas 204 (No Content) ou outras sem corpo, retorna objeto vazio
-    if (response.status === 204 || response.headers.get('content-length') === '0') {
-      return { data: {} as T, status: response.status }
-    }
-
-    const raw = await response.text()
-    // Se não houver conteúdo, retorna objeto vazio
-    if (!raw || raw.trim() === '') {
-      return { data: {} as T, status: response.status }
-    }
-
-    let data: T
-    try {
-      data = JSON.parse(raw) as T
-    } catch {
-      // Se não conseguir fazer parse, retorna objeto vazio
-      data = {} as T
-    }
+    // Timeout de 10 segundos para evitar espera indefinida se backend externo estiver lento
+    // (ex: quando microserviço fiscal está off e backend está tentando chamá-lo)
+    // Se já houver um signal nas options, não criar um novo (permite cancelamento externo)
+    const hasExistingSignal = options.signal !== undefined
+    let controller: AbortController | undefined
+    let timeoutId: NodeJS.Timeout | null = null
     
-    return { data, status: response.status }
+    if (!hasExistingSignal) {
+      controller = new AbortController()
+      timeoutId = setTimeout(() => controller!.abort(), 10000)
+    }
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          ...defaultHeaders,
+          ...options.headers,
+        },
+        // Só adicionar signal se não houver um já definido
+        ...(controller ? { signal: controller.signal } : {}),
+      })
+
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+
+      if (!response.ok) {
+        const errorBody = await response.text().catch(() => '')
+        let errorData: ApiErrorResponse = {}
+        try {
+          errorData = errorBody ? (JSON.parse(errorBody) as ApiErrorResponse) : {}
+        } catch {
+          // Se não conseguir fazer parse, usa a mensagem do status
+          errorData = { message: `Erro ${response.status}: ${response.statusText}` }
+        }
+        throw new ApiError(
+          errorData.message || errorData.error || 'Erro na requisição',
+          response.status,
+          errorData
+        )
+      }
+
+      // Para respostas 204 (No Content) ou outras sem corpo, retorna objeto vazio
+      if (response.status === 204 || response.headers.get('content-length') === '0') {
+        return { data: {} as T, status: response.status }
+      }
+
+      const raw = await response.text()
+      // Se não houver conteúdo, retorna objeto vazio
+      if (!raw || raw.trim() === '') {
+        return { data: {} as T, status: response.status }
+      }
+
+      let data: T
+      try {
+        data = JSON.parse(raw) as T
+      } catch {
+        // Se não conseguir fazer parse, retorna objeto vazio
+        data = {} as T
+      }
+      
+      return { data, status: response.status }
+    } catch (error: any) {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+      // Se foi timeout, lançar erro específico
+      // No Node.js, o erro de abort pode ser DOMException ou Error com name 'AbortError'
+      if (
+        (error instanceof DOMException || error instanceof Error) &&
+        error.name === 'AbortError'
+      ) {
+        // Se foi abortado por timeout nosso (não por signal externo), lançar erro de timeout
+        if (controller) {
+          throw new ApiError(
+            'Timeout: O servidor demorou muito para responder. O serviço pode estar indisponível.',
+            504,
+            { timeout: true }
+          )
+        }
+        // Se foi abortado por signal externo, re-lançar o erro original
+      }
+      // Re-lançar outros erros
+      throw error
+    }
   }
 
   /**

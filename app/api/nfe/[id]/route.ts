@@ -12,6 +12,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let id: string | undefined
   try {
     const validation = validateRequest(request)
     if (!validation.valid || !validation.tokenInfo) {
@@ -19,7 +20,8 @@ export async function GET(
     }
     const { tokenInfo } = validation
 
-    const { id } = await params
+    const paramsData = await params
+    id = paramsData.id
     if (!id) {
       return NextResponse.json({ error: 'ID do documento fiscal é obrigatório' }, { status: 400 })
     }
