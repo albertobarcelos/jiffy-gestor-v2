@@ -3,8 +3,8 @@ import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 
 /**
- * POST /api/vendas/[id]/emitir-nfe
- * Emite nota fiscal (NFC-e ou NF-e) para uma venda
+ * POST /api/vendas/[id]/emitir-nota
+ * Emite nota fiscal (NFC-e ou NF-e) para uma venda PDV
  */
 export async function POST(
   request: NextRequest,
@@ -24,7 +24,6 @@ export async function POST(
 
     const body = await request.json()
 
-    // Validação básica dos campos obrigatórios
     if (!body.modelo || !body.serie || !body.ambiente || !body.crt) {
       return NextResponse.json(
         { error: 'Campos obrigatórios: modelo, serie, ambiente, crt' },
@@ -45,7 +44,7 @@ export async function POST(
     })
     
     const response = await apiClient.request<any>(
-      `/api/v1/operacao-pdv/vendas/${id}/emitir-nfe`,
+      `/api/v1/operacao-pdv/vendas/${id}/emitir-nota`,
       {
         method: 'POST',
         headers: {
@@ -56,23 +55,9 @@ export async function POST(
       }
     )
 
-    console.log('[Emitir NFe] Resposta do backend:', {
-      vendaId: id,
-      status: 'success',
-      data: response.data,
-    })
-
-    return NextResponse.json(response.data || {})
+    return NextResponse.json(response.data || {}, { status: response.status })
   } catch (error) {
-    console.error('[Emitir NFe] Erro ao emitir NFe:', {
-      vendaId: id,
-      error: error instanceof ApiError ? {
-        message: error.message,
-        status: error.status,
-        data: error.data,
-      } : error,
-    })
-    
+    console.error('Erro ao emitir nota fiscal:', error)
     if (error instanceof ApiError) {
       // Se for 404, retornar mensagem mais específica
       if (error.status === 404) {
@@ -86,7 +71,7 @@ export async function POST(
       }
       
       return NextResponse.json(
-        { error: error.message || 'Erro ao emitir NFe' },
+        { error: error.message || 'Erro ao emitir nota fiscal' },
         { status: error.status }
       )
     }

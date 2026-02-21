@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
+import { useCallback, useRef } from 'react'
 
 /**
  * Extrai o motivo de rejeição (xMotivo) do XML de retorno da SEFAZ
@@ -424,7 +425,60 @@ export function useMarcarEmissaoFiscal() {
 
 
 /**
- * Hook para emitir NFe (NFC-e ou NF-e) para uma venda PDV
+ * Faz polling do status de emissão até chegar a um estado final.
+ */
+async function pollStatusEmissao(
+  vendaId: string,
+  endpoint: 'vendas' | 'vendas/gestor',
+  token: string,
+  options: { interval?: number; maxAttempts?: number } = {}
+): Promise<any> {
+  const { interval = 3000, maxAttempts = 40 } = options
+  const baseUrl = endpoint === 'vendas'
+    ? `/api/vendas/${vendaId}/status-emissao`
+    : `/api/vendas/gestor/${vendaId}/status-emissao`
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, interval))
+
+    let response: Response
+    try {
+      response = await fetch(baseUrl, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+    } catch {
+      continue
+    }
+
+    if (response.status === 404) {
+      throw new Error('Endpoint de status de emissão não encontrado')
+    }
+
+    if (!response.ok) continue
+
+    let data: any
+    try {
+      data = await response.json()
+    } catch {
+      continue
+    }
+
+    const status = data.status
+
+    if (status === 'EMITIDA' || status === 'REJEITADA' || status === 'CANCELADA') {
+      return data
+    }
+  }
+
+  throw new Error('Tempo limite excedido aguardando autorização da nota fiscal')
+}
+
+/**
+ * Hook para emitir NFe (NFC-e ou NF-e) para uma venda PDV.
+ * Suporta emissão assíncrona: se o backend retornar 202, faz polling até o resultado final.
  */
 export function useEmitirNfe() {
   const { auth } = useAuthStore()
@@ -449,13 +503,16 @@ export function useEmitirNfe() {
         throw new Error('Token não encontrado')
       }
 
-      const response = await fetch(`/api/vendas/${id}/emitir-nfe`, {
+      const tipoDocumento = modelo === 55 ? 'NFE' : 'NFCE'
+
+      const response = await fetch(`/api/vendas/${id}/emitir-nota`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          tipoDocumento,
           modelo,
           serie,
           ambiente,
@@ -465,29 +522,38 @@ export function useEmitirNfe() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        
-        // Tentar extrair mensagem de erro do xmlRetorno se disponível
         let errorMessage = errorData.error || errorData.message || `Erro ${response.status}: ${response.statusText}`
-        
-        // Se a resposta contém xmlRetorno, tentar extrair o xMotivo
         if (errorData.xmlRetorno) {
           const xMotivo = extrairMotivoRejeicao(errorData.xmlRetorno)
           if (xMotivo) {
             errorMessage = `Nota fiscal rejeitada: ${xMotivo}`
           }
         }
-        
         throw new Error(errorMessage)
       }
 
       const result = await response.json()
-      
-      // Verificar se a nota foi rejeitada mesmo com status 200
-      if (result.status === 'REJEITADA' && result.xmlRetorno) {
-        const xMotivo = extrairMotivoRejeicao(result.xmlRetorno)
-        const errorMessage = xMotivo 
-          ? `Nota fiscal rejeitada: ${xMotivo}`
-          : 'Nota fiscal rejeitada pela SEFAZ'
+
+      if (response.status === 202 || result.status === 'PENDENTE' || result.status === 'PENDENTE_AUTORIZACAO') {
+        showToast.success('Nota fiscal enviada para processamento. Aguardando autorização...')
+        const polledResult = await pollStatusEmissao(id, 'vendas', token)
+
+        if (polledResult.status === 'REJEITADA') {
+          const motivo = polledResult.mensagemSefaz || polledResult.codigoRejeicao
+          throw new Error(motivo ? `Nota fiscal rejeitada: ${motivo}` : 'Nota fiscal rejeitada pela SEFAZ')
+        }
+
+        return polledResult
+      }
+
+      if (result.status === 'REJEITADA') {
+        let errorMessage = 'Nota fiscal rejeitada pela SEFAZ'
+        if (result.xmlRetorno) {
+          const xMotivo = extrairMotivoRejeicao(result.xmlRetorno)
+          if (xMotivo) errorMessage = `Nota fiscal rejeitada: ${xMotivo}`
+        } else if (result.mensagemSefaz) {
+          errorMessage = `Nota fiscal rejeitada: ${result.mensagemSefaz}`
+        }
         throw new Error(errorMessage)
       }
 
@@ -506,7 +572,8 @@ export function useEmitirNfe() {
 }
 
 /**
- * Hook para emitir NFe (NFC-e ou NF-e) para uma venda GESTOR
+ * Hook para emitir NFe (NFC-e ou NF-e) para uma venda GESTOR.
+ * Suporta emissão assíncrona: se o backend retornar 202, faz polling até o resultado final.
  */
 export function useEmitirNfeGestor() {
   const { auth } = useAuthStore()
@@ -531,10 +598,9 @@ export function useEmitirNfeGestor() {
         throw new Error('Token não encontrado')
       }
 
-      // Backend espera tipoDocumento (string) E modelo (number)
       const tipoDocumento = modelo === 55 ? 'NFE' : 'NFCE'
 
-      const response = await fetch(`/api/vendas/gestor/${id}/emitir-nfe`, {
+      const response = await fetch(`/api/vendas/gestor/${id}/emitir-nota`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -551,22 +617,30 @@ export function useEmitirNfeGestor() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        
-        // Tentar extrair mensagem de erro do xmlRetorno se disponível
         let errorMessage = errorData.error || errorData.message || `Erro ${response.status}: ${response.statusText}`
-        
-        // Se a resposta contém xmlRetorno, tentar extrair o xMotivo
         if (errorData.xmlRetorno) {
           const xMotivo = extrairMotivoRejeicao(errorData.xmlRetorno)
           if (xMotivo) {
             errorMessage = `Nota fiscal rejeitada: ${xMotivo}`
           }
         }
-        
         throw new Error(errorMessage)
       }
 
       const result = await response.json()
+
+      if (response.status === 202 || result.status === 'PENDENTE' || result.status === 'PENDENTE_AUTORIZACAO') {
+        showToast.success('Nota fiscal enviada para processamento. Aguardando autorização...')
+        const polledResult = await pollStatusEmissao(id, 'vendas/gestor', token)
+
+        if (polledResult.status === 'REJEITADA') {
+          const motivo = polledResult.mensagemSefaz || polledResult.codigoRejeicao
+          throw new Error(motivo ? `Nota fiscal rejeitada: ${motivo}` : 'Nota fiscal rejeitada pela SEFAZ')
+        }
+
+        return polledResult
+      }
+
       return result
     },
     onSuccess: (data, variables) => {
@@ -574,7 +648,6 @@ export function useEmitirNfeGestor() {
       queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
       queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id] })
 
-      // Microserviço fiscal retorna status e mensagemAmigavel
       if (data.status === 'REJEITADA') {
         const motivo = data.mensagemAmigavel || 'Nota fiscal rejeitada pela SEFAZ'
         showToast.error(motivo)

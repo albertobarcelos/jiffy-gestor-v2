@@ -539,6 +539,34 @@ export function FiscalFlowKanban() {
     setDetalhesVendaModalOpen(true)
   }
 
+  // Filtrar vendas por tipo (se filtro ativo)
+  const filtrarPorTipo = (vendas: Venda[]): Venda[] => {
+    // Se todos os filtros estão selecionados ou nenhum, não filtrar
+    if (todosFiltrosSelecionados || tipoVendaFiltros.length === 0) return vendas
+    
+    // Filtrar por tipos selecionados
+    return vendas.filter(v => {
+      // Para vendas do gestor, não temos tipoVenda, usar origem
+      if (v.isVendaGestor && v.isVendaGestor() && !v.isDelivery()) {
+        // Vendas do gestor aparecem quando filtro inclui balcão ou mesa
+        return tipoVendaFiltros.includes('balcao') || tipoVendaFiltros.includes('mesa')
+      }
+      
+      // Para delivery
+      if (v.isDelivery && v.isDelivery()) {
+        return tipoVendaFiltros.includes('delivery')
+      }
+      
+      // Para vendas do PDV, usar tipoVenda
+      if (v.isVendaPdv && v.isVendaPdv()) {
+        const tipoVenda = v.tipoVenda?.toLowerCase()
+        return tipoVenda && tipoVendaFiltros.some(filtro => filtro.toLowerCase() === tipoVenda)
+      }
+      
+      return false
+    })
+  }
+
   // Obter vendas de delivery por status
   // NOTA: Para delivery, o backend retorna vendas finalizadas OU com status '4' sem dataFinalizacao (COM_ENTREGADOR)
   const getVendasDeliveryPorStatus = (status: string | number): Venda[] => {

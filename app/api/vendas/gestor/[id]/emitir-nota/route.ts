@@ -3,8 +3,8 @@ import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 
 /**
- * POST /api/vendas/gestor/[id]/emitir-nfe
- * Emite NFe ou NFCe para uma venda do gestor
+ * POST /api/vendas/gestor/[id]/emitir-nota
+ * Emite nota fiscal (NFC-e ou NF-e) para uma venda do gestor
  */
 export async function POST(
   request: NextRequest,
@@ -100,7 +100,7 @@ export async function POST(
     })
 
     const response = await apiClient.request<any>(
-      `/api/v1/gestor/vendas/${id}/emitir-nfe`,
+      `/api/v1/gestor/vendas/${id}/emitir-nota`,
       {
         method: 'POST',
         headers: {
@@ -111,23 +111,9 @@ export async function POST(
       }
     )
 
-    console.log('[Emitir NFe Gestor] Resposta do backend:', {
-      vendaId: id,
-      status: 'success',
-      data: response.data,
-    })
-
-    return NextResponse.json(response.data || {}, { status: 201 })
+    return NextResponse.json(response.data || {}, { status: response.status })
   } catch (error) {
-    console.error('[Emitir NFe Gestor] Erro completo:', {
-      error,
-      errorType: error instanceof ApiError ? 'ApiError' : typeof error,
-      errorMessage: error instanceof ApiError ? error.message : (error as any)?.message,
-      errorStatus: error instanceof ApiError ? error.status : undefined,
-      errorData: error instanceof ApiError ? error.data : undefined,
-      payloadEnviado: payloadCompleto,
-    })
-    
+    console.error('Erro ao emitir nota fiscal para venda gestor:', error)
     if (error instanceof ApiError) {
       // Log detalhado do erro do backend
       console.error('[Emitir NFe Gestor] Detalhes do erro do backend:', {
@@ -139,7 +125,7 @@ export async function POST(
       })
       
       return NextResponse.json(
-        { error: error.message || 'Erro ao emitir NFe' },
+        { error: error.message || 'Erro ao emitir nota fiscal' },
         { status: error.status }
       )
     }
