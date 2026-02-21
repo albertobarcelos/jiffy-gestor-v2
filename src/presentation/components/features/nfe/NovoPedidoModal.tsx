@@ -54,6 +54,8 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
   const [meioPagamentoId, setMeioPagamentoId] = useState<string>('')
   const [grupoSelecionadoId, setGrupoSelecionadoId] = useState<string | null>(null)
   const [seletorClienteOpen, setSeletorClienteOpen] = useState(false)
+  const [tooltipGrupoId, setTooltipGrupoId] = useState<string | null>(null)
+  const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null)
   
   // Estados para arrastar a lista horizontal
   const gruposScrollRef = useRef<HTMLDivElement>(null)
@@ -498,29 +500,58 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                   {grupos.map(grupo => {
                     const corHex = grupo.getCorHex()
                     const iconName = grupo.getIconName()
+                    const showTooltip = tooltipGrupoId === grupo.getId()
                     return (
-                      <button
-                        key={grupo.getId()}
-                        onClick={() => setGrupoSelecionadoId(grupo.getId())}
-                        className="aspect-square p-4 border-2 rounded-lg transition-all flex flex-col items-center justify-center text-center gap-2 hover:opacity-80"
-                        style={{
-                          borderColor: corHex,
-                          backgroundColor: `${corHex}15`,
-                        }}
-                      >
+                      <div key={grupo.getId()} className="relative">
+                        <button
+                          onClick={() => setGrupoSelecionadoId(grupo.getId())}
+                          onMouseEnter={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect()
+                            setTooltipGrupoId(grupo.getId())
+                            setTooltipPosition({
+                              x: rect.left + rect.width / 2,
+                              y: rect.top - 10,
+                            })
+                          }}
+                          onMouseLeave={() => {
+                            setTooltipGrupoId(null)
+                            setTooltipPosition(null)
+                          }}
+                          className="aspect-square p-4 border-2 rounded-lg transition-all flex flex-col items-center justify-center text-center gap-2 hover:opacity-80 overflow-hidden w-full"
+                          style={{
+                            borderColor: corHex,
+                            backgroundColor: `${corHex}15`,
+                          }}
+                        >
                         <div 
-                          className="w-[45px] h-[45px] bg-info rounded-lg border-2 flex items-center justify-center"
+                          className="w-[45px] h-[45px] bg-info rounded-lg border-2 flex items-center justify-center flex-shrink-0"
                           style={{
                             borderColor: corHex,
                           }}
                         >
                           <DinamicIcon iconName={iconName} color={corHex} size={24} />
                         </div>
-                        <div className="font-medium text-sm text-gray-900 break-words">
+                        <div className="font-medium text-sm text-gray-900 line-clamp-2 overflow-hidden text-ellipsis w-full px-1">
                           {grupo.getNome()}
                         </div>
                       </button>
-                    )
+                      {showTooltip && tooltipPosition && (
+                        <div
+                          className="absolute z-50 p-2 bg-white border border-gray-300 rounded-lg shadow-lg pointer-events-none"
+                          style={{
+                            left: '50%',
+                            top: '10px',
+                            transform: 'translate(-50%, -100%)',
+                            maxWidth: '120px',
+                          }}
+                        >
+                          <span className="w-[105px] block text-xs text-center font-medium text-gray-900 break-words">{grupo.getNome()}</span>
+                         
+                          
+                        </div>
+                      )}
+                    </div>
+                  )
                   })}
                 </div>
               ) : (
@@ -538,28 +569,41 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                     const corHex = grupo.getCorHex()
                     const iconName = grupo.getIconName()
                     const isSelected = grupoSelecionadoId === grupo.getId()
+                    const showTooltip = tooltipGrupoId === grupo.getId()
                     return (
-                      <button
-                        key={grupo.getId()}
-                        onClick={(e) => {
-                          // Só executar o clique se não houve movimento significativo durante o arraste
-                          if (!hasMovedRef.current && !isDragging) {
-                            setGrupoSelecionadoId(grupo.getId())
-                          }
-                        }}
-                        onMouseDown={(e) => {
-                          // Permitir que o evento propague para o container para iniciar o arraste
-                          // O onClick só será executado se não houver movimento
-                        }}
-                        className="flex-shrink-0 aspect-square p-4 border-2 rounded-lg transition-all flex flex-col items-center justify-center text-center gap-2 min-w-[120px] pointer-events-auto"
-                        style={{
-                          borderColor: corHex,
-                          backgroundColor: isSelected ? corHex : `${corHex}15`,
-                          color: isSelected ? '#ffffff' : '#1f2937',
-                        }}
-                      >
+                      <div key={grupo.getId()} className="relative flex-shrink-0">
+                        <button
+                          onClick={(e) => {
+                            // Só executar o clique se não houve movimento significativo durante o arraste
+                            if (!hasMovedRef.current && !isDragging) {
+                              setGrupoSelecionadoId(grupo.getId())
+                            }
+                          }}
+                          onMouseDown={(e) => {
+                            // Permitir que o evento propague para o container para iniciar o arraste
+                            // O onClick só será executado se não houver movimento
+                          }}
+                          onMouseEnter={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect()
+                            setTooltipGrupoId(grupo.getId())
+                            setTooltipPosition({
+                              x: rect.left + rect.width / 2,
+                              y: rect.top - 10,
+                            })
+                          }}
+                          onMouseLeave={() => {
+                            setTooltipGrupoId(null)
+                            setTooltipPosition(null)
+                          }}
+                          className="aspect-square p-4 border-2 rounded-lg transition-all flex flex-col items-center justify-center text-center gap-2 min-w-[120px] pointer-events-auto overflow-hidden w-full"
+                          style={{
+                            borderColor: corHex,
+                            backgroundColor: isSelected ? corHex : `${corHex}15`,
+                            color: isSelected ? '#ffffff' : '#1f2937',
+                          }}
+                        >
                         <div 
-                          className="w-[45px] h-[45px] rounded-lg border-2 flex items-center justify-center"
+                          className="w-[45px] h-[45px] rounded-lg border-2 flex items-center justify-center flex-shrink-0"
                           style={{
                             borderColor: isSelected ? '#ffffff' : corHex,
                             backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.2)' : '#ffffff',
@@ -567,10 +611,28 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                         >
                           <DinamicIcon iconName={iconName} color={isSelected ? '#ffffff' : corHex} size={24} />
                         </div>
-                        <div className="font-medium text-sm break-words">
+                        <div className="font-medium text-sm line-clamp-2 overflow-hidden text-ellipsis w-full px-1">
                           {grupo.getNome()}
                         </div>
                       </button>
+                      {showTooltip && tooltipPosition && (
+                        <div
+                          className="absolute z-50 p-1 bg-white border border-gray-300 rounded-lg shadow-lg pointer-events-none"
+                          style={{
+                            left: '50%',
+                            top: '10px',
+                            transform: 'translate(-50%, -100%)',
+                            maxWidth: '112px',
+                          }}
+                        >
+                          <span className="block text-xs font-medium text-gray-900 break-words">{grupo.getNome()}</span>
+                          <div
+                            className="absolute left-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-300"
+                            style={{ transform: 'translateX(-50%)' }}
+                          />
+                        </div>
+                      )}
+                    </div>
                     )
                   })}
                 </div>
