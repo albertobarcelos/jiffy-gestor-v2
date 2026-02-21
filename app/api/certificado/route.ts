@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getTokenInfo } from '@/src/shared/utils/getTokenInfo'
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000'
+const BACKEND_URL = process.env.NEXT_PUBLIC_EXTERNAL_API_BASE_URL
 
 /**
  * POST /api/certificado - Cadastrar certificado digital

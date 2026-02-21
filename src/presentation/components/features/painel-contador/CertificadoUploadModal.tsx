@@ -239,7 +239,7 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
             <Button
               onClick={handleClose}
               disabled={isUploading}
-              variant="outline"
+              variant="outlined"
               className="flex-1"
             >
               Cancelar

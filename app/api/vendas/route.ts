@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     if (isUnificado) {
       // Redirecionar para endpoint unificado
       const params = new URLSearchParams()
-      params.append('empresaId', tokenInfo.empresaId)
+      params.append('empresaId', tokenInfo.empresaId ?? '')
       
       const origem = searchParams.get('origem')
       const statusFiscal = searchParams.get('statusFiscal')

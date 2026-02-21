@@ -108,10 +108,11 @@ export async function GET(
       },
     })
   } catch (error) {
+    const documentId = await params.then(p => p.id).catch(() => 'unknown')
     console.error('[NFe Route] Erro ao buscar DANFE:', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
-      documentId: id,
+      documentId,
     })
     return NextResponse.json(
       { 

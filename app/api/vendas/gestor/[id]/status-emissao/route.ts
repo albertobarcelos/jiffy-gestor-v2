@@ -3,10 +3,13 @@ import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 
 /**
- * POST /api/vendas/gestor
- * Cria uma nova venda no gestor (tabela venda_gestor)
+ * GET /api/vendas/gestor/[id]/status-emissao
+ * Consulta o status de emissão fiscal de uma venda do gestor
  */
-export async function POST(request: NextRequest) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const validation = validateRequest(request)
     if (!validation.valid || !validation.tokenInfo) {
@@ -14,27 +17,28 @@ export async function POST(request: NextRequest) {
     }
     const { tokenInfo } = validation
 
-    const body = await request.json()
+    const { id } = await params
+    if (!id) {
+      return NextResponse.json({ error: 'ID da venda é obrigatório' }, { status: 400 })
+    }
 
     const apiClient = new ApiClient()
     const response = await apiClient.request<any>(
-      `/api/v1/gestor/vendas`,
+      `/api/v1/gestor/vendas/${id}/status-emissao`,
       {
-        method: 'POST',
+        method: 'GET',
         headers: {
           Authorization: `Bearer ${tokenInfo.token}`,
-          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(body),
       }
     )
 
-    return NextResponse.json(response.data || {}, { status: 201 })
+    return NextResponse.json(response.data || {}, { status: response.status })
   } catch (error) {
-    console.error('Erro ao criar venda gestor:', error)
+    console.error('Erro ao consultar status de emissão (gestor):', error)
     if (error instanceof ApiError) {
       return NextResponse.json(
-        { error: error.message || 'Erro ao criar venda', details: error.data },
+        { error: error.message || 'Erro ao consultar status de emissão' },
         { status: error.status }
       )
     }

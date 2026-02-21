@@ -390,7 +390,7 @@ export function FiscalFlowKanban() {
     // Filtrar por tipos selecionados
     return vendas.filter(v => {
       // Para vendas do gestor, não temos tipoVenda, usar origem
-      if (v.isVendaGestor && !v.isDelivery()) {
+      if (v.isVendaGestor && v.isVendaGestor() && !v.isDelivery()) {
         // Vendas do gestor aparecem quando filtro inclui balcão ou mesa
         return tipoVendaFiltros.includes('balcao') || tipoVendaFiltros.includes('mesa')
       }

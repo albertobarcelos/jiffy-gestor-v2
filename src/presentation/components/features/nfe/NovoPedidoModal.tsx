@@ -458,7 +458,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                         <button
                           key={produto.getId()}
                           onClick={() => !jaAdicionado && adicionarProduto(produto.getId())}
-                          disabled={jaAdicionado}
+                          disabled={!!jaAdicionado}
                           className={`aspect-square p-3 border-2 rounded-lg transition-all flex flex-col items-center justify-center text-center ${
                             jaAdicionado
                               ? 'border-green-500 bg-green-50 opacity-60 cursor-not-allowed'
