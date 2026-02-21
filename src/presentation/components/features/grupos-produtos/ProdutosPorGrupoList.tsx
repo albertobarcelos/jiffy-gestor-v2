@@ -6,6 +6,7 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
@@ -21,6 +22,9 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { showToast } from '@/src/shared/utils/toast'
 import { ProdutosTabsModal, ProdutosTabsModalState } from '../produtos/ProdutosTabsModal'
+import { Produto } from '@/src/domain/entities/Produto'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { MdEdit } from 'react-icons/md'
 
 interface ProdutoGrupo {
   id: string
@@ -44,6 +48,7 @@ interface ProdutosPorGrupoListProps {
 const PAGE_SIZE = 10
 
 export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListProps) {
+  const { auth } = useAuthStore()
   const [localProdutos, setLocalProdutos] = useState<ProdutoGrupo[]>([])
   const [tabsModalState, setTabsModalState] = useState<ProdutosTabsModalState>({
     open: false,
@@ -55,9 +60,25 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
   })
   const listRef = useRef<HTMLDivElement>(null)
   const loadMoreRef = useRef<HTMLDivElement>(null)
+  const previousLocalProdutosRef = useRef<ProdutoGrupo[]>([])
+  const isInitialLoadRef = useRef(true)
+  const previousGrupoIdRef = useRef<string | undefined>(undefined)
 
+  // Sensores para drag and drop
+  // TouchSensor para mobile - delay curto para melhor UX, tolerance para evitar conflito com scroll
+  // PointerSensor para desktop com constraint de distância para evitar drag acidental
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 100, // Delay de 100ms em touch para evitar conflito com scroll
+        tolerance: 8, // Tolerância de 8px - permite pequeno movimento antes de ativar
+      },
+    }),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Requer movimento de 8px para ativar (evita drag acidental em desktop)
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -99,8 +120,56 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
   }, [data])
 
   useEffect(() => {
-    setLocalProdutos(serverProdutos)
-  }, [serverProdutos])
+    // Resetar quando o grupo mudar
+    if (previousGrupoIdRef.current !== grupoProdutoId) {
+      isInitialLoadRef.current = true
+      previousLocalProdutosRef.current = []
+      previousGrupoIdRef.current = grupoProdutoId
+    }
+
+    // Na primeira carga, usar diretamente os produtos do servidor
+    if (isInitialLoadRef.current) {
+      setLocalProdutos(serverProdutos)
+      previousLocalProdutosRef.current = serverProdutos
+      isInitialLoadRef.current = false
+      return
+    }
+
+    // Preservar a ordem atual dos produtos ao fazer merge com dados do servidor
+    // Isso evita que produtos editados mudem de posição
+    if (previousLocalProdutosRef.current.length > 0 && serverProdutos.length > 0) {
+      // Criar um mapa de produtos do servidor por ID para acesso rápido
+      const serverProdutosMap = new Map(serverProdutos.map((p) => [p.id, p]))
+      
+      // Manter produtos existentes na mesma ordem, atualizando seus dados
+      const preservedOrder: ProdutoGrupo[] = []
+      const processedIds = new Set<string>()
+      
+      // Primeiro, manter produtos que já existem na lista local na mesma ordem
+      previousLocalProdutosRef.current.forEach((localProduto) => {
+        const serverProduto = serverProdutosMap.get(localProduto.id)
+        if (serverProduto) {
+          // Atualizar dados mas manter a posição
+          preservedOrder.push(serverProduto)
+          processedIds.add(localProduto.id)
+        }
+      })
+      
+      // Depois, adicionar novos produtos que não estavam na lista local
+      serverProdutos.forEach((serverProduto) => {
+        if (!processedIds.has(serverProduto.id)) {
+          preservedOrder.push(serverProduto)
+        }
+      })
+      
+      setLocalProdutos(preservedOrder)
+      previousLocalProdutosRef.current = preservedOrder
+    } else {
+      // Se não há produtos locais ou no servidor, usar diretamente os do servidor
+      setLocalProdutos(serverProdutos)
+      previousLocalProdutosRef.current = serverProdutos
+    }
+  }, [serverProdutos, grupoProdutoId])
 
   useEffect(() => {
     const sentinel = loadMoreRef.current
@@ -169,6 +238,46 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
     []
   )
 
+  const handleEditProduto = useCallback(
+    async (produtoId: string) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      try {
+        const response = await fetch(`/api/produtos/${produtoId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || 'Erro ao carregar produto')
+        }
+
+        const produtoData = await response.json()
+        const produto = Produto.fromJSON(produtoData)
+
+        setTabsModalState({
+          open: true,
+          tab: 'produto',
+          mode: 'edit',
+          produto,
+          prefillGrupoProdutoId: undefined,
+          grupoId: produto.getGrupoId(),
+        })
+      } catch (err) {
+        console.error('Erro ao carregar produto:', err)
+        showToast.error(err instanceof Error ? err.message : 'Erro ao carregar produto')
+      }
+    },
+    [auth]
+  )
+
   const handleDragEnd = useCallback(
     async (event: DragEndEvent) => {
       const { active, over } = event
@@ -187,6 +296,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
       const previousState = [...localProdutos]
       const updatedState = arrayMove([...localProdutos], oldIndex, newIndex)
       setLocalProdutos(updatedState)
+      previousLocalProdutosRef.current = updatedState
 
       const novaPosicao = newIndex + 1
       try {
@@ -208,6 +318,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
       } catch (err: any) {
         console.error('Erro ao reordenar produto:', err)
         setLocalProdutos(previousState)
+        previousLocalProdutosRef.current = previousState
         showToast.error(err?.message || 'Erro ao reordenar produto')
       }
     },
@@ -243,23 +354,24 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
 
   return (
     <>
-      <div className="flex flex-col mx-2 h-full border border-primary/20 rounded-lg bg-white shadow-sm">
-      <div className="px-6 pt-2 pb-4">
-        <div className="flex items-center justify-between">
+      <div className="flex flex-col md:mx-2 mx-1 h-full border border-primary/20 rounded-lg bg-white shadow-sm">
+      <div className="md:px-6 px-2 pt-2 pb-4">
+        <div className="flex items-center justify-between gap-2">
           <div>
-            <h3 className="text-lg font-semibold text-primary-text">
+            <h3 className="md:text-lg text-sm font-semibold text-primary-text">
               Produtos vinculados ao grupo
             </h3>
-            <p className="text-sm text-secondary-text">
+            <p className="md:text-sm text-xs text-secondary-text">
               Arraste para reordenar a posição dos produtos
             </p>
           </div>
+          <div className="flex flex-col md:flex-row items-center gap-2">
           <button
             type="button"
             onClick={handleOpenNovoProdutoModal}
-            className="h-8 px-[10px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+            className="md:h-8 md:px-[10px] px-2 py-1 md:py-0 bg-primary text-info rounded-lg font-semibold font-exo md:text-sm text-xs flex items-center gap-2 hover:bg-primary/90 transition-colors"
             >
-            Criar novo produto
+            Novo produto
           </button>
           <button
             type="button"
@@ -268,27 +380,28 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
           >
             Atualizar
           </button>
+          </div>
         </div>
       </div>
 
-      <div className="mx-2 px-6 py-3 bg-custom-2 rounded-lg grid grid-cols-12 text-xs font-semibold text-primary-text">
-        <div className="col-span-1">Ordem</div>
+      <div className="md:mx-2 mx-1 px-2 md:px-6 py-3 bg-custom-2 rounded-lg grid grid-cols-12 text-xs font-semibold text-primary-text">
+        <div className="col-span-1">#</div>
         <div className="col-span-6">Produto</div>
         <div className="col-span-3">Valor</div>
-        <div className="col-span-2 text-right pr-5">Reordenar</div>
+        <div className="col-span-2 text-right pr-5">Ordenar</div>
       </div>
 
-      <div ref={listRef} className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
-        {isLoading && localProdutos.length === 0 && (
-          <div className="space-y-2">
-            {[...Array(5)].map((_, index) => (
-              <div
-                key={`produto-skeleton-${index}`}
-                className="h-14 rounded-lg bg-primary/10 animate-pulse"
-              />
-            ))}
-          </div>
-        )}
+      <div ref={listRef} className="flex-1 overflow-y-auto md:px-6 px-1 py-4 space-y-2">
+      {isLoading && localProdutos.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-8 gap-2">
+          <img
+            src="/images/jiffy-loading.gif"
+            alt="Carregando"
+            className="w-20 object-contain"
+          />
+          <p className="text-sm text-secondary-text text-center">Carregando produtos...</p>
+        </div>
+      )}
 
         <DndContext
           sensors={sensors}
@@ -305,6 +418,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
                 produto={produto}
                 index={index}
                 formatCurrency={formatCurrency}
+                onEdit={handleEditProduto}
               />
             ))}
           </SortableContext>
@@ -325,7 +439,18 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
       <ProdutosTabsModal
         state={tabsModalState}
         onClose={handleCloseTabsModal}
-        onReload={refetch}
+        onReload={(produtoId?: string, produtoData?: any) => {
+          // Se temos dados do produto, podemos atualizar o cache local
+          // Caso contrário, apenas refaz a requisição
+          if (produtoId && produtoData) {
+            // Atualizar produto na lista local se estiver presente
+            setLocalProdutos((prev) =>
+              prev.map((p) => (p.id === produtoId ? { ...p, ...produtoData } : p))
+            )
+          }
+          // Sempre refaz a requisição para garantir sincronização
+          refetch()
+        }}
         onTabChange={handleTabsModalTabChange}
       />
     </>
@@ -336,10 +461,12 @@ function ProdutoItem({
   produto,
   index,
   formatCurrency,
+  onEdit,
 }: {
   produto: ProdutoGrupo
   index: number
   formatCurrency: (value: number) => string
+  onEdit: (produtoId: string) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: produto.id,
@@ -354,20 +481,38 @@ function ProdutoItem({
     <div
       ref={setNodeRef}
       style={style}
-      className={`grid grid-cols-12 gap-3 items-center rounded-lg border border-primary/10 px-4 py-2 bg-white shadow-md hover:bg-primary/10 transition ${
-        isDragging ? 'opacity-50 ring-2 ring-primary/40' : ''
-      }`}
+      className={`grid grid-cols-12 gap-3 items-center rounded-lg md:px-4 px-1 py-2 transition ${
+        index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+      } ${isDragging ? 'opacity-50 ring-2 ring-primary/40' : ''}`}
     >
-      <div className="col-span-1 text-sm font-semibold text-primary-text">{index + 1}</div>
-      <div className="col-span-6 text-sm text-primary-text truncate">{produto.nome}</div>
-      <div className="col-span-3 text-sm text-primary-text">{formatCurrency(produto.valor)}</div>
+      <div className="col-span-1 md:text-sm text-xs font-semibold text-primary-text">{index + 1}</div>
+      <div className="col-span-6 md:text-sm text-xs text-primary-text whitespace-normal break-words">
+        <div className="flex items-center gap-2">
+          <span>{produto.nome}</span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onEdit(produto.id)
+            }}
+            className="text-primary hover:text-primary/80 transition-colors"
+            aria-label={`Editar ${produto.nome}`}
+            title="Editar produto"
+          >
+            <MdEdit size={16} />
+          </button>
+        </div>
+      </div>
+      <div className="col-span-3 md:text-sm text-xs text-primary-text">{formatCurrency(produto.valor)}</div>
       <div
-        className="col-span-2 flex justify-end pr-2 cursor-grab active:cursor-grabbing text-secondary-text hover:text-primary transition"
+        className="col-span-2 flex justify-end pr-2 cursor-grab active:cursor-grabbing text-secondary-text hover:text-primary active:text-primary transition touch-manipulation min-h-[35px] items-center"
         {...attributes}
         {...listeners}
+        style={{ touchAction: 'none' }}
+        title="Arraste para reordenar"
       >
         <svg
-          className="w-5 h-5"
+          className="md:w-5 md:h-5 w-4 h-4"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"

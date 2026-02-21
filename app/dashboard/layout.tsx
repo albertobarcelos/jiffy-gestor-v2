@@ -18,7 +18,7 @@ export default function DashboardLayout({
       <TopNav />
 
       {/* Conteúdo principal */}
-      <main className="px-2">
+      <main className="px-1 md:px-2">
         {children}
       </main>
     </div>

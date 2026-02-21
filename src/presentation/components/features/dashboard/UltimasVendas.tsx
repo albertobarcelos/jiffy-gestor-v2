@@ -19,15 +19,17 @@ interface UserPdvApiResponse {
 
 interface UltimasVendasProps {
   periodo: string;
+  periodoInicial?: Date | null;
+  periodoFinal?: Date | null;
 }
 
-const LAST_SALES_DISPLAY_LIMIT = 10; // Definir o limite de últimas vendas a serem exibidas
+// Removido limite de exibição - agora exibe todas as vendas retornadas (até 100)
 
 /**
  * Componente de Últimas Vendas
  * Design clean inspirado no exemplo
  */
-export function UltimasVendas({ periodo }: UltimasVendasProps) {
+export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: UltimasVendasProps) {
   const [vendas, setVendas] = useState<Venda[]>([])
   const [userNames, setUserNames] = useState<UserNamesMap>({})
   const [isLoading, setIsLoading] = useState(true)
@@ -90,22 +92,26 @@ export function UltimasVendas({ periodo }: UltimasVendasProps) {
         // Buscar últimas vendas da API
         const baseUrl = process.env.NEXT_PUBLIC_EXTERNAL_API_BASE_URL || ''
 
-        // Calcular data com base na prop periodo
-        const mappedPeriodo = mapPeriodoToCalculateFormat(periodo);
-        const { inicio, fim } = calculatePeriodo(mappedPeriodo);
-
         // Buscar vendas finalizadas, ordenadas por data (mais recentes primeiro)
         const params = new URLSearchParams({
           limit: '100', // Aumentado para buscar mais vendas no período
           offset: '0',
         })
         
-        // Só adiciona parâmetros de data se não for "Todos"
-        if (mappedPeriodo !== 'Todos' && inicio && fim) {
-          const periodoInicial = inicio.toISOString();
-          const periodoFinal = fim.toISOString();
-          params.append('periodoInicial', periodoInicial);
-          params.append('periodoFinal', periodoFinal);
+        // Se período for "Datas Personalizadas" e datas foram fornecidas, usa elas
+        if (periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) {
+          params.append('periodoInicial', periodoInicial.toISOString());
+          params.append('periodoFinal', periodoFinal.toISOString());
+        } else {
+          // Caso contrário, calcula com base no período
+          const mappedPeriodo = mapPeriodoToCalculateFormat(periodo);
+          const { inicio, fim } = calculatePeriodo(mappedPeriodo);
+          
+          // Só adiciona parâmetros de data se não for "Todos"
+          if (mappedPeriodo !== 'Todos' && inicio && fim) {
+            params.append('periodoInicial', inicio.toISOString());
+            params.append('periodoFinal', fim.toISOString());
+          }
         }
         
         params.append('status', 'FINALIZADA');
@@ -144,6 +150,8 @@ export function UltimasVendas({ periodo }: UltimasVendasProps) {
           const status = item.cancelado ? 'Cancelada' :
                         item.status === 'CANCELADA' ? 'Cancelada' :
                         'Aprovada'
+          const dataUltimoProdutoLancado = item.dataUltimoProdutoLancado ? new Date(item.dataUltimoProdutoLancado) : null
+          const dataUltimaMovimentacao = item.dataUltimaMovimentacao ? new Date(item.dataUltimaMovimentacao) : null
           const dataCancelamento = item.dataCancelamento ? new Date(item.dataCancelamento) : null
 
           return Venda.create(
@@ -159,14 +167,15 @@ export function UltimasVendas({ periodo }: UltimasVendasProps) {
             valorFaturado,
             metodoPagamento,
             status as 'Aprovada' | 'Cancelada',
+            dataUltimoProdutoLancado,
+            dataUltimaMovimentacao,
             dataCancelamento
           )
         })
 
-        // Ordenar as vendas pela data mais recente e limitar ao número desejado
+        // Ordenar as vendas pela data mais recente (exibe todas as vendas retornadas, até 100)
         const ultimasVendas = vendasMapeadas
           .sort((a, b) => b.getData().getTime() - a.getData().getTime())
-          .slice(0, LAST_SALES_DISPLAY_LIMIT);
 
         setVendas(ultimasVendas)
 
@@ -215,7 +224,7 @@ export function UltimasVendas({ periodo }: UltimasVendasProps) {
     }
 
     loadVendas()
-  }, [auth, periodo])
+  }, [auth, periodo, periodoInicial, periodoFinal])
 
 
   if (isLoading) {
@@ -233,10 +242,9 @@ export function UltimasVendas({ periodo }: UltimasVendasProps) {
 
   return (
     <>
-      <div className="bg-white h-[390px] rounded-lg shadow-sm shadow-primary/70 border border-gray-200 p-6 overflow-y-auto scrollbar-hide">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-primary">Últimas Vendas</h3>
-          <span className="text-sm text-primary/70">Última semana</span>
+      <div className="bg-white h-[440px] rounded-lg shadow-sm shadow-primary/70 border border-gray-200 p-6 overflow-y-auto scrollbar-hide">
+        <div className="flex items-center justify-center md:justify-between mb-2 md:mb-6">
+          <h3 className="text-lg font-semibold text-primary">Vendas do Período</h3>
         </div>
 
         <div className="space-y-4">
@@ -248,40 +256,38 @@ export function UltimasVendas({ periodo }: UltimasVendasProps) {
             vendas.map((venda) => {
               const displayUserId = venda.getUserId();
               const displayedName = userNames[displayUserId] || 'Usuário Desconhecido';
+              // Verifica se a venda foi cancelada através da data de cancelamento ou do status
+              const isCancelada = !!venda.getDataCancelamento() || venda.getStatus() === 'Cancelada';
 
               return (
                 <div
                   key={venda.getId()}
-                  className={`flex items-center justify-between p-4 rounded-lg transition-colors border border-primary/50 group cursor-pointer ${venda.getDataCancelamento() ? 'bg-red-100' : 'bg-white hover:bg-primary/10'}`}
+                  className={`flex flex-col md:flex-row items-center justify-between p-4 rounded-lg transition-colors border border-primary/50 group cursor-pointer ${
+                    isCancelada 
+                      ? 'bg-red-100 hover:bg-red-200' 
+                      : 'bg-white hover:bg-primary/10'
+                  }`}
                   onClick={() => handleOpenModal(venda.getId())}
                 >
                   <div className="flex items-center gap-4 flex-1">
                     {/* Avatar/Logo placeholder */}
-                    <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                    <div className="w-10 h-10 hidden md:flex bg-primary rounded-lg items-center justify-center text-white font-semibold text-sm flex-shrink-0">
                       <MdPerson size={28} />
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-900 truncate">{displayedName}</p>
+                      <p className="font-semibold text-sm text-gray-900 truncate">{displayedName}</p>
                       <p className="text-sm text-gray-500">{formatDate(venda.getData())}</p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 ">
-                    <div className="text-right">
-                      <p className="font-semibold text-green-600">
-                        +{formatCurrency(venda.getValorFaturado())}
+                  <div className="flex  items-center gap-3 ">
+                    <div className="flex md:flex-col flex-row items-center justify-between md:justify-end gap-2 text-right">
+                      <p className={`font-semibold text-sm md:text-base ${isCancelada ? 'text-red-600' : 'text-green-600'}`}>
+                        {isCancelada ? '-' : '+'}{formatCurrency(venda.getValorFaturado())}
                       </p>
                       <p className="text-xs text-gray-500">Venda #{venda.getNumeroVenda()}</p>
                     </div>
-
-                    {/* Ícone de olho para ver detalhes */}
-                    <button
-                      className="p-2 text-primary/70 hover:text-primary rounded-lg transition-colors flex-shrink-0"
-                      title="Ver detalhes da venda"
-                    >
-                      <MdVisibility className="w-5 h-5" />
-                    </button>
                   </div>
                 </div>
               );

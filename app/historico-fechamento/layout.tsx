@@ -10,7 +10,7 @@ export default function HistoricoFechamentoLayout({
   return (
     <div className="min-h-screen bg-gray-50">
       <TopNav />
-      <main className="px-6">
+      <main className="md:px-6 px-2">
         {children}
       </main>
     </div>

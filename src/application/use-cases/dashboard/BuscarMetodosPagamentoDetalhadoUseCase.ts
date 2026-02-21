@@ -3,15 +3,27 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'; // Para obte
 
 interface VendaListApiResponse {
   items: { id: string }[];
-  // ... outras propriedades que não usaremos
+  count?: number;
+  totalPages?: number;
+  limit?: number;
 }
 
 interface VendaDetalhesApiResponse {
   id: string;
+  status?: string;
+  dataFinalizacao?: string;
+  dataCancelamento?: string | null;
+  troco?: number;
+  valorFinal?: number; // Valor total da venda para cálculo do troco
   pagamentos: {
     id: string;
     valor: number;
     meioPagamentoId: string;
+    cancelado: boolean;
+    canceladoPorId?: string | null;
+    dataCancelamento?: string | null;
+    isTefUsed?: boolean;
+    isTefConfirmed?: boolean;
     // ... outras propriedades que não usaremos
   }[];
   // ... outras propriedades que não usaremos
@@ -19,7 +31,8 @@ interface VendaDetalhesApiResponse {
 
 interface MeioPagamentoApiResponse {
   id: string;
-  nome: string; // <-- Este é o campo que precisamos!
+  nome: string;
+  formaPagamentoFiscal?: string; // Campo para identificar se é dinheiro
   // ... outras propriedades
 }
 
@@ -91,7 +104,92 @@ function getPeriodoDates(periodo: string): PeriodoDates {
 
 
 export class BuscarMetodosPagamentoDetalhadoUseCase {
-  async execute(periodo: string = 'hoje'): Promise<DashboardMetodoPagamento[]> {
+  /**
+   * Busca todas as vendas finalizadas com paginação completa
+   */
+  private async fetchAllVendasFinalizadas(
+    baseUrl: string,
+    headers: HeadersInit,
+    periodoInicial: string,
+    periodoFinal: string
+  ): Promise<string[]> {
+    const baseParams = new URLSearchParams();
+
+    if (periodoInicial && periodoFinal) {
+      baseParams.append('periodoInicial', periodoInicial);
+      baseParams.append('periodoFinal', periodoFinal);
+    }
+    baseParams.append('status', 'FINALIZADA'); // Apenas vendas finalizadas
+
+    const limitPerPage = 100;
+    let allVendaIds: string[] = [];
+    let currentPage = 0;
+    let totalPages = 1;
+
+    while (currentPage < totalPages) {
+      const currentParams = new URLSearchParams(baseParams.toString());
+      currentParams.append('limit', limitPerPage.toString());
+      currentParams.append('offset', (currentPage * limitPerPage).toString());
+
+      const vendasUrl = `${baseUrl}/api/v1/operacao-pdv/vendas?${currentParams.toString()}`;
+      console.log(`Buscando página ${currentPage + 1} de vendas finalizadas:`, vendasUrl);
+
+      const vendasResponse = await fetch(vendasUrl, { headers });
+      if (!vendasResponse.ok) {
+        throw new Error(`Erro ao buscar vendas finalizadas (página ${currentPage + 1})`);
+      }
+
+      const vendasData: VendaListApiResponse = await vendasResponse.json();
+      const pageVendaIds = vendasData.items.map((venda) => venda.id);
+      allVendaIds = allVendaIds.concat(pageVendaIds);
+
+      // Determina o total de páginas na primeira requisição
+      if (currentPage === 0) {
+        if (vendasData.totalPages) {
+          totalPages = vendasData.totalPages;
+        } else if (vendasData.count && vendasData.limit) {
+          totalPages = Math.ceil(vendasData.count / vendasData.limit);
+        } else if (pageVendaIds.length < limitPerPage) {
+          // Se retornou menos que o limite, não há mais páginas
+          totalPages = 1;
+        }
+      }
+
+      currentPage++;
+    }
+
+    console.log(`Total de ${allVendaIds.length} vendas finalizadas encontradas em ${totalPages} página(s)`);
+    return allVendaIds;
+  }
+
+  /**
+   * Valida se uma venda está realmente finalizada
+   */
+  private isVendaFinalizada(venda: VendaDetalhesApiResponse): boolean {
+    // Verifica se tem data de cancelamento (não deve ter)
+    if (venda.dataCancelamento) {
+      return false;
+    }
+
+    // Verifica se tem data de finalização (deve ter)
+    if (!venda.dataFinalizacao) {
+      return false;
+    }
+
+    // Se tiver campo status, valida explicitamente
+    if (venda.status) {
+      return venda.status.toUpperCase() === 'FINALIZADA';
+    }
+
+    // Se não tiver campo status, considera finalizada se tem dataFinalizacao e não tem dataCancelamento
+    return true;
+  }
+
+  async execute(
+    periodo: string = 'hoje',
+    periodoInicialCustom?: Date | null,
+    periodoFinalCustom?: Date | null
+  ): Promise<DashboardMetodoPagamento[]> {
     const { auth } = useAuthStore.getState();
     const token = auth?.getAccessToken();
     const baseUrl = process.env.NEXT_PUBLIC_EXTERNAL_API_BASE_URL;
@@ -105,39 +203,39 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
       'Authorization': `Bearer ${token}`,
     };
 
-    const { periodoInicial, periodoFinal } = getPeriodoDates(periodo);
-    const params = new URLSearchParams();
-
-    if (periodoInicial && periodoFinal) {
-      params.append('periodoInicial', periodoInicial);
-      params.append('periodoFinal', periodoFinal);
+    // Se datas personalizadas foram fornecidas, usa elas
+    let periodoInicial: string;
+    let periodoFinal: string;
+    
+    if (periodoInicialCustom && periodoFinalCustom) {
+      periodoInicial = periodoInicialCustom.toISOString();
+      periodoFinal = periodoFinalCustom.toISOString();
+    } else {
+      // Caso contrário, usa a função de cálculo de período
+      const dates = getPeriodoDates(periodo);
+      periodoInicial = dates.periodoInicial;
+      periodoFinal = dates.periodoFinal;
     }
-    params.append('status', 'FINALIZADA'); // Apenas vendas finalizadas
-    params.append('limit', '100'); // Adicionado para buscar todos os itens (ou um número grande o suficiente)
 
-    const vendasUrl = `${baseUrl}/api/v1/operacao-pdv/vendas?${params.toString()}`;
-    console.log('URL da requisição de vendas:', vendasUrl);
-
-    // Passo 1: Buscar IDs das Vendas
-    const vendasResponse = await fetch(vendasUrl, { headers });
-    if (!vendasResponse.ok) {
-      throw new Error('Erro ao buscar vendas por período.');
-    }
-    const vendasData: VendaListApiResponse = await vendasResponse.json();
-    console.log('Resposta da API de vendas:', vendasData);
-    const vendaIds = vendasData.items.map(venda => venda.id);
+    // Passo 1: Buscar TODAS as IDs das Vendas Finalizadas (com paginação completa)
+    const vendaIds = await this.fetchAllVendasFinalizadas(
+      baseUrl,
+      headers,
+      periodoInicial,
+      periodoFinal
+    );
 
     if (vendaIds.length === 0) {
-      return []; // Não há vendas para processar
+      return []; // Não há vendas finalizadas para processar
     }
 
-    // Cache para nomes dos meios de pagamento
-    const paymentMethodNamesCache = new Map<string, string>();
+    // Cache para dados completos dos meios de pagamento
+    const paymentMethodCache = new Map<string, MeioPagamentoApiResponse>();
 
-    // Função auxiliar para buscar o nome do meio de pagamento
-    const getPaymentMethodName = async (id: string): Promise<string> => {
-      if (paymentMethodNamesCache.has(id)) {
-        return paymentMethodNamesCache.get(id)!;
+    // Função auxiliar para buscar dados completos do meio de pagamento
+    const getPaymentMethodData = async (id: string): Promise<MeioPagamentoApiResponse | null> => {
+      if (paymentMethodCache.has(id)) {
+        return paymentMethodCache.get(id)!;
       }
 
       const paymentMethodUrl = `${baseUrl}/api/v1/pagamento/meios-pagamento/${id}`;
@@ -145,17 +243,23 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
 
       const response = await fetch(paymentMethodUrl, { headers });
       if (!response.ok) {
-        console.warn(`Não foi possível buscar o nome para o meio de pagamento ID: ${id}. Status: ${response.status}`);
-        return 'Desconhecido';
+        console.warn(`Não foi possível buscar dados para o meio de pagamento ID: ${id}. Status: ${response.status}`);
+        return null;
       }
       const data: MeioPagamentoApiResponse = await response.json();
       console.log(`Resposta da API de meios de pagamento para ID ${id}:`, data);
-      paymentMethodNamesCache.set(id, data.nome);
-      return data.nome;
+      paymentMethodCache.set(id, data);
+      return data;
+    };
+
+    // Função auxiliar para buscar apenas o nome (compatibilidade)
+    const getPaymentMethodName = async (id: string): Promise<string> => {
+      const data = await getPaymentMethodData(id);
+      return data?.nome || 'Desconhecido';
     };
 
 
-    // Passo 2: Buscar Detalhes de Cada Venda e Resolver Nomes
+    // Passo 2: Buscar Detalhes de Cada Venda e Validar Status
     const detailedVendasPromises = vendaIds.map(async (vendaId) => {
       const detalhesResponse = await fetch(`${baseUrl}/api/v1/operacao-pdv/vendas/${vendaId}`, { headers });
       if (!detalhesResponse.ok) {
@@ -165,18 +269,123 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
       return detalhesResponse.json() as Promise<VendaDetalhesApiResponse>;
     });
 
-    const detailedVendas = (await Promise.all(detailedVendasPromises)).filter(Boolean) as VendaDetalhesApiResponse[];
+    const allDetailedVendas = (await Promise.all(detailedVendasPromises)).filter(
+      Boolean
+    ) as VendaDetalhesApiResponse[];
 
-    // Passo 3: Agregar os Dados
+    // Passo 3: Filtrar apenas vendas realmente FINALIZADAS (validação adicional)
+    const detailedVendas = allDetailedVendas.filter((venda) => {
+      const isFinalizada = this.isVendaFinalizada(venda);
+      if (!isFinalizada) {
+        console.warn(
+          `Venda ${venda.id} foi filtrada: não está finalizada (status: ${venda.status}, dataFinalizacao: ${venda.dataFinalizacao}, dataCancelamento: ${venda.dataCancelamento})`
+        );
+      }
+      return isFinalizada;
+    });
+
+    console.log(
+      `Processando ${detailedVendas.length} vendas finalizadas (${allDetailedVendas.length - detailedVendas.length} foram filtradas)`
+    );
+
+    // Passo 4: Agregar os Dados apenas das vendas finalizadas e pagamentos não cancelados e TEF confirmados
     const methodAggregation = new Map<string, { metodo: string; valor: number; quantidade: number }>();
     let totalSalesValue = 0;
+    let totalPagamentosCancelados = 0;
+    let totalPagamentosTefNaoConfirmados = 0;
 
     for (const venda of detailedVendas) {
-      for (const pagamento of venda.pagamentos) {
-        const metodoPagamentoId = pagamento.meioPagamentoId;
-        const valorPagamento = pagamento.valor;
+      // Garante que a venda tem pagamentos
+      if (!venda.pagamentos || venda.pagamentos.length === 0) {
+        continue;
+      }
 
-        const metodoNome = await getPaymentMethodName(metodoPagamentoId); // Resolve o nome aqui
+      // Filtra apenas pagamentos não cancelados e TEF confirmados (se aplicável)
+      const pagamentosValidos = venda.pagamentos.filter((pagamento) => {
+        // Um pagamento está cancelado se:
+        // 1. O campo cancelado é true, OU
+        // 2. Tem dataCancelamento preenchida
+        const isCancelado = pagamento.cancelado === true || (pagamento.dataCancelamento !== null && pagamento.dataCancelamento !== undefined);
+        
+        if (isCancelado) {
+          totalPagamentosCancelados++;
+          return false;
+        }
+
+        // Verifica se o pagamento usa TEF e se está confirmado
+        // Se isTefUsed === true, então isTefConfirmed deve ser === true
+        // Se isTefUsed === false ou não existe, o pagamento é válido (não usa TEF)
+        const usaTef = pagamento.isTefUsed === true;
+        if (usaTef) {
+          const tefConfirmado = pagamento.isTefConfirmed === true;
+          if (!tefConfirmado) {
+            totalPagamentosTefNaoConfirmados++;
+            return false; // Exclui pagamentos TEF não confirmados
+          }
+        }
+        
+        return true; // Pagamento válido: não cancelado e (não usa TEF ou TEF confirmado)
+      });
+
+      // Calcula o troco baseado nos pagamentos válidos (mesma lógica do DetalhesVendas.tsx)
+      // Exclui pagamentos cancelados e pagamentos com isTefConfirmed: false
+      const totalPagoValido = pagamentosValidos.reduce((sum, pagamento) => sum + pagamento.valor, 0);
+      
+      // Calcula o troco: total pago - total da venda
+      // Se der negativo, troco = 0 (não pode haver troco negativo)
+      const trocoCalculado = venda.valorFinal 
+        ? Math.max(0, totalPagoValido - venda.valorFinal)
+        : (venda.troco || 0); // Fallback para troco da API se valorFinal não estiver disponível
+
+      // Se houver troco calculado, calcula o total de pagamentos em dinheiro para distribuir o troco
+      let totalPagamentosDinheiro = 0;
+      const pagamentosComDados: Array<{
+        pagamento: typeof pagamentosValidos[0];
+        metodoNome: string;
+        isDinheiro: boolean;
+        valorOriginal: number;
+      }> = [];
+
+      // Primeiro, identifica todos os pagamentos e calcula total de dinheiro
+      for (const pagamento of pagamentosValidos) {
+        const paymentMethodData = await getPaymentMethodData(pagamento.meioPagamentoId);
+        const metodoNome = paymentMethodData?.nome || 'Desconhecido';
+        
+        // Verifica se é dinheiro
+        let isDinheiro = false;
+        if (paymentMethodData) {
+          const nomeLower = (paymentMethodData.nome || '').toLowerCase();
+          const formaFiscalLower = (paymentMethodData.formaPagamentoFiscal || '').toLowerCase();
+          isDinheiro = nomeLower.includes('dinheiro') || formaFiscalLower.includes('dinheiro');
+        }
+
+        if (isDinheiro) {
+          totalPagamentosDinheiro += pagamento.valor;
+        }
+
+        pagamentosComDados.push({
+          pagamento,
+          metodoNome,
+          isDinheiro,
+          valorOriginal: pagamento.valor,
+        });
+      }
+
+      // Processa os pagamentos aplicando desconto de troco se necessário
+      for (const { pagamento, metodoNome, isDinheiro, valorOriginal } of pagamentosComDados) {
+        let valorPagamento = valorOriginal;
+
+        // Se for pagamento em dinheiro e houver troco calculado, subtrai o troco proporcionalmente
+        if (isDinheiro && trocoCalculado > 0 && totalPagamentosDinheiro > 0) {
+          // Calcula a proporção deste pagamento no total de dinheiro
+          const proporcao = valorOriginal / totalPagamentosDinheiro;
+          const trocoProporcional = trocoCalculado * proporcao;
+          valorPagamento = Math.max(0, valorOriginal - trocoProporcional);
+          
+          console.log(
+            `Venda ${venda.id}: Pagamento em dinheiro - valor pago R$ ${valorOriginal.toFixed(2)}, troco calculado R$ ${trocoCalculado.toFixed(2)}, troco proporcional R$ ${trocoProporcional.toFixed(2)}, valor líquido R$ ${valorPagamento.toFixed(2)}`
+          );
+        }
 
         totalSalesValue += valorPagamento;
 
@@ -195,15 +404,28 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
       }
     }
 
-    // Passo 4: Retornar no Formato DashboardMetodoPagamento[]
+    if (totalPagamentosCancelados > 0) {
+      console.log(`Foram ignorados ${totalPagamentosCancelados} pagamento(s) cancelado(s) no cálculo do gráfico`);
+    }
+    if (totalPagamentosTefNaoConfirmados > 0) {
+      console.log(`Foram ignorados ${totalPagamentosTefNaoConfirmados} pagamento(s) TEF não confirmado(s) no cálculo do gráfico`);
+    }
+
+    // Passo 5: Retornar no Formato DashboardMetodoPagamento[]
     const metodosPagamento: DashboardMetodoPagamento[] = Array.from(methodAggregation.values())
-      .map(item => DashboardMetodoPagamento.create({
-        metodo: item.metodo,
-        valor: item.valor,
-        quantidade: item.quantidade,
-        percentual: totalSalesValue > 0 ? (item.valor / totalSalesValue) * 100 : 0,
-      }))
+      .map((item) =>
+        DashboardMetodoPagamento.create({
+          metodo: item.metodo,
+          valor: item.valor,
+          quantidade: item.quantidade,
+          percentual: totalSalesValue > 0 ? (item.valor / totalSalesValue) * 100 : 0,
+        })
+      )
       .sort((a, b) => b.getValor() - a.getValor());
+
+    console.log(
+      `Gráfico de métodos de pagamento: ${metodosPagamento.length} métodos, total R$ ${totalSalesValue.toFixed(2)}`
+    );
 
     return metodosPagamento;
   }

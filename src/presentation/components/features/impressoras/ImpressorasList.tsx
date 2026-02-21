@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Impressora } from '@/src/domain/entities/Impressora'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { MdSearch, MdPrint, MdDelete } from 'react-icons/md'
+import { MdSearch, MdPrint, MdDelete, MdContentCopy } from 'react-icons/md'
 import {
   ImpressorasTabsModal,
   ImpressorasTabsModalState,
@@ -174,6 +174,18 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
     router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
   }, [router, searchParams, pathname])
 
+  const handleCopy = useCallback((impressoraId: string) => {
+    setModalState({
+      open: true,
+      tab: 'impressora',
+      mode: 'copy',
+      impressoraId,
+    })
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.set('modalImpressoraOpen', 'true')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+  }, [router, searchParams, pathname])
+
   const handleAdd = useCallback(() => {
     setModalState({
       open: true,
@@ -259,19 +271,19 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="px-[30px] pt-2 pb-1 flex-shrink-0">
+      <div className="md:px-[30px] px-1 pt-2 pb-1 flex-shrink-0">
         <div className="flex items-start justify-between">
-          <div className="w-1/2 pl-5">
-            <p className="text-primary text-lg font-semibold font-nunito">
+          <div className=" md:pl-5">
+            <p className="text-primary md:text-lg text-sm font-semibold font-nunito">
               Impressoras Cadastradas
             </p>
-            <p className="text-tertiary text-[22px] font-medium font-nunito">
+            <p className="text-tertiary md:text-[22px] text-sm font-medium font-nunito">
               Total {impressoras.length} de {totalImpressoras}
             </p>
           </div>
           <button
             onClick={handleAdd}
-            className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+            className="h-8 md:px-[30px] px-2 bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
           >
             + Adicionar
           </button>
@@ -281,7 +293,7 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
       {/* Divisor amarelo */}
         <div className="h-[4px] border-t-2 border-primary/70 flex-shrink-0"></div>
           {/* Barra de pesquisa */}
-          <div className="flex gap-3 px-[20px] py-1 flex-shrink-0">
+          <div className="flex gap-3 md:px-[20px] px-1 py-1 flex-shrink-0">
         <div className="flex-1 min-w-[180px] max-w-[360px]">
             <label
               className="text-xs font-semibold text-secondary-text mb-1 block"
@@ -305,19 +317,19 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
           </div>
 
       {/* Cabeçalho da tabela */}
-      <div className="px-[30px] mt-0 flex-shrink-0">
+      <div className="md:px-[30px] mt-0 flex-shrink-0">
         <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px]">
-          <div className="flex-[1] w-16 font-nunito font-semibold text-sm text-primary-text text-left">
+          <div className="flex-[1] w-16 font-nunito font-semibold text-sm text-primary-text text-left hidden md:flex">
             Ícone
           </div>
-          <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
+          <div className="flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Código
           </div>
-          <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
+          <div className="flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Impressora
           </div>
           
-          <div className="flex-[1] text-right font-nunito font-semibold text-sm text-primary-text">
+          <div className="flex-[1] text-right font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Ações
           </div>
         </div>
@@ -326,7 +338,7 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
       {/* Lista de impressoras com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-[30px] mt-1 scrollbar-hide"
+        className="flex-1 overflow-y-auto md:px-[30px] px-1 mt-1 scrollbar-hide"
         style={{ maxHeight: 'calc(100vh - 300px)' }}
       >
         {impressoras.length === 0 && !isLoading && (
@@ -335,36 +347,49 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
           </div>
         )}
 
-        {impressoras.map((impressora) => {
+        {impressoras.map((impressora, index) => {
           // Handler para abrir edição ao clicar na linha
           const handleRowClick = () => {
             handleEdit(impressora.getId())
           }
 
+          const isZebraEven = index % 2 === 0
+          const bgClass = isZebraEven ? 'bg-gray-50' : 'bg-white'
+
           return (
           <div
             key={impressora.getId()}
             onClick={handleRowClick}
-            className="bg-info rounded-lg mb-2 overflow-hidden shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-colors cursor-pointer"
+            className={`${bgClass} rounded-lg mb-2 overflow-hidden hover:bg-primary/10 transition-colors cursor-pointer`}
           >
-            <div className="py-2 px-4 flex items-center gap-[10px]">
+            <div className="py-2 md:px-4 flex items-center md:gap-[10px]">
               {/* Icone */}
-              <div className="flex-[1] w-16 flex justify-left" onClick={(e) => e.stopPropagation()}>
+              <div className="flex-[1] w-16 justify-left hidden md:flex" onClick={(e) => e.stopPropagation()}>
                 <span className="text-2xl text-primary"><MdPrint /></span>
               </div>
               
               {/* Código */}
-              <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
-                # {getCodigo(impressora.getId())}
+              <div className="flex-[2] justify-start font-nunito font-semibold md:text-sm text-xs text-primary-text">
+                #{getCodigo(impressora.getId())}
               </div>
               
               {/* Impressora (Nome) */}
-              <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text">
+              <div className="flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text">
                 {impressora.getNome()}
               </div>
               
               {/* Ações */}
-              <div className="flex-[1] flex justify-end" onClick={(e) => e.stopPropagation()}>
+              <div className="flex-[1] flex justify-end md:gap-2" onClick={(e) => e.stopPropagation()}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleCopy(impressora.getId())
+                  }}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-primary/10 transition-colors"
+                  aria-label="Copiar impressora"
+                >
+                  <span className="text-primary text-lg"><MdContentCopy /></span>
+                </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
@@ -382,8 +407,13 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
         })}
 
         {isLoading && (
-          <div className="flex justify-center py-4">
-            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="flex flex-col items-center justify-center py-12">
+            <img
+              src="/images/jiffy-loading.gif"
+              alt="Carregando"
+              className="w-20 h-20 object-contain"
+            />
+            <span className="text-sm font-medium text-primary-text font-nunito mt-2">Carregando...</span>
           </div>
         )}
       </div>

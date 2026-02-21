@@ -17,7 +17,7 @@ export interface InputProps extends Omit<TextFieldProps, 'variant'> {
  * Componente Input usando Material UI TextField
  */
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ variant = 'outlined', value, min, max, step, maxLength, minLength, pattern, inputProps, ...props }, ref) => {
+  ({ variant = 'outlined', value, size, min, max, step, maxLength, minLength, pattern, inputProps, ...props }, ref) => {
     const normalizedValue = value === null || value === undefined ? '' : value
 
     const mergedInputProps = {
@@ -36,6 +36,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         variant={variant}
         fullWidth
         value={normalizedValue}
+        size={size}
         inputProps={mergedInputProps}
         {...props}
       />

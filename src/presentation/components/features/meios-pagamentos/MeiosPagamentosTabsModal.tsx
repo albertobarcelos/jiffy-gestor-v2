@@ -52,7 +52,7 @@ export function MeiosPagamentosTabsModal({
           m: 0,
           height: '100vh',
           maxHeight: '100vh',
-          width: 'min(900px, 60vw)',
+          width: { xs: '95vw', md: 'min(900px, 60vw)' },
           borderRadius: 0,
           display: 'flex',
           flexDirection: 'column',

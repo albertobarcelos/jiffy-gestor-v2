@@ -1,0 +1,21 @@
+'use client'
+
+import { usePathname } from 'next/navigation'
+import { TopNav } from '@/src/presentation/components/layouts/TopNav'
+
+export default function UsuariosGestorLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const pathname = usePathname()
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <TopNav />
+      <main className='md:px-6'>
+        {children}
+      </main>
+    </div>
+  )
+}

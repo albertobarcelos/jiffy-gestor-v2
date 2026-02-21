@@ -44,7 +44,7 @@ export function EmpresaTab() {
   const { auth } = useAuthStore()
   const [empresa, setEmpresa] = useState<Cliente | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isEditing, setIsEditing] = useState(false)
+  const [isEditing, setIsEditing] = useState(true)
 
   // Campos do formulário
   const [cnpj, setCnpj] = useState('')
@@ -213,21 +213,26 @@ export function EmpresaTab() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="flex flex-col items-center justify-center py-12">
+        <img
+          src="/images/jiffy-loading.gif"
+          alt="Carregando"
+          className="w-20 object-contain"
+        />
+        <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
       </div>
     )
   }
 
   return (
-    <div className="h-full overflow-y-auto px-6 py-2 scrollbar-hide">
+    <div className="h-full overflow-y-auto md:px-6 px-1 py-2 scrollbar-hide">
       <div className="space-y-2">
         <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-primary text-xl font-semibold font-exo mb-1">
+          <h3 className="text-primary text-lg md:text-xl font-semibold font-exo mb-1">
             Dados da Empresa
           </h3>
-          <p className="text-secondary-text text-sm font-nunito">
+          <p className="text-secondary-text text-xs md:text-sm font-nunito">
             Gerencie as informações da sua empresa
           </p>
         </div>
@@ -240,7 +245,7 @@ export function EmpresaTab() {
           </button>
         )}
         {isEditing && (
-          <div className="flex gap-2">
+          <div className="flex flex-col md:flex-row gap-2">
             <button
               onClick={handleSave}
               disabled={cidadeValida === false && cidade.length > 0}
@@ -261,13 +266,13 @@ export function EmpresaTab() {
         )}
       </div>
 
-      <div className="bg-info px-[18px] space-y-4">
+      <div className="bg-info md:px-[18px] px-1 space-y-4">
         {/* Dados Básicos */}
         <div>
           <h4 className="text-primary text-lg font-bold font-nunito mb-2">
             Dados Básicos
           </h4>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
             <div>
               <label className="block text-sm font-medium text-primary-text">
                 CNPJ
@@ -336,7 +341,7 @@ export function EmpresaTab() {
           <h4 className="text-primary text-lg font-bold font-nunito mb-2">
             Endereço
           </h4>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid md:grid-cols-3 grid-cols-1 gap-4">
             <div>
               <label className="block text-sm font-medium text-primary-text">
                 CEP
@@ -349,7 +354,7 @@ export function EmpresaTab() {
                 className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
               />
             </div>
-            <div className="col-span-2">
+            <div className="md:col-span-2 col-span-1">
               <label className="block text-sm font-medium text-primary-text">
                 Rua
               </label>
@@ -373,7 +378,7 @@ export function EmpresaTab() {
                 className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
               />
             </div>
-            <div className="col-span-2">
+            <div className="md:col-span-2 col-span-1">
               <label className="block text-sm font-medium text-primary-text">
                 Complemento
               </label>

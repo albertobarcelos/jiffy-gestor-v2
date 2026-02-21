@@ -214,11 +214,13 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
   if (isLoadingData) {
     return (
       <div className="flex items-center justify-center h-screen bg-info">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-primary-text font-nunito">
-            Carregando dados do grupo...
-          </p>
+        <div className="text-center flex flex-col items-center gap-2">
+          <img
+            src="/images/jiffy-loading.gif"
+            alt="Carregando"
+            className="w-20 object-contain"
+          />
+          <p className="text-primary-text font-nunito">Carregando dados do grupo...</p>
         </div>
       </div>
     )
@@ -227,21 +229,21 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
   return (
     <div className="flex flex-col h-screen bg-info">
       {/* Header */}
-      <div className="h-20 bg-info px-[35px] flex items-center justify-between">
-        <h1 className="text-primary text-xl font-exo font-semibold">
+      <div className="h-20 bg-info md:px-[35px] px-2 flex items-center justify-between">
+        <h1 className="text-primary md:text-xl text-sm font-exo font-semibold">
           {isEditMode ? 'Editar Grupo de Produtos' : 'Novo Grupo de Produtos'}
         </h1>
-        <div className="flex items-center gap-2">
+        <div className="flex px-1 items-center gap-2">
           <button
             onClick={handleCancel}
-            className="px-6 h-8 bg-primary-bg text-primary-text rounded-lg font-nunito text-sm hover:bg-primary-bg/80 transition-colors"
+            className="px-6 h-8 bg-primary-bg text-primary-text rounded-lg font-nunito md:text-sm text-xs hover:bg-primary-bg/80 transition-colors"
           >
             Cancelar
           </button>
           <button
             onClick={handleSave}
             disabled={isLoading}
-            className="px-6 h-8 bg-primary text-info rounded-lg font-nunito text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 h-8 bg-primary text-info rounded-lg font-nunito md:text-sm text-xs font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? 'Salvando...' : 'Salvar'}
           </button>
@@ -252,10 +254,10 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
       <div className="flex-1 bg-primary-bg rounded-tl-lg overflow-y-auto">
         {/* Tabs */}
         <div className="border-b border-primary/20">
-          <div className="flex px-8">
+          <div className="flex md:px-8 px-2">
             <button
               onClick={() => setActiveTab(0)}
-              className={`px-6 py-2 font-nunito text-sm transition-colors ${
+              className={`md:px-6 py-2 font-nunito md:text-sm text-xs transition-colors ${
                 activeTab === 0
                   ? 'text-primary border-b-2 border-primary font-semibold'
                   : 'text-secondary-text'
@@ -265,7 +267,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
             </button>
             <button
               onClick={() => setActiveTab(1)}
-              className={`px-6 py-2 font-nunito text-sm transition-colors ${
+              className={`px-6 py-2 font-nunito md:text-sm text-xs transition-colors ${
                 activeTab === 1
                   ? 'text-primary border-b-2 border-primary font-semibold'
                   : 'text-secondary-text'
@@ -281,13 +283,13 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
           {activeTab === 0 && (
             <div className="max-w-4xl">
               {/* Card de informações */}
-              <div className="bg-info rounded-t-lg rounded-b-lg mt-2 mx-2">
+              <div className="bg-info rounded-t-lg rounded-b-lg mt-2 md:mx-2 mx-1">
                 {/* Header do card */}
-                <div className="px-5 py-4 border-b border-primary/10">
+                <div className="md:px-5 px-2 py-4 border-b border-primary/10">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div
-                        className="w-12 h-12 rounded-lg bg-white border-2 flex items-center justify-center"
+                        className="md:w-12 md:h-12 w-10 h-10 rounded-lg bg-white border-2 flex items-center justify-center"
                         style={{ borderColor: corHex || '#000000' }}
                       >
                         {iconName ? (
@@ -297,16 +299,16 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
                         )}
                       </div>
                       <div>
-                        <h2 className="text-primary-text text-lg font-nunito font-semibold">
+                        <h2 className="text-primary-text md:text-lg text-sm font-nunito font-semibold">
                           {nome.trim() ? nome : 'Nome do Grupo'}
                         </h2>
-                        <p className="text-secondary-text text-sm font-nunito">
+                        <p className="text-secondary-text md:text-sm text-xs font-nunito">
                           {iconName ? `Ícone selecionado: ${iconName}` : 'Definição do Ícone do Grupo'}
                         </p>
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-2">
-                      <p className="text-primary-text text-sm font-nunito">
+                      <p className="text-primary-text md:text-sm text-xs font-nunito">
                         {ativo ? 'Grupo ativo' : 'Grupo inativo'}
                       </p>
                       <label className="relative inline-flex items-center cursor-pointer">
@@ -323,8 +325,8 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
                 </div>
 
                 {/* Formulário */}
-                <div className="p-5">
-                  <div className="space-y-6">
+                <div className="md:p-5 p-2">
+                  <div className="md:space-y-6 space-y-4">
                     {/* Nome */}
                     <div>
                       <label className="block text-primary-text text-sm font-nunito font-semibold mb-2">
@@ -341,18 +343,18 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
                     </div>
 
                     {/* Cor e Ícone */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-2">
                       {/* Cor */}
                       <div>
-                        <label className="block text-primary-text text-sm font-nunito font-semibold mb-2">
+                        <label className="block text-primary-text md:text-sm text-xs font-nunito font-semibold mb-2">
                           Cor do Grupo
                         </label>
                         <div className="flex flex-col gap-2">
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2">
                             <button
                               type="button"
                               onClick={() => setIsColorPickerOpen(true)}
-                              className="w-12 h-12 rounded-lg border border-primary/20 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                              className="md:w-12 md:h-12 w-10 h-10 rounded-lg border border-primary/20 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                               style={{ backgroundColor: corHex || '#530CA3' }}
                               aria-label="Selecionar cor do grupo"
                             />
@@ -360,7 +362,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
                             <button
                               type="button"
                               onClick={() => setIsColorPickerOpen(true)}
-                              className="px-2 py-3 bg-primary text-info rounded-lg font-nunito text-sm font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
+                              className="px-2 py-3 bg-primary text-info rounded-lg font-nunito md:text-sm text-xs font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
                             >
                               Escolher cor
                             </button>
@@ -371,14 +373,14 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
 
                       {/* Ícone */}
                       <div>
-                        <label className="block text-primary-text text-sm font-nunito font-semibold mb-2">
+                        <label className="block text-primary-text md:text-sm text-xs font-nunito font-semibold mb-2">
                           Ícone do Grupo
                         </label>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           <button
                             type="button"
                             onClick={() => setIsIconPickerOpen(true)}
-                            className="w-12 h-12 rounded-lg border border-primary/30 bg-white flex items-center justify-center hover:shadow-lg transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                            className="md:w-12 md:h-12 w-10 h-10 rounded-lg border border-primary/30 bg-white flex items-center justify-center hover:shadow-lg transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                             aria-label="Selecionar ícone"
                           >
                             {iconName ? (
@@ -390,7 +392,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
                           <button
                             type="button"
                             onClick={() => setIsIconPickerOpen(true)}
-                            className="px-2 py-3 bg-primary text-info rounded-lg font-nunito text-sm font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
+                            className="px-2 py-3 bg-primary text-info rounded-lg font-nunito md:text-sm text-xs font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
                           >
                             Escolher Ícone
                           </button>
@@ -400,7 +402,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
 
                     {/* Preview do ícone */}
                     <div>
-                      <label className="block text-primary-text text-sm font-nunito font-semibold mb-2">
+                      <label className="block text-primary-text md:text-sm text-xs font-nunito font-semibold mb-2">
                         Preview do Ícone
                       </label>
                       <div className="flex items-center gap-4">
@@ -447,9 +449,9 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
                     </div>
 
                     {/* Ativo Delivery e Local */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="flex items-center gap-3 cursor-pointer">
+                        <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={ativoDelivery}
@@ -457,13 +459,13 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
                             className="w-5 h-5 rounded border-primary/60 text-primary focus:ring-primary"
                             style={{ accentColor: 'var(--color-primary)' }}
                           />
-                          <span className="text-primary-text text-sm font-nunito">
+                          <span className="text-primary-text md:text-sm text-xs font-nunito">
                             Ativo para Delivery
                           </span>
                         </label>
                       </div>
                       <div>
-                        <label className="flex items-center gap-3 cursor-pointer">
+                        <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={ativoLocal}
@@ -471,7 +473,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
                             className="w-5 h-5 rounded border-primary/60 text-primary focus:ring-primary"
                             style={{ accentColor: 'var(--color-primary)' }}
                           />
-                          <span className="text-primary-text text-sm font-nunito">
+                          <span className="text-primary-text md:text-sm text-xs font-nunito">
                             Ativo para Local
                           </span>
                         </label>

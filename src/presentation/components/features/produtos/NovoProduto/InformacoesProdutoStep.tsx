@@ -76,7 +76,7 @@ export function InformacoesProdutoStep({
   }
 
   return (
-    <div className="rounded-[24px] border border-[#E5E7F2] bg-white p-4 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
+    <div className="rounded-[24px] border border-[#E5E7F2] bg-white md:p-4 p-1 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
       {/* Título */}
       <div className="flex flex-col gap-2 mb-1">
         <div className="flex items-center justify-between flex-wrap gap-2">
@@ -99,6 +99,7 @@ export function InformacoesProdutoStep({
           </label>
           <Input
             type="text"
+            size="small"
             value={nomeProduto}
             onChange={(e) => onNomeProdutoChange(e.target.value)}
             placeholder="Digite o nome que aparecerá no PDV"
@@ -116,17 +117,17 @@ export function InformacoesProdutoStep({
             <select
               value={unidadeProduto || ''}
               onChange={(e) => onUnidadeProdutoChange(e.target.value || null)}
-              className="w-full h-14 px-4 rounded-lg border border-[#CBD0E3] bg-white text-primary-text focus:outline-none focus:border-primary-text hover:border-primary-text focus:border-2 font-nunito text-sm"
+              className="w-full h-14 md:px-4 px-1.5 rounded-lg border border-[#CBD0E3] bg-white text-primary-text focus:outline-none focus:border-primary-text hover:border-primary-text focus:border-2 font-nunito md:text-sm text-xs"
             >
-              <option value="">Escolha a unidade de venda do Produto</option>
-              <option value="UN">Unidade</option>
+              <option value="">Escolha a unidade do Produto</option>
+              <option value="UN">Unitário</option>
               <option value="KG">Kg</option>
               <option value="LT">Litro</option>
             </select>
           </div>
 
           {/* Grupo */}
-          <div className="flex-1">
+          <div className="flex-1 min-w-full">
             <label className="block text-sm font-semibold font-nunito mb-2 text-primary-text">
               Grupo
             </label>
@@ -138,9 +139,9 @@ export function InformacoesProdutoStep({
               <select
                 value={grupoProduto || ''}
                 onChange={(e) => onGrupoProdutoChange(e.target.value || null)}
-                className="w-full h-14 px-4 rounded-lg border border-[#CBD0E3] bg-white text-primary-text focus:outline-none focus:border-primary-text hover:border-primary-text focus:border-2 font-nunito text-sm"
+                className="w-full h-14 md:px-4 px-1.5 rounded-lg border border-[#CBD0E3] bg-white text-primary-text focus:outline-none focus:border-primary-text hover:border-primary-text focus:border-2 font-nunito md:text-sm text-xs"
               >
-                <option value="">Selecione o grupo do Produto</option>
+                <option value="">Selecione o grupo</option>
                 {grupos.map((grupo) => {
                   const id = getGrupoId(grupo)
                   const nome = getGrupoNome(grupo)

@@ -111,8 +111,13 @@ export function VisualizarCliente({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="flex flex-col items-center justify-center h-full gap-2">
+        <img
+          src="/images/jiffy-loading.gif"
+          alt="Carregando..."
+          className="w-20 h-20"
+        />
+        <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
       </div>
     )
   }
@@ -130,7 +135,7 @@ export function VisualizarCliente({
   return (
     <div className="flex flex-col h-full bg-primary-bg">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-primary-bg px-[30px] py-2 border-b-2 border-primary/70">
+      <div className="sticky top-0 z-10 bg-primary-bg md:px-[30px] px-1 py-2 border-b-2 border-primary/70">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
           <div
@@ -176,11 +181,11 @@ export function VisualizarCliente({
       </div>
 
       {/* Conteúdo */}
-      <div className="flex-1 overflow-y-auto px-[30px] py-2">
+      <div className="flex-1 overflow-y-auto md:px-[30px] px-1 py-2">
         {/* Grid com duas colunas: Dados e Endereço */}
-        <div className="grid grid-cols-2 gap-2 mb-6">
+        <div className="grid md:grid-cols-2 grid-cols-1 gap-2 mb-6">
           {/* Seção Dados (Esquerda) */}
-          <div className="bg-white rounded-lg px-6 py-2 shadow-sm">
+          <div className="bg-white rounded-lg md:px-6 px-2 py-2 shadow-sm">
             <h2 className="text-primary text-lg font-semibold font-nunito mb-3 pb-2 border-b-2 border-primary">
               Dados Pessoais
             </h2>
@@ -240,7 +245,7 @@ export function VisualizarCliente({
           </div>
 
           {/* Seção Endereço (Direita) */}
-          <div className="bg-white rounded-lg px-6 py-2 shadow-sm">
+          <div className="bg-white rounded-lg md:px-6 px-2 py-2 shadow-sm">
             <h2 className="text-primary text-lg font-semibold font-nunito mb-3 pb-2 border-b-2 border-primary">
               Endereço
             </h2>

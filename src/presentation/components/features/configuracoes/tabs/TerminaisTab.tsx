@@ -16,6 +16,12 @@ interface TerminalData {
   rawData: any // Dados brutos da API para campos extras
 }
 
+interface TerminalPreferenceData {
+  compartilharMesas: boolean
+  impressoraFinalizacaoNome: string
+  impressoraFinalizacaoId?: string
+}
+
 export function TerminaisTab() {
   const { auth } = useAuthStore()
   const [terminais, setTerminais] = useState<TerminalData[]>([])
@@ -23,6 +29,11 @@ export function TerminaisTab() {
   const [searchQuery, setSearchQuery] = useState('')
   const [totalItems, setTotalItems] = useState(0)
   const [togglingStatus, setTogglingStatus] = useState<Record<string, boolean>>({})
+  const [preferencesMap, setPreferencesMap] = useState<Record<string, TerminalPreferenceData>>({})
+  const [updatingShare, setUpdatingShare] = useState<Record<string, boolean>>({})
+  const [updatingPrinter, setUpdatingPrinter] = useState<Record<string, boolean>>({})
+  const [impressoras, setImpressoras] = useState<Array<{ id: string; nome: string }>>([])
+  const [loadingImpressoras, setLoadingImpressoras] = useState(false)
   const [tabsModalState, setTabsModalState] = useState<TerminaisTabsModalState>({
     open: false,
     tab: 'terminal',
@@ -45,6 +56,7 @@ export function TerminaisTab() {
     async () => {
       const token = auth?.getAccessToken()
       if (!token) {
+        setIsLoading(false)
         return
       }
 
@@ -55,6 +67,7 @@ export function TerminaisTab() {
         let currentOffset = 0
         let hasMore = true
         let totalCount = 0
+        let firstRequest = true
 
         // Loop para carregar todas as páginas
         while (hasMore) {
@@ -87,6 +100,12 @@ export function TerminaisTab() {
             console.log('Resposta da API de terminais:', data)
           }
 
+          // Atualiza o total apenas na primeira requisição
+          if (firstRequest) {
+            totalCount = data.count || data.total || allTerminais.length || 0
+            firstRequest = false
+          }
+
           // Filtrar e mapear apenas itens válidos, mantendo dados brutos
           const newTerminais = (data.items || [])
             .map((t: any) => {
@@ -105,19 +124,83 @@ export function TerminaisTab() {
 
           allTerminais.push(...newTerminais)
 
-          // Atualiza o total apenas na primeira requisição
-          if (currentOffset === 0) {
-            totalCount = data.count || data.total || 0
-          }
-
           // Verifica se há mais páginas
           // Se retornou menos de 10 itens, não há mais páginas
           hasMore = newTerminais.length === 10
           currentOffset += newTerminais.length
+
+          // Proteção contra loop infinito: se não retornou nenhum item e já fez pelo menos uma requisição, para
+          if (newTerminais.length === 0 && !firstRequest) {
+            hasMore = false
+          }
         }
 
         setTerminais(allTerminais)
         setTotalItems(totalCount)
+
+        // Buscar preferências (compartilhar mesas e impressora) para cada terminal
+        try {
+          const prefsEntries = await Promise.all(
+            allTerminais.map(async (item) => {
+              try {
+                const resp = await fetch(`/api/preferencias-terminal/${item.terminal.getId()}`, {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                })
+
+                if (!resp.ok) {
+                  return null
+                }
+
+                const data = await resp.json()
+                const impressoraId =
+                  data.impressoraFinalizacaoId ||
+                  data.impressoraFinalizacao?.id ||
+                  data.impressoraFinalizacao?.impressoraId ||
+                  data.impressoraFinalizacao?.impressora?.id
+                const impressoraNome =
+                  data.impressoraFinalizacao?.name ||
+                  data.impressoraFinalizacao?.nome ||
+                  data.impressoraFinalizacaoNome ||
+                  data.impressoraFinalizacao?.impressora?.nome ||
+                  data.impressoraFinalizacao?.impressora?.name ||
+                  'Nenhuma'
+                return {
+                  terminalId: item.terminal.getId(),
+                  compartilharMesas: !!data.compartilharMesas,
+                  impressoraFinalizacaoNome: impressoraNome,
+                  impressoraFinalizacaoId: impressoraId,
+                }
+              } catch {
+                return null
+              }
+            })
+          )
+
+          const prefsMap = prefsEntries
+            .filter(
+              (p): p is {
+                terminalId: string
+                compartilharMesas: boolean
+                impressoraFinalizacaoNome: string
+                impressoraFinalizacaoId: string | undefined
+              } => !!p
+            )
+            .reduce<Record<string, TerminalPreferenceData>>((acc, curr) => {
+              acc[curr.terminalId] = {
+                compartilharMesas: curr.compartilharMesas,
+                impressoraFinalizacaoNome: curr.impressoraFinalizacaoNome,
+                impressoraFinalizacaoId: curr.impressoraFinalizacaoId,
+              }
+              return acc
+            }, {})
+
+          setPreferencesMap(prefsMap)
+        } catch (error) {
+          console.warn('Não foi possível carregar preferências dos terminais', error)
+        }
       } catch (error) {
         console.error('Erro ao carregar terminais:', error)
       } finally {
@@ -126,6 +209,55 @@ export function TerminaisTab() {
     },
     [auth]
   )
+
+  const loadAllImpressoras = useCallback(async () => {
+    const token = auth?.getAccessToken()
+    if (!token) return
+
+    setLoadingImpressoras(true)
+    try {
+      const all: Array<{ id: string; nome: string }> = []
+      let currentOffset = 0
+      let hasMore = true
+      const limit = 50
+
+      while (hasMore) {
+        const params = new URLSearchParams({
+          limit: limit.toString(),
+          offset: currentOffset.toString(),
+        })
+
+        const resp = await fetch(`/api/impressoras?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (!resp.ok) {
+          const errorData = await resp.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Erro ao buscar impressoras')
+        }
+
+        const data = await resp.json()
+        const list = (data.items || []).map((i: any) => ({
+          id: i.id,
+          nome: i.nome || 'Sem nome',
+        }))
+        all.push(...list)
+
+        hasMore = list.length === limit
+        currentOffset += list.length
+      }
+
+      setImpressoras(all)
+    } catch (error) {
+      console.error('Erro ao carregar impressoras:', error)
+      showToast.error('Erro ao carregar impressoras')
+    } finally {
+      setLoadingImpressoras(false)
+    }
+  }, [auth])
 
   // Debounce para busca
   useEffect(() => {
@@ -217,22 +349,190 @@ export function TerminaisTab() {
     [auth, terminais, loadAllTerminais]
   )
 
+  const handleToggleCompartilhar = useCallback(
+    async (terminalId: string, novoValor: boolean) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      setUpdatingShare((prev) => ({ ...prev, [terminalId]: true }))
+      setPreferencesMap((prev) => ({
+        ...prev,
+        [terminalId]: {
+          compartilharMesas: novoValor,
+          impressoraFinalizacaoNome: prev[terminalId]?.impressoraFinalizacaoNome || 'Nenhuma',
+          impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId, // Preserva o ID da impressora
+        },
+      }))
+
+      try {
+        const response = await fetch(`/api/preferencias-terminal`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            terminaisId: terminalId,
+            fields: {
+              compartilharMesas: novoValor,
+            },
+          }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Erro ao atualizar preferências')
+        }
+
+        // Busca as preferências atualizadas do backend para garantir sincronização
+        try {
+          const prefsResponse = await fetch(`/api/preferencias-terminal/${terminalId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          })
+
+          if (prefsResponse.ok) {
+            const prefsData = await prefsResponse.json()
+            const impressoraId =
+              prefsData.impressoraFinalizacaoId ||
+              prefsData.impressoraFinalizacao?.id ||
+              prefsData.impressoraFinalizacao?.impressoraId ||
+              prefsData.impressoraFinalizacao?.impressora?.id
+            const impressoraNome =
+              prefsData.impressoraFinalizacao?.name ||
+              prefsData.impressoraFinalizacao?.nome ||
+              prefsData.impressoraFinalizacaoNome ||
+              prefsData.impressoraFinalizacao?.impressora?.nome ||
+              prefsData.impressoraFinalizacao?.impressora?.name ||
+              'Nenhuma'
+
+            // Atualiza o estado com os dados confirmados do backend
+            setPreferencesMap((prev) => ({
+              ...prev,
+              [terminalId]: {
+                compartilharMesas: !!prefsData.compartilharMesas,
+                impressoraFinalizacaoNome: impressoraNome,
+                impressoraFinalizacaoId: impressoraId,
+              },
+            }))
+          }
+        } catch (prefsError) {
+          console.warn('Erro ao buscar preferências atualizadas:', prefsError)
+          // Mesmo com erro ao buscar, mantém a atualização otimista já que a API confirmou sucesso
+        }
+
+        showToast.success('Preferência de compartilhamento atualizada!')
+      } catch (error: any) {
+        console.error('Erro ao atualizar compartilhamento:', error)
+        showToast.error(error.message || 'Erro ao atualizar compartilhamento')
+        setPreferencesMap((prev) => ({
+          ...prev,
+          [terminalId]: {
+            compartilharMesas: !novoValor,
+            impressoraFinalizacaoNome: prev[terminalId]?.impressoraFinalizacaoNome || 'Nenhuma',
+            impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId, // Preserva o ID da impressora
+          },
+        }))
+      } finally {
+        setUpdatingShare((prev) => {
+          const { [terminalId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [auth]
+  )
+
+  const handleChangeImpressora = useCallback(
+    async (terminalId: string, impressoraId: string) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      setUpdatingPrinter((prev) => ({ ...prev, [terminalId]: true }))
+
+      const impressoraNome =
+        impressoras.find((i) => i.id === impressoraId)?.nome || 'Nenhuma'
+
+      setPreferencesMap((prev) => ({
+        ...prev,
+        [terminalId]: {
+          compartilharMesas: prev[terminalId]?.compartilharMesas ?? false,
+          impressoraFinalizacaoNome: impressoraNome,
+          impressoraFinalizacaoId: impressoraId || undefined,
+        },
+      }))
+
+      try {
+        const response = await fetch(`/api/preferencias-terminal`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            terminaisId: terminalId,
+            fields: {
+              impressoraFinalizacaoId: impressoraId || null,
+            },
+          }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Erro ao atualizar impressora de finalização')
+        }
+
+        showToast.success('Impressora de finalização atualizada!')
+      } catch (error: any) {
+        console.error('Erro ao atualizar impressora de finalização:', error)
+        showToast.error(error.message || 'Erro ao atualizar impressora de finalização')
+
+        // Reverte para o valor anterior
+        setPreferencesMap((prev) => ({
+          ...prev,
+          [terminalId]: {
+            compartilharMesas: prev[terminalId]?.compartilharMesas ?? false,
+            impressoraFinalizacaoNome:
+              impressoras.find((i) => i.id === prev[terminalId]?.impressoraFinalizacaoId)?.nome ||
+              'Nenhuma',
+            impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId,
+          },
+        }))
+      } finally {
+        setUpdatingPrinter((prev) => {
+          const { [terminalId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [auth, impressoras]
+  )
+
   // Carrega dados iniciais
   useEffect(() => {
     loadAllTerminais()
+    loadAllImpressoras()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header fixo */}
-      <div className="px-4 flex-shrink-0">
+      <div className="md:px-4 px-1 flex-shrink-0">
         <div className="flex items-center justify-between border-b-2 border-primary/70 pb-2">
           <div className="flex flex-col">
-            <span className="text-primary text-2xl font-semibold font-exo">
+            <span className="text-primary text-lg md:text-xl font-semibold font-exo">
               Terminais Cadastrados
             </span>
-            <span className="text-tertiary text-[20px] font-medium font-nunito">
+            <span className="text-tertiary text-sm md:text-[20px] font-medium font-nunito">
               Total {terminais.length} de {totalItems}
             </span>
           </div>
@@ -241,7 +541,7 @@ export function TerminaisTab() {
       </div>
 
       {/* Busca fixa */}
-      <div className="flex gap-3 px-[20px] pb-2 flex-shrink-0">
+      <div className="flex gap-3 md:px-[20px] px-1 pb-2 flex-shrink-0">
         <div className="flex-1 min-w-[180px] max-w-[360px]">
           <label
             htmlFor="terminais-search"
@@ -267,31 +567,43 @@ export function TerminaisTab() {
       </div>
 
       {/* Lista de terminais com scroll */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-[20px] scrollbar-hide">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden md:px-[20px] px-1 scrollbar-hide">
         {/* Barra de títulos das colunas - sticky dentro do scroll */}
         {terminais.length > 0 && (
           <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px] sticky top-0 z-10 mb-2">
-            <div className="flex-[2] font-nunito font-semibold text-xs text-primary-text uppercase">
+            <div className="flex-[2] font-nunito font-semibold text-xs text-primary-text uppercase hidden md:block">
               Código do Terminal
             </div>
-            <div className="flex-[2] font-nunito font-semibold text-xs text-primary-text uppercase">
+            <div className="flex-[2] font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Nome do Terminal
             </div>
-            <div className="flex-[2] font-nunito font-semibold text-xs text-primary-text uppercase">
+            <div className="flex-[2] font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Modelo Dispositivo
             </div>
-            <div className="flex-[1.5] font-nunito font-semibold text-xs text-primary-text uppercase">
+            <div className="flex-[1.5] font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Versão APK
             </div>
-            <div className="flex-[1.5] text-center font-nunito font-semibold text-xs text-primary-text uppercase">
+            <div className="flex-[2] font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase hidden md:flex">
+              Imp. Finalização
+            </div>
+            <div className="flex-[1.5] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
+              Comp. Mesas
+            </div>
+            <div className="md:flex-[1.5] flex-[1] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Status
             </div>
           </div>
         )}
 
         {terminais.length === 0 && !isLoading && (
-          <div className="flex items-center justify-center py-12">
-            <p className="text-secondary-text">Nenhum terminal encontrado.</p>
+          <div className="flex flex-col items-center justify-center py-12">
+            <MdPhone className="text-secondary-text mb-4" size={48} />
+            <p className="text-primary-text font-semibold text-lg mb-2">
+              Nenhum terminal cadastrado
+            </p>
+            <p className="text-secondary-text text-sm text-center max-w-md">
+              Não há terminais cadastrados no sistema. Cadastre um terminal para começar a utilizá-lo.
+            </p>
           </div>
         )}
 
@@ -304,6 +616,9 @@ export function TerminaisTab() {
           // Status: bloqueado = false significa ATIVO, bloqueado = true significa BLOQUEADO/INATIVO
           const bloqueado = rawData?.bloqueado ?? terminal.getBloqueado()
           const ativo = !bloqueado
+          const prefs = preferencesMap[terminal.getId()]
+          const compartilhamentoAtivo = prefs?.compartilharMesas ?? false
+          const impressoraFinalizacaoNome = prefs?.impressoraFinalizacaoNome ?? '—'
 
           return (
               <div
@@ -318,29 +633,76 @@ export function TerminaisTab() {
               }
               className=" px-4 py-2 flex items-center gap-[10px] bg-info rounded-lg my-2 shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-colors cursor-pointer"
             >
-              <div className="flex-[2] flex items-center gap-3">
+              <div className="flex-[2] hidden md:flex items-center gap-3">
                 
                 <span className="text-sm font-medium text-primary-text font-nunito">
                  # {codigo}
                 </span>
               </div>
-              <div className="flex-[2] flex items-center gap-1 text-sm text-primary-text font-nunito">
+              <div className="flex-[2] flex items-center gap-1 md:text-sm text-[10px] text-primary-text font-nunito">
                 {nome}
               </div>
-              <div className="flex-[2] text-sm text-secondary-text font-nunito">
+              <div className="flex-[2] md:text-sm text-[10px] text-secondary-text font-nunito">
                 {modelo}
               </div>
-              <div className="flex-[1.5] text-sm text-secondary-text font-nunito">
+              <div className="flex-[1.5] md:text-sm text-[10px] text-secondary-text font-nunito">
                 {versao}
               </div>
-              <div className="flex-[1.5] flex justify-center">
+              <div className="flex-[2] md:text-sm text-[10px] text-secondary-text font-nunito hidden md:flex">
+                {preferencesMap[terminal.getId()] ? (
+                  <select
+                    value={preferencesMap[terminal.getId()]?.impressoraFinalizacaoId ?? ''}
+                    onChange={(event) => {
+                      event.stopPropagation()
+                      handleChangeImpressora(terminal.getId(), event.target.value)
+                    }}
+                    onClick={(event) => event.stopPropagation()}
+                    disabled={updatingPrinter[terminal.getId()] || loadingImpressoras}
+                    className="w-full max-w-[220px] h-8 rounded-lg border border-gray-200 bg-white md:text-sm text-xs text-primary-text px-2 focus:outline-none focus:border-primary"
+                  >
+                    <option value="">Nenhuma</option>
+                    {impressoras.map((imp) => (
+                      <option key={imp.id} value={imp.id}>
+                        {imp.nome}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="md:text-xs text-[10px] text-secondary-text">Carregando...</div>
+                )}
+              </div>
+              <div className="flex-[1.5] flex justify-center" onClick={(e) => e.stopPropagation()}>
                 <label
-                  className={`relative inline-flex h-5 w-12 items-center ${
+                  className={`relative inline-flex h-4 w-10 md:h-5 md:w-12 items-center ${
+                    updatingShare[terminal.getId()] ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+                  }`}
+                  title={compartilhamentoAtivo ? 'Compartilhamento habilitado' : 'Compartilhamento desabilitado'}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={compartilhamentoAtivo}
+                    onChange={(event) => {
+                      event.stopPropagation();
+                      handleToggleCompartilhar(terminal.getId(), event.target.checked)
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    disabled={!!updatingShare[terminal.getId()]}
+                  />
+                  <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
+                  <span className="absolute left-[2px] top-1/2 block h-[14px] w-[14px] md:h-4 md:w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[18px] md:peer-checked:translate-x-[28px]" />
+                </label>
+              </div>
+              <div className="md:flex-[1.5] flex-[1] flex justify-center" onClick={(e) => e.stopPropagation()}>
+                <label
+                  className={`relative inline-flex h-4 w-10 md:h-5 md:w-12 items-center ${
                     togglingStatus[terminal.getId()]
                       ? 'cursor-not-allowed opacity-60'
                       : 'cursor-pointer'
                   }`}
                   title={ativo ? 'Terminal Ativo' : 'Terminal Bloqueado'}
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <input
                     type="checkbox"
@@ -350,10 +712,11 @@ export function TerminaisTab() {
                       event.stopPropagation();
                       handleToggleTerminalStatus(terminal.getId(), !event.target.checked)
                     }}
+                    onClick={(e) => e.stopPropagation()}
                     disabled={!!togglingStatus[terminal.getId()]}
                   />
                   <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                  <span className="absolute left-[2px] top-1/2 block h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[28px]" />
+                  <span className="absolute left-[2px] top-1/2 block h-[14px] w-[14px] md:h-4 md:w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[18px] md:peer-checked:translate-x-[28px]" />
                 </label>
               </div>
             </div>
@@ -361,8 +724,13 @@ export function TerminaisTab() {
         })} 
 
         {isLoading && (
-          <div className="flex justify-center py-8">
-            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="flex flex-col items-center justify-center py-8">
+            <img
+              src="/images/jiffy-loading.gif"
+              alt="Carregando"
+              className="w-20 object-contain"
+            />
+            <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
           </div>
         )}
       </div>
