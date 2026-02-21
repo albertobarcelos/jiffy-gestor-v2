@@ -471,16 +471,60 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
 
           {/* Produtos - Seleção por Grupos */}
           <div className="space-y-4">
-            <Label>Produtos</Label>
+            <div className="flex items-center justify-between">
+              <Label>Produtos</Label>
+              {grupoSelecionadoId && (
+                <Button
+                  variant="outlined"
+                  size="sm"
+                  onClick={() => setGrupoSelecionadoId(null)}
+                  type="button"
+                >
+                  Voltar
+                </Button>
+              )}
+            </div>
             
-            {/* Lista Horizontal de Grupos */}
+            {/* Grid ou Lista Horizontal de Grupos */}
             <div className="space-y-2">
               <Label className="text-sm text-gray-600">Selecione um grupo:</Label>
               {isLoadingGrupos ? (
                 <div className="text-center py-4 text-gray-500">Carregando grupos...</div>
               ) : grupos.length === 0 ? (
                 <div className="text-center py-4 text-gray-500">Nenhum grupo encontrado</div>
+              ) : !grupoSelecionadoId ? (
+                // Grid de Grupos (quando nenhum grupo está selecionado)
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                  {grupos.map(grupo => {
+                    const corHex = grupo.getCorHex()
+                    const iconName = grupo.getIconName()
+                    return (
+                      <button
+                        key={grupo.getId()}
+                        onClick={() => setGrupoSelecionadoId(grupo.getId())}
+                        className="aspect-square p-4 border-2 rounded-lg transition-all flex flex-col items-center justify-center text-center gap-2 hover:opacity-80"
+                        style={{
+                          borderColor: corHex,
+                          backgroundColor: `${corHex}15`,
+                        }}
+                      >
+                        <div 
+                          className="w-[45px] h-[45px] bg-info rounded-lg border-2 flex items-center justify-center"
+                          style={{
+                            borderColor: corHex,
+                          }}
+                        >
+                          <DinamicIcon iconName={iconName} color={corHex} size={24} />
+                        </div>
+                        <div className="font-medium text-sm text-gray-900 break-words">
+                          {grupo.getNome()}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
               ) : (
+                // Lista Horizontal de Grupos (quando um grupo está selecionado)
                 <div 
                   ref={gruposScrollRef}
                   className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin cursor-grab active:cursor-grabbing select-none" 
