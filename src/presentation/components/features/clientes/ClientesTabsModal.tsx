@@ -44,6 +44,7 @@ export function ClientesTabsModal({
       maxWidth="xl"
       sx={{
         '& .MuiDialog-container': {
+          zIndex: 1500,
           justifyContent: {
             xs: 'center', // Centraliza em mobile
             md: 'flex-end', // Alinha à direita em desktop
@@ -51,6 +52,8 @@ export function ClientesTabsModal({
           alignItems: 'stretch',
           margin: 0,
         },
+        '& .MuiBackdrop-root': { zIndex: 1500 },
+        '& .MuiDialog-paper': { zIndex: 1500 },
       }}
       PaperProps={{
         sx: {

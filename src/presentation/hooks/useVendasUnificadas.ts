@@ -31,11 +31,6 @@ export class VendaUnificadaDTO {
             id: string;
             nome: string;
         },
-        public readonly cliente?: {
-            id: string;
-            nome: string;
-            cpfCnpj?: string;
-        },
         public readonly numeroFiscal?: number | null,
         public readonly serieFiscal?: string | null,
         public readonly dataEmissaoFiscal?: string | null,

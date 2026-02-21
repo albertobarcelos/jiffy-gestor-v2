@@ -1,22 +1,24 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useCallback } from 'react'
 import { Dialog, DialogContent, DialogTitle, DialogFooter } from '@/src/presentation/components/ui/dialog'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Label } from '@/src/presentation/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/presentation/components/ui/select'
 import { Input } from '@/src/presentation/components/ui/input'
 import { useQuery } from '@tanstack/react-query'
-import { useClientes } from '@/src/presentation/hooks/useClientes'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
 import { Produto } from '@/src/domain/entities/Produto'
+import { Cliente } from '@/src/domain/entities/Cliente'
 import { useCreateVendaGestor } from '@/src/presentation/hooks/useVendas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { extractTokenInfo } from '@/src/shared/utils/validateToken'
-import { MdAdd, MdDelete } from 'react-icons/md'
+import { MdAdd, MdDelete, MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
+import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
+import { SeletorClienteModal } from './SeletorClienteModal'
 
 interface NovoPedidoModalProps {
   open: boolean
@@ -46,18 +48,19 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
   const [origem, setOrigem] = useState<OrigemVenda>('GESTOR')
   const [status, setStatus] = useState<StatusVenda>('FINALIZADA')
   const [clienteId, setClienteId] = useState<string>('')
+  const [clienteNome, setClienteNome] = useState<string>('')
   const [produtos, setProdutos] = useState<ProdutoSelecionado[]>([])
   const [pagamentos, setPagamentos] = useState<PagamentoSelecionado[]>([])
   const [meioPagamentoId, setMeioPagamentoId] = useState<string>('')
-  const [buscaCliente, setBuscaCliente] = useState<string>('')
   const [grupoSelecionadoId, setGrupoSelecionadoId] = useState<string | null>(null)
-
-  // Buscar clientes
-  const { data: clientesData, isLoading: isLoadingClientes } = useClientes({
-    q: buscaCliente,
-    limit: 50,
-    ativo: true,
-  })
+  const [seletorClienteOpen, setSeletorClienteOpen] = useState(false)
+  
+  // Estados para arrastar a lista horizontal
+  const gruposScrollRef = useRef<HTMLDivElement>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const [startX, setStartX] = useState(0)
+  const [scrollLeft, setScrollLeft] = useState(0)
+  const hasMovedRef = useRef(false) // Rastreia se houve movimento significativo durante o arraste
 
   // Buscar grupos de produtos
   const { data: gruposData, isLoading: isLoadingGrupos } = useGruposProdutos({
@@ -110,7 +113,64 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     ativo: true,
   })
 
-  const clientes = clientesData?.clientes || []
+  // Handler para seleção de cliente
+  const handleSelectCliente = (cliente: Cliente) => {
+    setClienteId(cliente.getId())
+    setClienteNome(cliente.getNome())
+  }
+
+  const handleRemoveCliente = () => {
+    setClienteId('')
+    setClienteNome('')
+  }
+
+  // Handlers para arrastar a lista horizontal de grupos
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!gruposScrollRef.current) return
+    hasMovedRef.current = false // Reset flag de movimento
+    setIsDragging(true)
+    setStartX(e.pageX - gruposScrollRef.current.offsetLeft)
+    setScrollLeft(gruposScrollRef.current.scrollLeft)
+    gruposScrollRef.current.style.cursor = 'grabbing'
+    gruposScrollRef.current.style.userSelect = 'none'
+  }, [])
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDragging || !gruposScrollRef.current) return
+    
+    const x = e.pageX - gruposScrollRef.current.offsetLeft
+    const walk = (x - startX) * 2 // Velocidade do scroll (ajustável)
+    
+    // Verificar se houve movimento significativo (mais de 5px)
+    if (Math.abs(walk) > 5) {
+      hasMovedRef.current = true
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    
+    if (hasMovedRef.current) {
+      gruposScrollRef.current.scrollLeft = scrollLeft - walk
+    }
+  }, [isDragging, startX, scrollLeft])
+
+  const handleMouseUp = useCallback(() => {
+    if (!gruposScrollRef.current) return
+    setIsDragging(false)
+    gruposScrollRef.current.style.cursor = 'grab'
+    gruposScrollRef.current.style.userSelect = 'auto'
+    // Reset após um pequeno delay para permitir que o onClick do botão seja processado
+    setTimeout(() => {
+      hasMovedRef.current = false
+    }, 100)
+  }, [])
+
+  const handleMouseLeave = useCallback(() => {
+    if (!gruposScrollRef.current) return
+    setIsDragging(false)
+    gruposScrollRef.current.style.cursor = 'grab'
+    gruposScrollRef.current.style.userSelect = 'auto'
+    hasMovedRef.current = false
+  }, [])
   
   // Ordenar grupos por nome
   const grupos = useMemo(() => {
@@ -286,10 +346,10 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     setOrigem('GESTOR')
     setStatus('FINALIZADA')
     setClienteId('')
+    setClienteNome('')
     setProdutos([])
     setPagamentos([])
     setMeioPagamentoId('')
-    setBuscaCliente('')
     setGrupoSelecionadoId(null)
   }
 
@@ -302,17 +362,30 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     <Dialog 
       open={open} 
       onOpenChange={handleClose}
-      maxWidth="lg"
-      fullWidth
+      maxWidth={false}
       sx={{
-        '& .MuiDialog-container': { zIndex: 1300 },
+        '& .MuiDialog-container': { 
+          zIndex: 1300,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
         '& .MuiBackdrop-root': { zIndex: 1300, backgroundColor: 'rgba(0, 0, 0, 0.5)' },
-        '& .MuiDialog-paper': { zIndex: 1300, backgroundColor: '#ffffff', opacity: 1, maxHeight: '90vh' },
+        '& .MuiDialog-paper': { 
+          zIndex: 1300, 
+          backgroundColor: '#ffffff', 
+          opacity: 1, 
+          maxHeight: '90vh',
+          margin: '32px',
+          width: 'auto',
+          maxWidth: 'calc(100% - 64px)',
+        },
       }}
     >
       <DialogContent 
         sx={{ 
-          maxWidth: '56rem', 
+          width: '48rem',
+          maxWidth: '100%',
           maxHeight: '90vh', 
           overflow: 'hidden', 
           backgroundColor: '#ffffff', 
@@ -351,32 +424,32 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
             <div className="flex gap-2">
               <Input
                 type="text"
-                value={buscaCliente}
-                onChange={(e) => setBuscaCliente(e.target.value)}
-                placeholder="Buscar cliente..."
-                className="flex-1"
+                value={clienteNome}
+                placeholder="Nenhum cliente selecionado"
+                inputProps={{ readOnly: true }}
+                className="flex-1 cursor-pointer"
+                onClick={() => setSeletorClienteOpen(true)}
               />
+              {clienteNome && (
+                <Button
+                  type="button"
+                  variant="outlined"
+                  size="sm"
+                  onClick={handleRemoveCliente}
+                  className="flex-shrink-0"
+                >
+                  <MdDelete className="w-4 h-4" />
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outlined"
+                onClick={() => setSeletorClienteOpen(true)}
+                className="flex-shrink-0"
+              >
+                <MdSearch className="w-4 h-4" />
+              </Button>
             </div>
-            {buscaCliente && (
-              <Select value={clienteId} onValueChange={setClienteId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um cliente" />
-                </SelectTrigger>
-                <SelectContent>
-                  {isLoadingClientes ? (
-                    <SelectItem value="loading" disabled>Carregando...</SelectItem>
-                  ) : clientes.length === 0 ? (
-                    <SelectItem value="empty" disabled>Nenhum cliente encontrado</SelectItem>
-                  ) : (
-                    clientes.map(cliente => (
-                      <SelectItem key={cliente.getId()} value={cliente.getId()}>
-                        {cliente.getNome()} {(cliente.getCpf() || cliente.getCnpj()) ? `- ${cliente.getCpf() || cliente.getCnpj()}` : ''}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            )}
           </div>
 
           {/* Status */}
@@ -400,58 +473,90 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
           <div className="space-y-4">
             <Label>Produtos</Label>
             
-            {/* Grid de Grupos */}
-            {!grupoSelecionadoId && (
-              <div className="space-y-2">
-                <Label className="text-sm text-gray-600">Selecione um grupo:</Label>
-                {isLoadingGrupos ? (
-                  <div className="text-center py-4 text-gray-500">Carregando grupos...</div>
-                ) : grupos.length === 0 ? (
-                  <div className="text-center py-4 text-gray-500">Nenhum grupo encontrado</div>
-                ) : (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                    {grupos.map(grupo => (
+            {/* Lista Horizontal de Grupos */}
+            <div className="space-y-2">
+              <Label className="text-sm text-gray-600">Selecione um grupo:</Label>
+              {isLoadingGrupos ? (
+                <div className="text-center py-4 text-gray-500">Carregando grupos...</div>
+              ) : grupos.length === 0 ? (
+                <div className="text-center py-4 text-gray-500">Nenhum grupo encontrado</div>
+              ) : (
+                <div 
+                  ref={gruposScrollRef}
+                  className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin cursor-grab active:cursor-grabbing select-none" 
+                  style={{ scrollbarWidth: 'thin' }}
+                  onMouseDown={handleMouseDown}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleMouseUp}
+                  onMouseLeave={handleMouseLeave}
+                >
+                  {grupos.map(grupo => {
+                    const corHex = grupo.getCorHex()
+                    const iconName = grupo.getIconName()
+                    const isSelected = grupoSelecionadoId === grupo.getId()
+                    return (
                       <button
                         key={grupo.getId()}
-                        onClick={() => setGrupoSelecionadoId(grupo.getId())}
-                        className="aspect-square p-4 border-2 border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all flex flex-col items-center justify-center text-center"
+                        onClick={(e) => {
+                          // Só executar o clique se não houve movimento significativo durante o arraste
+                          if (!hasMovedRef.current && !isDragging) {
+                            setGrupoSelecionadoId(grupo.getId())
+                          }
+                        }}
+                        onMouseDown={(e) => {
+                          // Permitir que o evento propague para o container para iniciar o arraste
+                          // O onClick só será executado se não houver movimento
+                        }}
+                        className="flex-shrink-0 aspect-square p-4 border-2 rounded-lg transition-all flex flex-col items-center justify-center text-center gap-2 min-w-[120px] pointer-events-auto"
+                        style={{
+                          borderColor: corHex,
+                          backgroundColor: isSelected ? corHex : `${corHex}15`,
+                          color: isSelected ? '#ffffff' : '#1f2937',
+                        }}
                       >
-                        <div className="font-medium text-sm text-gray-900 break-words">
+                        <div 
+                          className="w-[45px] h-[45px] rounded-lg border-2 flex items-center justify-center"
+                          style={{
+                            borderColor: isSelected ? '#ffffff' : corHex,
+                            backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.2)' : '#ffffff',
+                          }}
+                        >
+                          <DinamicIcon iconName={iconName} color={isSelected ? '#ffffff' : corHex} size={24} />
+                        </div>
+                        <div className="font-medium text-sm break-words">
                           {grupo.getNome()}
                         </div>
                       </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+                    )
+                  })}
+                </div>
+              )}
+            </div>
 
             {/* Grid de Produtos do Grupo Selecionado */}
-            {grupoSelecionadoId && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
+            {grupoSelecionadoId && (() => {
+              const grupoSelecionado = grupos.find(g => g.getId() === grupoSelecionadoId)
+              const corHexGrupo = grupoSelecionado?.getCorHex() || '#6b7280'
+              return (
+                <div className="space-y-2">
                   <Label className="text-sm text-gray-600">
-                    Produtos do grupo: <span className="font-semibold">{grupos.find(g => g.getId() === grupoSelecionadoId)?.getNome()}</span>
+                    Produtos do grupo: <span className="font-semibold">{grupoSelecionado?.getNome()}</span>
                   </Label>
-                  <Button
-                    variant="outlined"
-                    size="sm"
-                    onClick={() => setGrupoSelecionadoId(null)}
-                    type="button"
-                  >
-                    Voltar
-                  </Button>
-                </div>
-                {isLoadingProdutos ? (
-                  <div className="text-center py-4 text-gray-500">Carregando produtos...</div>
-                ) : produtosError ? (
-                  <div className="text-center py-4 text-red-500">
-                    Erro ao carregar produtos: {produtosError instanceof Error ? produtosError.message : 'Erro desconhecido'}
-                  </div>
-                ) : produtosList.length === 0 ? (
-                  <div className="text-center py-4 text-gray-500">Nenhum produto encontrado neste grupo</div>
-                ) : (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 max-h-64 overflow-y-auto border rounded-lg p-3 bg-gray-50">
+                  {isLoadingProdutos ? (
+                    <div className="text-center py-4 text-gray-500">Carregando produtos...</div>
+                  ) : produtosError ? (
+                    <div className="text-center py-4 text-red-500">
+                      Erro ao carregar produtos: {produtosError instanceof Error ? produtosError.message : 'Erro desconhecido'}
+                    </div>
+                  ) : produtosList.length === 0 ? (
+                    <div className="text-center py-4 text-gray-500">Nenhum produto encontrado neste grupo</div>
+                  ) : (
+                    <div 
+                      className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 max-h-64 overflow-y-auto border rounded-lg p-3"
+                      style={{
+                        backgroundColor: `${corHexGrupo}15`,
+                      }}
+                    >
                     {produtosList.map(produto => {
                       const jaAdicionado = produtos.find(p => p.produtoId === produto.getId())
                       const isDisabled = !!jaAdicionado
@@ -462,26 +567,43 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                           disabled={isDisabled}
                           className={`aspect-square p-3 border-2 rounded-lg transition-all flex flex-col items-center justify-center text-center ${
                             jaAdicionado
-                              ? 'border-green-500 bg-green-50 opacity-60 cursor-not-allowed'
-                              : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-pointer'
+                              ? 'cursor-not-allowed'
+                              : 'cursor-pointer'
                           }`}
+                          style={{
+                            borderColor: corHexGrupo,
+                            backgroundColor: jaAdicionado ? `${corHexGrupo}15` : '#ffffff',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!jaAdicionado) {
+                              e.currentTarget.style.borderColor = corHexGrupo
+                              e.currentTarget.style.backgroundColor = '#ffffff'
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!jaAdicionado) {
+                              e.currentTarget.style.borderColor = corHexGrupo
+                              e.currentTarget.style.backgroundColor = '#ffffff'
+                            }
+                          }}
                         >
                           <div className="font-medium text-xs text-gray-900 break-words mb-1">
                             {produto.getNome()}
                           </div>
-                          <div className="text-xs font-semibold text-blue-600">
+                          <div className="text-xs font-semibold text-primary-text">
                             {transformarParaReal(produto.getValor())}
                           </div>
                           {jaAdicionado && (
-                            <div className="text-xs text-green-600 mt-1">✓ Adicionado</div>
+                            <div className="text-xs mt-1" style={{ color: corHexGrupo }}>✓ Adicionado</div>
                           )}
                         </button>
                       )
                     })}
-                  </div>
-                )}
-              </div>
-            )}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Lista de Produtos */}
             {produtos.length > 0 && (
@@ -616,6 +738,12 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <SeletorClienteModal
+        open={seletorClienteOpen}
+        onClose={() => setSeletorClienteOpen(false)}
+        onSelect={handleSelectCliente}
+      />
     </Dialog>
   )
 }

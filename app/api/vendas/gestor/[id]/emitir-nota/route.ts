@@ -10,6 +10,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Declarar no escopo da função para estar acessível no catch
+  let payloadCompleto: any = null
+  
   try {
     const validation = validateRequest(request)
     if (!validation.valid || !validation.tokenInfo) {
@@ -27,7 +30,7 @@ export async function POST(
     // Buscar dados fiscais da empresa para obter codigoMunicipio
     const apiClient = new ApiClient()
     let codigoMunicipio: string | undefined
-    let payloadCompleto: any = { ...body } // Declarar no escopo correto
+    payloadCompleto = { ...body } // Inicializar no escopo do try
 
     // Buscar codigoMunicipio dos dados da empresa
     try {
@@ -120,8 +123,8 @@ export async function POST(
         status: error.status,
         message: error.message,
         data: error.data,
-        payloadEnviado: payloadCompleto,
-        payloadString: JSON.stringify(payloadCompleto),
+        payloadEnviado: payloadCompleto || 'Não disponível (erro antes de montar payload)',
+        payloadString: payloadCompleto ? JSON.stringify(payloadCompleto) : 'Não disponível',
       })
       
       return NextResponse.json(
