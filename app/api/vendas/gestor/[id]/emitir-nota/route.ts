@@ -3,8 +3,8 @@ import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 
 /**
- * POST /api/vendas/[id]/emitir-nfe
- * Emite nota fiscal (NFC-e ou NF-e) para uma venda
+ * POST /api/vendas/gestor/[id]/emitir-nota
+ * Emite nota fiscal (NFC-e ou NF-e) para uma venda do gestor
  */
 export async function POST(
   request: NextRequest,
@@ -24,17 +24,9 @@ export async function POST(
 
     const body = await request.json()
 
-    // Validação básica dos campos obrigatórios
-    if (!body.modelo || !body.serie || !body.ambiente || !body.crt) {
-      return NextResponse.json(
-        { error: 'Campos obrigatórios: modelo, serie, ambiente, crt' },
-        { status: 400 }
-      )
-    }
-
     const apiClient = new ApiClient()
     const response = await apiClient.request<any>(
-      `/api/v1/operacao-pdv/vendas/${id}/emitir-nfe`,
+      `/api/v1/gestor/vendas/${id}/emitir-nota`,
       {
         method: 'POST',
         headers: {
@@ -45,12 +37,12 @@ export async function POST(
       }
     )
 
-    return NextResponse.json(response.data || {})
+    return NextResponse.json(response.data || {}, { status: response.status })
   } catch (error) {
-    console.error('Erro ao emitir NFe:', error)
+    console.error('Erro ao emitir nota fiscal para venda gestor:', error)
     if (error instanceof ApiError) {
       return NextResponse.json(
-        { error: error.message || 'Erro ao emitir NFe' },
+        { error: error.message || 'Erro ao emitir nota fiscal' },
         { status: error.status }
       )
     }
