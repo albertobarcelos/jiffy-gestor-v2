@@ -479,10 +479,53 @@ export function Etapa3EmissorFiscal() {
     }
   }
 
-  const handleToggleNfce = (ativo: boolean) => {
-    // Toggle funciona apenas no frontend (estado local)
-    // A validação e salvamento acontecem apenas ao clicar em "Salvar Configuração NFC-e"
+  const handleToggleNfce = async (ativo: boolean) => {
+    const token = auth?.getAccessToken()
+    if (!token) return
+
+    // Atualizar estado local primeiro
     setEmissorFiscal(prev => ({ ...prev, nfceAtivo: ativo }))
+
+    // Se não tiver configuração de numeração, apenas atualizar toggle local
+    // O toggle será salvo quando o usuário salvar a numeração
+    if (!nfceNumeracao || !nfceForm.serie || !nfceForm.proximoNumero) {
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      // Salvar toggle junto com a numeração
+      const payload = {
+        modelo: 65,
+        serie: parseInt(nfceForm.serie),
+        numeroInicial: parseInt(nfceForm.proximoNumero),
+        terminalId: null,
+        nfceAtivo: ativo,
+        // Manter CSC se já existir
+        nfceCscId: nfceForm.cscId || undefined,
+        nfceCscCodigo: nfceForm.cscCodigo || undefined,
+      }
+
+      const response = await fetch(`/api/v1/fiscal/configuracoes/numeracao/${65}/${nfceNumeracao.serie}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setNfceNumeracao(prev => prev ? { ...prev, nfceAtivo: data.nfceAtivo } : null)
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar toggle NFC-e:', error)
+      // Reverter toggle em caso de erro
+      setEmissorFiscal(prev => ({ ...prev, nfceAtivo: !ativo }))
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   if (isLoading) {
