@@ -15,7 +15,7 @@ import { useCreateVendaGestor } from '@/src/presentation/hooks/useVendas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { extractTokenInfo } from '@/src/shared/utils/validateToken'
-import { MdAdd, MdDelete, MdSearch } from 'react-icons/md'
+import { MdAdd, MdDelete, MdSearch, MdArrowForward, MdArrowBack, MdCheckCircle } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { SeletorClienteModal } from './SeletorClienteModal'
@@ -56,6 +56,10 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
   const [seletorClienteOpen, setSeletorClienteOpen] = useState(false)
   const [tooltipGrupoId, setTooltipGrupoId] = useState<string | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null)
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1)
+  
+  // Estado para controlar valores em edição (índice do produto -> valor string)
+  const [valoresEmEdicao, setValoresEmEdicao] = useState<Record<number, string>>({})
   
   // Estados para arrastar a lista horizontal
   const gruposScrollRef = useRef<HTMLDivElement>(null)
@@ -353,6 +357,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     setPagamentos([])
     setMeioPagamentoId('')
     setGrupoSelecionadoId(null)
+    setCurrentStep(1)
   }
 
   const handleClose = () => {
@@ -360,35 +365,89 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     onClose()
   }
 
+  // Validação dos steps
+  const canGoToStep2 = () => {
+    // Step 1 sempre pode avançar (origem e status têm valores padrão)
+    return true
+  }
+
+  const canGoToStep3 = () => {
+    // Step 2 precisa ter pelo menos um produto
+    return produtos.length > 0
+  }
+
+  const canSubmit = () => {
+    // Step 3 precisa validar pagamentos se status for FINALIZADA ou PENDENTE_EMISSAO
+    if (status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') {
+      if (pagamentos.length === 0) return false
+      const diferenca = totalProdutos - totalPagamentos
+      return Math.abs(diferenca) <= 0.01
+    }
+    return true
+  }
+
+  // Navegação entre steps
+  const handleNextStep = () => {
+    if (currentStep === 1 && canGoToStep2()) {
+      setCurrentStep(2)
+    } else if (currentStep === 2 && canGoToStep3()) {
+      setCurrentStep(3)
+    } else if (currentStep === 2 && !canGoToStep3()) {
+      showToast.error('Adicione pelo menos um produto antes de continuar')
+    }
+  }
+
+  const handlePreviousStep = () => {
+    if (currentStep === 2) {
+      setCurrentStep(1)
+    } else if (currentStep === 3) {
+      setCurrentStep(2)
+    }
+  }
+
   return (
-    <Dialog 
-      open={open} 
-      onOpenChange={handleClose}
-      maxWidth={false}
-      sx={{
+    <>
+      <style>{`
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        input[type="number"] {
+          -moz-appearance: textfield;
+        }
+      `}</style>
+      <Dialog 
+        open={open} 
+        onOpenChange={handleClose}
+        maxWidth={false}
+        sx={{
         '& .MuiDialog-container': { 
           zIndex: 1300,
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: 'stretch',
+          justifyContent: 'flex-end',
         },
         '& .MuiBackdrop-root': { zIndex: 1300, backgroundColor: 'rgba(0, 0, 0, 0.5)' },
         '& .MuiDialog-paper': { 
           zIndex: 1300, 
           backgroundColor: '#ffffff', 
           opacity: 1, 
-          maxHeight: '90vh',
-          margin: '32px',
-          width: 'auto',
-          maxWidth: 'calc(100% - 64px)',
+          height: '100vh',
+          maxHeight: '100vh',
+          margin: 0,
+          marginLeft: 'auto',
+          width: '53rem',
+          maxWidth: '100%',
+          borderRadius: 0,
         },
       }}
     >
       <DialogContent 
         sx={{ 
-          width: '48rem',
-          maxWidth: '100%',
-          maxHeight: '90vh', 
+          width: '100%',
+          height: '100%',
+          maxHeight: '100vh', 
           overflow: 'hidden', 
           backgroundColor: '#ffffff', 
           padding: 0, 
@@ -396,15 +455,77 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
           flexDirection: 'column' 
         }}
       >
-        <div style={{ padding: '24px 24px 16px 24px', flexShrink: 0 }}>
-          <DialogTitle>Novo Pedido</DialogTitle>
+        <div className="px-4 py-2">
+          <h1 className="text-2xl font-bold">Novo Pedido</h1>
+          
+          {/* Indicador de Steps */}
+          <div className="flex items-center justify-center gap-2 mt-2">
+            {/* Step 1 */}
+            <div className="flex items-center gap-2">
+              <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
+                currentStep >= 1 
+                  ? 'bg-primary border-primary text-white' 
+                  : 'bg-white border-gray-300 text-gray-400'
+              }`}>
+                {currentStep > 1 ? (
+                  <MdCheckCircle className="w-5 h-5" />
+                ) : (
+                  <span className="text-sm font-semibold">1</span>
+                )}
+              </div>
+              <span className={`text-sm font-medium ${currentStep >= 1 ? 'text-primary' : 'text-gray-400'}`}>
+                Informações
+              </span>
+            </div>
+            
+            {/* Linha */}
+            <div className={`h-0.5 w-12 ${currentStep >= 2 ? 'bg-primary' : 'bg-gray-300'}`} />
+            
+            {/* Step 2 */}
+            <div className="flex items-center gap-2">
+              <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
+                currentStep >= 2 
+                  ? 'bg-primary border-primary text-white' 
+                  : 'bg-white border-gray-300 text-gray-400'
+              }`}>
+                {currentStep > 2 ? (
+                  <MdCheckCircle className="w-5 h-5" />
+                ) : (
+                  <span className="text-sm font-semibold">2</span>
+                )}
+              </div>
+              <span className={`text-sm font-medium ${currentStep >= 2 ? 'text-primary' : 'text-gray-400'}`}>
+                Produtos
+              </span>
+            </div>
+            
+            {/* Linha */}
+            <div className={`h-0.5 w-12 ${currentStep >= 3 ? 'bg-primary' : 'bg-gray-300'}`} />
+            
+            {/* Step 3 */}
+            <div className="flex items-center gap-2">
+              <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
+                currentStep >= 3 
+                  ? 'bg-primary border-primary text-white' 
+                  : 'bg-white border-gray-300 text-gray-400'
+              }`}>
+                <span className="text-sm font-semibold">3</span>
+              </div>
+              <span className={`text-sm font-medium ${currentStep >= 3 ? 'text-primary' : 'text-gray-400'}`}>
+                Pagamento
+              </span>
+            </div>
+          </div>
         </div>
 
         <div 
           style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 24px', minHeight: 0 }}
           className="scrollbar-thin"
         >
-          {/* Origem */}
+          {/* STEP 1: Informações do Pedido */}
+          {currentStep === 1 && (
+            <div className="py-2">
+              {/* Origem */}
           <div className="space-y-2">
             <Label>Origem do Pedido</Label>
             <Select value={origem} onValueChange={(value) => setOrigem(value as OrigemVenda)}>
@@ -454,41 +575,219 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
             </div>
           </div>
 
-          {/* Status */}
-          <div className="space-y-2">
-            <Label>Status do Pedido</Label>
-            <Select value={status} onValueChange={(value) => setStatus(value as StatusVenda)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {statusDisponiveis.map(st => (
-                  <SelectItem key={st.value} value={st.value}>
-                    {st.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Produtos - Seleção por Grupos */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label>Produtos</Label>
-              {grupoSelecionadoId && (
-                <Button
-                  variant="outlined"
-                  size="sm"
-                  onClick={() => setGrupoSelecionadoId(null)}
-                  type="button"
-                >
-                  Voltar
-                </Button>
-              )}
+              {/* Status */}
+              <div className="space-y-2">
+                <Label>Status do Pedido</Label>
+                <Select value={status} onValueChange={(value) => setStatus(value as StatusVenda)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusDisponiveis.map(st => (
+                      <SelectItem key={st.value} value={st.value}>
+                        {st.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            
-            {/* Grid ou Lista Horizontal de Grupos */}
-            <div className="space-y-2">
+          )}
+
+          {/* STEP 2: Seleção de Produtos */}
+          {currentStep === 2 && (
+            <div className="space-y-2 py-2">
+              {/* Área de Edição de Produtos Selecionados */}
+              <div 
+                className="h-48 border rounded-lg bg-gray-50 overflow-y-auto scrollbar-thin"
+              >
+                {produtos.length > 0 ? (
+                  <div className="p-2">
+                    {/* Cabeçalho da tabela */}
+                    <div className="flex gap-2 pb-2 border-b border-gray-300 mb-2">
+                      <div className="w-[60px] flex-shrink-0 flex items-center justify-center">
+                        <span className="text-xs text-center font-semibold text-gray-700">Qtd</span>
+                      </div>
+                      <div className="flex-[4]">
+                        <span className="text-xs font-semibold text-gray-700">Produto</span>
+                      </div>
+                      <div className="flex-1 flex justify-end">
+                        <span className="text-xs font-semibold text-gray-700 text-right">Val Unit.</span>
+                      </div>
+                      <div className="flex-1 flex justify-end">
+                        <span className="text-xs font-semibold text-gray-700 text-right">Total</span>
+                      </div>
+                      <div className="flex-1 flex justify-end">
+                        <span className="text-xs font-semibold text-gray-700 mr-2">Remover</span>
+                      </div>
+                    </div>
+                    {/* Linhas de produtos */}
+                    <div className="space-y-1">
+                      {produtos.map((produto, index) => (
+                        <div 
+                          key={index} 
+                          className="flex gap-2 items-center py-1 hover:bg-gray-100 rounded"
+                        >
+                          {/* Quantidade */}
+                          <div className="w-[60px] flex-shrink-0">
+                            <input
+                              type="number"
+                              min={1}
+                              value={produto.quantidade}
+                              onChange={(e) => {
+                                const valor = parseInt(e.target.value) || 1
+                                atualizarProduto(index, 'quantidade', Math.max(1, valor))
+                              }}
+                              style={{
+                                MozAppearance: 'textfield',
+                                WebkitAppearance: 'none',
+                                appearance: 'none',
+                              }}
+                              className="w-full h-7 text-xs border-0 bg-transparent focus:bg-white focus:ring-1 focus:ring-primary p-1 text-center [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                          </div>
+                          {/* Nome do Produto */}
+                          <div className="flex-[4] min-w-0">
+                            <span className="text-xs text-gray-900 truncate block">{produto.nome}</span>
+                          </div>
+                          {/* Valor Unitário */}
+                          <div className="flex-1">
+                            <input
+                            type="text"
+                            value={valoresEmEdicao[index] !== undefined 
+                              ? valoresEmEdicao[index]
+                              : (produto.valorUnitario > 0 ? produto.valorUnitario.toFixed(2).replace('.', ',') : '')
+                            }
+                            onChange={(e) => {
+                              let valorStr = e.target.value
+                              
+                              // Se vazio, limpa o campo
+                              if (valorStr === '') {
+                                setValoresEmEdicao(prev => ({ ...prev, [index]: '' }))
+                                atualizarProduto(index, 'valorUnitario', 0)
+                                return
+                              }
+                              
+                              // Se contém vírgula, significa que o usuário está editando um valor formatado
+                              // Remove a vírgula e converte para centavos
+                              if (valorStr.includes(',')) {
+                                valorStr = valorStr.replace(',', '').replace(/\D/g, '')
+                              } else {
+                                // Se não contém vírgula, remove tudo exceto números
+                                valorStr = valorStr.replace(/\D/g, '')
+                              }
+                              
+                              // Se vazio após limpeza, limpa o campo
+                              if (valorStr === '') {
+                                setValoresEmEdicao(prev => ({ ...prev, [index]: '' }))
+                                atualizarProduto(index, 'valorUnitario', 0)
+                                return
+                              }
+                              
+                              // Converte para número (centavos) e divide por 100 para obter reais
+                              const valorCentavos = parseInt(valorStr, 10)
+                              const valorReais = valorCentavos / 100
+                              
+                              // Formata com 2 casas decimais usando vírgula
+                              const valorFormatado = valorReais.toFixed(2).replace('.', ',')
+                              
+                              // Atualiza o estado de edição com o valor formatado
+                              setValoresEmEdicao(prev => ({ ...prev, [index]: valorFormatado }))
+                              
+                              // Atualiza o valor do produto
+                              atualizarProduto(index, 'valorUnitario', valorReais)
+                            }}
+                            onFocus={(e) => {
+                              // Ao focar, mantém o valor formatado (ex: "8,00")
+                              const valorAtual = produto.valorUnitario
+                              if (valorAtual > 0) {
+                                const valorFormatado = valorAtual.toFixed(2).replace('.', ',')
+                                setValoresEmEdicao(prev => ({ ...prev, [index]: valorFormatado }))
+                              } else {
+                                setValoresEmEdicao(prev => ({ ...prev, [index]: '' }))
+                              }
+                              // Seleciona todo o texto para facilitar substituição
+                              setTimeout(() => e.target.select(), 0)
+                            }}
+                            onBlur={(e) => {
+                              // Garante formatação correta ao perder o foco
+                              const valor = produto.valorUnitario
+                              if (valor > 0) {
+                                const valorFormatado = valor.toFixed(2).replace('.', ',')
+                                setValoresEmEdicao(prev => ({ ...prev, [index]: valorFormatado }))
+                                // Remove do estado após um pequeno delay para mostrar formato final
+                                setTimeout(() => {
+                                  setValoresEmEdicao(prev => {
+                                    const novo = { ...prev }
+                                    delete novo[index]
+                                    return novo
+                                  })
+                                }, 100)
+                              } else {
+                                // Remove do estado se vazio
+                                setValoresEmEdicao(prev => {
+                                  const novo = { ...prev }
+                                  delete novo[index]
+                                  return novo
+                                })
+                              }
+                            }}
+                            placeholder="0,00"
+                            style={{
+                              MozAppearance: 'textfield',
+                              WebkitAppearance: 'none',
+                              appearance: 'none',
+                            }}
+                            className="w-full h-7 text-xs border-0 bg-transparent focus:bg-white focus:ring-1 focus:ring-primary p-1 text-right"
+                          />
+                          </div>
+                          {/* Total */}
+                          <div className="flex-1">
+                            <span className="text-xs font-semibold text-gray-900 text-right block">
+                              {transformarParaReal(produto.valorUnitario * produto.quantidade)}
+                            </span>
+                          </div>
+                          {/* Botão Remover */}
+                          <div className="flex-1 flex justify-end">
+                            <Button
+                              variant="outlined"
+                              size="sm"
+                              onClick={() => removerProduto(index)}
+                              type="button"
+                              className="h-7 w-7 p-0 flex items-center justify-center min-w-[28px] min-h-[28px]"
+                            >
+                              <MdDelete className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-sm text-gray-500">Nenhum produto selecionado</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Produtos - Seleção por Grupos */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Produtos</Label>
+                  {grupoSelecionadoId && (
+                    <Button
+                      variant="outlined"
+                      size="sm"
+                      onClick={() => setGrupoSelecionadoId(null)}
+                      type="button"
+                    >
+                      Voltar
+                    </Button>
+                  )}
+                </div>
+                
+                {/* Grid ou Lista Horizontal de Grupos */}
+                <div className="space-y-2">
               <Label className="text-sm text-gray-600">Selecione um grupo:</Label>
               {isLoadingGrupos ? (
                 <div className="text-center py-4 text-gray-500">Carregando grupos...</div>
@@ -496,7 +795,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                 <div className="text-center py-4 text-gray-500">Nenhum grupo encontrado</div>
               ) : !grupoSelecionadoId ? (
                 // Grid de Grupos (quando nenhum grupo está selecionado)
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
                   {grupos.map(grupo => {
                     const corHex = grupo.getCorHex()
                     const iconName = grupo.getIconName()
@@ -517,21 +816,21 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                             setTooltipGrupoId(null)
                             setTooltipPosition(null)
                           }}
-                          className="aspect-square p-4 border-2 rounded-lg transition-all flex flex-col items-center justify-center text-center gap-2 hover:opacity-80 overflow-hidden w-full"
+                          className="aspect-square p-2 border-2 rounded-lg transition-all flex flex-col items-center justify-center text-center gap-2 hover:opacity-80 overflow-hidden w-full"
                           style={{
                             borderColor: corHex,
                             backgroundColor: `${corHex}15`,
                           }}
                         >
                         <div 
-                          className="w-[45px] h-[45px] bg-info rounded-lg border-2 flex items-center justify-center flex-shrink-0"
+                          className="w-[40px] h-[40px] bg-info rounded-lg border-2 flex items-center justify-center flex-shrink-0"
                           style={{
                             borderColor: corHex,
                           }}
                         >
                           <DinamicIcon iconName={iconName} color={corHex} size={24} />
                         </div>
-                        <div className="font-medium text-sm text-gray-900 line-clamp-2 overflow-hidden text-ellipsis w-full px-1">
+                        <div className="font-medium text-[10px] text-gray-900 line-clamp-2 overflow-hidden text-ellipsis w-full px-1">
                           {grupo.getNome()}
                         </div>
                       </button>
@@ -540,12 +839,12 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                           className="absolute z-50 p-2 bg-white border border-gray-300 rounded-lg shadow-lg pointer-events-none"
                           style={{
                             left: '50%',
-                            top: '10px',
+                            top: '30px',
                             transform: 'translate(-50%, -100%)',
                             maxWidth: '120px',
                           }}
                         >
-                          <span className="w-[105px] block text-xs text-center font-medium text-gray-900 break-words">{grupo.getNome()}</span>
+                          <span className="w-[105px] block text-[10px] text-center font-medium text-gray-900 break-words">{grupo.getNome()}</span>
                          
                           
                         </div>
@@ -571,7 +870,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                     const isSelected = grupoSelecionadoId === grupo.getId()
                     const showTooltip = tooltipGrupoId === grupo.getId()
                     return (
-                      <div key={grupo.getId()} className="relative flex-shrink-0">
+                      <div key={grupo.getId()} className="relative flex-shrink-0" style={{ width: '100px' }}>
                         <button
                           onClick={(e) => {
                             // Só executar o clique se não houve movimento significativo durante o arraste
@@ -595,7 +894,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                             setTooltipGrupoId(null)
                             setTooltipPosition(null)
                           }}
-                          className="aspect-square p-4 border-2 rounded-lg transition-all flex flex-col items-center justify-center text-center gap-2 min-w-[120px] pointer-events-auto overflow-hidden w-full"
+                          className="aspect-square p-2 border-2 rounded-lg transition-all flex flex-col items-center justify-center text-center gap-2 pointer-events-auto overflow-hidden w-full h-full"
                           style={{
                             borderColor: corHex,
                             backgroundColor: isSelected ? corHex : `${corHex}15`,
@@ -603,7 +902,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                           }}
                         >
                         <div 
-                          className="w-[45px] h-[45px] rounded-lg border-2 flex items-center justify-center flex-shrink-0"
+                          className="w-[40px] h-[40px] rounded-lg border-2 flex items-center justify-center flex-shrink-0"
                           style={{
                             borderColor: isSelected ? '#ffffff' : corHex,
                             backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.2)' : '#ffffff',
@@ -611,36 +910,33 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                         >
                           <DinamicIcon iconName={iconName} color={isSelected ? '#ffffff' : corHex} size={24} />
                         </div>
-                        <div className="font-medium text-sm line-clamp-2 overflow-hidden text-ellipsis w-full px-1">
+                        <div className="font-medium text-[10px] line-clamp-2 overflow-hidden text-ellipsis w-full px-1">
                           {grupo.getNome()}
                         </div>
                       </button>
                       {showTooltip && tooltipPosition && (
                         <div
-                          className="absolute z-50 p-1 bg-white border border-gray-300 rounded-lg shadow-lg pointer-events-none"
+                          className="absolute z-50 p-1 bg-white bg-opacity-80 border border-gray-300 rounded-lg shadow-lg pointer-events-none"
                           style={{
                             left: '50%',
-                            top: '10px',
-                            transform: 'translate(-50%, -100%)',
-                            maxWidth: '112px',
+                            top: '0%',
+                            marginTop: '2px',
+                            transform: 'translateX(-50%)',
+                            maxWidth: '120px',
                           }}
                         >
-                          <span className="block text-xs font-medium text-gray-900 break-words">{grupo.getNome()}</span>
-                          <div
-                            className="absolute left-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-300"
-                            style={{ transform: 'translateX(-50%)' }}
-                          />
+                          <span className="max-w-[120px] min-w-[100px] block text-[10px] text-center font-medium text-gray-900 break-words">{grupo.getNome()}</span>
                         </div>
                       )}
                     </div>
                     )
                   })}
                 </div>
-              )}
-            </div>
+                )}
+                </div>
 
-            {/* Grid de Produtos do Grupo Selecionado */}
-            {grupoSelecionadoId && (() => {
+                {/* Grid de Produtos do Grupo Selecionado */}
+                {grupoSelecionadoId && (() => {
               const grupoSelecionado = grupos.find(g => g.getId() === grupoSelecionadoId)
               const corHexGrupo = grupoSelecionado?.getCorHex() || '#6b7280'
               return (
@@ -658,7 +954,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                     <div className="text-center py-4 text-gray-500">Nenhum produto encontrado neste grupo</div>
                   ) : (
                     <div 
-                      className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 max-h-64 overflow-y-auto border rounded-lg p-3"
+                      className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-2 max-h-60 overflow-y-auto border rounded-lg p-2"
                       style={{
                         backgroundColor: `${corHexGrupo}15`,
                       }}
@@ -671,7 +967,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                           key={produto.getId()}
                           onClick={() => !jaAdicionado && adicionarProduto(produto.getId())}
                           disabled={isDisabled}
-                          className={`aspect-square p-3 border-2 rounded-lg transition-all flex flex-col items-center justify-center text-center ${
+                          className={`aspect-square border-2 rounded-lg transition-all flex flex-col items-center justify-center text-center ${
                             jaAdicionado
                               ? 'cursor-not-allowed'
                               : 'cursor-pointer'
@@ -693,14 +989,14 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                             }
                           }}
                         >
-                          <div className="font-medium text-xs text-gray-900 break-words mb-1">
+                          <div className="font-medium text-[10px] text-gray-900 break-words mb-1">
                             {produto.getNome()}
                           </div>
-                          <div className="text-xs font-semibold text-primary-text">
+                          <div className="text-[10px] font-semibold text-primary-text">
                             {transformarParaReal(produto.getValor())}
                           </div>
                           {jaAdicionado && (
-                            <div className="text-xs mt-1" style={{ color: corHexGrupo }}>✓ Adicionado</div>
+                            <div className="text-[10px] mt-1" style={{ color: corHexGrupo }}>✓ Adicionado</div>
                           )}
                         </button>
                       )
@@ -709,65 +1005,69 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                   )}
                 </div>
               )
-            })()}
+                })()}
+              </div>
+            </div>
+          )}
 
-            {/* Lista de Produtos */}
-            {produtos.length > 0 && (
-              <div className="space-y-2 border rounded-lg p-3">
-                {produtos.map((produto, index) => (
-                  <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
-                    <div className="flex-1">
-                      <p className="font-medium">{produto.nome}</p>
-                      <div className="flex gap-2 items-center mt-1">
-                        <Label className="text-xs">Qtd:</Label>
-                        <Input
-                          type="number"
-                          inputProps={{ min: 1 }}
-                          value={produto.quantidade}
-                          onChange={(e) => {
-                            const valor = parseInt(e.target.value) || 1
-                            atualizarProduto(index, 'quantidade', Math.max(1, valor))
-                          }}
-                          className="w-20 h-8"
-                        />
-                        <Label className="text-xs">Valor Unit.:</Label>
-                        <Input
-                          type="number"
-                          inputProps={{ min: 0, step: 0.01 }}
-                          value={produto.valorUnitario}
-                          onChange={(e) => {
-                            const valor = parseFloat(e.target.value) || 0
-                            atualizarProduto(index, 'valorUnitario', Math.max(0, valor))
-                          }}
-                          className="w-32 h-8"
-                        />
-                        <span className="text-sm font-semibold">
-                          Total: {transformarParaReal(produto.valorUnitario * produto.quantidade)}
-                        </span>
-                      </div>
-                    </div>
-                    <Button
-                      variant="outlined"
-                      size="sm"
-                      onClick={() => removerProduto(index)}
-                      type="button"
-                    >
-                      <MdDelete className="w-4 h-4" />
-                    </Button>
+          {/* STEP 3: Pagamento */}
+          {currentStep === 3 && (
+            <div className="space-y-4 py-4">
+              {/* Resumo do Pedido */}
+              <div className="border rounded-lg p-4 bg-gray-50">
+                <h3 className="font-semibold text-lg mb-3">Resumo do Pedido</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Origem:</span>
+                    <span className="font-medium">{origem}</span>
                   </div>
-                ))}
-                <div className="pt-2 border-t">
-                  <p className="text-right font-semibold">
-                    Total: {transformarParaReal(totalProdutos)}
-                  </p>
+                  {clienteNome && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Cliente:</span>
+                      <span className="font-medium">{clienteNome}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Status:</span>
+                    <span className="font-medium">{statusDisponiveis.find(s => s.value === status)?.label}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Total de Produtos:</span>
+                    <span className="font-medium">{produtos.length}</span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t">
+                    <span className="text-gray-900 font-semibold">Total:</span>
+                    <span className="text-primary font-bold text-lg">{transformarParaReal(totalProdutos)}</span>
+                  </div>
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Pagamentos (se status finalizada ou pendente emissão) */}
-          {(status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') && (
-            <div className="space-y-2">
+              {/* Lista de Produtos Selecionados */}
+              {produtos.length > 0 && (
+                <div className="space-y-2 border rounded-lg p-3">
+                  <Label className="text-base font-semibold">Produtos Selecionados</Label>
+                  {produtos.map((produto, index) => (
+                    <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+                      <div className="flex-1">
+                        <p className="font-medium">{produto.nome}</p>
+                        <div className="flex gap-2 items-center mt-1">
+                          <span className="text-xs text-gray-600">Qtd: {produto.quantidade}</span>
+                          <span className="text-xs text-gray-600">•</span>
+                          <span className="text-xs text-gray-600">Unit: {transformarParaReal(produto.valorUnitario)}</span>
+                          <span className="text-xs text-gray-600">•</span>
+                          <span className="text-sm font-semibold">
+                            Total: {transformarParaReal(produto.valorUnitario * produto.quantidade)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Pagamentos (se status finalizada ou pendente emissão) */}
+              {(status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') && (
+                <div className="space-y-2">
               <Label>Formas de Pagamento</Label>
               <div className="flex gap-2">
                 <Select value={meioPagamentoId} onValueChange={setMeioPagamentoId}>
@@ -830,7 +1130,9 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                     </p>
                   </div>
                 </div>
-              )}
+                )}
+              </div>
+            )}
             </div>
           )}
         </div>
@@ -839,9 +1141,40 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
           <Button variant="outlined" onClick={handleClose} disabled={createVendaGestor.isPending}>
             Cancelar
           </Button>
-          <Button onClick={handleSubmit} disabled={createVendaGestor.isPending}>
-            {createVendaGestor.isPending ? 'Criando...' : 'Criar Pedido'}
-          </Button>
+          
+          {currentStep > 1 && (
+            <Button 
+              variant="outlined" 
+              onClick={handlePreviousStep} 
+              disabled={createVendaGestor.isPending}
+              className="flex items-center gap-2"
+            >
+              <MdArrowBack className="w-4 h-4" />
+              Anterior
+            </Button>
+          )}
+          
+          {currentStep < 3 ? (
+            <Button 
+              onClick={handleNextStep} 
+              disabled={
+                createVendaGestor.isPending || 
+                (currentStep === 2 && !canGoToStep3())
+              }
+              className="flex items-center gap-2"
+            >
+              Próximo
+              <MdArrowForward className="w-4 h-4" />
+            </Button>
+          ) : (
+            <Button 
+              onClick={handleSubmit} 
+              disabled={createVendaGestor.isPending || !canSubmit()}
+              className="flex items-center gap-2"
+            >
+              {createVendaGestor.isPending ? 'Criando...' : 'Criar Pedido'}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
 
@@ -851,5 +1184,6 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
         onSelect={handleSelectCliente}
       />
     </Dialog>
+    </>
   )
 }
