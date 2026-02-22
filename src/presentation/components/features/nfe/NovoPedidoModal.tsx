@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useMemo, useRef, useCallback } from 'react'
-import { Dialog, DialogContent, DialogTitle, DialogFooter } from '@/src/presentation/components/ui/dialog'
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
+import { Dialog, DialogContent, DialogTitle, DialogFooter, DialogDescription } from '@/src/presentation/components/ui/dialog'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Label } from '@/src/presentation/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/presentation/components/ui/select'
@@ -32,6 +32,7 @@ interface ComplementoSelecionado {
   nome: string
   valor: number
   quantidade: number
+  tipoImpactoPreco?: 'aumenta' | 'diminui' | 'nenhum'
 }
 
 interface ProdutoSelecionado {
@@ -76,11 +77,16 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
   // Estado para rastrear complementos selecionados por produto (produtoId -> complementoIds[])
   const [complementosSelecionados, setComplementosSelecionados] = useState<Record<string, string[]>>({})
   
+  // Estado para modal de confirmação de saída
+  const [modalConfirmacaoSaidaOpen, setModalConfirmacaoSaidaOpen] = useState(false)
+  // Estado interno para controlar o Dialog (para impedir fechamento quando houver dados)
+  const [internalDialogOpen, setInternalDialogOpen] = useState(open)
+  
   // Estados para arrastar a lista horizontal
   const gruposScrollRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [startX, setStartX] = useState(0)
-  const [scrollLeft, setScrollLeft] = useState(0)
+  const startXRef = useRef(0)
+  const scrollLeftRef = useRef(0)
   const hasMovedRef = useRef(false) // Rastreia se houve movimento significativo durante o arraste
 
   // Buscar grupos de produtos
@@ -150,47 +156,68 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     if (!gruposScrollRef.current) return
     hasMovedRef.current = false // Reset flag de movimento
     setIsDragging(true)
-    setStartX(e.pageX - gruposScrollRef.current.offsetLeft)
-    setScrollLeft(gruposScrollRef.current.scrollLeft)
+    
+    const startXValue = e.pageX - gruposScrollRef.current.offsetLeft
+    const scrollLeftValue = gruposScrollRef.current.scrollLeft
+    startXRef.current = startXValue
+    scrollLeftRef.current = scrollLeftValue
+    
     gruposScrollRef.current.style.cursor = 'grabbing'
     gruposScrollRef.current.style.userSelect = 'none'
+    
+    // Adicionar listeners globais para capturar movimento mesmo fora do elemento
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (!gruposScrollRef.current) return
+      
+      const x = e.pageX - gruposScrollRef.current.offsetLeft
+      const walk = (x - startXRef.current) * 2 // Velocidade do scroll (ajustável)
+      
+      // Verificar se houve movimento significativo (mais de 5px)
+      if (Math.abs(walk) > 5) {
+        hasMovedRef.current = true
+        e.preventDefault()
+        e.stopPropagation()
+      }
+      
+      if (hasMovedRef.current) {
+        gruposScrollRef.current.scrollLeft = scrollLeftRef.current - walk
+      }
+    }
+    
+    const handleGlobalMouseUp = () => {
+      if (!gruposScrollRef.current) return
+      setIsDragging(false)
+      gruposScrollRef.current.style.cursor = 'grab'
+      gruposScrollRef.current.style.userSelect = 'auto'
+      
+      // Remover listeners globais
+      document.removeEventListener('mousemove', handleGlobalMouseMove)
+      document.removeEventListener('mouseup', handleGlobalMouseUp)
+      
+      // Reset após um pequeno delay para permitir que o onClick do botão seja processado
+      setTimeout(() => {
+        hasMovedRef.current = false
+      }, 100)
+    }
+    
+    // Adicionar listeners globais
+    document.addEventListener('mousemove', handleGlobalMouseMove)
+    document.addEventListener('mouseup', handleGlobalMouseUp)
   }, [])
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDragging || !gruposScrollRef.current) return
-    
-    const x = e.pageX - gruposScrollRef.current.offsetLeft
-    const walk = (x - startX) * 2 // Velocidade do scroll (ajustável)
-    
-    // Verificar se houve movimento significativo (mais de 5px)
-    if (Math.abs(walk) > 5) {
-      hasMovedRef.current = true
-      e.preventDefault()
-      e.stopPropagation()
-    }
-    
-    if (hasMovedRef.current) {
-      gruposScrollRef.current.scrollLeft = scrollLeft - walk
-    }
-  }, [isDragging, startX, scrollLeft])
+    // Este handler não é mais necessário, mas mantemos para compatibilidade
+    // O movimento real é tratado pelos listeners globais
+  }, [])
 
   const handleMouseUp = useCallback(() => {
-    if (!gruposScrollRef.current) return
-    setIsDragging(false)
-    gruposScrollRef.current.style.cursor = 'grab'
-    gruposScrollRef.current.style.userSelect = 'auto'
-    // Reset após um pequeno delay para permitir que o onClick do botão seja processado
-    setTimeout(() => {
-      hasMovedRef.current = false
-    }, 100)
+    // Este handler não é mais necessário, mas mantemos para compatibilidade
+    // O mouseup real é tratado pelos listeners globais
   }, [])
 
   const handleMouseLeave = useCallback(() => {
-    if (!gruposScrollRef.current) return
-    setIsDragging(false)
-    gruposScrollRef.current.style.cursor = 'grab'
-    gruposScrollRef.current.style.userSelect = 'auto'
-    hasMovedRef.current = false
+    // Não resetar o dragging ao sair do elemento, pois o arraste pode continuar
+    // O reset só acontece no mouseup global
   }, [])
   
   // Ordenar grupos por nome
@@ -229,11 +256,47 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     return `${parteInteiraFormatada},${parteDecimal}`
   }
 
+  // Função para formatar valor do complemento conforme tipoImpactoPreco (para o modal)
+  const formatarValorComplemento = (valor: number, tipoImpactoPreco?: 'aumenta' | 'diminui' | 'nenhum'): string => {
+    const valorFormatado = transformarParaReal(valor)
+    const tipo = tipoImpactoPreco || 'nenhum'
+    
+    switch (tipo) {
+      case 'aumenta':
+        return `+ ${valorFormatado}`
+      case 'diminui':
+        return `- ${valorFormatado}`
+      case 'nenhum':
+      default:
+        return `( ${valorFormatado} )`
+    }
+  }
+
+  // Função para obter total do complemento a exibir na lista (0,00 se nenhum)
+  const obterTotalComplemento = (complemento: ComplementoSelecionado): number => {
+    const tipo = complemento.tipoImpactoPreco || 'nenhum'
+    if (tipo === 'nenhum') {
+      return 0
+    }
+    return complemento.valor * complemento.quantidade
+  }
+
   // Calcular totais
   const totalProdutos = useMemo(() => {
     return produtos.reduce((sum, p) => {
       const valorProduto = p.valorUnitario * p.quantidade
-      const valorComplementos = p.complementos.reduce((compSum, comp) => compSum + (comp.valor * comp.quantidade), 0)
+      const valorComplementos = p.complementos.reduce((compSum, comp) => {
+        const tipo = comp.tipoImpactoPreco || 'nenhum'
+        const valorTotal = comp.valor * comp.quantidade
+        
+        if (tipo === 'aumenta') {
+          return compSum + valorTotal
+        } else if (tipo === 'diminui') {
+          return compSum - valorTotal
+        }
+        // nenhum não afeta o total
+        return compSum
+      }, 0)
       return sum + valorProduto + valorComplementos
     }, 0)
   }, [produtos])
@@ -448,9 +511,53 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     setModalComplementosOpen(false)
   }
 
+  // Verifica se há dados da venda que seriam perdidos
+  const temDadosVenda = () => {
+    return produtos.length > 0 || pagamentos.length > 0 || clienteId !== '' || currentStep > 1
+  }
+
   const handleClose = () => {
+    if (temDadosVenda()) {
+      setModalConfirmacaoSaidaOpen(true)
+    } else {
+      resetForm()
+      onClose()
+    }
+  }
+
+  const handleConfirmarSaida = () => {
     resetForm()
+    setModalConfirmacaoSaidaOpen(false)
+    setInternalDialogOpen(false)
     onClose()
+  }
+
+  const handleCancelarSaida = () => {
+    setModalConfirmacaoSaidaOpen(false)
+  }
+
+  // Sincroniza o estado interno com o prop open
+  useEffect(() => {
+    setInternalDialogOpen(open)
+  }, [open])
+
+  // Intercepta o fechamento do Dialog
+  const handleDialogOpenChange = (isOpen: boolean) => {
+    if (!isOpen) {
+      // Tentando fechar o modal
+      if (temDadosVenda()) {
+        // Impede o fechamento e mostra o modal de confirmação
+        setInternalDialogOpen(true)
+        setModalConfirmacaoSaidaOpen(true)
+      } else {
+        // Permite o fechamento se não houver dados
+        setInternalDialogOpen(false)
+        resetForm()
+        onClose()
+      }
+    } else {
+      setInternalDialogOpen(true)
+    }
   }
 
   // Validação dos steps
@@ -506,8 +613,8 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
         }
       `}</style>
       <Dialog 
-        open={open} 
-        onOpenChange={handleClose}
+        open={internalDialogOpen} 
+        onOpenChange={handleDialogOpenChange}
         maxWidth={false}
         sx={{
         '& .MuiDialog-container': { 
@@ -838,13 +945,13 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                               {/* Botão Remover */}
                               <div className="flex-1 flex justify-end">
                                 <Button
-                                  variant="outlined"
+                                  variant="ghost"
                                   size="sm"
                                   onClick={() => removerProduto(index)}
                                   type="button"
-                                  className="h-7 w-7 p-0 flex items-center justify-center min-w-[28px] min-h-[28px]"
+                                  className="h-7 w-7 p-0 flex items-center justify-center min-w-[28px] min-h-[28px] border-0"
                                 >
-                                  <MdDelete className="w-4 h-4" />
+                                  <MdDelete className="w-4 h-4 text-red-500" />
                                 </Button>
                               </div>
                             </div>
@@ -887,91 +994,108 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                                   </div>
                                   {/* Valor Unitário do Complemento - Editável */}
                                   <div className="flex-1">
-                                    <input
-                                      type="text"
-                                      value={valorEmEdicao !== undefined 
-                                        ? valorEmEdicao
-                                        : (complemento.valor > 0 ? formatarNumeroComMilhar(complemento.valor) : '')
-                                      }
-                                      onChange={(e) => {
-                                        let valorStr = e.target.value
-                                        
-                                        if (valorStr === '') {
-                                          setValoresEmEdicao(prev => ({ ...prev, [compKey]: '' }))
-                                          atualizarComplemento(index, compIndex, 'valor', 0)
-                                          return
-                                        }
-                                        
-                                        valorStr = valorStr.replace(/\./g, '').replace(',', '').replace(/\D/g, '')
-                                        
-                                        if (valorStr === '') {
-                                          setValoresEmEdicao(prev => ({ ...prev, [compKey]: '' }))
-                                          atualizarComplemento(index, compIndex, 'valor', 0)
-                                          return
-                                        }
-                                        
-                                        const valorCentavos = parseInt(valorStr, 10)
-                                        const valorReais = valorCentavos / 100
-                                        const valorFormatado = formatarNumeroComMilhar(valorReais)
-                                        
-                                        setValoresEmEdicao(prev => ({ ...prev, [compKey]: valorFormatado }))
-                                        atualizarComplemento(index, compIndex, 'valor', valorReais)
-                                      }}
-                                      onFocus={(e) => {
-                                        const valorAtual = complemento.valor
-                                        if (valorAtual > 0) {
-                                          const valorFormatado = formatarNumeroComMilhar(valorAtual)
-                                          setValoresEmEdicao(prev => ({ ...prev, [compKey]: valorFormatado }))
-                                        } else {
-                                          setValoresEmEdicao(prev => ({ ...prev, [compKey]: '' }))
-                                        }
-                                        setTimeout(() => e.target.select(), 0)
-                                      }}
-                                      onBlur={(e) => {
-                                        const valor = complemento.valor
-                                        if (valor > 0) {
-                                          const valorFormatado = formatarNumeroComMilhar(valor)
-                                          setValoresEmEdicao(prev => ({ ...prev, [compKey]: valorFormatado }))
-                                          setTimeout(() => {
-                                            setValoresEmEdicao(prev => {
-                                              const novo = { ...prev }
-                                              delete novo[compKey]
-                                              return novo
-                                            })
-                                          }, 100)
-                                        } else {
-                                          setValoresEmEdicao(prev => {
-                                            const novo = { ...prev }
-                                            delete novo[compKey]
-                                            return novo
-                                          })
-                                        }
-                                      }}
-                                      placeholder="0,00"
-                                      style={{
-                                        MozAppearance: 'textfield',
-                                        WebkitAppearance: 'none',
-                                        appearance: 'none',
-                                      }}
-                                      className="w-full h-7 text-xs border-0 bg-transparent focus:bg-white focus:ring-1 focus:ring-primary p-1 text-right"
-                                    />
+                                    {complemento.tipoImpactoPreco === 'nenhum' ? (
+                                      <span className="text-xs text-gray-600 text-right block">
+                                        -
+                                      </span>
+                                    ) : (
+                                      <div className="flex items-center justify-end gap-1">
+                                       
+                                        <input
+                                          type="text"
+                                          value={valorEmEdicao !== undefined 
+                                            ? valorEmEdicao
+                                            : (complemento.valor > 0 ? formatarNumeroComMilhar(complemento.valor) : '')
+                                          }
+                                          onChange={(e) => {
+                                            let valorStr = e.target.value
+                                            
+                                            if (valorStr === '') {
+                                              setValoresEmEdicao(prev => ({ ...prev, [compKey]: '' }))
+                                              atualizarComplemento(index, compIndex, 'valor', 0)
+                                              return
+                                            }
+                                            
+                                            valorStr = valorStr.replace(/\./g, '').replace(',', '').replace(/\D/g, '')
+                                            
+                                            if (valorStr === '') {
+                                              setValoresEmEdicao(prev => ({ ...prev, [compKey]: '' }))
+                                              atualizarComplemento(index, compIndex, 'valor', 0)
+                                              return
+                                            }
+                                            
+                                            const valorCentavos = parseInt(valorStr, 10)
+                                            const valorReais = valorCentavos / 100
+                                            const valorFormatado = formatarNumeroComMilhar(valorReais)
+                                            
+                                            setValoresEmEdicao(prev => ({ ...prev, [compKey]: valorFormatado }))
+                                            atualizarComplemento(index, compIndex, 'valor', valorReais)
+                                          }}
+                                          onFocus={(e) => {
+                                            const valorAtual = complemento.valor
+                                            if (valorAtual > 0) {
+                                              const valorFormatado = formatarNumeroComMilhar(valorAtual)
+                                              setValoresEmEdicao(prev => ({ ...prev, [compKey]: valorFormatado }))
+                                            } else {
+                                              setValoresEmEdicao(prev => ({ ...prev, [compKey]: '' }))
+                                            }
+                                            setTimeout(() => e.target.select(), 0)
+                                          }}
+                                          onBlur={(e) => {
+                                            const valor = complemento.valor
+                                            if (valor > 0) {
+                                              const valorFormatado = formatarNumeroComMilhar(valor)
+                                              setValoresEmEdicao(prev => ({ ...prev, [compKey]: valorFormatado }))
+                                              setTimeout(() => {
+                                                setValoresEmEdicao(prev => {
+                                                  const novo = { ...prev }
+                                                  delete novo[compKey]
+                                                  return novo
+                                                })
+                                              }, 100)
+                                            } else {
+                                              setValoresEmEdicao(prev => {
+                                                const novo = { ...prev }
+                                                delete novo[compKey]
+                                                return novo
+                                              })
+                                            }
+                                          }}
+                                          placeholder="0,00"
+                                          style={{
+                                            MozAppearance: 'textfield',
+                                            WebkitAppearance: 'none',
+                                            appearance: 'none',
+                                          }}
+                                          className="w-full h-7 text-xs border-0 bg-transparent focus:bg-white focus:ring-1 focus:ring-primary p-1 text-right"
+                                        />
+                                      </div>
+                                    )}
                                   </div>
                                   {/* Total do Complemento */}
                                   <div className="flex-1">
                                     <span className="text-xs font-semibold text-gray-600 text-right block">
-                                      R$ {formatarNumeroComMilhar(complemento.valor * complemento.quantidade)}
+                                      {complemento.tipoImpactoPreco === 'nenhum' ? (
+                                        <>-</>
+                                      ) : complemento.tipoImpactoPreco === 'aumenta' ? (
+                                        <>+ R$ {formatarNumeroComMilhar(obterTotalComplemento(complemento))}</>
+                                      ) : complemento.tipoImpactoPreco === 'diminui' ? (
+                                        <>- R$ {formatarNumeroComMilhar(obterTotalComplemento(complemento))}</>
+                                      ) : (
+                                        <>R$ {formatarNumeroComMilhar(obterTotalComplemento(complemento))}</>
+                                      )}
                                     </span>
                                   </div>
                                   {/* Botão Remover Complemento */}
                                   <div className="flex-1 flex justify-end">
                                     <Button
-                                      variant="outlined"
+                                      variant="ghost"
                                       size="sm"
                                       onClick={() => removerComplemento(index, compIndex)}
                                       type="button"
-                                      className="h-7 w-7 p-0 flex items-center justify-center min-w-[28px] min-h-[28px]"
+                                      className="h-7 w-7 p-0 flex items-center justify-center min-w-[28px] min-h-[28px] border-0"
                                     >
-                                      <MdDelete className="w-4 h-4" />
+                                      <MdDelete className="w-4 h-4 text-red-500" />
                                     </Button>
                                   </div>
                                 </div>
@@ -989,25 +1113,33 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                 )}
               </div>
 
+              {/* Total do Pedido */}
+              <div className="flex justify-end items-center gap-2">
+                <span className="text-sm font-semibold text-gray-700">Total do Pedido:</span>
+                <span className="text-lg font-bold text-primary">
+                  {transformarParaReal(totalProdutos)}
+                </span>
+              </div>
+
               {/* Produtos - Seleção por Grupos */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Produtos</Label>
-                  {grupoSelecionadoId && (
+                {/* Grid ou Lista Horizontal de Grupos */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2"> 
+                  {!grupoSelecionadoId ? (
+                    <Label className="text-sm text-gray-600">Selecione um grupo:</Label>
+                  ) : (
                     <Button
                       variant="outlined"
                       size="sm"
                       onClick={() => setGrupoSelecionadoId(null)}
                       type="button"
+                      className="h-7 p-0 flex items-center justify-center min-w-[28px] min-h-[28px]"
                     >
-                      Voltar
+                      <MdArrowBack className="w-4 h-4" /> Voltar aos grupos
                     </Button>
                   )}
                 </div>
-                
-                {/* Grid ou Lista Horizontal de Grupos */}
-                <div className="space-y-2">
-              <Label className="text-sm text-gray-600">Selecione um grupo:</Label>
               {isLoadingGrupos ? (
                 <div className="text-center py-4 text-gray-500">Carregando grupos...</div>
               ) : grupos.length === 0 ? (
@@ -1456,7 +1588,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
               if (produto) {
                 const novosComplementos: ComplementoSelecionado[] = []
                 produto.getGruposComplementos().forEach((grupo: { id: string; nome: string; complementos: Array<{ id: string; nome: string; valor?: number }> }) => {
-                  grupo.complementos.forEach((comp: { id: string; nome: string; valor?: number }) => {
+                  grupo.complementos.forEach((comp: { id: string; nome: string; valor?: number; tipoImpactoPreco?: 'aumenta' | 'diminui' | 'nenhum' }) => {
                     const chaveComp = `${grupo.id}-${comp.id}`
                     if (novos.includes(chaveComp)) {
                       // Verificar se o complemento já existe para manter a quantidade
@@ -1468,6 +1600,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                         nome: comp.nome,
                         valor: comp.valor || 0,
                         quantidade: complementoExistente?.quantidade || 1,
+                        tipoImpactoPreco: comp.tipoImpactoPreco || 'nenhum',
                       })
                     }
                   })
@@ -1495,8 +1628,15 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                 setProdutoSelecionadoParaComplementos(null)
               }
             }}
+            maxWidth={false}
+            sx={{
+              '& .MuiDialog-paper': {
+                width: '500px',
+                maxWidth: '500px',
+              },
+            }}
           >
-            <DialogContent className="max-w-2xl">
+            <DialogContent>
               <DialogTitle>
                 Complementos - {produtoSelecionadoParaComplementos.getNome()}
               </DialogTitle>
@@ -1512,6 +1652,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                               const chaveUnica = `${grupo.id}-${complemento.id}`
                               const isSelecionado = complementosAtuais.includes(chaveUnica)
                               const valor = complemento.valor || 0
+                              const tipoImpactoPreco = complemento.tipoImpactoPreco || 'nenhum'
                               return (
                                 <div 
                                   key={chaveUnica} 
@@ -1529,7 +1670,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                                     <span className="text-sm">{complemento.nome}</span>
                                   </div>
                                   <span className="text-sm font-semibold text-primary">
-                                    {transformarParaReal(valor)}
+                                    {formatarValorComplemento(valor, tipoImpactoPreco)}
                                   </span>
                                 </div>
                               )
@@ -1557,6 +1698,44 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
           </Dialog>
         )
       })()}
+
+      {/* Modal de Confirmação de Saída */}
+      <Dialog
+        open={modalConfirmacaoSaidaOpen}
+        onOpenChange={setModalConfirmacaoSaidaOpen}
+        maxWidth="sm"
+        sx={{
+          '& .MuiDialog-container': {
+            zIndex: 1400,
+          },
+        }}
+      >
+        <DialogContent sx={{ p: 3 }}>
+          <DialogTitle sx={{ mb: 2 }}>
+            Confirmar Saída
+          </DialogTitle>
+          <div style={{ marginBottom: '24px' }}>
+            <DialogDescription>
+              Você tem certeza que deseja sair? Todos os dados da venda serão perdidos.
+            </DialogDescription>
+          </div>
+          <DialogFooter sx={{ gap: 2, justifyContent: 'flex-end' }}>
+            <Button
+              variant="outlined"
+              onClick={handleCancelarSaida}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="contained"
+              color="error"
+              onClick={handleConfirmarSaida}
+            >
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
     </>
   )
