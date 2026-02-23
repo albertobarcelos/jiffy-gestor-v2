@@ -6,6 +6,7 @@ import { Button } from '@/src/presentation/components/ui/button'
 import { Label } from '@/src/presentation/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/presentation/components/ui/select'
 import { Input } from '@/src/presentation/components/ui/input'
+import { Switch } from '@/src/presentation/components/ui/switch'
 import { useQuery } from '@tanstack/react-query'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
@@ -15,7 +16,7 @@ import { useCreateVendaGestor } from '@/src/presentation/hooks/useVendas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { extractTokenInfo } from '@/src/shared/utils/validateToken'
-import { MdLaunch, MdDelete, MdSearch, MdArrowForward, MdArrowBack, MdCheckCircle, MdAttachMoney, MdCreditCard, MdQrCode, MdPerson, MdStore, MdPersonOutline, MdInfo } from 'react-icons/md'
+import { MdLaunch, MdDelete, MdClear, MdSearch, MdArrowForward, MdArrowBack, MdCheckCircle, MdAttachMoney, MdCreditCard, MdQrCode, MdPerson, MdStore, MdPersonOutline, MdInfo, MdAdd, MdRemove, MdClose, MdEdit } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { SeletorClienteModal } from './SeletorClienteModal'
@@ -41,6 +42,10 @@ interface ProdutoSelecionado {
   quantidade: number
   valorUnitario: number
   complementos: ComplementoSelecionado[]
+  tipoDesconto?: 'fixo' | 'porcentagem' | null
+  valorDesconto?: number | null
+  tipoAcrescimo?: 'fixo' | 'porcentagem' | null
+  valorAcrescimo?: number | null
 }
 
 interface PagamentoSelecionado {
@@ -81,6 +86,14 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
   const [complementosSelecionados, setComplementosSelecionados] = useState<Record<string, string[]>>({})
   // Estado para rastrear se estamos editando um produto existente (índice) ou adicionando um novo (null)
   const [produtoIndexEdicaoComplementos, setProdutoIndexEdicaoComplementos] = useState<number | null>(null)
+  
+  // Estados para modal de edição de produto
+  const [modalEdicaoProdutoOpen, setModalEdicaoProdutoOpen] = useState(false)
+  const [produtoIndexEdicao, setProdutoIndexEdicao] = useState<number | null>(null)
+  const [quantidadeEdicao, setQuantidadeEdicao] = useState<number>(1)
+  const [ehAcrescimo, setEhAcrescimo] = useState<boolean>(false) // false = desconto, true = acréscimo
+  const [ehPorcentagem, setEhPorcentagem] = useState<boolean>(false) // false = valor fixo, true = porcentagem
+  const [valorDescontoAcrescimo, setValorDescontoAcrescimo] = useState<string>('0')
   
   // Estado para modal de confirmação de saída
   const [modalConfirmacaoSaidaOpen, setModalConfirmacaoSaidaOpen] = useState(false)
@@ -319,7 +332,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
 
   // Função para formatar valor do complemento conforme tipoImpactoPreco (para o modal)
   const formatarValorComplemento = (valor: number, tipoImpactoPreco?: 'aumenta' | 'diminui' | 'nenhum'): string => {
-    const valorFormatado = transformarParaReal(valor)
+    const valorFormatado = formatarNumeroComMilhar(valor)
     const tipo = tipoImpactoPreco || 'nenhum'
     
     switch (tipo) {
@@ -342,12 +355,39 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     return complemento.valor * complemento.quantidade
   }
 
-  // Função para calcular o total de um produto incluindo complementos
+  // Função para calcular o total de um produto (sem complementos) com desconto e acréscimo
   const calcularTotalProduto = (produto: ProdutoSelecionado): number => {
     const valorProduto = produto.valorUnitario * produto.quantidade
-    const valorComplementos = produto.complementos.reduce((sum, comp) => {
+    
+    // Calcular desconto
+    let valorDesconto = 0
+    if (produto.tipoDesconto && produto.valorDesconto) {
+      if (produto.tipoDesconto === 'porcentagem') {
+        valorDesconto = valorProduto * (produto.valorDesconto / 100)
+      } else {
+        valorDesconto = produto.valorDesconto
+      }
+    }
+    
+    // Calcular acréscimo
+    let valorAcrescimo = 0
+    if (produto.tipoAcrescimo && produto.valorAcrescimo) {
+      if (produto.tipoAcrescimo === 'porcentagem') {
+        valorAcrescimo = valorProduto * (produto.valorAcrescimo / 100)
+      } else {
+        valorAcrescimo = produto.valorAcrescimo
+      }
+    }
+    
+    return valorProduto - valorDesconto + valorAcrescimo
+  }
+
+  // Função para calcular o total dos complementos de um produto
+  const calcularTotalComplementos = (produto: ProdutoSelecionado): number => {
+    return produto.complementos.reduce((sum, comp) => {
       const tipo = comp.tipoImpactoPreco || 'nenhum'
-      const valorTotal = comp.valor * comp.quantidade
+      // Multiplicar o valor do complemento pela quantidade do complemento E pela quantidade do produto
+      const valorTotal = comp.valor * comp.quantidade * produto.quantidade
       
       if (tipo === 'aumenta') {
         return sum + valorTotal
@@ -356,26 +396,17 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
       }
       return sum
     }, 0)
-    return valorProduto + valorComplementos
   }
 
-  // Calcular totais
+  // Calcular totais do pedido (produtos com desconto/acréscimo + complementos)
   const totalProdutos = useMemo(() => {
     return produtos.reduce((sum, p) => {
-      const valorProduto = p.valorUnitario * p.quantidade
-      const valorComplementos = p.complementos.reduce((compSum, comp) => {
-        const tipo = comp.tipoImpactoPreco || 'nenhum'
-        const valorTotal = comp.valor * comp.quantidade
-        
-        if (tipo === 'aumenta') {
-          return compSum + valorTotal
-        } else if (tipo === 'diminui') {
-          return compSum - valorTotal
-        }
-        // nenhum não afeta o total
-        return compSum
-      }, 0)
-      return sum + valorProduto + valorComplementos
+      // Calcular total do produto (sem complementos) com desconto/acréscimo
+      const totalProduto = calcularTotalProduto(p)
+      // Calcular total dos complementos
+      const totalComplementos = calcularTotalComplementos(p)
+      // Soma produto + complementos
+      return sum + totalProduto + totalComplementos
     }, 0)
   }, [produtos])
 
@@ -577,6 +608,11 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
       novosProdutos[produtoIndexEdicaoComplementos] = {
         ...novosProdutos[produtoIndexEdicaoComplementos],
         complementos: novosComplementos,
+        // Manter desconto e acréscimo existentes
+        tipoDesconto: novosProdutos[produtoIndexEdicaoComplementos].tipoDesconto || null,
+        valorDesconto: novosProdutos[produtoIndexEdicaoComplementos].valorDesconto || null,
+        tipoAcrescimo: novosProdutos[produtoIndexEdicaoComplementos].tipoAcrescimo || null,
+        valorAcrescimo: novosProdutos[produtoIndexEdicaoComplementos].valorAcrescimo || null,
       }
       setProdutos(novosProdutos)
     } else {
@@ -587,6 +623,10 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
         quantidade: 1,
         valorUnitario: produtoSelecionadoParaComplementos.getValor(),
         complementos: novosComplementos,
+        tipoDesconto: null,
+        valorDesconto: null,
+        tipoAcrescimo: null,
+        valorAcrescimo: null,
       }])
     }
 
@@ -619,6 +659,86 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     }))
     
     setModalComplementosOpen(true)
+  }
+
+  // Função para abrir modal de edição de produto
+  const abrirModalEdicaoProduto = (index: number) => {
+    const produto = produtos[index]
+    // Buscar o produto atualizado da lista de produtos para verificar permiteDesconto e permiteAcrescimo
+    const produtoEntity = produtosList.find(p => p.getId() === produto.produtoId)
+    const permiteDesconto = produtoEntity?.permiteDescontoAtivo() || false
+    const permiteAcrescimo = produtoEntity?.permiteAcrescimoAtivo() || false
+    
+    setProdutoIndexEdicao(index)
+    setQuantidadeEdicao(Math.floor(produto.quantidade)) // Garantir que seja sempre inteiro
+    
+    // Verificar se o produto ainda permite desconto/acréscimo e definir valores iniciais
+    if (produto.tipoDesconto && produto.valorDesconto) {
+      // Se tem desconto, usar desconto
+      setEhAcrescimo(false)
+      setEhPorcentagem(produto.tipoDesconto === 'porcentagem')
+      setValorDescontoAcrescimo(produto.tipoDesconto === 'porcentagem' 
+        ? produto.valorDesconto.toString() 
+        : formatarNumeroComMilhar(produto.valorDesconto))
+    } else if (produto.tipoAcrescimo && produto.valorAcrescimo) {
+      // Se tem acréscimo, usar acréscimo
+      setEhAcrescimo(true)
+      setEhPorcentagem(produto.tipoAcrescimo === 'porcentagem')
+      setValorDescontoAcrescimo(produto.tipoAcrescimo === 'porcentagem' 
+        ? produto.valorAcrescimo.toString() 
+        : formatarNumeroComMilhar(produto.valorAcrescimo))
+    } else {
+      // Sem desconto nem acréscimo
+      setEhAcrescimo(false)
+      setEhPorcentagem(false)
+      setValorDescontoAcrescimo('0')
+    }
+    
+    setModalEdicaoProdutoOpen(true)
+  }
+
+  // Função para confirmar edição do produto
+  const confirmarEdicaoProduto = () => {
+    if (produtoIndexEdicao === null) return
+
+    const novosProdutos = [...produtos]
+    const produtoAtual = novosProdutos[produtoIndexEdicao]
+    
+    // Buscar o produto atualizado da lista para verificar permiteDesconto e permiteAcrescimo
+    const produtoEntity = produtosList.find(p => p.getId() === produtoAtual.produtoId)
+    const permiteDesconto = produtoEntity?.permiteDescontoAtivo() || false
+    const permiteAcrescimo = produtoEntity?.permiteAcrescimoAtivo() || false
+    
+    // Converter valor de desconto/acréscimo
+    let valorNum: number | null = null
+    
+    // Só processar se houver valor e o produto permitir
+    const valorDigitado = valorDescontoAcrescimo && valorDescontoAcrescimo !== '0'
+    const podeAplicarDesconto = !ehAcrescimo && permiteDesconto && valorDigitado
+    const podeAplicarAcrescimo = ehAcrescimo && permiteAcrescimo && valorDigitado
+    
+    if (podeAplicarDesconto || podeAplicarAcrescimo) {
+      if (ehPorcentagem) {
+        // Para porcentagem, o valor já está em porcentagem (0-100)
+        valorNum = parseFloat(valorDescontoAcrescimo) || 0
+      } else {
+        // Para fixo, converter de formato brasileiro para número
+        valorNum = parseFloat(valorDescontoAcrescimo.replace(/\./g, '').replace(',', '.')) || 0
+      }
+    }
+
+    novosProdutos[produtoIndexEdicao] = {
+      ...produtoAtual,
+      quantidade: Math.floor(quantidadeEdicao), // Garantir que seja sempre inteiro
+      tipoDesconto: podeAplicarDesconto ? (ehPorcentagem ? 'porcentagem' : 'fixo') : null,
+      valorDesconto: podeAplicarDesconto ? valorNum : null,
+      tipoAcrescimo: podeAplicarAcrescimo ? (ehPorcentagem ? 'porcentagem' : 'fixo') : null,
+      valorAcrescimo: podeAplicarAcrescimo ? valorNum : null,
+    }
+
+    setProdutos(novosProdutos)
+    setModalEdicaoProdutoOpen(false)
+    setProdutoIndexEdicao(null)
   }
 
   const removerProduto = (index: number) => {
@@ -735,6 +855,10 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
             produtoId: p.produtoId,
             quantidade: p.quantidade,
             valorUnitario: p.valorUnitario,
+            tipoDesconto: p.tipoDesconto || null,
+            valorDesconto: p.valorDesconto || null,
+            tipoAcrescimo: p.tipoAcrescimo || null,
+            valorAcrescimo: p.valorAcrescimo || null,
             complementos: (p.complementos || []).map(comp => ({
               complementoId: comp.id,
               grupoComplementoId: comp.grupoId,
@@ -803,6 +927,12 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     setComplementosSelecionados({})
     setProdutoSelecionadoParaComplementos(null)
     setModalComplementosOpen(false)
+    setModalEdicaoProdutoOpen(false)
+    setProdutoIndexEdicao(null)
+    setQuantidadeEdicao(1)
+    setEhAcrescimo(false)
+    setEhPorcentagem(false)
+    setValorDescontoAcrescimo('0')
   }
 
   // Verifica se há dados da venda que seriam perdidos
@@ -1226,7 +1356,9 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                     {/* Linhas de produtos */}
                     <div className="space-y-1">
                       {produtos.map((produto, index) => {
-                        const totalProduto = produto.valorUnitario * produto.quantidade
+                        const totalProduto = calcularTotalProduto(produto)
+                        const totalComplementos = calcularTotalComplementos(produto)
+                        const totalProdutoComComplementos = totalProduto + totalComplementos
                         
                         return (
                           <div key={index} className="space-y-0">
@@ -1241,7 +1373,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                                 <input
                                   type="number"
                                   min={1}
-                                  value={produto.quantidade}
+                                  value={Math.floor(produto.quantidade)}
                                   onChange={(e) => {
                                     const valor = parseInt(e.target.value) || 1
                                     atualizarProduto(index, 'quantidade', Math.max(1, valor))
@@ -1346,11 +1478,19 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                               {/* Total */}
                               <div className="flex-1">
                                 <span className="text-xs font-semibold text-gray-900 text-right block">
-                                  R$ {formatarNumeroComMilhar(totalProduto)}
+                                  R$ {formatarNumeroComMilhar(totalProdutoComComplementos)}
                                 </span>
                               </div>
-                              {/* Ações (Complementos e Remover) */}
-                              <div className="flex-1 flex justify-end">
+                              {/* Ações (Editar, Complementos e Remover) */}
+                              <div className="flex-1 flex justify-end gap-1">
+                                <button
+                                  onClick={() => abrirModalEdicaoProduto(index)}
+                                  type="button"
+                                  title="Editar produto"
+                                  className="h-7 w-7 p-0 flex items-center justify-center min-w-[28px] min-h-[28px] border-0 hover:bg-gray-200 rounded transition-colors"
+                                >
+                                  <MdEdit className="w-4 h-4 text-primary" />
+                                </button>
                                 {(() => {
                                   const produtoEntity = produtosList.find(p => p.getId() === produto.produtoId)
                                   if (!produtoEntity) return null
@@ -1364,7 +1504,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                                     <button
                                       onClick={() => abrirModalComplementosProdutoExistente(index)}
                                       type="button"
-                                      className="h-7 w-7 p-0 flex items-center justify-center min-w-[28px] min-h-[28px] border-0"
+                                      className="h-7 w-7 p-0 flex items-center justify-center min-w-[28px] min-h-[28px] border-0 hover:bg-gray-200 rounded transition-colors"
                                       title="Editar complementos"
                                     >
                                       <MdLaunch className="w-4 h-4 text-primary" />
@@ -1375,7 +1515,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                                   onClick={() => removerProduto(index)}
                                   type="button"
                                   title="Remover produto"
-                                  className="h-7 w-7 p-0 flex items-center justify-center min-w-[28px] min-h-[28px] border-0"
+                                  className="h-7 w-7 p-0 flex items-center justify-center min-w-[28px] min-h-[28px] border-0 hover:bg-red-100 rounded transition-colors"
                                 >
                                   <MdDelete className="w-4 h-4 text-red-500" />
                                 </button>
@@ -1390,9 +1530,10 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                               return (
                                 <div
                                   key={compKey}
-                                  className={`flex gap-1 items-center rounded ${
+                                  className={`flex gap-1 items-center rounded -mt-0.5 ${
                                     index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
                                   } hover:bg-gray-100`}
+                                  style={{ minHeight: '24px' }}
                                 >
                                   {/* Quantidade do Complemento */}
                                   <div className="w-[60px] flex-shrink-0 pl-4">
@@ -1409,120 +1550,33 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                                         WebkitAppearance: 'none',
                                         appearance: 'none',
                                       }}
-                                      className="w-full h-7 text-right text-xs border-0 bg-transparent focus:bg-white focus:ring-1 focus:ring-primary px-2 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                      className="w-full h-5 text-right text-xs border-0 bg-transparent focus:bg-white focus:ring-1 focus:ring-primary px-1 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     />
                                   </div>
                                   {/* Nome do Complemento com indentação */}
                                   <div className="flex-[4] min-w-0 pl-4">
-                                    <span className="text-xs text-gray-600 truncate block">
+                                    <span className="text-xs text-gray-600 truncate block leading-tight">
                                       {complemento.nome}
                                     </span>
                                   </div>
-                                  {/* Valor Unitário do Complemento - Editável */}
+                                  {/* Valor Unitário do Complemento - Apenas exibição */}
                                   <div className="flex-1">
-                                    {complemento.tipoImpactoPreco === 'nenhum' ? (
-                                      <span className="text-xs text-gray-600 text-right block">
-                                        -
-                                      </span>
-                                    ) : (
-                                      <div className="flex items-center justify-end gap-1">
-                                       
-                                        <input
-                                          type="text"
-                                          value={valorEmEdicao !== undefined 
-                                            ? valorEmEdicao
-                                            : (complemento.valor > 0 ? formatarNumeroComMilhar(complemento.valor) : '')
-                                          }
-                                          onChange={(e) => {
-                                            let valorStr = e.target.value
-                                            
-                                            if (valorStr === '') {
-                                              setValoresEmEdicao(prev => ({ ...prev, [compKey]: '' }))
-                                              atualizarComplemento(index, compIndex, 'valor', 0)
-                                              return
-                                            }
-                                            
-                                            valorStr = valorStr.replace(/\./g, '').replace(',', '').replace(/\D/g, '')
-                                            
-                                            if (valorStr === '') {
-                                              setValoresEmEdicao(prev => ({ ...prev, [compKey]: '' }))
-                                              atualizarComplemento(index, compIndex, 'valor', 0)
-                                              return
-                                            }
-                                            
-                                            const valorCentavos = parseInt(valorStr, 10)
-                                            const valorReais = valorCentavos / 100
-                                            const valorFormatado = formatarNumeroComMilhar(valorReais)
-                                            
-                                            setValoresEmEdicao(prev => ({ ...prev, [compKey]: valorFormatado }))
-                                            atualizarComplemento(index, compIndex, 'valor', valorReais)
-                                          }}
-                                          onFocus={(e) => {
-                                            const valorAtual = complemento.valor
-                                            if (valorAtual > 0) {
-                                              const valorFormatado = formatarNumeroComMilhar(valorAtual)
-                                              setValoresEmEdicao(prev => ({ ...prev, [compKey]: valorFormatado }))
-                                            } else {
-                                              setValoresEmEdicao(prev => ({ ...prev, [compKey]: '' }))
-                                            }
-                                            setTimeout(() => e.target.select(), 0)
-                                          }}
-                                          onBlur={(e) => {
-                                            const valor = complemento.valor
-                                            if (valor > 0) {
-                                              const valorFormatado = formatarNumeroComMilhar(valor)
-                                              setValoresEmEdicao(prev => ({ ...prev, [compKey]: valorFormatado }))
-                                              setTimeout(() => {
-                                                setValoresEmEdicao(prev => {
-                                                  const novo = { ...prev }
-                                                  delete novo[compKey]
-                                                  return novo
-                                                })
-                                              }, 100)
-                                            } else {
-                                              setValoresEmEdicao(prev => {
-                                                const novo = { ...prev }
-                                                delete novo[compKey]
-                                                return novo
-                                              })
-                                            }
-                                          }}
-                                          placeholder="0,00"
-                                          style={{
-                                            MozAppearance: 'textfield',
-                                            WebkitAppearance: 'none',
-                                            appearance: 'none',
-                                          }}
-                                          className="w-full h-7 text-xs border-0 bg-transparent focus:bg-white focus:ring-1 focus:ring-primary p-1 text-right"
-                                        />
-                                      </div>
-                                    )}
-                                  </div>
-                                  {/* Total do Complemento */}
-                                  <div className="flex-1">
-                                    <span className="text-xs font-semibold text-gray-600 text-right block">
-                                      {complemento.tipoImpactoPreco === 'nenhum' ? (
-                                        <>-</>
-                                      ) : complemento.tipoImpactoPreco === 'aumenta' ? (
-                                        <>+ R$ {formatarNumeroComMilhar(obterTotalComplemento(complemento))}</>
-                                      ) : complemento.tipoImpactoPreco === 'diminui' ? (
-                                        <>- R$ {formatarNumeroComMilhar(obterTotalComplemento(complemento))}</>
-                                      ) : (
-                                        <>R$ {formatarNumeroComMilhar(obterTotalComplemento(complemento))}</>
-                                      )}
+                                    <span className="text-xs text-gray-600 text-right block leading-tight">
+                                      {formatarValorComplemento(complemento.valor, complemento.tipoImpactoPreco)}
                                     </span>
                                   </div>
+                                  {/* Espaço vazio onde seria o Total (complementos não têm total próprio) */}
+                                  <div className="flex-1"></div>
                                   {/* Botão Remover Complemento */}
                                   <div className="flex-1 flex justify-end">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
+                                    <button
                                       onClick={() => removerComplemento(index, compIndex)}
                                       type="button"
-                                      className="h-7 w-7 p-0 flex items-center justify-center min-w-[28px] min-h-[28px] border-0"
+                                      title="Remover complemento"
+                                      className="h-5 w-5 p-0 flex items-center justify-center min-w-[20px] min-h-[20px] border-0"
                                     >
-                                      <MdDelete className="w-4 h-4 text-red-500" />
-                                    </Button>
+                                      <MdClear className="w-3 h-3 text-red-500" />
+                                    </button>
                                   </div>
                                 </div>
                               )
@@ -1576,23 +1630,10 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                   {grupos.map(grupo => {
                     const corHex = grupo.getCorHex()
                     const iconName = grupo.getIconName()
-                    const showTooltip = tooltipGrupoId === grupo.getId()
                     return (
                       <div key={grupo.getId()} className="relative">
                         <button
                           onClick={() => setGrupoSelecionadoId(grupo.getId())}
-                          onMouseEnter={(e) => {
-                            const rect = e.currentTarget.getBoundingClientRect()
-                            setTooltipGrupoId(grupo.getId())
-                            setTooltipPosition({
-                              x: rect.left + rect.width / 2,
-                              y: rect.top - 10,
-                            })
-                          }}
-                          onMouseLeave={() => {
-                            setTooltipGrupoId(null)
-                            setTooltipPosition(null)
-                          }}
                           className="aspect-square p-2 border-2 rounded-lg transition-all flex flex-col items-center justify-center text-center gap-2 hover:opacity-80 overflow-hidden w-full"
                           style={{
                             borderColor: corHex,
@@ -1611,21 +1652,6 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                           {grupo.getNome()}
                         </div>
                       </button>
-                      {showTooltip && tooltipPosition && (
-                        <div
-                          className="absolute z-50 p-2 bg-white border border-gray-300 rounded-lg shadow-lg pointer-events-none"
-                          style={{
-                            left: '50%',
-                            top: '30px',
-                            transform: 'translate(-50%, -100%)',
-                            maxWidth: '120px',
-                          }}
-                        >
-                          <span className="w-[105px] block text-[10px] text-center font-medium text-gray-900 break-words">{grupo.getNome()}</span>
-                         
-                          
-                        </div>
-                      )}
                     </div>
                   )
                   })}
@@ -1645,7 +1671,6 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                     const corHex = grupo.getCorHex()
                     const iconName = grupo.getIconName()
                     const isSelected = grupoSelecionadoId === grupo.getId()
-                    const showTooltip = tooltipGrupoId === grupo.getId()
                     return (
                       <div key={grupo.getId()} className="relative flex-shrink-0" style={{ width: '100px' }}>
                         <button
@@ -1658,18 +1683,6 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                           onMouseDown={(e) => {
                             // Permitir que o evento propague para o container para iniciar o arraste
                             // O onClick só será executado se não houver movimento
-                          }}
-                          onMouseEnter={(e) => {
-                            const rect = e.currentTarget.getBoundingClientRect()
-                            setTooltipGrupoId(grupo.getId())
-                            setTooltipPosition({
-                              x: rect.left + rect.width / 2,
-                              y: rect.top - 10,
-                            })
-                          }}
-                          onMouseLeave={() => {
-                            setTooltipGrupoId(null)
-                            setTooltipPosition(null)
                           }}
                           className="aspect-square p-2 border-2 rounded-lg transition-all flex flex-col items-center justify-center text-center gap-2 pointer-events-auto overflow-hidden w-full h-full"
                           style={{
@@ -1691,20 +1704,6 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                           {grupo.getNome()}
                         </div>
                       </button>
-                      {showTooltip && tooltipPosition && (
-                        <div
-                          className="absolute z-50 p-1 bg-white bg-opacity-80 border border-gray-300 rounded-lg shadow-lg pointer-events-none"
-                          style={{
-                            left: '50%',
-                            top: '0%',
-                            marginTop: '2px',
-                            transform: 'translateX(-50%)',
-                            maxWidth: '120px',
-                          }}
-                        >
-                          <span className="max-w-[120px] min-w-[100px] block text-[10px] text-center font-medium text-gray-900 break-words">{grupo.getNome()}</span>
-                        </div>
-                      )}
                     </div>
                     )
                   })}
@@ -2102,6 +2101,235 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                   Cancelar
                 </Button>
                 <Button onClick={confirmarProdutoComComplementos}>
+                  Confirmar
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )
+      })()}
+
+      {/* Modal de Edição de Produto */}
+      {modalEdicaoProdutoOpen && produtoIndexEdicao !== null && (() => {
+        const produto = produtos[produtoIndexEdicao]
+        const produtoEntity = produtosList.find(p => p.getId() === produto.produtoId)
+        const permiteDesconto = produtoEntity?.permiteDescontoAtivo() || false
+        const permiteAcrescimo = produtoEntity?.permiteAcrescimoAtivo() || false
+        
+        return (
+          <Dialog
+            open={modalEdicaoProdutoOpen}
+            onOpenChange={(open) => {
+              setModalEdicaoProdutoOpen(open)
+              if (!open) {
+                setProdutoIndexEdicao(null)
+              }
+            }}
+            maxWidth={false}
+            sx={{
+              '& .MuiDialog-paper': {
+                width: '500px',
+                maxWidth: '500px',
+                backgroundColor: '#f0fdf4', // Light green background
+              },
+            }}
+          >
+            <DialogContent sx={{ p: 3 }}>
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1">
+                  <DialogTitle sx={{ fontSize: '1.5rem', fontWeight: 'bold', mb: 1, p: 0 }}>
+                    {produto.nome}
+                  </DialogTitle>
+                  <div className="text-lg font-semibold text-gray-700">
+                    {(() => {
+                      const valorProduto = produto.valorUnitario * quantidadeEdicao
+                      // Calcular complementos com a quantidade em edição
+                      const valorComplementos = produto.complementos.reduce((sum, comp) => {
+                        const tipo = comp.tipoImpactoPreco || 'nenhum'
+                        const valorTotal = comp.valor * comp.quantidade * quantidadeEdicao
+                        if (tipo === 'aumenta') {
+                          return sum + valorTotal
+                        } else if (tipo === 'diminui') {
+                          return sum - valorTotal
+                        }
+                        return sum
+                      }, 0)
+                      return transformarParaReal(valorProduto + valorComplementos)
+                    })()}
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setModalEdicaoProdutoOpen(false)
+                    setProdutoIndexEdicao(null)
+                  }}
+                  className="p-1 hover:bg-gray-200 rounded transition-colors"
+                >
+                  <MdClose className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+
+              {/* Quantidade */}
+              <div className="bg-white rounded-lg p-4 mb-4">
+                <div className="text-sm font-semibold text-primary mb-3">Quantidade</div>
+                <div className="flex items-center justify-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setQuantidadeEdicao(Math.max(1, quantidadeEdicao - 1))}
+                    className="w-10 h-10 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
+                  >
+                    <MdRemove className="w-5 h-5" />
+                  </button>
+                  <div className="text-2xl font-semibold text-gray-900 min-w-[60px] text-center">
+                    {quantidadeEdicao.toFixed(0)}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setQuantidadeEdicao(quantidadeEdicao + 1)}
+                    className="w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center hover:bg-green-600 transition-colors"
+                  >
+                    <MdAdd className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Desconto/Acréscimo */}
+              <div className="bg-white  rounded-lg p-4">
+                  
+                <div className="text-sm text-center font-semibold text-primary mb-3">Desconto/Acréscimo</div>
+                <div className="flex flex-col min-h-24 items-center gap-1">
+                <div className="flex w-full items-center justify-between gap-4">
+                  {/* Switch Esquerdo: Desconto/Acréscimo */}
+                  <div className="flex min-w-[100px] flex-col items-center gap-1">
+                    <span className="text-xs text-gray-600">{ehAcrescimo ? 'Acréscimo' : 'Desconto'}</span>
+                    <Switch
+                      checked={ehAcrescimo}
+                      onChange={(e) => {
+                        setEhAcrescimo(e.target.checked)
+                        // Resetar valor ao mudar tipo
+                        setValorDescontoAcrescimo('0')
+                      }}
+                      color="secondary"
+                    />
+                  </div>
+
+                  {/* Input Central */}
+                  <div className="flex-1 max-w-[100px]">
+                    <Input
+                      type="text"
+                      value={valorDescontoAcrescimo}
+                      onChange={(e) => {
+                        let valorStr = e.target.value.replace(/\./g, '').replace(',', '').replace(/\D/g, '')
+                        if (valorStr === '') {
+                          setValorDescontoAcrescimo('0')
+                          return
+                        }
+                        if (ehPorcentagem) {
+                          // Para porcentagem, valor de 0 a 100
+                          const valorNum = parseInt(valorStr, 10)
+                          const valorLimitado = Math.min(100, valorNum)
+                          setValorDescontoAcrescimo(valorLimitado.toString())
+                        } else {
+                          // Para fixo, valor em centavos
+                          const valorCentavos = parseInt(valorStr, 10)
+                          const valorReais = valorCentavos / 100
+                          setValorDescontoAcrescimo(formatarNumeroComMilhar(valorReais))
+                        }
+                      }}
+                      disabled={(ehAcrescimo && !permiteAcrescimo) || (!ehAcrescimo && !permiteDesconto)}
+                      className="w-full text-center"
+                      placeholder={ehPorcentagem ? '0' : '0,00'}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          padding: '4px 8px',
+                          '& input': {
+                            padding: '4px 8px',
+                            textAlign: 'center',
+                          },
+                        },
+                      }}
+                    />
+                  </div>
+
+                  {/* Switch Direito: Porcentagem/Valor */}
+                  <div className="flex min-w-[100px] flex-col items-center gap-1">
+                    <span className="text-xs text-gray-600">{ehPorcentagem ? 'Porcento' : 'Valor'}</span>
+                    <Switch
+                      checked={ehPorcentagem}
+                      onChange={(e) => {
+                        setEhPorcentagem(e.target.checked)
+                        // Resetar valor ao mudar tipo
+                        setValorDescontoAcrescimo('0')
+                      }}
+                      size="small"
+                    />
+                  </div>
+                  </div>
+
+                  <div className="flex flex-col items-center gap-1">
+                  {((!ehAcrescimo && !permiteDesconto) || (ehAcrescimo && !permiteAcrescimo)) && (
+                      <div className="text-xs text-red-600 text-center mt-1">
+                        {!ehAcrescimo 
+                          ? 'Permitir desconto está desativado para este produto'
+                          : 'Permitir acréscimo está desativado para este produto'}
+                      </div>
+                    )}
+                    </div>
+                </div>
+
+                {/* Exibir total calculado */}
+                {(() => {
+                  const valorUnitario = produto.valorUnitario
+                  const valorProduto = valorUnitario * quantidadeEdicao
+                  // Calcular complementos com a quantidade em edição
+                  const valorComplementos = produto.complementos.reduce((sum, comp) => {
+                    const tipo = comp.tipoImpactoPreco || 'nenhum'
+                    const valorTotal = comp.valor * comp.quantidade * quantidadeEdicao
+                    if (tipo === 'aumenta') {
+                      return sum + valorTotal
+                    } else if (tipo === 'diminui') {
+                      return sum - valorTotal
+                    }
+                    return sum
+                  }, 0)
+                  const subtotal = valorProduto + valorComplementos // Incluir complementos no subtotal
+                  let valorCalculado = 0
+                  
+                  if (valorDescontoAcrescimo && valorDescontoAcrescimo !== '0') {
+                    if (ehPorcentagem) {
+                      const percentual = parseFloat(valorDescontoAcrescimo) || 0
+                      valorCalculado = subtotal * (percentual / 100) // Aplicar sobre produto + complementos
+                    } else {
+                      valorCalculado = parseFloat(valorDescontoAcrescimo.replace(/\./g, '').replace(',', '.')) || 0
+                    }
+                  }
+                  
+                  const total = ehAcrescimo ? subtotal + valorCalculado : subtotal - valorCalculado
+                  
+                  return (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Total:</span>
+                        <span className="text-lg font-semibold text-gray-900">
+                          {transformarParaReal(Math.max(0, total))}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
+
+              <DialogFooter sx={{ mt: 3, gap: 2 }}>
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    setModalEdicaoProdutoOpen(false)
+                    setProdutoIndexEdicao(null)
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button onClick={confirmarEdicaoProduto}>
                   Confirmar
                 </Button>
               </DialogFooter>
