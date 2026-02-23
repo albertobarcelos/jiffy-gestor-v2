@@ -15,7 +15,7 @@ import { useCreateVendaGestor } from '@/src/presentation/hooks/useVendas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { extractTokenInfo } from '@/src/shared/utils/validateToken'
-import { MdAdd, MdDelete, MdSearch, MdArrowForward, MdArrowBack, MdCheckCircle } from 'react-icons/md'
+import { MdLaunch, MdDelete, MdSearch, MdArrowForward, MdArrowBack, MdCheckCircle, MdAttachMoney, MdCreditCard, MdQrCode, MdPerson, MdStore, MdPersonOutline, MdInfo } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { SeletorClienteModal } from './SeletorClienteModal'
@@ -62,11 +62,14 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
   const [produtos, setProdutos] = useState<ProdutoSelecionado[]>([])
   const [pagamentos, setPagamentos] = useState<PagamentoSelecionado[]>([])
   const [meioPagamentoId, setMeioPagamentoId] = useState<string>('')
+  const [valorRecebido, setValorRecebido] = useState<string>('')
   const [grupoSelecionadoId, setGrupoSelecionadoId] = useState<string | null>(null)
   const [seletorClienteOpen, setSeletorClienteOpen] = useState(false)
   const [tooltipGrupoId, setTooltipGrupoId] = useState<string | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null)
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1)
+  const [nomeUsuario, setNomeUsuario] = useState<string>('')
+  const [isLoadingUsuario, setIsLoadingUsuario] = useState(false)
   
   // Estado para controlar valores em edição (índice do produto ou chave do complemento -> valor string)
   const [valoresEmEdicao, setValoresEmEdicao] = useState<Record<string | number, string>>({})
@@ -76,6 +79,8 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
   const [modalComplementosOpen, setModalComplementosOpen] = useState(false)
   // Estado para rastrear complementos selecionados por produto (produtoId -> complementoIds[])
   const [complementosSelecionados, setComplementosSelecionados] = useState<Record<string, string[]>>({})
+  // Estado para rastrear se estamos editando um produto existente (índice) ou adicionando um novo (null)
+  const [produtoIndexEdicaoComplementos, setProdutoIndexEdicaoComplementos] = useState<number | null>(null)
   
   // Estado para modal de confirmação de saída
   const [modalConfirmacaoSaidaOpen, setModalConfirmacaoSaidaOpen] = useState(false)
@@ -88,6 +93,13 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
   const startXRef = useRef(0)
   const scrollLeftRef = useRef(0)
   const hasMovedRef = useRef(false) // Rastreia se houve movimento significativo durante o arraste
+
+  // Estados para arrastar a lista horizontal de formas de pagamento
+  const meiosPagamentoScrollRef = useRef<HTMLDivElement>(null)
+  const [isDraggingMeiosPagamento, setIsDraggingMeiosPagamento] = useState(false)
+  const startXMeiosPagamentoRef = useRef(0)
+  const scrollLeftMeiosPagamentoRef = useRef(0)
+  const hasMovedMeiosPagamentoRef = useRef(false)
 
   // Buscar grupos de produtos
   const { data: gruposData, isLoading: isLoadingGrupos } = useGruposProdutos({
@@ -219,6 +231,55 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     // Não resetar o dragging ao sair do elemento, pois o arraste pode continuar
     // O reset só acontece no mouseup global
   }, [])
+
+  // Handlers para arrastar a lista horizontal de formas de pagamento
+  const handleMouseDownMeiosPagamento = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!meiosPagamentoScrollRef.current) return
+    hasMovedMeiosPagamentoRef.current = false
+    setIsDraggingMeiosPagamento(true)
+    
+    const startXValue = e.pageX - meiosPagamentoScrollRef.current.offsetLeft
+    const scrollLeftValue = meiosPagamentoScrollRef.current.scrollLeft
+    startXMeiosPagamentoRef.current = startXValue
+    scrollLeftMeiosPagamentoRef.current = scrollLeftValue
+    
+    meiosPagamentoScrollRef.current.style.cursor = 'grabbing'
+    meiosPagamentoScrollRef.current.style.userSelect = 'none'
+    
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (!meiosPagamentoScrollRef.current) return
+      
+      const x = e.pageX - meiosPagamentoScrollRef.current.offsetLeft
+      const walk = (x - startXMeiosPagamentoRef.current) * 2
+      
+      if (Math.abs(walk) > 5) {
+        hasMovedMeiosPagamentoRef.current = true
+        e.preventDefault()
+        e.stopPropagation()
+      }
+      
+      if (hasMovedMeiosPagamentoRef.current) {
+        meiosPagamentoScrollRef.current.scrollLeft = scrollLeftMeiosPagamentoRef.current - walk
+      }
+    }
+    
+    const handleGlobalMouseUp = () => {
+      if (!meiosPagamentoScrollRef.current) return
+      setIsDraggingMeiosPagamento(false)
+      meiosPagamentoScrollRef.current.style.cursor = 'grab'
+      meiosPagamentoScrollRef.current.style.userSelect = 'auto'
+      
+      document.removeEventListener('mousemove', handleGlobalMouseMove)
+      document.removeEventListener('mouseup', handleGlobalMouseUp)
+      
+      setTimeout(() => {
+        hasMovedMeiosPagamentoRef.current = false
+      }, 100)
+    }
+    
+    document.addEventListener('mousemove', handleGlobalMouseMove)
+    document.addEventListener('mouseup', handleGlobalMouseUp)
+  }, [])
   
   // Ordenar grupos por nome
   const grupos = useMemo(() => {
@@ -281,6 +342,23 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     return complemento.valor * complemento.quantidade
   }
 
+  // Função para calcular o total de um produto incluindo complementos
+  const calcularTotalProduto = (produto: ProdutoSelecionado): number => {
+    const valorProduto = produto.valorUnitario * produto.quantidade
+    const valorComplementos = produto.complementos.reduce((sum, comp) => {
+      const tipo = comp.tipoImpactoPreco || 'nenhum'
+      const valorTotal = comp.valor * comp.quantidade
+      
+      if (tipo === 'aumenta') {
+        return sum + valorTotal
+      } else if (tipo === 'diminui') {
+        return sum - valorTotal
+      }
+      return sum
+    }, 0)
+    return valorProduto + valorComplementos
+  }
+
   // Calcular totais
   const totalProdutos = useMemo(() => {
     return produtos.reduce((sum, p) => {
@@ -305,6 +383,120 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     return pagamentos.reduce((sum, p) => sum + p.valor, 0)
   }, [pagamentos])
 
+  // Calcular valor a pagar (restante)
+  const valorAPagar = useMemo(() => {
+    return Math.max(0, totalProdutos - totalPagamentos)
+  }, [totalProdutos, totalPagamentos])
+
+  // Calcular troco (apenas se o último pagamento foi em dinheiro e ultrapassou o valor a pagar)
+  const troco = useMemo(() => {
+    if (pagamentos.length === 0) return 0
+    
+    // Verificar o último pagamento
+    const ultimoPagamento = pagamentos[pagamentos.length - 1]
+    const meioUltimoPagamento = meiosPagamento.find(m => m.getId() === ultimoPagamento.meioPagamentoId)
+    
+    if (!meioUltimoPagamento) return 0
+    
+    const nomeMeio = meioUltimoPagamento.getNome().toLowerCase()
+    const isDinheiro = nomeMeio.includes('dinheiro') || nomeMeio.includes('cash')
+    
+    // Se o último pagamento foi em dinheiro e ultrapassou o valor que faltava pagar
+    if (isDinheiro) {
+      // Calcular quanto faltava pagar antes deste último pagamento
+      const totalAntesUltimoPagamento = pagamentos.slice(0, -1).reduce((sum, p) => sum + p.valor, 0)
+      const valorFaltavaPagar = totalProdutos - totalAntesUltimoPagamento
+      
+      // Se o valor recebido em dinheiro foi maior que o que faltava, há troco
+      if (ultimoPagamento.valor > valorFaltavaPagar) {
+        return ultimoPagamento.valor - valorFaltavaPagar
+      }
+    }
+    
+    return 0
+  }, [totalProdutos, pagamentos, meiosPagamento])
+
+  // Função para obter ícone do meio de pagamento
+  const obterIconeMeioPagamento = (nome: string) => {
+    const nomeLower = nome.toLowerCase()
+    if (nomeLower.includes('dinheiro') || nomeLower.includes('cash')) {
+      return MdAttachMoney
+    }
+    if (nomeLower.includes('pix')) {
+      return MdQrCode
+    }
+    if (nomeLower.includes('credito') || nomeLower.includes('debito') || nomeLower.includes('cartão') || nomeLower.includes('cartao')) {
+      return MdCreditCard
+    }
+    return MdCreditCard // Ícone padrão
+  }
+
+  // Função para formatar valor recebido
+  const formatarValorRecebido = (valor: string): string => {
+    // Remove tudo exceto números
+    const apenasNumeros = valor.replace(/\D/g, '')
+    if (apenasNumeros === '') return ''
+    
+    // Converte para número (centavos) e divide por 100
+    const valorCentavos = parseInt(apenasNumeros, 10)
+    const valorReais = valorCentavos / 100
+    
+    return formatarNumeroComMilhar(valorReais)
+  }
+
+  // Função para verificar se é meio de pagamento em dinheiro
+  const isMeioPagamentoDinheiro = (meioPagamentoId: string): boolean => {
+    const meio = meiosPagamento.find(m => m.getId() === meioPagamentoId)
+    if (!meio) return false
+    const nomeMeio = meio.getNome().toLowerCase()
+    return nomeMeio.includes('dinheiro') || nomeMeio.includes('cash')
+  }
+
+  // Função para adicionar pagamento ao clicar no card
+  const adicionarPagamentoPorCard = (meioPagamentoIdSelecionado: string) => {
+    // Se não houver valor digitado, usar o valor a pagar
+    let valorParaUsar = 0
+    
+    if (valorRecebido && valorRecebido.trim() !== '') {
+      // Converter valor formatado para número
+      const valorLimpo = valorRecebido.replace(/\./g, '').replace(',', '.')
+      valorParaUsar = parseFloat(valorLimpo) || 0
+    } else {
+      // Se não digitou valor, usar o valor a pagar
+      valorParaUsar = valorAPagar
+    }
+
+    if (valorParaUsar <= 0) {
+      showToast.error('Valor inválido')
+      return
+    }
+
+    // Verificar se é dinheiro
+    const isDinheiro = isMeioPagamentoDinheiro(meioPagamentoIdSelecionado)
+    
+    // Se não for dinheiro, limitar ao valor a pagar exato
+    if (!isDinheiro && valorParaUsar > valorAPagar) {
+      showToast.error(`Este meio de pagamento não pode ultrapassar o valor a pagar.`)
+      return
+    }
+
+    // Se for dinheiro:
+    // - Pode ser menor que o valor a pagar (pagamento parcial)
+    // - Pode ser igual ao valor a pagar (pagamento exato)
+    // - Pode ser maior que o valor a pagar (para calcular troco)
+    // Não precisa de validação adicional para dinheiro
+
+    // Permitir usar o mesmo meio de pagamento múltiplas vezes
+    // A única restrição é que meios que não são dinheiro não podem ultrapassar o valor a pagar
+    setPagamentos([...pagamentos, {
+      meioPagamentoId: meioPagamentoIdSelecionado,
+      valor: valorParaUsar,
+    }])
+    
+    // Limpar valor recebido
+    setValorRecebido('')
+  }
+
   // Função para verificar se o produto tem complementos
   const produtoTemComplementos = (produto: Produto): boolean => {
     const gruposComplementos = produto.getGruposComplementos()
@@ -320,12 +512,23 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     const produto = produtosList.find(p => p.getId() === produtoId)
     if (!produto) return
 
-    const jaExiste = produtos.find(p => p.produtoId === produtoId)
-    if (jaExiste) {
-      showToast.error('Produto já adicionado')
+    const abreComplementos = produto.abreComplementosAtivo()
+    const temComplementos = produtoTemComplementos(produto)
+
+    // Se o produto tem complementos e abreComplementos é true, abrir modal antes de adicionar
+    if (abreComplementos && temComplementos) {
+      setProdutoSelecionadoParaComplementos(produto)
+      setProdutoIndexEdicaoComplementos(null) // Novo produto, não está editando
+      // Inicializar complementos vazios para novo produto
+      setComplementosSelecionados(prev => ({
+        ...prev,
+        [produto.getId()]: []
+      }))
+      setModalComplementosOpen(true)
       return
     }
 
+    // Se não tem complementos, adicionar diretamente
     setProdutos([...produtos, {
       produtoId: produto.getId(),
       nome: produto.getNome(),
@@ -333,6 +536,89 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
       valorUnitario: produto.getValor(),
       complementos: [],
     }])
+  }
+
+  // Função para confirmar e adicionar/atualizar produto com complementos
+  const confirmarProdutoComComplementos = () => {
+    if (!produtoSelecionadoParaComplementos) return
+
+    const produtoId = produtoSelecionadoParaComplementos.getId()
+    const complementosAtuais = complementosSelecionados[produtoId] || []
+    
+    // Criar array de complementos selecionados
+    const novosComplementos: ComplementoSelecionado[] = []
+    produtoSelecionadoParaComplementos.getGruposComplementos().forEach((grupo: { id: string; nome: string; complementos: Array<{ id: string; nome: string; valor?: number; tipoImpactoPreco?: 'aumenta' | 'diminui' | 'nenhum' }> }) => {
+      grupo.complementos.forEach((comp: { id: string; nome: string; valor?: number; tipoImpactoPreco?: 'aumenta' | 'diminui' | 'nenhum' }) => {
+        const chaveComp = `${grupo.id}-${comp.id}`
+        if (complementosAtuais.includes(chaveComp)) {
+          // Se está editando um produto existente, manter a quantidade do complemento existente
+          let quantidade = 1
+          if (produtoIndexEdicaoComplementos !== null) {
+            const produtoExistente = produtos[produtoIndexEdicaoComplementos]
+            const complementoExistente = produtoExistente.complementos.find(c => c.grupoId === grupo.id && c.id === comp.id)
+            quantidade = complementoExistente?.quantidade || 1
+          }
+          
+          novosComplementos.push({
+            id: comp.id,
+            grupoId: grupo.id,
+            nome: comp.nome,
+            valor: comp.valor || 0,
+            quantidade,
+            tipoImpactoPreco: comp.tipoImpactoPreco || 'nenhum',
+          })
+        }
+      })
+    })
+
+    // Se está editando um produto existente, atualizar
+    if (produtoIndexEdicaoComplementos !== null) {
+      const novosProdutos = [...produtos]
+      novosProdutos[produtoIndexEdicaoComplementos] = {
+        ...novosProdutos[produtoIndexEdicaoComplementos],
+        complementos: novosComplementos,
+      }
+      setProdutos(novosProdutos)
+    } else {
+      // Adicionar novo produto com complementos à lista
+      setProdutos([...produtos, {
+        produtoId: produtoSelecionadoParaComplementos.getId(),
+        nome: produtoSelecionadoParaComplementos.getNome(),
+        quantidade: 1,
+        valorUnitario: produtoSelecionadoParaComplementos.getValor(),
+        complementos: novosComplementos,
+      }])
+    }
+
+    // Fechar modal e limpar seleção
+    setModalComplementosOpen(false)
+    setProdutoSelecionadoParaComplementos(null)
+    setProdutoIndexEdicaoComplementos(null)
+  }
+
+  // Função para abrir modal de complementos para editar produto existente
+  const abrirModalComplementosProdutoExistente = (index: number) => {
+    const produtoSelecionado = produtos[index]
+    const produto = produtosList.find(p => p.getId() === produtoSelecionado.produtoId)
+    
+    if (!produto) return
+    
+    const abreComplementos = produto.abreComplementosAtivo()
+    const temComplementos = produtoTemComplementos(produto)
+    
+    if (!abreComplementos || !temComplementos) return
+    
+    setProdutoSelecionadoParaComplementos(produto)
+    setProdutoIndexEdicaoComplementos(index)
+    
+    // Inicializar complementos já selecionados do produto
+    const complementosChaves = produtoSelecionado.complementos.map(comp => `${comp.grupoId}-${comp.id}`)
+    setComplementosSelecionados(prev => ({
+      ...prev,
+      [produto.getId()]: complementosChaves
+    }))
+    
+    setModalComplementosOpen(true)
   }
 
   const removerProduto = (index: number) => {
@@ -425,7 +711,13 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     // Validar se pagamentos cobrem o total
     if (status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') {
       const diferenca = totalProdutos - totalPagamentos
-      if (Math.abs(diferenca) > 0.01) {
+      
+      // Aceitar quando os pagamentos cobrem exatamente o total (diferença <= 0.01)
+      // Ou quando há troco (pagamentos ultrapassam o total, o que é válido para dinheiro)
+      const pagamentosCobremTotal = Math.abs(diferenca) <= 0.01
+      const temTrocoValido = totalPagamentos > totalProdutos && troco > 0
+      
+      if (!pagamentosCobremTotal && !temTrocoValido) {
         showToast.error(`Valor dos pagamentos (${transformarParaReal(totalPagamentos)}) não corresponde ao total (${transformarParaReal(totalProdutos)})`)
         return
       }
@@ -438,17 +730,19 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
         valorFinal: totalProdutos,
         totalDesconto: 0,
         totalAcrescimo: 0,
-        produtos: produtos.map(p => ({
-          produtoId: p.produtoId,
-          quantidade: p.quantidade,
-          valorUnitario: p.valorUnitario,
-          complementos: p.complementos.map(comp => ({
-            complementoId: comp.id,
-            grupoId: comp.grupoId,
-            valor: comp.valor,
-            quantidade: comp.quantidade,
-          })),
-        })),
+        produtos: produtos.map(p => {
+          return {
+            produtoId: p.produtoId,
+            quantidade: p.quantidade,
+            valorUnitario: p.valorUnitario,
+            complementos: (p.complementos || []).map(comp => ({
+              complementoId: comp.id,
+              grupoComplementoId: comp.grupoId,
+              valorUnitario: comp.valor,
+              quantidade: comp.quantidade,
+            })),
+          };
+        }),
       }
 
       // Adicionar clienteId se selecionado
@@ -473,7 +767,6 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
         vendaData.solicitarEmissaoFiscal = true
       }
 
-      console.log('📤 Criando venda gestor:', vendaData)
       const resultado = await createVendaGestor.mutateAsync(vendaData)
       console.log('✅ Venda criada com sucesso:', resultado)
       showToast.success('Pedido criado com sucesso!')
@@ -504,6 +797,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     setProdutos([])
     setPagamentos([])
     setMeioPagamentoId('')
+    setValorRecebido('')
     setGrupoSelecionadoId(null)
     setCurrentStep(1)
     setComplementosSelecionados({})
@@ -541,6 +835,74 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     setInternalDialogOpen(open)
   }, [open])
 
+  // Buscar nome do usuário gestor quando o modal abrir
+  useEffect(() => {
+    const fetchNomeUsuario = async () => {
+      if (!open || !auth) {
+        setNomeUsuario('')
+        return
+      }
+
+      try {
+        setIsLoadingUsuario(true)
+        const token = auth.getAccessToken()
+        if (!token) {
+          setNomeUsuario('')
+          return
+        }
+
+        // 1. Buscar dados do /api/auth/me para obter o userId
+        const meResponse = await fetch('/api/auth/me', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (!meResponse.ok) {
+          setNomeUsuario('')
+          return
+        }
+
+        const meData = await meResponse.json()
+        const userId = meData.sub || meData.userId
+
+        if (!userId) {
+          setNomeUsuario('')
+          return
+        }
+
+        // 2. Buscar dados completos do usuário gestor
+        const gestorResponse = await fetch(`/api/pessoas/usuarios-gestor/${userId}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (!gestorResponse.ok) {
+          // Se não encontrar, tenta usar o nome do User do authStore como fallback
+          const user = auth.getUser()
+          setNomeUsuario(user?.getName() || '')
+          return
+        }
+
+        const gestorData = await gestorResponse.json()
+        setNomeUsuario(gestorData.nome || gestorData.username || '')
+      } catch (error) {
+        // Em caso de erro, tenta usar o nome do User do authStore como fallback
+        const user = auth.getUser()
+        setNomeUsuario(user?.getName() || '')
+      } finally {
+        setIsLoadingUsuario(false)
+      }
+    }
+
+    fetchNomeUsuario()
+  }, [open, auth])
+
   // Intercepta o fechamento do Dialog
   const handleDialogOpenChange = (isOpen: boolean) => {
     if (!isOpen) {
@@ -575,8 +937,20 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     // Step 3 precisa validar pagamentos se status for FINALIZADA ou PENDENTE_EMISSAO
     if (status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') {
       if (pagamentos.length === 0) return false
+      
+      // Aceitar quando os pagamentos cobrem o total (com tolerância de 0.01)
+      // Ou quando há troco (pagamentos ultrapassam o total, o que é válido para dinheiro)
       const diferenca = totalProdutos - totalPagamentos
-      return Math.abs(diferenca) <= 0.01
+      
+      // Se os pagamentos cobrem exatamente o total (diferença <= 0.01)
+      if (Math.abs(diferenca) <= 0.01) return true
+      
+      // Se os pagamentos ultrapassam o total, verificar se há troco válido
+      // (significa que foi um pagamento em dinheiro que gerou troco)
+      if (totalPagamentos > totalProdutos && troco > 0) return true
+      
+      // Caso contrário, ainda falta pagar
+      return false
     }
     return true
   }
@@ -651,7 +1025,15 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
         }}
       >
         <div className="px-4 py-2">
-          <h1 className="text-2xl font-bold">Novo Pedido</h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold">Novo Pedido</h1>
+            {nomeUsuario && (
+              <div className="flex items-center gap-2">
+                <MdPerson className="w-4 h-4 text-primary" />
+                <span className="text-sm text-gray-600 font-medium">Usuário Gestor: <span className="text-primary font-semibold">{nomeUsuario}</span></span>
+              </div>
+            )}
+          </div>
           
           {/* Indicador de Steps */}
           <div className="flex items-center justify-center gap-2 mt-2">
@@ -719,62 +1101,87 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
         >
           {/* STEP 1: Informações do Pedido */}
           {currentStep === 1 && (
-            <div className="py-2">
-              {/* Origem */}
-          <div className="space-y-2">
-            <Label>Origem do Pedido</Label>
-            <Select value={origem} onValueChange={(value) => setOrigem(value as OrigemVenda)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="GESTOR">Gestor (Manual)</SelectItem>
-                <SelectItem value="IFOOD">iFood</SelectItem>
-                <SelectItem value="RAPPI">Rappi</SelectItem>
-                <SelectItem value="OUTROS">Outros</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+            <div className="py-2 space-y-3">
+              
 
-          {/* Cliente */}
-          <div className="space-y-2">
-            <Label>Cliente (Opcional)</Label>
-            <div className="flex gap-2">
-              <Input
-                type="text"
-                value={clienteNome}
-                placeholder="Nenhum cliente selecionado"
-                inputProps={{ readOnly: true }}
-                className="flex-1 cursor-pointer"
-                onClick={() => setSeletorClienteOpen(true)}
-              />
-              {clienteNome && (
-                <Button
-                  type="button"
-                  variant="outlined"
-                  size="sm"
-                  onClick={handleRemoveCliente}
-                  className="flex-shrink-0"
-                >
-                  <MdDelete className="w-4 h-4" />
-                </Button>
-              )}
-              <Button
-                type="button"
-                variant="outlined"
-                onClick={() => setSeletorClienteOpen(true)}
-                className="flex-shrink-0"
-              >
-                <MdSearch className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
+              {/* Cliente */}
+              <div className="bg-gray-50 rounded-lg p-2 border-2 border-primary/20">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <MdPersonOutline className="w-5 h-5 text-primary" />
+                  </div>
+                  <span className="text-lg font-semibold text-primary">Cliente (Opcional)</span>
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    type="text"
+                    value={clienteNome}
+                    placeholder="Nenhum cliente selecionado"
+                    inputProps={{ readOnly: true }}
+                    className="flex-1 cursor-pointer bg-white border-primary/30"
+                    onClick={() => setSeletorClienteOpen(true)}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        padding: '4px 8px',
+                        '& input': {
+                          padding: '4px 8px',
+                        },
+                      },
+                    }}
+                  />
+                  {clienteNome && (
+                    <Button
+                      type="button"
+                      variant="outlined"
+                      size="sm"
+                      onClick={handleRemoveCliente}
+                      className="flex-shrink-0 border-primary/30 hover:bg-red-50 hover:border-red-300"
+                    >
+                      <MdDelete className="w-4 h-4 text-red-600" />
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outlined"
+                    onClick={() => setSeletorClienteOpen(true)}
+                    className="flex-shrink-0 border-primary/30 hover:bg-primary/10"
+                  >
+                    <MdSearch className="w-4 h-4 text-primary" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Origem */}
+              <div className="bg-gray-50 rounded-lg p-2 border-2 border-primary/20">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <MdStore className="w-5 h-5 text-primary" />
+                  </div>
+                  <span className="text-lg font-semibold text-primary">Origem do Pedido</span>
+                </div>
+                <Select value={origem} onValueChange={(value) => setOrigem(value as OrigemVenda)}>
+                  <SelectTrigger className="bg-white border-primary/30">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="GESTOR">Gestor (Manual)</SelectItem>
+                    <SelectItem value="IFOOD">iFood</SelectItem>
+                    <SelectItem value="RAPPI">Rappi</SelectItem>
+                    <SelectItem value="OUTROS">Outros</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
               {/* Status */}
-              <div className="space-y-2">
-                <Label>Status do Pedido</Label>
+              <div className="bg-gray-50 rounded-lg p-2 border-2 border-primary/20">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <MdInfo className="w-5 h-5 text-primary" />
+                  </div>
+                  <span className="text-lg font-semibold text-primary">Status do Pedido</span>
+                </div>
                 <Select value={status} onValueChange={(value) => setStatus(value as StatusVenda)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white border-primary/30">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -813,7 +1220,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                         <span className="text-xs font-semibold text-gray-700 text-right">Total</span>
                       </div>
                       <div className="flex-1 flex justify-end">
-                        <span className="text-xs font-semibold text-gray-700 mr-2">Remover</span>
+                        <span className="text-xs font-semibold text-gray-700 mr-2">Ações</span>
                       </div>
                     </div>
                     {/* Linhas de produtos */}
@@ -942,17 +1349,36 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                                   R$ {formatarNumeroComMilhar(totalProduto)}
                                 </span>
                               </div>
-                              {/* Botão Remover */}
+                              {/* Ações (Complementos e Remover) */}
                               <div className="flex-1 flex justify-end">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
+                                {(() => {
+                                  const produtoEntity = produtosList.find(p => p.getId() === produto.produtoId)
+                                  if (!produtoEntity) return null
+                                  
+                                  const abreComplementos = produtoEntity.abreComplementosAtivo()
+                                  const temComplementos = produtoTemComplementos(produtoEntity)
+                                  
+                                  if (!abreComplementos || !temComplementos) return null
+                                  
+                                  return (
+                                    <button
+                                      onClick={() => abrirModalComplementosProdutoExistente(index)}
+                                      type="button"
+                                      className="h-7 w-7 p-0 flex items-center justify-center min-w-[28px] min-h-[28px] border-0"
+                                      title="Editar complementos"
+                                    >
+                                      <MdLaunch className="w-4 h-4 text-primary" />
+                                    </button>
+                                  )
+                                })()}
+                                <button
                                   onClick={() => removerProduto(index)}
                                   type="button"
+                                  title="Remover produto"
                                   className="h-7 w-7 p-0 flex items-center justify-center min-w-[28px] min-h-[28px] border-0"
                                 >
                                   <MdDelete className="w-4 h-4 text-red-500" />
-                                </Button>
+                                </button>
                               </div>
                             </div>
                             
@@ -1311,39 +1737,25 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                       }}
                     >
                     {produtosList.map(produto => {
-                      const jaAdicionado = produtos.find(p => p.produtoId === produto.getId())
-                      const temComplementos = produtoTemComplementos(produto)
-                      // Botão aparece se o produto está adicionado E tem complementos
-                      const mostrarBotaoComplemento = !!jaAdicionado && temComplementos
-                      
                       return (
                         <div
                           key={produto.getId()}
                           className="relative"
                         >
                           <button
-                            onClick={() => !jaAdicionado && adicionarProduto(produto.getId())}
-                            disabled={!!jaAdicionado}
+                            onClick={() => adicionarProduto(produto.getId())}
                             onMouseEnter={(e) => {
-                              if (!jaAdicionado) {
-                                e.currentTarget.style.borderColor = corHexGrupo
-                                e.currentTarget.style.backgroundColor = '#ffffff'
-                              }
+                              e.currentTarget.style.borderColor = corHexGrupo
+                              e.currentTarget.style.backgroundColor = '#ffffff'
                             }}
                             onMouseLeave={(e) => {
-                              if (!jaAdicionado) {
-                                e.currentTarget.style.borderColor = corHexGrupo
-                                e.currentTarget.style.backgroundColor = '#ffffff'
-                              }
+                              e.currentTarget.style.borderColor = corHexGrupo
+                              e.currentTarget.style.backgroundColor = '#ffffff'
                             }}
-                            className={`aspect-square border-2 rounded-lg transition-all flex flex-col items-center justify-center text-center relative w-full ${
-                              jaAdicionado
-                                ? 'cursor-not-allowed'
-                                : 'cursor-pointer'
-                            }`}
+                            className="aspect-square border-2 rounded-lg transition-all flex flex-col items-center justify-center text-center relative w-full cursor-pointer"
                             style={{
                               borderColor: corHexGrupo,
-                              backgroundColor: jaAdicionado ? `${corHexGrupo}15` : '#ffffff',
+                              backgroundColor: '#ffffff',
                             }}
                           >
                             <div className="font-medium text-[10px] text-gray-900 break-words mb-1">
@@ -1354,33 +1766,6 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                             </div>
                             
                           </button>
-                          {/* Botão Complemento - aparece quando o produto está adicionado e tem complementos */}
-                          {mostrarBotaoComplemento && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                e.preventDefault()
-                                setProdutoSelecionadoParaComplementos(produto)
-                                // Inicializar complementos já selecionados
-                                if (jaAdicionado) {
-                                  const complementosChaves = jaAdicionado.complementos.map(comp => `${comp.grupoId}-${comp.id}`)
-                                  setComplementosSelecionados(prev => ({
-                                    ...prev,
-                                    [produto.getId()]: complementosChaves
-                                  }))
-                                }
-                                setModalComplementosOpen(true)
-                              }}
-                              onMouseDown={(e) => {
-                                e.stopPropagation()
-                              }}
-                              className="absolute bottom-1 left-1/2 transform -translate-x-1/2 bg-corHexGrupo text-white text-[8px] px-2 py-1 rounded hover:bg-primary-dark transition-colors z-20"
-                              style={{ minWidth: '60px', pointerEvents: 'auto', backgroundColor: corHexGrupo }}
-                            >
-                              Complementos
-                            </button>
-                          )}
                         </div>
                       )
                     })}
@@ -1395,127 +1780,179 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
 
           {/* STEP 3: Pagamento */}
           {currentStep === 3 && (
-            <div className="space-y-4 py-4">
-              {/* Resumo do Pedido */}
-              <div className="border rounded-lg p-4 bg-gray-50">
-                <h3 className="font-semibold text-lg mb-3">Resumo do Pedido</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
+            <div className="space-y-2">
+              {/* Informações do Pedido */}
+              <div className="border rounded-lg px-4 bg-gray-50">
+                <h3 className="font-semibold text-lg">Informações do Pedido</h3>
+                <div className="text-sm">
+                  <div className="flex justify-between bg-white rounded-lg px-1">
+                    <span className="text-gray-600">Data:</span>
+                    <span className="font-medium">{new Date().toLocaleString('pt-BR', { 
+                      day: '2-digit', 
+                      month: '2-digit', 
+                      year: 'numeric', 
+                      hour: '2-digit', 
+                      minute: '2-digit' 
+                    })}</span>
+                  </div>
+                  <div className="flex justify-between px-1">
                     <span className="text-gray-600">Origem:</span>
                     <span className="font-medium">{origem}</span>
                   </div>
+                  <div className="flex justify-between bg-white rounded-lg px-1">
+                    <span className="text-gray-600">Status:</span>
+                    <span className="font-medium">{statusDisponiveis.find(s => s.value === status)?.label}</span>
+                  </div>
                   {clienteNome && (
-                    <div className="flex justify-between">
+                    <div className="flex justify-between px-1">
                       <span className="text-gray-600">Cliente:</span>
                       <span className="font-medium">{clienteNome}</span>
                     </div>
                   )}
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Status:</span>
-                    <span className="font-medium">{statusDisponiveis.find(s => s.value === status)?.label}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Total de Produtos:</span>
-                    <span className="font-medium">{produtos.length}</span>
-                  </div>
-                  <div className="flex justify-between pt-2 border-t">
-                    <span className="text-gray-900 font-semibold">Total:</span>
-                    <span className="text-primary font-bold text-lg">{transformarParaReal(totalProdutos)}</span>
+                  
+                  <div className="flex justify-between bg-white rounded-lg px-1">
+                    <span className="text-gray-600">Total de Itens:</span>
+                    <span className="font-medium">{produtos.length} {produtos.length === 1 ? 'produto' : 'produtos'}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Lista de Produtos Selecionados */}
-              {produtos.length > 0 && (
-                <div className="space-y-2 border rounded-lg p-3">
-                  <Label className="text-base font-semibold">Produtos Selecionados</Label>
-                  {produtos.map((produto, index) => (
-                    <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
-                      <div className="flex-1">
-                        <p className="font-medium">{produto.nome}</p>
-                        <div className="flex gap-2 items-center mt-1">
-                          <span className="text-xs text-gray-600">Qtd: {produto.quantidade}</span>
-                          <span className="text-xs text-gray-600">•</span>
-                          <span className="text-xs text-gray-600">Unit: {transformarParaReal(produto.valorUnitario)}</span>
-                          <span className="text-xs text-gray-600">•</span>
-                          <span className="text-sm font-semibold">
-                            Total: {transformarParaReal(produto.valorUnitario * produto.quantidade)}
-                          </span>
-                        </div>
+              {/* Pagamento (se status finalizada ou pendente emissão) */}
+              {(status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') && (
+                <div className="space-y-4">
+                  <div className="border rounded-lg px-4 bg-white">
+                    <h3 className="font-semibold text-lg">Pagamento</h3>
+                    
+                    {/* Total do Pedido e A pagar */}
+                    <div className="space-y-2 mb-2 text-sm">
+                      <div className="flex justify-between items-center bg-gray-100 rounded-lg p-1">
+                        <span className="text-gray-700 font-medium">Total do Pedido:</span>
+                        <span className="text-base font-bold text-primary">
+                          {transformarParaReal(totalProdutos)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center bg-gray-100 rounded-lg p-1">
+                        <span className="text-gray-700 font-medium">A pagar:</span>
+                        <span className={`text-base font-bold ${
+                          valorAPagar > 0 ? 'text-red-600' : 'text-green-600'
+                        }`}>
+                          {transformarParaReal(valorAPagar)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-primary-text font-medium">Valor Recebido:</span>
+                        <input
+                          type="text"
+                          value={valorRecebido}
+                          onChange={(e) => {
+                            const valorFormatado = formatarValorRecebido(e.target.value)
+                            setValorRecebido(valorFormatado)
+                          }}
+                          placeholder="0,00"
+                          className=" text-right font-semibold border-2 rounded-lg p-1 hover:border-primary-text transition-colors"
+                        />
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
 
-              {/* Pagamentos (se status finalizada ou pendente emissão) */}
-              {(status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') && (
-                <div className="space-y-2">
-              <Label>Formas de Pagamento</Label>
-              <div className="flex gap-2">
-                <Select value={meioPagamentoId} onValueChange={setMeioPagamentoId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um meio de pagamento" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {meiosPagamento.map(meio => (
-                      <SelectItem key={meio.getId()} value={meio.getId()}>
-                        {meio.getNome()}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button onClick={adicionarPagamento} type="button">
-                  <MdAdd className="w-4 h-4" />
-                </Button>
-              </div>
-
-              {/* Lista de Pagamentos */}
-              {pagamentos.length > 0 && (
-                <div className="space-y-2 border rounded-lg p-3">
-                  {pagamentos.map((pagamento, index) => {
-                    const meio = meiosPagamento.find(m => m.getId() === pagamento.meioPagamentoId)
-                    return (
-                      <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
-                        <div className="flex-1">
-                          <p className="font-medium">{meio?.getNome() || 'Meio de pagamento'}</p>
-                          <div className="flex gap-2 items-center mt-1">
-                            <Label className="text-xs">Valor:</Label>
-                            <Input
-                              type="number"
-                              inputProps={{ min: 0, step: 0.01 }}
-                              value={pagamento.valor}
-                              onChange={(e) => {
-                                const valor = parseFloat(e.target.value) || 0
-                                atualizarPagamento(index, Math.max(0, valor))
+                    {/* Formas de Pagamento - Cards */}
+                    <div className="mb-2">
+                      <Label className="text-base font-semibold mb-2 block">Forma de Pagamento</Label>
+                      <div 
+                        ref={meiosPagamentoScrollRef}
+                        className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin cursor-grab active:cursor-grabbing select-none"
+                        style={{ scrollbarWidth: 'thin' }}
+                        onMouseDown={handleMouseDownMeiosPagamento}
+                      >
+                        {meiosPagamento.map(meio => {
+                          const Icone = obterIconeMeioPagamento(meio.getNome())
+                          
+                          return (
+                            <button
+                              key={meio.getId()}
+                              type="button"
+                              onClick={(e) => {
+                                // Só executar o clique se não houve movimento significativo durante o arraste
+                                if (!hasMovedMeiosPagamentoRef.current && !isDraggingMeiosPagamento) {
+                                  adicionarPagamentoPorCard(meio.getId())
+                                }
                               }}
-                              className="w-32 h-8"
-                            />
-                          </div>
-                        </div>
-                        <Button
-                          variant="outlined"
-                          size="sm"
-                          onClick={() => removerPagamento(index)}
-                          type="button"
-                        >
-                          <MdDelete className="w-4 h-4" />
-                        </Button>
+                              onMouseDown={(e) => {
+                                // Permitir que o evento propague para o container para iniciar o arraste
+                              }}
+                              disabled={valorAPagar <= 0}
+                              className={`
+                                flex flex-col items-center justify-center gap-1 p-2 border-2 rounded-lg transition-all flex-shrink-0 min-w-[100px]
+                                bg-white border-primary hover:bg-primary hover:text-white cursor-pointer
+                                ${valorAPagar <= 0 ? 'opacity-50 cursor-not-allowed' : ''}
+                              `}
+                            >
+                              <Icone className="w-8 h-8" />
+                              <span className="text-xs font-medium text-center">
+                                {meio.getNome()}
+                              </span>
+                            </button>
+                          )
+                        })}
                       </div>
-                    )
-                  })}
-                  <div className="pt-2 border-t">
-                    <p className="text-right">
-                      Total Pago: {transformarParaReal(totalPagamentos)}
-                    </p>
-                    <p className={`text-right ${Math.abs(totalProdutos - totalPagamentos) > 0.01 ? 'text-red-600' : 'text-green-600'}`}>
-                      Restante: {transformarParaReal(totalProdutos - totalPagamentos)}
-                    </p>
+                    </div>
+
+                    {/* Total Pago e Troco */}
+                    <div className="border-t pt-2 text-sm">
+                      <div className="flex justify-between items-center bg-gray-100 rounded-lg p-1">
+                        <span className="text-gray-700 font-semibold">Total Pago:</span>
+                        <span className="text-base font-bold text-gray-900">
+                          {transformarParaReal(totalPagamentos)}
+                        </span>
+                      </div>
+                      {troco > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-700 font-semibold">Troco:</span>
+                          <span className="text-base font-bold text-green-600">
+                            {transformarParaReal(troco)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Detalhes dos Pagamentos Aplicados */}
+                    {pagamentos.length > 0 && (
+                      <div className="mt-2 pt-2 border-t">
+                        <Label className="text-sm font-semibold mb-2 block">Detalhes:</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {pagamentos.map((pagamento, index) => {
+                            const meio = meiosPagamento.find(m => m.getId() === pagamento.meioPagamentoId)
+                            const Icone = meio ? obterIconeMeioPagamento(meio.getNome()) : MdCreditCard
+                            
+                            return (
+                              <div
+                                key={index}
+                                className="flex items-center gap-2 p-2 bg-green-100 rounded-lg border border-green-300"
+                              >
+                                <Icone className="w-6 h-6 text-green-700" />
+                                <div className="flex flex-col">
+                                <span className="text-xs font-medium text-green-900">
+                                  {meio?.getNome() || 'Meio de pagamento'}
+                                </span>
+                                <span className="text-xs font-bold text-green-900">
+                                  {transformarParaReal(pagamento.valor)}
+                                </span>
+                                </div>
+                                <button
+                                  onClick={() => removerPagamento(index)}
+                                  type="button"
+                                  className="flex-shrink-0 w-8 h-8 p-0 rounded-lg bg-green-100 hover:bg-green-200 flex items-center justify-center"
+                                >
+                                  <MdDelete className="w-4 h-4 text-green-700" />
+                                </button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-                )}
-              </div>
-            )}
+              )}
             </div>
           )}
         </div>
@@ -1581,40 +2018,6 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
               ? atuais.filter(chave => chave !== chaveUnica)
               : [...atuais, chaveUnica]
             
-            // Atualizar complementos no produto selecionado
-            const produtoIndex = produtos.findIndex(p => p.produtoId === produtoId)
-            if (produtoIndex !== -1) {
-              const produto = produtosList.find(p => p.getId() === produtoId)
-              if (produto) {
-                const novosComplementos: ComplementoSelecionado[] = []
-                produto.getGruposComplementos().forEach((grupo: { id: string; nome: string; complementos: Array<{ id: string; nome: string; valor?: number }> }) => {
-                  grupo.complementos.forEach((comp: { id: string; nome: string; valor?: number; tipoImpactoPreco?: 'aumenta' | 'diminui' | 'nenhum' }) => {
-                    const chaveComp = `${grupo.id}-${comp.id}`
-                    if (novos.includes(chaveComp)) {
-                      // Verificar se o complemento já existe para manter a quantidade
-                      const produtoAtual = produtos[produtoIndex]
-                      const complementoExistente = produtoAtual.complementos.find(c => c.grupoId === grupo.id && c.id === comp.id)
-                      novosComplementos.push({
-                        id: comp.id,
-                        grupoId: grupo.id,
-                        nome: comp.nome,
-                        valor: comp.valor || 0,
-                        quantidade: complementoExistente?.quantidade || 1,
-                        tipoImpactoPreco: comp.tipoImpactoPreco || 'nenhum',
-                      })
-                    }
-                  })
-                })
-                
-                const novosProdutos = [...produtos]
-                novosProdutos[produtoIndex] = {
-                  ...novosProdutos[produtoIndex],
-                  complementos: novosComplementos,
-                }
-                setProdutos(novosProdutos)
-              }
-            }
-            
             return { ...prev, [produtoId]: novos }
           })
         }
@@ -1626,6 +2029,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
               setModalComplementosOpen(open)
               if (!open) {
                 setProdutoSelecionadoParaComplementos(null)
+                setProdutoIndexEdicaoComplementos(null)
               }
             }}
             maxWidth={false}
@@ -1687,11 +2091,18 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                 )}
               </div>
               <DialogFooter>
-                <Button onClick={() => {
-                  setModalComplementosOpen(false)
-                  setProdutoSelecionadoParaComplementos(null)
-                }}>
-                  Fechar
+                <Button 
+                  variant="outlined"
+                  onClick={() => {
+                    setModalComplementosOpen(false)
+                    setProdutoSelecionadoParaComplementos(null)
+                    setProdutoIndexEdicaoComplementos(null)
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button onClick={confirmarProdutoComComplementos}>
+                  Confirmar
                 </Button>
               </DialogFooter>
             </DialogContent>
