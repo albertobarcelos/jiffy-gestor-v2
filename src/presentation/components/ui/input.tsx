@@ -14,7 +14,10 @@ export interface InputProps extends Omit<TextFieldProps, 'variant'> {
 }
 
 /**
- * Componente Input usando Material UI TextField
+ * Componente Input usando Material UI TextField.
+ * Padrão visual alinhado ao Select (Radix UI):
+ * - size="small" → altura ~40px (h-10)
+ * - borderRadius: 6px → equivalente ao rounded-md do Tailwind
  */
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ variant = 'outlined', value, size, min, max, step, maxLength, minLength, pattern, inputProps, ...props }, ref) => {

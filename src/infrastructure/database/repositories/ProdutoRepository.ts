@@ -83,8 +83,9 @@ export class ProdutoRepository implements IProdutoRepository {
         total: response.data.count || 0,
       }
     } catch (error) {
+      // Preserva ApiError para manter o status code (ex: 504 para timeout)
       if (error instanceof ApiError) {
-        throw new Error(error.message || 'Erro ao buscar produtos')
+        throw error
       }
       throw error
     }

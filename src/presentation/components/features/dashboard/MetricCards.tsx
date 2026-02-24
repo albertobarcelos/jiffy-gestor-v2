@@ -151,7 +151,9 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
         const total = await useCase.execute(mappedPeriodo, ['FINALIZADA', 'CANCELADA'], useCustomDates ? periodoInicial : undefined, useCustomDates ? periodoFinal : undefined);
         const finalizadas = await useCase.execute(mappedPeriodo, ['FINALIZADA'], useCustomDates ? periodoInicial : undefined, useCustomDates ? periodoFinal : undefined);
         const canceladas = await useCase.execute(mappedPeriodo, ['CANCELADA'], useCustomDates ? periodoInicial : undefined, useCustomDates ? periodoFinal : undefined);
-        const abertas = await useCase.execute(mappedPeriodo, ['ABERTA'], useCustomDates ? periodoInicial : undefined, useCustomDates ? periodoFinal : undefined);
+        // IMPORTANTE: Vendas ABERTA sempre buscam todas as mesas abertas no momento,
+        // independente do período selecionado, pois representam estado atual do sistema
+        const abertas = await useCase.execute('todos', ['ABERTA'], undefined, undefined);
         
         setDataTotal(total);
         setDataFinalizadas(finalizadas);

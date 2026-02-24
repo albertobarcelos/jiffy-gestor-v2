@@ -167,7 +167,12 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
       if (!token) return null
 
       try {
-        const response = await fetch(`/api/usuarios/${usuarioId}`, {
+        // Usa endpoint diferente dependendo da origem da venda
+        const endpoint = tabelaOrigem === 'venda_gestor'
+          ? `/api/pessoas/usuarios-gestor/${usuarioId}`
+          : `/api/usuarios/${usuarioId}`
+        
+        const response = await fetch(endpoint, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -183,7 +188,7 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
         return null
       }
     },
-    [auth]
+    [auth, tabelaOrigem]
   )
 
   /**
@@ -369,9 +374,43 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
         codigoTerminal = String(dataRaw.terminalId)
       }
       
+      // Mapear produtos lançados garantindo que os complementos sejam preservados
+      const produtosLancadosMapeados = dataRaw.produtosLancados?.map((produto: any) => {
+        // Mapear complementos garantindo que todos os campos estejam presentes
+        const complementosMapeados = Array.isArray(produto.complementos) 
+          ? produto.complementos.map((comp: any) => {
+              // Normalizar tipoImpactoPreco (pode vir como string ou já no formato correto)
+              let tipoImpactoPreco: 'aumenta' | 'diminui' | 'nenhum' = 'nenhum'
+              if (comp.tipoImpactoPreco) {
+                const tipo = String(comp.tipoImpactoPreco).toLowerCase()
+                if (tipo === 'aumenta' || tipo === 'increase') {
+                  tipoImpactoPreco = 'aumenta'
+                } else if (tipo === 'diminui' || tipo === 'decrease' || tipo === 'diminui') {
+                  tipoImpactoPreco = 'diminui'
+                } else {
+                  tipoImpactoPreco = 'nenhum'
+                }
+              }
+              
+              return {
+                nomeComplemento: comp.nomeComplemento || comp.nome || comp.nomeComplemento || '',
+                quantidade: Number(comp.quantidade) || 0,
+                valorUnitario: Number(comp.valorUnitario) || 0,
+                tipoImpactoPreco,
+              }
+            })
+          : []
+        
+        return {
+          ...produto,
+          complementos: complementosMapeados,
+        }
+      }) || []
+      
       const data: VendaDetalhes = {
         ...dataRaw,
         codigoTerminal: codigoTerminal,
+        produtosLancados: produtosLancadosMapeados,
       }
       
       // Debug: log para verificar se o campo está sendo capturado
@@ -844,14 +883,19 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
                           </div>
 
                           {/* Linhas dos complementos */}
-                          {produto.complementos && produto.complementos.length > 0 && (
+                          {produto.complementos && produto.complementos.length > 0 ? (
                             <div className="space-y-1 md:ml-7 ml-2">
                               {produto.complementos.map((complemento, compIndex) => {
+                                console.log(`  🎨 Renderizando complemento ${compIndex}:`, complemento)
+                                
                                 const valorTotalComplemento = calcularValorComplemento(complemento)
                                 const temImpactoPreco = complemento.tipoImpactoPreco !== 'nenhum'
-                                const prefix = temImpactoPreco
-                                  ? (complemento.tipoImpactoPreco === 'aumenta' ? '+ ' : '- ')
-                                  : ''
+                                
+                                // Determina o prefixo baseado no tipo de impacto
+                                let prefix = ''
+                                if (temImpactoPreco) {
+                                  prefix = complemento.tipoImpactoPreco === 'aumenta' ? '+ ' : '- '
+                                }
                                 
                                 return (
                                   <div key={compIndex} className="flex items-center justify-between gap-2">
@@ -859,14 +903,16 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
                                       {complemento.quantidade}x {complemento.nomeComplemento}
                                       {temImpactoPreco && ` (${formatNumber(complemento.valorUnitario)})`}
                                     </span>
-                                    <div className="text-xs font-semibold text-secondary-text font-nunito">
-                                      {temImpactoPreco ? `${prefix}${formatCurrency(valorTotalComplemento)}` : '-'}
-                                    </div>
+                                    {temImpactoPreco && (
+                                      <div className="text-xs font-semibold text-secondary-text font-nunito">
+                                        {prefix}{formatCurrency(valorTotalComplemento)}
+                                      </div>
+                                    )}
                                   </div>
                                 )
                               })}
                             </div>
-                          )}
+                          ) : null}
 
                           {/* Informações de lançamento */}
                           <div className="flex flex-col md:flex-row text-xs text-secondary-text mt-1 md:ml-7">

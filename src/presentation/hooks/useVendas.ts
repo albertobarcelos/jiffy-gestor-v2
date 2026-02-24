@@ -244,11 +244,6 @@ export function useCreateVendaGestor() {
         throw new Error('Token não encontrado')
       }
 
-      console.log('📤 [Hook] Enviando requisição para criar venda gestor:', {
-        url: '/api/vendas/gestor',
-        data: JSON.stringify(data, null, 2),
-      })
-
       const response = await fetch('/api/vendas/gestor', {
         method: 'POST',
         headers: {
@@ -258,28 +253,15 @@ export function useCreateVendaGestor() {
         body: JSON.stringify(data),
       })
 
-      console.log('📥 [Hook] Resposta recebida:', {
-        status: response.status,
-        ok: response.ok,
-        statusText: response.statusText,
-      })
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        console.error('❌ [Hook] Erro na resposta da API:', {
-          status: response.status,
-          statusText: response.statusText,
-          errorData: JSON.stringify(errorData, null, 2),
-        })
         const errorMessage = errorData.error || errorData.message || errorData.details || `Erro ${response.status}: ${response.statusText}`
         const error = new Error(errorMessage)
         ;(error as any).response = { data: errorData, status: response.status }
         throw error
       }
 
-      const result = await response.json()
-      console.log('✅ [Hook] Venda criada com sucesso:', result)
-      return result
+      return await response.json()
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
@@ -288,7 +270,6 @@ export function useCreateVendaGestor() {
     },
     onError: (error: Error) => {
       // Toast de erro é exibido no componente
-      console.error('❌ [Hook] Erro ao criar venda gestor:', error)
     },
   })
 }
@@ -422,6 +403,7 @@ export function useMarcarEmissaoFiscal() {
     },
   })
 }
+
 
 /**
  * Hook para emitir NFe (NFC-e ou NF-e) para uma venda PDV.

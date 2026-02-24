@@ -97,7 +97,10 @@ export async function POST(req: NextRequest) {
     const apiClient = new ApiClient()
     
     // Chama a API externa
-    const { data } = await apiClient.request('/api/v1/cardapio/produtos/bulk-update', {
+    const { data } = await apiClient.request<{
+      totalUpdated?: number
+      produtosIds?: string[]
+    }>('/api/v1/cardapio/produtos/bulk-update', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

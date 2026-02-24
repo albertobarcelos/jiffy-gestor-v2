@@ -2,6 +2,7 @@
 
 import { Suspense } from 'react'
 import { ConfiguracaoEmpresaCompleta } from '@/src/presentation/components/features/painel-contador/ConfiguracaoEmpresaCompleta'
+import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
 
 /**
  * Rota /painel-contador/config/empresa-completa
@@ -9,10 +10,8 @@ import { ConfiguracaoEmpresaCompleta } from '@/src/presentation/components/featu
  */
 export default function ConfiguracaoEmpresaCompletaPage() {
   return (
-    <div className="h-full overflow-y-auto bg-gray-50">
-      <Suspense fallback={<div className="p-4">Carregando configuração...</div>}>
-        <ConfiguracaoEmpresaCompleta />
-      </Suspense>
-    </div>
+    <Suspense fallback={<PageLoading />}>
+      <ConfiguracaoEmpresaCompleta />
+    </Suspense>
   )
 }
