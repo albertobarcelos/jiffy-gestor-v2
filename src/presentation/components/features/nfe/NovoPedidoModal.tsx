@@ -112,6 +112,14 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
   const [isDraggingMeiosPagamento, setIsDraggingMeiosPagamento] = useState(false)
   const startXMeiosPagamentoRef = useRef(0)
   const scrollLeftMeiosPagamentoRef = useRef(0)
+  
+  // Refs para long press na linha do produto
+  const longPressTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressIndexRef = useRef<number | null>(null)
+  
+  // Refs para long press na linha do complemento
+  const longPressComplementoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressComplementoIndexRef = useRef<number | null>(null)
   const hasMovedMeiosPagamentoRef = useRef(false)
 
   // Buscar grupos de produtos
@@ -914,6 +922,20 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
   }
 
   const resetForm = () => {
+    // Limpar timeouts de long press
+    if (longPressTimeoutRef.current) {
+      clearTimeout(longPressTimeoutRef.current)
+      longPressTimeoutRef.current = null
+    }
+    longPressIndexRef.current = null
+    
+    // Limpar timeouts de long press de complementos
+    if (longPressComplementoTimeoutRef.current) {
+      clearTimeout(longPressComplementoTimeoutRef.current)
+      longPressComplementoTimeoutRef.current = null
+    }
+    longPressComplementoIndexRef.current = null
+    
     setOrigem('GESTOR')
     setStatus('FINALIZADA')
     setClienteId('')
@@ -933,7 +955,26 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     setEhAcrescimo(false)
     setEhPorcentagem(false)
     setValorDescontoAcrescimo('0')
+    
+    // Limpar timeouts de long press de complementos
+    if (longPressComplementoTimeoutRef.current) {
+      clearTimeout(longPressComplementoTimeoutRef.current)
+      longPressComplementoTimeoutRef.current = null
+    }
+    longPressComplementoIndexRef.current = null
   }
+  
+  // Cleanup de timeouts quando o componente for desmontado
+  useEffect(() => {
+    return () => {
+      if (longPressTimeoutRef.current) {
+        clearTimeout(longPressTimeoutRef.current)
+      }
+      if (longPressComplementoTimeoutRef.current) {
+        clearTimeout(longPressComplementoTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Verifica se há dados da venda que seriam perdidos
   const temDadosVenda = () => {
@@ -1366,7 +1407,37 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                             <div 
                               className={`flex gap-1 items-center rounded ${
                                 index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                              } hover:bg-gray-100`}
+                              } hover:bg-gray-100 cursor-pointer`}
+                              onMouseDown={(e) => {
+                                // Iniciar long press apenas se não for em um input ou button
+                                const target = e.target as HTMLElement
+                                if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.closest('button') || target.closest('input')) {
+                                  return
+                                }
+                                
+                                longPressIndexRef.current = index
+                                longPressTimeoutRef.current = setTimeout(() => {
+                                  if (longPressIndexRef.current === index) {
+                                    abrirModalEdicaoProduto(index)
+                                  }
+                                }, 800) // 800ms para long press
+                              }}
+                              onMouseUp={() => {
+                                // Limpar timeout se soltar antes do tempo
+                                if (longPressTimeoutRef.current) {
+                                  clearTimeout(longPressTimeoutRef.current)
+                                  longPressTimeoutRef.current = null
+                                }
+                                longPressIndexRef.current = null
+                              }}
+                              onMouseLeave={() => {
+                                // Limpar timeout se sair da área
+                                if (longPressTimeoutRef.current) {
+                                  clearTimeout(longPressTimeoutRef.current)
+                                  longPressTimeoutRef.current = null
+                                }
+                                longPressIndexRef.current = null
+                              }}
                             >
                               {/* Quantidade */}
                               <div className="w-[60px] flex-shrink-0">
@@ -1532,8 +1603,47 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                                   key={compKey}
                                   className={`flex gap-1 items-center rounded -mt-0.5 ${
                                     index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                                  } hover:bg-gray-100`}
+                                  } hover:bg-gray-100 cursor-pointer`}
                                   style={{ minHeight: '24px' }}
+                                  onMouseDown={(e) => {
+                                    // Iniciar long press apenas se não for em um input ou button
+                                    const target = e.target as HTMLElement
+                                    if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.closest('button') || target.closest('input')) {
+                                      return
+                                    }
+                                    
+                                    // Verificar se o produto permite editar complementos
+                                    const produtoEntity = produtosList.find(p => p.getId() === produto.produtoId)
+                                    if (!produtoEntity) return
+                                    
+                                    const abreComplementos = produtoEntity.abreComplementosAtivo()
+                                    const temComplementos = produtoTemComplementos(produtoEntity)
+                                    
+                                    if (!abreComplementos || !temComplementos) return
+                                    
+                                    longPressComplementoIndexRef.current = index
+                                    longPressComplementoTimeoutRef.current = setTimeout(() => {
+                                      if (longPressComplementoIndexRef.current === index) {
+                                        abrirModalComplementosProdutoExistente(index)
+                                      }
+                                    }, 800) // 800ms para long press
+                                  }}
+                                  onMouseUp={() => {
+                                    // Limpar timeout se soltar antes do tempo
+                                    if (longPressComplementoTimeoutRef.current) {
+                                      clearTimeout(longPressComplementoTimeoutRef.current)
+                                      longPressComplementoTimeoutRef.current = null
+                                    }
+                                    longPressComplementoIndexRef.current = null
+                                  }}
+                                  onMouseLeave={() => {
+                                    // Limpar timeout se sair da área
+                                    if (longPressComplementoTimeoutRef.current) {
+                                      clearTimeout(longPressComplementoTimeoutRef.current)
+                                      longPressComplementoTimeoutRef.current = null
+                                    }
+                                    longPressComplementoIndexRef.current = null
+                                  }}
                                 >
                                   {/* Quantidade do Complemento */}
                                   <div className="w-[60px] flex-shrink-0 pl-4">
@@ -1641,12 +1751,12 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                           }}
                         >
                         <div 
-                          className="w-[40px] h-[40px] bg-info rounded-lg border-2 flex items-center justify-center flex-shrink-0"
+                          className="w-[40px] h-[40px] flex items-center justify-center flex-shrink-0"
                           style={{
                             borderColor: corHex,
                           }}
                         >
-                          <DinamicIcon iconName={iconName} color={corHex} size={24} />
+                          <DinamicIcon iconName={iconName} color={corHex} size={34} />
                         </div>
                         <div className="font-medium text-[10px] text-gray-900 line-clamp-2 overflow-hidden text-ellipsis w-full px-1">
                           {grupo.getNome()}
@@ -1692,13 +1802,10 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                           }}
                         >
                         <div 
-                          className="w-[40px] h-[40px] rounded-lg border-2 flex items-center justify-center flex-shrink-0"
-                          style={{
-                            borderColor: isSelected ? '#ffffff' : corHex,
-                            backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.2)' : '#ffffff',
-                          }}
+                          className="w-[40px] h-[40px] flex items-center justify-center flex-shrink-0"
+                         
                         >
-                          <DinamicIcon iconName={iconName} color={isSelected ? '#ffffff' : corHex} size={24} />
+                          <DinamicIcon iconName={iconName} color={isSelected ? '#ffffff' : corHex} size={34} />
                         </div>
                         <div className="font-medium text-[10px] line-clamp-2 overflow-hidden text-ellipsis w-full px-1">
                           {grupo.getNome()}
