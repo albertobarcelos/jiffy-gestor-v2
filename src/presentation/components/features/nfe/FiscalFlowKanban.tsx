@@ -767,12 +767,23 @@ export function FiscalFlowKanban() {
                                 className="flex-1"
                                 onClick={() => handleEmitirNfe(venda)}
                                 disabled={
+                                  venda.statusFiscal === 'PENDENTE' ||
+                                  venda.statusFiscal === 'PENDENTE_EMISSAO' ||
                                   venda.statusFiscal === 'EMITINDO' || 
                                   venda.statusFiscal === 'PENDENTE_AUTORIZACAO' ||
+                                  venda.statusFiscal === 'CONTINGENCIA' ||
                                   venda.statusFiscal === 'EMITIDA'
                                 }
                               >
-                                {venda.statusFiscal === 'REJEITADA' ? 'Reemitir NFe' : 'Emitir NFe'}
+                                {venda.statusFiscal === 'REJEITADA'
+                                  ? 'Reemitir NFe'
+                                  : venda.statusFiscal === 'PENDENTE' ||
+                                      venda.statusFiscal === 'PENDENTE_EMISSAO' ||
+                                      venda.statusFiscal === 'EMITINDO' ||
+                                      venda.statusFiscal === 'PENDENTE_AUTORIZACAO' ||
+                                      venda.statusFiscal === 'CONTINGENCIA'
+                                    ? 'Aguardando...'
+                                    : 'Emitir NFe'}
                               </Button>
                             )}
 

@@ -106,9 +106,10 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(body),
     })
 
+    const result = data as Record<string, any>
     return NextResponse.json({
-      totalUpdated: data.totalUpdated || body.length,
-      produtosIds: data.produtosIds || body.map((item: any) => item.produtoId),
+      totalUpdated: result.totalUpdated || body.length,
+      produtosIds: result.produtosIds || body.map((item: any) => item.produtoId),
     })
   } catch (error: any) {
     console.error('Erro na API de bulk-update de produtos:', error)

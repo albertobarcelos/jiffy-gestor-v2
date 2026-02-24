@@ -424,60 +424,9 @@ export function useMarcarEmissaoFiscal() {
 }
 
 /**
- * Faz polling do status de emissão até chegar a um estado final.
- */
-async function pollStatusEmissao(
-  vendaId: string,
-  endpoint: 'vendas' | 'vendas/gestor',
-  token: string,
-  options: { interval?: number; maxAttempts?: number } = {}
-): Promise<any> {
-  const { interval = 3000, maxAttempts = 40 } = options
-  const baseUrl = endpoint === 'vendas'
-    ? `/api/vendas/${vendaId}/status-emissao`
-    : `/api/vendas/gestor/${vendaId}/status-emissao`
-
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    await new Promise(resolve => setTimeout(resolve, interval))
-
-    let response: Response
-    try {
-      response = await fetch(baseUrl, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      })
-    } catch {
-      continue
-    }
-
-    if (response.status === 404) {
-      throw new Error('Endpoint de status de emissão não encontrado')
-    }
-
-    if (!response.ok) continue
-
-    let data: any
-    try {
-      data = await response.json()
-    } catch {
-      continue
-    }
-
-    const status = data.status
-
-    if (status === 'EMITIDA' || status === 'REJEITADA' || status === 'CANCELADA') {
-      return data
-    }
-  }
-
-  throw new Error('Tempo limite excedido aguardando autorização da nota fiscal')
-}
-
-/**
  * Hook para emitir NFe (NFC-e ou NF-e) para uma venda PDV.
- * Suporta emissão assíncrona: se o backend retornar 202, faz polling até o resultado final.
+ * Fluxo assíncrono real: retorna após enfileirar/processar no backend.
+ * A atualização final de status vem por webhook + refetch.
  */
 export function useEmitirNfe() {
   const { auth } = useAuthStore()
@@ -533,16 +482,15 @@ export function useEmitirNfe() {
 
       const result = await response.json()
 
-      if (response.status === 202 || result.status === 'PENDENTE' || result.status === 'PENDENTE_AUTORIZACAO') {
-        showToast.success('Nota fiscal enviada para processamento. Aguardando autorização...')
-        const polledResult = await pollStatusEmissao(id, 'vendas', token)
-
-        if (polledResult.status === 'REJEITADA') {
-          const motivo = polledResult.mensagemSefaz || polledResult.codigoRejeicao
-          throw new Error(motivo ? `Nota fiscal rejeitada: ${motivo}` : 'Nota fiscal rejeitada pela SEFAZ')
-        }
-
-        return polledResult
+      if (
+        response.status === 202 ||
+        result.status === 'PENDENTE' ||
+        result.status === 'PENDENTE_EMISSAO' ||
+        result.status === 'EMITINDO' ||
+        result.status === 'PENDENTE_AUTORIZACAO' ||
+        result.status === 'CONTINGENCIA'
+      ) {
+        return result
       }
 
       if (result.status === 'REJEITADA') {
@@ -558,11 +506,23 @@ export function useEmitirNfe() {
 
       return result
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
       queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
       queryClient.invalidateQueries({ queryKey: ['venda', variables.id] })
-      showToast.success('NFe emitida com sucesso!')
+
+      if (data?.status === 'EMITIDA') {
+        showToast.success('NFe emitida com sucesso!')
+        return
+      }
+
+      if (data?.status === 'REJEITADA') {
+        const motivo = data?.mensagemAmigavel || data?.codigoRejeicao || 'Nota fiscal rejeitada pela SEFAZ'
+        showToast.error(motivo)
+        return
+      }
+
+      showToast.success('NFe enviada. Aguardando retorno da SEFAZ...')
     },
     onError: (error: Error) => {
       showToast.error(error.message || 'Erro ao emitir NFe')
@@ -572,7 +532,8 @@ export function useEmitirNfe() {
 
 /**
  * Hook para emitir NFe (NFC-e ou NF-e) para uma venda GESTOR.
- * Suporta emissão assíncrona: se o backend retornar 202, faz polling até o resultado final.
+ * Fluxo assíncrono real: retorna após enfileirar/processar no backend.
+ * A atualização final de status vem por webhook + refetch.
  */
 export function useEmitirNfeGestor() {
   const { auth } = useAuthStore()
@@ -628,16 +589,15 @@ export function useEmitirNfeGestor() {
 
       const result = await response.json()
 
-      if (response.status === 202 || result.status === 'PENDENTE' || result.status === 'PENDENTE_AUTORIZACAO') {
-        showToast.success('Nota fiscal enviada para processamento. Aguardando autorização...')
-        const polledResult = await pollStatusEmissao(id, 'vendas/gestor', token)
-
-        if (polledResult.status === 'REJEITADA') {
-          const motivo = polledResult.mensagemSefaz || polledResult.codigoRejeicao
-          throw new Error(motivo ? `Nota fiscal rejeitada: ${motivo}` : 'Nota fiscal rejeitada pela SEFAZ')
-        }
-
-        return polledResult
+      if (
+        response.status === 202 ||
+        result.status === 'PENDENTE' ||
+        result.status === 'PENDENTE_EMISSAO' ||
+        result.status === 'EMITINDO' ||
+        result.status === 'PENDENTE_AUTORIZACAO' ||
+        result.status === 'CONTINGENCIA'
+      ) {
+        return result
       }
 
       return result

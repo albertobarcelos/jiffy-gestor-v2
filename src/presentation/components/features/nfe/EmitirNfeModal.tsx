@@ -20,11 +20,18 @@ export function EmitirNfeModal({ open, onClose, vendaId, vendaNumero, tabelaOrig
   
   // Usar o hook correto baseado na tabela de origem
   const emitirNfe = tabelaOrigem === 'venda_gestor' ? emitirNfeGestor : emitirNfePdv
-  const [formData, setFormData] = useState({
-    modelo: 65 as 55 | 65, // 55 = NF-e, 65 = NFC-e
-    serie: 1,
-    ambiente: 'PRODUCAO' as 'HOMOLOGACAO' | 'PRODUCAO',
-    crt: 1 as 1 | 2 | 3, // 1=Simples Nacional, 2=Simples Excesso, 3=Regime Normal
+  const [formData, setFormData] = useState(() => {
+    const ambientePadrao: 'HOMOLOGACAO' | 'PRODUCAO' =
+      typeof window !== 'undefined' && window.location.hostname === 'localhost'
+        ? 'HOMOLOGACAO'
+        : 'PRODUCAO'
+
+    return {
+      modelo: 65 as 55 | 65, // 55 = NF-e, 65 = NFC-e
+      serie: 1,
+      ambiente: ambientePadrao,
+      crt: 1 as 1 | 2 | 3, // 1=Simples Nacional, 2=Simples Excesso, 3=Regime Normal
+    }
   })
   
   // Estado para controlar se está processando (desabilita botão imediatamente)
@@ -39,7 +46,7 @@ export function EmitirNfeModal({ open, onClose, vendaId, vendaNumero, tabelaOrig
     setEmissaoEmProcessamento(true)
 
     try {
-      const result = await emitirNfe.mutateAsync({
+      await emitirNfe.mutateAsync({
         id: vendaId,
         modelo: formData.modelo,
         serie: formData.serie,
@@ -47,10 +54,8 @@ export function EmitirNfeModal({ open, onClose, vendaId, vendaNumero, tabelaOrig
         crt: formData.crt,
       })
 
-      // Só fecha o modal se emitida com sucesso; rejeitada mantém aberto para o usuário ver o toast
-      if (result?.status === 'EMITIDA') {
-        onClose()
-      }
+      // Fluxo assíncrono: fecha após enviar e acompanha status no kanban.
+      onClose()
     } catch (error) {
       // Erro de rede/servidor já é tratado pelo hook com toast
       console.error('Erro ao emitir NFe:', error)

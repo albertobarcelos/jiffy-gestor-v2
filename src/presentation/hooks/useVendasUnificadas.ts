@@ -25,7 +25,7 @@ export class VendaUnificadaDTO {
             cpfCnpj?: string;
         } | null,
         public readonly solicitarEmissaoFiscal: boolean,
-        public readonly statusFiscal: 'PENDENTE_EMISSAO' | 'EMITINDO' | 'PENDENTE_AUTORIZACAO' | 'CONTINGENCIA' | 'EMITIDA' | 'REJEITADA' | 'CANCELADA' | null,
+        public readonly statusFiscal: 'PENDENTE' | 'PENDENTE_EMISSAO' | 'EMITINDO' | 'PENDENTE_AUTORIZACAO' | 'CONTINGENCIA' | 'EMITIDA' | 'REJEITADA' | 'CANCELADA' | null,
         public readonly documentoFiscalId: string | null,
         public readonly abertoPor: {
             id: string;
@@ -175,5 +175,22 @@ export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
         staleTime: 1000 * 30, // 30 segundos
         refetchOnWindowFocus: true,
         refetchOnReconnect: true,
+        refetchInterval: query => {
+            const data = query.state.data
+            if (!data?.items?.length) return false
+
+            const temEmissaoEmAndamento = data.items.some(venda => {
+                const status = venda.statusFiscal?.toUpperCase()
+                return (
+                    status === 'PENDENTE' ||
+                    status === 'PENDENTE_EMISSAO' ||
+                    status === 'EMITINDO' ||
+                    status === 'PENDENTE_AUTORIZACAO' ||
+                    status === 'CONTINGENCIA'
+                )
+            })
+
+            return temEmissaoEmAndamento ? 5000 : false
+        },
     })
 }
