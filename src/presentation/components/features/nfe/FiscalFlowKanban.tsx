@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useVendas, useMarcarEmissaoFiscal } from '@/src/presentation/hooks/useVendas'
+import { useMarcarEmissaoFiscal, useDuplicateVenda, useCancelarVendaGestor } from '@/src/presentation/hooks/useVendas'
 import { useVendasUnificadas, VendaUnificadaDTO } from '@/src/presentation/hooks/useVendasUnificadas'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { MdReceipt, MdAdd, MdVisibility, MdSchedule, MdRefresh, MdCheckCircle, MdError, MdCancel, MdMoreVert } from 'react-icons/md'
@@ -12,6 +12,7 @@ import { StatusFiscalBadge } from './StatusFiscalBadge'
 import { DetalhesVendas } from '@/src/presentation/components/features/vendas/DetalhesVendas'
 import { NovoPedidoModal } from './NovoPedidoModal'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { showToast } from '@/src/shared/utils/toast'
 
 type Priority = 'high' | 'medium' | 'low'
 
@@ -50,6 +51,7 @@ export function FiscalFlowKanban() {
   } | null>(null)
   const [tipoVendaFiltros, setTipoVendaFiltros] = useState<TipoVendaFiltro[]>([])
   const [novoPedidoModalOpen, setNovoPedidoModalOpen] = useState(false)
+  const [menuAcoesVendaIdAberto, setMenuAcoesVendaIdAberto] = useState<string | null>(null)
   
   // Função para alternar filtro (seleção múltipla)
   const toggleFiltro = (tipo: TipoVendaFiltro) => {
@@ -109,6 +111,8 @@ export function FiscalFlowKanban() {
   })
   
   const marcarEmissaoFiscal = useMarcarEmissaoFiscal()
+  const duplicarVenda = useDuplicateVenda()
+  const cancelarVendaGestor = useCancelarVendaGestor()
   
   // Todas as vendas unificadas
   const todasVendas: Venda[] = vendasUnificadasData?.items || []
@@ -535,11 +539,62 @@ export function FiscalFlowKanban() {
   }
 
   const handleViewDetails = (venda: Venda) => {
+    setMenuAcoesVendaIdAberto(null)
     setVendaSelecionadaParaDetalhes({
       id: venda.id,
       tabelaOrigem: venda.tabelaOrigem,
     })
     setDetalhesVendaModalOpen(true)
+  }
+
+  const toggleMenuAcoes = (vendaId: string) => {
+    setMenuAcoesVendaIdAberto((prev) => (prev === vendaId ? null : vendaId))
+  }
+
+  const handleDuplicarVenda = async (venda: Venda) => {
+    setMenuAcoesVendaIdAberto(null)
+    if (venda.tabelaOrigem !== 'venda') {
+      showToast.error('Duplicação disponível apenas para vendas do PDV.')
+      return
+    }
+
+    try {
+      await duplicarVenda.mutateAsync(venda.id)
+      await refetch()
+    } catch (error) {
+      console.error('Erro ao duplicar venda:', error)
+    }
+  }
+
+  const handleExcluirVenda = async (venda: Venda) => {
+    setMenuAcoesVendaIdAberto(null)
+    if (venda.tabelaOrigem !== 'venda_gestor') {
+      showToast.error('Exclusão disponível apenas para vendas do Gestor.')
+      return
+    }
+
+    const motivo = window
+      .prompt('Informe o motivo da exclusão (mínimo 15 caracteres):', 'Cancelamento solicitado pelo operador.')
+      ?.trim()
+
+    if (!motivo) return
+    if (motivo.length < 15) {
+      showToast.error('Justificativa deve ter no mínimo 15 caracteres.')
+      return
+    }
+
+    const confirmou = window.confirm('Deseja realmente excluir esta venda?')
+    if (!confirmou) return
+
+    try {
+      await cancelarVendaGestor.mutateAsync({
+        id: venda.id,
+        motivo,
+      })
+      await refetch()
+    } catch (error) {
+      console.error('Erro ao excluir venda:', error)
+    }
   }
 
 
@@ -799,13 +854,35 @@ export function FiscalFlowKanban() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              // TODO: Abrir menu de opções
+                              toggleMenuAcoes(venda.id)
                             }}
                             className="absolute top-1.5 right-1.5 p-0.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
                             title="Mais opções"
                           >
                             <MdMoreVert className="w-4 h-4" />
                           </button>
+
+                          {menuAcoesVendaIdAberto === venda.id && (
+                            <div
+                              className="absolute top-7 right-2 z-20 w-36 bg-white border border-gray-200 rounded-lg shadow-lg py-1"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                onClick={() => handleDuplicarVenda(venda)}
+                                className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={duplicarVenda.isPending || cancelarVendaGestor.isPending}
+                              >
+                                Duplicar
+                              </button>
+                              <button
+                                onClick={() => handleExcluirVenda(venda)}
+                                className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={duplicarVenda.isPending || cancelarVendaGestor.isPending}
+                              >
+                                Excluir
+                              </button>
+                            </div>
+                          )}
 
                           {/* Venda N° */}
                           <p className="text-xs text-gray-600 mb-0.5">Venda #{venda.numeroVenda}</p>
