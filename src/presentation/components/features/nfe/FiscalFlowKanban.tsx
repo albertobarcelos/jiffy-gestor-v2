@@ -40,6 +40,7 @@ export function FiscalFlowKanban() {
     id: string
     tabelaOrigem: 'venda' | 'venda_gestor'
     numeroVenda?: number
+    modeloInicial?: 55 | 65
   } | null>(null)
   const [emitirNfeModalOpen, setEmitirNfeModalOpen] = useState(false)
   const [detalhesVendaModalOpen, setDetalhesVendaModalOpen] = useState(false)
@@ -365,10 +366,12 @@ export function FiscalFlowKanban() {
   }
 
   const handleEmitirNfe = (venda: Venda) => {
+    const modeloInicial: 55 | 65 = venda.tipoDocFiscal === 'NFE' ? 55 : 65
     setVendaSelecionadaParaEmissao({
       id: venda.id,
       tabelaOrigem: venda.tabelaOrigem,
       numeroVenda: venda.numeroVenda,
+      modeloInicial,
     })
     setSelectedVendaId(venda.id) // Mantém para compatibilidade
     setEmitirNfeModalOpen(true)
@@ -775,15 +778,20 @@ export function FiscalFlowKanban() {
                                   venda.statusFiscal === 'EMITIDA'
                                 }
                               >
-                                {venda.statusFiscal === 'REJEITADA'
-                                  ? 'Reemitir NFe'
-                                  : venda.statusFiscal === 'PENDENTE' ||
-                                      venda.statusFiscal === 'PENDENTE_EMISSAO' ||
-                                      venda.statusFiscal === 'EMITINDO' ||
-                                      venda.statusFiscal === 'PENDENTE_AUTORIZACAO' ||
-                                      venda.statusFiscal === 'CONTINGENCIA'
-                                    ? 'Aguardando...'
-                                    : 'Emitir NFe'}
+                                {(() => {
+                                  const documentoLabel = venda.tipoDocFiscal === 'NFE' ? 'NFe' : 'NFCe'
+                                  if (venda.statusFiscal === 'REJEITADA') return `Reemitir ${documentoLabel}`
+                                  if (
+                                    venda.statusFiscal === 'PENDENTE' ||
+                                    venda.statusFiscal === 'PENDENTE_EMISSAO' ||
+                                    venda.statusFiscal === 'EMITINDO' ||
+                                    venda.statusFiscal === 'PENDENTE_AUTORIZACAO' ||
+                                    venda.statusFiscal === 'CONTINGENCIA'
+                                  ) {
+                                    return 'Aguardando...'
+                                  }
+                                  return `Emitir ${documentoLabel}`
+                                })()}
                               </Button>
                             )}
 
@@ -794,8 +802,9 @@ export function FiscalFlowKanban() {
                                 className="flex-1"
                                 onClick={async () => {
                                   const url = `/api/nfe/${venda.documentoFiscalId}`
+                                  const documentoLabel = venda.tipoDocFiscal === 'NFE' ? 'DANFE' : 'DANFCE'
                                   
-                                  // Verificar se o DANFE está disponível antes de abrir
+                                  // Verificar se o PDF fiscal está disponível antes de abrir
                                   try {
                                     const response = await fetch(url)
                                     
@@ -803,28 +812,28 @@ export function FiscalFlowKanban() {
                                       // Verificar se é realmente um PDF
                                       const contentType = response.headers.get('content-type')
                                       if (contentType?.includes('application/pdf')) {
-                                        // DANFE disponível, abrir normalmente
+                                        // PDF fiscal disponível, abrir normalmente
                                         window.open(url, '_blank')
                                       } else {
                                         // Resposta inesperada
                                         const errorData = await response.json().catch(() => ({}))
-                                        alert(errorData.error || 'Erro ao buscar DANFE. Tente novamente mais tarde.')
+                                        alert(errorData.error || `Erro ao buscar ${documentoLabel}. Tente novamente mais tarde.`)
                                       }
                                     } else if (response.status === 404) {
-                                      // DANFE ainda não foi gerado
+                                      // PDF fiscal ainda não foi gerado
                                       const errorData = await response.json().catch(() => ({}))
-                                      const errorMessage = errorData.error || 'O DANFE ainda não foi gerado.'
+                                      const errorMessage = errorData.error || `O ${documentoLabel} ainda não foi gerado.`
                                       
                                       // Oferecer opção de regenerar ou aguardar
                                       const opcao = confirm(
                                         `${errorMessage}\n\n` +
                                         `Escolha uma opção:\n` +
-                                        `OK = Regenerar DANFE agora\n` +
+                                        `OK = Regenerar ${documentoLabel} agora\n` +
                                         `Cancelar = Aguardar e tentar novamente automaticamente`
                                       )
                                       
                                       if (opcao) {
-                                        // Regenerar DANFE via Next.js API route (proxy)
+                                        // Regenerar PDF fiscal via Next.js API route (proxy)
                                         try {
                                           const regenerarUrl = `/api/nfe/${venda.documentoFiscalId}/regenerar`
                                           
@@ -837,14 +846,14 @@ export function FiscalFlowKanban() {
                                           
                                           if (regenerarResponse.ok) {
                                             const regenerarData = await regenerarResponse.json()
-                                            alert(`✅ ${regenerarData.mensagem || 'Geração de DANFE iniciada. Aguarde alguns segundos e tente novamente.'}`)
+                                            alert(`✅ ${regenerarData.mensagem || `Geração de ${documentoLabel} iniciada. Aguarde alguns segundos e tente novamente.`}`)
                                             
                                             // Aguardar 5 segundos e tentar abrir
                                             setTimeout(async () => {
                                               let tentativas = 0
                                               const maxTentativas = 6 // 30 segundos no total (6 x 5s)
                                               
-                                              const verificarDanfe = async () => {
+                                              const verificarPdfFiscal = async () => {
                                                 tentativas++
                                                 try {
                                                   const retryResponse = await fetch(url)
@@ -857,33 +866,33 @@ export function FiscalFlowKanban() {
                                                   }
                                                   
                                                   if (tentativas < maxTentativas) {
-                                                    setTimeout(verificarDanfe, 5000) // Tentar novamente em 5 segundos
+                                                    setTimeout(verificarPdfFiscal, 5000) // Tentar novamente em 5 segundos
                                                   } else {
-                                                    alert('O DANFE ainda não foi gerado após 30 segundos. Por favor, tente novamente mais tarde.')
+                                                    alert(`O ${documentoLabel} ainda não foi gerado após 30 segundos. Por favor, tente novamente mais tarde.`)
                                                   }
                                                 } catch {
                                                   if (tentativas < maxTentativas) {
-                                                    setTimeout(verificarDanfe, 5000)
+                                                    setTimeout(verificarPdfFiscal, 5000)
                                                   }
                                                 }
                                               }
                                               
-                                              setTimeout(verificarDanfe, 5000)
+                                              setTimeout(verificarPdfFiscal, 5000)
                                             }, 5000)
                                           } else {
                                             const errorRegenerar = await regenerarResponse.json().catch(() => ({}))
-                                            alert(`Erro ao regenerar DANFE: ${errorRegenerar.error || errorRegenerar.message || 'Erro desconhecido'}`)
+                                            alert(`Erro ao regenerar ${documentoLabel}: ${errorRegenerar.error || errorRegenerar.message || 'Erro desconhecido'}`)
                                           }
                                         } catch (error) {
-                                          console.error('Erro ao regenerar DANFE:', error)
-                                          alert('Erro ao regenerar DANFE. Tente novamente mais tarde.')
+                                          console.error(`Erro ao regenerar ${documentoLabel}:`, error)
+                                          alert(`Erro ao regenerar ${documentoLabel}. Tente novamente mais tarde.`)
                                         }
                                       } else {
                                         // Aguardar e tentar novamente automaticamente
                                         let tentativas = 0
                                         const maxTentativas = 6 // 30 segundos no total (6 x 5s)
                                         
-                                        const verificarDanfe = async () => {
+                                        const verificarPdfFiscal = async () => {
                                           tentativas++
                                           try {
                                             const retryResponse = await fetch(url)
@@ -896,32 +905,32 @@ export function FiscalFlowKanban() {
                                             }
                                             
                                             if (tentativas < maxTentativas) {
-                                              setTimeout(verificarDanfe, 5000) // Tentar novamente em 5 segundos
+                                              setTimeout(verificarPdfFiscal, 5000) // Tentar novamente em 5 segundos
                                             } else {
-                                              alert('O DANFE ainda não foi gerado após 30 segundos. Por favor, tente novamente mais tarde.')
+                                              alert(`O ${documentoLabel} ainda não foi gerado após 30 segundos. Por favor, tente novamente mais tarde.`)
                                             }
                                           } catch {
                                             if (tentativas < maxTentativas) {
-                                              setTimeout(verificarDanfe, 5000)
+                                              setTimeout(verificarPdfFiscal, 5000)
                                             }
                                           }
                                         }
                                         
-                                        setTimeout(verificarDanfe, 5000)
+                                        setTimeout(verificarPdfFiscal, 5000)
                                       }
                                     } else {
                                       // Outro erro
                                       const errorData = await response.json().catch(() => ({}))
-                                      alert(errorData.error || 'Erro ao buscar DANFE. Tente novamente mais tarde.')
+                                      alert(errorData.error || `Erro ao buscar ${documentoLabel}. Tente novamente mais tarde.`)
                                     }
                                   } catch (error) {
                                     // Erro de rede, tentar abrir mesmo assim
-                                    console.error('Erro ao verificar DANFE:', error)
+                                    console.error(`Erro ao verificar ${documentoLabel}:`, error)
                                     window.open(url, '_blank')
                                   }
                                 }}
                               >
-                                Ver NFe
+                                Ver {venda.tipoDocFiscal === 'NFE' ? 'NFe' : 'NFCe'}
                               </Button>
                             )}
                             
@@ -959,6 +968,7 @@ export function FiscalFlowKanban() {
           vendaId={vendaSelecionadaParaEmissao.id}
           vendaNumero={vendaSelecionadaParaEmissao.numeroVenda?.toString()}
           tabelaOrigem={vendaSelecionadaParaEmissao.tabelaOrigem}
+          modeloInicial={vendaSelecionadaParaEmissao.modeloInicial ?? 65}
         />
       )}
 

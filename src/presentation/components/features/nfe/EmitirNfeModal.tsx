@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/presentation/components/ui/dialog'
 import { Button } from '@/src/presentation/components/ui/button'
 import { useEmitirNfe, useEmitirNfeGestor } from '@/src/presentation/hooks/useVendas'
@@ -12,9 +12,17 @@ interface EmitirNfeModalProps {
   vendaId: string
   vendaNumero?: string
   tabelaOrigem?: 'venda' | 'venda_gestor' // Indica de qual tabela é a venda
+  modeloInicial?: 55 | 65
 }
 
-export function EmitirNfeModal({ open, onClose, vendaId, vendaNumero, tabelaOrigem = 'venda' }: EmitirNfeModalProps) {
+export function EmitirNfeModal({
+  open,
+  onClose,
+  vendaId,
+  vendaNumero,
+  tabelaOrigem = 'venda',
+  modeloInicial = 65,
+}: EmitirNfeModalProps) {
   const emitirNfePdv = useEmitirNfe()
   const emitirNfeGestor = useEmitirNfeGestor()
   
@@ -27,7 +35,7 @@ export function EmitirNfeModal({ open, onClose, vendaId, vendaNumero, tabelaOrig
         : 'PRODUCAO'
 
     return {
-      modelo: 65 as 55 | 65, // 55 = NF-e, 65 = NFC-e
+      modelo: modeloInicial, // 55 = NF-e, 65 = NFC-e
       serie: 1,
       ambiente: ambientePadrao,
       crt: 1 as 1 | 2 | 3, // 1=Simples Nacional, 2=Simples Excesso, 3=Regime Normal
@@ -36,6 +44,22 @@ export function EmitirNfeModal({ open, onClose, vendaId, vendaNumero, tabelaOrig
   
   // Estado para controlar se está processando (desabilita botão imediatamente)
   const [emissaoEmProcessamento, setEmissaoEmProcessamento] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+
+    const ambientePadrao: 'HOMOLOGACAO' | 'PRODUCAO' =
+      typeof window !== 'undefined' && window.location.hostname === 'localhost'
+        ? 'HOMOLOGACAO'
+        : 'PRODUCAO'
+
+    setFormData({
+      modelo: modeloInicial,
+      serie: 1,
+      ambiente: ambientePadrao,
+      crt: 1,
+    })
+  }, [open, modeloInicial])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -68,7 +92,7 @@ export function EmitirNfeModal({ open, onClose, vendaId, vendaNumero, tabelaOrig
     <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
       <DialogContent sx={{ maxWidth: 500 }}>
         <DialogHeader>
-          <DialogTitle>Emitir Nota Fiscal</DialogTitle>
+          <DialogTitle>Emitir {formData.modelo === 55 ? 'NFe' : 'NFCe'}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
@@ -158,7 +182,9 @@ export function EmitirNfeModal({ open, onClose, vendaId, vendaNumero, tabelaOrig
               isLoading={emissaoEmProcessamento || emitirNfe.isPending}
               disabled={emissaoEmProcessamento || emitirNfe.isPending}
             >
-              {emissaoEmProcessamento || emitirNfe.isPending ? 'Emitindo...' : 'Emitir NFe'}
+              {emissaoEmProcessamento || emitirNfe.isPending
+                ? 'Emitindo...'
+                : `Emitir ${formData.modelo === 55 ? 'NFe' : 'NFCe'}`}
             </Button>
           </DialogFooter>
         </form>
