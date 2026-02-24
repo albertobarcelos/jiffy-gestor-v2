@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
   DialogFooter,
 } from '@/src/presentation/components/ui/dialog'
@@ -362,11 +361,11 @@ export function ConfigurarNcmModal({
           flexDirection: 'column',
         }}
       >
-        <DialogHeader sx={{ padding: '24px 24px 16px 24px', flexShrink: 0 }}>
+        <div style={{ padding: '24px 24px 16px 24px', flexShrink: 0 }}>
           <DialogTitle>
             {configuracaoImposto ? 'Editar Configuração de Impostos por NCM' : 'Nova Configuração de Impostos por NCM'}
           </DialogTitle>
-        </DialogHeader>
+        </div>
 
         <div 
           style={{
@@ -389,7 +388,7 @@ export function ConfigurarNcmModal({
                 setFormData({ ...formData, ncm: value })
               }}
               placeholder="12345678"
-              maxLength={8}
+              inputProps={{ maxLength: 8 }}
               required
               disabled={!!configuracaoImposto}
             />
@@ -407,7 +406,7 @@ export function ConfigurarNcmModal({
                   setFormData({ ...formData, cfop: value })
                 }}
                 placeholder="5102"
-                maxLength={4}
+                inputProps={{ maxLength: 4 }}
               />
               <p className="text-xs text-secondary-text/70">4 dígitos</p>
             </div>
@@ -477,9 +476,7 @@ export function ConfigurarNcmModal({
               <Input
                 id="icmsAliquota"
                 type="number"
-                step="0.01"
-                min="0"
-                max="100"
+                inputProps={{ step: 0.01, min: 0, max: 100 }}
                 value={formData.icmsAliquota}
                 onChange={(e) =>
                   setFormData({ ...formData, icmsAliquota: e.target.value })
@@ -519,9 +516,7 @@ export function ConfigurarNcmModal({
               <Input
                 id="pisAliquota"
                 type="number"
-                step="0.01"
-                min="0"
-                max="100"
+                inputProps={{ step: 0.01, min: 0, max: 100 }}
                 value={formData.pisAliquota}
                 onChange={(e) =>
                   setFormData({ ...formData, pisAliquota: e.target.value })
@@ -558,9 +553,7 @@ export function ConfigurarNcmModal({
               <Input
                 id="cofinsAliquota"
                 type="number"
-                step="0.01"
-                min="0"
-                max="100"
+                inputProps={{ step: 0.01, min: 0, max: 100 }}
                 value={formData.cofinsAliquota}
                 onChange={(e) =>
                   setFormData({ ...formData, cofinsAliquota: e.target.value })

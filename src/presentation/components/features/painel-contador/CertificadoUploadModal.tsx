@@ -156,26 +156,26 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
 
   return (
     <Dialog open={open} onClose={handleClose}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-primary">
+      <div className="max-w-md px-4">
+        <div>
+          <p className="text-2xl text-center font-bold text-primary pt-4">
             Cadastrar Certificado Digital
-          </DialogTitle>
-          <DialogDescription className="text-secondary-text">
+          </p>
+          <p className="text-secondary-text">
             Faça upload do arquivo .pfx ou .p12 e informe a senha do certificado
-          </DialogDescription>
-        </DialogHeader>
+          </p>
+        </div>
 
         <div className="flex flex-col gap-4 py-4">
           {/* Upload de arquivo */}
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 px-8">
             <label className="text-sm font-medium text-primary">
               Arquivo do Certificado
             </label>
             <div className="flex flex-col gap-2">
               <label 
                 htmlFor="certificado-file" 
-                className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-primary/30 bg-primary/5 px-4 py-6 cursor-pointer hover:border-primary/50 hover:bg-primary/10 transition-colors"
+                className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-primary/30 bg-primary/5 px-4 py-8 cursor-pointer hover:border-primary/50 hover:bg-primary/10 transition-colors"
               >
                 <MdUploadFile className="text-primary" size={24} />
                 <span className="text-sm font-medium text-primary">
@@ -221,7 +221,7 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
               Senha do Certificado
             </label>
             <div className="relative">
-              <MdLock className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
+              <MdLock className="absolute left-2 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
               <Input
                 id="senha-cert"
                 type="password"
@@ -229,7 +229,11 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
                 disabled={isUploading}
-                className="pl-10"
+                sx={{
+                  '& .MuiOutlinedInput-input': {
+                    paddingLeft: '2rem', // 56px (equivalente ao pl-14 do Tailwind)
+                  },
+                }}
               />
             </div>
           </div>
@@ -257,7 +261,7 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
             </Button>
           </div>
         </div>
-      </DialogContent>
+      </div>
     </Dialog>
   )
 }

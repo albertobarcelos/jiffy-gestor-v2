@@ -114,12 +114,12 @@ export function Etapa5TabelaIbpt() {
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-primary/20 bg-white p-4">
-        <h4 className="font-exo font-semibold text-primary text-lg mb-4">
+        <h4 className="font-exo font-semibold text-primary text-base mb-2">
           Tabela IBPT (Impostos Básicos sobre Produtos e Serviços)
         </h4>
 
         {status && status.totalRegistros > 0 ? (
-          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+          <div className="mb-2 p-3 bg-green-50 border border-green-200 rounded-lg">
             <div className="flex items-center gap-2 mb-2">
               <MdCheckCircle className="text-green-600" size={20} />
               <span className="font-inter font-medium text-green-800 text-sm">
@@ -135,7 +135,7 @@ export function Etapa5TabelaIbpt() {
             </div>
           </div>
         ) : (
-          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="mb-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
             <div className="flex items-center gap-2 mb-2">
               <MdError className="text-yellow-600" size={20} />
               <span className="font-inter font-medium text-yellow-800 text-sm">
@@ -148,7 +148,7 @@ export function Etapa5TabelaIbpt() {
           </div>
         )}
 
-        <div className="space-y-4">
+        <div className="space-y-2">
           <div>
             <label className="block text-sm font-medium text-secondary-text mb-2">
               Selecionar arquivo JSON

@@ -149,7 +149,7 @@ export function ConfigurarReformaTributariaModal({
                 setFormData({ ...formData, ncm: value })
               }}
               placeholder="12345678"
-              maxLength={8}
+              inputProps={{ maxLength: 8 }}
               required
               disabled={!!configuracao}
             />

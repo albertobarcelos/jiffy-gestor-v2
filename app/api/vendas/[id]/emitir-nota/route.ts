@@ -32,6 +32,17 @@ export async function POST(
     }
 
     const apiClient = new ApiClient()
+    
+    // Log para debug
+    console.log('[Emitir NFe] Tentando emitir NFe:', {
+      vendaId: id,
+      modelo: body.modelo,
+      serie: body.serie,
+      ambiente: body.ambiente,
+      crt: body.crt,
+      endpoint: `/api/v1/operacao-pdv/vendas/${id}/emitir-nfe`,
+    })
+    
     const response = await apiClient.request<any>(
       `/api/v1/operacao-pdv/vendas/${id}/emitir-nota`,
       {
@@ -48,6 +59,17 @@ export async function POST(
   } catch (error) {
     console.error('Erro ao emitir nota fiscal:', error)
     if (error instanceof ApiError) {
+      // Se for 404, retornar mensagem mais específica
+      if (error.status === 404) {
+        return NextResponse.json(
+          { 
+            error: 'Venda não encontrada ou endpoint não disponível. Verifique se a venda existe e está marcada para emissão fiscal.',
+            details: error.message 
+          },
+          { status: 404 }
+        )
+      }
+      
       return NextResponse.json(
         { error: error.message || 'Erro ao emitir nota fiscal' },
         { status: error.status }

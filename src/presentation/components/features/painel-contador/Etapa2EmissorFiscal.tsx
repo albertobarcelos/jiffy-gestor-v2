@@ -89,9 +89,13 @@ export function Etapa3EmissorFiscal() {
       if (numeracaoResponse.ok) {
         const numeracoes: ConfiguracaoNumeracao[] = await numeracaoResponse.json()
         
+        console.log('📥 Dados carregados do servidor (todas as numerações):', numeracoes)
+        
         // NF-e: modelo 55, terminal_id = null (geral)
         // Só pode haver uma configuração de NF-e por empresa
         const nfes = numeracoes.filter(n => n.modelo === 55 && !n.terminalId)
+        console.log('📥 NF-es filtradas (modelo 55, sem terminalId):', nfes)
+        
         if (nfes.length > 0) {
           // Pegar a primeira (e única) configuração de NF-e
           const nfe = nfes[0]
@@ -104,9 +108,11 @@ export function Etapa3EmissorFiscal() {
           })
           
           // Atualizar toggles da NF-e
+          const nfeAtivoValue = nfe.nfeAtivo ?? false
+          
           setEmissorFiscal(prev => ({
             ...prev,
-            nfeAtivo: nfe.nfeAtivo ?? false,
+            nfeAtivo: nfeAtivoValue,
           }))
         } else {
           // Se não encontrou configuração, limpar
@@ -243,10 +249,12 @@ export function Etapa3EmissorFiscal() {
       }
       setNfeNumeracao(novaNumeracao)
       
-      // Atualizar toggles
+      // Atualizar toggles - usar o valor retornado, mas se não vier, usar o que foi enviado
+      const nfeAtivoFinal = data.nfeAtivo !== undefined ? data.nfeAtivo : payload.nfeAtivo
+      
       setEmissorFiscal(prev => ({
         ...prev,
-        nfeAtivo: data.nfeAtivo ?? false,
+        nfeAtivo: nfeAtivoFinal,
       }))
       
       // Atualizar formulário com os valores salvos (importante: usar a série que foi salva)
@@ -471,10 +479,53 @@ export function Etapa3EmissorFiscal() {
     }
   }
 
-  const handleToggleNfce = (ativo: boolean) => {
-    // Toggle funciona apenas no frontend (estado local)
-    // A validação e salvamento acontecem apenas ao clicar em "Salvar Configuração NFC-e"
+  const handleToggleNfce = async (ativo: boolean) => {
+    const token = auth?.getAccessToken()
+    if (!token) return
+
+    // Atualizar estado local primeiro
     setEmissorFiscal(prev => ({ ...prev, nfceAtivo: ativo }))
+
+    // Se não tiver configuração de numeração, apenas atualizar toggle local
+    // O toggle será salvo quando o usuário salvar a numeração
+    if (!nfceNumeracao || !nfceForm.serie || !nfceForm.proximoNumero) {
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      // Salvar toggle junto com a numeração
+      const payload = {
+        modelo: 65,
+        serie: parseInt(nfceForm.serie),
+        numeroInicial: parseInt(nfceForm.proximoNumero),
+        terminalId: null,
+        nfceAtivo: ativo,
+        // Manter CSC se já existir
+        nfceCscId: nfceForm.cscId || undefined,
+        nfceCscCodigo: nfceForm.cscCodigo || undefined,
+      }
+
+      const response = await fetch(`/api/v1/fiscal/configuracoes/numeracao/${65}/${nfceNumeracao.serie}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setNfceNumeracao(prev => prev ? { ...prev, nfceAtivo: data.nfceAtivo } : null)
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar toggle NFC-e:', error)
+      // Reverter toggle em caso de erro
+      setEmissorFiscal(prev => ({ ...prev, nfceAtivo: !ativo }))
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   if (isLoading) {
@@ -486,18 +537,26 @@ export function Etapa3EmissorFiscal() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-2">
       {/* NF-e */}
-      <div className="rounded-lg border border-primary/20 bg-white p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="font-exo font-semibold text-primary text-lg">NF-e (Nota Fiscal Eletrônica)</h4>
-          <div className="flex items-center gap-2">
-            <Label htmlFor="nfe-ativo" className="text-sm">Ativar NF-e</Label>
+      <div className="rounded-lg border border-primary/20 bg-white p-2">
+        <div className="flex items-center justify-between">
+          <h4 className="font-exo font-semibold text-primary text-base">NF-e (Nota Fiscal Eletrônica)</h4>
+          <div className="flex items-center gap-1">
+            <Label htmlFor="nfe-ativo" className="text-sm">NF-e</Label>
             <Switch
               id="nfe-ativo"
               checked={emissorFiscal.nfeAtivo}
               onChange={(e) => handleToggleNfe(e.target.checked)}
               disabled={isSaving}
+              sx={{
+                '& .MuiSwitch-switchBase.Mui-checked': {
+                  color: 'var(--color-primary)',
+                },
+                '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                  backgroundColor: 'var(--color-primary)',
+                },
+              }}
             />
           </div>
         </div>
@@ -506,7 +565,7 @@ export function Etapa3EmissorFiscal() {
         {emissorFiscal.nfeAtivo && (
           <>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="">
                 <Label htmlFor="nfe-serie">Série *</Label>
                 <Input
                   id="nfe-serie"
@@ -521,7 +580,7 @@ export function Etapa3EmissorFiscal() {
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="">
                 <Label htmlFor="nfe-proximo">Próxima Emissão *</Label>
                 <Input
                   id="nfe-proximo"
@@ -534,7 +593,7 @@ export function Etapa3EmissorFiscal() {
               </div>
             </div>
 
-            <div className="mt-4 flex justify-end">
+            <div className="mt-2 flex justify-end">
               <Button
                 onClick={handleSaveNfe}
                 disabled={isSaving}
@@ -552,16 +611,24 @@ export function Etapa3EmissorFiscal() {
       </div>
 
       {/* NFC-e */}
-      <div className="rounded-lg border border-primary/20 bg-white p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="font-exo font-semibold text-primary text-lg">NFC-e (Nota Fiscal de Consumidor Eletrônica)</h4>
-          <div className="flex items-center gap-2">
-            <Label htmlFor="nfce-ativo" className="text-sm">Ativar NFC-e</Label>
+      <div className="rounded-lg border border-primary/20 bg-white p-2">
+        <div className="flex items-center justify-between">
+          <h4 className="font-exo font-semibold text-primary text-base">NFC-e (Nota Fiscal de Consumidor Eletrônica)</h4>
+          <div className="flex items-center gap-1">
+            <Label htmlFor="nfce-ativo" className="text-sm">NFC-e</Label>
             <Switch
               id="nfce-ativo"
               checked={emissorFiscal.nfceAtivo}
               onChange={(e) => handleToggleNfce(e.target.checked)}
               disabled={isSaving}
+              sx={{
+                '& .MuiSwitch-switchBase.Mui-checked': {
+                  color: 'var(--color-primary)',
+                },
+                '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                  backgroundColor: 'var(--color-primary)',
+                },
+              }}
             />
           </div>
         </div>
@@ -569,14 +636,14 @@ export function Etapa3EmissorFiscal() {
         {/* Mostrar campos e botão apenas se NFC-e estiver ativada */}
         {emissorFiscal.nfceAtivo && (
           <>
-            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-sm text-yellow-800">
                 ⚠️ <strong>CSC é obrigatório</strong> para emissão de NFC-e. Configure abaixo.
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <div className="">
                 <Label htmlFor="nfce-serie">Série *</Label>
                 <Input
                   id="nfce-serie"
@@ -591,7 +658,7 @@ export function Etapa3EmissorFiscal() {
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="">
                 <Label htmlFor="nfce-proximo">Próxima Emissão *</Label>
                 <Input
                   id="nfce-proximo"
@@ -604,8 +671,8 @@ export function Etapa3EmissorFiscal() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="">
                 <Label htmlFor="nfce-csc-id">CSC ID *</Label>
                 <Input
                   id="nfce-csc-id"
@@ -618,7 +685,7 @@ export function Etapa3EmissorFiscal() {
                 </p>
               </div>
 
-              <div className="space-y-2">
+              <div className="">
                 <Label htmlFor="nfce-csc-codigo">CSC Código *</Label>
                 <Input
                   id="nfce-csc-codigo"
@@ -632,7 +699,7 @@ export function Etapa3EmissorFiscal() {
               </div>
             </div>
 
-            <div className="mt-4 flex justify-end">
+            <div className="mt-2 flex justify-end">
               <Button
                 onClick={handleSaveNfce}
                 disabled={isSaving || (emissorFiscal.nfceAtivo && (!nfceForm.serie || !nfceForm.proximoNumero || !nfceForm.cscId || !nfceForm.cscCodigo))}
