@@ -78,7 +78,14 @@ export async function GET(req: NextRequest) {
     
     // Se for timeout (microserviço fiscal off), retorna lista vazia com sucesso
     // Isso permite que a UI continue funcionando normalmente
-    if (error instanceof ApiError && error.status === 504 && error.data?.timeout) {
+    if (
+      error instanceof ApiError &&
+      error.status === 504 &&
+      error.data &&
+      typeof error.data === 'object' &&
+      'timeout' in error.data &&
+      (error.data as { timeout?: boolean }).timeout
+    ) {
       console.warn('Timeout ao buscar produtos - retornando lista vazia para não bloquear a UI')
       return NextResponse.json(
         {
@@ -98,10 +105,17 @@ export async function GET(req: NextRequest) {
     
     // Se for ApiError com outro status, preserva o status code
     if (error instanceof ApiError) {
+      const timeoutValue =
+        error.data &&
+        typeof error.data === 'object' &&
+        'timeout' in error.data
+          ? (error.data as { timeout?: boolean }).timeout || false
+          : false
+
       return NextResponse.json(
         { 
           message: error.message || 'Erro ao buscar produtos',
-          timeout: error.data?.timeout || false
+          timeout: timeoutValue
         },
         { status: error.status }
       )
