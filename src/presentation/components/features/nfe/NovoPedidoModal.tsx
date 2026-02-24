@@ -367,27 +367,42 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
   const calcularTotalProduto = (produto: ProdutoSelecionado): number => {
     const valorProduto = produto.valorUnitario * produto.quantidade
     
-    // Calcular desconto
+    // Calcular total dos complementos primeiro
+    const valorComplementos = produto.complementos.reduce((sum, comp) => {
+      const tipo = comp.tipoImpactoPreco || 'nenhum'
+      const valorTotal = comp.valor * comp.quantidade * produto.quantidade
+      if (tipo === 'aumenta') {
+        return sum + valorTotal
+      } else if (tipo === 'diminui') {
+        return sum - valorTotal
+      }
+      return sum
+    }, 0)
+    
+    // Subtotal = produto + complementos (igual ao modal)
+    const subtotal = valorProduto + valorComplementos
+    
+    // Calcular desconto sobre o subtotal (produto + complementos)
     let valorDesconto = 0
     if (produto.tipoDesconto && produto.valorDesconto) {
       if (produto.tipoDesconto === 'porcentagem') {
-        valorDesconto = valorProduto * (produto.valorDesconto / 100)
+        valorDesconto = subtotal * (produto.valorDesconto / 100)
       } else {
         valorDesconto = produto.valorDesconto
       }
     }
     
-    // Calcular acréscimo
+    // Calcular acréscimo sobre o subtotal (produto + complementos)
     let valorAcrescimo = 0
     if (produto.tipoAcrescimo && produto.valorAcrescimo) {
       if (produto.tipoAcrescimo === 'porcentagem') {
-        valorAcrescimo = valorProduto * (produto.valorAcrescimo / 100)
+        valorAcrescimo = subtotal * (produto.valorAcrescimo / 100)
       } else {
         valorAcrescimo = produto.valorAcrescimo
       }
     }
     
-    return valorProduto - valorDesconto + valorAcrescimo
+    return subtotal - valorDesconto + valorAcrescimo
   }
 
   // Função para calcular o total dos complementos de um produto
@@ -406,15 +421,47 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     }, 0)
   }
 
-  // Calcular totais do pedido (produtos com desconto/acréscimo + complementos)
+  // Função para formatar desconto/acréscimo para exibição
+  const formatarDescontoAcrescimo = (produto: ProdutoSelecionado): string => {
+    const valorProduto = produto.valorUnitario * produto.quantidade
+    const valorComplementos = calcularTotalComplementos(produto)
+    const subtotal = valorProduto + valorComplementos
+    
+    // Verificar desconto
+    if (produto.tipoDesconto && produto.valorDesconto) {
+      let valorDesconto = 0
+      if (produto.tipoDesconto === 'porcentagem') {
+        valorDesconto = subtotal * (produto.valorDesconto / 100)
+      } else {
+        valorDesconto = produto.valorDesconto
+      }
+      if (valorDesconto > 0) {
+        return `Desc. -${formatarNumeroComMilhar(valorDesconto)}`
+      }
+    }
+    
+    // Verificar acréscimo
+    if (produto.tipoAcrescimo && produto.valorAcrescimo) {
+      let valorAcrescimo = 0
+      if (produto.tipoAcrescimo === 'porcentagem') {
+        valorAcrescimo = subtotal * (produto.valorAcrescimo / 100)
+      } else {
+        valorAcrescimo = produto.valorAcrescimo
+      }
+      if (valorAcrescimo > 0) {
+        return `Acres. +${formatarNumeroComMilhar(valorAcrescimo)}`
+      }
+    }
+    
+    return ''
+  }
+
+  // Calcular totais do pedido (produtos com desconto/acréscimo já incluindo complementos)
   const totalProdutos = useMemo(() => {
     return produtos.reduce((sum, p) => {
-      // Calcular total do produto (sem complementos) com desconto/acréscimo
+      // calcularTotalProduto já inclui complementos e aplica desconto/acréscimo sobre o total
       const totalProduto = calcularTotalProduto(p)
-      // Calcular total dos complementos
-      const totalComplementos = calcularTotalComplementos(p)
-      // Soma produto + complementos
-      return sum + totalProduto + totalComplementos
+      return sum + totalProduto
     }, 0)
   }, [produtos])
 
@@ -1385,6 +1432,9 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                         <span className="text-xs font-semibold text-gray-700">Produto</span>
                       </div>
                       <div className="flex-1 flex justify-end">
+                        <span className="text-xs font-semibold text-gray-700 text-right">Desc./Acres.</span>
+                      </div>
+                      <div className="flex-1 flex justify-end">
                         <span className="text-xs font-semibold text-gray-700 text-right">Val Unit.</span>
                       </div>
                       <div className="flex-1 flex justify-end">
@@ -1397,9 +1447,8 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                     {/* Linhas de produtos */}
                     <div className="space-y-1">
                       {produtos.map((produto, index) => {
-                        const totalProduto = calcularTotalProduto(produto)
-                        const totalComplementos = calcularTotalComplementos(produto)
-                        const totalProdutoComComplementos = totalProduto + totalComplementos
+                        // calcularTotalProduto já inclui complementos e desconto/acréscimo
+                        const totalProdutoComComplementos = calcularTotalProduto(produto)
                         
                         return (
                           <div key={index} className="space-y-0">
@@ -1460,6 +1509,12 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                               {/* Nome do Produto */}
                               <div className="flex-[4] min-w-0">
                                 <span className="text-xs text-gray-900 truncate block">{produto.nome}</span>
+                              </div>
+                              {/* Desconto/Acréscimo */}
+                              <div className="flex-1">
+                                <span className="text-xs text-gray-600 text-right block">
+                                  {formatarDescontoAcrescimo(produto)}
+                                </span>
                               </div>
                               {/* Valor Unitário */}
                               <div className="flex-1">
@@ -1669,6 +1724,8 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                                       {complemento.nome}
                                     </span>
                                   </div>
+                                  {/* Espaço vazio para Desconto/Acréscimo (complementos não têm) */}
+                                  <div className="flex-1"></div>
                                   {/* Valor Unitário do Complemento - Apenas exibição */}
                                   <div className="flex-1">
                                     <span className="text-xs text-gray-600 text-right block leading-tight">
@@ -2316,7 +2373,26 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                         // Resetar valor ao mudar tipo
                         setValorDescontoAcrescimo('0')
                       }}
-                      color="secondary"
+                      color={ehAcrescimo ? "success" : "error"}
+                      sx={
+                        !ehAcrescimo
+                          ? {
+                              // Quando for desconto (não marcado), forçar cor vermelha
+                              '& .MuiSwitch-switchBase': {
+                                color: '#d32f2f',
+                              },
+                              '& .MuiSwitch-switchBase.Mui-checked': {
+                                color: '#d32f2f',
+                              },
+                              '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                                backgroundColor: '#d32f2f',
+                              },
+                              '& .MuiSwitch-track': {
+                                backgroundColor: '#d32f2f',
+                              },
+                            }
+                          : undefined
+                      }
                     />
                   </div>
 
@@ -2360,7 +2436,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
 
                   {/* Switch Direito: Porcentagem/Valor */}
                   <div className="flex min-w-[100px] flex-col items-center gap-1">
-                    <span className="text-xs text-gray-600">{ehPorcentagem ? 'Porcento' : 'Valor'}</span>
+                    <span className="text-xs text-gray-600">{ehPorcentagem ? 'Porcentagem' : 'Valor Fixo'}</span>
                     <Switch
                       checked={ehPorcentagem}
                       onChange={(e) => {
@@ -2368,7 +2444,18 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                         // Resetar valor ao mudar tipo
                         setValorDescontoAcrescimo('0')
                       }}
-                      size="small"
+                      color="default"
+                      sx={{
+                        '& .MuiSwitch-switchBase.Mui-checked': {
+                          color: '#000000',
+                        },
+                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                          backgroundColor: '#000000',
+                        },
+                        '& .MuiSwitch-track': {
+                          backgroundColor: '#9ca3af',
+                        },
+                      }}
                     />
                   </div>
                   </div>
