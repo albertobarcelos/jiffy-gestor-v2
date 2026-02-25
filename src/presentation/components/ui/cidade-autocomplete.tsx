@@ -24,6 +24,11 @@ interface CidadeAutocompleteProps {
   useNativeInput?: boolean
   // Classes customizadas para o input nativo
   inputClassName?: string
+  // Callback opcional para retornar o código IBGE da cidade quando selecionada
+  onCidadeSelecionada?: (codigoCidadeIbge: string) => void
+  // Props para o Input do MUI
+  size?: 'small' | 'medium'
+  sx?: any
 }
 
 // Limite de itens exibidos no dropdown quando não há filtro ativo (Infinity = sem limite)
@@ -57,6 +62,9 @@ export function CidadeAutocomplete({
   className = '',
   useNativeInput = false,
   inputClassName = '',
+  onCidadeSelecionada,
+  size = 'small',
+  sx,
 }: CidadeAutocompleteProps) {
   const [isValidating, setIsValidating] = useState(false)
   const [isValid, setIsValid] = useState<boolean | null>(null)
@@ -267,6 +275,7 @@ export function CidadeAutocomplete({
    * - Preenche o campo com o nome oficial do IBGE
    * - Marca como válido imediatamente (sem nova chamada à API)
    * - Fecha o dropdown
+   * - Retorna o código IBGE da cidade se o callback estiver definido
    */
   const handleSelectSuggestion = (municipio: Municipio) => {
     onChange(municipio.nomeCidade)
@@ -275,6 +284,7 @@ export function CidadeAutocomplete({
     setSelectedFromList(true)
     setShowDropdown(false)
     onValidationChange?.(true)
+    onCidadeSelecionada?.(municipio.codigoCidadeIbge)
   }
 
   /**
@@ -374,7 +384,7 @@ export function CidadeAutocomplete({
   `.trim()
 
   return (
-    <div ref={containerRef} className={`space-y-2 ${className}`}>
+    <div ref={containerRef} className={`space-y-1 ${className}`}>
       {useNativeInput ? (
         <label className="block text-sm font-medium text-primary-text">
           {label}
@@ -413,6 +423,8 @@ export function CidadeAutocomplete({
             required={required}
             disabled={disabled || !estado || isLoadingMunicipios}
             autoComplete="off"
+            size={size}
+            sx={sx}
             className={
               isValid === false
                 ? 'border-red-500 focus:border-red-500'

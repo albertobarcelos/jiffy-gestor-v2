@@ -11,7 +11,7 @@ export const AtualizarClienteSchema = z.object({
   // .optional() apenas torna o campo opcional, não remove strings vazias
   cpf: z.string().optional(),
   cnpj: z.string().optional(),
-  telefone: z.string().optional(),
+  telefone: z.string().nullable().optional(),
   email: z.string().email('Email inválido').optional().or(z.literal('')),
   nomeFantasia: z.string().optional(),
   ativo: z.boolean().optional(),
@@ -24,6 +24,8 @@ export const AtualizarClienteSchema = z.object({
       estado: z.string().optional(),
       cep: z.string().optional(),
       complemento: z.string().optional(),
+      codigoCidadeIbge: z.string().optional(),
+      codigoEstadoIbge: z.string().optional(),
     })
     .optional(),
 })
