@@ -34,7 +34,8 @@ export class VendaUnificadaDTO {
         public readonly numeroFiscal?: number | null,
         public readonly serieFiscal?: string | null,
         public readonly dataEmissaoFiscal?: string | null,
-        public readonly tipoDocFiscal?: 'NFE' | 'NFCE' | null
+        public readonly tipoDocFiscal?: 'NFE' | 'NFCE' | null,
+        public readonly retornoSefaz?: string | null
     ) {}
 
     isPendenteEmissao(): boolean {
@@ -158,7 +159,8 @@ export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
                 v.numeroFiscal,
                 v.serieFiscal,
                 v.dataEmissaoFiscal,
-                v.tipoDocFiscal
+                v.tipoDocFiscal,
+                v.retornoSefaz
             ))
 
             return {

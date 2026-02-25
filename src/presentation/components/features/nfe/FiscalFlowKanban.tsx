@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useMarcarEmissaoFiscal, useDuplicateVenda, useCancelarVendaGestor } from '@/src/presentation/hooks/useVendas'
+import { useMarcarEmissaoFiscal, useDuplicateVenda, useCancelarVendaGestor, useEmitirNfe, useEmitirNfeGestor } from '@/src/presentation/hooks/useVendas'
 import { useVendasUnificadas, VendaUnificadaDTO } from '@/src/presentation/hooks/useVendasUnificadas'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { MdReceipt, MdAdd, MdVisibility, MdSchedule, MdRefresh, MdCheckCircle, MdError, MdCancel, MdMoreVert } from 'react-icons/md'
@@ -42,6 +42,9 @@ export function FiscalFlowKanban() {
     tabelaOrigem: 'venda' | 'venda_gestor'
     numeroVenda?: number
     modeloInicial?: 55 | 65
+    serieInicial?: number
+    ambienteInicial?: 'HOMOLOGACAO' | 'PRODUCAO'
+    crtInicial?: 1 | 2 | 3
   } | null>(null)
   const [emitirNfeModalOpen, setEmitirNfeModalOpen] = useState(false)
   const [detalhesVendaModalOpen, setDetalhesVendaModalOpen] = useState(false)
@@ -113,6 +116,8 @@ export function FiscalFlowKanban() {
   const marcarEmissaoFiscal = useMarcarEmissaoFiscal()
   const duplicarVenda = useDuplicateVenda()
   const cancelarVendaGestor = useCancelarVendaGestor()
+  const emitirNfePdv = useEmitirNfe()
+  const emitirNfeGestor = useEmitirNfeGestor()
   
   // Todas as vendas unificadas
   const todasVendas: Venda[] = vendasUnificadasData?.items || []
@@ -526,13 +531,54 @@ export function FiscalFlowKanban() {
     }
   }
 
-  const handleEmitirNfe = (venda: Venda) => {
+  const getAmbientePadrao = (): 'HOMOLOGACAO' | 'PRODUCAO' => {
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+      return 'HOMOLOGACAO'
+    }
+    return 'PRODUCAO'
+  }
+
+  const handleEmitirNfe = async (venda: Venda) => {
     const modeloInicial: 55 | 65 = venda.tipoDocFiscal === 'NFE' ? 55 : 65
+    const serieInicial = venda.serieFiscal ? Number(venda.serieFiscal) : undefined
+    const ambienteInicial = getAmbientePadrao()
+    const crtInicial: 1 | 2 | 3 = 1
+
+    // Reemissão: reutiliza os parâmetros fiscais já conhecidos sem reabrir modal.
+    if (
+      venda.statusFiscal === 'REJEITADA' &&
+      Number.isFinite(serieInicial) &&
+      serieInicial! > 0
+    ) {
+      try {
+        const payload = {
+          id: venda.id,
+          modelo: modeloInicial,
+          serie: serieInicial!,
+          ambiente: ambienteInicial,
+          crt: crtInicial,
+        }
+
+        if (venda.tabelaOrigem === 'venda_gestor') {
+          await emitirNfeGestor.mutateAsync(payload)
+        } else {
+          await emitirNfePdv.mutateAsync(payload)
+        }
+        return
+      } catch (error) {
+        // O hook já exibe o erro; reabre modal apenas se falhou por parâmetro insuficiente.
+        console.error('Erro ao tentar reemitir automaticamente:', error)
+      }
+    }
+
     setVendaSelecionadaParaEmissao({
       id: venda.id,
       tabelaOrigem: venda.tabelaOrigem,
       numeroVenda: venda.numeroVenda,
       modeloInicial,
+      serieInicial: serieInicial && serieInicial > 0 ? serieInicial : 1,
+      ambienteInicial,
+      crtInicial,
     })
     setSelectedVendaId(venda.id) // Mantém para compatibilidade
     setEmitirNfeModalOpen(true)
@@ -951,6 +997,8 @@ export function FiscalFlowKanban() {
                                 className="flex-1"
                                 onClick={() => handleEmitirNfe(venda)}
                                 disabled={
+                                  emitirNfePdv.isPending ||
+                                  emitirNfeGestor.isPending ||
                                   venda.statusFiscal === 'PENDENTE' ||
                                   venda.statusFiscal === 'PENDENTE_EMISSAO' ||
                                   venda.statusFiscal === 'EMITINDO' || 
@@ -1150,6 +1198,9 @@ export function FiscalFlowKanban() {
           vendaNumero={vendaSelecionadaParaEmissao.numeroVenda?.toString()}
           tabelaOrigem={vendaSelecionadaParaEmissao.tabelaOrigem}
           modeloInicial={vendaSelecionadaParaEmissao.modeloInicial ?? 65}
+          serieInicial={vendaSelecionadaParaEmissao.serieInicial ?? 1}
+          ambienteInicial={vendaSelecionadaParaEmissao.ambienteInicial}
+          crtInicial={vendaSelecionadaParaEmissao.crtInicial ?? 1}
         />
       )}
 

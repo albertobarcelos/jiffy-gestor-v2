@@ -13,6 +13,9 @@ interface EmitirNfeModalProps {
   vendaNumero?: string
   tabelaOrigem?: 'venda' | 'venda_gestor' // Indica de qual tabela é a venda
   modeloInicial?: 55 | 65
+  serieInicial?: number
+  ambienteInicial?: 'HOMOLOGACAO' | 'PRODUCAO'
+  crtInicial?: 1 | 2 | 3
 }
 
 export function EmitirNfeModal({
@@ -22,6 +25,9 @@ export function EmitirNfeModal({
   vendaNumero,
   tabelaOrigem = 'venda',
   modeloInicial = 65,
+  serieInicial = 1,
+  ambienteInicial,
+  crtInicial = 1,
 }: EmitirNfeModalProps) {
   const emitirNfePdv = useEmitirNfe()
   const emitirNfeGestor = useEmitirNfeGestor()
@@ -36,9 +42,9 @@ export function EmitirNfeModal({
 
     return {
       modelo: modeloInicial, // 55 = NF-e, 65 = NFC-e
-      serie: 1,
-      ambiente: ambientePadrao,
-      crt: 1 as 1 | 2 | 3, // 1=Simples Nacional, 2=Simples Excesso, 3=Regime Normal
+      serie: serieInicial,
+      ambiente: ambienteInicial ?? ambientePadrao,
+      crt: crtInicial, // 1=Simples Nacional, 2=Simples Excesso, 3=Regime Normal
     }
   })
   
@@ -55,11 +61,11 @@ export function EmitirNfeModal({
 
     setFormData({
       modelo: modeloInicial,
-      serie: 1,
-      ambiente: ambientePadrao,
-      crt: 1,
+      serie: serieInicial,
+      ambiente: ambienteInicial ?? ambientePadrao,
+      crt: crtInicial,
     })
-  }, [open, modeloInicial])
+  }, [open, modeloInicial, serieInicial, ambienteInicial, crtInicial])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
