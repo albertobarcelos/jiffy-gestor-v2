@@ -3,8 +3,8 @@ import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 
 /**
- * POST /api/vendas/gestor/[id]/emitir-nota
- * Emite nota fiscal (NFC-e ou NF-e) para uma venda do gestor
+ * POST /api/vendas/gestor/[id]/duplicar
+ * Duplica uma venda do gestor copiando cliente + itens
  */
 export async function POST(
   request: NextRequest,
@@ -22,26 +22,24 @@ export async function POST(
       return NextResponse.json({ error: 'ID da venda é obrigatório' }, { status: 400 })
     }
 
-    const body = await request.json()
     const apiClient = new ApiClient()
-
     const response = await apiClient.request<any>(
-      `/api/v1/gestor/vendas/${id}/emitir-nota`,
+      `/api/v1/gestor/vendas/${id}/duplicar`,
       {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${tokenInfo.token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(body),
       }
     )
 
     return NextResponse.json(response.data || {}, { status: response.status })
   } catch (error) {
+    console.error('Erro ao duplicar venda gestor:', error)
     if (error instanceof ApiError) {
       return NextResponse.json(
-        { error: error.message || 'Erro ao emitir nota fiscal' },
+        { error: error.message || 'Erro ao duplicar venda gestor' },
         { status: error.status }
       )
     }

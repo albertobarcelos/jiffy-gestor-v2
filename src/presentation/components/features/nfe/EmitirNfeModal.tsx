@@ -13,9 +13,6 @@ interface EmitirNfeModalProps {
   vendaNumero?: string
   tabelaOrigem?: 'venda' | 'venda_gestor' // Indica de qual tabela é a venda
   modeloInicial?: 55 | 65
-  serieInicial?: number
-  ambienteInicial?: 'HOMOLOGACAO' | 'PRODUCAO'
-  crtInicial?: 1 | 2 | 3
 }
 
 export function EmitirNfeModal({
@@ -25,28 +22,15 @@ export function EmitirNfeModal({
   vendaNumero,
   tabelaOrigem = 'venda',
   modeloInicial = 65,
-  serieInicial = 1,
-  ambienteInicial,
-  crtInicial = 1,
 }: EmitirNfeModalProps) {
   const emitirNfePdv = useEmitirNfe()
   const emitirNfeGestor = useEmitirNfeGestor()
   
   // Usar o hook correto baseado na tabela de origem
   const emitirNfe = tabelaOrigem === 'venda_gestor' ? emitirNfeGestor : emitirNfePdv
-  const [formData, setFormData] = useState(() => {
-    const ambientePadrao: 'HOMOLOGACAO' | 'PRODUCAO' =
-      typeof window !== 'undefined' && window.location.hostname === 'localhost'
-        ? 'HOMOLOGACAO'
-        : 'PRODUCAO'
-
-    return {
-      modelo: modeloInicial, // 55 = NF-e, 65 = NFC-e
-      serie: serieInicial,
-      ambiente: ambienteInicial ?? ambientePadrao,
-      crt: crtInicial, // 1=Simples Nacional, 2=Simples Excesso, 3=Regime Normal
-    }
-  })
+  const [formData, setFormData] = useState(() => ({
+    modelo: modeloInicial, // 55 = NF-e, 65 = NFC-e
+  }))
   
   // Estado para controlar se está processando (desabilita botão imediatamente)
   const [emissaoEmProcessamento, setEmissaoEmProcessamento] = useState(false)
@@ -54,18 +38,10 @@ export function EmitirNfeModal({
   useEffect(() => {
     if (!open) return
 
-    const ambientePadrao: 'HOMOLOGACAO' | 'PRODUCAO' =
-      typeof window !== 'undefined' && window.location.hostname === 'localhost'
-        ? 'HOMOLOGACAO'
-        : 'PRODUCAO'
-
     setFormData({
       modelo: modeloInicial,
-      serie: serieInicial,
-      ambiente: ambienteInicial ?? ambientePadrao,
-      crt: crtInicial,
     })
-  }, [open, modeloInicial, serieInicial, ambienteInicial, crtInicial])
+  }, [open, modeloInicial])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -79,9 +55,6 @@ export function EmitirNfeModal({
       await emitirNfe.mutateAsync({
         id: vendaId,
         modelo: formData.modelo,
-        serie: formData.serie,
-        ambiente: formData.ambiente,
-        crt: formData.crt,
       })
 
       // Fluxo assíncrono: fecha após enviar e acompanha status no kanban.
@@ -127,50 +100,6 @@ export function EmitirNfeModal({
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Série *
-              </label>
-              <input
-                type="number"
-                min="1"
-                value={formData.serie}
-                onChange={(e) => setFormData({ ...formData, serie: Number(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Ambiente *
-              </label>
-              <select
-                value={formData.ambiente}
-                onChange={(e) => setFormData({ ...formData, ambiente: e.target.value as 'HOMOLOGACAO' | 'PRODUCAO' })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              >
-                <option value="HOMOLOGACAO">Homologação</option>
-                <option value="PRODUCAO">Produção</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                CRT (Código de Regime Tributário) *
-              </label>
-              <select
-                value={formData.crt}
-                onChange={(e) => setFormData({ ...formData, crt: Number(e.target.value) as 1 | 2 | 3 })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              >
-                <option value={1}>1 - Simples Nacional</option>
-                <option value={2}>2 - Simples Nacional - Excesso de Sublimite</option>
-                <option value={3}>3 - Regime Normal</option>
-              </select>
-            </div>
           </div>
 
           <DialogFooter sx={{ mt: 3 }}>

@@ -19,6 +19,7 @@ export class VendaUnificadaDTO {
         public readonly totalAcrescimo: number,
         public readonly dataCriacao: string,
         public readonly dataFinalizacao: string | null,
+        public readonly dataCancelamento: string | null,
         public readonly cliente: {
             id: string;
             nome: string;
@@ -38,17 +39,33 @@ export class VendaUnificadaDTO {
         public readonly retornoSefaz?: string | null
     ) {}
 
+    private possuiDocumentoFiscal(): boolean {
+        return !!this.documentoFiscalId || !!this.numeroFiscal
+    }
+
     isPendenteEmissao(): boolean {
         // Vendas GESTOR: sempre pendentes de emissão quando finalizadas (exceto se já emitida)
         // Vendas PDV: pendentes apenas se foram marcadas para emissão
+        if (this.dataCancelamento) {
+            return false
+        }
+
+        if (this.statusFiscal === 'CANCELADA') {
+            return false
+        }
+
         if (this.isVendaGestor()) {
             return !!this.dataFinalizacao && this.statusFiscal !== 'EMITIDA';
         }
+
         return this.solicitarEmissaoFiscal && this.statusFiscal !== 'EMITIDA';
     }
 
     temNFeEmitida(): boolean {
-        return this.statusFiscal === 'EMITIDA' && !!this.documentoFiscalId;
+        const statusComDocumentoValido =
+            this.statusFiscal === 'EMITIDA' || this.statusFiscal === 'CANCELADA'
+
+        return statusComDocumentoValido && this.possuiDocumentoFiscal()
     }
 
     isVendaPdv(): boolean {
@@ -80,6 +97,7 @@ export class VendaUnificadaDTO {
 interface VendasUnificadasQueryParams {
     origem?: 'PDV' | 'GESTOR' | 'DELIVERY'
     statusFiscal?: string
+    incluirCanceladas?: boolean
     periodoInicial?: string // ISO date string
     periodoFinal?: string   // ISO date string
     offset?: number
@@ -117,6 +135,7 @@ export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
             const searchParams = new URLSearchParams()
             if (params.origem) searchParams.append('origem', params.origem)
             if (params.statusFiscal) searchParams.append('statusFiscal', params.statusFiscal)
+            if (params.incluirCanceladas) searchParams.append('incluirCanceladas', 'true')
             if (params.periodoInicial) searchParams.append('periodoInicial', params.periodoInicial)
             if (params.periodoFinal) searchParams.append('periodoFinal', params.periodoFinal)
             if (params.offset != null) searchParams.append('offset', params.offset.toString())
@@ -151,6 +170,7 @@ export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
                 v.totalAcrescimo,
                 v.dataCriacao,
                 v.dataFinalizacao,
+                v.dataCancelamento,
                 v.cliente,
                 v.solicitarEmissaoFiscal,
                 v.statusFiscal,

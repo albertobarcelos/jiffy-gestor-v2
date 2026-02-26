@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useMarcarEmissaoFiscal, useDuplicateVenda, useCancelarVendaGestor, useEmitirNfe, useEmitirNfeGestor } from '@/src/presentation/hooks/useVendas'
+import { useMarcarEmissaoFiscal, useDuplicateVenda, useExcluirVendaGestor, useEmitirNfe, useEmitirNfeGestor, useReemitirNfe, useReemitirNfeGestor } from '@/src/presentation/hooks/useVendas'
 import { useVendasUnificadas, VendaUnificadaDTO } from '@/src/presentation/hooks/useVendasUnificadas'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { MdReceipt, MdAdd, MdVisibility, MdSchedule, MdRefresh, MdCheckCircle, MdError, MdCancel, MdMoreVert } from 'react-icons/md'
@@ -11,7 +11,6 @@ import { Badge } from '@/src/presentation/components/ui/badge'
 import { StatusFiscalBadge } from './StatusFiscalBadge'
 import { DetalhesVendas } from '@/src/presentation/components/features/vendas/DetalhesVendas'
 import { NovoPedidoModal } from './NovoPedidoModal'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 
 type Priority = 'high' | 'medium' | 'low'
@@ -34,6 +33,7 @@ type Venda = VendaUnificadaDTO
  * Baseado no modelo de Kanban moderno e limpo
  */
 type TipoVendaFiltro = 'balcao' | 'mesa' | 'delivery'
+type StatusVendaFiltro = 'TODAS' | 'ATIVAS' | 'CANCELADAS'
 
 export function FiscalFlowKanban() {
   const [selectedVendaId, setSelectedVendaId] = useState<string | null>(null)
@@ -42,9 +42,6 @@ export function FiscalFlowKanban() {
     tabelaOrigem: 'venda' | 'venda_gestor'
     numeroVenda?: number
     modeloInicial?: 55 | 65
-    serieInicial?: number
-    ambienteInicial?: 'HOMOLOGACAO' | 'PRODUCAO'
-    crtInicial?: 1 | 2 | 3
   } | null>(null)
   const [emitirNfeModalOpen, setEmitirNfeModalOpen] = useState(false)
   const [detalhesVendaModalOpen, setDetalhesVendaModalOpen] = useState(false)
@@ -53,8 +50,10 @@ export function FiscalFlowKanban() {
     tabelaOrigem: 'venda' | 'venda_gestor'
   } | null>(null)
   const [tipoVendaFiltros, setTipoVendaFiltros] = useState<TipoVendaFiltro[]>([])
+  const [statusVendaFiltro, setStatusVendaFiltro] = useState<StatusVendaFiltro>('ATIVAS')
   const [novoPedidoModalOpen, setNovoPedidoModalOpen] = useState(false)
   const [menuAcoesVendaIdAberto, setMenuAcoesVendaIdAberto] = useState<string | null>(null)
+  const [acaoFiscalEmAndamentoPorVenda, setAcaoFiscalEmAndamentoPorVenda] = useState<Record<string, 'emitindo' | 'reemitindo'>>({})
   
   // Função para alternar filtro (seleção múltipla)
   const toggleFiltro = (tipo: TipoVendaFiltro) => {
@@ -72,25 +71,6 @@ export function FiscalFlowKanban() {
   // Verificar se todos os filtros estão selecionados (equivalente a "todos")
   const todosFiltrosSelecionados = tipoVendaFiltros.length === 3
   
-  // Obter empresaId do token decodificado
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-  
-  // Decodificar token JWT para obter empresaId (decodificação simples base64)
-  let empresaId = ''
-  if (token) {
-    try {
-      const parts = token.split('.')
-      if (parts.length === 3) {
-        const payload = JSON.parse(atob(parts[1]))
-        empresaId = payload.empresaId || ''
-      }
-    } catch (e) {
-      console.error('Erro ao decodificar token:', e)
-    }
-  }
-
-  
   // Calcular período do mês atual (formato ISO para o backend)
   const agora = new Date()
   const periodoInicial = new Date(agora.getFullYear(), agora.getMonth(), 1).toISOString()
@@ -107,6 +87,7 @@ export function FiscalFlowKanban() {
   // Buscar vendas unificadas (PDV + Gestor)
   const { data: vendasUnificadasData, isLoading, refetch } = useVendasUnificadas({
     origem: getOrigemFiltro(),
+    incluirCanceladas: true,
     periodoInicial,
     periodoFinal,
     offset: 0,
@@ -115,9 +96,45 @@ export function FiscalFlowKanban() {
   
   const marcarEmissaoFiscal = useMarcarEmissaoFiscal()
   const duplicarVenda = useDuplicateVenda()
-  const cancelarVendaGestor = useCancelarVendaGestor()
+  const excluirVendaGestor = useExcluirVendaGestor()
   const emitirNfePdv = useEmitirNfe()
   const emitirNfeGestor = useEmitirNfeGestor()
+  const reemitirNfePdv = useReemitirNfe()
+  const reemitirNfeGestor = useReemitirNfeGestor()
+
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+  const setAcaoFiscalEmAndamento = (
+    vendaId: string,
+    acao: 'emitindo' | 'reemitindo' | null
+  ) => {
+    setAcaoFiscalEmAndamentoPorVenda((prev) => {
+      if (!acao) {
+        const { [vendaId]: _, ...rest } = prev
+        return rest
+      }
+      return { ...prev, [vendaId]: acao }
+    })
+  }
+
+  const refetchAteMudarStatusFiscal = async (
+    vendaId: string,
+    statusAnterior: Venda['statusFiscal'],
+    tentativasMaximas = 6,
+    intervaloMs = 2000
+  ) => {
+    for (let tentativa = 0; tentativa < tentativasMaximas; tentativa++) {
+      const result = await refetch()
+      const vendaAtualizada = result.data?.items?.find((item: Venda) => item.id === vendaId)
+      if (!vendaAtualizada) return
+
+      if (vendaAtualizada.statusFiscal !== statusAnterior) {
+        return
+      }
+
+      await sleep(intervaloMs)
+    }
+  }
   
   // Todas as vendas unificadas
   const todasVendas: Venda[] = vendasUnificadasData?.items || []
@@ -149,9 +166,17 @@ export function FiscalFlowKanban() {
       return false
     })
   }
+
+  const filtrarPorStatusVenda = (vendas: Venda[]): Venda[] => {
+    if (statusVendaFiltro === 'TODAS') return vendas
+    if (statusVendaFiltro === 'ATIVAS') {
+      return vendas.filter((v) => !v.dataCancelamento)
+    }
+    return vendas.filter((v) => !!v.dataCancelamento)
+  }
   
   // Filtrar vendas por tipo (Mesa, Balcão, Delivery) - aplica filtros do frontend
-  const vendasFiltradasPorTipo: Venda[] = filtrarPorTipo(todasVendas)
+  const vendasFiltradasPorTipo: Venda[] = filtrarPorStatusVenda(filtrarPorTipo(todasVendas))
 
   // Função para obter colunas baseadas no filtro de tipo de venda
   const getColumns = (): KanbanColumn[] => {
@@ -531,43 +556,42 @@ export function FiscalFlowKanban() {
     }
   }
 
-  const getAmbientePadrao = (): 'HOMOLOGACAO' | 'PRODUCAO' => {
-    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-      return 'HOMOLOGACAO'
-    }
-    return 'PRODUCAO'
-  }
-
   const handleEmitirNfe = async (venda: Venda) => {
     const modeloInicial: 55 | 65 = venda.tipoDocFiscal === 'NFE' ? 55 : 65
-    const serieInicial = venda.serieFiscal ? Number(venda.serieFiscal) : undefined
-    const ambienteInicial = getAmbientePadrao()
-    const crtInicial: 1 | 2 | 3 = 1
 
-    // Reemissão: reutiliza os parâmetros fiscais já conhecidos sem reabrir modal.
+    // Reemissão: rota explícita dedicada.
     if (
       venda.statusFiscal === 'REJEITADA' &&
-      Number.isFinite(serieInicial) &&
-      serieInicial! > 0
+      venda.tipoDocFiscal
     ) {
+      setAcaoFiscalEmAndamento(venda.id, 'reemitindo')
       try {
+        const serieReemissao = Number(venda.serieFiscal)
+        if (!Number.isFinite(serieReemissao) || serieReemissao <= 0) {
+          showToast.error('Série fiscal da rejeição não encontrada. Não foi possível reemitir automaticamente.')
+          return
+        }
+
         const payload = {
           id: venda.id,
           modelo: modeloInicial,
-          serie: serieInicial!,
-          ambiente: ambienteInicial,
-          crt: crtInicial,
+          tipoDocumento: venda.tipoDocFiscal,
+          serie: serieReemissao,
         }
 
         if (venda.tabelaOrigem === 'venda_gestor') {
-          await emitirNfeGestor.mutateAsync(payload)
+          await reemitirNfeGestor.mutateAsync(payload)
         } else {
-          await emitirNfePdv.mutateAsync(payload)
+          await reemitirNfePdv.mutateAsync(payload)
         }
+        await refetch()
+        await refetchAteMudarStatusFiscal(venda.id, 'REJEITADA')
         return
       } catch (error) {
-        // O hook já exibe o erro; reabre modal apenas se falhou por parâmetro insuficiente.
-        console.error('Erro ao tentar reemitir automaticamente:', error)
+        console.error('Erro ao tentar reemitir:', error)
+        return
+      } finally {
+        setAcaoFiscalEmAndamento(venda.id, null)
       }
     }
 
@@ -576,9 +600,6 @@ export function FiscalFlowKanban() {
       tabelaOrigem: venda.tabelaOrigem,
       numeroVenda: venda.numeroVenda,
       modeloInicial,
-      serieInicial: serieInicial && serieInicial > 0 ? serieInicial : 1,
-      ambienteInicial,
-      crtInicial,
     })
     setSelectedVendaId(venda.id) // Mantém para compatibilidade
     setEmitirNfeModalOpen(true)
@@ -599,13 +620,12 @@ export function FiscalFlowKanban() {
 
   const handleDuplicarVenda = async (venda: Venda) => {
     setMenuAcoesVendaIdAberto(null)
-    if (venda.tabelaOrigem !== 'venda') {
-      showToast.error('Duplicação disponível apenas para vendas do PDV.')
-      return
-    }
 
     try {
-      await duplicarVenda.mutateAsync(venda.id)
+      await duplicarVenda.mutateAsync({
+        id: venda.id,
+        tabelaOrigem: venda.tabelaOrigem,
+      })
       await refetch()
     } catch (error) {
       console.error('Erro ao duplicar venda:', error)
@@ -619,23 +639,17 @@ export function FiscalFlowKanban() {
       return
     }
 
-    const motivo = window
-      .prompt('Informe o motivo da exclusão (mínimo 15 caracteres):', 'Cancelamento solicitado pelo operador.')
-      ?.trim()
-
-    if (!motivo) return
-    if (motivo.length < 15) {
-      showToast.error('Justificativa deve ter no mínimo 15 caracteres.')
+    if (venda.statusFiscal === 'EMITIDA' || venda.statusFiscal === 'CANCELADA') {
+      showToast.error('Venda com documento fiscal autorizado/cancelado não pode ser excluída. Use cancelamento.')
       return
     }
 
-    const confirmou = window.confirm('Deseja realmente excluir esta venda?')
+    const confirmou = window.confirm('Deseja realmente excluir esta venda de forma definitiva?')
     if (!confirmou) return
 
     try {
-      await cancelarVendaGestor.mutateAsync({
+      await excluirVendaGestor.mutateAsync({
         id: venda.id,
-        motivo,
       })
       await refetch()
     } catch (error) {
@@ -853,6 +867,17 @@ export function FiscalFlowKanban() {
           >
             Delivery
           </button>
+          <div className="ml-3">
+            <select
+              value={statusVendaFiltro}
+              onChange={(e) => setStatusVendaFiltro(e.target.value as StatusVendaFiltro)}
+              className="px-3 py-2 text-sm font-medium rounded-lg bg-white text-gray-700 border border-gray-300"
+            >
+              <option value="TODAS">Todas</option>
+              <option value="ATIVAS">Ativas</option>
+              <option value="CANCELADAS">Canceladas</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -916,14 +941,19 @@ export function FiscalFlowKanban() {
                               <button
                                 onClick={() => handleDuplicarVenda(venda)}
                                 className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                                disabled={duplicarVenda.isPending || cancelarVendaGestor.isPending}
+                                disabled={duplicarVenda.isPending || excluirVendaGestor.isPending}
                               >
                                 Duplicar
                               </button>
                               <button
                                 onClick={() => handleExcluirVenda(venda)}
                                 className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                                disabled={duplicarVenda.isPending || cancelarVendaGestor.isPending}
+                                disabled={
+                                  duplicarVenda.isPending ||
+                                  excluirVendaGestor.isPending ||
+                                  venda.statusFiscal === 'EMITIDA' ||
+                                  venda.statusFiscal === 'CANCELADA'
+                                }
                               >
                                 Excluir
                               </button>
@@ -997,8 +1027,11 @@ export function FiscalFlowKanban() {
                                 className="flex-1"
                                 onClick={() => handleEmitirNfe(venda)}
                                 disabled={
+                                  !!acaoFiscalEmAndamentoPorVenda[venda.id] ||
                                   emitirNfePdv.isPending ||
                                   emitirNfeGestor.isPending ||
+                                  reemitirNfePdv.isPending ||
+                                  reemitirNfeGestor.isPending ||
                                   venda.statusFiscal === 'PENDENTE' ||
                                   venda.statusFiscal === 'PENDENTE_EMISSAO' ||
                                   venda.statusFiscal === 'EMITINDO' || 
@@ -1008,6 +1041,9 @@ export function FiscalFlowKanban() {
                                 }
                               >
                                 {(() => {
+                                  const acaoEmAndamento = acaoFiscalEmAndamentoPorVenda[venda.id]
+                                  if (acaoEmAndamento === 'reemitindo') return 'Reemitindo...'
+                                  if (acaoEmAndamento === 'emitindo') return 'Emitindo...'
                                   const documentoLabel = venda.tipoDocFiscal === 'NFE' ? 'NFe' : 'NFCe'
                                   if (venda.statusFiscal === 'REJEITADA') return `Reemitir ${documentoLabel}`
                                   if (
@@ -1198,9 +1234,6 @@ export function FiscalFlowKanban() {
           vendaNumero={vendaSelecionadaParaEmissao.numeroVenda?.toString()}
           tabelaOrigem={vendaSelecionadaParaEmissao.tabelaOrigem}
           modeloInicial={vendaSelecionadaParaEmissao.modeloInicial ?? 65}
-          serieInicial={vendaSelecionadaParaEmissao.serieInicial ?? 1}
-          ambienteInicial={vendaSelecionadaParaEmissao.ambienteInicial}
-          crtInicial={vendaSelecionadaParaEmissao.crtInicial ?? 1}
         />
       )}
 
