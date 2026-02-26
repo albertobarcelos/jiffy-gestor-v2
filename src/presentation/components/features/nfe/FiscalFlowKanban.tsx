@@ -54,6 +54,8 @@ export function FiscalFlowKanban() {
   } | null>(null)
   const [tipoVendaFiltros, setTipoVendaFiltros] = useState<TipoVendaFiltro[]>([])
   const [novoPedidoModalOpen, setNovoPedidoModalOpen] = useState(false)
+  const [novoPedidoModalVisualizacaoOpen, setNovoPedidoModalVisualizacaoOpen] = useState(false)
+  const [vendaIdParaVisualizacao, setVendaIdParaVisualizacao] = useState<string | null>(null)
   const [menuAcoesVendaIdAberto, setMenuAcoesVendaIdAberto] = useState<string | null>(null)
   
   // Função para alternar filtro (seleção múltipla)
@@ -586,11 +588,19 @@ export function FiscalFlowKanban() {
 
   const handleViewDetails = (venda: Venda) => {
     setMenuAcoesVendaIdAberto(null)
-    setVendaSelecionadaParaDetalhes({
-      id: venda.id,
-      tabelaOrigem: venda.tabelaOrigem,
-    })
-    setDetalhesVendaModalOpen(true)
+    
+    // Se for venda_gestor, abrir NovoPedidoModal na step 4
+    if (venda.tabelaOrigem === 'venda_gestor') {
+      setVendaIdParaVisualizacao(venda.id)
+      setNovoPedidoModalVisualizacaoOpen(true)
+    } else {
+      // Para vendas do PDV, manter DetalhesVendas
+      setVendaSelecionadaParaDetalhes({
+        id: venda.id,
+        tabelaOrigem: venda.tabelaOrigem,
+      })
+      setDetalhesVendaModalOpen(true)
+    }
   }
 
   const toggleMenuAcoes = (vendaId: string) => {
@@ -1228,6 +1238,24 @@ export function FiscalFlowKanban() {
           refetch()
         }}
       />
+
+      {/* Modal de Novo Pedido em Modo Visualização (Step 4) */}
+      {vendaIdParaVisualizacao && (
+        <NovoPedidoModal
+          open={novoPedidoModalVisualizacaoOpen}
+          onClose={() => {
+            setNovoPedidoModalVisualizacaoOpen(false)
+            setVendaIdParaVisualizacao(null)
+          }}
+          onSuccess={() => {
+            setNovoPedidoModalVisualizacaoOpen(false)
+            setVendaIdParaVisualizacao(null)
+            refetch()
+          }}
+          vendaId={vendaIdParaVisualizacao}
+          modoVisualizacao={true}
+        />
+      )}
     </div>
   )
 }

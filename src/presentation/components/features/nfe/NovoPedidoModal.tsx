@@ -25,6 +25,9 @@ interface NovoPedidoModalProps {
   open: boolean
   onClose: () => void
   onSuccess: () => void
+  // Props opcionais para visualizar venda existente
+  vendaId?: string // ID da venda_gestor para carregar e visualizar
+  modoVisualizacao?: boolean // Se true, abre direto na step 4 em modo apenas visualização
 }
 
 interface ComplementoSelecionado {
@@ -56,7 +59,7 @@ interface PagamentoSelecionado {
 type OrigemVenda = 'GESTOR' | 'IFOOD' | 'RAPPI' | 'OUTROS'
 type StatusVenda = 'ABERTA' | 'FINALIZADA' | 'PENDENTE_EMISSAO'
 
-export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalProps) {
+export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisualizacao }: NovoPedidoModalProps) {
   const { auth } = useAuthStore()
   const createVendaGestor = useCreateVendaGestor()
   
@@ -72,9 +75,13 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
   const [seletorClienteOpen, setSeletorClienteOpen] = useState(false)
   const [tooltipGrupoId, setTooltipGrupoId] = useState<string | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null)
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1)
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1)
   const [nomeUsuario, setNomeUsuario] = useState<string>('')
   const [isLoadingUsuario, setIsLoadingUsuario] = useState(false)
+  
+  // Estados para carregamento de venda existente
+  const [isLoadingVenda, setIsLoadingVenda] = useState(false)
+  const [dataVenda, setDataVenda] = useState<string>('') // Data da venda para exibição
   
   // Estado para controlar valores em edição (índice do produto ou chave do complemento -> valor string)
   const [valoresEmEdicao, setValoresEmEdicao] = useState<Record<string | number, string>>({})
@@ -906,14 +913,39 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
         totalDesconto: 0,
         totalAcrescimo: 0,
         produtos: produtos.map(p => {
+          // Converter valores de desconto/acréscimo para o formato esperado pelo backend
+          // Se for porcentagem, converter de 0-100 para 0-1 (decimal)
+          let valorDescontoFinal: number | null = null
+          let valorAcrescimoFinal: number | null = null
+          
+          if (p.tipoDesconto && p.valorDesconto !== null && p.valorDesconto !== undefined) {
+            if (p.tipoDesconto === 'porcentagem') {
+              // Converter de porcentagem (10 = 10%) para decimal (0.1 = 10%)
+              valorDescontoFinal = p.valorDesconto / 100
+            } else {
+              // Valor fixo, manter como está
+              valorDescontoFinal = p.valorDesconto
+            }
+          }
+          
+          if (p.tipoAcrescimo && p.valorAcrescimo !== null && p.valorAcrescimo !== undefined) {
+            if (p.tipoAcrescimo === 'porcentagem') {
+              // Converter de porcentagem (10 = 10%) para decimal (0.1 = 10%)
+              valorAcrescimoFinal = p.valorAcrescimo / 100
+            } else {
+              // Valor fixo, manter como está
+              valorAcrescimoFinal = p.valorAcrescimo
+            }
+          }
+          
           return {
             produtoId: p.produtoId,
             quantidade: p.quantidade,
             valorUnitario: p.valorUnitario,
             tipoDesconto: p.tipoDesconto || null,
-            valorDesconto: p.valorDesconto || null,
+            valorDesconto: valorDescontoFinal,
             tipoAcrescimo: p.tipoAcrescimo || null,
-            valorAcrescimo: p.valorAcrescimo || null,
+            valorAcrescimo: valorAcrescimoFinal,
             complementos: (p.complementos || []).map(comp => ({
               complementoId: comp.id,
               grupoComplementoId: comp.grupoId,
@@ -923,6 +955,9 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
           };
         }),
       }
+      
+      // Log para debug
+      console.log('📤 Payload sendo enviado:', JSON.stringify(vendaData, null, 2))
 
       // Adicionar clienteId se selecionado
       if (clienteId) {
@@ -949,8 +984,8 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
       const resultado = await createVendaGestor.mutateAsync(vendaData)
       console.log('✅ Venda criada com sucesso:', resultado)
       showToast.success('Pedido criado com sucesso!')
-      resetForm()
-      onSuccess()
+      // Ir para step 4 (Detalhes da Venda) após criar o pedido
+      setCurrentStep(4)
     } catch (error: any) {
       console.error('❌ Erro ao criar pedido:', error)
       console.error('❌ Detalhes do erro:', {
@@ -1025,10 +1060,21 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
 
   // Verifica se há dados da venda que seriam perdidos
   const temDadosVenda = () => {
+    // Em modo visualização, não há dados a perder
+    if (vendaId && modoVisualizacao) {
+      return false
+    }
     return produtos.length > 0 || pagamentos.length > 0 || clienteId !== '' || currentStep > 1
   }
 
   const handleClose = () => {
+    // Em modo visualização, fechar diretamente sem confirmação
+    if (vendaId && modoVisualizacao) {
+      resetForm()
+      onClose()
+      return
+    }
+    
     if (temDadosVenda()) {
       setModalConfirmacaoSaidaOpen(true)
     } else {
@@ -1048,10 +1094,348 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     setModalConfirmacaoSaidaOpen(false)
   }
 
+  // Função para carregar dados de uma venda existente
+  const carregarVendaExistente = useCallback(async () => {
+    if (!vendaId || !open || !auth) return
+
+    const token = auth.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado')
+      return
+    }
+
+    setIsLoadingVenda(true)
+
+    try {
+      // Buscar dados da venda_gestor
+      const response = await fetch(`/api/vendas/gestor/${vendaId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || errorData.message || 'Erro ao carregar venda')
+      }
+
+      const vendaData = await response.json()
+
+      // Debug: verificar estrutura dos dados retornados
+      console.log('📦 Dados da venda carregados:', {
+        produtosLancados: vendaData.produtosLancados,
+        produtos: vendaData.produtos,
+        produtosLancadosLength: vendaData.produtosLancados?.length,
+        produtosLength: vendaData.produtos?.length,
+      })
+
+      // Mapear dados da venda para os estados do componente
+      // Origem
+      if (vendaData.origem) {
+        setOrigem(vendaData.origem as OrigemVenda)
+      }
+
+      // Status
+      if (vendaData.statusVenda) {
+        setStatus(vendaData.statusVenda as StatusVenda)
+      } else if (vendaData.dataFinalizacao) {
+        setStatus('FINALIZADA')
+      } else {
+        setStatus('ABERTA')
+      }
+
+      // Cliente
+      if (vendaData.clienteId) {
+        setClienteId(vendaData.clienteId)
+        // Buscar nome do cliente
+        try {
+          const clienteResponse = await fetch(`/api/clientes/${vendaData.clienteId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          })
+          if (clienteResponse.ok) {
+            const clienteData = await clienteResponse.json()
+            setClienteNome(clienteData.nome || clienteData.name || '')
+          }
+        } catch (error) {
+          console.error('Erro ao buscar nome do cliente:', error)
+        }
+      }
+
+      // Data da venda
+      if (vendaData.dataCriacao) {
+        setDataVenda(vendaData.dataCriacao)
+      } else if (vendaData.dataFinalizacao) {
+        setDataVenda(vendaData.dataFinalizacao)
+      }
+
+      // Produtos - Verificar tanto produtosLancados quanto produtos
+      // A API pode retornar em qualquer um dos formatos
+      const produtosRaw = vendaData.produtosLancados || vendaData.produtos
+      
+      if (produtosRaw && Array.isArray(produtosRaw)) {
+        const produtosMapeados: ProdutoSelecionado[] = produtosRaw
+          .filter((prod: any) => !prod.removido) // Filtrar produtos removidos
+          .map((prod: any) => {
+            // Buscar nome do produto
+            let nomeProduto = prod.nomeProduto || prod.nome || 'Produto sem nome'
+            
+            // Mapear complementos garantindo que todos os campos estejam presentes
+            const complementosMapeados: ComplementoSelecionado[] = Array.isArray(prod.complementos) 
+              ? prod.complementos.map((comp: any) => {
+                  // Normalizar tipoImpactoPreco (pode vir como string ou já no formato correto)
+                  let tipoImpactoPreco: 'aumenta' | 'diminui' | 'nenhum' = 'nenhum'
+                  if (comp.tipoImpactoPreco) {
+                    const tipo = String(comp.tipoImpactoPreco).toLowerCase()
+                    if (tipo === 'aumenta' || tipo === 'increase') {
+                      tipoImpactoPreco = 'aumenta'
+                    } else if (tipo === 'diminui' || tipo === 'decrease') {
+                      tipoImpactoPreco = 'diminui'
+                    } else {
+                      tipoImpactoPreco = 'nenhum'
+                    }
+                  }
+                  
+                  return {
+                    id: comp.complementoId || comp.id || '',
+                    grupoId: comp.grupoComplementoId || comp.grupoId || '',
+                    nome: comp.nomeComplemento || comp.nome || 'Complemento',
+                    valor: comp.valorUnitario || comp.valor || 0,
+                    quantidade: comp.quantidade || 1,
+                    tipoImpactoPreco,
+                  }
+                })
+              : []
+
+            // Calcular valor base do produto (sem desconto/acréscimo)
+            const valorBaseProduto = (prod.valorUnitario || 0) * (prod.quantidade || 1)
+            
+            // Calcular valor dos complementos
+            const valorComplementos = complementosMapeados.reduce((sum, comp) => {
+              const tipo = comp.tipoImpactoPreco || 'nenhum'
+              const valorTotal = comp.valor * comp.quantidade * (prod.quantidade || 1)
+              if (tipo === 'aumenta') {
+                return sum + valorTotal
+              } else if (tipo === 'diminui') {
+                return sum - valorTotal
+              }
+              return sum
+            }, 0)
+            
+            const subtotalEsperado = valorBaseProduto + valorComplementos
+            
+            // Se temos valorFinal do produto, calcular diferença para determinar desconto/acréscimo
+            let tipoDescontoFinal = prod.tipoDesconto || null
+            let valorDescontoFinal: number | null = typeof prod.desconto === 'string' ? parseFloat(prod.desconto) : (prod.desconto || prod.valorDesconto || null)
+            let tipoAcrescimoFinal = prod.tipoAcrescimo || null
+            let valorAcrescimoFinal: number | null = typeof prod.acrescimo === 'string' ? parseFloat(prod.acrescimo) : (prod.acrescimo || prod.valorAcrescimo || null)
+            
+            // Se o backend retorna porcentagem como decimal (0.1 = 10%), converter para porcentagem (10 = 10%)
+            // O frontend trabalha com porcentagem 0-100, não decimal 0-1
+            if (tipoDescontoFinal === 'porcentagem' && valorDescontoFinal !== null && valorDescontoFinal !== undefined) {
+              // Se o valor é menor que 1, provavelmente está em decimal (0.1), converter para porcentagem (10)
+              if (valorDescontoFinal < 1 && valorDescontoFinal > 0) {
+                valorDescontoFinal = valorDescontoFinal * 100
+              }
+            }
+            
+            if (tipoAcrescimoFinal === 'porcentagem' && valorAcrescimoFinal !== null && valorAcrescimoFinal !== undefined) {
+              // Se o valor é menor que 1, provavelmente está em decimal (0.1), converter para porcentagem (10)
+              if (valorAcrescimoFinal < 1 && valorAcrescimoFinal > 0) {
+                valorAcrescimoFinal = valorAcrescimoFinal * 100
+              }
+            }
+            
+            // Se não temos tipoAcrescimo/tipoDesconto mas temos valorFinal, calcular a partir da diferença
+            if (prod.valorFinal !== undefined && prod.valorFinal !== null) {
+              const valorFinalProduto = prod.valorFinal
+              const diferenca = valorFinalProduto - subtotalEsperado
+              
+              // Se a diferença é significativa (maior que 0.01 para evitar problemas de arredondamento)
+              if (Math.abs(diferenca) > 0.01) {
+                if (diferenca > 0) {
+                  // Acréscimo
+                  if (!tipoAcrescimoFinal && !valorAcrescimoFinal) {
+                    tipoAcrescimoFinal = 'fixo'
+                    valorAcrescimoFinal = diferenca
+                  }
+                } else {
+                  // Desconto
+                  if (!tipoDescontoFinal && !valorDescontoFinal) {
+                    tipoDescontoFinal = 'fixo'
+                    valorDescontoFinal = Math.abs(diferenca)
+                  }
+                }
+              }
+            }
+            
+            return {
+              produtoId: prod.produtoId || prod.id || '',
+              nome: nomeProduto,
+              quantidade: prod.quantidade || 1,
+              valorUnitario: prod.valorUnitario || 0,
+              complementos: complementosMapeados,
+              tipoDesconto: tipoDescontoFinal,
+              valorDesconto: valorDescontoFinal,
+              tipoAcrescimo: tipoAcrescimoFinal,
+              valorAcrescimo: valorAcrescimoFinal,
+            }
+          })
+        
+        // Se temos valorFinal da venda e há diferença, distribuir entre produtos que não têm desconto/acréscimo
+        if (vendaData.valorFinal !== undefined && vendaData.valorFinal !== null && produtosMapeados.length > 0) {
+          // Calcular soma total dos produtos (com complementos, mas sem desconto/acréscimo aplicado)
+          const somaProdutos = produtosMapeados.reduce((sum, p) => {
+            const valorProduto = p.valorUnitario * p.quantidade
+            const valorComplementos = p.complementos.reduce((compSum, comp) => {
+              const tipo = comp.tipoImpactoPreco || 'nenhum'
+              const valorTotal = comp.valor * comp.quantidade * p.quantidade
+              if (tipo === 'aumenta') {
+                return compSum + valorTotal
+              } else if (tipo === 'diminui') {
+                return compSum - valorTotal
+              }
+              return compSum
+            }, 0)
+            return sum + valorProduto + valorComplementos
+          }, 0)
+          
+          // Calcular diferença entre valorFinal da venda e soma dos produtos
+          const diferencaTotal = vendaData.valorFinal - somaProdutos
+          
+          // Se há diferença significativa e não está explicada por descontos/acréscimos já mapeados
+          if (Math.abs(diferencaTotal) > 0.01) {
+            // Verificar se todos os produtos já têm desconto/acréscimo mapeado
+            const produtosSemDescontoAcrescimo = produtosMapeados.filter(p => 
+              !p.tipoDesconto && !p.valorDesconto && !p.tipoAcrescimo && !p.valorAcrescimo
+            )
+            
+            // Se há produtos sem desconto/acréscimo, distribuir a diferença proporcionalmente
+            if (produtosSemDescontoAcrescimo.length > 0 && produtosSemDescontoAcrescimo.length === produtosMapeados.length) {
+              // Todos os produtos não têm desconto/acréscimo, distribuir proporcionalmente
+              const somaProdutosSemDescontoAcrescimo = produtosSemDescontoAcrescimo.reduce((sum, p) => {
+                const valorProduto = p.valorUnitario * p.quantidade
+                const valorComplementos = p.complementos.reduce((compSum, comp) => {
+                  const tipo = comp.tipoImpactoPreco || 'nenhum'
+                  const valorTotal = comp.valor * comp.quantidade * p.quantidade
+                  if (tipo === 'aumenta') {
+                    return compSum + valorTotal
+                  } else if (tipo === 'diminui') {
+                    return compSum - valorTotal
+                  }
+                  return compSum
+                }, 0)
+                return sum + valorProduto + valorComplementos
+              }, 0)
+              
+              // Distribuir diferença proporcionalmente
+              produtosMapeados.forEach((produto, index) => {
+                const valorProduto = produto.valorUnitario * produto.quantidade
+                const valorComplementos = produto.complementos.reduce((compSum, comp) => {
+                  const tipo = comp.tipoImpactoPreco || 'nenhum'
+                  const valorTotal = comp.valor * comp.quantidade * produto.quantidade
+                  if (tipo === 'aumenta') {
+                    return compSum + valorTotal
+                  } else if (tipo === 'diminui') {
+                    return compSum - valorTotal
+                  }
+                  return compSum
+                }, 0)
+                const subtotalProduto = valorProduto + valorComplementos
+                
+                // Só aplicar se o produto não tem desconto/acréscimo já mapeado
+                if (!produto.tipoDesconto && !produto.valorDesconto && !produto.tipoAcrescimo && !produto.valorAcrescimo) {
+                  const proporcao = somaProdutosSemDescontoAcrescimo > 0 ? subtotalProduto / somaProdutosSemDescontoAcrescimo : 1 / produtosMapeados.length
+                  const diferencaProduto = diferencaTotal * proporcao
+                  
+                  if (Math.abs(diferencaProduto) > 0.01) {
+                    if (diferencaProduto > 0) {
+                      produto.tipoAcrescimo = 'fixo'
+                      produto.valorAcrescimo = diferencaProduto
+                    } else {
+                      produto.tipoDesconto = 'fixo'
+                      produto.valorDesconto = Math.abs(diferencaProduto)
+                    }
+                  }
+                }
+              })
+            } else if (produtosSemDescontoAcrescimo.length === 1) {
+              // Se há apenas um produto sem desconto/acréscimo, aplicar toda a diferença nele
+              const produtoUnico = produtosSemDescontoAcrescimo[0]
+              const index = produtosMapeados.findIndex(p => p.produtoId === produtoUnico.produtoId)
+              
+              if (index !== -1) {
+                if (diferencaTotal > 0) {
+                  produtosMapeados[index].tipoAcrescimo = 'fixo'
+                  produtosMapeados[index].valorAcrescimo = diferencaTotal
+                } else {
+                  produtosMapeados[index].tipoDesconto = 'fixo'
+                  produtosMapeados[index].valorDesconto = Math.abs(diferencaTotal)
+                }
+              }
+            }
+          }
+        }
+        
+        console.log('✅ Produtos mapeados:', produtosMapeados)
+        setProdutos(produtosMapeados)
+      } else {
+        console.warn('⚠️ Nenhum produto encontrado na resposta da API. Campos disponíveis:', Object.keys(vendaData))
+        setProdutos([])
+      }
+
+      // Pagamentos
+      if (vendaData.pagamentos && Array.isArray(vendaData.pagamentos)) {
+        const pagamentosMapeados: PagamentoSelecionado[] = vendaData.pagamentos
+          .filter((pag: any) => !pag.cancelado) // Filtrar pagamentos cancelados
+          .map((pag: any) => ({
+            meioPagamentoId: pag.meioPagamentoId || pag.id || '',
+            valor: pag.valor || 0,
+          }))
+        setPagamentos(pagamentosMapeados)
+      }
+
+      // Se estiver em modo visualização, ir direto para step 4
+      if (modoVisualizacao) {
+        setCurrentStep(4)
+      }
+    } catch (error: any) {
+      console.error('Erro ao carregar venda:', error)
+      showToast.error(error.message || 'Erro ao carregar dados da venda')
+      onClose()
+    } finally {
+      setIsLoadingVenda(false)
+    }
+  }, [vendaId, open, auth, modoVisualizacao, onClose])
+
   // Sincroniza o estado interno com o prop open
   useEffect(() => {
     setInternalDialogOpen(open)
   }, [open])
+
+  // Carregar venda existente quando modal abrir com vendaId
+  useEffect(() => {
+    if (open && vendaId) {
+      // Se estiver em modo visualização, definir currentStep como 4 imediatamente
+      // Mas ainda mostrar loading até os dados carregarem
+      if (modoVisualizacao) {
+        setCurrentStep(4)
+      } else {
+        setCurrentStep(1)
+      }
+      carregarVendaExistente()
+    } else if (!open) {
+      // Limpar dados quando modal fechar
+      setDataVenda('')
+      // Resetar step apenas se não estiver em modo visualização
+      if (!modoVisualizacao) {
+        setCurrentStep(1)
+      }
+    }
+  }, [open, vendaId, modoVisualizacao, carregarVendaExistente])
 
   // Buscar nome do usuário gestor quando o modal abrir
   useEffect(() => {
@@ -1175,6 +1559,11 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
 
   // Navegação entre steps
   const handleNextStep = () => {
+    // Não permitir navegação em modo visualização
+    if (vendaId && modoVisualizacao) {
+      return
+    }
+    
     if (currentStep === 1 && canGoToStep2()) {
       setCurrentStep(2)
     } else if (currentStep === 2 && canGoToStep3()) {
@@ -1185,6 +1574,11 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
   }
 
   const handlePreviousStep = () => {
+    // Não permitir navegação em modo visualização
+    if (vendaId && modoVisualizacao) {
+      return
+    }
+    
     if (currentStep === 2) {
       setCurrentStep(1)
     } else if (currentStep === 3) {
@@ -1244,7 +1638,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
       >
         <div className="px-4 py-2">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold">Novo Pedido</h1>
+            <h1 className="text-2xl font-bold">{modoVisualizacao ? 'Detalhes do Pedido' : 'Novo Pedido'}</h1>
             {nomeUsuario && (
               <div className="flex items-center gap-2">
                 <MdPerson className="w-4 h-4 text-primary" />
@@ -1304,10 +1698,31 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                   ? 'bg-primary border-primary text-white' 
                   : 'bg-white border-gray-300 text-gray-400'
               }`}>
-                <span className="text-sm font-semibold">3</span>
+                {currentStep > 3 ? (
+                  <MdCheckCircle className="w-5 h-5" />
+                ) : (
+                  <span className="text-sm font-semibold">3</span>
+                )}
               </div>
               <span className={`text-sm font-medium ${currentStep >= 3 ? 'text-primary' : 'text-gray-400'}`}>
                 Pagamento
+              </span>
+            </div>
+            
+            {/* Linha */}
+            <div className={`h-0.5 w-12 ${currentStep >= 4 ? 'bg-primary' : 'bg-gray-300'}`} />
+            
+            {/* Step 4 */}
+            <div className="flex items-center gap-2">
+              <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
+                currentStep >= 4 
+                  ? 'bg-primary border-primary text-white' 
+                  : 'bg-white border-gray-300 text-gray-400'
+              }`}>
+                <span className="text-sm font-semibold">4</span>
+              </div>
+              <span className={`text-sm font-medium ${currentStep >= 4 ? 'text-primary' : 'text-gray-400'}`}>
+                Detalhes
               </span>
             </div>
           </div>
@@ -1317,8 +1732,22 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
           style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 24px', minHeight: 0 }}
           className="scrollbar-thin"
         >
+          {/* Loading em modo visualização - não mostrar steps até carregar */}
+          {modoVisualizacao && isLoadingVenda && (
+            <div className="flex items-center justify-center py-16">
+              <div className="text-center">
+                <img 
+                  src="/images/jiffy-loading.gif" 
+                  alt="Carregando..." 
+                  className="w-32 h-32 mx-auto mb-4"
+                />
+                <p className="text-sm text-gray-600">Carregando detalhes da venda...</p>
+              </div>
+            </div>
+          )}
+
           {/* STEP 1: Informações do Pedido */}
-          {currentStep === 1 && (
+          {!modoVisualizacao && currentStep === 1 && (
             <div className="py-2 space-y-3">
               
 
@@ -1415,7 +1844,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
           )}
 
           {/* STEP 2: Seleção de Produtos */}
-          {currentStep === 2 && (
+          {!modoVisualizacao && currentStep === 2 && (
             <div className="space-y-2 py-2">
               {/* Área de Edição de Produtos Selecionados */}
               <div 
@@ -1942,7 +2371,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
           )}
 
           {/* STEP 3: Pagamento */}
-          {currentStep === 3 && (
+          {!modoVisualizacao && currentStep === 3 && (
             <div className="space-y-2">
               {/* Informações do Pedido */}
               <div className="border rounded-lg px-4 bg-gray-50">
@@ -2118,45 +2547,276 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
               )}
             </div>
           )}
+
+          {/* STEP 4: Detalhes da Venda (Apenas Visualização) */}
+          {currentStep === 4 && !isLoadingVenda && (
+            <div className="space-y-4 py-2">
+              <>
+              {/* Informações do Pedido */}
+              <div className="border rounded-lg px-4 bg-gray-50">
+                <h3 className="font-semibold text-lg">Informações do Pedido</h3>
+                <div className="text-sm">
+                  <div className="flex justify-between bg-white rounded-lg px-1">
+                    <span className="text-gray-600">Data:</span>
+                    <span className="font-medium">{(dataVenda ? new Date(dataVenda) : new Date()).toLocaleString('pt-BR', { 
+                      day: '2-digit', 
+                      month: '2-digit', 
+                      year: 'numeric', 
+                      hour: '2-digit', 
+                      minute: '2-digit' 
+                    })}</span>
+                  </div>
+                  <div className="flex justify-between px-1">
+                    <span className="text-gray-600">Origem:</span>
+                    <span className="font-medium">{origem}</span>
+                  </div>
+                  <div className="flex justify-between bg-white rounded-lg px-1">
+                    <span className="text-gray-600">Status:</span>
+                    <span className="font-medium">{statusDisponiveis.find(s => s.value === status)?.label}</span>
+                  </div>
+                  {clienteNome && (
+                    <div className="flex justify-between px-1">
+                      <span className="text-gray-600">Cliente:</span>
+                      <span className="font-medium">{clienteNome}</span>
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-between bg-white rounded-lg px-1">
+                    <span className="text-gray-600">Total de Itens:</span>
+                    <span className="font-medium">{produtos.length} {produtos.length === 1 ? 'produto' : 'produtos'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lista de Produtos (Visualização) */}
+              <div className="border rounded-lg bg-gray-50 overflow-hidden">
+                <div className="p-2">
+                  <h3 className="font-semibold text-lg mb-2">Produtos do Pedido</h3>
+                  {produtos.length > 0 ? (
+                    <div className="space-y-1">
+                      {/* Cabeçalho da tabela */}
+                      <div className="flex gap-2 pb-2 border-b border-gray-300 mb-2">
+                        <div className="w-[60px] flex-shrink-0 flex items-center justify-center">
+                          <span className="text-xs text-center font-semibold text-gray-700">Qtd</span>
+                        </div>
+                        <div className="flex-[4]">
+                          <span className="text-xs font-semibold text-gray-700">Produto</span>
+                        </div>
+                        <div className="flex-1 flex justify-end">
+                          <span className="text-xs font-semibold text-gray-700 text-right">Desc./Acres.</span>
+                        </div>
+                        <div className="flex-1 flex justify-end">
+                          <span className="text-xs font-semibold text-gray-700 text-right">Val Unit.</span>
+                        </div>
+                        <div className="flex-1 flex justify-end">
+                          <span className="text-xs font-semibold text-gray-700 text-right">Total</span>
+                        </div>
+                      </div>
+                      {/* Linhas de produtos */}
+                      <div className="space-y-1">
+                        {produtos.map((produto, index) => {
+                          const totalProdutoComComplementos = calcularTotalProduto(produto)
+                          
+                          return (
+                            <div key={index} className="space-y-0">
+                              {/* Linha do Produto Principal */}
+                              <div 
+                                className={`flex gap-1 items-center rounded ${
+                                  index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                                }`}
+                              >
+                                {/* Quantidade */}
+                                <div className="w-[60px] flex-shrink-0">
+                                  <span className="text-xs text-gray-900 text-center block">{Math.floor(produto.quantidade)}</span>
+                                </div>
+                                {/* Nome do Produto */}
+                                <div className="flex-[4] min-w-0">
+                                  <span className="text-xs text-gray-900 truncate block">{produto.nome}</span>
+                                </div>
+                                {/* Desconto/Acréscimo */}
+                                <div className="flex-1">
+                                  <span className="text-xs text-gray-600 text-right block">
+                                    {formatarDescontoAcrescimo(produto)}
+                                  </span>
+                                </div>
+                                {/* Valor Unitário */}
+                                <div className="flex-1">
+                                  <span className="text-xs text-gray-900 text-right block">
+                                    {formatarNumeroComMilhar(produto.valorUnitario)}
+                                  </span>
+                                </div>
+                                {/* Total */}
+                                <div className="flex-1">
+                                  <span className="text-xs font-semibold text-gray-900 text-right block">
+                                    R$ {formatarNumeroComMilhar(totalProdutoComComplementos)}
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              {/* Linhas dos Complementos */}
+                              {produto.complementos.map((complemento, compIndex) => {
+                                const compKey = `comp-${index}-${complemento.grupoId}-${complemento.id}`
+                                
+                                return (
+                                  <div
+                                    key={compKey}
+                                    className={`flex gap-1 items-center rounded -mt-0.5 ${
+                                      index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                                    }`}
+                                    style={{ minHeight: '24px' }}
+                                  >
+                                    {/* Quantidade do Complemento */}
+                                    <div className="w-[60px] flex-shrink-0 pl-4">
+                                      <span className="text-xs text-gray-600 text-right block">{complemento.quantidade}</span>
+                                    </div>
+                                    {/* Nome do Complemento com indentação */}
+                                    <div className="flex-[4] min-w-0 pl-4">
+                                      <span className="text-xs text-gray-600 truncate block leading-tight">
+                                        {complemento.nome}
+                                      </span>
+                                    </div>
+                                    {/* Espaço vazio para Desconto/Acréscimo (complementos não têm) */}
+                                    <div className="flex-1"></div>
+                                    {/* Valor Unitário do Complemento - Apenas exibição */}
+                                    <div className="flex-1">
+                                      <span className="text-xs text-gray-600 text-right block leading-tight">
+                                        {formatarValorComplemento(complemento.valor, complemento.tipoImpactoPreco)}
+                                      </span>
+                                    </div>
+                                    {/* Espaço vazio onde seria o Total (complementos não têm total próprio) */}
+                                    <div className="flex-1"></div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center py-4">
+                      <p className="text-sm text-gray-500">Nenhum produto selecionado</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Total do Pedido */}
+              <div className="flex justify-end items-center gap-2">
+                <span className="text-sm font-semibold text-gray-700">Total do Pedido:</span>
+                <span className="text-lg font-bold text-primary">
+                  {transformarParaReal(totalProdutos)}
+                </span>
+              </div>
+
+              {/* Pagamentos (se status finalizada ou pendente emissão) */}
+              {(status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') && pagamentos.length > 0 && (
+                <div className="border rounded-lg px-4 bg-white">
+                  <h3 className="font-semibold text-lg mb-2">Pagamentos</h3>
+                  
+                  {/* Total Pago e Troco */}
+                  <div className="border-t pt-2 text-sm mb-2">
+                    <div className="flex justify-between items-center bg-gray-100 rounded-lg p-1">
+                      <span className="text-gray-700 font-semibold">Total Pago:</span>
+                      <span className="text-base font-bold text-gray-900">
+                        {transformarParaReal(totalPagamentos)}
+                      </span>
+                    </div>
+                    {troco > 0 && (
+                      <div className="flex justify-between items-center mt-2">
+                        <span className="text-gray-700 font-semibold">Troco:</span>
+                        <span className="text-base font-bold text-green-600">
+                          {transformarParaReal(troco)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Cards das Formas de Pagamento */}
+                  <div className="mb-2">
+                    <Label className="text-base font-semibold mb-2 block">Formas de Pagamento Utilizadas</Label>
+                    <div className="flex flex-wrap gap-3">
+                      {pagamentos.map((pagamento, index) => {
+                        const meio = meiosPagamento.find(m => m.getId() === pagamento.meioPagamentoId)
+                        const Icone = meio ? obterIconeMeioPagamento(meio.getNome()) : MdCreditCard
+                        
+                        return (
+                          <div
+                            key={index}
+                            className="flex flex-col items-center justify-center gap-1 p-3 border-2 rounded-lg bg-white border-primary min-w-[120px]"
+                          >
+                            <Icone className="w-8 h-8 text-primary" />
+                            <span className="text-xs font-medium text-center">
+                              {meio?.getNome() || 'Meio de pagamento'}
+                            </span>
+                            <span className="text-sm font-bold text-primary">
+                              {transformarParaReal(pagamento.valor)}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+              </>
+            </div>
+          )}
         </div>
 
         <DialogFooter sx={{ padding: '16px 24px 24px 24px', flexShrink: 0, borderTop: '1px solid #e5e7eb', marginTop: 0 }}>
-          <Button variant="outlined" onClick={handleClose} disabled={createVendaGestor.isPending}>
-            Cancelar
-          </Button>
-          
-          {currentStep > 1 && (
+          {/* Step 4: Apenas botão Concluir */}
+          {currentStep === 4 ? (
             <Button 
-              variant="outlined" 
-              onClick={handlePreviousStep} 
-              disabled={createVendaGestor.isPending}
+              onClick={() => {
+                resetForm()
+                onSuccess()
+                onClose()
+              }}
               className="flex items-center gap-2"
             >
-              <MdArrowBack className="w-4 h-4" />
-              Anterior
-            </Button>
-          )}
-          
-          {currentStep < 3 ? (
-            <Button 
-              onClick={handleNextStep} 
-              disabled={
-                createVendaGestor.isPending || 
-                (currentStep === 2 && !canGoToStep3())
-              }
-              className="flex items-center gap-2"
-            >
-              Próximo
-              <MdArrowForward className="w-4 h-4" />
+              Concluir
             </Button>
           ) : (
-            <Button 
-              onClick={handleSubmit} 
-              disabled={createVendaGestor.isPending || !canSubmit()}
-              className="flex items-center gap-2"
-            >
-              {createVendaGestor.isPending ? 'Criando...' : 'Criar Pedido'}
-            </Button>
+            <>
+              <Button variant="outlined" onClick={handleClose} disabled={createVendaGestor.isPending}>
+                Cancelar
+              </Button>
+              
+              {currentStep > 1 && (
+                <Button 
+                  variant="outlined" 
+                  onClick={handlePreviousStep} 
+                  disabled={createVendaGestor.isPending}
+                  className="flex items-center gap-2"
+                >
+                  <MdArrowBack className="w-4 h-4" />
+                  Anterior
+                </Button>
+              )}
+              
+              {currentStep < 3 ? (
+                <Button 
+                  onClick={handleNextStep} 
+                  disabled={
+                    createVendaGestor.isPending || 
+                    (currentStep === 2 && !canGoToStep3())
+                  }
+                  className="flex items-center gap-2"
+                >
+                  Próximo
+                  <MdArrowForward className="w-4 h-4" />
+                </Button>
+              ) : (
+                <Button 
+                  onClick={handleSubmit} 
+                  disabled={createVendaGestor.isPending || !canSubmit()}
+                  className="flex items-center gap-2"
+                >
+                  {createVendaGestor.isPending ? 'Criando...' : 'Criar Pedido'}
+                </Button>
+              )}
+            </>
           )}
         </DialogFooter>
       </DialogContent>
