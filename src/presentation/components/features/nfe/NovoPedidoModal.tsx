@@ -49,6 +49,7 @@ interface ProdutoSelecionado {
   valorDesconto?: number | null
   tipoAcrescimo?: 'fixo' | 'porcentagem' | null
   valorAcrescimo?: number | null
+  valorFinal?: number | null // Valor final do produto quando carregado do backend (já calculado)
 }
 
 interface PagamentoSelecionado {
@@ -82,6 +83,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
   // Estados para carregamento de venda existente
   const [isLoadingVenda, setIsLoadingVenda] = useState(false)
   const [dataVenda, setDataVenda] = useState<string>('') // Data da venda para exibição
+  const [valorFinalVenda, setValorFinalVenda] = useState<number | null>(null) // Valor final da venda do backend (quando carregando pedido existente)
   
   // Estado para controlar valores em edição (índice do produto ou chave do complemento -> valor string)
   const [valoresEmEdicao, setValoresEmEdicao] = useState<Record<string | number, string>>({})
@@ -130,7 +132,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
   const hasMovedMeiosPagamentoRef = useRef(false)
 
   // Buscar grupos de produtos
-  const { data: gruposData, isLoading: isLoadingGrupos } = useGruposProdutos({
+  const { data: gruposData, isLoading: isLoadingGrupos, refetch: refetchGrupos } = useGruposProdutos({
     ativo: true,
     limit: 100,
   })
@@ -309,10 +311,31 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
     document.addEventListener('mouseup', handleGlobalMouseUp)
   }, [])
   
-  // Ordenar grupos por nome
+  // Ordenar grupos por ordem (campo ordem da API)
   const grupos = useMemo(() => {
     if (!gruposData) return []
-    return [...gruposData].sort((a, b) => a.getNome().localeCompare(b.getNome()))
+    return [...gruposData].sort((a, b) => {
+      const ordemA = a.getOrdem()
+      const ordemB = b.getOrdem()
+      
+      // Se ambos têm ordem, ordenar numericamente
+      if (ordemA !== undefined && ordemB !== undefined) {
+        return ordemA - ordemB
+      }
+      
+      // Se apenas A tem ordem, A vem primeiro
+      if (ordemA !== undefined && ordemB === undefined) {
+        return -1
+      }
+      
+      // Se apenas B tem ordem, B vem primeiro
+      if (ordemA === undefined && ordemB !== undefined) {
+        return 1
+      }
+      
+      // Se nenhum tem ordem, usar ordem alfabética como fallback
+      return a.getNome().localeCompare(b.getNome())
+    })
   }, [gruposData])
   
   // Ordenar produtos por nome
@@ -463,14 +486,21 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
     return ''
   }
 
-  // Calcular totais do pedido (produtos com desconto/acréscimo já incluindo complementos)
+  // Calcular totais do pedido
+  // Se estiver carregando um pedido existente, usar valorFinal do backend
+  // Caso contrário, calcular a partir dos produtos
   const totalProdutos = useMemo(() => {
+    // Se temos valorFinal da venda (pedido existente), usar ele diretamente
+    if (valorFinalVenda !== null) {
+      return valorFinalVenda
+    }
+    // Para novo pedido, calcular a partir dos produtos
     return produtos.reduce((sum, p) => {
       // calcularTotalProduto já inclui complementos e aplica desconto/acréscimo sobre o total
       const totalProduto = calcularTotalProduto(p)
       return sum + totalProduto
     }, 0)
-  }, [produtos])
+  }, [produtos, valorFinalVenda])
 
   const totalPagamentos = useMemo(() => {
     return pagamentos.reduce((sum, p) => sum + p.valor, 0)
@@ -1037,6 +1067,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
     setEhAcrescimo(false)
     setEhPorcentagem(false)
     setValorDescontoAcrescimo('0')
+    setValorFinalVenda(null) // Limpar valor final ao resetar
     
     // Limpar timeouts de long press de complementos
     if (longPressComplementoTimeoutRef.current) {
@@ -1172,6 +1203,13 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
         setDataVenda(vendaData.dataFinalizacao)
       }
 
+      // Valor final da venda (já calculado pelo backend)
+      if (vendaData.valorFinal !== undefined && vendaData.valorFinal !== null) {
+        setValorFinalVenda(vendaData.valorFinal)
+      } else {
+        setValorFinalVenda(null)
+      }
+
       // Produtos - Verificar tanto produtosLancados quanto produtos
       // A API pode retornar em qualquer um dos formatos
       const produtosRaw = vendaData.produtosLancados || vendaData.produtos
@@ -1210,28 +1248,11 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
                 })
               : []
 
-            // Calcular valor base do produto (sem desconto/acréscimo)
-            const valorBaseProduto = (prod.valorUnitario || 0) * (prod.quantidade || 1)
-            
-            // Calcular valor dos complementos
-            const valorComplementos = complementosMapeados.reduce((sum, comp) => {
-              const tipo = comp.tipoImpactoPreco || 'nenhum'
-              const valorTotal = comp.valor * comp.quantidade * (prod.quantidade || 1)
-              if (tipo === 'aumenta') {
-                return sum + valorTotal
-              } else if (tipo === 'diminui') {
-                return sum - valorTotal
-              }
-              return sum
-            }, 0)
-            
-            const subtotalEsperado = valorBaseProduto + valorComplementos
-            
-            // Se temos valorFinal do produto, calcular diferença para determinar desconto/acréscimo
+            // Mapear campos de desconto/acréscimo diretamente do backend
             let tipoDescontoFinal = prod.tipoDesconto || null
-            let valorDescontoFinal: number | null = typeof prod.desconto === 'string' ? parseFloat(prod.desconto) : (prod.desconto || prod.valorDesconto || null)
+            let valorDescontoFinal: number | null = typeof prod.valorDesconto === 'string' ? parseFloat(prod.valorDesconto) : (prod.valorDesconto || null)
             let tipoAcrescimoFinal = prod.tipoAcrescimo || null
-            let valorAcrescimoFinal: number | null = typeof prod.acrescimo === 'string' ? parseFloat(prod.acrescimo) : (prod.acrescimo || prod.valorAcrescimo || null)
+            let valorAcrescimoFinal: number | null = typeof prod.valorAcrescimo === 'string' ? parseFloat(prod.valorAcrescimo) : (prod.valorAcrescimo || null)
             
             // Se o backend retorna porcentagem como decimal (0.1 = 10%), converter para porcentagem (10 = 10%)
             // O frontend trabalha com porcentagem 0-100, não decimal 0-1
@@ -1249,29 +1270,6 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
               }
             }
             
-            // Se não temos tipoAcrescimo/tipoDesconto mas temos valorFinal, calcular a partir da diferença
-            if (prod.valorFinal !== undefined && prod.valorFinal !== null) {
-              const valorFinalProduto = prod.valorFinal
-              const diferenca = valorFinalProduto - subtotalEsperado
-              
-              // Se a diferença é significativa (maior que 0.01 para evitar problemas de arredondamento)
-              if (Math.abs(diferenca) > 0.01) {
-                if (diferenca > 0) {
-                  // Acréscimo
-                  if (!tipoAcrescimoFinal && !valorAcrescimoFinal) {
-                    tipoAcrescimoFinal = 'fixo'
-                    valorAcrescimoFinal = diferenca
-                  }
-                } else {
-                  // Desconto
-                  if (!tipoDescontoFinal && !valorDescontoFinal) {
-                    tipoDescontoFinal = 'fixo'
-                    valorDescontoFinal = Math.abs(diferenca)
-                  }
-                }
-              }
-            }
-            
             return {
               produtoId: prod.produtoId || prod.id || '',
               nome: nomeProduto,
@@ -1282,103 +1280,9 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
               valorDesconto: valorDescontoFinal,
               tipoAcrescimo: tipoAcrescimoFinal,
               valorAcrescimo: valorAcrescimoFinal,
+              valorFinal: prod.valorFinal || null, // Valor final do produto (já calculado pelo backend)
             }
           })
-        
-        // Se temos valorFinal da venda e há diferença, distribuir entre produtos que não têm desconto/acréscimo
-        if (vendaData.valorFinal !== undefined && vendaData.valorFinal !== null && produtosMapeados.length > 0) {
-          // Calcular soma total dos produtos (com complementos, mas sem desconto/acréscimo aplicado)
-          const somaProdutos = produtosMapeados.reduce((sum, p) => {
-            const valorProduto = p.valorUnitario * p.quantidade
-            const valorComplementos = p.complementos.reduce((compSum, comp) => {
-              const tipo = comp.tipoImpactoPreco || 'nenhum'
-              const valorTotal = comp.valor * comp.quantidade * p.quantidade
-              if (tipo === 'aumenta') {
-                return compSum + valorTotal
-              } else if (tipo === 'diminui') {
-                return compSum - valorTotal
-              }
-              return compSum
-            }, 0)
-            return sum + valorProduto + valorComplementos
-          }, 0)
-          
-          // Calcular diferença entre valorFinal da venda e soma dos produtos
-          const diferencaTotal = vendaData.valorFinal - somaProdutos
-          
-          // Se há diferença significativa e não está explicada por descontos/acréscimos já mapeados
-          if (Math.abs(diferencaTotal) > 0.01) {
-            // Verificar se todos os produtos já têm desconto/acréscimo mapeado
-            const produtosSemDescontoAcrescimo = produtosMapeados.filter(p => 
-              !p.tipoDesconto && !p.valorDesconto && !p.tipoAcrescimo && !p.valorAcrescimo
-            )
-            
-            // Se há produtos sem desconto/acréscimo, distribuir a diferença proporcionalmente
-            if (produtosSemDescontoAcrescimo.length > 0 && produtosSemDescontoAcrescimo.length === produtosMapeados.length) {
-              // Todos os produtos não têm desconto/acréscimo, distribuir proporcionalmente
-              const somaProdutosSemDescontoAcrescimo = produtosSemDescontoAcrescimo.reduce((sum, p) => {
-                const valorProduto = p.valorUnitario * p.quantidade
-                const valorComplementos = p.complementos.reduce((compSum, comp) => {
-                  const tipo = comp.tipoImpactoPreco || 'nenhum'
-                  const valorTotal = comp.valor * comp.quantidade * p.quantidade
-                  if (tipo === 'aumenta') {
-                    return compSum + valorTotal
-                  } else if (tipo === 'diminui') {
-                    return compSum - valorTotal
-                  }
-                  return compSum
-                }, 0)
-                return sum + valorProduto + valorComplementos
-              }, 0)
-              
-              // Distribuir diferença proporcionalmente
-              produtosMapeados.forEach((produto, index) => {
-                const valorProduto = produto.valorUnitario * produto.quantidade
-                const valorComplementos = produto.complementos.reduce((compSum, comp) => {
-                  const tipo = comp.tipoImpactoPreco || 'nenhum'
-                  const valorTotal = comp.valor * comp.quantidade * produto.quantidade
-                  if (tipo === 'aumenta') {
-                    return compSum + valorTotal
-                  } else if (tipo === 'diminui') {
-                    return compSum - valorTotal
-                  }
-                  return compSum
-                }, 0)
-                const subtotalProduto = valorProduto + valorComplementos
-                
-                // Só aplicar se o produto não tem desconto/acréscimo já mapeado
-                if (!produto.tipoDesconto && !produto.valorDesconto && !produto.tipoAcrescimo && !produto.valorAcrescimo) {
-                  const proporcao = somaProdutosSemDescontoAcrescimo > 0 ? subtotalProduto / somaProdutosSemDescontoAcrescimo : 1 / produtosMapeados.length
-                  const diferencaProduto = diferencaTotal * proporcao
-                  
-                  if (Math.abs(diferencaProduto) > 0.01) {
-                    if (diferencaProduto > 0) {
-                      produto.tipoAcrescimo = 'fixo'
-                      produto.valorAcrescimo = diferencaProduto
-                    } else {
-                      produto.tipoDesconto = 'fixo'
-                      produto.valorDesconto = Math.abs(diferencaProduto)
-                    }
-                  }
-                }
-              })
-            } else if (produtosSemDescontoAcrescimo.length === 1) {
-              // Se há apenas um produto sem desconto/acréscimo, aplicar toda a diferença nele
-              const produtoUnico = produtosSemDescontoAcrescimo[0]
-              const index = produtosMapeados.findIndex(p => p.produtoId === produtoUnico.produtoId)
-              
-              if (index !== -1) {
-                if (diferencaTotal > 0) {
-                  produtosMapeados[index].tipoAcrescimo = 'fixo'
-                  produtosMapeados[index].valorAcrescimo = diferencaTotal
-                } else {
-                  produtosMapeados[index].tipoDesconto = 'fixo'
-                  produtosMapeados[index].valorDesconto = Math.abs(diferencaTotal)
-                }
-              }
-            }
-          }
-        }
         
         console.log('✅ Produtos mapeados:', produtosMapeados)
         setProdutos(produtosMapeados)
@@ -1430,6 +1334,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
     } else if (!open) {
       // Limpar dados quando modal fechar
       setDataVenda('')
+      setValorFinalVenda(null) // Limpar valor final quando modal fechar
       // Resetar step apenas se não estiver em modo visualização
       if (!modoVisualizacao) {
         setCurrentStep(1)
@@ -1504,6 +1409,14 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
 
     fetchNomeUsuario()
   }, [open, auth])
+
+  // Refetch grupos de produtos quando modal abrir e estiver na Step 2
+  // Isso garante que a ordem dos grupos esteja atualizada após reordenação
+  useEffect(() => {
+    if (open && currentStep === 2 && !modoVisualizacao) {
+      refetchGrupos()
+    }
+  }, [open, currentStep, modoVisualizacao, refetchGrupos])
 
   // Intercepta o fechamento do Dialog
   const handleDialogOpenChange = (isOpen: boolean) => {
@@ -2615,7 +2528,11 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
                       {/* Linhas de produtos */}
                       <div className="space-y-1">
                         {produtos.map((produto, index) => {
-                          const totalProdutoComComplementos = calcularTotalProduto(produto)
+                          // Se temos valorFinal do produto (pedido existente), usar ele
+                          // Caso contrário, calcular (novo pedido)
+                          const totalProdutoComComplementos = produto.valorFinal !== null && produto.valorFinal !== undefined
+                            ? produto.valorFinal
+                            : calcularTotalProduto(produto)
                           
                           return (
                             <div key={index} className="space-y-0">
