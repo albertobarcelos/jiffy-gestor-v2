@@ -153,29 +153,33 @@ export function TopNav() {
       icon: MdDashboard 
     },
     {
-      name: 'Cadastros',
+      name: 'Produtos',
       path: '#',
-      icon: MdInventory2,
+      icon: MdShoppingBag,
       children: [
-        { name: 'Grupo Produtos', path: '/cadastros/grupos-produtos', icon: MdCategory },
+        { name: 'Grupo de Produtos', path: '/cadastros/grupos-produtos', icon: MdCategory },
         { name: 'Produtos', path: '/produtos', icon: MdShoppingBag },
-        { name: 'Grupo Complementos', path: '/cadastros/grupos-complementos', icon: MdCategory },
+        { name: 'Grupo de Complementos', path: '/cadastros/grupos-complementos', icon: MdCategory },
         { name: 'Complementos', path: '/cadastros/complementos', icon: MdAddCircle },
-        { name: 'Usuários', path: '/cadastros/usuarios', icon: MdPerson },
-        { name: 'Perfis de Usuários', path: '/cadastros/perfis-usuarios-pdv', icon: MdGroup },
+        { name: 'Cadastro por Planilhas', path: '/cadastro-por-planilha', icon: MdAirplaneTicket },
+      ],
+    },
+    {
+      name: 'Usuários',
+      path: '#',
+      icon: MdPeople,
+      children: [
+        { name: 'Perfis PDV', path: '/cadastros/perfis-usuarios-pdv', icon: MdGroup },
+        { name: 'Usuários PDV', path: '/cadastros/usuarios', icon: MdPerson },
         { name: 'Perfis Gestor', path: '/cadastros/perfis-gestor', icon: MdAccountBalance },
         { name: 'Usuários Gestor', path: '/cadastros/usuarios-gestor', icon: MdPerson },
         { name: 'Clientes', path: '/cadastros/clientes', icon: MdPeople },
-        { name: 'Impressoras', path: '/cadastros/impressoras', icon: MdPrint },
-        { name: 'Meios de Pagamentos', path: '/cadastros/meios-pagamentos', icon: MdPayment },
-        { name: 'Cadastro por Planilha', path: '/cadastro-por-planilha', icon: MdAirplaneTicket },
       ],
     },
-    //{ name: 'Estoque', path: '/estoque', icon: MdInventory },
     {
       name: 'Vendas',
       path: '#',
-      icon: MdInventory2,
+      icon: MdPointOfSale,
       children: [
         {
           name: 'Mesas Abertas',
@@ -194,14 +198,21 @@ export function TopNav() {
             />
           ),
         },
-        //{ name: 'Meu Caixa', path: '/meu-caixa', icon: MdPointOfSale },
-        { name: 'Hist. Fechamento', path: '/historico-fechamento', icon: MdHistory },
+        { name: 'Hist. Fechamentos', path: '/historico-fechamento', icon: MdHistory },
         { name: 'Relatórios', path: '/relatorios', icon: MdAssessment },
-
+        { name: 'Meios de Pagamentos', path: '/cadastros/meios-pagamentos', icon: MdPayment },
       ],
     },
-    { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: MdReceipt },
-    { name: 'Painel do Contador', path: '/painel-contador', icon: MdAccountBalance },
+    {
+      name: 'Fiscal',
+      path: '#',
+      icon: MdReceipt,
+      children: [
+        { name: 'Painel do Contador', path: '/painel-contador', icon: MdAccountBalance },
+        { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: MdReceipt },
+        { name: 'Impressoras', path: '/cadastros/impressoras', icon: MdPrint },
+      ],
+    },
     { name: 'Configurações', path: '/configuracoes', icon: MdSettings },
   ]
 
