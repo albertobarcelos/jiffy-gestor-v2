@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Produto } from '@/src/domain/entities/Produto'
+import { Impressora } from '@/src/domain/entities/Impressora'
 import { transformarParaReal, brToEUA } from '@/src/shared/utils/formatters'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
@@ -33,6 +34,14 @@ export function AtualizarPrecoLote() {
   const [adjustAmount, setAdjustAmount] = useState('')
   const [adjustDirection, setAdjustDirection] = useState<'increase' | 'decrease'>('increase')
   const [filtersExpanded, setFiltersExpanded] = useState(false)
+  const [produtosExpandidos, setProdutosExpandidos] = useState<Set<string>>(new Set())
+  const [impressorasSelecionadas, setImpressorasSelecionadas] = useState<Set<string>>(new Set())
+  const [impressorasDisponiveis, setImpressorasDisponiveis] = useState<Impressora[]>([])
+  const [isLoadingImpressoras, setIsLoadingImpressoras] = useState(false)
+  const [gruposComplementosSelecionados, setGruposComplementosSelecionados] = useState<Set<string>>(new Set())
+  const [activeTab, setActiveTab] = useState<'precos' | 'impressoras' | 'gruposComplementos'>('precos')
+  const [modoImpressora, setModoImpressora] = useState<'adicionar' | 'remover'>('adicionar')
+  const [modoGrupoComplemento, setModoGrupoComplemento] = useState<'adicionar' | 'remover'>('adicionar')
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const { auth } = useAuthStore()
   const {
@@ -49,7 +58,7 @@ export function AtualizarPrecoLote() {
     const token = auth?.getAccessToken()
     if (!token) return
 
-    const limit = 10
+    const limit = 50
     setIsLoading(true)
     setProdutos([])
     setProdutosSelecionados(new Set())
@@ -150,7 +159,7 @@ export function AtualizarPrecoLote() {
     grupoComplementoFilter,
   ])
 
-  // Debounce na busca
+  // Debounce na busca e filtros
   useEffect(() => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current)
@@ -165,12 +174,7 @@ export function AtualizarPrecoLote() {
         clearTimeout(debounceTimerRef.current)
       }
     }
-  }, [searchText, buscarProdutos])
-
-  useEffect(() => {
-    buscarProdutos()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterStatus, ativoLocalFilter, ativoDeliveryFilter, grupoProdutoFilter, grupoComplementoFilter])
+  }, [searchText, filterStatus, ativoLocalFilter, ativoDeliveryFilter, grupoProdutoFilter, grupoComplementoFilter, buscarProdutos])
 
   // Toggle seleção de produto
   const toggleSelecao = (produtoId: string) => {
@@ -184,6 +188,108 @@ export function AtualizarPrecoLote() {
       return novo
     })
   }
+
+  // Toggle expansão mobile
+  const toggleExpansao = (produtoId: string) => {
+    setProdutosExpandidos((prev) => {
+      const novo = new Set(prev)
+      if (novo.has(produtoId)) {
+        novo.delete(produtoId)
+      } else {
+        novo.add(produtoId)
+      }
+      return novo
+    })
+  }
+
+  // Toggle seleção de impressora
+  const toggleImpressora = (impressoraId: string) => {
+    setImpressorasSelecionadas((prev) => {
+      const novo = new Set(prev)
+      if (novo.has(impressoraId)) {
+        novo.delete(impressoraId)
+      } else {
+        novo.add(impressoraId)
+      }
+      return novo
+    })
+  }
+
+  // Toggle seleção de grupo complemento
+  const toggleGrupoComplemento = (grupoId: string) => {
+    setGruposComplementosSelecionados((prev) => {
+      const novo = new Set(prev)
+      if (novo.has(grupoId)) {
+        novo.delete(grupoId)
+      } else {
+        novo.add(grupoId)
+      }
+      return novo
+    })
+  }
+
+  // Carregar todas as impressoras
+  const loadAllImpressoras = useCallback(async () => {
+    const token = auth?.getAccessToken()
+    if (!token) return
+
+    setIsLoadingImpressoras(true)
+    try {
+      let hasMorePages = true
+      let currentOffset = 0
+      const acumulado: Impressora[] = []
+      const limit = 50
+
+      while (hasMorePages) {
+        const params = new URLSearchParams({
+          limit: limit.toString(),
+          offset: currentOffset.toString(),
+        })
+
+        const response = await fetch(`/api/impressoras?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
+        if (!response.ok) {
+          throw new Error(`Erro ${response.status}: ${response.statusText}`)
+        }
+
+        const data = await response.json()
+        const impressorasList = Array.isArray(data.items) ? data.items : []
+
+        const impressorasParsed = impressorasList
+          .map((i: any) => {
+            try {
+              return Impressora.fromJSON(i)
+            } catch (error) {
+              console.error('Erro ao parsear impressora:', error, i)
+              return null
+            }
+          })
+          .filter((i: Impressora | null): i is Impressora => i !== null)
+
+        acumulado.push(...impressorasParsed)
+        currentOffset += impressorasParsed.length
+        hasMorePages = impressorasParsed.length === limit
+      }
+
+      setImpressorasDisponiveis(acumulado)
+    } catch (error: any) {
+      console.error('Erro ao buscar impressoras', error)
+      showToast.error('Erro ao carregar impressoras')
+    } finally {
+      setIsLoadingImpressoras(false)
+    }
+  }, [auth])
+
+  // Carregar impressoras quando tab de impressoras estiver ativa
+  useEffect(() => {
+    if (activeTab === 'impressoras' && impressorasDisponiveis.length === 0) {
+      loadAllImpressoras()
+    }
+  }, [activeTab, loadAllImpressoras, impressorasDisponiveis.length])
 
   // Atualizar preços
   const atualizarPrecos = async () => {
@@ -235,19 +341,9 @@ export function AtualizarPrecoLote() {
     showToast.loading('Atualizando preços...')
 
     try {
-      const produtosIds = Array.from(produtosSelecionados)
-      let sucesso = 0
-      let erros = 0
-
-      // Atualizar cada produto sequencialmente
-      for (const produtoId of produtosIds) {
-        const produtoBase = produtos.find((produto) => produto.getId() === produtoId)
-        if (!produtoBase) {
-          erros++
-          continue
-        }
-
-        const valorAtual = produtoBase.getValor()
+      // Calcula novos valores para cada produto
+      const payload = produtosSelecionadosDados.map((produto) => {
+        const valorAtual = produto.getValor()
         const directionSign = adjustDirection === 'increase' ? 1 : -1
         let novoValor =
           adjustMode === 'valor'
@@ -256,53 +352,298 @@ export function AtualizarPrecoLote() {
         novoValor = Number(novoValor.toFixed(2))
 
         if (novoValor <= 0) {
-          erros++
-          continue
+          throw new Error(`Valor calculado inválido para produto ${produto.getNome()}`)
         }
 
-        try {
-          const response = await fetch(`/api/produtos/${produtoId}`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ valor: novoValor }),
-          })
-
-          if (!response.ok) {
-            throw new Error(`Erro ${response.status}`)
-          }
-
-          sucesso++
-        } catch (error) {
-          console.error(`Erro ao atualizar produto ${produtoId}:`, error)
-          erros++
+        return {
+          produtoId: produto.getId(),
+          valor: novoValor,
         }
+      })
+
+      // Chama API de bulk-update
+      const response = await fetch('/api/produtos/bulk-update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `Erro ${response.status}`)
       }
 
-      // showToast.dismiss(toastId)
+      // Delay de 800ms após sucesso
+      await new Promise((resolve) => setTimeout(resolve, 800))
 
-      if (erros === 0) {
-        showToast.success(`Preços atualizados com sucesso! (${sucesso} produtos)`)
-        setProdutosSelecionados(new Set())
-        setAdjustAmount('')
-        buscarProdutos() // Recarregar lista
-      } else {
-        showToast.warning(
-          `Atualizados: ${sucesso} | Erros: ${erros}`
-        )
-      }
+      // Recarrega lista
+      await buscarProdutos()
+
+      // Delay de 500ms
+      await new Promise((resolve) => setTimeout(resolve, 500))
+
+      showToast.success(`Preços atualizados com sucesso! (${payload.length} produtos)`)
+      setProdutosSelecionados(new Set())
+      setAdjustAmount('')
     } catch (error: any) {
-      // showToast.dismiss(toastId)
       console.error('Erro ao atualizar preços', error)
+      showToast.error(error.message || 'Erro ao atualizar preços')
     } finally {
       setIsUpdating(false)
     }
   }
 
+  // Funções de impressoras
+  const adicionarImpressoras = async () => {
+    if (produtosSelecionados.size === 0) {
+      showToast.error('Selecione pelo menos um produto')
+      return
+    }
+
+    if (impressorasSelecionadas.size === 0) {
+      showToast.error('Selecione pelo menos uma impressora')
+      return
+    }
+
+    const token = auth?.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado')
+      return
+    }
+
+    setIsUpdating(true)
+    showToast.loading('Vinculando impressoras...')
+
+    try {
+      const impressorasIdsArray = Array.from(impressorasSelecionadas)
+      const payload = Array.from(produtosSelecionados).map((produtoId) => {
+        const produto = produtos.find((p) => p.getId() === produtoId)
+        const impressorasExistentes = produto?.getImpressoras().map((i) => i.id) || []
+        const impressorasCombinadas = [...new Set([...impressorasExistentes, ...impressorasIdsArray])]
+
+        return {
+          produtoId,
+          impressorasIds: impressorasCombinadas,
+        }
+      })
+
+      const response = await fetch('/api/produtos/bulk-update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `Erro ${response.status}`)
+      }
+
+      await buscarProdutos()
+      showToast.success(`Impressoras vinculadas com sucesso!`)
+      setImpressorasSelecionadas(new Set())
+      setProdutosSelecionados(new Set())
+    } catch (error: any) {
+      console.error('Erro ao vincular impressoras', error)
+      showToast.error(error.message || 'Erro ao vincular impressoras')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const removerImpressoras = async () => {
+    if (produtosSelecionados.size === 0) {
+      showToast.error('Selecione pelo menos um produto')
+      return
+    }
+
+    if (impressorasSelecionadas.size === 0) {
+      showToast.error('Selecione pelo menos uma impressora')
+      return
+    }
+
+    const token = auth?.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado')
+      return
+    }
+
+    setIsUpdating(true)
+    showToast.loading('Desvinculando impressoras...')
+
+    try {
+      const impressorasIdsArray = Array.from(impressorasSelecionadas)
+      const payload = Array.from(produtosSelecionados).map((produtoId) => ({
+        produtoId,
+        impressorasIdsToRemove: impressorasIdsArray,
+      }))
+
+      const response = await fetch('/api/produtos/bulk-update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `Erro ${response.status}`)
+      }
+
+      await buscarProdutos()
+      showToast.success(`Impressoras desvinculadas com sucesso!`)
+      setImpressorasSelecionadas(new Set())
+      setProdutosSelecionados(new Set())
+    } catch (error: any) {
+      console.error('Erro ao desvincular impressoras', error)
+      showToast.error(error.message || 'Erro ao desvincular impressoras')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const atualizarImpressoras = () => {
+    if (modoImpressora === 'adicionar') {
+      adicionarImpressoras()
+    } else {
+      removerImpressoras()
+    }
+  }
+
+  // Funções de grupos complementos
+  const vincularGruposComplementos = async () => {
+    if (produtosSelecionados.size === 0) {
+      showToast.error('Selecione pelo menos um produto')
+      return
+    }
+
+    if (gruposComplementosSelecionados.size === 0) {
+      showToast.error('Selecione pelo menos um grupo de complementos')
+      return
+    }
+
+    const token = auth?.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado')
+      return
+    }
+
+    setIsUpdating(true)
+    showToast.loading('Vinculando grupos de complementos...')
+
+    try {
+      const gruposIdsArray = Array.from(gruposComplementosSelecionados)
+      const payload = Array.from(produtosSelecionados).map((produtoId) => {
+        const produto = produtos.find((p) => p.getId() === produtoId)
+        const gruposExistentes = produto?.getGruposComplementos().map((g) => g.id) || []
+        const gruposCombinados = [...new Set([...gruposExistentes, ...gruposIdsArray])]
+
+        return {
+          produtoId,
+          gruposComplementosIds: gruposCombinados,
+        }
+      })
+
+      const response = await fetch('/api/produtos/bulk-update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `Erro ${response.status}`)
+      }
+
+      await buscarProdutos()
+      showToast.success(`Grupos de complementos vinculados com sucesso!`)
+      setGruposComplementosSelecionados(new Set())
+      setProdutosSelecionados(new Set())
+    } catch (error: any) {
+      console.error('Erro ao vincular grupos de complementos', error)
+      showToast.error(error.message || 'Erro ao vincular grupos de complementos')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const desvincularGruposComplementos = async () => {
+    if (produtosSelecionados.size === 0) {
+      showToast.error('Selecione pelo menos um produto')
+      return
+    }
+
+    if (gruposComplementosSelecionados.size === 0) {
+      showToast.error('Selecione pelo menos um grupo de complementos')
+      return
+    }
+
+    const token = auth?.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado')
+      return
+    }
+
+    setIsUpdating(true)
+    showToast.loading('Desvinculando grupos de complementos...')
+
+    try {
+      const gruposIdsArray = Array.from(gruposComplementosSelecionados)
+      const payload = Array.from(produtosSelecionados).map((produtoId) => ({
+        produtoId,
+        gruposComplementosIdsToRemove: gruposIdsArray,
+      }))
+
+      const response = await fetch('/api/produtos/bulk-update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `Erro ${response.status}`)
+      }
+
+      await buscarProdutos()
+      showToast.success(`Grupos de complementos desvinculados com sucesso!`)
+      setGruposComplementosSelecionados(new Set())
+      setProdutosSelecionados(new Set())
+    } catch (error: any) {
+      console.error('Erro ao desvincular grupos de complementos', error)
+      showToast.error(error.message || 'Erro ao desvincular grupos de complementos')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const atualizarGruposComplementos = () => {
+    if (modoGrupoComplemento === 'adicionar') {
+      vincularGruposComplementos()
+    } else {
+      desvincularGruposComplementos()
+    }
+  }
+
   const todosSelecionados = produtos.length > 0 && produtosSelecionados.size === produtos.length
   const algunsSelecionados = produtosSelecionados.size > 0 && produtosSelecionados.size < produtos.length
+  const todasImpressorasSelecionadas = impressorasDisponiveis.length > 0 && impressorasSelecionadas.size === impressorasDisponiveis.length
+  const algumasImpressorasSelecionadas = impressorasSelecionadas.size > 0 && impressorasSelecionadas.size < impressorasDisponiveis.length
+  const todosGruposComplementosSelecionados = gruposComplementos.length > 0 && gruposComplementosSelecionados.size === gruposComplementos.length
+  const algunsGruposComplementosSelecionados = gruposComplementosSelecionados.size > 0 && gruposComplementosSelecionados.size < gruposComplementos.length
 
   const handleClearFilters = useCallback(() => {
     setSearchText('')
@@ -316,133 +657,400 @@ export function AtualizarPrecoLote() {
   return (
     <div className="flex flex-col h-full bg-info">
       {/* Header */}
-      <div className="flex items-center justify-between bg-primary-bg border-b border-primary/70 md:px-6 px-1 py-2 md:gap-4 gap-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="md:text-2xl text-sm font-bold text-primary">Atualizar Preços em Lote</h1>
-            <p className="md:text-sm text-xs text-secondary-text">
-              Total de itens: {total} | Selecionados: {produtosSelecionados.size}
+      <div className="flex flex-col bg-primary-bg border-b border-primary/70">
+        <div className="flex items-center justify-between md:px-6 px-1 py-2 md:gap-4 gap-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="md:text-2xl text-sm font-bold text-primary">
+                {activeTab === 'precos' && 'Atualizar Preços em Lote'}
+                {activeTab === 'impressoras' && 'Vincular Impressoras'}
+                {activeTab === 'gruposComplementos' && 'Vincular Grupos de Complementos'}
+              </h1>
+              <p className="md:text-sm text-xs text-secondary-text">
+                Total de itens: {total} | Selecionados: {produtosSelecionados.size}
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/produtos"
+            className="h-8 px-8 rounded-lg bg-info text-primary font-semibold font-exo text-sm border border-primary shadow-sm hover:bg-primary/20 transition-colors flex items-center"
+          >
+            Cancelar
+          </Link>
+        </div>
+        {/* Tabs */}
+        <div className="flex border-t border-primary/30">
+          <button
+            type="button"
+            onClick={() => setActiveTab('precos')}
+            className={`flex-1 px-4 py-2 text-sm font-semibold transition-colors ${
+              activeTab === 'precos'
+                ? 'bg-primary text-info border-b-2 border-primary'
+                : 'bg-primary-bg text-secondary-text hover:bg-primary/10'
+            }`}
+          >
+            Preços
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('impressoras')}
+            className={`flex-1 px-4 py-2 text-sm font-semibold transition-colors ${
+              activeTab === 'impressoras'
+                ? 'bg-primary text-info border-b-2 border-primary'
+                : 'bg-primary-bg text-secondary-text hover:bg-primary/10'
+            }`}
+          >
+            Impressoras
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('gruposComplementos')}
+            className={`flex-1 px-4 py-2 text-sm font-semibold transition-colors ${
+              activeTab === 'gruposComplementos'
+                ? 'bg-primary text-info border-b-2 border-primary'
+                : 'bg-primary-bg text-secondary-text hover:bg-primary/10'
+            }`}
+          >
+            Grupos Complementos
+          </button>
+        </div>
+      </div>
+
+      {/* Controles por Tab */}
+      {activeTab === 'precos' && (
+        <div className="bg-primary-bg border-b border-primary/70 md:px-6 px-1 py-2">
+          <div className="flex flex-wrap md:gap-4 gap-1 items-end">
+            <div className="w-full sm:w-[150px]">
+              <label className="block text-xs font-semibold text-secondary-text mb-1">
+                Tipo de ajuste
+              </label>
+              <select
+                value={adjustMode}
+                onChange={(e) => setAdjustMode(e.target.value as 'valor' | 'percentual')}
+                className="w-full h-8 px-4 rounded-lg border border-primary/70 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
+              >
+                <option value="valor">Valor (R$)</option>
+                <option value="percentual">Porcent. (%)</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <label className="flex items-center gap-1 text-sm font-semibold text-primary-text">
+                <Checkbox
+                  checked={adjustDirection === 'increase'}
+                  onChange={() => setAdjustDirection('increase')}
+                  sx={{
+                    color: 'var(--color-primary)',
+                    '&.Mui-checked': {
+                      color: 'var(--color-primary)',
+                    },
+                  }}
+                />
+                ( + )
+              </label>
+              <label className="flex items-center gap-1 text-sm font-semibold text-primary-text">
+                <Checkbox
+                  checked={adjustDirection === 'decrease'}
+                  onChange={() => setAdjustDirection('decrease')}
+                  sx={{
+                    color: 'var(--color-primary)',
+                    '&.Mui-checked': {
+                      color: 'var(--color-primary)',
+                    },
+                  }}
+                />
+                ( - )
+              </label>
+            </div>
+
+            <div className="flex-1 flex flex-row justify-between items-end gap-2 w-full md:max-w-[350px]">
+              <div className="flex flex-col gap-1 w-full">
+                <label className="block text-xs font-semibold text-secondary-text">
+                  {adjustDirection === 'increase' ? 'Aumentar' : 'Diminuir'} (
+                  {adjustMode === 'valor' ? 'R$' : '%'})
+                </label>
+                <Input
+                  className="rounded-lg"
+                  type="text"
+                  value={adjustAmount}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^\d,.-]/g, '')
+                    setAdjustAmount(value)
+                  }}
+                  placeholder={adjustMode === 'valor' ? '0,00' : '0'}
+                  InputProps={{
+                    sx: {
+                      border: '1px solid',
+                      borderColor: 'var(--color-primary)',
+                      backgroundColor: 'var(--color-info)',
+                      height: 32,
+                      '&.Mui-focused': {
+                        borderColor: 'var(--color-primary)',
+                        borderWidth: '1px',
+                      },
+                      '&:hover': {
+                        borderColor: 'var(--color-primary)',
+                      },
+                      '& input': {
+                        padding: '6px 10px',
+                        fontSize: '0.875rem',
+                      },
+                      '& fieldset': {
+                        border: 'none',
+                      },
+                    },
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="w-full h-8 rounded-lg flex gap-2 items-end">
+              <Button
+                onClick={atualizarPrecos}
+                disabled={
+                  isUpdating || produtosSelecionados.size === 0 || !adjustAmount.trim()
+                }
+                className="md:min-w-[180px] h-8 hover:bg-primary/90"
+                sx={{
+                  color: 'var(--color-info)',
+                  backgroundColor: 'var(--color-primary)',
+                }}
+              >
+                {isUpdating
+                  ? 'Aplicando ajuste...'
+                  : `Aplicar ajuste (${produtosSelecionados.size})`}
+              </Button>
+            </div>
+          </div>
+          {produtosSelecionados.size > 0 && (
+            <p className="text-xs text-secondary-text mt-2">
+              O ajuste será aplicado aos {produtosSelecionados.size} produto(s) selecionado(s).
             </p>
-          </div>
+          )}
         </div>
-        <Link
-          href="/produtos"
-          className="h-8 px-8 rounded-lg bg-info text-primary font-semibold font-exo text-sm border border-primary shadow-sm hover:bg-primary/20 transition-colors flex items-center"
-        >
-          Cancelar
-        </Link>
-      </div>
+      )}
 
-      <div className="bg-primary-bg border-b border-primary/70 md:px-6 px-1 py-2">
-        <div className="flex flex-wrap md:gap-4 gap-1 items-end">
-          <div className="w-full sm:w-[150px]">
-            <label className="block text-xs font-semibold text-secondary-text mb-1">
-              Tipo de ajuste
-            </label>
-            <select
-              value={adjustMode}
-              onChange={(e) => setAdjustMode(e.target.value as 'valor' | 'percentual')}
-              className="w-full h-8 px-4 rounded-lg border border-primary/70 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
-            >
-              <option value="valor">Valor (R$)</option>
-              <option value="percentual">Porcent. (%)</option>
-            </select>
-          </div>
+      {activeTab === 'impressoras' && (
+        <div className="bg-primary-bg border-b border-primary/70 md:px-6 px-1 py-2">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-semibold text-primary-text">
+                  Modo:
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setModoImpressora('adicionar')}
+                  className={`px-4 py-1 rounded-lg text-sm font-semibold transition-colors ${
+                    modoImpressora === 'adicionar'
+                      ? 'bg-primary text-info'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  Vincular
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModoImpressora('remover')}
+                  className={`px-4 py-1 rounded-lg text-sm font-semibold transition-colors ${
+                    modoImpressora === 'remover'
+                      ? 'bg-primary text-info'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  Desvincular
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-secondary-text">
+                  {impressorasSelecionadas.size} selecionada(s)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (todasImpressorasSelecionadas) {
+                      setImpressorasSelecionadas(new Set())
+                    } else {
+                      setImpressorasSelecionadas(new Set(impressorasDisponiveis.map((i) => i.getId())))
+                    }
+                  }}
+                  className="px-3 py-1 rounded-lg text-xs font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+                >
+                  {todasImpressorasSelecionadas ? 'Desmarcar todas' : 'Selecionar todas'}
+                </button>
+              </div>
+            </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <label className="flex items-center gap-1 text-sm font-semibold text-primary-text">
-              <Checkbox
-                checked={adjustDirection === 'increase'}
-                onChange={() => setAdjustDirection('increase')}
+            {isLoadingImpressoras ? (
+              <div className="py-4 text-center text-sm text-secondary-text">
+                Carregando impressoras...
+              </div>
+            ) : impressorasDisponiveis.length === 0 ? (
+              <div className="py-4 text-center text-sm text-secondary-text">
+                Nenhuma impressora disponível
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 max-h-48 overflow-y-auto">
+                {impressorasDisponiveis.map((impressora) => {
+                  const isSelected = impressorasSelecionadas.has(impressora.getId())
+                  return (
+                    <label
+                      key={impressora.getId()}
+                      className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
+                        isSelected
+                          ? 'bg-primary/20 border-primary'
+                          : 'bg-white border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <Checkbox
+                        checked={isSelected}
+                        onChange={() => toggleImpressora(impressora.getId())}
+                        className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                      />
+                      <span className="text-xs font-medium text-primary-text flex-1">
+                        {impressora.getNome()}
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Button
+                onClick={atualizarImpressoras}
+                disabled={
+                  isUpdating ||
+                  produtosSelecionados.size === 0 ||
+                  impressorasSelecionadas.size === 0
+                }
+                className="md:min-w-[200px] h-8 hover:bg-primary/90"
                 sx={{
-                  color: 'var(--color-primary)',
-                  '&.Mui-checked': {
-                    color: 'var(--color-primary)',
-                  },
+                  color: 'var(--color-info)',
+                  backgroundColor: 'var(--color-primary)',
                 }}
-              />
-              ( + )
-            </label>
-            <label className="flex items-center gap-1 text-sm font-semibold text-primary-text">
-              <Checkbox
-                checked={adjustDirection === 'decrease'}
-                onChange={() => setAdjustDirection('decrease')}
+              >
+                {isUpdating
+                  ? 'Processando...'
+                  : modoImpressora === 'adicionar'
+                    ? `Vincular a ${produtosSelecionados.size} produto(s)`
+                    : `Desvincular de ${produtosSelecionados.size} produto(s)`}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'gruposComplementos' && (
+        <div className="bg-primary-bg border-b border-primary/70 md:px-6 px-1 py-2">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-semibold text-primary-text">
+                  Modo:
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setModoGrupoComplemento('adicionar')}
+                  className={`px-4 py-1 rounded-lg text-sm font-semibold transition-colors ${
+                    modoGrupoComplemento === 'adicionar'
+                      ? 'bg-primary text-info'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  Vincular
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModoGrupoComplemento('remover')}
+                  className={`px-4 py-1 rounded-lg text-sm font-semibold transition-colors ${
+                    modoGrupoComplemento === 'remover'
+                      ? 'bg-primary text-info'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  Desvincular
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-secondary-text">
+                  {gruposComplementosSelecionados.size} selecionado(s)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (todosGruposComplementosSelecionados) {
+                      setGruposComplementosSelecionados(new Set())
+                    } else {
+                      setGruposComplementosSelecionados(new Set(gruposComplementos.map((g) => g.getId())))
+                    }
+                  }}
+                  className="px-3 py-1 rounded-lg text-xs font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+                >
+                  {todosGruposComplementosSelecionados ? 'Desmarcar todos' : 'Selecionar todos'}
+                </button>
+              </div>
+            </div>
+
+            {isLoadingGruposComplementos ? (
+              <div className="py-4 text-center text-sm text-secondary-text">
+                Carregando grupos de complementos...
+              </div>
+            ) : gruposComplementos.length === 0 ? (
+              <div className="py-4 text-center text-sm text-secondary-text">
+                Nenhum grupo de complementos disponível
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 max-h-48 overflow-y-auto">
+                {gruposComplementos.map((grupo) => {
+                  const isSelected = gruposComplementosSelecionados.has(grupo.getId())
+                  return (
+                    <label
+                      key={grupo.getId()}
+                      className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
+                        isSelected
+                          ? 'bg-primary/20 border-primary'
+                          : 'bg-white border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <Checkbox
+                        checked={isSelected}
+                        onChange={() => toggleGrupoComplemento(grupo.getId())}
+                        className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                      />
+                      <span className="text-xs font-medium text-primary-text flex-1">
+                        {grupo.getNome()}
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Button
+                onClick={atualizarGruposComplementos}
+                disabled={
+                  isUpdating ||
+                  produtosSelecionados.size === 0 ||
+                  gruposComplementosSelecionados.size === 0
+                }
+                className="md:min-w-[200px] h-8 hover:bg-primary/90"
                 sx={{
-                  color: 'var(--color-primary)',
-                  '&.Mui-checked': {
-                    color: 'var(--color-primary)',
-                  },
+                  color: 'var(--color-info)',
+                  backgroundColor: 'var(--color-primary)',
                 }}
-              />
-              ( - )
-            </label>
-          </div>
-
-          <div className="flex-1 flex flex-row justify-between items-end gap-2 w-full md:max-w-[350px]">
-            <div className="flex flex-col gap-1 w-full">
-            <label className="block text-xs font-semibold text-secondary-text">
-              {adjustDirection === 'increase' ? 'Aumentar' : 'Diminuir'} (
-              {adjustMode === 'valor' ? 'R$' : '%'})
-            </label>
-            <Input className="rounded-lg"
-              type="text"
-              value={adjustAmount}
-              onChange={(e) => {
-                const value = e.target.value.replace(/[^\d,.-]/g, '')
-                setAdjustAmount(value)
-              }}
-              placeholder={adjustMode === 'valor' ? '0,00' : '0'}
-              InputProps={{
-                sx: {
-                  border: '1px solid',
-                  borderColor: 'var(--color-primary)',
-                  backgroundColor: 'var(--color-info)',
-                  height: 32,
-                  '&.Mui-focused': {
-                    borderColor: 'var(--color-primary)',
-                    borderWidth: '1px',
-                  },
-                  '&:hover': {
-                    borderColor: 'var(--color-primary)',
-                  },
-                  '& input': {
-                    padding: '6px 10px',
-                    fontSize: '0.875rem',
-                  },
-                  '& fieldset': {
-                    border: 'none',
-                  },
-                },
-              }}
-            />
-          </div>
-
-          <div className="w-full h-8 rounded-lg flex gap-2 items-end">
-            <Button
-              onClick={atualizarPrecos}
-              disabled={
-                isUpdating || produtosSelecionados.size === 0 || !adjustAmount.trim()
-              }
-              className="md:min-w-[180px] h-8 hover:bg-primary/90"
-              sx={{
-                color: 'var(--color-info)',
-                backgroundColor: 'var(--color-primary)',
-              }}
-            >
-              {isUpdating
-                ? 'Aplicando ajuste...'
-                : `Aplicar ajuste (${produtosSelecionados.size})`}
-            </Button>
+              >
+                {isUpdating
+                  ? 'Processando...'
+                  : modoGrupoComplemento === 'adicionar'
+                    ? `Vincular a ${produtosSelecionados.size} produto(s)`
+                    : `Desvincular de ${produtosSelecionados.size} produto(s)`}
+              </Button>
+            </div>
           </div>
         </div>
-
-        </div>
-        {produtosSelecionados.size > 0 && (
-          <p className="text-xs text-secondary-text mt-2">
-            O ajuste será aplicado aos {produtosSelecionados.size} produto(s) selecionado(s).
-          </p>
-        )}
-      </div>
+      )}
 
       <div className="h-[4px] border-t-2 border-primary/70"></div>
       <div className="bg-white md:px-[20px] py-2 border-b border-gray-100">
@@ -608,9 +1216,8 @@ export function AtualizarPrecoLote() {
               </div>
               <div className="flex-1 md:w-14 text-xs">Código</div>
               <div className="flex-[1.5] text-xs">Nome</div>
-              <div className="flex-[1.4] text-center hidden md:flex">Grupo de produtos</div>
+              <div className="flex-[1.2] text-center hidden md:flex">Impressoras</div>
               <div className="flex-[1.2] text-center hidden md:flex">Grupo de complementos</div>
-              <div className="flex-1 text-center hidden md:flex">Status</div>
               <div className="flex-1 text-right text-xs">Valor atual</div>
             </div>
 
@@ -620,12 +1227,15 @@ export function AtualizarPrecoLote() {
                 .sort((a, b) => a.getNome().localeCompare(b.getNome(), 'pt-BR'))
                 .map((produto, index) => {
                 const isSelected = produtosSelecionados.has(produto.getId())
+                const isExpanded = produtosExpandidos.has(produto.getId())
                 const gruposComplementos = produto.getGruposComplementos()
+                const impressoras = produto.getImpressoras()
                 const gruposLabels = gruposComplementos.map((grupo) => {
                   const nomeGrupo = grupo.nome || 'Grupo sem nome'
                   const qtdComplementos = grupo.complementos?.length ?? 0
                   return `${nomeGrupo} (${qtdComplementos} complemento${qtdComplementos === 1 ? '' : 's'})`
                 })
+                const impressorasLabels = impressoras.map((imp) => imp.nome)
                 // Cor de fundo alternada: se selecionado usa primary/20, senão alterna entre gray-50 e white
                 const bgColor = isSelected 
                   ? 'bg-primary/20' 
@@ -633,64 +1243,161 @@ export function AtualizarPrecoLote() {
                     ? 'bg-gray-50' 
                     : 'bg-white'
                 return (
-                  <div
-                    key={produto.getId()}
-                    className={`flex rounded-lg items-center md:px-4 gap-2 ${bgColor} hover:bg-primary-bg transition-colors cursor-default`}
-                    style={{ minHeight: '36px' }}
-                  >
-                    <div className="flex-none md:w-10 w-6 flex justify-center">
-                      <Checkbox
-                        checked={isSelected}
-                        onChange={(checked) => {
-                          if (checked !== undefined) {
-                            toggleSelecao(produto.getId())
-                          }
-                        }}
-                        className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                      />
-                    </div>
-                    <div className="flex-1 md:w-24 font-mono text-xs text-secondary-text">
-                      {produto.getCodigoProduto() || '-'}
-                    </div>
-                    <div className="md:flex-[1.5] flex-[2] md:text-sm text-xs font-semibold text-primary-text break-words md:pr-4">
-                      {produto.getNome()}
-                    </div>
-                    <div className="flex-[1.4] text-center text-xs text-primary-text hidden md:flex">
-                      {produto.getNomeGrupo() || 'Sem grupo'}
-                    </div>
-                    <div className="flex-[1.2] justify-center hidden md:flex">
-                      {gruposLabels.length === 0 ? (
-                        <span className="text-xs text-secondary-text">Nenhum</span>
-                      ) : (
-                        <select
-                          className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary"
-                          defaultValue=""
-                          onChange={(event) => {
-                            event.currentTarget.value = ''
+                  <div key={produto.getId()}>
+                    {/* Desktop: Linha completa */}
+                    <div
+                      className={`hidden md:flex rounded-lg items-center md:px-4 gap-2 ${bgColor} hover:bg-primary-bg transition-colors cursor-default`}
+                      style={{ minHeight: '36px' }}
+                    >
+                      <div className="flex-none md:w-10 w-6 flex justify-center">
+                        <Checkbox
+                          checked={isSelected}
+                          onChange={(checked) => {
+                            if (checked !== undefined) {
+                              toggleSelecao(produto.getId())
+                            }
                           }}
-                        >
-                          <option value="" disabled>
-                            {gruposLabels.length} grupo(s)
-                          </option>
-                          {gruposLabels.map((label, index) => (
-                            <option key={`${produto.getId()}-grupo-${index}`} value={label}>
-                              {label}
+                          className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                        />
+                      </div>
+                      <div className="flex-1 md:w-24 font-mono text-xs text-secondary-text">
+                        {produto.getCodigoProduto() || '-'}
+                      </div>
+                      <div className="md:flex-[1.5] flex-[2] md:text-sm text-xs font-semibold text-primary-text break-words md:pr-4">
+                        {produto.getNome()}
+                      </div>
+                      <div className="flex-[1.2] justify-center hidden md:flex">
+                        {impressorasLabels.length === 0 ? (
+                          <span className="text-xs text-secondary-text">Nenhuma</span>
+                        ) : (
+                          <select
+                            className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary"
+                            defaultValue=""
+                            onChange={(event) => {
+                              event.currentTarget.value = ''
+                            }}
+                          >
+                            <option value="" disabled>
+                              {impressorasLabels.length} impressora(s)
                             </option>
-                          ))}
-                        </select>
+                            {impressorasLabels.map((label, idx) => (
+                              <option key={`${produto.getId()}-imp-${idx}`} value={label}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                      <div className="flex-[1.2] justify-center hidden md:flex">
+                        {gruposLabels.length === 0 ? (
+                          <span className="text-xs text-secondary-text">Nenhum</span>
+                        ) : (
+                          <select
+                            className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary"
+                            defaultValue=""
+                            onChange={(event) => {
+                              event.currentTarget.value = ''
+                            }}
+                          >
+                            <option value="" disabled>
+                              {gruposLabels.length} grupo(s)
+                            </option>
+                            {gruposLabels.map((label, idx) => (
+                              <option key={`${produto.getId()}-grupo-${idx}`} value={label}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                      <div className="flex-1 text-right font-semibold md:text-sm text-xs text-primary-text">
+                        {transformarParaReal(produto.getValor())}
+                      </div>
+                    </div>
+
+                    {/* Mobile: Card compacto com expansão */}
+                    <div className={`md:hidden rounded-lg ${bgColor} border border-gray-200`}>
+                      <div className="flex items-center gap-2 p-2">
+                        <Checkbox
+                          checked={isSelected}
+                          onChange={(checked) => {
+                            if (checked !== undefined) {
+                              toggleSelecao(produto.getId())
+                            }
+                          }}
+                          className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-mono text-xs text-secondary-text">
+                            {produto.getCodigoProduto() || '-'}
+                          </div>
+                          <div className="text-sm font-semibold text-primary-text truncate">
+                            {produto.getNome()}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-semibold text-primary-text">
+                            {transformarParaReal(produto.getValor())}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => toggleExpansao(produto.getId())}
+                            className="mt-1 text-primary"
+                          >
+                            {isExpanded ? <MdExpandLess size={20} /> : <MdExpandMore size={20} />}
+                          </button>
+                        </div>
+                      </div>
+                      {isExpanded && (
+                        <div className="px-2 pb-2 space-y-2 border-t border-gray-200 pt-2">
+                          <div>
+                            <label className="text-xs font-semibold text-secondary-text">Impressoras:</label>
+                            {impressorasLabels.length === 0 ? (
+                              <span className="text-xs text-secondary-text ml-2">Nenhuma</span>
+                            ) : (
+                              <select
+                                className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary mt-1"
+                                defaultValue=""
+                                onChange={(event) => {
+                                  event.currentTarget.value = ''
+                                }}
+                              >
+                                <option value="" disabled>
+                                  {impressorasLabels.length} impressora(s)
+                                </option>
+                                {impressorasLabels.map((label, idx) => (
+                                  <option key={`${produto.getId()}-imp-mob-${idx}`} value={label}>
+                                    {label}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
+                          <div>
+                            <label className="text-xs font-semibold text-secondary-text">Grupos Complementos:</label>
+                            {gruposLabels.length === 0 ? (
+                              <span className="text-xs text-secondary-text ml-2">Nenhum</span>
+                            ) : (
+                              <select
+                                className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary mt-1"
+                                defaultValue=""
+                                onChange={(event) => {
+                                  event.currentTarget.value = ''
+                                }}
+                              >
+                                <option value="" disabled>
+                                  {gruposLabels.length} grupo(s)
+                                </option>
+                                {gruposLabels.map((label, idx) => (
+                                  <option key={`${produto.getId()}-grupo-mob-${idx}`} value={label}>
+                                    {label}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
+                        </div>
                       )}
-                    </div>
-                    <div className="flex-1 justify-center hidden md:flex">
-                      <span
-                        className={`px-4 py-1 rounded-lg text-[11px] font-medium border ${
-                          produto.isAtivo() ? 'border-primary/50 text-success' : ' border-error text-error'
-                        }`}
-                      >
-                        {produto.isAtivo() ? 'Ativo' : 'Desativado'}
-                      </span>
-                    </div>
-                    <div className="flex-1 text-right font-semibold md:text-sm text-xs text-primary-text">
-                      {transformarParaReal(produto.getValor())}
                     </div>
                   </div>
                 )
