@@ -26,8 +26,8 @@
   --cardapio-divider: #333333;
 
   /* Acentos */
-  --cardapio-accent-primary: #DC2626;
-  --cardapio-accent-secondary: #6366F1;
+  --cardapio-accent-primary: #6366F1; /* Índigo - mais padrão para dark */
+  --cardapio-accent-secondary: #8B5CF6; /* Roxo */
   --cardapio-accent-success: #10B981;
   --cardapio-accent-warning: #F59E0B;
   --cardapio-accent-error: #EF4444;
@@ -42,7 +42,7 @@
   --cardapio-menu-bg: #000000;
   --cardapio-menu-item: #1A1A1A;
   --cardapio-menu-item-hover: #2A2A2A;
-  --cardapio-menu-item-active: #DC2626;
+  --cardapio-menu-item-active: #6366F1;
 
   /* Botões */
   --cardapio-btn-primary: #FFFFFF;
@@ -54,7 +54,7 @@
   /* Gradientes */
   --cardapio-gradient-primary: linear-gradient(135deg, #000000 0%, #1A1A1A 100%);
   --cardapio-gradient-secondary: linear-gradient(135deg, #1A1A1A 0%, #2A2A2A 100%);
-  --cardapio-gradient-accent: linear-gradient(135deg, #DC2626 0%, #B91C1C 100%);
+  --cardapio-gradient-accent: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
 }
 
 /* ============================================

@@ -315,8 +315,8 @@ export default function CardapioPage() {
                   `}
                   style={{
                     background: mostrarDestaques
-                      ? `linear-gradient(to right, var(--cardapio-accent-primary) 0%, var(--cardapio-accent-primary) 35%, rgba(220, 38, 38, 0.6) 40%, rgba(220, 38, 38, 0.3) 55%, transparent 80%)`
-                      : `linear-gradient(to right, var(--cardapio-accent-primary) 0%, var(--cardapio-accent-primary) 50%, rgba(220, 38, 38, 0.3) 70%, transparent 90%)`,
+                      ? `linear-gradient(to right, var(--cardapio-accent-primary) 0%, var(--cardapio-accent-primary) 35%, rgba(99, 102, 241, 0.6) 40%, rgba(99, 102, 241, 0.3) 55%, transparent 80%)`
+                      : `linear-gradient(to right, var(--cardapio-accent-primary) 0%, var(--cardapio-accent-primary) 50%, rgba(99, 102, 241, 0.3) 70%, transparent 90%)`,
                   }}
                 >
                   <div className="flex items-center gap-3 relative z-10">
