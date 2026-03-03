@@ -713,14 +713,16 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
 
   const openTabsModal = useCallback(
     (config: Partial<ProdutosTabsModalState>) => {
-      setTabsModalState(() => ({
+      // Sempre atualizar o estado de forma atômica, garantindo que o modal abra corretamente
+      // mesmo se foi fechado recentemente clicando fora
+      setTabsModalState({
         open: true,
         tab: config.tab ?? 'produto',
         mode: config.mode ?? 'create',
         produto: config.produto,
         prefillGrupoProdutoId: config.prefillGrupoProdutoId ?? undefined,
         grupoId: config.grupoId,
-      }))
+      })
 
       // Adicionar um parâmetro na URL para forçar o recarregamento ao fechar
       const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
@@ -731,13 +733,16 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
   )
 
   const closeTabsModal = useCallback(() => {
-    setTabsModalState((prev) => ({
-      ...prev,
+    // Resetar completamente o estado para garantir que o modal esteja realmente fechado
+    // Isso evita problemas quando o usuário tenta abrir novamente logo após fechar
+    setTabsModalState({
       open: false,
+      tab: 'produto',
+      mode: 'create',
       produto: undefined,
       prefillGrupoProdutoId: undefined,
       grupoId: undefined,
-    }))
+    })
 
     // Remover o parâmetro da URL
     const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
