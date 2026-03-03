@@ -29,7 +29,6 @@ export function AtualizarPrecoLote() {
   const [ativoLocalFilter, setAtivoLocalFilter] = useState<'Todos' | 'Sim' | 'Não'>('Todos')
   const [ativoDeliveryFilter, setAtivoDeliveryFilter] = useState<'Todos' | 'Sim' | 'Não'>('Todos')
   const [grupoProdutoFilter, setGrupoProdutoFilter] = useState('')
-  const [grupoComplementoFilter, setGrupoComplementoFilter] = useState('')
   const [adjustMode, setAdjustMode] = useState<'valor' | 'percentual'>('valor')
   const [adjustAmount, setAdjustAmount] = useState('')
   const [adjustDirection, setAdjustDirection] = useState<'increase' | 'decrease'>('increase')
@@ -94,9 +93,6 @@ export function AtualizarPrecoLote() {
         if (grupoProdutoFilter) {
           params.append('grupoProdutoId', grupoProdutoFilter)
         }
-        if (grupoComplementoFilter) {
-          params.append('grupoComplementosId', grupoComplementoFilter)
-        }
 
         const response = await fetch(`/api/produtos?${params.toString()}`, {
           headers: {
@@ -156,7 +152,6 @@ export function AtualizarPrecoLote() {
     ativoLocalFilter,
     ativoDeliveryFilter,
     grupoProdutoFilter,
-    grupoComplementoFilter,
   ])
 
   // Debounce na busca e filtros
@@ -174,7 +169,7 @@ export function AtualizarPrecoLote() {
         clearTimeout(debounceTimerRef.current)
       }
     }
-  }, [searchText, filterStatus, ativoLocalFilter, ativoDeliveryFilter, grupoProdutoFilter, grupoComplementoFilter, buscarProdutos])
+  }, [searchText, filterStatus, ativoLocalFilter, ativoDeliveryFilter, grupoProdutoFilter, buscarProdutos])
 
   // Toggle seleção de produto
   const toggleSelecao = (produtoId: string) => {
@@ -651,406 +646,453 @@ export function AtualizarPrecoLote() {
     setAtivoLocalFilter('Todos')
     setAtivoDeliveryFilter('Todos')
     setGrupoProdutoFilter('')
-    setGrupoComplementoFilter('')
   }, [])
 
   return (
     <div className="flex flex-col h-full bg-info">
       {/* Header */}
-      <div className="flex flex-col bg-primary-bg border-b border-primary/70">
-        <div className="flex items-center justify-between md:px-6 px-1 py-2 md:gap-4 gap-2">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="md:text-2xl text-sm font-bold text-primary">
-                {activeTab === 'precos' && 'Atualizar Preços em Lote'}
-                {activeTab === 'impressoras' && 'Vincular Impressoras'}
-                {activeTab === 'gruposComplementos' && 'Vincular Grupos de Complementos'}
-              </h1>
-              <p className="md:text-sm text-xs text-secondary-text">
-                Total de itens: {total} | Selecionados: {produtosSelecionados.size}
-              </p>
-            </div>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between bg-primary-bg border-b border-primary/70 md:px-6 px-1 py-1 md:gap-4 gap-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="md:text-2xl text-sm font-bold text-primary">
+              {activeTab === 'precos'
+                ? 'Atualizar Preços em Lote'
+                : activeTab === 'impressoras'
+                  ? 'Atualizar Impressoras em Lote'
+                  : 'Atualizar Grupos de Complementos em Lote'}
+            </h1>
+            <p className="md:text-sm text-xs text-secondary-text">
+              Total de itens: {total} | Selecionados: {produtosSelecionados.size}
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-col md:flex-row md:items-center gap-2">
+          {/* Tabs */}
+          <div className="flex flex-row gap-1 bg-info rounded-lg p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('precos')
+                setImpressorasSelecionadas(new Set())
+                setGruposComplementosSelecionados(new Set())
+              }}
+              className={`md:px-4 px-3 py-1 rounded text-sm font-semibold transition-colors ${
+                activeTab === 'precos'
+                  ? 'bg-primary text-info'
+                  : 'text-secondary-text hover:bg-primary/10'
+              }`}
+            >
+              Preços
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('impressoras')
+                setAdjustAmount('')
+                setModoImpressora('adicionar')
+                setImpressorasSelecionadas(new Set())
+              }}
+              className={`md:px-4 px-2 py-1 rounded text-sm font-semibold transition-colors ${
+                activeTab === 'impressoras'
+                  ? 'bg-primary text-info'
+                  : 'text-secondary-text hover:bg-primary/10'
+              }`}
+            >
+              Impressoras
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('gruposComplementos')
+                setAdjustAmount('')
+                setModoGrupoComplemento('adicionar')
+                setGruposComplementosSelecionados(new Set())
+              }}
+              className={`md:px-4 px-1 py-1 rounded text-sm font-semibold transition-colors ${
+                activeTab === 'gruposComplementos'
+                  ? 'bg-primary text-info'
+                  : 'text-secondary-text hover:bg-primary/10'
+              }`}
+            >
+              Grupos Complementos
+            </button>
           </div>
           <Link
             href="/produtos"
-            className="h-8 px-8 rounded-lg bg-info text-primary font-semibold font-exo text-sm border border-primary shadow-sm hover:bg-primary/20 transition-colors flex items-center"
+            className="h-8 px-8 rounded-lg bg-info text-primary justify-center font-semibold font-exo text-sm border border-primary shadow-sm hover:bg-primary/20 transition-colors flex items-center"
           >
             Cancelar
           </Link>
         </div>
-        {/* Tabs */}
-        <div className="flex border-t border-primary/30">
-          <button
-            type="button"
-            onClick={() => setActiveTab('precos')}
-            className={`flex-1 px-4 py-2 text-sm font-semibold transition-colors ${
-              activeTab === 'precos'
-                ? 'bg-primary text-info border-b-2 border-primary'
-                : 'bg-primary-bg text-secondary-text hover:bg-primary/10'
-            }`}
-          >
-            Preços
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('impressoras')}
-            className={`flex-1 px-4 py-2 text-sm font-semibold transition-colors ${
-              activeTab === 'impressoras'
-                ? 'bg-primary text-info border-b-2 border-primary'
-                : 'bg-primary-bg text-secondary-text hover:bg-primary/10'
-            }`}
-          >
-            Impressoras
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('gruposComplementos')}
-            className={`flex-1 px-4 py-2 text-sm font-semibold transition-colors ${
-              activeTab === 'gruposComplementos'
-                ? 'bg-primary text-info border-b-2 border-primary'
-                : 'bg-primary-bg text-secondary-text hover:bg-primary/10'
-            }`}
-          >
-            Grupos Complementos
-          </button>
-        </div>
       </div>
 
-      {/* Controles por Tab */}
-      {activeTab === 'precos' && (
-        <div className="bg-primary-bg border-b border-primary/70 md:px-6 px-1 py-2">
-          <div className="flex flex-wrap md:gap-4 gap-1 items-end">
-            <div className="w-full sm:w-[150px]">
-              <label className="block text-xs font-semibold text-secondary-text mb-1">
-                Tipo de ajuste
-              </label>
-              <select
-                value={adjustMode}
-                onChange={(e) => setAdjustMode(e.target.value as 'valor' | 'percentual')}
-                className="w-full h-8 px-4 rounded-lg border border-primary/70 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
-              >
-                <option value="valor">Valor (R$)</option>
-                <option value="percentual">Porcent. (%)</option>
-              </select>
-            </div>
+      <div className="bg-primary-bg border-b border-primary/70 md:px-6 px-1 py-2">
+        {activeTab === 'precos' ? (
+          <>
+            <div className="flex flex-wrap md:gap-4 gap-1 items-end">
+              <div className="w-full sm:w-[150px]">
+                <label className="block text-xs font-semibold text-secondary-text mb-1">
+                  Tipo de ajuste
+                </label>
+                <select
+                  value={adjustMode}
+                  onChange={(e) => setAdjustMode(e.target.value as 'valor' | 'percentual')}
+                  className="w-full h-8 px-4 rounded-lg border border-primary/70 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
+                >
+                  <option value="valor">Valor (R$)</option>
+                  <option value="percentual">Porcent. (%)</option>
+                </select>
+              </div>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <label className="flex items-center gap-1 text-sm font-semibold text-primary-text">
-                <Checkbox
-                  checked={adjustDirection === 'increase'}
-                  onChange={() => setAdjustDirection('increase')}
-                  sx={{
-                    color: 'var(--color-primary)',
-                    '&.Mui-checked': {
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <label className="flex items-center gap-1 text-sm font-semibold text-primary-text">
+                  <Checkbox
+                    checked={adjustDirection === 'increase'}
+                    onChange={() => setAdjustDirection('increase')}
+                    sx={{
                       color: 'var(--color-primary)',
-                    },
-                  }}
-                />
-                ( + )
-              </label>
-              <label className="flex items-center gap-1 text-sm font-semibold text-primary-text">
-                <Checkbox
-                  checked={adjustDirection === 'decrease'}
-                  onChange={() => setAdjustDirection('decrease')}
-                  sx={{
-                    color: 'var(--color-primary)',
-                    '&.Mui-checked': {
+                      '&.Mui-checked': {
+                        color: 'var(--color-primary)',
+                      },
+                    }}
+                  />
+                  ( + )
+                </label>
+                <label className="flex items-center gap-1 text-sm font-semibold text-primary-text">
+                  <Checkbox
+                    checked={adjustDirection === 'decrease'}
+                    onChange={() => setAdjustDirection('decrease')}
+                    sx={{
                       color: 'var(--color-primary)',
-                    },
-                  }}
-                />
-                ( - )
-              </label>
-            </div>
+                      '&.Mui-checked': {
+                        color: 'var(--color-primary)',
+                      },
+                    }}
+                  />
+                  ( - )
+                </label>
+              </div>
 
-            <div className="flex-1 flex flex-row justify-between items-end gap-2 w-full md:max-w-[350px]">
-              <div className="flex flex-col gap-1 w-full">
+              <div className="flex-1 flex flex-row justify-between items-end gap-2 w-full md:max-w-[350px]">
+                <div className="flex flex-col gap-1 w-full">
+                  <label className="block text-xs font-semibold text-secondary-text">
+                    {adjustDirection === 'increase' ? 'Aumentar' : 'Diminuir'} (
+                    {adjustMode === 'valor' ? 'R$' : '%'})
+                  </label>
+                  <Input
+                    className="rounded-lg"
+                    type="text"
+                    value={adjustAmount}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^\d,.-]/g, '')
+                      setAdjustAmount(value)
+                    }}
+                    placeholder={adjustMode === 'valor' ? '0,00' : '0'}
+                    InputProps={{
+                      sx: {
+                        border: '1px solid',
+                        borderColor: 'var(--color-primary)',
+                        backgroundColor: 'var(--color-info)',
+                        height: 32,
+                        '&.Mui-focused': {
+                          borderColor: 'var(--color-primary)',
+                          borderWidth: '1px',
+                        },
+                        '&:hover': {
+                          borderColor: 'var(--color-primary)',
+                        },
+                        '& input': {
+                          padding: '6px 10px',
+                          fontSize: '0.875rem',
+                        },
+                        '& fieldset': {
+                          border: 'none',
+                        },
+                      },
+                    }}
+                  />
+                </div>
+
+                <div className="w-full h-8 rounded-lg flex gap-2 items-end">
+                  <Button
+                    onClick={atualizarPrecos}
+                    disabled={
+                      isUpdating || produtosSelecionados.size === 0 || !adjustAmount.trim()
+                    }
+                    className="md:min-w-[180px] h-8 hover:bg-primary/90"
+                    sx={{
+                      color: 'var(--color-info)',
+                      backgroundColor: 'var(--color-primary)',
+                    }}
+                  >
+                    {isUpdating
+                      ? 'Aplicando ajuste...'
+                      : `Aplicar ajuste (${produtosSelecionados.size})`}
+                  </Button>
+                </div>
+              </div>
+            </div>
+            {produtosSelecionados.size > 0 && (
+              <p className="text-xs text-secondary-text mt-2">
+                O ajuste será aplicado aos {produtosSelecionados.size} produto(s) selecionado(s).
+              </p>
+            )}
+          </>
+        ) : activeTab === 'impressoras' ? (
+          <>
+            <div className="flex flex-col gap-1">
+              {/* Modo de operação: Adicionar ou Remover */}
+              <div className="flex items-center gap-2">
                 <label className="block text-xs font-semibold text-secondary-text">
-                  {adjustDirection === 'increase' ? 'Aumentar' : 'Diminuir'} (
-                  {adjustMode === 'valor' ? 'R$' : '%'})
+                  Modo de operação:
                 </label>
-                <Input
-                  className="rounded-lg"
-                  type="text"
-                  value={adjustAmount}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/[^\d,.-]/g, '')
-                    setAdjustAmount(value)
-                  }}
-                  placeholder={adjustMode === 'valor' ? '0,00' : '0'}
-                  InputProps={{
-                    sx: {
-                      border: '1px solid',
-                      borderColor: 'var(--color-primary)',
-                      backgroundColor: 'var(--color-info)',
-                      height: 32,
-                      '&.Mui-focused': {
-                        borderColor: 'var(--color-primary)',
-                        borderWidth: '1px',
-                      },
-                      '&:hover': {
-                        borderColor: 'var(--color-primary)',
-                      },
-                      '& input': {
-                        padding: '6px 10px',
-                        fontSize: '0.875rem',
-                      },
-                      '& fieldset': {
-                        border: 'none',
-                      },
-                    },
-                  }}
-                />
-              </div>
-            </div>
-
-            <div className="w-full h-8 rounded-lg flex gap-2 items-end">
-              <Button
-                onClick={atualizarPrecos}
-                disabled={
-                  isUpdating || produtosSelecionados.size === 0 || !adjustAmount.trim()
-                }
-                className="md:min-w-[180px] h-8 hover:bg-primary/90"
-                sx={{
-                  color: 'var(--color-info)',
-                  backgroundColor: 'var(--color-primary)',
-                }}
-              >
-                {isUpdating
-                  ? 'Aplicando ajuste...'
-                  : `Aplicar ajuste (${produtosSelecionados.size})`}
-              </Button>
-            </div>
-          </div>
-          {produtosSelecionados.size > 0 && (
-            <p className="text-xs text-secondary-text mt-2">
-              O ajuste será aplicado aos {produtosSelecionados.size} produto(s) selecionado(s).
-            </p>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'impressoras' && (
-        <div className="bg-primary-bg border-b border-primary/70 md:px-6 px-1 py-2">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-semibold text-primary-text">
-                  Modo:
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setModoImpressora('adicionar')}
-                  className={`px-4 py-1 rounded-lg text-sm font-semibold transition-colors ${
-                    modoImpressora === 'adicionar'
-                      ? 'bg-primary text-info'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  Vincular
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setModoImpressora('remover')}
-                  className={`px-4 py-1 rounded-lg text-sm font-semibold transition-colors ${
-                    modoImpressora === 'remover'
-                      ? 'bg-primary text-info'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  Desvincular
-                </button>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-secondary-text">
-                  {impressorasSelecionadas.size} selecionada(s)
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (todasImpressorasSelecionadas) {
+                <div className="flex gap-1 bg-info rounded-lg p-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModoImpressora('adicionar')
                       setImpressorasSelecionadas(new Set())
-                    } else {
-                      setImpressorasSelecionadas(new Set(impressorasDisponiveis.map((i) => i.getId())))
-                    }
-                  }}
-                  className="px-3 py-1 rounded-lg text-xs font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
-                >
-                  {todasImpressorasSelecionadas ? 'Desmarcar todas' : 'Selecionar todas'}
-                </button>
+                    }}
+                    className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                      modoImpressora === 'adicionar'
+                        ? 'bg-primary text-info'
+                        : 'text-secondary-text hover:bg-primary/10'
+                    }`}
+                  >
+                    Vincular
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModoImpressora('remover')
+                      setImpressorasSelecionadas(new Set())
+                    }}
+                    className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                      modoImpressora === 'remover'
+                        ? 'bg-primary text-info'
+                        : 'text-secondary-text hover:bg-primary/10'
+                    }`}
+                  >
+                    Desvincular
+                  </button>
+                </div>
               </div>
-            </div>
-
-            {isLoadingImpressoras ? (
-              <div className="py-4 text-center text-sm text-secondary-text">
-                Carregando impressoras...
-              </div>
-            ) : impressorasDisponiveis.length === 0 ? (
-              <div className="py-4 text-center text-sm text-secondary-text">
-                Nenhuma impressora disponível
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 max-h-48 overflow-y-auto">
-                {impressorasDisponiveis.map((impressora) => {
-                  const isSelected = impressorasSelecionadas.has(impressora.getId())
-                  return (
-                    <label
-                      key={impressora.getId()}
-                      className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
-                        isSelected
-                          ? 'bg-primary/20 border-primary'
-                          : 'bg-white border-gray-200 hover:bg-gray-50'
-                      }`}
-                    >
-                      <Checkbox
-                        checked={isSelected}
-                        onChange={() => toggleImpressora(impressora.getId())}
-                        className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                      />
-                      <span className="text-xs font-medium text-primary-text flex-1">
-                        {impressora.getNome()}
-                      </span>
-                    </label>
-                  )
-                })}
-              </div>
-            )}
-
-            <div className="flex justify-end">
-              <Button
-                onClick={atualizarImpressoras}
-                disabled={
-                  isUpdating ||
-                  produtosSelecionados.size === 0 ||
-                  impressorasSelecionadas.size === 0
-                }
-                className="md:min-w-[200px] h-8 hover:bg-primary/90"
-                sx={{
-                  color: 'var(--color-info)',
-                  backgroundColor: 'var(--color-primary)',
-                }}
-              >
-                {isUpdating
-                  ? 'Processando...'
-                  : modoImpressora === 'adicionar'
-                    ? `Vincular a ${produtosSelecionados.size} produto(s)`
-                    : `Desvincular de ${produtosSelecionados.size} produto(s)`}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'gruposComplementos' && (
-        <div className="bg-primary-bg border-b border-primary/70 md:px-6 px-1 py-2">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-semibold text-primary-text">
-                  Modo:
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                <label className="block text-xs font-semibold text-secondary-text">
+                  {modoImpressora === 'adicionar' ? 'Selecionar Impressoras' : 'Selecionar Impressoras para Remover'} ({impressorasSelecionadas.size} selecionada{impressorasSelecionadas.size !== 1 ? 's' : ''})
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setModoGrupoComplemento('adicionar')}
-                  className={`px-4 py-1 rounded-lg text-sm font-semibold transition-colors ${
-                    modoGrupoComplemento === 'adicionar'
-                      ? 'bg-primary text-info'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  Vincular
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setModoGrupoComplemento('remover')}
-                  className={`px-4 py-1 rounded-lg text-sm font-semibold transition-colors ${
-                    modoGrupoComplemento === 'remover'
-                      ? 'bg-primary text-info'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  Desvincular
-                </button>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-secondary-text">
-                  {gruposComplementosSelecionados.size} selecionado(s)
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (todosGruposComplementosSelecionados) {
-                      setGruposComplementosSelecionados(new Set())
-                    } else {
-                      setGruposComplementosSelecionados(new Set(gruposComplementos.map((g) => g.getId())))
-                    }
-                  }}
-                  className="px-3 py-1 rounded-lg text-xs font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
-                >
-                  {todosGruposComplementosSelecionados ? 'Desmarcar todos' : 'Selecionar todos'}
-                </button>
-              </div>
-            </div>
-
-            {isLoadingGruposComplementos ? (
-              <div className="py-4 text-center text-sm text-secondary-text">
-                Carregando grupos de complementos...
-              </div>
-            ) : gruposComplementos.length === 0 ? (
-              <div className="py-4 text-center text-sm text-secondary-text">
-                Nenhum grupo de complementos disponível
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 max-h-48 overflow-y-auto">
-                {gruposComplementos.map((grupo) => {
-                  const isSelected = gruposComplementosSelecionados.has(grupo.getId())
-                  return (
-                    <label
-                      key={grupo.getId()}
-                      className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
-                        isSelected
-                          ? 'bg-primary/20 border-primary'
-                          : 'bg-white border-gray-200 hover:bg-gray-50'
-                      }`}
+                <div className="flex items-center gap-4">
+                  {impressorasDisponiveis.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (todasImpressorasSelecionadas) {
+                          setImpressorasSelecionadas(new Set())
+                        } else {
+                          setImpressorasSelecionadas(
+                            new Set(impressorasDisponiveis.map((i) => i.getId()))
+                          )
+                        }
+                      }}
+                      className="text-xs text-primary hover:underline"
                     >
-                      <Checkbox
-                        checked={isSelected}
-                        onChange={() => toggleGrupoComplemento(grupo.getId())}
-                        className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                      />
-                      <span className="text-xs font-medium text-primary-text flex-1">
-                        {grupo.getNome()}
-                      </span>
-                    </label>
-                  )
-                })}
+                      {todasImpressorasSelecionadas ? 'Desmarcar todas' : 'Selecionar todas'}
+                    </button>
+                  )}
+                  <div className="flex justify-end max-w-4xl">
+                    <Button
+                      onClick={atualizarImpressoras}
+                      disabled={
+                        isUpdating ||
+                        produtosSelecionados.size === 0 ||
+                        impressorasSelecionadas.size === 0
+                      }
+                      className="md:min-w-[180px] h-8 hover:bg-primary/90"
+                      sx={{
+                        color: 'var(--color-info)',
+                        backgroundColor: 'var(--color-primary)',
+                      }}
+                    >
+                      {isUpdating
+                        ? modoImpressora === 'adicionar' ? 'Adicionando...' : 'Removendo...'
+                        : modoImpressora === 'adicionar'
+                          ? `Vincular a ${produtosSelecionados.size} produto(s)`
+                          : `Desvincular de ${produtosSelecionados.size} produto(s)`}
+                    </Button>
+                  </div>
+                </div>
               </div>
-            )}
-
-            <div className="flex justify-end">
-              <Button
-                onClick={atualizarGruposComplementos}
-                disabled={
-                  isUpdating ||
-                  produtosSelecionados.size === 0 ||
-                  gruposComplementosSelecionados.size === 0
-                }
-                className="md:min-w-[200px] h-8 hover:bg-primary/90"
-                sx={{
-                  color: 'var(--color-info)',
-                  backgroundColor: 'var(--color-primary)',
-                }}
-              >
-                {isUpdating
-                  ? 'Processando...'
-                  : modoGrupoComplemento === 'adicionar'
-                    ? `Vincular a ${produtosSelecionados.size} produto(s)`
-                    : `Desvincular de ${produtosSelecionados.size} produto(s)`}
-              </Button>
+              {isLoadingImpressoras ? (
+                <div className="flex items-center justify-start py-4">
+                  <span className="text-sm text-secondary-text">Carregando impressoras...</span>
+                </div>
+              ) : impressorasDisponiveis.length === 0 ? (
+                <div className="flex items-center justify-center py-4">
+                  <span className="text-sm text-secondary-text">Nenhuma impressora disponível</span>
+                </div>
+              ) : (
+                <div className="w-full">
+                  <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-1 bg-white ">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      {impressorasDisponiveis.map((impressora) => {
+                        const isSelected = impressorasSelecionadas.has(impressora.getId())
+                        return (
+                          <label
+                            key={impressora.getId()}
+                            className={`flex items-center rounded-lg border cursor-pointer transition-colors min-h-[40px] ${
+                              isSelected
+                                ? 'bg-primary/10 border-primary'
+                                : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                            }`}
+                          >
+                            <Checkbox
+                              checked={isSelected}
+                              onChange={() => toggleImpressora(impressora.getId())}
+                              className="data-[state=checked]:bg-primary data-[state=checked]:border-primary flex-shrink-0"
+                            />
+                            <span className="md:text-sm text-xs font-medium text-primary-text truncate">
+                              {impressora.getNome()}
+                            </span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
             </div>
-          </div>
-        </div>
-      )}
+            
+          </>
+        ) : (
+          <>
+            <div className="flex flex-col gap-1">
+              {/* Modo de operação: Adicionar ou Remover */}
+              <div className="flex items-center gap-2">
+                <label className="block text-xs font-semibold text-secondary-text">
+                  Modo de operação:
+                </label>
+                <div className="flex gap-1 bg-info rounded-lg p-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModoGrupoComplemento('adicionar')
+                      setGruposComplementosSelecionados(new Set())
+                    }}
+                    className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                      modoGrupoComplemento === 'adicionar'
+                        ? 'bg-primary text-info'
+                        : 'text-secondary-text hover:bg-primary/10'
+                    }`}
+                  >
+                    Vincular
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModoGrupoComplemento('remover')
+                      setGruposComplementosSelecionados(new Set())
+                    }}
+                    className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                      modoGrupoComplemento === 'remover'
+                        ? 'bg-primary text-info'
+                        : 'text-secondary-text hover:bg-primary/10'
+                    }`}
+                  >
+                    Desvincular
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                <label className="block text-xs font-semibold text-secondary-text">
+                  {modoGrupoComplemento === 'adicionar' ? 'Selecionar Grupos de Complementos' : 'Selecionar Grupos de Complementos para Remover'} ({gruposComplementosSelecionados.size} selecionado{gruposComplementosSelecionados.size !== 1 ? 's' : ''})
+                </label>
+                <div className="flex items-center gap-4">
+                  {gruposComplementos.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (todosGruposComplementosSelecionados) {
+                          setGruposComplementosSelecionados(new Set())
+                        } else {
+                          setGruposComplementosSelecionados(
+                            new Set(gruposComplementos.map((g) => g.getId()))
+                          )
+                        }
+                      }}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      {todosGruposComplementosSelecionados ? 'Desmarcar todos' : 'Selecionar todos'}
+                    </button>
+                  )}
+                  <div className="flex justify-end max-w-4xl">
+                    <Button
+                      onClick={atualizarGruposComplementos}
+                      disabled={
+                        isUpdating ||
+                        produtosSelecionados.size === 0 ||
+                        gruposComplementosSelecionados.size === 0
+                      }
+                      className="md:min-w-[180px] h-8 hover:bg-primary/90"
+                      sx={{
+                        color: 'var(--color-info)',
+                        backgroundColor: 'var(--color-primary)',
+                      }}
+                    >
+                      {isUpdating
+                        ? modoGrupoComplemento === 'adicionar' ? 'Vinculando...' : 'Desvinculando...'
+                        : modoGrupoComplemento === 'adicionar'
+                          ? `Vincular a ${produtosSelecionados.size} produto(s)`
+                          : `Desvincular de ${produtosSelecionados.size} produto(s)`}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              {isLoadingGruposComplementos ? (
+                <div className="flex items-center justify-center py-4">
+                  <span className="text-sm text-secondary-text">Carregando grupos de complementos...</span>
+                </div>
+              ) : gruposComplementos.length === 0 ? (
+                <div className="flex items-center justify-center py-4">
+                  <span className="text-sm text-secondary-text">Nenhum grupo de complementos disponível</span>
+                </div>
+              ) : (
+                <div className="w-full">
+                  <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-1 bg-white">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-1">
+                      {gruposComplementos.map((grupo) => {
+                        const isSelected = gruposComplementosSelecionados.has(grupo.getId())
+                        return (
+                          <label
+                            key={grupo.getId()}
+                            className={`flex items-center rounded-lg border cursor-pointer transition-colors min-h-[40px] ${
+                              isSelected
+                                ? 'bg-primary/10 border-primary'
+                                : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                            }`}
+                          >
+                            <Checkbox
+                              checked={isSelected}
+                              onChange={() => toggleGrupoComplemento(grupo.getId())}
+                              className="data-[state=checked]:bg-primary data-[state=checked]:border-primary flex-shrink-0"
+                            />
+                            <span className="md:text-sm text-xs font-medium text-primary-text truncate">
+                              {grupo.getNome()}
+                            </span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+             
+            </div>
+            
+          </>
+        )}
+      </div>
+
 
       <div className="h-[4px] border-t-2 border-primary/70"></div>
       <div className="bg-white md:px-[20px] py-2 border-b border-gray-100">
@@ -1152,24 +1194,6 @@ export function AtualizarPrecoLote() {
               </select>
             </div>
 
-            <div className="w-full sm:w-[220px]">
-              <label className="text-xs font-semibold text-secondary-text mb-1 block">Grupo de complementos</label>
-              <select
-                value={grupoComplementoFilter}
-                onChange={(e) => setGrupoComplementoFilter(e.target.value)}
-                disabled={isLoadingGruposComplementos}
-                className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                <option value="">{isLoadingGruposComplementos ? 'Carregando...' : 'Todos'}</option>
-                {!isLoadingGruposComplementos &&
-                  gruposComplementos.map((grupo) => (
-                    <option key={grupo.getId()} value={grupo.getId()}>
-                      {grupo.getNome()}
-                    </option>
-                  ))}
-              </select>
-            </div>
-
             <div className="w-full sm:w-auto">
               <button
                 type="button"
@@ -1200,7 +1224,7 @@ export function AtualizarPrecoLote() {
           </div>
         ) : (
           <div className="bg-info rounded-lg overflow-hidden">
-            <div className="flex items-center h-11 gap-2 md:px-4 text-xs font-semibold text-primary-text uppercase tracking-wide bg-custom-2">
+            <div className="flex items-center h-11 gap-2 md:px-4 px-2 text-xs font-semibold text-primary-text uppercase tracking-wide bg-custom-2">
               <div className="flex-none md:w-10 w-6 flex justify-center">
                 <Checkbox
                   checked={todosSelecionados}
@@ -1217,8 +1241,8 @@ export function AtualizarPrecoLote() {
               <div className="flex-1 md:w-14 text-xs">Código</div>
               <div className="flex-[1.5] text-xs">Nome</div>
               <div className="flex-[1.2] text-center hidden md:flex">Impressoras</div>
-              <div className="flex-[1.2] text-center hidden md:flex">Grupo de complementos</div>
-              <div className="flex-1 text-right text-xs">Valor atual</div>
+              <div className="flex-[1.2] text-center hidden md:flex">Grupos Complementos</div>
+              <div className="md:flex-1 text-right text-xs">Valor atual</div>
             </div>
 
             <div className="flex flex-col gap-2 mt-2">
@@ -1227,26 +1251,22 @@ export function AtualizarPrecoLote() {
                 .sort((a, b) => a.getNome().localeCompare(b.getNome(), 'pt-BR'))
                 .map((produto, index) => {
                 const isSelected = produtosSelecionados.has(produto.getId())
-                const isExpanded = produtosExpandidos.has(produto.getId())
-                const gruposComplementos = produto.getGruposComplementos()
-                const impressoras = produto.getImpressoras()
-                const gruposLabels = gruposComplementos.map((grupo) => {
-                  const nomeGrupo = grupo.nome || 'Grupo sem nome'
-                  const qtdComplementos = grupo.complementos?.length ?? 0
-                  return `${nomeGrupo} (${qtdComplementos} complemento${qtdComplementos === 1 ? '' : 's'})`
-                })
-                const impressorasLabels = impressoras.map((imp) => imp.nome)
+                // Usar diretamente as impressoras que vêm do produto (já têm id, nome e ativo)
+                const impressorasDoProduto = produto.getImpressoras()
+                // Usar diretamente os grupos de complementos que vêm do produto
+                const gruposComplementosDoProduto = produto.getGruposComplementos()
                 // Cor de fundo alternada: se selecionado usa primary/20, senão alterna entre gray-50 e white
                 const bgColor = isSelected 
                   ? 'bg-primary/20' 
                   : index % 2 === 0 
                     ? 'bg-gray-50' 
                     : 'bg-white'
+                const isExpanded = produtosExpandidos.has(produto.getId())
                 return (
-                  <div key={produto.getId()}>
-                    {/* Desktop: Linha completa */}
+                  <div key={produto.getId()} className="flex flex-col">
+                    {/* Linha principal do produto */}
                     <div
-                      className={`hidden md:flex rounded-lg items-center md:px-4 gap-2 ${bgColor} hover:bg-primary-bg transition-colors cursor-default`}
+                      className={`flex rounded-lg items-center md:px-4 px-2 gap-2 ${bgColor} hover:bg-primary-bg transition-colors cursor-default`}
                       style={{ minHeight: '36px' }}
                     >
                       <div className="flex-none md:w-10 w-6 flex justify-center">
@@ -1266,45 +1286,49 @@ export function AtualizarPrecoLote() {
                       <div className="md:flex-[1.5] flex-[2] md:text-sm text-xs font-semibold text-primary-text break-words md:pr-4">
                         {produto.getNome()}
                       </div>
+                      {/* Colunas de impressoras e grupos (apenas desktop) */}
                       <div className="flex-[1.2] justify-center hidden md:flex">
-                        {impressorasLabels.length === 0 ? (
+                        {impressorasDoProduto.length === 0 ? (
                           <span className="text-xs text-secondary-text">Nenhuma</span>
                         ) : (
                           <select
-                            className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary"
+                            className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
                             defaultValue=""
                             onChange={(event) => {
                               event.currentTarget.value = ''
                             }}
+                            onClick={(e) => e.stopPropagation()}
                           >
                             <option value="" disabled>
-                              {impressorasLabels.length} impressora(s)
+                              {impressorasDoProduto.length} impressora{impressorasDoProduto.length !== 1 ? 's' : ''}
                             </option>
-                            {impressorasLabels.map((label, idx) => (
-                              <option key={`${produto.getId()}-imp-${idx}`} value={label}>
-                                {label}
+                            {impressorasDoProduto.map((impressora) => (
+                              <option key={impressora.id} value={impressora.id}>
+                                {impressora.nome}
+                                {impressora.ativo === false ? ' (Inativa)' : ''}
                               </option>
                             ))}
                           </select>
                         )}
                       </div>
                       <div className="flex-[1.2] justify-center hidden md:flex">
-                        {gruposLabels.length === 0 ? (
+                        {gruposComplementosDoProduto.length === 0 ? (
                           <span className="text-xs text-secondary-text">Nenhum</span>
                         ) : (
                           <select
-                            className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary"
+                            className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
                             defaultValue=""
                             onChange={(event) => {
                               event.currentTarget.value = ''
                             }}
+                            onClick={(e) => e.stopPropagation()}
                           >
                             <option value="" disabled>
-                              {gruposLabels.length} grupo(s)
+                              {gruposComplementosDoProduto.length} grupo{gruposComplementosDoProduto.length !== 1 ? 's' : ''}
                             </option>
-                            {gruposLabels.map((label, idx) => (
-                              <option key={`${produto.getId()}-grupo-${idx}`} value={label}>
-                                {label}
+                            {gruposComplementosDoProduto.map((grupo) => (
+                              <option key={grupo.id} value={grupo.id}>
+                                {grupo.nome}
                               </option>
                             ))}
                           </select>
@@ -1313,92 +1337,79 @@ export function AtualizarPrecoLote() {
                       <div className="flex-1 text-right font-semibold md:text-sm text-xs text-primary-text">
                         {transformarParaReal(produto.getValor())}
                       </div>
+                      {/* Botão para expandir/ocultar (apenas mobile) */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleExpansao(produto.getId())
+                        }}
+                        className="md:hidden flex items-center justify-center w-8 h-8 rounded-lg hover:bg-primary/10 transition-colors"
+                        aria-label={isExpanded ? 'Ocultar detalhes' : 'Expandir detalhes'}
+                      >
+                        {isExpanded ? (
+                          <MdExpandLess size={20} className="text-primary-text" />
+                        ) : (
+                          <MdExpandMore size={20} className="text-primary-text" />
+                        )}
+                      </button>
                     </div>
-
-                    {/* Mobile: Card compacto com expansão */}
-                    <div className={`md:hidden rounded-lg ${bgColor} border border-gray-200`}>
-                      <div className="flex items-center gap-2 p-2">
-                        <Checkbox
-                          checked={isSelected}
-                          onChange={(checked) => {
-                            if (checked !== undefined) {
-                              toggleSelecao(produto.getId())
-                            }
-                          }}
-                          className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="font-mono text-xs text-secondary-text">
-                            {produto.getCodigoProduto() || '-'}
+                    {/* Área expansível com impressoras e grupos (apenas mobile) */}
+                    {isExpanded && (
+                      <div className="md:hidden px-2 pb-2 pt-1 bg-gray-50 border-b border-gray-200">
+                        <div className="flex flex-col gap-3">
+                          <div className="flex flex-col gap-1">
+                            <label className="text-xs font-semibold text-secondary-text">Impressoras</label>
+                            {impressorasDoProduto.length === 0 ? (
+                              <span className="text-xs text-secondary-text">Nenhuma</span>
+                            ) : (
+                              <select
+                                className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
+                                defaultValue=""
+                                onChange={(event) => {
+                                  event.currentTarget.value = ''
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <option value="" disabled>
+                                  {impressorasDoProduto.length} impressora{impressorasDoProduto.length !== 1 ? 's' : ''}
+                                </option>
+                                {impressorasDoProduto.map((impressora) => (
+                                  <option key={impressora.id} value={impressora.id}>
+                                    {impressora.nome}
+                                    {impressora.ativo === false ? ' (Inativa)' : ''}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
                           </div>
-                          <div className="text-sm font-semibold text-primary-text truncate">
-                            {produto.getNome()}
+                          <div className="flex flex-col gap-1">
+                            <label className="text-xs font-semibold text-secondary-text">Grupos de Complementos</label>
+                            {gruposComplementosDoProduto.length === 0 ? (
+                              <span className="text-xs text-secondary-text">Nenhum</span>
+                            ) : (
+                              <select
+                                className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
+                                defaultValue=""
+                                onChange={(event) => {
+                                  event.currentTarget.value = ''
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <option value="" disabled>
+                                  {gruposComplementosDoProduto.length} grupo{gruposComplementosDoProduto.length !== 1 ? 's' : ''}
+                                </option>
+                                {gruposComplementosDoProduto.map((grupo) => (
+                                  <option key={grupo.id} value={grupo.id}>
+                                    {grupo.nome}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
                           </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm font-semibold text-primary-text">
-                            {transformarParaReal(produto.getValor())}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => toggleExpansao(produto.getId())}
-                            className="mt-1 text-primary"
-                          >
-                            {isExpanded ? <MdExpandLess size={20} /> : <MdExpandMore size={20} />}
-                          </button>
                         </div>
                       </div>
-                      {isExpanded && (
-                        <div className="px-2 pb-2 space-y-2 border-t border-gray-200 pt-2">
-                          <div>
-                            <label className="text-xs font-semibold text-secondary-text">Impressoras:</label>
-                            {impressorasLabels.length === 0 ? (
-                              <span className="text-xs text-secondary-text ml-2">Nenhuma</span>
-                            ) : (
-                              <select
-                                className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary mt-1"
-                                defaultValue=""
-                                onChange={(event) => {
-                                  event.currentTarget.value = ''
-                                }}
-                              >
-                                <option value="" disabled>
-                                  {impressorasLabels.length} impressora(s)
-                                </option>
-                                {impressorasLabels.map((label, idx) => (
-                                  <option key={`${produto.getId()}-imp-mob-${idx}`} value={label}>
-                                    {label}
-                                  </option>
-                                ))}
-                              </select>
-                            )}
-                          </div>
-                          <div>
-                            <label className="text-xs font-semibold text-secondary-text">Grupos Complementos:</label>
-                            {gruposLabels.length === 0 ? (
-                              <span className="text-xs text-secondary-text ml-2">Nenhum</span>
-                            ) : (
-                              <select
-                                className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary mt-1"
-                                defaultValue=""
-                                onChange={(event) => {
-                                  event.currentTarget.value = ''
-                                }}
-                              >
-                                <option value="" disabled>
-                                  {gruposLabels.length} grupo(s)
-                                </option>
-                                {gruposLabels.map((label, idx) => (
-                                  <option key={`${produto.getId()}-grupo-mob-${idx}`} value={label}>
-                                    {label}
-                                  </option>
-                                ))}
-                              </select>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
                 )
               })}
