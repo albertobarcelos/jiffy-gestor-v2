@@ -416,15 +416,15 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       }
 
       showToast.success('Ordem atualizada com sucesso!')
-      // Não recarregar página - a atualização otimista já atualizou a UI
-      // O cache será invalidado apenas quando necessário (ex: ao fechar modal, mudar filtros, etc)
+      // Invalidar cache do React Query para atualizar outras telas que usam os grupos
+      queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false })
     } catch (error: any) {
       console.error('Erro ao reordenar grupo:', error)
       // Reverte feedback otimista
       setLocalGrupos(previousState)
       showToast.error(error.message || 'Erro ao atualizar ordem do grupo')
     }
-  }, [localGrupos, auth])
+  }, [localGrupos, auth, queryClient])
 
   return (
     <>

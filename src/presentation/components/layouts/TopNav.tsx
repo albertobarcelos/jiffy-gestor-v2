@@ -1,13 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import type { ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useQueryClient } from '@tanstack/react-query'
-import { usePrefetch } from '@/src/presentation/hooks/usePrefetch'
 import { MdDashboard, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose, MdAirplaneTicket } from 'react-icons/md'
 import { 
   MdInventory2, 
@@ -37,7 +36,6 @@ export function TopNav() {
   const router = useRouter()
   const { logout, getUser } = useAuthStore()
   const queryClient = useQueryClient()
-  // const { prefetchRoute } = usePrefetch() // prefetchRoute não existe mais
   const menuRef = useRef<HTMLDivElement>(null)
   
   // Estado para controlar hidratação (evita hydration mismatch)
@@ -66,21 +64,17 @@ export function TopNav() {
     const timer = setTimeout(() => {
       routesToPrefetch.forEach((route) => {
         router.prefetch(route)
-        // prefetchRoute(route)
       })
     }, 100)
 
     return () => clearTimeout(timer)
   }, [router])
 
-  // Prefetch de rota E dados ao hover
+  // Prefetch de rota ao hover
   const handleLinkHover = useCallback(
     (path: string) => {
       if (path && path !== '#') {
-        // Prefetch da rota do Next.js
         router.prefetch(path)
-        // Prefetch dos dados do React Query
-        // prefetchRoute(path)
       }
     },
     [router]
@@ -119,13 +113,6 @@ export function TopNav() {
         // Fechar outros menus ao abrir um novo
         newExpanded.clear()
         newExpanded.add(menuName)
-        // Quando expandir "Cadastros", prefetch das rotas mais acessadas
-        if (menuName === 'Cadastros') {
-          // prefetchRoute('/cadastros/grupos-complementos')
-          // prefetchRoute('/cadastros/complementos')
-          // prefetchRoute('/produtos')
-          // prefetchRoute('/cadastros/grupos-produtos')
-        }
       }
       setExpandedMenus(newExpanded)
     },
@@ -153,29 +140,33 @@ export function TopNav() {
       icon: MdDashboard 
     },
     {
-      name: 'Cadastros',
+      name: 'Produtos',
       path: '#',
-      icon: MdInventory2,
+      icon: MdShoppingBag,
       children: [
-        { name: 'Grupo Produtos', path: '/cadastros/grupos-produtos', icon: MdCategory },
+        { name: 'Grupo de Produtos', path: '/cadastros/grupos-produtos', icon: MdCategory },
         { name: 'Produtos', path: '/produtos', icon: MdShoppingBag },
-        { name: 'Grupo Complementos', path: '/cadastros/grupos-complementos', icon: MdCategory },
+        { name: 'Grupo de Complementos', path: '/cadastros/grupos-complementos', icon: MdCategory },
         { name: 'Complementos', path: '/cadastros/complementos', icon: MdAddCircle },
-        { name: 'Usuários', path: '/cadastros/usuarios', icon: MdPerson },
-        { name: 'Perfis de Usuários', path: '/cadastros/perfis-usuarios-pdv', icon: MdGroup },
+        { name: 'Cadastro por Planilhas', path: '/cadastro-por-planilha', icon: MdAirplaneTicket },
+      ],
+    },
+    {
+      name: 'Usuários',
+      path: '#',
+      icon: MdPeople,
+      children: [
+        { name: 'Perfis PDV', path: '/cadastros/perfis-usuarios-pdv', icon: MdGroup },
+        { name: 'Usuários PDV', path: '/cadastros/usuarios', icon: MdPerson },
         { name: 'Perfis Gestor', path: '/cadastros/perfis-gestor', icon: MdAccountBalance },
         { name: 'Usuários Gestor', path: '/cadastros/usuarios-gestor', icon: MdPerson },
         { name: 'Clientes', path: '/cadastros/clientes', icon: MdPeople },
-        { name: 'Impressoras', path: '/cadastros/impressoras', icon: MdPrint },
-        { name: 'Meios de Pagamentos', path: '/cadastros/meios-pagamentos', icon: MdPayment },
-        { name: 'Cadastro por Planilha', path: '/cadastro-por-planilha', icon: MdAirplaneTicket },
       ],
     },
-    //{ name: 'Estoque', path: '/estoque', icon: MdInventory },
     {
       name: 'Vendas',
       path: '#',
-      icon: MdInventory2,
+      icon: MdPointOfSale,
       children: [
         {
           name: 'Mesas Abertas',
@@ -194,14 +185,21 @@ export function TopNav() {
             />
           ),
         },
-        //{ name: 'Meu Caixa', path: '/meu-caixa', icon: MdPointOfSale },
-        { name: 'Hist. Fechamento', path: '/historico-fechamento', icon: MdHistory },
+        { name: 'Hist. Fechamentos', path: '/historico-fechamento', icon: MdHistory },
         { name: 'Relatórios', path: '/relatorios', icon: MdAssessment },
-
+        { name: 'Meios de Pagamentos', path: '/cadastros/meios-pagamentos', icon: MdPayment },
       ],
     },
-    { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: MdReceipt },
-    { name: 'Painel do Contador', path: '/painel-contador', icon: MdAccountBalance },
+    {
+      name: 'Fiscal',
+      path: '#',
+      icon: MdReceipt,
+      children: [
+        { name: 'Painel do Contador', path: '/painel-contador', icon: MdAccountBalance },
+        { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: MdReceipt },
+        { name: 'Impressoras', path: '/cadastros/impressoras', icon: MdPrint },
+      ],
+    },
     { name: 'Configurações', path: '/configuracoes', icon: MdSettings },
   ]
 
@@ -239,16 +237,9 @@ export function TopNav() {
 
   const handleMobileChildNavigate = useCallback(
     (child: ChildMenuItem) => {
-      if (child.name === 'Mesas Abertas') {
-        console.log('Clique mobile Mesas Abertas', {
-          path: child.path,
-          expandedMenus: Array.from(expandedMenus),
-          isMobileMenuOpen,
-        })
-      }
       handleMobileNavigate(child.path)
     },
-    [expandedMenus, handleMobileNavigate, isMobileMenuOpen]
+    [handleMobileNavigate]
   )
 
   useEffect(() => {
@@ -277,7 +268,7 @@ export function TopNav() {
           <div className="flex items-center gap-2">
             <div className="relative w-10 h-10">
               <Image
-                src="/images/jiffy-loading.gif"
+                src="/images/jiffy-100x100.gif"
                 alt="Jiffy"
                 fill
                 sizes="40px"
@@ -401,7 +392,7 @@ export function TopNav() {
           <Link href="/dashboard" className="flex items-center">
             <div className="relative ml-6 md:ml-0 w-12 h-12 sm:w-20 sm:h-14">
               <Image
-                src="/images/jiffy-loading.gif"
+                src="/images/jiffy-100x100.gif"
                 alt="Jiffy"
                 fill
                 sizes="(max-width: 640px) 176px, 208px"
@@ -439,7 +430,7 @@ export function TopNav() {
                     }`}
                   >
                     {renderedIcon}
-                    <span >{item.name}</span>
+                    <span>{item.name}</span>
                     <MdExpandMore 
                       className={`w-4 h-4 transition-transform duration-200 ${
                         isExpanded ? 'rotate-180' : ''
