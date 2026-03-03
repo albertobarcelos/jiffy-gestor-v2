@@ -15,6 +15,7 @@ import { showToast } from '@/src/shared/utils/toast'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import BannerDestaques from '@/src/presentation/components/features/cardapio-digital/BannerDestaques'
 import CarrosselProdutosDestaque from '@/src/presentation/components/features/cardapio-digital/CarrosselProdutosDestaque'
+import ThemeSelector from '@/src/presentation/components/features/cardapio-digital/ThemeSelector'
 
 /**
  * Página principal do cardápio
@@ -30,18 +31,21 @@ export default function CardapioPage() {
   const [grupoSelecionadoId, setGrupoSelecionadoId] = useState<string | null>(null)
   const [produtoSelecionado, setProdutoSelecionado] = useState<Produto | null>(null)
   const [carrinhoCount, setCarrinhoCount] = useState(0)
-  const sessionId = sessionStorage.getItem('cardapio_session_token') || mesaId
-  const numeroMesa = sessionStorage.getItem('cardapio_numero_mesa') || '?'
+  const [sessionId, setSessionId] = useState<string>(mesaId)
+  const [numeroMesa, setNumeroMesa] = useState<string>('?')
 
   // Buscar grupos de produtos
   const { data: gruposData, isLoading: isLoadingGrupos } = useQuery({
-    queryKey: ['cardapio-grupos', mesaId],
+    queryKey: ['cardapio-grupos', mesaId, sessionId],
     queryFn: async () => {
-      if (!auth?.getAccessToken()) {
+      // Priorizar token administrativo (API requer JWT administrativo)
+      // sessionToken não funciona para esta API
+      const token = auth?.getAccessToken()
+      
+      if (!token) {
         return []
       }
 
-      const token = auth.getAccessToken()
       const response = await fetch('/api/grupos-produtos?ativo=true&limit=100&offset=0', {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -147,10 +151,17 @@ export default function CardapioPage() {
     return () => clearInterval(interval)
   }, [sessionId])
 
-  // Validar sessão
+  // Carregar valores do sessionStorage e validar sessão
   useEffect(() => {
+    if (typeof window === 'undefined') return
+
     const sessionToken = sessionStorage.getItem('cardapio_session_token')
     const storedMesaId = sessionStorage.getItem('cardapio_mesa_id')
+    const storedNumeroMesa = sessionStorage.getItem('cardapio_numero_mesa')
+
+    // Atualizar estados com valores do sessionStorage
+    setSessionId(sessionToken || mesaId)
+    setNumeroMesa(storedNumeroMesa || '?')
 
     if (!sessionToken || storedMesaId !== mesaId) {
       router.push('/cardapio/instrucoes')
@@ -185,31 +196,69 @@ export default function CardapioPage() {
   }
 
   return (
-    <div className="h-screen bg-white flex flex-col overflow-hidden">
+    <div
+      className="h-screen flex flex-col overflow-hidden"
+      style={{ backgroundColor: 'var(--cardapio-bg-primary)' }}
+    >
       {/* Barra Superior */}
-      <div className="bg-black border-b border-gray-800 shadow-sm flex-shrink-0 z-20">
+      <div
+        className="border-b shadow-sm flex-shrink-0 z-20"
+        style={{
+          backgroundColor: 'var(--cardapio-bg-secondary)',
+          borderColor: 'var(--cardapio-border)',
+        }}
+      >
         <div className="flex items-center justify-between px-4 py-3">
           {/* Esquerda: Voltar e Número da Mesa */}
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.push(`/cardapio/mesa/${mesaId}`)}
-              className="text-sm text-white hover:text-white/80 font-medium transition-colors flex items-center gap-1"
+              className="text-sm font-medium transition-colors flex items-center gap-1"
+              style={{ color: 'var(--cardapio-text-primary)' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = 'var(--cardapio-text-secondary)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'var(--cardapio-text-primary)'
+              }}
             >
               <MdArrowBack className="w-4 h-4" />
               <span>VOLTAR</span>
             </button>
-            <div className="h-6 w-px bg-gray-700" />
+            <div
+              className="h-6 w-px"
+              style={{ backgroundColor: 'var(--cardapio-divider)' }}
+            />
             <div className="flex items-center gap-2">
-              <MdTableRestaurant className="w-5 h-5 text-white" />
-              <span className="text-sm font-semibold text-white">Mesa {numeroMesa}</span>
+              <MdTableRestaurant
+                className="w-5 h-5"
+                style={{ color: 'var(--cardapio-text-primary)' }}
+              />
+              <span
+                className="text-sm font-semibold"
+                style={{ color: 'var(--cardapio-text-primary)' }}
+              >
+                Mesa {numeroMesa}
+              </span>
             </div>
           </div>
 
-          {/* Direita: Carrinho */}
+          {/* Direita: Carrinho e Seletor de Tema */}
           <div className="flex items-center gap-3">
+            <ThemeSelector />
             <button
               onClick={() => router.push(`/cardapio/mesa/${mesaId}/carrinho`)}
-              className="relative px-4 py-2 text-sm font-medium text-white hover:bg-white/10 rounded-lg transition-colors flex items-center gap-2"
+              className="relative px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+              style={{
+                color: 'var(--cardapio-text-primary)',
+                backgroundColor: 'transparent',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--cardapio-bg-hover)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent'
+              }}
             >
               <MdShoppingCart className="w-5 h-5" />
               <span className="hidden sm:inline">
@@ -228,15 +277,29 @@ export default function CardapioPage() {
       {/* Conteúdo Principal */}
       <div className="flex-1 flex overflow-hidden">
         {/* Menu Lateral - Grupos */}
-        <div className="w-64 bg-black border-r border-gray-800 flex flex-col overflow-hidden">
+        <div
+          className="w-64 border-r flex flex-col overflow-hidden"
+          style={{
+            backgroundColor: 'var(--cardapio-menu-bg)',
+            borderColor: 'var(--cardapio-border)',
+          }}
+        >
           <div className="flex-1 overflow-y-auto scrollbar-hide">
             <div className="p-4">
             {isLoadingGrupos ? (
               <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                <div
+                  className="animate-spin rounded-full h-8 w-8 border-b-2"
+                  style={{ borderColor: 'var(--cardapio-accent-primary)' }}
+                />
               </div>
             ) : grupos.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-8">Nenhuma categoria disponível</p>
+              <p
+                className="text-sm text-center py-8"
+                style={{ color: 'var(--cardapio-text-tertiary)' }}
+              >
+                Nenhuma categoria disponível
+              </p>
             ) : (
               <div className="space-y-2">
                 {/* Opção Destaques */}
@@ -252,16 +315,27 @@ export default function CardapioPage() {
                   `}
                   style={{
                     background: mostrarDestaques
-                      ? 'linear-gradient(to right, rgb(220, 38, 38) 0%, rgb(220, 38, 38) 35%, rgba(220, 38, 38, 0.6) 40%, rgba(220, 38, 38, 0.3) 55%, transparent 80%)'
-                      : 'linear-gradient(to right, rgb(220, 38, 38) 0%, rgb(220, 38, 38) 50%, rgba(220, 38, 38, 0.3) 70%, transparent 90%)',
+                      ? `linear-gradient(to right, var(--cardapio-accent-primary) 0%, var(--cardapio-accent-primary) 35%, rgba(220, 38, 38, 0.6) 40%, rgba(220, 38, 38, 0.3) 55%, transparent 80%)`
+                      : `linear-gradient(to right, var(--cardapio-accent-primary) 0%, var(--cardapio-accent-primary) 50%, rgba(220, 38, 38, 0.3) 70%, transparent 90%)`,
                   }}
                 >
                   <div className="flex items-center gap-3 relative z-10">
-                    <div className="w-8 h-8 rounded flex items-center justify-center flex-shrink-0 bg-white/20">
-                      <span className="text-white text-lg font-bold">⭐</span>
+                    <div
+                      className="w-8 h-8 rounded flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: 'var(--cardapio-bg-elevated)' }}
+                    >
+                      <span
+                        className="text-lg font-bold"
+                        style={{ color: 'var(--cardapio-text-primary)' }}
+                      >
+                        ⭐
+                      </span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm truncate text-white font-semibold">
+                      <p
+                        className="text-sm truncate font-semibold"
+                        style={{ color: 'var(--cardapio-text-primary)' }}
+                      >
                         DESTAQUES
                       </p>
                     </div>
@@ -269,7 +343,7 @@ export default function CardapioPage() {
                 </button>
 
                 {/* Grupos de Produtos */}
-                {grupos.map((grupo) => {
+                {grupos.map((grupo: GrupoProduto) => {
                   const isSelected = grupo.getId() === grupoSelecionadoId && !mostrarDestaques
                   const corHex = grupo.getCorHex() || '#6366f1'
                   
@@ -279,33 +353,45 @@ export default function CardapioPage() {
                       onClick={() => handleSelecionarGrupo(grupo.getId())}
                       className={`
                         w-full px-3 py-4 rounded-lg transition-all duration-200
-                        ${
-                          isSelected
-                            ? 'bg-white/10 font-semibold'
-                            : 'bg-transparent hover:bg-white/5'
-                        }
+                        ${isSelected ? 'font-semibold' : ''}
                       `}
+                      style={{
+                        backgroundColor: isSelected
+                          ? 'var(--cardapio-menu-item-active)'
+                          : 'var(--cardapio-menu-item)',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.backgroundColor = 'var(--cardapio-menu-item-hover)'
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.backgroundColor = 'var(--cardapio-menu-item)'
+                        }
+                      }}
                     >
                       <div className="flex flex-col items-center gap-2">
                         {/* Ícone do grupo */}
                         <div
-                          className="w-24 h-24 rounded-lg flex items-center justify-center flex-shrink-0"
-                          style={{ 
+                          className="w-full h-24 rounded-lg flex items-center justify-center flex-shrink-0"
+                          style={{
                             backgroundColor: isSelected ? corHex : `${corHex}20`,
                           }}
                         >
-                          <DinamicIcon 
-                            iconName={grupo.getIconName()} 
-                            color={isSelected ? 'white' : corHex} 
-                            size={60} 
+                          <DinamicIcon
+                            iconName={grupo.getIconName()}
+                            color={isSelected ? 'white' : corHex}
+                            size={60}
                           />
                         </div>
                         {/* Nome do grupo */}
                         <p
-                          className={`text-base text-center line-clamp-2 ${
-                            isSelected ? 'text-white font-semibold' : 'text-white/80'
-                          }`}
+                          className="text-base text-center line-clamp-2"
                           style={{
+                            color: isSelected
+                              ? 'var(--cardapio-text-primary)'
+                              : 'var(--cardapio-text-secondary)',
                             display: '-webkit-box',
                             WebkitLineClamp: 2,
                             WebkitBoxOrient: 'vertical',
@@ -326,11 +412,17 @@ export default function CardapioPage() {
         </div>
 
         {/* Área Principal - Produtos */}
-        <div className="flex-1 flex flex-col overflow-hidden bg-gray-800">
+        <div
+          className="flex-1 flex flex-col overflow-hidden"
+          style={{ backgroundColor: 'var(--cardapio-bg-tertiary)' }}
+        >
           <div className="flex-1 overflow-y-auto scrollbar-hide">
           {mostrarDestaques ? (
             /* Exibir Destaques */
-            <div className="h-full flex flex-col bg-gradient-to-br from-gray-900 to-black">
+            <div
+              className="h-full flex flex-col"
+              style={{ background: 'var(--cardapio-gradient-secondary)' }}
+            >
               {/* Banner Destaques */}
               <div className="flex-shrink-0">
                 <BannerDestaques />
@@ -343,12 +435,18 @@ export default function CardapioPage() {
             </div>
           ) : isLoadingProdutos ? (
             <div className="flex items-center justify-center h-full">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+              <div
+                className="animate-spin rounded-full h-12 w-12 border-b-2"
+                style={{ borderColor: 'var(--cardapio-accent-primary)' }}
+              />
             </div>
           ) : produtos.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
-                <p className="text-gray-400 text-lg mb-2">
+                <p
+                  className="text-lg mb-2"
+                  style={{ color: 'var(--cardapio-text-tertiary)' }}
+                >
                   {grupoSelecionadoId
                     ? 'Nenhum produto disponível nesta categoria'
                     : 'Selecione uma categoria'}
@@ -358,7 +456,7 @@ export default function CardapioPage() {
           ) : (
             <div className="p-4 md:p-6">
               <div className="space-y-4">
-                {produtos.map((produto) => {
+                {produtos.map((produto: Produto) => {
                   const nome = produto.getNome()
                   const valor = produto.getValor()
                   const descricao = produto.getDescricao()
@@ -368,7 +466,20 @@ export default function CardapioPage() {
                     <button
                       key={produto.getId()}
                       onClick={() => setProdutoSelecionado(produto)}
-                      className="w-full bg-white border border-gray-200 rounded-lg p-4 hover:border-primary hover:shadow-md transition-all duration-200 text-left group flex gap-4"
+                      className="w-full rounded-lg p-4 hover:shadow-md transition-all duration-200 text-left group flex gap-4"
+                      style={{
+                        backgroundColor: 'var(--cardapio-card-bg)',
+                        borderColor: 'var(--cardapio-card-border)',
+                        borderWidth: '1px',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--cardapio-accent-primary)'
+                        e.currentTarget.style.backgroundColor = 'var(--cardapio-card-hover)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--cardapio-card-border)'
+                        e.currentTarget.style.backgroundColor = 'var(--cardapio-card-bg)'
+                      }}
                     >
                       {/* Imagem do Produto - Lado Esquerdo */}
                       <div className="relative w-64 h-64 md:w-80 md:h-80 flex-shrink-0 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg overflow-hidden">
@@ -392,21 +503,33 @@ export default function CardapioPage() {
                         {/* Nome do Produto e Preço na mesma linha */}
                         <div className="mb-2">
                           <div className="flex items-center justify-between gap-4 mb-2">
-                            <h3 className="font-bold text-lg md:text-xl text-gray-900 flex-1">
+                            <h3
+                              className="font-bold text-lg md:text-xl flex-1"
+                              style={{ color: 'var(--cardapio-text-primary)' }}
+                            >
                               {nome.toUpperCase()}
                             </h3>
-                            <span className="text-xl md:text-2xl font-bold text-primary flex-shrink-0">
+                            <span
+                              className="text-xl md:text-2xl font-bold flex-shrink-0"
+                              style={{ color: 'var(--cardapio-accent-primary)' }}
+                            >
                               {formatarPreco(valor)}
                             </span>
                           </div>
 
                           {/* Descrição */}
                           {descricao ? (
-                            <p className="text-sm md:text-base text-gray-600 mb-3 line-clamp-2 leading-relaxed">
+                            <p
+                              className="text-sm md:text-base mb-3 line-clamp-2 leading-relaxed"
+                              style={{ color: 'var(--cardapio-text-secondary)' }}
+                            >
                               {descricao}
                             </p>
                           ) : (
-                            <p className="text-sm text-gray-500 mb-3 italic line-clamp-2">
+                            <p
+                              className="text-sm mb-3 italic line-clamp-2"
+                              style={{ color: 'var(--cardapio-text-tertiary)' }}
+                            >
                               Produto disponível no cardápio
                             </p>
                           )}
@@ -414,7 +537,19 @@ export default function CardapioPage() {
 
                         {/* Botão Selecionar - Alinhado à direita */}
                         <div className="mt-auto flex justify-end">
-                          <button className="bg-primary text-white px-3 py-1.5 rounded-lg font-medium text-xs hover:bg-primary/90 transition-colors">
+                          <button
+                            className="px-3 py-1.5 rounded-lg font-medium text-xs transition-colors"
+                            style={{
+                              backgroundColor: 'var(--cardapio-btn-primary)',
+                              color: 'var(--cardapio-btn-primary-text)',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = 'var(--cardapio-btn-hover)'
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'var(--cardapio-btn-primary)'
+                            }}
+                          >
                             Selecionar Produto
                           </button>
                         </div>

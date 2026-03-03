@@ -7,6 +7,7 @@ import { obterCarrinho } from '@/src/infrastructure/api/cardapio/cardapioApiServ
 import CarrinhoResumo from './CarrinhoResumo'
 import CarrosselProdutosDestaque from './CarrosselProdutosDestaque'
 import BannerDestaques from './BannerDestaques'
+import ThemeSelector from './ThemeSelector'
 import Image from 'next/image'
 
 interface CardapioHomeScreenProps {
@@ -69,9 +70,15 @@ export default function CardapioHomeScreen({ mesaId }: CardapioHomeScreenProps) 
   ]
 
   return (
-    <div className="min-h-screen bg-black flex flex-col lg:flex-row">
+    <div
+      className="min-h-screen flex flex-col lg:flex-row"
+      style={{ backgroundColor: 'var(--cardapio-bg-primary)' }}
+    >
       {/* Painel Esquerdo - Controles */}
-      <div className="w-full lg:w-1/3 bg-black flex flex-col min-h-screen lg:min-h-0">
+      <div
+        className="w-full lg:w-1/3 flex flex-col min-h-screen lg:min-h-0"
+        style={{ backgroundColor: 'var(--cardapio-bg-primary)' }}
+      >
         {/* Logo no Topo */}
         <div className="px-6 pt-6 pb-4">
           {/* Título e Mesa na mesma linha */}
@@ -88,21 +95,58 @@ export default function CardapioHomeScreen({ mesaId }: CardapioHomeScreenProps) 
               </div>
             ) : (
               <div className="flex-1">
-                <h1 className="text-3xl font-bold text-white mb-1">Giuseppe</h1>
-                <p className="text-base text-white/80 font-light">PIZZARIA</p>
+                <h1
+                  className="text-3xl font-bold mb-1"
+                  style={{ color: 'var(--cardapio-text-primary)' }}
+                >
+                  Giuseppe
+                </h1>
+                <p
+                  className="text-base font-light"
+                  style={{ color: 'var(--cardapio-text-secondary)' }}
+                >
+                  PIZZARIA
+                </p>
               </div>
             )}
 
             {/* Número da Mesa - à direita do título */}
-            <div className="flex items-center gap-2 px-3 py-2 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20 flex-shrink-0">
-              <MdTableRestaurant className="w-5 h-5 text-white/80" />
-              <span className="text-white/90 text-sm font-medium">Mesa</span>
-              <span className="text-white text-lg font-bold">{numeroMesa}</span>
+            <div
+              className="flex items-center gap-2 px-3 py-2 rounded-lg backdrop-blur-sm border flex-shrink-0"
+              style={{
+                backgroundColor: 'var(--cardapio-bg-elevated)',
+                borderColor: 'var(--cardapio-border)',
+              }}
+            >
+              <MdTableRestaurant
+                className="w-5 h-5"
+                style={{ color: 'var(--cardapio-text-secondary)' }}
+              />
+              <span
+                className="text-sm font-medium"
+                style={{ color: 'var(--cardapio-text-secondary)' }}
+              >
+                Mesa
+              </span>
+              <span
+                className="text-lg font-bold"
+                style={{ color: 'var(--cardapio-text-primary)' }}
+              >
+                {numeroMesa}
+              </span>
             </div>
           </div>
 
+          {/* Seletor de Tema */}
+          <div className="mb-3">
+            <ThemeSelector />
+          </div>
+
           {/* Texto de Instrução */}
-          <p className="text-white/70 text-xs font-light mb-3 lg:mb-4">
+          <p
+            className="text-xs font-light mb-3 lg:mb-4"
+            style={{ color: 'var(--cardapio-text-tertiary)' }}
+          >
             Seja bem-vindo(a), acesse o cardápio e faça seu pedido!
           </p>
 
@@ -129,15 +173,12 @@ export default function CardapioHomeScreen({ mesaId }: CardapioHomeScreenProps) 
                 key={botao.id}
                 onClick={botao.onClick}
                 className="
-                  bg-white
-                  text-black
                   rounded-xl
                   px-6
                   py-4
                   flex
                   items-center
                   gap-4
-                  hover:bg-white/90
                   active:scale-95
                   transition-all
                   duration-200
@@ -146,14 +187,28 @@ export default function CardapioHomeScreen({ mesaId }: CardapioHomeScreenProps) 
                   group
                 "
                 style={{
+                  backgroundColor: 'var(--cardapio-btn-primary)',
+                  color: 'var(--cardapio-btn-primary-text)',
                   animation: `fadeInLeft 0.5s ease-out ${index * 0.1}s both`,
                   animationFillMode: 'both',
                 }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--cardapio-btn-hover)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--cardapio-btn-primary)'
+                }}
               >
                 <div className="w-10 h-10 flex items-center justify-center">
-                  <Icon className="w-6 h-6 text-black group-hover:scale-110 transition-transform" />
+                  <Icon
+                    className="w-6 h-6 group-hover:scale-110 transition-transform"
+                    style={{ color: 'var(--cardapio-btn-primary-text)' }}
+                  />
                 </div>
-                <span className="text-lg font-semibold flex-1 text-left">
+                <span
+                  className="text-lg font-semibold flex-1 text-left"
+                  style={{ color: 'var(--cardapio-btn-primary-text)' }}
+                >
                   {botao.label}
                 </span>
                 <svg
@@ -178,23 +233,31 @@ export default function CardapioHomeScreen({ mesaId }: CardapioHomeScreenProps) 
             <button
               onClick={() => router.push(`/cardapio/mesa/${mesaId}/carrinho`)}
               className="
-                bg-white/10
-                text-white
                 border-2
-                border-white/30
                 rounded-xl
                 px-6
                 py-4
                 flex
                 items-center
                 gap-4
-                hover:bg-white/20
-                hover:border-white/50
                 active:scale-95
                 transition-all
                 duration-200
                 group
               "
+              style={{
+                backgroundColor: 'var(--cardapio-bg-elevated)',
+                borderColor: 'var(--cardapio-border)',
+                color: 'var(--cardapio-text-primary)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--cardapio-bg-hover)'
+                e.currentTarget.style.borderColor = 'var(--cardapio-border-hover)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--cardapio-bg-elevated)'
+                e.currentTarget.style.borderColor = 'var(--cardapio-border)'
+              }}
             >
               <div className="relative">
                 <MdShoppingCart className="w-6 h-6" />
@@ -211,14 +274,22 @@ export default function CardapioHomeScreen({ mesaId }: CardapioHomeScreenProps) 
 
         {/* Footer */}
         <div className="px-6 pb-4">
-          <p className="text-white/40 text-xs text-center">
+          <p
+            className="text-xs text-center"
+            style={{ color: 'var(--cardapio-text-muted)' }}
+          >
             Desenvolvido por ConnectPlug
           </p>
         </div>
       </div>
 
       {/* Painel Direito - Banner e Carrossel de Produtos em Destaque */}
-      <div className="hidden lg:flex lg:w-2/3 bg-gradient-to-br from-gray-900 to-black relative h-screen flex-col overflow-hidden">
+      <div
+        className="hidden lg:flex lg:w-2/3 relative h-screen flex-col overflow-hidden"
+        style={{
+          background: 'var(--cardapio-gradient-secondary)',
+        }}
+      >
         {/* Banner Destaques do Dia */}
         <BannerDestaques />
         

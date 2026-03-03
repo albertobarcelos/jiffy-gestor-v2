@@ -1,6 +1,8 @@
 'use client'
 
 import { ReactNode } from 'react'
+import { useCardapioTheme } from '@/src/presentation/hooks/useCardapioTheme'
+import '@/src/presentation/styles/cardapio-themes.css'
 
 /**
  * Layout isolado do cardápio digital
@@ -12,6 +14,9 @@ export default function CardapioLayout({
 }: {
   children: ReactNode
 }) {
+  // Inicializar tema (aplica automaticamente no documentElement)
+  useCardapioTheme()
+
   return (
     <>
       <style dangerouslySetInnerHTML={{
@@ -124,7 +129,7 @@ export default function CardapioLayout({
           }
         `
       }} />
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="min-h-screen" style={{ backgroundColor: 'var(--cardapio-bg-primary)' }}>
         {/* Conteúdo principal do cardápio */}
         <main className="w-full">
           {children}
