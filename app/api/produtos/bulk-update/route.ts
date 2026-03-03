@@ -3,6 +3,14 @@ import { ApiClient } from '@/src/infrastructure/api/apiClient'
 import { getTokenInfo } from '@/src/shared/utils/getTokenInfo'
 
 /**
+ * Tipo da resposta da API externa de bulk-update
+ */
+interface BulkUpdateResponse {
+  totalUpdated?: number
+  produtosIds?: string[]
+}
+
+/**
  * POST /api/produtos/bulk-update
  * Atualiza múltiplos produtos em lote
  * 
@@ -113,7 +121,7 @@ export async function POST(req: NextRequest) {
 
     // Chama API externa
     const apiClient = new ApiClient()
-    const { data } = await apiClient.request('/api/v1/cardapio/produtos/bulk-update', {
+    const { data } = await apiClient.request<BulkUpdateResponse>('/api/v1/cardapio/produtos/bulk-update', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
