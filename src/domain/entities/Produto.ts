@@ -33,7 +33,8 @@ export class Produto {
     private readonly permiteAcrescimo?: boolean,
     private readonly permiteDesconto?: boolean,
     private readonly gruposComplementos?: ProdutoGrupoComplementoResumo[],
-    private readonly impressoras?: ProdutoImpressoraResumo[]
+    private readonly impressoras?: ProdutoImpressoraResumo[],
+    private readonly descricao?: string
   ) {}
 
   static create(
@@ -50,7 +51,8 @@ export class Produto {
     permiteAcrescimo?: boolean,
     permiteDesconto?: boolean,
     gruposComplementos?: ProdutoGrupoComplementoResumo[],
-    impressoras?: ProdutoImpressoraResumo[]
+    impressoras?: ProdutoImpressoraResumo[],
+    descricao?: string
   ): Produto {
     if (!id || !nome) {
       throw new Error('ID e nome são obrigatórios')
@@ -70,7 +72,8 @@ export class Produto {
       permiteAcrescimo,
       permiteDesconto,
       gruposComplementos,
-      impressoras
+      impressoras,
+      descricao
     )
   }
 
@@ -110,7 +113,8 @@ export class Produto {
               : [],
           }))
         : [],
-      impressorasMapeadas
+      impressorasMapeadas,
+      data.descricao?.toString()
     )
   }
 
@@ -170,6 +174,10 @@ export class Produto {
     return this.impressoras || []
   }
 
+  getDescricao(): string | undefined {
+    return this.descricao
+  }
+
   toJSON() {
     return {
       id: this.id,
@@ -186,6 +194,7 @@ export class Produto {
       permiteDesconto: this.permiteDesconto,
       gruposComplementos: this.gruposComplementos,
       impressoras: this.impressoras,
+      descricao: this.descricao,
     }
   }
 }

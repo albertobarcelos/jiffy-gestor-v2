@@ -14,7 +14,8 @@ export function middleware(request: NextRequest) {
     pathname === '/login' || 
     pathname.startsWith('/api/auth/login') ||
     pathname.startsWith('/api/consulta-cnpj') ||
-    pathname.startsWith('/api/consulta-cep')
+    pathname.startsWith('/api/consulta-cep') ||
+    pathname.startsWith('/cardapio') // Rotas do cardápio são públicas
   ) {
     return NextResponse.next()
   }
