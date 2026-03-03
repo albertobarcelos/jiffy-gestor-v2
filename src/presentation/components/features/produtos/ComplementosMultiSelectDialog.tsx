@@ -48,6 +48,7 @@ export function ComplementosMultiSelectDialog({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [abreComplementos, setAbreComplementos] = useState<boolean>(false)
   const [isSelectDialogOpen, setIsSelectDialogOpen] = useState(false)
   const [allSelectableGroups, setAllSelectableGroups] = useState<Array<{ id: string; nome: string }>>(
     []
@@ -102,6 +103,9 @@ export function ComplementosMultiSelectDialog({
               : 0,
         qtdMaxima: typeof grupo.qtdMaxima === 'number' && grupo.qtdMaxima > 0 ? grupo.qtdMaxima : 0,
       }))
+
+      // Captura o valor de abreComplementos do produto
+      setAbreComplementos(Boolean(produto.abreComplementos))
 
       setGroups(grupos)
       setExpandedGroups(
@@ -651,15 +655,22 @@ export function ComplementosMultiSelectDialog({
                 {groups.length} grupo{groups.length === 1 ? '' : 's'} vinculados
               </p>
             </div>
-            <button
-          type="button"
-          onClick={handleOpenSelectDialog}
-          disabled={isUpdating}
-          className="md:h-8 px-4 py-1 rounded-lg border border-primary bg-primary text-white font-semibold md:text-sm text-xs flex items-center md:gap-2 hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          <MdAdd size={18} />
-          Vincular grupo
-        </button>
+            <div className="flex flex-col items-end gap-1">
+              <button
+                type="button"
+                onClick={handleOpenSelectDialog}
+                disabled={isUpdating || !abreComplementos}
+                className="md:h-8 px-4 py-1 rounded-lg border border-primary bg-primary text-white font-semibold md:text-sm text-xs flex items-center md:gap-2 hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <MdAdd size={18} />
+                Vincular grupo
+              </button>
+              {!abreComplementos && (
+                <span className="text-[10px] text-secondary-text text-right max-w-[200px]">
+                  Ative &quot;Abre Complementos&quot; nas configurações do produto
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto md:px-6 px-2 py-4">{renderDialogBody()}</div>
           <div className="px-6 py-12 border-t border-gray-100 flex justify-end">

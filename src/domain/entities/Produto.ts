@@ -12,6 +12,12 @@ interface ProdutoGrupoComplementoResumo {
   complementos: ProdutoComplementoResumo[]
 }
 
+interface ProdutoImpressoraResumo {
+  id: string
+  nome: string
+  ativo: boolean
+}
+
 export class Produto {
   private constructor(
     private readonly id: string,
@@ -26,7 +32,8 @@ export class Produto {
     private readonly abreComplementos?: boolean,
     private readonly permiteAcrescimo?: boolean,
     private readonly permiteDesconto?: boolean,
-    private readonly gruposComplementos?: ProdutoGrupoComplementoResumo[]
+    private readonly gruposComplementos?: ProdutoGrupoComplementoResumo[],
+    private readonly impressoras?: ProdutoImpressoraResumo[]
   ) {}
 
   static create(
@@ -42,7 +49,8 @@ export class Produto {
     abreComplementos?: boolean,
     permiteAcrescimo?: boolean,
     permiteDesconto?: boolean,
-    gruposComplementos?: ProdutoGrupoComplementoResumo[]
+    gruposComplementos?: ProdutoGrupoComplementoResumo[],
+    impressoras?: ProdutoImpressoraResumo[]
   ): Produto {
     if (!id || !nome) {
       throw new Error('ID e nome são obrigatórios')
@@ -61,7 +69,8 @@ export class Produto {
       abreComplementos,
       permiteAcrescimo,
       permiteDesconto,
-      gruposComplementos
+      gruposComplementos,
+      impressoras
     )
   }
 
@@ -89,6 +98,13 @@ export class Produto {
                   nome: comp.nome?.toString() || '',
                 }))
               : [],
+          }))
+        : [],
+      Array.isArray(data.impressoras)
+        ? data.impressoras.map((imp: any) => ({
+            id: imp.id?.toString() || '',
+            nome: imp.nome?.toString() || 'Impressora',
+            ativo: imp.ativo === true || imp.ativo === 'true',
           }))
         : []
     )
@@ -146,6 +162,10 @@ export class Produto {
     return this.gruposComplementos || []
   }
 
+  getImpressoras(): ProdutoImpressoraResumo[] {
+    return this.impressoras || []
+  }
+
   toJSON() {
     return {
       id: this.id,
@@ -161,6 +181,7 @@ export class Produto {
       permiteAcrescimo: this.permiteAcrescimo,
       permiteDesconto: this.permiteDesconto,
       gruposComplementos: this.gruposComplementos,
+      impressoras: this.impressoras,
     }
   }
 }

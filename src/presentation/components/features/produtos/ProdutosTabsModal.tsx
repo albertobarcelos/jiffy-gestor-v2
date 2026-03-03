@@ -28,6 +28,12 @@ interface ProdutosTabsModalProps {
 
 export function ProdutosTabsModal({ state, onClose, onReload, onTabChange }: ProdutosTabsModalProps) {
   const produtoId = state.produto?.getId()
+  
+  // Gerar uma key única baseada no produto e modo para forçar recriação quando necessário
+  // Isso resolve problemas de timing quando o modal é fechado e reaberto rapidamente
+  const dialogKey = useMemo(() => {
+    return `produto-modal-${produtoId || 'new'}-${state.mode}-${state.tab}`
+  }, [produtoId, state.mode, state.tab])
 
   const title = useMemo(() => {
     if (state.tab === 'produto') {
@@ -52,9 +58,12 @@ export function ProdutosTabsModal({ state, onClose, onReload, onTabChange }: Pro
 
   return (
     <Dialog
+      key={dialogKey}
       open={state.open}
       onOpenChange={(open) => {
-        if (!open) {
+        // Só chamar onClose se o estado realmente mudou para fechado
+        // Isso evita chamadas duplicadas que podem causar problemas de timing
+        if (!open && state.open) {
           onClose()
         }
       }}
