@@ -149,6 +149,7 @@ export function TopNav() {
         { name: 'Grupo de Complementos', path: '/cadastros/grupos-complementos', icon: MdCategory },
         { name: 'Complementos', path: '/cadastros/complementos', icon: MdAddCircle },
         { name: 'Cadastro por Planilhas', path: '/cadastro-por-planilha', icon: MdAirplaneTicket },
+        { name: 'Impressoras', path: '/cadastros/impressoras', icon: MdPrint },
       ],
     },
     {
@@ -188,18 +189,10 @@ export function TopNav() {
         { name: 'Hist. Fechamentos', path: '/historico-fechamento', icon: MdHistory },
         { name: 'Relatórios', path: '/relatorios', icon: MdAssessment },
         { name: 'Meios de Pagamentos', path: '/cadastros/meios-pagamentos', icon: MdPayment },
-      ],
-    },
-    {
-      name: 'Fiscal',
-      path: '#',
-      icon: MdReceipt,
-      children: [
-        { name: 'Painel do Contador', path: '/painel-contador', icon: MdAccountBalance },
         { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: MdReceipt },
-        { name: 'Impressoras', path: '/cadastros/impressoras', icon: MdPrint },
       ],
     },
+    { name: 'Painel do Contador', path: '/painel-contador', icon: MdAccountBalance },
     { name: 'Configurações', path: '/configuracoes', icon: MdSettings },
   ]
 
