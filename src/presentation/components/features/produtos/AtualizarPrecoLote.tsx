@@ -721,7 +721,7 @@ export function AtualizarPrecoLote() {
             href="/produtos"
             className="h-8 px-8 rounded-lg bg-info text-primary justify-center font-semibold font-exo text-sm border border-primary shadow-sm hover:bg-primary/20 transition-colors flex items-center"
           >
-            Cancelar
+            Voltar
           </Link>
         </div>
       </div>
