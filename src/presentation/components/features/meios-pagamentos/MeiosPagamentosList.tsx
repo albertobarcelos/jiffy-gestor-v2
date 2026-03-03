@@ -28,8 +28,12 @@ interface MeiosPagamentosListProps {
 const formasPagamentoFiscalMap: Record<string, string> = {
   dinheiro: 'Dinheiro',
   pix: 'PIX',
-  cartao_credito: 'Cartão Crédito',
-  cartao_debito: 'Cartão Débito',
+  cartao_credito: 'Cartão de Crédito',
+  cartao_debito: 'Cartão de Débito',
+  vale_alimentacao: 'Vale Alimentação',
+  vale_refeicao: 'Vale Refeição',
+  vale_presente: 'Vale Presente',
+  vale_combustivel: 'Vale Combustível',
 }
 
 /**
