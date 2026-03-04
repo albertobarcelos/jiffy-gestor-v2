@@ -7,6 +7,7 @@ import { MdSearch, MdAttachMoney, MdCalendarToday, MdFilterAltOff, MdRestaurant,
 import { showToast } from '@/src/shared/utils/toast'
 import { DetalhesVendas } from './DetalhesVendas'
 import { EscolheDatasModal } from './EscolheDatasModal'
+import { GraficoVendasPorUsuarioModal } from './GraficoVendasPorUsuarioModal'
 import {
   FormControl,
   InputLabel,
@@ -25,6 +26,7 @@ interface Venda {
   valorFinal: number
   tipoVenda: 'balcao' | 'mesa'
   abertoPorId: string
+  canceladoPorId?: string
   codigoTerminal: string
   terminalId: string
   dataCriacao: string
@@ -111,6 +113,8 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   const [isDatasModalOpen, setIsDatasModalOpen] = useState(false)
   const [filtrosVisiveisMobile, setFiltrosVisiveisMobile] = useState(false)
   const [isMobileViewport, setIsMobileViewport] = useState(false)
+  const [isGraficoVendasPorUsuarioOpen, setIsGraficoVendasPorUsuarioOpen] = useState(false)
+  const [isGraficoVendasCanceladasOpen, setIsGraficoVendasCanceladasOpen] = useState(false)
 
   const pageSize = 100 // Aumentado para buscar mais itens por página
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -1018,7 +1022,11 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         {/* Cards de Métricas */}
         <div className="flex gap-2 m-1 overflow-x-auto pb-2 scrollbar-thin">
           {/* Vendas Finalizadas/Em Aberto */}
-          <div className="flex-1 border-2 rounded-lg p-1 flex items-center gap-3">
+          <div 
+            className="flex-1 border-2 rounded-lg p-1 flex items-center gap-3 cursor-pointer hover:bg-primary/5 transition-colors"
+            onClick={() => setIsGraficoVendasPorUsuarioOpen(true)}
+            title="Clique para ver gráfico de vendas por usuário"
+          >
             <div className="w-10 h-10 rounded-full bg-alternate flex items-center justify-center flex-shrink-0">
               <span className="text-info text-xl">🛒</span>
             </div>
@@ -1033,7 +1041,11 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           </div>
 
           {/* Vendas Canceladas */}
-          <div className="flex-1 rounded-lg border-2 p-1 flex items-center gap-3">
+          <div 
+            className="flex-1 rounded-lg border-2 p-1 flex items-center gap-3 cursor-pointer hover:bg-primary/5 transition-colors"
+            onClick={() => setIsGraficoVendasCanceladasOpen(true)}
+            title="Clique para ver gráfico de vendas canceladas por usuário"
+          >
             <div className="w-10 h-10 rounded-full bg-error flex items-center justify-center flex-shrink-0">
               <span className="text-info text-xl">✕</span>
             </div>
@@ -1277,6 +1289,24 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         onConfirm={handleConfirmDatas}
         dataInicial={periodoInicial}
         dataFinal={periodoFinal}
+      />
+
+      {/* Modal de Gráfico de Vendas por Usuário */}
+      <GraficoVendasPorUsuarioModal
+        open={isGraficoVendasPorUsuarioOpen}
+        onClose={() => setIsGraficoVendasPorUsuarioOpen(false)}
+        vendas={vendas}
+        usuariosPDV={usuariosPDV}
+        tipo="finalizadas"
+      />
+
+      {/* Modal de Gráfico de Vendas Canceladas por Usuário */}
+      <GraficoVendasPorUsuarioModal
+        open={isGraficoVendasCanceladasOpen}
+        onClose={() => setIsGraficoVendasCanceladasOpen(false)}
+        vendas={vendas}
+        usuariosPDV={usuariosPDV}
+        tipo="canceladas"
       />
     </div>
   )
