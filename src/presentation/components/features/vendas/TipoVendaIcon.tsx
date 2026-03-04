@@ -54,15 +54,15 @@ export function TipoVendaIcon({
   const borderCircleSize = size * 0.6 // Tamanho do círculo com a borda
   const innerCircleSize = size * 0.5 // Tamanho do círculo interno (sólido)
   const textFontSize = size / 4 // Tamanho da fonte do número da mesa
-  const beerIconSize = size / 2 // Tamanho do ícone da cerveja para balcão
-  const balcaoTextSize = size / 6 // Tamanho da fonte do texto "Balcão"
+  const beerIconSize = size // Tamanho do ícone da cerveja para balcão
+  const balcaoTextSize = size / 5 // Tamanho da fonte do texto "Balcão"
 
   if (tipoVenda === 'mesa') {
     return (
       <div
-        className={`relative flex flex-col items-center justify-center tooltip-hover ${className}`}
+        className={`relative flex flex-col items-center justify-center ${title ? 'tooltip-hover' : ''} ${className}`}
         style={{ height: `${iconHeight}px`, width: `${containerSize}px` }}
-        data-tooltip={title || ''}
+        {...(title ? { 'data-tooltip': title } : {})}
       >
         {/* Container Stack - equivalente ao Stack do Flutter */}
         <div className="relative flex items-center justify-center" style={{ width: `${outerCircleSize}px`, height: `${outerCircleSize}px` }}>
@@ -166,9 +166,20 @@ export function TipoVendaIcon({
   // Componente de Balcão - usa o tamanho da prop size
   if (tipoVenda === 'balcao') {
     return (
-      <div className={`flex flex-col items-center justify-center ${className}`} style={{ height: `${iconHeight}px`, width: `${outerCircleSize}px` }}>
+      <div 
+        className={`flex flex-col items-center justify-center ${className}`} 
+        style={{ 
+          height: `${iconHeight}px`, 
+          width: `${outerCircleSize}px`,
+          minHeight: `${iconHeight}px`,
+          minWidth: `${outerCircleSize}px`,
+          maxHeight: `${iconHeight}px`,
+          maxWidth: `${outerCircleSize}px`,
+          flexShrink: 0
+        }}
+      >
         <RiBeerFill size={beerIconSize} color={corBalcao} />
-        <span className="mt-1 font-medium" style={{ color: corBalcao, fontSize: `${balcaoTextSize}px` }}>Balcão</span>
+        <span className="mt-1 font-medium whitespace-nowrap" style={{ color: corBalcao, fontSize: `${balcaoTextSize}px`, lineHeight: 1 }}>Balcão</span>
       </div>
     )
   }

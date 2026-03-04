@@ -688,8 +688,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                   {venda.produtosLancados?.map((produto, index) => {
                     const valorTotal = calcularValorProduto(produto)
                     const isRemovido = produto.removido
-                    // Se o produto foi removido, o valor total exibido deve ser R$ 0,00
-                    const valorExibir = isRemovido ? 0 : valorTotal
+                    // Sempre exibe o valor total, mesmo quando removido (com risco)
 
                     return (
                       <div
@@ -743,8 +742,8 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                               
                               return null
                             })()}
-                            <div className="flex-1 flex items-center justify-end text-sm font-semibold text-primary-text font-nunito">
-                              {formatCurrency(valorExibir)}
+                            <div className={`flex-1 flex items-center justify-end text-sm font-semibold text-primary-text font-nunito ${isRemovido ? 'line-through' : ''}`}>
+                              {formatCurrency(valorTotal)}
                             </div>
                           </div>
 
@@ -764,7 +763,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                                       {complemento.quantidade}x {complemento.nomeComplemento}
                                       {temImpactoPreco && ` (${formatNumber(complemento.valorUnitario)})`}
                                     </span>
-                                    <div className="text-xs font-semibold text-secondary-text font-nunito">
+                                    <div className={`text-xs font-semibold text-secondary-text font-nunito ${isRemovido ? 'line-through' : ''}`}>
                                       {temImpactoPreco ? `${prefix}${formatCurrency(valorTotalComplemento)}` : '-'}
                                     </div>
                                   </div>

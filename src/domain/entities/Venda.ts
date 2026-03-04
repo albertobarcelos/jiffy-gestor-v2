@@ -18,6 +18,7 @@ export class Venda {
     private readonly dataUltimoProdutoLancado?: Date | null,
     private readonly dataUltimaMovimentacao?: Date | null,
     private readonly dataCancelamento?: Date | null,
+    private readonly dataFinalizacao?: Date | null,
   ) {}
 
   static create(
@@ -36,6 +37,7 @@ export class Venda {
     dataUltimoProdutoLancado?: Date | null,
     dataUltimaMovimentacao?: Date | null,
     dataCancelamento?: Date | null,
+    dataFinalizacao?: Date | null,
   ): Venda {
     if (!id || !data || numeroVenda <= 0 || !userId || !tipoVenda) {
       throw new Error('Campos obrigatórios não preenchidos')
@@ -56,7 +58,8 @@ export class Venda {
       status,
       dataUltimoProdutoLancado,
       dataUltimaMovimentacao,
-      dataCancelamento
+      dataCancelamento,
+      dataFinalizacao
     )
   }
 
@@ -76,7 +79,8 @@ export class Venda {
       data.status === 'Aprovada' || data.status === 'Cancelada' ? data.status : 'Aprovada',
       data.dataUltimoProdutoLancado ? new Date(data.dataUltimoProdutoLancado) : null,
       data.dataUltimaMovimentacao ? new Date(data.dataUltimaMovimentacao) : null,
-      data.dataCancelamento ? new Date(data.dataCancelamento) : null
+      data.dataCancelamento ? new Date(data.dataCancelamento) : null,
+      data.dataFinalizacao ? new Date(data.dataFinalizacao) : null
     )
   }
 
@@ -140,6 +144,10 @@ export class Venda {
     return this.dataUltimaMovimentacao
   }
 
+  getDataFinalizacao(): Date | null | undefined {
+    return this.dataFinalizacao
+  }
+
   isAprovada(): boolean {
     return this.status === 'Aprovada'
   }
@@ -170,6 +178,7 @@ export class Venda {
       dataUltimoProdutoLancado: this.dataUltimoProdutoLancado?.toISOString() || null,
       dataUltimaMovimentacao: this.dataUltimaMovimentacao?.toISOString() || null,
       dataCancelamento: this.dataCancelamento?.toISOString() || null,
+      dataFinalizacao: this.dataFinalizacao?.toISOString() || null,
     }
   }
 }

@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Venda } from '@/src/domain/entities/Venda'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { MdPerson, MdVisibility } from 'react-icons/md'
 import { DetalhesVendas } from '@/src/presentation/components/features/vendas/DetalhesVendas'
+import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 import { calculatePeriodo } from '@/src/shared/utils/dateFilters' // Importar calculatePeriodo
 
 interface UserNamesMap {
@@ -15,6 +15,11 @@ interface UserPdvApiResponse {
   id: string;
   nome: string;
   // Adicione outras propriedades relevantes se necessário
+}
+
+interface VendaExtraInfo {
+  tipoVenda: 'mesa' | 'balcao';
+  numeroMesa?: number | null;
 }
 
 interface UltimasVendasProps {
@@ -32,6 +37,7 @@ interface UltimasVendasProps {
 export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: UltimasVendasProps) {
   const [vendas, setVendas] = useState<Venda[]>([])
   const [userNames, setUserNames] = useState<UserNamesMap>({})
+  const [vendasExtraInfo, setVendasExtraInfo] = useState<Map<string, VendaExtraInfo>>(new Map())
   const [isLoading, setIsLoading] = useState(true)
   const { auth } = useAuthStore()
 
@@ -50,9 +56,8 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
     const month = date.toLocaleDateString('pt-BR', { month: 'long' })
     const hours = date.getHours().toString().padStart(2, '0')
     const minutes = date.getMinutes().toString().padStart(2, '0')
-    const period = date.getHours() >= 12 ? 'PM' : 'AM'
-    // Formato: "20 fevereiro, 11:20 AM"
-    return `${day} ${month}, ${hours}:${minutes} ${period}`
+    // Formato: "20 fevereiro, 11:20" (sem AM/PM)
+    return `${day} ${month}, ${hours}:${minutes}`
   }, [])
 
   const handleOpenModal = useCallback((vendaId: string) => {
@@ -92,7 +97,7 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
         // Buscar últimas vendas da API
         const baseUrl = process.env.NEXT_PUBLIC_EXTERNAL_API_BASE_URL || ''
 
-        // Buscar vendas finalizadas, ordenadas por data (mais recentes primeiro)
+        // Buscar apenas vendas finalizadas (sem canceladas), ordenadas por data (mais recentes primeiro)
         const params = new URLSearchParams({
           limit: '100', // Aumentado para buscar mais vendas no período
           offset: '0',
@@ -114,8 +119,8 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
           }
         }
         
+        // Filtrar apenas vendas FINALIZADAS (sem canceladas)
         params.append('status', 'FINALIZADA');
-        params.append('status', 'CANCELADA');
 
         const response = await fetch(`${baseUrl}/api/v1/operacao-pdv/vendas?${params}`, {
           headers: {
@@ -131,6 +136,7 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
         const data = await response.json()
 
         // Mapear dados da API para entidade Venda, extraindo userId
+        const extraInfoMap = new Map<string, VendaExtraInfo>()
         const vendasMapeadas: Venda[] = (data.items || []).map((item: any) => {
           const userId = item.abertoPor?.id || item.usuarioPdv?.id || item.usuario?.id || item.abertoPorId || item.usuarioId || ''
           
@@ -141,25 +147,54 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
                            new Date()
           const valorFaturado = item.valorFinal || item.valorTotal || item.valor || 0
           const numeroVenda = item.numeroVenda || item.numero || item.id || ''
-          const tipoVenda = item.tipoVenda || item.tipo || 'Balcão'
+          const tipoVendaRaw = item.tipoVenda || item.tipo || 'Balcão'
+          // Normalizar tipoVenda para o formato esperado pelo TipoVendaIcon
+          // Aceita variações: 'Mesa', 'mesa', 'MESA', etc.
+          const tipoVendaLower = tipoVendaRaw.toLowerCase().trim()
+          const tipoVendaNormalizado = tipoVendaLower === 'mesa' ? 'mesa' : 'balcao'
+          // Extrair numeroMesa com múltiplos fallbacks
+          const numeroMesa = item.numeroMesa !== undefined && item.numeroMesa !== null ? item.numeroMesa :
+                            item.mesa?.numero !== undefined && item.mesa?.numero !== null ? item.mesa.numero :
+                            item.mesa?.numeroMesa !== undefined && item.mesa?.numeroMesa !== null ? item.mesa.numeroMesa :
+                            item.mesaNumero !== undefined && item.mesaNumero !== null ? item.mesaNumero :
+                            null
           const metodoPagamento = item.meioPagamento?.nome ||
                                  item.meioPagamentoNome ||
                                  item.metodoPagamento ||
                                  item.formaPagamento ||
                                  'Não informado'
-          const status = item.cancelado ? 'Cancelada' :
-                        item.status === 'CANCELADA' ? 'Cancelada' :
-                        'Aprovada'
+          // Todas as vendas retornadas serão FINALIZADAS, então sempre 'Aprovada'
+          const status = 'Aprovada'
           const dataUltimoProdutoLancado = item.dataUltimoProdutoLancado ? new Date(item.dataUltimoProdutoLancado) : null
           const dataUltimaMovimentacao = item.dataUltimaMovimentacao ? new Date(item.dataUltimaMovimentacao) : null
           const dataCancelamento = item.dataCancelamento ? new Date(item.dataCancelamento) : null
+          const dataFinalizacao = item.dataFinalizacao ? new Date(item.dataFinalizacao) : null
+
+          const vendaId = item.id?.toString() || ''
+          
+          // Armazenar informações extras para o TipoVendaIcon
+          // Converte numeroMesa para número, tratando 0 como valor válido
+          let numeroMesaConvertido: number | null = null
+          if (numeroMesa !== null && numeroMesa !== undefined) {
+            if (typeof numeroMesa === 'number') {
+              numeroMesaConvertido = numeroMesa
+            } else {
+              const parsed = parseInt(String(numeroMesa), 10)
+              numeroMesaConvertido = isNaN(parsed) ? null : parsed
+            }
+          }
+          
+          extraInfoMap.set(vendaId, {
+            tipoVenda: tipoVendaNormalizado,
+            numeroMesa: numeroMesaConvertido
+          })
 
           return Venda.create(
-            item.id?.toString() || '',
+            vendaId,
             dataVenda,
             typeof numeroVenda === 'number' ? numeroVenda : parseInt(numeroVenda) || 0,
             userId,
-            tipoVenda,
+            tipoVendaRaw,
             valorFaturado, // valorInicial
             0, // acrescimo
             0, // descontoConta
@@ -169,13 +204,20 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
             status as 'Aprovada' | 'Cancelada',
             dataUltimoProdutoLancado,
             dataUltimaMovimentacao,
-            dataCancelamento
+            dataCancelamento,
+            dataFinalizacao
           )
         })
+        
+        setVendasExtraInfo(extraInfoMap)
 
-        // Ordenar as vendas pela data mais recente (exibe todas as vendas retornadas, até 100)
+        // Ordenar as vendas pela data de finalização mais recente (ou data de abertura se não houver finalização)
         const ultimasVendas = vendasMapeadas
-          .sort((a, b) => b.getData().getTime() - a.getData().getTime())
+          .sort((a, b) => {
+            const dataA = a.getDataFinalizacao() || a.getData()
+            const dataB = b.getDataFinalizacao() || b.getData()
+            return dataB.getTime() - dataA.getTime()
+          })
 
         setVendas(ultimasVendas)
 
@@ -242,7 +284,7 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
 
   return (
     <>
-      <div className="bg-white h-[440px] rounded-lg shadow-sm shadow-primary/70 border border-gray-200 p-6 overflow-y-auto scrollbar-hide">
+      <div className="bg-white h-[440px] rounded-lg shadow-sm shadow-primary/70 border border-gray-200 md:p-6 p-2 overflow-y-auto scrollbar-hide">
         <div className="flex items-center justify-center md:justify-between mb-2 md:mb-6">
           <h3 className="text-lg font-semibold text-primary">Vendas do Período</h3>
         </div>
@@ -256,35 +298,59 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
             vendas.map((venda) => {
               const displayUserId = venda.getUserId();
               const displayedName = userNames[displayUserId] || 'Usuário Desconhecido';
-              // Verifica se a venda foi cancelada através da data de cancelamento ou do status
-              const isCancelada = !!venda.getDataCancelamento() || venda.getStatus() === 'Cancelada';
 
               return (
                 <div
                   key={venda.getId()}
-                  className={`flex flex-col md:flex-row items-center justify-between p-4 rounded-lg transition-colors border border-primary/50 group cursor-pointer ${
-                    isCancelada 
-                      ? 'bg-red-100 hover:bg-red-200' 
-                      : 'bg-white hover:bg-primary/10'
-                  }`}
+                  className="flex flex-col md:flex-row items-center justify-between md:p-4 p-2 rounded-lg transition-colors border border-primary/50 group cursor-pointer bg-white hover:bg-primary/10"
                   onClick={() => handleOpenModal(venda.getId())}
                 >
-                  <div className="flex items-center gap-4 flex-1">
-                    {/* Avatar/Logo placeholder */}
-                    <div className="w-10 h-10 hidden md:flex bg-primary rounded-lg items-center justify-center text-white font-semibold text-sm flex-shrink-0">
-                      <MdPerson size={28} />
+                  <div className="flex items-center md:gap-4 flex-1 w-full md:w-auto">
+                    {/* Ícone do tipo de venda (Mesa ou Balcão) */}
+                    <div className="md:flex flex-shrink-0" style={{ minWidth: 'fit-content', minHeight: 'fit-content' }}>
+                      {(() => {
+                        const extraInfo = vendasExtraInfo.get(venda.getId())
+                        if (extraInfo) {
+                          return (
+                            <TipoVendaIcon
+                              tipoVenda={extraInfo.tipoVenda}
+                              numeroMesa={extraInfo.numeroMesa}
+                              size={55}
+                              containerScale={0.90}
+                              corTexto="#FFFFFF"
+                              corPrincipal="var(--color-primary)"
+                              corSecundaria="var(--color-info)"
+                              corBorda="var(--color-primary)"
+                              corFundo="var(--color-primary-background)"
+                              corBalcao="var(--color-primary)"
+                            />
+                          )
+                        }
+                        // Fallback: se não tiver info, mostra ícone de balcão
+                        return (
+                          <TipoVendaIcon
+                            tipoVenda="balcao"
+                            size={55}
+                            containerScale={0.90}
+                            corBalcao="var(--color-primary)"
+
+                          />
+                        )
+                      })()}
                     </div>
 
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 flex flex-col min-w-0 md:gap-2">
                       <p className="font-semibold text-sm text-gray-900 truncate">{displayedName}</p>
-                      <p className="text-sm text-gray-500">{formatDate(venda.getData())}</p>
+                      <p className="text-sm text-gray-500">
+                        <span className="font-semibold text-primary-text">Fechada em:</span> {formatDate(venda.getDataFinalizacao() || venda.getData())}
+                      </p>
                     </div>
                   </div>
 
-                  <div className="flex  items-center gap-3 ">
-                    <div className="flex md:flex-col flex-row items-center justify-between md:justify-end gap-2 text-right">
-                      <p className={`font-semibold text-sm md:text-base ${isCancelada ? 'text-red-600' : 'text-green-600'}`}>
-                        {isCancelada ? '-' : '+'}{formatCurrency(venda.getValorFaturado())}
+                  <div className="flex  items-center justify-between gap-3 w-full md:w-auto">
+                    <div className="flex md:flex-col w-full flex-row items-center justify-between mx-2 md:mx-0 md:justify-end gap-2 md:text-right">
+                      <p className="font-semibold text-sm md:text-base text-green-600   ">
+                        {formatCurrency(venda.getValorFaturado())}
                       </p>
                       <p className="text-xs text-gray-500">Venda #{venda.getNumeroVenda()}</p>
                     </div>

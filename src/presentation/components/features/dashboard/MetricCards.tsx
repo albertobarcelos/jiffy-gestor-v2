@@ -268,7 +268,7 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
 
         {/* Vendas em Aberto */}
         <MetricCard className=" border hover:border-primary/50"
-          title="Vendas em Aberto"
+          title="Mesas Abertas"
           value={formatNumber(dataAbertas?.getCountVendasEfetivadas())}
           icon={<LuDoorOpen size={20} color="var(--color-primary)" />}
           bgColorClass="bg-info border-2 border-primary"
