@@ -15,7 +15,7 @@ interface ProdutoGrupoComplementoResumo {
 interface ProdutoImpressoraResumo {
   id: string
   nome: string
-  ativo?: boolean
+  ativo: boolean
 }
 
 export class Produto {
@@ -110,7 +110,13 @@ export class Produto {
               : [],
           }))
         : [],
-      impressorasMapeadas
+      Array.isArray(data.impressoras)
+        ? data.impressoras.map((imp: any) => ({
+            id: imp.id?.toString() || '',
+            nome: imp.nome?.toString() || 'Impressora',
+            ativo: imp.ativo === true || imp.ativo === 'true',
+          }))
+        : []
     )
   }
 

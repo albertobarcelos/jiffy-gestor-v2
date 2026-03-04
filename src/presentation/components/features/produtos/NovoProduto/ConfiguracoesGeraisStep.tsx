@@ -271,11 +271,8 @@ export function ConfiguracoesGeraisStep({
     onImpressorasIdsChange(impressorasIds.filter((item) => item !== id))
   }
 
-  useEffect(() => {
-    if (!abreComplementos && grupoComplementosIds.length) {
-      onGrupoComplementosIdsChange([])
-    }
-  }, [abreComplementos, grupoComplementosIds, onGrupoComplementosIdsChange])
+  // Removido: useEffect que apagava grupos quando abreComplementos era desativado
+  // Agora os grupos são preservados mesmo quando abreComplementos está desativado
 
   return (
     <>
@@ -391,7 +388,9 @@ export function ConfiguracoesGeraisStep({
             </button>
             {!abreComplementos && (
               <p className="text-xs text-secondary-text mt-3">
-                Ative a opção “Abre Complementos” na seção Geral para vincular os grupos.
+                {grupoComplementosIds.length > 0
+                  ? 'Grupos vinculados são preservados. Ative "Abre Complementos" para adicionar novos grupos.'
+                  : 'Ative a opção "Abre Complementos" na seção Geral para vincular grupos.'}
               </p>
             )}
             {grupoComplementosIds.length > 0 && (
