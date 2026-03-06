@@ -235,6 +235,8 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
   /**
    * Calcula valor total de um produto com descontos e acréscimos
    * NOTA: Não inclui complementos no cálculo - eles são exibidos separadamente
+   * IMPORTANTE: Quando tipoDesconto/tipoAcrescimo é 'porcentagem', o backend retorna
+   * o valor já como decimal (ex: 0.1 para 10%), então NÃO deve dividir por 100
    */
   const calcularValorProduto = (produto: ProdutoLancado): number => {
     let valor = produto.valorUnitario * produto.quantidade
@@ -243,8 +245,10 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
     if (produto.desconto) {
       const descontoValue = typeof produto.desconto === 'string' ? parseFloat(produto.desconto) : produto.desconto
       if (produto.tipoDesconto === 'porcentagem') {
-        valor -= valor * (descontoValue / 100)
+        // Backend retorna 0.1 para 10%, então não divide por 100
+        valor -= valor * descontoValue
       } else {
+        // Desconto fixo: subtrai o valor diretamente
         valor -= descontoValue
       }
     }
@@ -253,8 +257,10 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
     if (produto.acrescimo) {
       const acrescimoValue = typeof produto.acrescimo === 'string' ? parseFloat(produto.acrescimo) : produto.acrescimo
       if (produto.tipoAcrescimo === 'porcentagem') {
-        valor += valor * (acrescimoValue / 100)
+        // Backend retorna 0.1 para 10%, então não divide por 100
+        valor += valor * acrescimoValue
       } else {
+        // Acréscimo fixo: adiciona o valor diretamente
         valor += acrescimoValue
       }
     }
@@ -430,6 +436,100 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
       setNomesMeiosPagamento({}) // Limpa cache de meios de pagamento
     }
   }, [open, vendaId, fetchVendaDetalhes])
+
+  /**
+   * Calcula o resumo financeiro dos itens lançados
+   */
+  const resumoFinanceiro = useMemo(() => {
+    if (!venda || !venda.produtosLancados || venda.produtosLancados.length === 0) {
+      return {
+        totalItensLancados: 0,
+        totalItensCancelados: 0,
+        totalDosItens: 0,
+        totalDescontosConta: 0,
+        totalAcrescimosConta: 0,
+        totalCupom: 0,
+      }
+    }
+
+    let totalItensLancados = 0 // Soma TODOS os itens lançados (cancelados + não cancelados)
+    let totalItensCancelados = 0
+    let totalDescontosConta = 0 // Soma todos os descontos aplicados nos produtos
+    let totalAcrescimosConta = 0 // Soma todos os acréscimos aplicados nos produtos
+
+    venda.produtosLancados.forEach((produto) => {
+      // Valor base do produto (sem desconto/acréscimo)
+      const valorBaseProduto = produto.valorUnitario * produto.quantidade
+
+      // Calcula valor do desconto aplicado (se houver)
+      let valorDesconto = 0
+      if (produto.desconto) {
+        const descontoValue = typeof produto.desconto === 'string' ? parseFloat(produto.desconto) : produto.desconto
+        if (produto.tipoDesconto === 'porcentagem') {
+          // Backend retorna 0.1 para 10%, então multiplica diretamente
+          valorDesconto = valorBaseProduto * descontoValue
+        } else {
+          // Desconto fixo
+          valorDesconto = descontoValue
+        }
+        totalDescontosConta += valorDesconto
+      }
+
+      // Calcula valor do acréscimo aplicado (se houver)
+      let valorAcrescimo = 0
+      if (produto.acrescimo) {
+        const acrescimoValue = typeof produto.acrescimo === 'string' ? parseFloat(produto.acrescimo) : produto.acrescimo
+        if (produto.tipoAcrescimo === 'porcentagem') {
+          // Backend retorna 0.1 para 10%, então multiplica diretamente
+          valorAcrescimo = valorBaseProduto * acrescimoValue
+        } else {
+          // Acréscimo fixo
+          valorAcrescimo = acrescimoValue
+        }
+        totalAcrescimosConta += valorAcrescimo
+      }
+
+      // Calcula valor total do produto (com descontos/acréscimos)
+      const valorTotalProduto = calcularValorProduto(produto)
+
+      // Soma complementos que impactam preço
+      let valorComplementos = 0
+      if (produto.complementos && produto.complementos.length > 0) {
+        produto.complementos.forEach((complemento) => {
+          if (complemento.tipoImpactoPreco === 'aumenta') {
+            valorComplementos += calcularValorComplemento(complemento)
+          } else if (complemento.tipoImpactoPreco === 'diminui') {
+            valorComplementos -= calcularValorComplemento(complemento)
+          }
+        })
+      }
+
+      const valorTotalComComplementos = valorTotalProduto + valorComplementos
+
+      // SEMPRE soma ao total lançado (independente se foi cancelado ou não)
+      totalItensLancados += valorTotalComComplementos
+
+      if (produto.removido) {
+        // Produto removido: também soma ao total cancelado
+        totalItensCancelados += valorTotalComComplementos
+      }
+    })
+
+    // Total dos itens (A - B)
+    const totalDosItens = totalItensLancados - totalItensCancelados
+
+    // Total do cupom (valorFinal da venda)
+    const totalCupom = venda.valorFinal
+
+    return {
+      totalItensLancados,
+      totalItensCancelados,
+      totalDosItens,
+      totalDescontosConta,
+      totalAcrescimosConta,
+      totalCupom,
+    }
+  }, [venda])
 
   /**
    * Calcula o troco baseado nos pagamentos válidos
@@ -640,7 +740,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                   {/* Data/Hora de Criação */}
                   <div className="flex justify-between md:text-sm text-xs text-primary-text font-nunito px-1 rounded-lg bg-white">
                     <span>
-                      Data/Hora Criação: 
+                      Data/Hora Abertura: 
                     </span>
                     <span>{formatDateTime(venda.dataCriacao)}</span>
                   </div>
@@ -909,6 +1009,66 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                       </span>
                     </div>
                   )}
+                </div>
+              </div>
+
+              {/* Card Resumo Financeiro */}
+              <div className="px-2 mb-4">
+                <h2 className="text-sm font-bold font-exo text-primary-text mb-2">
+                  Resumo Financeiro
+                </h2>
+                <div className="border-t border-dashed border-gray-400"></div>
+
+                <div className="rounded-lg px-4 py-2 space-y-1.5">
+                  {/* A - Total de itens lançados */}
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-medium text-gray-800 font-nunito">
+                      A - Total de itens lançados (+)
+                    </span>
+                    <span className="text-xs font-semibold text-gray-800 font-nunito text-right tabular-nums">
+                      {formatNumber(resumoFinanceiro.totalItensLancados)}
+                    </span>
+                  </div>
+
+                  {/* B - Total de itens cancelados */}
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-medium text-gray-800 font-nunito">
+                      B - Total de itens cancelados (-)
+                    </span>
+                    <span className="text-xs font-semibold text-gray-800 font-nunito text-right tabular-nums line-through">
+                      {formatNumber(resumoFinanceiro.totalItensCancelados)}
+                    </span>
+                  </div>
+
+                  {/* D - Total dos itens (A - B) */}
+                  <div className="flex justify-between items-center border-t border-gray-400 pt-1.5 mt-1">
+                    <span className="text-xs font-medium text-gray-800 font-nunito">
+                      C - Total dos itens (A - B)
+                    </span>
+                    <span className="text-xs font-semibold text-gray-800 font-nunito text-right tabular-nums">
+                      {formatNumber(resumoFinanceiro.totalDosItens)}
+                    </span>
+                  </div>
+
+                  {/* Total de descontos na conta */}
+                  <div className="flex justify-between items-center pt-4">
+                    <span className="text-xs font-medium text-gray-800 font-nunito">
+                      Total de descontos na conta
+                    </span>
+                    <span className="text-xs font-semibold text-gray-800 font-nunito text-right tabular-nums">
+                      {formatNumber(resumoFinanceiro.totalDescontosConta)}
+                    </span>
+                  </div>
+
+                  {/* Total de acréscimos na conta */}
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-medium text-gray-800 font-nunito">
+                      Total de acréscimos na conta
+                    </span>
+                    <span className="text-xs font-semibold text-gray-800 font-nunito text-right tabular-nums">
+                      {formatNumber(resumoFinanceiro.totalAcrescimosConta)}
+                    </span>
+                  </div>
                 </div>
               </div>
             </>
