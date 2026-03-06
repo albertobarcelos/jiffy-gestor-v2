@@ -26,7 +26,7 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
   const [dataTotal, setDataTotal] = useState<DashboardVendas | null>(null);
   const [dataFinalizadas, setDataFinalizadas] = useState<DashboardVendas | null>(null);
   const [dataCanceladas, setDataCanceladas] = useState<DashboardVendas | null>(null);
-  const [dataAbertas, setDataAbertas] = useState<DashboardVendas | null>(null);
+  const [mesasAbertas, setMesasAbertas] = useState<number>(0); // Estado para armazenar a quantidade de mesas abertas
   const [totalCancelado, setTotalCancelado] = useState<number>(0); // Estado para armazenar a soma das vendas canceladas
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +62,84 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
     const { inicio, fim } = calculatePeriodo(periodo)
     return { inicio, fim }
   }
+
+  /**
+   * Conta todas as mesas abertas (status=ABERTA e tipoVenda=mesa)
+   * Não aplica filtro de período, pois vendas abertas não têm data de finalização
+   */
+  const contarMesasAbertas = useCallback(async (): Promise<number> => {
+    const token = auth?.getAccessToken()
+    if (!token) return 0
+
+    try {
+      const baseParams = new URLSearchParams()
+      
+      // Filtros fixos: apenas mesas abertas
+      baseParams.append('status', 'ABERTA')
+      baseParams.append('tipoVenda', 'mesa')
+      // Não aplica filtro de período para vendas abertas
+
+      let totalCount = 0
+      let currentPage = 0
+      let totalPages = 1
+      const pageSize = 100
+
+      while (currentPage < totalPages) {
+        const params = new URLSearchParams(baseParams.toString())
+        params.append('limit', pageSize.toString())
+        params.append('offset', (currentPage * pageSize).toString())
+
+        const response = await fetch(`/api/vendas?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (!response.ok) {
+          console.error('Erro ao buscar mesas abertas:', response.status)
+          break
+        }
+
+        const data = await response.json()
+        const items = data.items || []
+
+        // Conta os itens retornados nesta página
+        totalCount += items.length
+
+        // Calcula total de páginas na primeira requisição
+        if (currentPage === 0) {
+          if (data.totalPages) {
+            totalPages = data.totalPages
+          } else if (data.count && data.limit) {
+            totalPages = Math.ceil(data.count / data.limit)
+          } else if (data.hasNext === false) {
+            totalPages = 1
+          } else if (items.length < pageSize) {
+            totalPages = 1
+          } else {
+            // Se não há informação de paginação e retornou pageSize itens,
+            // assume que pode haver mais páginas
+            // Continua buscando até retornar menos itens que pageSize
+            totalPages = 999 // Limite de segurança (máximo 99.900 mesas)
+          }
+        }
+
+        // Se retornou menos itens que o pageSize, é a última página
+        if (items.length < pageSize) {
+          break
+        }
+
+        currentPage++
+      }
+
+      console.log('🔍 contarMesasAbertas - Total de mesas abertas encontradas:', totalCount)
+      return totalCount
+    } catch (error) {
+      console.error('Erro ao contar mesas abertas:', error)
+      return 0
+    }
+  }, [auth])
 
   /**
    * Busca todas as vendas canceladas e calcula a soma dos valores
@@ -151,12 +229,14 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
         const total = await useCase.execute(mappedPeriodo, ['FINALIZADA', 'CANCELADA'], useCustomDates ? periodoInicial : undefined, useCustomDates ? periodoFinal : undefined);
         const finalizadas = await useCase.execute(mappedPeriodo, ['FINALIZADA'], useCustomDates ? periodoInicial : undefined, useCustomDates ? periodoFinal : undefined);
         const canceladas = await useCase.execute(mappedPeriodo, ['CANCELADA'], useCustomDates ? periodoInicial : undefined, useCustomDates ? periodoFinal : undefined);
-        const abertas = await useCase.execute(mappedPeriodo, ['ABERTA'], useCustomDates ? periodoInicial : undefined, useCustomDates ? periodoFinal : undefined);
         
         setDataTotal(total);
         setDataFinalizadas(finalizadas);
         setDataCanceladas(canceladas);
-        setDataAbertas(abertas);
+
+        // Conta mesas abertas diretamente da API (sem usar metricas)
+        const totalMesasAbertas = await contarMesasAbertas();
+        setMesasAbertas(totalMesasAbertas);
 
         // Calcula o total cancelado somando os valores das vendas canceladas
         const totalCanceladoCalculado = await calcularTotalCancelado();
@@ -170,7 +250,7 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
     };
 
     loadData();
-  }, [periodo, periodoInicial, periodoFinal, auth, calcularTotalCancelado]);
+  }, [periodo, periodoInicial, periodoFinal, auth, calcularTotalCancelado, contarMesasAbertas]);
 
   const formatCurrency = (value?: number) => {
     if (!value) return 'R$ 0,00'
@@ -269,7 +349,7 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
         {/* Vendas em Aberto */}
         <MetricCard className=" border hover:border-primary/50"
           title="Mesas Abertas"
-          value={formatNumber(dataAbertas?.getCountVendasEfetivadas())}
+          value={formatNumber(mesasAbertas)}
           icon={<LuDoorOpen size={20} color="var(--color-primary)" />}
           bgColorClass="bg-info border-2 border-primary"
           iconColorClass="text-info"
