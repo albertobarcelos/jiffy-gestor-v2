@@ -80,6 +80,7 @@ export function Etapa5NumeracoesFiscais() {
   const [mensagemConfiguracao, setMensagemConfiguracao] = useState<string | null>(null)
   const [contextoFiscal, setContextoFiscal] = useState<ContextoFiscal | null>(null)
   const [gapsSelecionados, setGapsSelecionados] = useState<string[]>([])
+  const historicoDisponivel = false
 
   const gapsHistoricos = useMemo(() => {
     if (!gapsData) return [] as GapItem[]
@@ -101,7 +102,7 @@ export function Etapa5NumeracoesFiscais() {
   }, [gapsData])
 
   const carregarConfiguracoesDisponiveis = async (token: string): Promise<{ modelo: '55' | '65'; serie: string } | null> => {
-    const response = await fetch('/api/v1/fiscal/configuracoes/numeracao', {
+    const response = await fetch('/api/v1/fiscal/configuracoes/emissao', {
       headers: { Authorization: `Bearer ${token}` },
     })
 
@@ -138,29 +139,20 @@ export function Etapa5NumeracoesFiscais() {
   const carregarHistorico = async (token: string, modeloAtual: string, serieAtual: string) => {
     setIsLoadingHistorico(true)
     try {
-      const params = new URLSearchParams({
-        modelo: modeloAtual,
-        serie: serieAtual,
-      })
+      if (!historicoDisponivel) {
+        setHistorico([])
+        return
+      }
+
+      // Mantido para futura ativação quando endpoint estiver disponível no backend.
+      const params = new URLSearchParams({ modelo: modeloAtual, serie: serieAtual })
       const response = await fetch(`/api/v1/fiscal/inutilizacoes?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}))
-        const mensagem = err?.error || err?.message || ''
-        if (mensagem.includes('Configuração não encontrada')) {
-          setHistorico([])
-          setMensagemConfiguracao(mensagem)
-          return
-        }
-        throw new Error(err?.error || 'Erro ao carregar histórico de inutilizações')
-      }
-
+      if (!response.ok) throw new Error('Erro ao carregar histórico de inutilizações')
       const data = await response.json()
       setHistorico(Array.isArray(data) ? data : [])
-    } catch (error: any) {
-      showToast.error(error?.message || 'Erro ao carregar histórico de inutilizações')
+    } catch (_error: any) {
       setHistorico([])
     } finally {
       setIsLoadingHistorico(false)
@@ -576,6 +568,10 @@ export function Etapa5NumeracoesFiscais() {
 
         {isLoadingHistorico ? (
           <p className="text-xs text-secondary-text">Carregando histórico...</p>
+        ) : !historicoDisponivel ? (
+          <p className="text-xs text-secondary-text">
+            Histórico de inutilizações indisponível na API atual.
+          </p>
         ) : (
           <div className="max-h-44 overflow-y-auto rounded-md border border-primary/10 p-2">
             {historico.length === 0 ? (

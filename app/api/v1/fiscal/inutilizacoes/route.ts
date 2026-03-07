@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
+import { buildInutilizacoesQuery } from '@/src/server/fiscal/numeracaoOperacoesMapper'
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,16 +11,8 @@ export async function GET(request: NextRequest) {
     }
     const { tokenInfo } = validation
 
-    const searchParams = request.nextUrl.searchParams
-    const modelo = searchParams.get('modelo')
-    const serie = searchParams.get('serie')
-    const status = searchParams.get('status')
-
     let url = '/api/v1/fiscal/inutilizacoes'
-    const params = new URLSearchParams()
-    if (modelo) params.append('modelo', modelo)
-    if (serie) params.append('serie', serie)
-    if (status) params.append('status', status)
+    const params = buildInutilizacoesQuery(request.nextUrl.searchParams)
     if (params.toString()) url += `?${params.toString()}`
 
     const apiClient = new ApiClient()

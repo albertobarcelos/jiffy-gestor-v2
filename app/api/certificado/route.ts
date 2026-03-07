@@ -20,12 +20,16 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
+    const requestBody = {
+      cnpj: body?.cnpj,
+      certificadoPfx: body?.certificadoPfx,
+      senhaCertificado: body?.senhaCertificado,
+      aliasCertificado: body?.aliasCertificado,
+    }
 
     const logData = {
-      uf: body.uf,
-      ambiente: body.ambiente,
-      cnpj: body.cnpj?.substring(0, 4) + '...',
-      aliasCertificado: body.aliasCertificado,
+      cnpj: requestBody.cnpj?.substring(0, 4) + '...',
+      aliasCertificado: requestBody.aliasCertificado,
     }
     console.error('[CERTIFICADO] 📨 Backend proxy recebeu:', JSON.stringify(logData, null, 2))
     console.log('[CERTIFICADO] 📨 Backend proxy recebeu:', logData)
@@ -45,7 +49,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${tokenInfo.token}`,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(requestBody),
     })
 
     console.error('[CERTIFICADO] 📥 Fiscal service respondeu:', response.status)
@@ -116,9 +120,7 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    // ✅ Arquitetura correta: Frontend → Next.js API Route → jiffy-backend → App-Services → FiscalGateway → FiscalService
-    // Buscar do jiffy-backend
-    const response = await fetch(`${BACKEND_URL}/api/v1/fiscal/certificados/ativo`, {
+    const response = await fetch(`${BACKEND_URL}/api/v1/fiscal/certificados/me`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${tokenInfo.token}`,
@@ -207,27 +209,14 @@ export async function DELETE(req: NextRequest) {
       )
     }
 
-    // Extrair parâmetros da query string
-    const { searchParams } = new URL(req.url)
-    const ambiente = searchParams.get('ambiente')
-
-    // UF não é mais necessária - uma empresa tem apenas UMA configuração por ambiente
-    if (!ambiente) {
-      return NextResponse.json(
-        { success: false, message: 'Ambiente é obrigatório' },
-        { status: 400 }
-      )
-    }
-
     console.log('[CERTIFICADO DELETE] 🗑️ Removendo certificado:', {
       empresaId: tokenInfo.empresaId,
-      ambiente
     })
 
     // ✅ Arquitetura correta: Frontend → Next.js API Route → jiffy-backend → App-Services → FiscalGateway → FiscalService
     // Segurança: empresaId é extraído do JWT pelo backend, não mais passado na URL
     const response = await fetch(
-      `${BACKEND_URL}/api/v1/fiscal/certificados/me?ambiente=${ambiente}`,
+      `${BACKEND_URL}/api/v1/fiscal/certificados/me`,
       {
         method: 'DELETE',
         headers: {

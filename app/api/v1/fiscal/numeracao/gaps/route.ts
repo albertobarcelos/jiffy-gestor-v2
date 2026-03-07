@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
+import { validateGapsQuery } from '@/src/server/fiscal/numeracaoOperacoesMapper'
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,25 +11,17 @@ export async function GET(request: NextRequest) {
     }
     const { tokenInfo } = validation
 
-    const searchParams = request.nextUrl.searchParams
-    const modelo = searchParams.get('modelo')
-    const serie = searchParams.get('serie')
-    const numeroInicial = searchParams.get('numeroInicial')
-    const numeroFinal = searchParams.get('numeroFinal')
-
-    if (!modelo || !serie) {
+    const queryValidation = validateGapsQuery(request.nextUrl.searchParams)
+    if (!queryValidation.ok || !queryValidation.params) {
       return NextResponse.json(
-        { error: 'modelo e serie são obrigatórios' },
+        { error: queryValidation.error || 'Parâmetros inválidos' },
         { status: 400 }
       )
     }
-
-    const params = new URLSearchParams({ modelo, serie })
-    if (numeroInicial) params.append('numeroInicial', numeroInicial)
-    if (numeroFinal) params.append('numeroFinal', numeroFinal)
+    const params = queryValidation.params
 
     const apiClient = new ApiClient()
-    const response = await apiClient.request<any>(`/api/v1/fiscal/numeracao/gaps?${params.toString()}`, {
+    const response = await apiClient.request<any>(`/api/v1/fiscal/documentos/gaps?${params.toString()}`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${tokenInfo.token}`,

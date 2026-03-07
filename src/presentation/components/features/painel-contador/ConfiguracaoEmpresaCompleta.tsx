@@ -13,7 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/src/presentation/components/ui/select'
-import { extractTokenInfo } from '@/src/shared/utils/validateToken'
 import { MdCheckCircle, MdError, MdSave } from 'react-icons/md'
 import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
 
@@ -116,18 +115,11 @@ export function ConfiguracaoEmpresaCompleta() {
 
   const loadData = async () => {
     if (!isRehydrated) return
-    
-    const token = auth?.getAccessToken()
-    if (!token) {
-      return
-    }
 
     setIsLoading(true)
     try {
       // Buscar dados da empresa do backend
-      const empresaResponse = await fetch('/api/empresas/me', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const empresaResponse = await fetch('/api/empresas/me')
 
       if (empresaResponse.ok) {
         const empresaData = await empresaResponse.json()
@@ -155,8 +147,7 @@ export function ConfiguracaoEmpresaCompleta() {
       // Buscar configuração fiscal (empresaId é extraído do JWT pelo backend)
       {
         const fiscalResponse = await fetch(
-          `/api/v1/fiscal/empresas-fiscais/me`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          `/api/v1/fiscal/empresas-fiscais/me`
         )
 
         if (fiscalResponse.ok) {
@@ -183,12 +174,6 @@ export function ConfiguracaoEmpresaCompleta() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    const token = auth?.getAccessToken()
-    if (!token) {
-      showToast.error('Sessão expirada. Faça login novamente.')
-      return
-    }
 
     // Validações
     if (!formDataEmpresa.cnpj.trim()) {
@@ -252,11 +237,10 @@ export function ConfiguracaoEmpresaCompleta() {
     const toastId = showToast.loading('Salvando configurações...')
 
     try {
-      const tokenInfo = auth?.getAccessToken() ? extractTokenInfo(auth.getAccessToken()) : null
-      const empresaId = tokenInfo?.empresaId
+      const empresaId = empresa?.id
       
       if (!empresaId) {
-        showToast.error('Empresa não identificada no token')
+        showToast.error('Empresa não identificada na sessão atual')
         return
       }
 
@@ -282,7 +266,6 @@ export function ConfiguracaoEmpresaCompleta() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(empresaPayload),
       })
@@ -312,7 +295,6 @@ export function ConfiguracaoEmpresaCompleta() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(fiscalPayload),
       })

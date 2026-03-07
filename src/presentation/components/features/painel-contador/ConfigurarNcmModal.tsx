@@ -19,7 +19,6 @@ import {
 } from '@/src/presentation/components/ui/select'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
-import { extractTokenInfo } from '@/src/shared/utils/validateToken'
 
 interface ConfiguracaoImpostoNcm {
   ncm?: {
@@ -84,49 +83,29 @@ export function ConfigurarNcmModal({
       }
 
       try {
-        const tokenInfo = extractTokenInfo(token)
-        const empresaId = tokenInfo?.empresaId
-        if (!empresaId) {
-          setIsLoadingRegime(false)
-          setRegimeTributario(1) // Default: Simples Nacional
-          return
-        }
-
-        // Segurança: empresaId é extraído do JWT pelo backend
-        const response = await fetch(`/api/v1/fiscal/empresas-fiscais/me/todas`, {
+        const response = await fetch('/api/v1/fiscal/empresas-fiscais/me', {
           headers: { Authorization: `Bearer ${token}` },
         })
 
         if (response.ok) {
-          const configs = await response.json()
-          console.log('[ConfigurarNcmModal] Configurações fiscais recebidas:', configs)
-          if (configs && configs.length > 0) {
-            const codigoRegime = configs[0].codigoRegimeTributario
-            console.log('[ConfigurarNcmModal] Código regime tributário (raw):', codigoRegime, 'tipo:', typeof codigoRegime)
-            // Garantir que seja número (pode vir como string da API)
-            const regimeNumero = typeof codigoRegime === 'string' 
-              ? parseInt(codigoRegime, 10) 
+          const config = await response.json()
+          const codigoRegime = config?.codigoRegimeTributario
+          const regimeNumero =
+            typeof codigoRegime === 'string'
+              ? parseInt(codigoRegime, 10)
               : (typeof codigoRegime === 'number' ? codigoRegime : null)
-            console.log('[ConfigurarNcmModal] Código regime tributário (convertido):', regimeNumero)
-            // Validar se é um número válido (1, 2 ou 3)
-            if (regimeNumero === 1 || regimeNumero === 2 || regimeNumero === 3) {
-              console.log('[ConfigurarNcmModal] Regime tributário carregado:', regimeNumero, 'isSimplesNacional:', regimeNumero === 1 || regimeNumero === 2)
-              setRegimeTributario(regimeNumero)
-            } else {
-              console.warn('[ConfigurarNcmModal] Regime tributário inválido:', codigoRegime, 'usando default: 1')
-              setRegimeTributario(1) // Default: Simples Nacional
-            }
+
+          if (regimeNumero === 1 || regimeNumero === 2 || regimeNumero === 3) {
+            setRegimeTributario(regimeNumero)
           } else {
-            console.warn('[ConfigurarNcmModal] Nenhuma configuração encontrada, usando default: 1')
             setRegimeTributario(1) // Default: Simples Nacional
           }
         } else {
-          const errorText = await response.text()
-          console.warn('[ConfigurarNcmModal] Erro ao buscar regime tributário:', response.status, errorText, 'usando default: 1')
+          await response.text()
           setRegimeTributario(1) // Default: Simples Nacional
         }
       } catch (error) {
-        console.error('[ConfigurarNcmModal] Erro ao buscar regime tributário:', error)
+        console.error('Erro ao buscar regime tributário:', error)
         setRegimeTributario(1) // Default: Simples Nacional
       } finally {
         setIsLoadingRegime(false)

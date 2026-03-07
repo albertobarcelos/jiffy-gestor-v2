@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
+import { buildInutilizarQueryFromBody } from '@/src/server/fiscal/numeracaoOperacoesMapper'
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,14 +12,7 @@ export async function POST(request: NextRequest) {
     const { tokenInfo } = validation
 
     const body = await request.json()
-    const params = new URLSearchParams()
-    params.set('uf', String(body?.uf ?? ''))
-    params.set('ambiente', String(body?.ambiente ?? ''))
-    params.set('modelo', String(body?.modelo ?? ''))
-    params.set('serie', String(body?.serie ?? ''))
-    params.set('numeroInicial', String(body?.numeroInicial ?? ''))
-    params.set('numeroFinal', String(body?.numeroFinal ?? ''))
-    params.set('justificativa', String(body?.justificativa ?? ''))
+    const params = buildInutilizarQueryFromBody(body)
 
     const apiClient = new ApiClient()
     const response = await apiClient.request<any>(`/api/v1/fiscal/inutilizar?${params.toString()}`, {

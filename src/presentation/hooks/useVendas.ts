@@ -128,12 +128,13 @@ async function resolveFiscalEmissionConfig(
 
   const loadPromise = (async (): Promise<FiscalEmissionResolvedConfig> => {
   const tipoDocumento: 'NFE' | 'NFCE' = modelo === 55 ? 'NFE' : 'NFCE'
+  const authHeaders = {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  }
 
-  const numeracaoResponse = await fetch(`/api/v1/fiscal/configuracoes/numeracao?modelo=${modelo}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+  const numeracaoResponse = await fetch(`/api/v1/fiscal/configuracoes/emissao?modelo=${modelo}`, {
+    headers: authHeaders,
   })
 
   if (!numeracaoResponse.ok) {
@@ -145,11 +146,60 @@ async function resolveFiscalEmissionConfig(
     )
   }
 
-  const numeracoes = (await numeracaoResponse.json()) as Array<{
+  const numeracoesPayload = await numeracaoResponse.json()
+  const numeracoesBase = (Array.isArray(numeracoesPayload)
+    ? numeracoesPayload
+    : numeracoesPayload
+      ? [numeracoesPayload]
+      : []) as Array<{
     serie?: number
     ativo?: boolean
     terminalId?: string | null
+    ambiente?: 'HOMOLOGACAO' | 'PRODUCAO' | string
+    modelo?: number
   }>
+
+  let numeracoes = numeracoesBase
+    .filter((n) => Number(n?.modelo ?? modelo) === modelo)
+
+  // Alguns backends retornam lista vazia no endpoint agregado mesmo com configuração existente.
+  // Nesse caso, consulta diretamente por ambiente no endpoint específico do modelo.
+  if (numeracoes.length === 0) {
+    const ambientes: Array<'PRODUCAO' | 'HOMOLOGACAO'> = ['PRODUCAO', 'HOMOLOGACAO']
+    const fallbackNumeracoes: Array<{
+      serie?: number
+      ativo?: boolean
+      terminalId?: string | null
+      ambiente?: 'HOMOLOGACAO' | 'PRODUCAO' | string
+      modelo?: number
+    }> = []
+
+    for (const ambiente of ambientes) {
+      const response = await fetch(
+        `/api/v1/fiscal/configuracoes/emissao/${modelo}?ambiente=${ambiente}`,
+        { headers: authHeaders }
+      )
+
+      if (response.ok) {
+        const data = await response.json()
+        fallbackNumeracoes.push(data)
+        continue
+      }
+
+      if (response.status === 400 || response.status === 404) {
+        continue
+      }
+
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(
+        errorData.error ||
+          errorData.message ||
+          `Erro ao buscar configuração fiscal de ${tipoDocumento} no ambiente ${ambiente}`
+      )
+    }
+
+    numeracoes = fallbackNumeracoes
+  }
 
   const numeracaoSelecionada =
     numeracoes.find((n) => n.ativo !== false && (n.terminalId == null)) ||
@@ -163,38 +213,15 @@ async function resolveFiscalEmissionConfig(
       `Numeração fiscal não configurada para ${tipoDocumento}. Configure a série no Painel do Contador.`
     )
   }
-
-  const certificadoResponse = await fetch('/api/certificado', {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  })
-
-  if (!certificadoResponse.ok) {
-    const errorData = await certificadoResponse.json().catch(() => ({}))
-    throw new Error(
-      errorData.error ||
-        errorData.message ||
-        'Certificado digital não configurado para emissão fiscal.'
-    )
-  }
-
-  const certificadoPayload = await certificadoResponse.json()
-  const certificadoData = certificadoPayload?.data ?? certificadoPayload
-  const ambiente = certificadoData?.ambiente as 'HOMOLOGACAO' | 'PRODUCAO' | undefined
-
+  const ambiente = numeracaoSelecionada?.ambiente
   if (ambiente !== 'HOMOLOGACAO' && ambiente !== 'PRODUCAO') {
     throw new Error(
-      'Ambiente fiscal não encontrado no certificado da empresa. Verifique a configuração fiscal.'
+      `Ambiente fiscal não configurado em ${tipoDocumento}. Defina HOMOLOGACAO ou PRODUCAO na configuração de emissão.`
     )
   }
 
   const empresaFiscalResponse = await fetch('/api/v1/fiscal/empresas-fiscais/me', {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+    headers: authHeaders,
   })
 
   if (!empresaFiscalResponse.ok) {

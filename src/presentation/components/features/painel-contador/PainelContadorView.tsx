@@ -19,7 +19,7 @@ import { ConfiguracaoEmpresaCompleta } from './ConfiguracaoEmpresaCompleta'
  */
 export function PainelContadorView() {
   const { addTab, activeTabId, setActiveTab: setActiveTabStore } = useTabsStore()
-  const { auth, isRehydrated } = useAuthStore()
+  const { isRehydrated } = useAuthStore()
   const [empresaNome, setEmpresaNome] = useState<string>('Empresa')
   const [empresaCnpj, setEmpresaCnpj] = useState<string>('--')
 
@@ -44,12 +44,8 @@ export function PainelContadorView() {
     if (!isRehydrated) return
     
     const loadEmpresa = async () => {
-      const token = auth?.getAccessToken()
-      if (!token) return
       try {
-        const response = await fetch('/api/empresas/me', {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        const response = await fetch('/api/empresas/me')
         if (!response.ok) return
         const data = await response.json()
         // Usa os campos retornados para preencher nome e cnpj
@@ -66,7 +62,7 @@ export function PainelContadorView() {
       }
     }
     loadEmpresa()
-  }, [auth])
+  }, [isRehydrated])
 
 
   if (activeTabId === 'impostos') {

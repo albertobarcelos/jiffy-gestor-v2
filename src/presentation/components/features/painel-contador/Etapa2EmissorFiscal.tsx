@@ -8,7 +8,6 @@ import { Input } from '@/src/presentation/components/ui/input'
 import { Label } from '@/src/presentation/components/ui/label'
 import { Switch } from '@/src/presentation/components/ui/switch'
 import { MdCheckCircle, MdError } from 'react-icons/md'
-import { extractTokenInfo } from '@/src/shared/utils/validateToken'
 
 interface ConfiguracaoNumeracao {
   id: string
@@ -24,7 +23,10 @@ interface ConfiguracaoNumeracao {
   nfceAtivo?: boolean
   nfceCscId?: string
   nfceCscCodigo?: string
+  ambiente?: 'HOMOLOGACAO' | 'PRODUCAO'
 }
+
+type AmbienteFiscal = 'HOMOLOGACAO' | 'PRODUCAO'
 
 interface ConfiguracaoEmissorFiscal {
   id?: string
@@ -53,6 +55,7 @@ export function Etapa3EmissorFiscal() {
   const [nfeForm, setNfeForm] = useState({
     serie: '',
     proximoNumero: '',
+    ambiente: '' as AmbienteFiscal | '',
   })
   
   // Formulário NFC-e
@@ -61,7 +64,24 @@ export function Etapa3EmissorFiscal() {
     proximoNumero: '',
     cscId: '',
     cscCodigo: '',
+    ambiente: '' as AmbienteFiscal | '',
   })
+
+  const selectConfiguracaoPrincipal = (
+    numeracoes: ConfiguracaoNumeracao[],
+    modelo: 55 | 65
+  ): ConfiguracaoNumeracao | null => {
+    const candidatas = numeracoes.filter((n) => n.modelo === modelo && !n.terminalId)
+    if (candidatas.length === 0) return null
+
+    return (
+      candidatas.find((n) => n.ativo && n.ambiente === 'PRODUCAO') ||
+      candidatas.find((n) => n.ativo && n.ambiente === 'HOMOLOGACAO') ||
+      candidatas.find((n) => n.ambiente === 'PRODUCAO') ||
+      candidatas.find((n) => n.ambiente === 'HOMOLOGACAO') ||
+      candidatas[0]
+    )
+  }
 
   useEffect(() => {
     // Aguardar reidratação do Zustand antes de fazer requisições
@@ -82,29 +102,25 @@ export function Etapa3EmissorFiscal() {
     setIsLoading(true)
     try {
       // Buscar configurações de numeração
-      const numeracaoResponse = await fetch('/api/v1/fiscal/configuracoes/numeracao', {
+      const numeracaoResponse = await fetch('/api/v1/fiscal/configuracoes/emissao', {
         headers: { Authorization: `Bearer ${token}` },
       })
 
       if (numeracaoResponse.ok) {
         const numeracoes: ConfiguracaoNumeracao[] = await numeracaoResponse.json()
         
-        console.log('📥 Dados carregados do servidor (todas as numerações):', numeracoes)
-        
         // NF-e: modelo 55, terminal_id = null (geral)
         // Só pode haver uma configuração de NF-e por empresa
-        const nfes = numeracoes.filter(n => n.modelo === 55 && !n.terminalId)
-        console.log('📥 NF-es filtradas (modelo 55, sem terminalId):', nfes)
         
-        if (nfes.length > 0) {
-          // Pegar a primeira (e única) configuração de NF-e
-          const nfe = nfes[0]
+        const nfe = selectConfiguracaoPrincipal(numeracoes, 55)
+        if (nfe) {
           
           setNfeNumeracao(nfe)
           // Sempre atualizar o formulário com os valores do banco (garantir sincronização)
           setNfeForm({
             serie: String(nfe.serie),
             proximoNumero: String(nfe.proximoNumero),
+            ambiente: nfe.ambiente ?? '',
           })
           
           // Atualizar toggles da NF-e
@@ -120,15 +136,14 @@ export function Etapa3EmissorFiscal() {
           setNfeForm({
             serie: '',
             proximoNumero: '',
+            ambiente: '',
           })
         }
         
         // NFC-e: modelo 65, terminal_id = null (controle único, igual NF-e)
         // Só pode haver uma configuração de NFC-e por empresa
-        const nfces = numeracoes.filter(n => n.modelo === 65 && !n.terminalId)
-        if (nfces.length > 0) {
-          // Pegar a primeira (e única) configuração de NFC-e
-          const nfce = nfces[0]
+        const nfce = selectConfiguracaoPrincipal(numeracoes, 65)
+        if (nfce) {
           
           setNfceNumeracao(nfce)
           // Sempre atualizar o formulário com os valores do banco (garantir sincronização)
@@ -138,6 +153,7 @@ export function Etapa3EmissorFiscal() {
             proximoNumero: String(nfce.proximoNumero),
             cscId: nfce.nfceCscId || '',
             cscCodigo: nfce.nfceCscCodigo || '',
+            ambiente: nfce.ambiente ?? '',
           }))
           
           // Atualizar toggles e CSC da NFC-e
@@ -154,8 +170,13 @@ export function Etapa3EmissorFiscal() {
             proximoNumero: '',
             cscId: '',
             cscCodigo: '',
+            ambiente: '',
           }))
         }
+      }
+      if (!numeracaoResponse.ok) {
+        const errorData = await numeracaoResponse.json().catch(() => ({}))
+        throw new Error(errorData.error || errorData.message || 'Erro ao carregar configurações de emissão')
       }
     } catch (error: any) {
       console.error('Erro ao carregar dados:', error)
@@ -181,21 +202,26 @@ export function Etapa3EmissorFiscal() {
     const toastId = showToast.loading('Salvando configuração NF-e...')
 
     try {
+      const ambiente = nfeForm.ambiente
+      if (ambiente !== 'HOMOLOGACAO' && ambiente !== 'PRODUCAO') {
+        throw new Error('Selecione o ambiente da NF-e (HOMOLOGACAO ou PRODUCAO).')
+      }
+
       const payload = {
         modelo: 55,
         serie: parseInt(nfeForm.serie),
         numeroInicial: parseInt(nfeForm.proximoNumero),
         terminalId: null, // NF-e é geral
         nfeAtivo: emissorFiscal.nfeAtivo, // Toggle NF-e
+        ambiente,
       }
 
       let response
-      const serieAtual = parseInt(nfeForm.serie)
       
       if (nfeNumeracao) {
         // Para NF-e, sempre atualizar a configuração existente (não criar nova)
         // Permitir mudar a série livremente
-        response = await fetch(`/api/v1/fiscal/configuracoes/numeracao/${55}/${nfeNumeracao.serie}`, {
+        response = await fetch('/api/v1/fiscal/configuracoes/emissao/55', {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -204,9 +230,9 @@ export function Etapa3EmissorFiscal() {
           body: JSON.stringify(payload),
         })
       } else {
-        // Criar nova configuração apenas se não existir
-        response = await fetch('/api/v1/fiscal/configuracoes/numeracao', {
-          method: 'POST',
+        // Sempre usa o endpoint de emissão para criar/atualizar
+        response = await fetch('/api/v1/fiscal/configuracoes/emissao/55', {
+          method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
@@ -246,6 +272,7 @@ export function Etapa3EmissorFiscal() {
         nfceAtivo: data.nfceAtivo,
         nfceCscId: data.nfceCscId,
         nfceCscCodigo: data.nfceCscCodigo,
+        ambiente: data.ambiente,
       }
       setNfeNumeracao(novaNumeracao)
       
@@ -261,6 +288,7 @@ export function Etapa3EmissorFiscal() {
       setNfeForm({
         serie: String(data.serie),
         proximoNumero: String(data.proximoNumero),
+        ambiente: data.ambiente ?? ambiente,
       })
 
       showToast.successLoading(toastId, 'Configuração NF-e salva com sucesso!')
@@ -324,6 +352,11 @@ export function Etapa3EmissorFiscal() {
     const toastId = showToast.loading('Salvando configuração NFC-e...')
 
     try {
+      const ambiente = nfceForm.ambiente
+      if (ambiente !== 'HOMOLOGACAO' && ambiente !== 'PRODUCAO') {
+        throw new Error('Selecione o ambiente da NFC-e (HOMOLOGACAO ou PRODUCAO).')
+      }
+
       // Salvar configuração de numeração (série e próxima emissão) - igual NF-e
       if (emissorFiscal.nfceAtivo && nfceForm.serie && nfceForm.proximoNumero) {
         const serieNum = parseInt(nfceForm.serie)
@@ -342,17 +375,15 @@ export function Etapa3EmissorFiscal() {
           nfceAtivo: emissorFiscal.nfceAtivo, // Toggle NFC-e
           nfceCscId: nfceForm.cscId || undefined,
           nfceCscCodigo: nfceForm.cscCodigo || undefined,
+          ambiente,
         }
-
-        // Debug: verificar payload antes de enviar
-        console.log('Payload NFC-e numeração:', numeracaoPayload)
 
         let numeracaoResponse
         if (nfceNumeracao) {
           // Para NFC-e, sempre atualizar a configuração existente (não criar nova)
           // Permitir mudar a série livremente
           // IMPORTANTE: modelo e serie também devem estar no body para validação
-          numeracaoResponse = await fetch(`/api/v1/fiscal/configuracoes/numeracao/${65}/${nfceNumeracao.serie}`, {
+          numeracaoResponse = await fetch('/api/v1/fiscal/configuracoes/emissao/65', {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -361,9 +392,9 @@ export function Etapa3EmissorFiscal() {
             body: JSON.stringify(numeracaoPayload),
           })
         } else {
-          // Criar nova configuração apenas se não existir
-          numeracaoResponse = await fetch('/api/v1/fiscal/configuracoes/numeracao', {
-            method: 'POST',
+          // Sempre usa o endpoint de emissão para criar/atualizar
+          numeracaoResponse = await fetch('/api/v1/fiscal/configuracoes/emissao/65', {
+            method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`,
@@ -403,6 +434,7 @@ export function Etapa3EmissorFiscal() {
           nfceAtivo: numeracaoData.nfceAtivo,
           nfceCscId: numeracaoData.nfceCscId,
           nfceCscCodigo: numeracaoData.nfceCscCodigo,
+          ambiente: numeracaoData.ambiente,
         }
         setNfceNumeracao(novaNumeracao)
         
@@ -413,6 +445,7 @@ export function Etapa3EmissorFiscal() {
           proximoNumero: String(numeracaoData.proximoNumero),
           cscId: numeracaoData.nfceCscId || '',
           cscCodigo: numeracaoData.nfceCscCodigo || '',
+          ambiente: numeracaoData.ambiente ?? ambiente,
         }))
         
         // Atualizar toggles
@@ -448,6 +481,11 @@ export function Etapa3EmissorFiscal() {
 
     setIsSaving(true)
     try {
+      const ambiente = nfeForm.ambiente || nfeNumeracao?.ambiente
+      if (ambiente !== 'HOMOLOGACAO' && ambiente !== 'PRODUCAO') {
+        throw new Error('Ambiente da configuração NF-e inválido para atualizar status.')
+      }
+
       // Salvar toggle junto com a numeração
       const payload = {
         modelo: 55,
@@ -455,9 +493,10 @@ export function Etapa3EmissorFiscal() {
         numeroInicial: parseInt(nfeForm.proximoNumero),
         terminalId: null,
         nfeAtivo: ativo,
+        ambiente,
       }
 
-      const response = await fetch(`/api/v1/fiscal/configuracoes/numeracao/${55}/${nfeNumeracao.serie}`, {
+      const response = await fetch('/api/v1/fiscal/configuracoes/emissao/55', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -494,6 +533,11 @@ export function Etapa3EmissorFiscal() {
 
     setIsSaving(true)
     try {
+      const ambiente = nfceForm.ambiente || nfceNumeracao?.ambiente
+      if (ambiente !== 'HOMOLOGACAO' && ambiente !== 'PRODUCAO') {
+        throw new Error('Ambiente da configuração NFC-e inválido para atualizar status.')
+      }
+
       // Salvar toggle junto com a numeração
       const payload = {
         modelo: 65,
@@ -504,9 +548,10 @@ export function Etapa3EmissorFiscal() {
         // Manter CSC se já existir
         nfceCscId: nfceForm.cscId || undefined,
         nfceCscCodigo: nfceForm.cscCodigo || undefined,
+        ambiente,
       }
 
-      const response = await fetch(`/api/v1/fiscal/configuracoes/numeracao/${65}/${nfceNumeracao.serie}`, {
+      const response = await fetch('/api/v1/fiscal/configuracoes/emissao/65', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -566,6 +611,27 @@ export function Etapa3EmissorFiscal() {
           <>
             <div className="grid grid-cols-2 gap-4">
               <div className="">
+                <Label htmlFor="nfe-ambiente">Ambiente *</Label>
+                <select
+                  id="nfe-ambiente"
+                  value={nfeForm.ambiente}
+                  onChange={(e) =>
+                    setNfeForm({
+                      ...nfeForm,
+                      ambiente: e.target.value as AmbienteFiscal | '',
+                    })
+                  }
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="">Selecione</option>
+                  <option value="HOMOLOGACAO">Homologacao</option>
+                  <option value="PRODUCAO">Producao</option>
+                </select>
+              </div>
+
+              <div />
+
+              <div className="">
                 <Label htmlFor="nfe-serie">Série *</Label>
                 <Input
                   id="nfe-serie"
@@ -596,7 +662,7 @@ export function Etapa3EmissorFiscal() {
             <div className="mt-2 flex justify-end">
               <Button
                 onClick={handleSaveNfe}
-                disabled={isSaving}
+                disabled={isSaving || !nfeForm.ambiente || !nfeForm.serie || !nfeForm.proximoNumero}
                 className="rounded-lg px-4 py-2 text-white text-sm font-medium"
                 sx={{
                   backgroundColor: 'var(--color-secondary)',
@@ -643,6 +709,27 @@ export function Etapa3EmissorFiscal() {
             </div>
 
             <div className="grid grid-cols-2 gap-2 mb-2">
+              <div className="">
+                <Label htmlFor="nfce-ambiente">Ambiente *</Label>
+                <select
+                  id="nfce-ambiente"
+                  value={nfceForm.ambiente}
+                  onChange={(e) =>
+                    setNfceForm({
+                      ...nfceForm,
+                      ambiente: e.target.value as AmbienteFiscal | '',
+                    })
+                  }
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="">Selecione</option>
+                  <option value="HOMOLOGACAO">Homologacao</option>
+                  <option value="PRODUCAO">Producao</option>
+                </select>
+              </div>
+
+              <div />
+
               <div className="">
                 <Label htmlFor="nfce-serie">Série *</Label>
                 <Input
@@ -702,7 +789,7 @@ export function Etapa3EmissorFiscal() {
             <div className="mt-2 flex justify-end">
               <Button
                 onClick={handleSaveNfce}
-                disabled={isSaving || (emissorFiscal.nfceAtivo && (!nfceForm.serie || !nfceForm.proximoNumero || !nfceForm.cscId || !nfceForm.cscCodigo))}
+                disabled={isSaving || (emissorFiscal.nfceAtivo && (!nfceForm.ambiente || !nfceForm.serie || !nfceForm.proximoNumero || !nfceForm.cscId || !nfceForm.cscCodigo))}
                 className="rounded-lg px-4 py-2 text-white text-sm font-medium"
                 sx={{
                   backgroundColor: 'var(--color-secondary)',

@@ -4,7 +4,6 @@ import React, { useState } from 'react'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/src/presentation/components/ui/dialog'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdUploadFile, MdLock } from 'react-icons/md'
 
@@ -15,24 +14,17 @@ interface CertificadoUploadModalProps {
 }
 
 export function CertificadoUploadModal({ open, onClose, onSuccess }: CertificadoUploadModalProps) {
-  const { auth } = useAuthStore()
   const [file, setFile] = useState<File | null>(null)
   const [senha, setSenha] = useState('')
   const [isUploading, setIsUploading] = useState(false)
   const [cnpj, setCnpj] = useState('')
-  const [uf, setUf] = useState('SP')
-  const [ambiente, setAmbiente] = useState<'HOMOLOGACAO' | 'PRODUCAO'>('HOMOLOGACAO')
 
   // Buscar dados da empresa ao abrir modal
   React.useEffect(() => {
     if (open) {
       const loadEmpresa = async () => {
-        const token = auth?.getAccessToken()
-        if (!token) return
         try {
-          const response = await fetch('/api/empresas/me', {
-            headers: { Authorization: `Bearer ${token}` },
-          })
+          const response = await fetch('/api/empresas/me')
           if (!response.ok) return
           const data = await response.json()
           if (data?.cnpj) {
@@ -40,14 +32,13 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
             const cnpjNumeros = data.cnpj.replace(/\D/g, '')
             setCnpj(cnpjNumeros)
           }
-          if (data?.uf) setUf(data.uf)
         } catch (error) {
           console.error('Erro ao carregar empresa:', error)
         }
       }
       loadEmpresa()
     }
-  }, [open, auth])
+  }, [open])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
@@ -77,12 +68,6 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
     setIsUploading(true)
 
     try {
-      const token = auth?.getAccessToken()
-      if (!token) {
-        showToast.errorLoading(toastId, 'Sessão expirada. Faça login novamente.')
-        return
-      }
-
       // Converter arquivo para base64
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader()
@@ -98,8 +83,6 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
 
       // Preparar dados para envio
       const requestBody = {
-        uf: uf.toUpperCase(), // Garantir maiúsculo
-        ambiente: ambiente, // Já está como 'HOMOLOGACAO' ou 'PRODUCAO'
         cnpj: cnpj,
         certificadoPfx: base64,
         senhaCertificado: senha,
@@ -107,8 +90,6 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
       }
 
       console.log('📤 Enviando certificado:', {
-        uf: requestBody.uf,
-        ambiente: requestBody.ambiente,
         cnpj: requestBody.cnpj,
         aliasCertificado: requestBody.aliasCertificado,
       })
@@ -118,7 +99,6 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(requestBody),
       })
@@ -194,25 +174,6 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
                 Formatos aceitos: .pfx, .p12 (Certificado A1)
               </p>
             </div>
-          </div>
-
-          {/* Ambiente */}
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-primary">
-              Ambiente
-            </label>
-            <select
-              value={ambiente}
-              onChange={(e) => setAmbiente(e.target.value as 'HOMOLOGACAO' | 'PRODUCAO')}
-              disabled={isUploading}
-              className="h-10 rounded-lg border border-input bg-background px-3 text-sm"
-            >
-              <option value="HOMOLOGACAO">Homologação</option>
-              <option value="PRODUCAO">Produção</option>
-            </select>
-            <p className="text-xs text-secondary-text">
-              Use Homologação para testes e Produção para emissões reais
-            </p>
           </div>
 
           {/* Campo de senha */}
