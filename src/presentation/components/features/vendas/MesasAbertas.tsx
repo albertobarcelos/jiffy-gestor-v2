@@ -62,38 +62,32 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
   const [vendas, setVendas] = useState<Venda[]>([])
   const [metricas, setMetricas] = useState<MetricasVendas | null>(null)
   const [usuariosPDV, setUsuariosPDV] = useState<UsuarioPDV[]>([])
-  const [vendaClienteIdMap, setVendaClienteIdMap] = useState<Record<string, string | null>>({})
   const [clienteNomeMap, setClienteNomeMap] = useState<Record<string, string | null>>({})
   const [apenasSemMovimentacao, setApenasSemMovimentacao] = useState(false)
   const [cachesHydrated, setCachesHydrated] = useState(false)
 
-  // Hidrata caches de cliente a partir da sessionStorage para evitar refetch após reload
+  // Hidrata cache de nomes de clientes a partir da sessionStorage para evitar refetch após reload
   useEffect(() => {
     try {
-      const storedVendaCliente = sessionStorage.getItem('mesasAbertas_vendaClienteIdMap')
       const storedClienteNome = sessionStorage.getItem('mesasAbertas_clienteNomeMap')
-      if (storedVendaCliente) {
-        setVendaClienteIdMap(JSON.parse(storedVendaCliente))
-      }
       if (storedClienteNome) {
         setClienteNomeMap(JSON.parse(storedClienteNome))
       }
       setCachesHydrated(true)
     } catch (err) {
-      console.warn('Não foi possível ler caches de cliente da sessão', err)
+      console.warn('Não foi possível ler cache de nomes de clientes da sessão', err)
       setCachesHydrated(true)
     }
   }, [])
 
-  // Persiste caches na sessionStorage para reaproveitar após reload
+  // Persiste cache de nomes de clientes na sessionStorage para reaproveitar após reload
   useEffect(() => {
     try {
-      sessionStorage.setItem('mesasAbertas_vendaClienteIdMap', JSON.stringify(vendaClienteIdMap))
       sessionStorage.setItem('mesasAbertas_clienteNomeMap', JSON.stringify(clienteNomeMap))
     } catch (err) {
-      console.warn('Não foi possível salvar caches de cliente na sessão', err)
+      console.warn('Não foi possível salvar cache de nomes de clientes na sessão', err)
     }
-  }, [vendaClienteIdMap, clienteNomeMap])
+  }, [clienteNomeMap])
 
   // Estados de UI
   const [isLoading, setIsLoading] = useState(false)
@@ -268,45 +262,6 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
   }, [auth])
 
   /**
-   * Busca o clienteId a partir do detalhe da venda (endpoint de detalhes).
-   */
-  const fetchClienteIdPorVenda = useCallback(
-    async (ids: string[]) => {
-      const token = auth?.getAccessToken()
-      if (!token || ids.length === 0) return
-
-      const results = await Promise.all(
-        ids.map(async (id) => {
-          try {
-            const response = await fetch(`/api/vendas/${id}`, {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
-            })
-            if (!response.ok) return { id, clienteId: null }
-            const data = await response.json()
-            const clienteId = (data.clienteId as string | undefined) || null
-            return { id, clienteId }
-          } catch {
-            return { id, clienteId: null }
-          }
-        })
-      )
-
-      setVendaClienteIdMap((prev) => {
-        const next = { ...prev }
-        results.forEach(({ id, clienteId }) => {
-          // marca mesmo que null para evitar refetch infinito
-          next[id] = clienteId
-        })
-        return next
-      })
-    },
-    [auth]
-  )
-
-  /**
    * Busca nome do cliente dado o clienteId (usa mesmo endpoint de VisualizarCliente).
    */
   const fetchNomesClientes = useCallback(
@@ -470,26 +425,16 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
     return () => container.removeEventListener('scroll', handleScroll)
   }, [canLoadMore, isLoadingMore, isLoading, fetchVendas])
 
-  // Buscar clienteId via detalhe da venda para cada venda listada
+  // Buscar nome do cliente para clienteIds das vendas listadas (clienteId já vem na resposta da listagem)
   useEffect(() => {
-    const ids = vendas
-      .map((v) => v.id)
-      .filter((id) => !(id in vendaClienteIdMap))
+    const clienteIds = vendas
+      .map((v) => v.clienteId)
+      .filter((cid): cid is string => !!cid && !(cid in clienteNomeMap))
 
-    if (ids.length > 0) {
-      fetchClienteIdPorVenda(ids)
-    }
-  }, [vendas, vendaClienteIdMap, fetchClienteIdPorVenda])
-
-  // Buscar nome do cliente para clienteIds recém obtidos
-  useEffect(() => {
-    const clienteIds = Object.values(vendaClienteIdMap).filter(
-      (cid): cid is string => !!cid && !(cid in clienteNomeMap)
-    )
     if (clienteIds.length > 0) {
       fetchNomesClientes(clienteIds)
     }
-  }, [vendaClienteIdMap, clienteNomeMap, fetchNomesClientes])
+  }, [vendas, clienteNomeMap, fetchNomesClientes])
 
   // Efeito para carregar dados auxiliares e iniciar a busca de vendas
   useEffect(() => {
@@ -601,10 +546,9 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
               const elapsedTime = formatElapsedTime(venda.dataCriacao)
               const usuarioNome =
                 usuariosPDV.find((u) => u.id === venda.abertoPorId)?.nome || venda.abertoPorId
-              const resolvedClienteId =
-                venda.clienteId || vendaClienteIdMap[venda.id] || undefined
+              // clienteId já vem na resposta da listagem, não precisa buscar separadamente
               const clienteNome =
-                (resolvedClienteId !== undefined && clienteNomeMap[resolvedClienteId]) || null
+                (venda.clienteId && clienteNomeMap[venda.clienteId]) || null
 
               // dataUltimoProdutoLancado já vem na resposta da listagem, não precisa buscar separadamente
               const minutosUltimoProduto = venda.dataUltimoProdutoLancado
