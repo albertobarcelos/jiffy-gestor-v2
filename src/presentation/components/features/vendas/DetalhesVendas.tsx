@@ -228,9 +228,9 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
   /**
    * Calcula valor total de um complemento
    */
-  const calcularValorComplemento = (complemento: Complemento): number => {
+  const calcularValorComplemento = useCallback((complemento: Complemento): number => {
     return complemento.valorUnitario * complemento.quantidade
-  }
+  }, [])
 
   /**
    * Calcula valor total de um produto com descontos e acréscimos
@@ -238,7 +238,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
    * IMPORTANTE: Quando tipoDesconto/tipoAcrescimo é 'porcentagem', o backend retorna
    * o valor já como decimal (ex: 0.1 para 10%), então NÃO deve dividir por 100
    */
-  const calcularValorProduto = (produto: ProdutoLancado): number => {
+  const calcularValorProduto = useCallback((produto: ProdutoLancado): number => {
     let valor = produto.valorUnitario * produto.quantidade
 
     // Aplica desconto
@@ -268,7 +268,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
     // Complementos NÃO são incluídos aqui - são exibidos separadamente abaixo do valor do produto
 
     return valor
-  }
+  }, [])
 
   /**
    * Busca detalhes da venda
@@ -348,19 +348,77 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
         codigoTerminal = String(dataRaw.terminalId)
       }
       
+      // Mapeia produtos lançados garantindo prioridade para os campos "valor*",
+      // pois em algumas vendas abertas o backend envia desconto/acréscimo como 0
+      // e o valor real em valorDesconto/valorAcrescimo.
+      const parseNumberOrNull = (value: unknown): number | null => {
+        if (value === null || value === undefined || value === '') return null
+        const parsed = typeof value === 'number' ? value : Number(value)
+        return Number.isNaN(parsed) ? null : parsed
+      }
+
+      const pickModifierValue = (
+        preferredRaw: unknown,
+        fallbackRaw: unknown
+      ): number | undefined => {
+        const preferred = parseNumberOrNull(preferredRaw)
+        const fallback = parseNumberOrNull(fallbackRaw)
+
+        // Regra: se preferred veio zerado e fallback tem valor > 0, usa fallback.
+        if (preferred !== null && preferred > 0) return preferred
+        if (fallback !== null && fallback > 0) return fallback
+        if (preferred !== null) return preferred
+        if (fallback !== null) return fallback
+        return undefined
+      }
+
+      const produtosLancadosMapeados = (dataRaw.produtosLancados || dataRaw.produtos || []).map((produto: any) => ({
+        ...produto,
+        desconto: pickModifierValue(
+          produto.valorDesconto ?? produto.descontoValor ?? produto.valorDescontoProduto,
+          produto.desconto
+        ),
+        tipoDesconto:
+          produto.tipoDesconto ??
+          produto.tipoDescontoValor ??
+          produto.tipoDescontoProduto ??
+          undefined,
+        acrescimo: pickModifierValue(
+          produto.valorAcrescimo ?? produto.acrescimoValor ?? produto.valorAcrescimoProduto,
+          produto.acrescimo
+        ),
+        tipoAcrescimo:
+          produto.tipoAcrescimo ??
+          produto.tipoAcrescimoValor ??
+          produto.tipoAcrescimoProduto ??
+          undefined,
+      }))
+      
       const data: VendaDetalhes = {
         ...dataRaw,
         codigoTerminal: codigoTerminal,
+        produtosLancados: produtosLancadosMapeados,
       }
       
       // Debug: log para verificar se o campo está sendo capturado
-      if (typeof window !== 'undefined' && !codigoTerminal) {
-        console.warn('DetalhesVendas: codigoTerminal não encontrado na resposta da API', {
-          vendaId,
-          dataRaw,
-          terminal: dataRaw.terminal,
-          terminalId: dataRaw.terminalId,
-        })
+      if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+        if (!codigoTerminal) {
+          console.warn('DetalhesVendas: codigoTerminal não encontrado na resposta da API', {
+            vendaId,
+            dataRaw,
+            terminal: dataRaw.terminal,
+            terminalId: dataRaw.terminalId,
+          })
+        }
+        // Debug: verifica produtos com desconto/acréscimo
+        const produtosComModificacao = produtosLancadosMapeados.filter((p: any) => 
+          (p.desconto && p.desconto > 0) || (p.acrescimo && p.acrescimo > 0)
+        )
+        if (produtosComModificacao.length > 0) {
+          console.log('DetalhesVendas: Produtos com desconto/acréscimo encontrados:', produtosComModificacao)
+        } else {
+          console.log('DetalhesVendas: Nenhum produto com desconto/acréscimo encontrado. Produtos:', produtosLancadosMapeados)
+        }
       }
       
       setVenda(data)
@@ -529,7 +587,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
       totalAcrescimosConta,
       totalCupom,
     }
-  }, [venda])
+  }, [venda, calcularValorProduto, calcularValorComplemento])
 
   /**
    * Calcula o troco baseado nos pagamentos válidos
@@ -789,6 +847,29 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                     const valorTotal = calcularValorProduto(produto)
                     const isRemovido = produto.removido
                     // Sempre exibe o valor total, mesmo quando removido (com risco)
+                    
+                    // Debug: verifica se os campos de desconto/acréscimo estão presentes (apenas para produtos com modificações)
+                    if (process.env.NODE_ENV === 'development') {
+                      const descontoValue = produto.desconto !== undefined && produto.desconto !== null
+                        ? (typeof produto.desconto === 'string' ? parseFloat(produto.desconto) : produto.desconto)
+                        : 0
+                      const acrescimoValue = produto.acrescimo !== undefined && produto.acrescimo !== null
+                        ? (typeof produto.acrescimo === 'string' ? parseFloat(produto.acrescimo) : produto.acrescimo)
+                        : 0
+                      
+                      if ((descontoValue > 0) || (acrescimoValue > 0)) {
+                        console.log('Produto com desconto/acréscimo:', {
+                          nome: produto.nomeProduto,
+                          desconto: produto.desconto,
+                          descontoValue,
+                          tipoDesconto: produto.tipoDesconto,
+                          acrescimo: produto.acrescimo,
+                          acrescimoValue,
+                          tipoAcrescimo: produto.tipoAcrescimo,
+                          produtoCompleto: produto
+                        })
+                      }
+                    }
 
                     return (
                       <div
@@ -805,43 +886,67 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                                 {produto.quantidade}x {produto.nomeProduto} ({formatNumber(produto.valorUnitario)})
                               </span>
                             </div>
-                            {/* Se tem acréscimo ou desconto maior que 0, mostra na mesma linha */}
-                            {(() => {
-                              const acrescimoValue = produto.acrescimo 
-                                ? (typeof produto.acrescimo === 'string' ? parseFloat(produto.acrescimo) : produto.acrescimo)
-                                : 0
-                              const descontoValue = produto.desconto
-                                ? (typeof produto.desconto === 'string' ? parseFloat(produto.desconto) : produto.desconto)
-                                : 0
-                              
-                              if (acrescimoValue > 0) {
-                                const valorExibir = produto.tipoAcrescimo === 'porcentagem' 
-                                  ? `${Math.round(acrescimoValue * 100)}%` 
-                                  : formatNumber(acrescimoValue)
-                                return (
-                                  <div className="flex-1 flex justify-start md:text-sm text-xs text-secondary-text font-nunito">
-                                    <span className="text-success">
+                            {/* Exibe acréscimo e/ou desconto se existirem */}
+                            <div className="flex-1 flex flex-col md:flex-row gap-1 justify-start md:text-sm text-xs text-secondary-text font-nunito">
+                              {(() => {
+                                // Tenta obter acréscimo de diferentes possíveis campos
+                                const acrescimoRaw = (produto as any).acrescimo ?? 
+                                                    (produto as any).valorAcrescimo ?? 
+                                                    (produto as any).acrescimoValor ?? 
+                                                    null
+                                const tipoAcrescimoRaw = produto.tipoAcrescimo ?? 
+                                                         (produto as any).tipoAcrescimoValor ?? 
+                                                         (produto as any).tipoAcrescimoProduto ?? 
+                                                         null
+                                
+                                // Tenta obter desconto de diferentes possíveis campos
+                                const descontoRaw = produto.desconto ?? 
+                                                   (produto as any).valorDesconto ?? 
+                                                   (produto as any).descontoValor ?? 
+                                                   null
+                                const tipoDescontoRaw = produto.tipoDesconto ?? 
+                                                        (produto as any).tipoDescontoValor ?? 
+                                                        (produto as any).tipoDescontoProduto ?? 
+                                                        null
+                                
+                                const acrescimoValue = acrescimoRaw !== undefined && acrescimoRaw !== null && acrescimoRaw !== ''
+                                  ? (typeof acrescimoRaw === 'string' ? parseFloat(acrescimoRaw) : acrescimoRaw)
+                                  : null
+                                const descontoValue = descontoRaw !== undefined && descontoRaw !== null && descontoRaw !== ''
+                                  ? (typeof descontoRaw === 'string' ? parseFloat(descontoRaw) : descontoRaw)
+                                  : null
+                                
+                                const elementos = []
+                                
+                                // Exibe acréscimo se existir e for maior que 0
+                                if (acrescimoValue !== null && !isNaN(acrescimoValue) && acrescimoValue > 0) {
+                                  const tipoAcrescimo = tipoAcrescimoRaw || 'fixo' // Default para fixo se não especificado
+                                  const valorExibir = tipoAcrescimo === 'porcentagem' 
+                                    ? `${Math.round(acrescimoValue * 100)}%` 
+                                    : formatNumber(acrescimoValue)
+                                  elementos.push(
+                                    <span key="acrescimo" className="text-success">
                                       Acresc. +{valorExibir}
                                     </span>
-                                  </div>
-                                )
-                              }
-                              
-                              if (descontoValue > 0) {
-                                const valorExibir = produto.tipoDesconto === 'porcentagem' 
-                                  ? `${Math.round(descontoValue * 100)}%` 
-                                  : formatNumber(descontoValue)
-                                return (
-                                  <div className="flex-1 flex justify-start text-xs text-secondary-text font-nunito">
-                                    <span className="text-error">
+                                  )
+                                }
+                                
+                                // Exibe desconto se existir e for maior que 0
+                                if (descontoValue !== null && !isNaN(descontoValue) && descontoValue > 0) {
+                                  const tipoDesconto = tipoDescontoRaw || 'fixo' // Default para fixo se não especificado
+                                  const valorExibir = tipoDesconto === 'porcentagem' 
+                                    ? `${Math.round(descontoValue * 100)}%` 
+                                    : formatNumber(descontoValue)
+                                  elementos.push(
+                                    <span key="desconto" className="text-error">
                                       Desc. -{valorExibir}
                                     </span>
-                                  </div>
-                                )
-                              }
-                              
-                              return null
-                            })()}
+                                  )
+                                }
+                                
+                                return elementos.length > 0 ? elementos : null
+                              })()}
+                            </div>
                             <div className={`flex-1 flex items-center justify-end text-sm font-semibold text-primary-text font-nunito ${isRemovido ? 'line-through' : ''}`}>
                               {formatCurrency(valorTotal)}
                             </div>

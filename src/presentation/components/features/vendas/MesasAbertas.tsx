@@ -62,7 +62,6 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
   const [vendas, setVendas] = useState<Venda[]>([])
   const [metricas, setMetricas] = useState<MetricasVendas | null>(null)
   const [usuariosPDV, setUsuariosPDV] = useState<UsuarioPDV[]>([])
-  const [ultimoProdutoPorVenda, setUltimoProdutoPorVenda] = useState<Record<string, string | null>>({})
   const [vendaClienteIdMap, setVendaClienteIdMap] = useState<Record<string, string | null>>({})
   const [clienteNomeMap, setClienteNomeMap] = useState<Record<string, string | null>>({})
   const [apenasSemMovimentacao, setApenasSemMovimentacao] = useState(false)
@@ -269,51 +268,6 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
   }, [auth])
 
   /**
-   * Busca data do último produto lançado para uma lista de vendas
-   */
-  const fetchUltimoProdutoLancado = useCallback(
-    async (ids: string[]) => {
-      const token = auth?.getAccessToken()
-      if (!token || ids.length === 0) return
-
-      try {
-        const results = await Promise.all(
-          ids.map(async (id) => {
-            try {
-              const response = await fetch(`/api/vendas/${id}`, {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                  'Content-Type': 'application/json',
-                },
-              })
-              if (!response.ok) {
-                return { id, dataUltimoProdutoLancado: null }
-              }
-              const data = await response.json()
-              return { id, dataUltimoProdutoLancado: data.dataUltimoProdutoLancado || null }
-            } catch {
-              return { id, dataUltimoProdutoLancado: null }
-            }
-          })
-        )
-
-        setUltimoProdutoPorVenda((prev) => {
-          const next = { ...prev }
-          results.forEach(({ id, dataUltimoProdutoLancado }) => {
-            if (dataUltimoProdutoLancado !== undefined) {
-              next[id] = dataUltimoProdutoLancado
-            }
-          })
-          return next
-        })
-      } catch (error) {
-        console.error('Erro ao buscar último produto lançado:', error)
-      }
-    },
-    [auth]
-  )
-
-  /**
    * Busca o clienteId a partir do detalhe da venda (endpoint de detalhes).
    */
   const fetchClienteIdPorVenda = useCallback(
@@ -516,19 +470,6 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
     return () => container.removeEventListener('scroll', handleScroll)
   }, [canLoadMore, isLoadingMore, isLoading, fetchVendas])
 
-  /**
-   * Busca data do último produto lançado para as vendas listadas
-   */
-  useEffect(() => {
-    const ids = vendas
-      .map((v) => v.id)
-      .filter((id) => ultimoProdutoPorVenda[id] === undefined)
-
-    if (ids.length > 0) {
-      fetchUltimoProdutoLancado(ids)
-    }
-  }, [vendas, fetchUltimoProdutoLancado, ultimoProdutoPorVenda])
-
   // Buscar clienteId via detalhe da venda para cada venda listada
   useEffect(() => {
     const ids = vendas
@@ -665,13 +606,12 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
               const clienteNome =
                 (resolvedClienteId !== undefined && clienteNomeMap[resolvedClienteId]) || null
 
+              // dataUltimoProdutoLancado já vem na resposta da listagem, não precisa buscar separadamente
               const minutosUltimoProduto = venda.dataUltimoProdutoLancado
                 ? Math.floor((Date.now() - toMs(venda.dataUltimoProdutoLancado)) / 60000)
-                : ultimoProdutoPorVenda[venda.id]
-                ? Math.floor((Date.now() - toMs(ultimoProdutoPorVenda[venda.id]!)) / 60000)
                 : Math.floor((Date.now() - toMs(venda.dataCriacao)) / 60000)
 
-              // Fallback para movimentação: dataUltimaMovimentacao -> dataUltimoProdutoLancado -> detalhe -> criação
+              // Fallback para movimentação: dataUltimaMovimentacao -> dataUltimaModificacao -> dataUltimoProdutoLancado -> criação
               const minutosUltimaMov =
                 venda.dataUltimaMovimentacao && venda.dataUltimaMovimentacao.length > 0
                   ? Math.floor((Date.now() - toMs(venda.dataUltimaMovimentacao)) / 60000)
@@ -679,8 +619,6 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
                   ? Math.floor((Date.now() - toMs(venda.dataUltimaModificacao)) / 60000)
                   : venda.dataUltimoProdutoLancado && venda.dataUltimoProdutoLancado.length > 0
                   ? Math.floor((Date.now() - toMs(venda.dataUltimoProdutoLancado)) / 60000)
-                  : ultimoProdutoPorVenda[venda.id]
-                  ? Math.floor((Date.now() - toMs(ultimoProdutoPorVenda[venda.id]!)) / 60000)
                   : Math.floor((Date.now() - toMs(venda.dataCriacao)) / 60000)
 
               // Debug do tempo de movimentação
