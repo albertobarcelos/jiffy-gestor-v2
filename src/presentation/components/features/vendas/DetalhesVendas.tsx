@@ -510,6 +510,8 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
       }
     }
 
+    const isVendaCancelada = !!venda.canceladoPorId
+
     let totalItensLancados = 0 // Soma TODOS os itens lançados (cancelados + não cancelados)
     let totalItensCancelados = 0
     let totalDescontosConta = 0 // Soma todos os descontos aplicados nos produtos
@@ -567,8 +569,9 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
       // SEMPRE soma ao total lançado (independente se foi cancelado ou não)
       totalItensLancados += valorTotalComComplementos
 
-      if (produto.removido) {
-        // Produto removido: também soma ao total cancelado
+      // Se a venda está cancelada, TODOS os produtos são considerados cancelados
+      // Caso contrário, apenas produtos removidos individualmente
+      if (isVendaCancelada || produto.removido) {
         totalItensCancelados += valorTotalComComplementos
       }
     })
@@ -576,8 +579,11 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
     // Total dos itens (A - B)
     const totalDosItens = totalItensLancados - totalItensCancelados
 
-    // Total do cupom (valorFinal da venda)
-    const totalCupom = venda.valorFinal
+    // Total do cupom: se cancelada, usa o total calculado (soma de todos os produtos)
+    // Caso contrário, usa o valorFinal da venda
+    const totalCupom = isVendaCancelada 
+      ? totalItensLancados // Quando cancelada, totalCupom = total de todos os produtos
+      : venda.valorFinal
 
     return {
       totalItensLancados,
@@ -625,6 +631,45 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
 
     return troco;
   }, [venda]);
+
+  /**
+   * Calcula o total da venda
+   * Se a venda está cancelada, soma TODOS os produtos lançados (ignorando remoções anteriores)
+   * Caso contrário, usa o valorFinal da venda
+   */
+  const totalVendaCalculado = useMemo(() => {
+    if (!venda || !venda.produtosLancados || venda.produtosLancados.length === 0) {
+      return venda?.valorFinal || 0
+    }
+
+    const isVendaCancelada = !!venda.canceladoPorId
+
+    if (isVendaCancelada) {
+      // Quando cancelada, soma TODOS os produtos lançados, mesmo que tenham sido removidos antes
+      let total = 0
+      venda.produtosLancados.forEach((produto) => {
+        const valorTotalProduto = calcularValorProduto(produto)
+        
+        // Soma complementos que impactam preço
+        let valorComplementos = 0
+        if (produto.complementos && produto.complementos.length > 0) {
+          produto.complementos.forEach((complemento) => {
+            if (complemento.tipoImpactoPreco === 'aumenta') {
+              valorComplementos += calcularValorComplemento(complemento)
+            } else if (complemento.tipoImpactoPreco === 'diminui') {
+              valorComplementos -= calcularValorComplemento(complemento)
+            }
+          })
+        }
+
+        total += valorTotalProduto + valorComplementos
+      })
+      return total
+    }
+
+    // Se não está cancelada, usa o valorFinal da venda
+    return venda.valorFinal
+  }, [venda, calcularValorProduto, calcularValorComplemento])
 
   if (!open) return null
 
@@ -846,6 +891,9 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                   {venda.produtosLancados?.map((produto, index) => {
                     const valorTotal = calcularValorProduto(produto)
                     const isRemovido = produto.removido
+                    const isVendaCancelada = statusVenda === 'CANCELADA'
+                    // Se a venda está cancelada, todos os produtos são considerados cancelados
+                    const isCancelado = isVendaCancelada || isRemovido
                     // Sempre exibe o valor total, mesmo quando removido (com risco)
                     
                     // Debug: verifica se os campos de desconto/acréscimo estão presentes (apenas para produtos com modificações)
@@ -875,7 +923,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                       <div
                         key={index}
                         className={`md:px-3 px-1 rounded-lg ${
-                          isRemovido ? 'bg-error/20' : 'bg-white'
+                          isCancelado ? 'bg-error/20' : 'bg-white'
                         }`}
                       >
                         <div className="flex flex-col gap-1">
@@ -947,7 +995,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                                 return elementos.length > 0 ? elementos : null
                               })()}
                             </div>
-                            <div className={`flex-1 flex items-center justify-end text-sm font-semibold text-primary-text font-nunito ${isRemovido ? 'line-through' : ''}`}>
+                            <div className={`flex-1 flex items-center justify-end text-sm font-semibold text-primary-text font-nunito ${isCancelado ? 'line-through' : ''}`}>
                               {formatCurrency(valorTotal)}
                             </div>
                           </div>
@@ -968,7 +1016,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                                       {complemento.quantidade}x {complemento.nomeComplemento}
                                       {temImpactoPreco && ` (${formatNumber(complemento.valorUnitario)})`}
                                     </span>
-                                    <div className={`text-xs font-semibold text-secondary-text font-nunito ${isRemovido ? 'line-through' : ''}`}>
+                                    <div className={`text-xs font-semibold text-secondary-text font-nunito ${isCancelado ? 'line-through' : ''}`}>
                                       {temImpactoPreco ? `${prefix}${formatCurrency(valorTotalComplemento)}` : '-'}
                                     </div>
                                   </div>
@@ -1005,8 +1053,8 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                       <span className="text-base font-bold text-primary-text font-nunito">
                         Total da Venda:
                       </span>
-                      <span className="text-base font-bold text-primary font-nunito">
-                        {formatCurrency(venda.valorFinal)}
+                      <span className={`text-base font-bold text-primary font-nunito ${statusVenda === 'CANCELADA' ? 'line-through' : ''}`}>
+                        {formatCurrency(totalVendaCalculado)}
                       </span>
                     </div>
                   </div>
