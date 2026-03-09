@@ -63,6 +63,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
   const [metricas, setMetricas] = useState<MetricasVendas | null>(null)
   const [usuariosPDV, setUsuariosPDV] = useState<UsuarioPDV[]>([])
   const [clienteNomeMap, setClienteNomeMap] = useState<Record<string, string | null>>({})
+  const [vendaClienteIdMap, setVendaClienteIdMap] = useState<Record<string, string | null>>({}) // Cache de clienteId por venda (fallback)
   const [apenasSemMovimentacao, setApenasSemMovimentacao] = useState(false)
   const [cachesHydrated, setCachesHydrated] = useState(false)
 
@@ -293,6 +294,53 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
         results.forEach(({ clienteId, nome }) => {
           next[clienteId] = nome // nome pode ser null para evitar refetch
         })
+        // Debug: verifica se os nomes foram salvos corretamente
+        if (process.env.NODE_ENV === 'development') {
+          console.log('MesasAbertas: Nomes de clientes atualizados:', {
+            resultados: results,
+            mapaAtualizado: next
+          })
+        }
+        return next
+      })
+    },
+    [auth]
+  )
+
+  /**
+   * Busca o clienteId a partir do detalhe da venda (endpoint de detalhes).
+   * Fallback temporário enquanto o clienteId não vem na resposta da listagem.
+   */
+  const fetchClienteIdPorVenda = useCallback(
+    async (ids: string[]) => {
+      const token = auth?.getAccessToken()
+      if (!token || ids.length === 0) return
+
+      const results = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const response = await fetch(`/api/vendas/${id}`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            })
+            if (!response.ok) return { id, clienteId: null }
+            const data = await response.json()
+            const clienteId = (data.clienteId as string | undefined) || null
+            return { id, clienteId }
+          } catch {
+            return { id, clienteId: null }
+          }
+        })
+      )
+
+      setVendaClienteIdMap((prev) => {
+        const next = { ...prev }
+        results.forEach(({ id, clienteId }) => {
+          // marca mesmo que null para evitar refetch infinito
+          next[id] = clienteId
+        })
         return next
       })
     },
@@ -338,6 +386,17 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
         }
 
         const data = await response.json()
+
+        // Debug: verifica se o clienteId está vindo na resposta da listagem
+        if (process.env.NODE_ENV === 'development') {
+          const itemsComClienteId = (data.items || []).filter((item: any) => item.clienteId && item.clienteId.trim() !== '')
+          console.log('MesasAbertas: Resposta da API de listagem:', {
+            totalItems: (data.items || []).length,
+            itemsComClienteId: itemsComClienteId.length,
+            exemplosClienteId: itemsComClienteId.slice(0, 3).map((item: any) => ({ id: item.id, clienteId: item.clienteId })),
+            primeiroItem: data.items?.[0] ? { id: data.items[0].id, clienteId: data.items[0].clienteId, campos: Object.keys(data.items[0]) } : null
+          })
+        }
 
         const filteredItems = sortByUltimaMovimentacaoAsc(
           (data.items || []).filter((item: Venda) => {
@@ -425,16 +484,56 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
     return () => container.removeEventListener('scroll', handleScroll)
   }, [canLoadMore, isLoadingMore, isLoading, fetchVendas])
 
-  // Buscar nome do cliente para clienteIds das vendas listadas (clienteId já vem na resposta da listagem)
+  // Fallback: Buscar clienteId via detalhes da venda quando não estiver presente na listagem
   useEffect(() => {
-    const clienteIds = vendas
-      .map((v) => v.clienteId)
-      .filter((cid): cid is string => !!cid && !(cid in clienteNomeMap))
+    const idsParaBuscar = vendas
+      .filter((v) => {
+        // Busca apenas vendas que não têm clienteId na resposta da listagem
+        // e ainda não foram verificadas (não estão no cache)
+        const temClienteIdNaListagem = v.clienteId && typeof v.clienteId === 'string' && v.clienteId.trim() !== ''
+        const jaVerificado = v.id in vendaClienteIdMap
+        return !temClienteIdNaListagem && !jaVerificado
+      })
+      .map((v) => v.id)
 
-    if (clienteIds.length > 0) {
-      fetchNomesClientes(clienteIds)
+    if (idsParaBuscar.length > 0) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('MesasAbertas: Buscando clienteId via detalhes para vendas:', idsParaBuscar)
+      }
+      fetchClienteIdPorVenda(idsParaBuscar)
     }
-  }, [vendas, clienteNomeMap, fetchNomesClientes])
+  }, [vendas, vendaClienteIdMap, fetchClienteIdPorVenda])
+
+  // Buscar nome do cliente para clienteIds das vendas listadas ou obtidos via fallback
+  useEffect(() => {
+    // Coleta clienteIds de duas fontes:
+    // 1. Da resposta da listagem (venda.clienteId)
+    // 2. Do cache de fallback (vendaClienteIdMap)
+    const clienteIds = new Set<string>()
+    
+    vendas.forEach((v) => {
+      // Prioriza clienteId da listagem, se disponível
+      if (v.clienteId && typeof v.clienteId === 'string' && v.clienteId.trim() !== '') {
+        clienteIds.add(v.clienteId)
+      } else if (vendaClienteIdMap[v.id] && typeof vendaClienteIdMap[v.id] === 'string' && vendaClienteIdMap[v.id]!.trim() !== '') {
+        // Fallback: usa clienteId do cache de detalhes
+        clienteIds.add(vendaClienteIdMap[v.id]!)
+      }
+    })
+
+    // Filtra apenas clienteIds que ainda não estão no cache de nomes
+    const clienteIdsParaBuscar = Array.from(clienteIds).filter((cid) => !(cid in clienteNomeMap))
+
+    if (clienteIdsParaBuscar.length > 0) {
+      // Debug: verifica se os clienteIds estão sendo encontrados
+      if (process.env.NODE_ENV === 'development') {
+        console.log('MesasAbertas: Buscando nomes de clientes para IDs:', clienteIdsParaBuscar)
+        console.log('MesasAbertas: Vendas com clienteId (listagem):', vendas.filter(v => v.clienteId && v.clienteId.trim() !== '').map(v => ({ id: v.id, clienteId: v.clienteId })))
+        console.log('MesasAbertas: Vendas com clienteId (fallback):', Object.entries(vendaClienteIdMap).filter(([id, cid]) => cid && cid.trim() !== '').map(([id, cid]) => ({ id, clienteId: cid })))
+      }
+      fetchNomesClientes(clienteIdsParaBuscar)
+    }
+  }, [vendas, vendaClienteIdMap, clienteNomeMap, fetchNomesClientes])
 
   // Efeito para carregar dados auxiliares e iniciar a busca de vendas
   useEffect(() => {
@@ -546,9 +645,28 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
               const elapsedTime = formatElapsedTime(venda.dataCriacao)
               const usuarioNome =
                 usuariosPDV.find((u) => u.id === venda.abertoPorId)?.nome || venda.abertoPorId
-              // clienteId já vem na resposta da listagem, não precisa buscar separadamente
-              const clienteNome =
-                (venda.clienteId && clienteNomeMap[venda.clienteId]) || null
+              // Obtém clienteId da listagem ou do fallback (detalhes)
+              const resolvedClienteId = 
+                (venda.clienteId && typeof venda.clienteId === 'string' && venda.clienteId.trim() !== '')
+                  ? venda.clienteId
+                  : (vendaClienteIdMap[venda.id] && typeof vendaClienteIdMap[venda.id] === 'string' && vendaClienteIdMap[venda.id]!.trim() !== '')
+                    ? vendaClienteIdMap[venda.id]!
+                    : null
+              
+              // Busca o nome do cliente usando o clienteId resolvido
+              const clienteNome = resolvedClienteId ? (clienteNomeMap[resolvedClienteId] || null) : null
+              
+              // Debug: verifica se o clienteId está presente e se o nome foi encontrado
+              if (process.env.NODE_ENV === 'development' && resolvedClienteId) {
+                console.log('MesasAbertas: Cliente info para venda', venda.id, {
+                  clienteIdListagem: venda.clienteId,
+                  clienteIdFallback: vendaClienteIdMap[venda.id],
+                  resolvedClienteId,
+                  clienteNome,
+                  clienteNomeMap: resolvedClienteId ? clienteNomeMap[resolvedClienteId] : null,
+                  todasChaves: Object.keys(clienteNomeMap)
+                })
+              }
 
               // dataUltimoProdutoLancado já vem na resposta da listagem, não precisa buscar separadamente
               const minutosUltimoProduto = venda.dataUltimoProdutoLancado
