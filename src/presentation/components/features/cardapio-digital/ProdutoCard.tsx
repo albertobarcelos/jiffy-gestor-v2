@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import { Produto } from '@/src/domain/entities/Produto'
 import { MdAdd, MdInfo } from 'react-icons/md'
+import { getProdutoImagem } from '@/src/presentation/utils/produtoImagens'
 
 interface ProdutoCardProps {
   produto: Produto
@@ -24,11 +25,11 @@ export default function ProdutoCard({ produto, onDetalhes }: ProdutoCardProps) {
   const nome = produto.getNome()
   const valor = produto.getValor()
   const ativo = produto.isAtivo()
+  const descricao = produto.getDescricao()
   
-  // Por enquanto, descricao e imagemUrl não estão na entidade
-  // Quando backend estiver pronto, esses campos virão no JSON
-  const descricao = undefined // produto.getDescricao?.() || undefined
-  const imagemUrl = undefined // produto.getImagemUrl?.() || undefined
+  // Busca a imagem do produto: primeiro tenta do backend, depois do mapeamento manual
+  const imagemUrlBackend = undefined // produto.getImagemUrl?.() || undefined (quando backend estiver pronto)
+  const imagemUrl = getProdutoImagem(produto.getId(), imagemUrlBackend)
 
   return (
     <div
@@ -85,10 +86,10 @@ export default function ProdutoCard({ produto, onDetalhes }: ProdutoCardProps) {
 
       {/* Informações do Produto */}
       <div className="p-5 flex-1 flex flex-col">
-        <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2">{nome}</h3>
+        <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-2">{nome}</h3>
 
         {descricao && (
-          <p className="text-sm text-gray-600 mb-4 line-clamp-2 flex-1">{descricao}</p>
+          <p className="text-lg text-gray-600 mb-4 line-clamp-2 flex-1">{descricao}</p>
         )}
 
         {/* Preço e Ação */}

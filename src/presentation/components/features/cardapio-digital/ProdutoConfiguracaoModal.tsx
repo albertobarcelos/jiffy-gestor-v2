@@ -8,6 +8,7 @@ import Image from 'next/image'
 import { MdClose, MdAdd, MdRemove, MdCheck, MdArrowForward } from 'react-icons/md'
 import { adicionarItemCarrinho } from '@/src/infrastructure/api/cardapio/cardapioApiService'
 import { showToast } from '@/src/shared/utils/toast'
+import { getProdutoImagem } from '@/src/presentation/utils/produtoImagens'
 
 interface GrupoComplemento {
   id: string
@@ -63,7 +64,9 @@ export default function ProdutoConfiguracaoModal({
   const nome = produto.getNome()
   const valorBase = produto.getValor()
   const ativo = produto.isAtivo()
-  const imagemUrl = undefined // Será implementado quando backend tiver
+  // Busca a imagem do produto: primeiro tenta do backend, depois do mapeamento manual
+  const imagemUrlBackend = undefined // produto.getImagemUrl?.() || undefined (quando backend estiver pronto)
+  const imagemUrl = getProdutoImagem(produto.getId(), imagemUrlBackend)
   const descricao = produto.getDescricao()
 
   // Carregar complementos do produto

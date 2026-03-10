@@ -114,7 +114,7 @@ export default function ProdutosPorGrupoPage() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => router.push(`/cardapio/mesa/${mesaId}/grupos`)}
+              onClick={() => router.push(`/cardapio/mesa/${mesaId}/cardapio`)}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <MdArrowBack className="w-6 h-6 text-gray-700" />

@@ -18,61 +18,61 @@ interface ThemeOption {
 const themeOptions: ThemeOption[] = [
   {
     id: 'dark',
-    label: 'Escuro',
+    label: 'Dark Food',
     icon: MdDarkMode,
-    description: 'Elegante e sofisticado',
+    description: 'Tema escuro moderno para cardápio',
     previewColors: {
-      primary: '#000000',
-      secondary: '#1A1A1A',
-      accent: '#DC2626',
+      primary: '#121212',
+      secondary: '#1E1E1E',
+      accent: '#FF7A00',
     },
   },
   {
     id: 'clean',
-    label: 'Limpo',
+    label: 'Premium',
     icon: MdLightMode,
-    description: 'Minimalista e claro',
+    description: 'Tema limpo e premium',
     previewColors: {
-      primary: '#FFFFFF',
-      secondary: '#F8F9FA',
-      accent: '#0D6EFD',
+      primary: '#F8F9FA',
+      secondary: '#FFFFFF',
+      accent: '#D62828',
     },
   },
   {
     id: 'colors',
-    label: 'Colorido',
+    label: 'Gourmet',
     icon: MdPalette,
-    description: 'Vibrante e alegre',
+    description: 'Tema escuro gourmet',
     previewColors: {
-      primary: '#F0F4F8',
-      secondary: '#FFFFFF',
-      accent: '#FF6B6B',
+      primary: '#121212',
+      secondary: '#1E1E1E',
+      accent: '#E63946',
     },
   },
 ]
 
 /**
  * Seletor de tema para o cardápio digital
- * Permite escolher entre Dark, Clean e Colors
+ * Permite escolher entre Dark Food, Premium e Gourmet
  */
 export default function ThemeSelector() {
   const { theme, setTheme } = useCardapioTheme()
 
   return (
     <div
-      className="flex items-center gap-2 p-2 backdrop-blur-sm rounded-lg border"
+      className="flex items-center gap-1.5 p-1.5 backdrop-blur-sm rounded-lg border"
       style={{
         backgroundColor: 'var(--cardapio-bg-elevated)',
         borderColor: 'var(--cardapio-border)',
       }}
     >
       <span
-        className="text-xs font-medium px-2"
+        className="text-[10px] font-medium px-1.5 whitespace-nowrap"
         style={{ color: 'var(--cardapio-text-secondary)' }}
       >
         Tema:
       </span>
-      <div className="flex gap-1">
+      <div className="flex gap-0.5">
         {themeOptions.map((option) => {
           const Icon = option.icon
           const isActive = theme === option.id
@@ -81,7 +81,7 @@ export default function ThemeSelector() {
             <button
               key={option.id}
               onClick={() => setTheme(option.id)}
-              className="relative px-3 py-2 rounded-lg transition-all duration-200 flex items-center gap-2"
+              className="relative px-2 py-1 rounded-md transition-all duration-200 flex items-center gap-1 whitespace-nowrap"
               style={{
                 backgroundColor: isActive
                   ? 'var(--cardapio-menu-item-active)'
@@ -89,7 +89,7 @@ export default function ThemeSelector() {
                 color: isActive
                   ? 'var(--cardapio-text-primary)'
                   : 'var(--cardapio-text-secondary)',
-                boxShadow: isActive ? '0 4px 6px rgba(0, 0, 0, 0.1)' : 'none',
+                boxShadow: isActive ? '0 2px 4px rgba(0, 0, 0, 0.1)' : 'none',
               }}
               onMouseEnter={(e) => {
                 if (!isActive) {
@@ -105,17 +105,17 @@ export default function ThemeSelector() {
               }}
               title={option.description}
             >
-              <Icon className="w-4 h-4" />
-              <span className="text-xs font-medium hidden sm:inline">{option.label}</span>
+              <Icon className="w-3 h-3 flex-shrink-0" />
+              <span className="text-[10px] font-medium">{option.label}</span>
 
               {/* Indicador visual de cores */}
-              <div className="flex gap-0.5 ml-1">
+              <div className="flex gap-0.5 ml-0.5">
                 <div
-                  className="w-2 h-2 rounded-full"
+                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                   style={{ backgroundColor: option.previewColors.primary }}
                 />
                 <div
-                  className="w-2 h-2 rounded-full"
+                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                   style={{ backgroundColor: option.previewColors.accent }}
                 />
               </div>
@@ -123,7 +123,7 @@ export default function ThemeSelector() {
               {/* Indicador de ativo */}
               {isActive && (
                 <div
-                  className="absolute -top-1 -right-1 w-2 h-2 rounded-full"
+                  className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full"
                   style={{ backgroundColor: 'var(--cardapio-accent-primary)' }}
                 />
               )}

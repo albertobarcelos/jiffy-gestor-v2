@@ -13,9 +13,10 @@ import ProdutoConfiguracaoModal from '@/src/presentation/components/features/car
 import { adicionarItemCarrinho } from '@/src/infrastructure/api/cardapio/cardapioApiService'
 import { showToast } from '@/src/shared/utils/toast'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
-import BannerDestaques from '@/src/presentation/components/features/cardapio-digital/BannerDestaques'
 import CarrosselProdutosDestaque from '@/src/presentation/components/features/cardapio-digital/CarrosselProdutosDestaque'
 import ThemeSelector from '@/src/presentation/components/features/cardapio-digital/ThemeSelector'
+import BannerPromocoesVertical from '@/src/presentation/components/features/cardapio-digital/BannerPromocoesVertical'
+import { getProdutoImagem } from '@/src/presentation/utils/produtoImagens'
 
 /**
  * Página principal do cardápio
@@ -33,6 +34,8 @@ export default function CardapioPage() {
   const [carrinhoCount, setCarrinhoCount] = useState(0)
   const [sessionId, setSessionId] = useState<string>(mesaId)
   const [numeroMesa, setNumeroMesa] = useState<string>('?')
+  const [accentColor, setAccentColor] = useState<string>('#FF7A00')
+  const [accentTextColor, setAccentTextColor] = useState<string>('#FFFFFF')
 
   // Buscar grupos de produtos
   const { data: gruposData, isLoading: isLoadingGrupos } = useQuery({
@@ -150,6 +153,30 @@ export default function CardapioPage() {
     const interval = setInterval(carregarCarrinho, 2000)
     return () => clearInterval(interval)
   }, [sessionId])
+
+  // Obter cores do tema em tempo de execução
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const updateThemeColors = () => {
+      const root = document.documentElement
+      const accent = getComputedStyle(root).getPropertyValue('--cardapio-accent-primary').trim()
+      const text = getComputedStyle(root).getPropertyValue('--cardapio-btn-primary-text').trim()
+      setAccentColor(accent || '#FF7A00')
+      setAccentTextColor(text || '#FFFFFF')
+    }
+
+    updateThemeColors()
+
+    // Observar mudanças no tema
+    const observer = new MutationObserver(updateThemeColors)
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-cardapio-theme'],
+    })
+
+    return () => observer.disconnect()
+  }, [])
 
   // Carregar valores do sessionStorage e validar sessão
   useEffect(() => {
@@ -278,7 +305,7 @@ export default function CardapioPage() {
       <div className="flex-1 flex overflow-hidden">
         {/* Menu Lateral - Grupos */}
         <div
-          className="w-64 border-r flex flex-col overflow-hidden"
+          className="w-64 border-r flex flex-col overflow-hidden flex-shrink-0"
           style={{
             backgroundColor: 'var(--cardapio-menu-bg)',
             borderColor: 'var(--cardapio-border)',
@@ -301,12 +328,12 @@ export default function CardapioPage() {
                 Nenhuma categoria disponível
               </p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2 ">
                 {/* Opção Destaques */}
                 <button
                   onClick={handleSelecionarDestaques}
                   className={`
-                    w-full text-left px-3 py-3 rounded-lg transition-all duration-200 relative overflow-hidden
+                    w-full text-left px-3 py-3 rounded-lg transition-all duration-200 relative overflow-hidden 
                     ${
                       mostrarDestaques
                         ? 'font-semibold'
@@ -314,29 +341,16 @@ export default function CardapioPage() {
                     }
                   `}
                   style={{
-                    background: mostrarDestaques
-                      ? `linear-gradient(to right, var(--cardapio-accent-primary) 0%, var(--cardapio-accent-primary) 35%, rgba(99, 102, 241, 0.6) 40%, rgba(99, 102, 241, 0.3) 55%, transparent 80%)`
-                      : `linear-gradient(to right, var(--cardapio-accent-primary) 0%, var(--cardapio-accent-primary) 50%, rgba(99, 102, 241, 0.3) 70%, transparent 90%)`,
+                    backgroundColor: 'var(--cardapio-accent-primary)',
                   }}
                 >
-                  <div className="flex items-center gap-3 relative z-10">
-                    <div
-                      className="w-8 h-8 rounded flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: 'var(--cardapio-bg-elevated)' }}
-                    >
-                      <span
-                        className="text-lg font-bold"
-                        style={{ color: 'var(--cardapio-text-primary)' }}
-                      >
-                        ⭐
-                      </span>
-                    </div>
+                  <div className="flex items-center gap-3 relative z-10 ">
                     <div className="flex-1 min-w-0">
                       <p
                         className="text-sm truncate font-semibold"
                         style={{ color: 'var(--cardapio-text-primary)' }}
                       >
-                        DESTAQUES
+                        DESTAQUES DO DIA
                       </p>
                     </div>
                   </div>
@@ -345,14 +359,13 @@ export default function CardapioPage() {
                 {/* Grupos de Produtos */}
                 {grupos.map((grupo: GrupoProduto) => {
                   const isSelected = grupo.getId() === grupoSelecionadoId && !mostrarDestaques
-                  const corHex = grupo.getCorHex() || '#6366f1'
                   
                   return (
                     <button
                       key={grupo.getId()}
                       onClick={() => handleSelecionarGrupo(grupo.getId())}
                       className={`
-                        w-full px-3 py-4 rounded-lg transition-all duration-200
+                        w-full px-3 py-2 rounded-lg transition-all duration-200 group
                         ${isSelected ? 'font-semibold' : ''}
                       `}
                       style={{
@@ -363,25 +376,38 @@ export default function CardapioPage() {
                       onMouseEnter={(e) => {
                         if (!isSelected) {
                           e.currentTarget.style.backgroundColor = 'var(--cardapio-menu-item-hover)'
+                          // Atualizar cor de fundo do container do ícone
+                          const iconContainer = e.currentTarget.querySelector('[data-icon-container]') as HTMLElement
+                          if (iconContainer) {
+                            iconContainer.style.backgroundColor = 'var(--cardapio-menu-item-hover)'
+                          }
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (!isSelected) {
                           e.currentTarget.style.backgroundColor = 'var(--cardapio-menu-item)'
+                          // Restaurar cor de fundo do container do ícone
+                          const iconContainer = e.currentTarget.querySelector('[data-icon-container]') as HTMLElement
+                          if (iconContainer) {
+                            iconContainer.style.backgroundColor = 'var(--cardapio-bg-elevated)'
+                          }
                         }
                       }}
                     >
-                      <div className="flex flex-col items-center gap-2">
-                        {/* Ícone do grupo */}
+                      <div className="flex flex-col items-center">
+                        {/* Ícone do grupo - usando cores do tema */}
                         <div
-                          className="w-full h-24 rounded-lg flex items-center justify-center flex-shrink-0"
+                          data-icon-container
+                          className="w-full h-20 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors duration-200"
                           style={{
-                            backgroundColor: isSelected ? corHex : `${corHex}20`,
+                            backgroundColor: isSelected 
+                              ? 'var(--cardapio-accent-primary)' 
+                              : 'var(--cardapio-bg-elevated)',
                           }}
                         >
                           <DinamicIcon
                             iconName={grupo.getIconName()}
-                            color={isSelected ? 'white' : corHex}
+                            color={isSelected ? accentTextColor : accentColor}
                             size={60}
                           />
                         </div>
@@ -411,6 +437,19 @@ export default function CardapioPage() {
           </div>
         </div>
 
+        {/* Banner Vertical de Promoções */}
+        <div
+          className="w-56 border-r flex flex-col overflow-hidden flex-shrink-0"
+          style={{
+            backgroundColor: 'var(--cardapio-bg-secondary)',
+            borderColor: 'var(--cardapio-border)',
+          }}
+        >
+          <div className="h-full p-1">
+            <BannerPromocoesVertical promocoes={[]} />
+          </div>
+        </div>
+
         {/* Área Principal - Produtos */}
         <div
           className="flex-1 flex flex-col overflow-hidden"
@@ -423,10 +462,6 @@ export default function CardapioPage() {
               className="h-full flex flex-col"
               style={{ background: 'var(--cardapio-gradient-secondary)' }}
             >
-              {/* Banner Destaques */}
-              <div className="flex-shrink-0">
-                <BannerDestaques />
-              </div>
               
               {/* Carrossel de Produtos em Destaque */}
               <div className="flex-1 overflow-hidden relative min-h-0">
@@ -454,19 +489,21 @@ export default function CardapioPage() {
               </div>
             </div>
           ) : (
-            <div className="p-4 md:p-6">
-              <div className="space-y-4">
+            <div className="p-4">
+              <div className="space-y-2">
                 {produtos.map((produto: Produto) => {
                   const nome = produto.getNome()
                   const valor = produto.getValor()
                   const descricao = produto.getDescricao()
-                  const imagemUrl = undefined // Será implementado quando backend tiver
+                  // Busca a imagem do produto: primeiro tenta do backend, depois do mapeamento manual
+                  const imagemUrlBackend = undefined // produto.getImagemUrl?.() || undefined (quando backend estiver pronto)
+                  const imagemUrl = getProdutoImagem(produto.getId(), imagemUrlBackend)
 
                   return (
                     <button
                       key={produto.getId()}
                       onClick={() => setProdutoSelecionado(produto)}
-                      className="w-full rounded-lg p-4 hover:shadow-md transition-all duration-200 text-left group flex gap-4"
+                      className="w-full rounded-lg p-2 hover:shadow-md transition-all duration-200 text-left group flex gap-4"
                       style={{
                         backgroundColor: 'var(--cardapio-card-bg)',
                         borderColor: 'var(--cardapio-card-border)',
@@ -482,14 +519,14 @@ export default function CardapioPage() {
                       }}
                     >
                       {/* Imagem do Produto - Lado Esquerdo */}
-                      <div className="relative w-64 h-64 md:w-80 md:h-80 flex-shrink-0 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg overflow-hidden">
+                      <div className="relative w-48 h-48 md:w-60 md:h-60 flex-shrink-0 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg overflow-hidden">
                         {imagemUrl ? (
                           <Image
                             src={imagemUrl}
                             alt={nome}
                             fill
                             className="object-cover group-hover:scale-105 transition-transform duration-200"
-                            sizes="160px"
+                            
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
@@ -520,7 +557,7 @@ export default function CardapioPage() {
                           {/* Descrição */}
                           {descricao ? (
                             <p
-                              className="text-sm md:text-base mb-3 line-clamp-2 leading-relaxed"
+                              className="text-sm md:text-lg mb-3 line-clamp-3 leading-relaxed"
                               style={{ color: 'var(--cardapio-text-secondary)' }}
                             >
                               {descricao}
@@ -538,7 +575,7 @@ export default function CardapioPage() {
                         {/* Botão Selecionar - Alinhado à direita */}
                         <div className="mt-auto flex justify-end">
                           <button
-                            className="px-3 py-1.5 rounded-lg font-medium text-xs transition-colors"
+                            className="px-3 py-1.5 rounded-lg font-medium text-lg transition-colors"
                             style={{
                               backgroundColor: 'var(--cardapio-btn-primary)',
                               color: 'var(--cardapio-btn-primary-text)',

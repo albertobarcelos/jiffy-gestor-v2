@@ -119,7 +119,8 @@ export class Produto {
             nome: imp.nome?.toString() || 'Impressora',
             ativo: imp.ativo === true || imp.ativo === 'true',
           }))
-        : []
+        : [],
+      data.descricao?.toString()
     )
   }
 

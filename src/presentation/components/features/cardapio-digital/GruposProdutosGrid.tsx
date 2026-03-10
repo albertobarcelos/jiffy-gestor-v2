@@ -46,7 +46,7 @@ export default function GruposProdutosGrid({ grupos, mesaId }: GruposProdutosGri
         return (
           <button
             key={grupo.getId()}
-            onClick={() => router.push(`/cardapio/mesa/${mesaId}/grupos/${grupo.getId()}`)}
+            onClick={() => router.push(`/cardapio/mesa/${mesaId}/cardapio`)}
             className="group relative overflow-hidden rounded-2xl shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300 min-h-[200px] flex flex-col"
             style={{
               ...getGradientStyle(corHex),

@@ -140,7 +140,7 @@ export default function CarrinhoCompleto({ mesaId }: CarrinhoCompletoProps) {
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Carrinho vazio</h2>
           <p className="text-gray-600 mb-6">Adicione produtos ao carrinho para continuar</p>
           <button
-            onClick={() => router.push(`/cardapio/mesa/${mesaId}/grupos`)}
+            onClick={() => router.push(`/cardapio/mesa/${mesaId}/cardapio`)}
             className="bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary/90 transition-colors"
           >
             Ver Cardápio

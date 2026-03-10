@@ -4,10 +4,11 @@ import { useRouter } from 'next/navigation'
 import { MdMenuBook, MdShoppingCart, MdRoomService, MdAttachMoney, MdTableRestaurant } from 'react-icons/md'
 import { useEffect, useState } from 'react'
 import { obterCarrinho } from '@/src/infrastructure/api/cardapio/cardapioApiService'
+import { useCardapioTheme } from '@/src/presentation/hooks/useCardapioTheme'
 import CarrinhoResumo from './CarrinhoResumo'
 import CarrosselProdutosDestaque from './CarrosselProdutosDestaque'
-import BannerDestaques from './BannerDestaques'
 import ThemeSelector from './ThemeSelector'
+import FloatingCircles from './FloatingCircles'
 import Image from 'next/image'
 
 interface CardapioHomeScreenProps {
@@ -20,10 +21,16 @@ interface CardapioHomeScreenProps {
  */
 export default function CardapioHomeScreen({ mesaId }: CardapioHomeScreenProps) {
   const router = useRouter()
+  const { theme } = useCardapioTheme()
   const [carrinhoCount, setCarrinhoCount] = useState(0)
   const sessionId = sessionStorage.getItem('cardapio_session_token') || mesaId
   const numeroMesa = sessionStorage.getItem('cardapio_numero_mesa') || '?'
   const empresaId = sessionStorage.getItem('cardapio_empresa_id') || ''
+  
+  // Cor da borda dos círculos: cinza escuro para tema Premium (clean), branco para outros
+  const borderColorCircles = theme === 'clean' 
+    ? 'rgba(100, 100, 100, 0.3)' // Cinza mais escuro para tema Premium
+    : 'rgba(255, 255, 255, 0.15)' // Branco para outros temas
 
   // TODO: Buscar logo e imagem do estabelecimento do backend
   // Por enquanto, usando placeholders
@@ -71,16 +78,23 @@ export default function CardapioHomeScreen({ mesaId }: CardapioHomeScreenProps) 
 
   return (
     <div
-      className="min-h-screen flex flex-col lg:flex-row"
+      className="min-h-screen flex flex-col md:flex-row"
       style={{ backgroundColor: 'var(--cardapio-bg-primary)' }}
     >
       {/* Painel Esquerdo - Controles */}
       <div
-        className="w-full lg:w-1/3 flex flex-col min-h-screen lg:min-h-0"
+        className="w-full md:w-1/3 flex flex-col min-h-screen md:min-h-0 relative"
         style={{ backgroundColor: 'var(--cardapio-bg-primary)' }}
       >
+        {/* Círculos flutuantes animados no fundo */}
+        <FloatingCircles borderColor={borderColorCircles} />
         {/* Logo no Topo */}
         <div className="px-6 pt-6 pb-4">
+          {/* Seletor de Tema - acima do título */}
+          <div className="mb-4">
+            <ThemeSelector />
+          </div>
+
           {/* Título e Mesa na mesma linha */}
           <div className="flex items-start justify-between gap-4 mb-4">
             {logoUrl ? (
@@ -137,26 +151,17 @@ export default function CardapioHomeScreen({ mesaId }: CardapioHomeScreenProps) 
             </div>
           </div>
 
-          {/* Seletor de Tema */}
-          <div className="mb-3">
-            <ThemeSelector />
-          </div>
-
           {/* Texto de Instrução */}
           <p
-            className="text-xs font-light mb-3 lg:mb-4"
+            className="text-xs font-light mb-3 md:mb-4"
             style={{ color: 'var(--cardapio-text-tertiary)' }}
           >
             Seja bem-vindo(a), acesse o cardápio e faça seu pedido!
           </p>
 
           {/* Mobile: Banner e Carrossel dentro do menu */}
-          <div className="lg:hidden w-full flex flex-col mb-4">
-            {/* Banner Destaques do Dia */}
-            <div className="w-full mb-2">
-              <BannerDestaques />
-            </div>
-            
+          <div className="md:hidden w-full flex flex-col mb-4">
+           
             {/* Carrossel */}
             <div className="h-[45vh] min-h-[300px] overflow-hidden relative w-full rounded-xl">
               <CarrosselProdutosDestaque produtos={[]} />
@@ -165,7 +170,7 @@ export default function CardapioHomeScreen({ mesaId }: CardapioHomeScreenProps) 
         </div>
 
         {/* Botões */}
-        <div className="flex-1 flex flex-col justify-center px-6 pb-4 lg:pb-6 space-y-2 lg:space-y-3">
+        <div className="flex-1 flex flex-col justify-center px-6 pb-4 md:pb-6 space-y-2 md:space-y-3">
           {botoes.map((botao, index) => {
             const Icon = botao.icon
             return (
@@ -283,24 +288,21 @@ export default function CardapioHomeScreen({ mesaId }: CardapioHomeScreenProps) 
         </div>
       </div>
 
-      {/* Painel Direito - Banner e Carrossel de Produtos em Destaque */}
+      {/* Painel Direito - Carrossel de Produtos em Destaque (imagem ocupa todo espaço) */}
       <div
-        className="hidden lg:flex lg:w-2/3 relative h-screen flex-col overflow-hidden"
+        className="hidden md:flex md:w-2/3 relative h-screen flex-col overflow-hidden"
         style={{
           background: 'var(--cardapio-gradient-secondary)',
         }}
       >
-        {/* Banner Destaques do Dia */}
-        <BannerDestaques />
-        
-        {/* Carrossel */}
-        <div className="flex-1 overflow-hidden relative w-full">
+        {/* Carrossel ocupa todo o espaço */}
+        <div className="flex-1 overflow-hidden relative w-full h-full">
           <CarrosselProdutosDestaque produtos={[]} />
         </div>
       </div>
 
       {/* Resumo Flutuante do Carrinho (apenas em mobile) */}
-      <div className="lg:hidden">
+      <div className="md:hidden">
         <CarrinhoResumo mesaId={mesaId} />
       </div>
     </div>
