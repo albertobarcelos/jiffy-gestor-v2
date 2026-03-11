@@ -5,7 +5,6 @@ import { MdMenuBook, MdShoppingCart, MdRoomService, MdAttachMoney, MdTableRestau
 import { useEffect, useState } from 'react'
 import { obterCarrinho } from '@/src/infrastructure/api/cardapio/cardapioApiService'
 import { useCardapioTheme } from '@/src/presentation/hooks/useCardapioTheme'
-import CarrinhoResumo from './CarrinhoResumo'
 import CarrosselProdutosDestaque from './CarrosselProdutosDestaque'
 import ThemeSelector from './ThemeSelector'
 import FloatingCircles from './FloatingCircles'
@@ -89,14 +88,14 @@ export default function CardapioHomeScreen({ mesaId }: CardapioHomeScreenProps) 
         {/* Círculos flutuantes animados no fundo */}
         <FloatingCircles borderColor={borderColorCircles} />
         {/* Logo no Topo */}
-        <div className="px-6 pt-6 pb-4">
+        <div className="px-3 lg:px-6 pt-3 lg:pt-6 pb-2 lg:pb-4">
           {/* Seletor de Tema - acima do título */}
-          <div className="mb-4">
+          <div className="mb-2 lg:mb-4">
             <ThemeSelector />
           </div>
 
           {/* Título e Mesa na mesma linha */}
-          <div className="flex items-start justify-between gap-4 mb-4">
+          <div className="flex items-start justify-between gap-2 lg:gap-4 mb-2 lg:mb-4">
             {logoUrl ? (
               <div className="relative h-16 w-auto flex-1">
                 <Image
@@ -110,7 +109,7 @@ export default function CardapioHomeScreen({ mesaId }: CardapioHomeScreenProps) 
             ) : (
               <div className="flex-1">
                 <h1
-                  className="text-3xl font-bold mb-1"
+                  className="lg:text-3xl text-2xl font-bold mb-1"
                   style={{ color: 'var(--cardapio-text-primary)' }}
                 >
                   Giuseppe
@@ -126,7 +125,7 @@ export default function CardapioHomeScreen({ mesaId }: CardapioHomeScreenProps) 
 
             {/* Número da Mesa - à direita do título */}
             <div
-              className="flex items-center gap-2 px-3 py-2 rounded-lg backdrop-blur-sm border flex-shrink-0"
+              className="flex items-center gap-2 px-1 lg:px-3 py-1 lg:py-2 rounded-lg backdrop-blur-sm border flex-shrink-0"
               style={{
                 backgroundColor: 'var(--cardapio-bg-elevated)',
                 borderColor: 'var(--cardapio-border)',
@@ -170,7 +169,7 @@ export default function CardapioHomeScreen({ mesaId }: CardapioHomeScreenProps) 
         </div>
 
         {/* Botões */}
-        <div className="flex-1 flex flex-col justify-center px-6 pb-4 md:pb-6 space-y-2 md:space-y-3">
+        <div className="flex-1 flex flex-col justify-center px-3 lg:px-6 pb-2 lg:pb-4 md:pb-6 space-y-2 md:space-y-3">
           {botoes.map((botao, index) => {
             const Icon = botao.icon
             return (
@@ -179,11 +178,11 @@ export default function CardapioHomeScreen({ mesaId }: CardapioHomeScreenProps) 
                 onClick={botao.onClick}
                 className="
                   rounded-xl
-                  px-6
-                  py-4
+                  px-2 lg:px-6
+                  py-2 lg:py-4
                   flex
                   items-center
-                  gap-4
+                  gap-2 lg:gap-4
                   active:scale-95
                   transition-all
                   duration-200
@@ -211,7 +210,7 @@ export default function CardapioHomeScreen({ mesaId }: CardapioHomeScreenProps) 
                   />
                 </div>
                 <span
-                  className="text-lg font-semibold flex-1 text-left"
+                  className="lg:text-lg text-sm font-semibold flex-1 text-left"
                   style={{ color: 'var(--cardapio-btn-primary-text)' }}
                 >
                   {botao.label}
@@ -240,11 +239,13 @@ export default function CardapioHomeScreen({ mesaId }: CardapioHomeScreenProps) 
               className="
                 border-2
                 rounded-xl
-                px-6
-                py-4
+                lg:px-6
+                px-3
+                lg:py-4
+                py-2
                 flex
                 items-center
-                gap-4
+                gap-3 lg:gap-4
                 active:scale-95
                 transition-all
                 duration-200
@@ -270,7 +271,7 @@ export default function CardapioHomeScreen({ mesaId }: CardapioHomeScreenProps) 
                   {carrinhoCount > 9 ? '9+' : carrinhoCount}
                 </span>
               </div>
-              <span className="text-lg font-semibold flex-1 text-left">
+              <span className="lg:text-lg text-sm font-semibold flex-1 text-left">
                 Ver Carrinho
               </span>
             </button>
@@ -301,10 +302,7 @@ export default function CardapioHomeScreen({ mesaId }: CardapioHomeScreenProps) 
         </div>
       </div>
 
-      {/* Resumo Flutuante do Carrinho (apenas em mobile) */}
-      <div className="md:hidden">
-        <CarrinhoResumo mesaId={mesaId} />
-      </div>
+     
     </div>
   )
 }

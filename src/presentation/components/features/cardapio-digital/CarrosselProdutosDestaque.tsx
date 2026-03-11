@@ -322,10 +322,10 @@ export default function CarrosselProdutosDestaque({
             <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/60 z-[1]" />
 
             {/* Conteúdo do Produto - Textos Sobrepostos */}
-            <div className="relative z-[2] h-full flex flex-col justify-between p-8 md:p-12 text-white">
+            <div className="relative z-[2] h-full flex flex-col justify-between p-8 lg:p-12 text-white">
               {/* Nome do Produto - Topo Esquerda */}
               <div className="flex-shrink-0">
-                <h2 className="text-4xl md:text-6xl lg:text-7xl font-bold drop-shadow-2xl">
+                <h2 className="text-4xl lg:text-7xl font-bold drop-shadow-2xl">
                   {produto.nome.toUpperCase()}
                 </h2>
               </div>
@@ -334,14 +334,14 @@ export default function CarrosselProdutosDestaque({
               <div className="flex-shrink-0 flex flex-col md:flex-row items-start md:items-end justify-between gap-4 md:gap-6">
                 {/* Descrição - Esquerda */}
                 {produto.descricao && (
-                  <p className="text-base md:text-lg lg:text-xl text-white/95 max-w-2xl drop-shadow-lg leading-relaxed flex-1">
+                  <p className="text-base md:text-sm lg:text-xl text-white/95 max-w-2xl drop-shadow-lg leading-relaxed flex-1">
                     {produto.descricao}
                   </p>
                 )}
                 
                 {/* Preço - Direita */}
                 {produto.valor && (
-                  <div className="text-3xl md:text-4xl lg:text-5xl font-bold text-primary drop-shadow-2xl flex-shrink-0">
+                  <div className="text-2xl md:text-3xl lg:text-5xl font-bold text-primary drop-shadow-2xl flex-shrink-0">
                     {formatarPreco(produto.valor)}
                   </div>
                 )}

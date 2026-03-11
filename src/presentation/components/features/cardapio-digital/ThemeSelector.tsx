@@ -60,14 +60,14 @@ export default function ThemeSelector() {
 
   return (
     <div
-      className="flex items-center gap-1.5 p-1.5 backdrop-blur-sm rounded-lg border"
+      className="items-center justify-center lg:justify-start gap-1.5 p-1.5 backdrop-blur-sm rounded-lg border md:flex hidden"
       style={{
         backgroundColor: 'var(--cardapio-bg-elevated)',
         borderColor: 'var(--cardapio-border)',
       }}
     >
       <span
-        className="text-[10px] font-medium px-1.5 whitespace-nowrap"
+        className="text-[10px] font-medium px-1.5 whitespace-nowrap hidden lg:block"
         style={{ color: 'var(--cardapio-text-secondary)' }}
       >
         Tema:
@@ -81,7 +81,7 @@ export default function ThemeSelector() {
             <button
               key={option.id}
               onClick={() => setTheme(option.id)}
-              className="relative px-2 py-1 rounded-md transition-all duration-200 flex items-center gap-1 whitespace-nowrap"
+              className="relative px-1 lg:px-2 py-1 lg:py-2 rounded-md transition-all duration-200 flex items-center gap-2 whitespace-nowrap"
               style={{
                 backgroundColor: isActive
                   ? 'var(--cardapio-menu-item-active)'
@@ -109,7 +109,7 @@ export default function ThemeSelector() {
               <span className="text-[10px] font-medium">{option.label}</span>
 
               {/* Indicador visual de cores */}
-              <div className="flex gap-0.5 ml-0.5">
+              <div className="gap-0.5 ml-0.5 hidden lg:flex">
                 <div
                   className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                   style={{ backgroundColor: option.previewColors.primary }}
