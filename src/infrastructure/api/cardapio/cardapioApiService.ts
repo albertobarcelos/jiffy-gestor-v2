@@ -79,7 +79,8 @@ export interface ICardapioApiService {
     quantidade: number,
     complementos?: any[],
     observacoes?: string,
-    complementosRemovidos?: any[]
+    complementosRemovidos?: any[],
+    valorTotal?: number
   ): Promise<Carrinho>
   modificarItemCarrinho(
     sessionId: string,
@@ -142,7 +143,8 @@ class CardapioApiServiceMock implements ICardapioApiService {
     quantidade: number,
     complementos?: any[],
     observacoes?: string,
-    complementosRemovidos?: any[]
+    complementosRemovidos?: any[],
+    valorTotalCalculado?: number
   ): Promise<Carrinho> {
     await new Promise((resolve) => setTimeout(resolve, 300))
 
@@ -166,15 +168,43 @@ class CardapioApiServiceMock implements ICardapioApiService {
       }
     }
 
-    // Calcular valor dos complementos (mock)
-    // valorAdicional já vem calculado como (valorComplemento * quantidadeComplemento) do frontend
-    // Então é o valor total dos complementos por unidade do produto
-    const valorComplementosPorItem = (complementos || []).reduce((sum: number, comp: any) => {
-      return sum + (comp.valorAdicional || 0)
-    }, 0)
+    // Se o valorTotal foi calculado e passado do frontend, usar esse valor
+    // Caso contrário, calcular aqui (fallback para compatibilidade)
+    let valorTotal: number
+    let valorUnitario: number
 
-    const valorUnitario = produtoData.valor + valorComplementosPorItem
-    const valorTotal = valorUnitario * quantidade
+    if (valorTotalCalculado !== undefined && valorTotalCalculado !== null && valorTotalCalculado > 0) {
+      // Usar o valor total calculado no modal
+      valorTotal = valorTotalCalculado
+      // Calcular valorUnitario a partir do valorTotal
+      valorUnitario = valorTotal / quantidade
+    } else {
+      // Fallback: calcular aqui (não recomendado, mas mantido para compatibilidade)
+      let valorComplementosAdicionados = 0
+      if (complementos && complementos.length > 0) {
+        valorComplementosAdicionados = complementos.reduce((sum: number, comp: any) => {
+          const tipoImpacto = comp.tipoImpactoPreco
+          if (tipoImpacto === 'aumenta' || tipoImpacto === 'nenhum' || !tipoImpacto) {
+            return sum + (comp.valorAdicional || 0)
+          }
+          return sum
+        }, 0)
+      }
+
+      let valorComplementosRemovidos = 0
+      if (complementosRemovidos && complementosRemovidos.length > 0) {
+        valorComplementosRemovidos = complementosRemovidos.reduce((sum: number, comp: any) => {
+          const tipoImpacto = comp.tipoImpactoPreco
+          if (tipoImpacto === 'diminui') {
+            return sum + ((comp.valor || 0) * (comp.quantidade || 1))
+          }
+          return sum
+        }, 0)
+      }
+
+      valorUnitario = produtoData.valor + valorComplementosAdicionados - valorComplementosRemovidos
+      valorTotal = valorUnitario * quantidade
+    }
 
     const novoItem: CarrinhoItem = {
       id: `item-${Date.now()}-${Math.random().toString(36).substring(7)}`,
@@ -377,8 +407,9 @@ export const adicionarItemCarrinho = (
   quantidade: number,
   complementos?: any[],
   observacoes?: string,
-  complementosRemovidos?: any[]
-) => cardapioApiService.adicionarItemCarrinho(sessionId, produtoId, quantidade, complementos, observacoes, complementosRemovidos)
+  complementosRemovidos?: any[],
+  valorTotal?: number
+) => cardapioApiService.adicionarItemCarrinho(sessionId, produtoId, quantidade, complementos, observacoes, complementosRemovidos, valorTotal)
 export const modificarItemCarrinho = (
   sessionId: string,
   itemId: string,

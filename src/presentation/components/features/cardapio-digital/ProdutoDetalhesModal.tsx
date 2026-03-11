@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { MdClose, MdAdd, MdRemove } from 'react-icons/md'
 import { adicionarItemCarrinho } from '@/src/infrastructure/api/cardapio/cardapioApiService'
 import { showToast } from '@/src/shared/utils/toast'
+import { getProdutoImagem } from '@/src/presentation/utils/produtoImagens'
 
 interface ProdutoDetalhesModalProps {
   produto: Produto
@@ -36,10 +37,11 @@ export default function ProdutoDetalhesModal({
   const nome = produto.getNome()
   const valor = produto.getValor()
   const ativo = produto.isAtivo()
+  const descricao = produto.getDescricao()
   
-  // Por enquanto, descricao e imagemUrl não estão na entidade
-  const descricao = undefined // produto.getDescricao?.() || undefined
-  const imagemUrl = undefined // produto.getImagemUrl?.() || undefined
+  // Busca a imagem do produto: primeiro tenta do backend, depois do mapeamento manual
+  const imagemUrlBackend = undefined // produto.getImagemUrl?.() || undefined (quando backend estiver pronto)
+  const imagemUrl = getProdutoImagem(produto.getId(), imagemUrlBackend)
   
   const valorTotal = valor * quantidade
 
@@ -57,7 +59,7 @@ export default function ProdutoDetalhesModal({
       const produtoCache = {
         nome: produto.getNome(),
         valor: produto.getValor(),
-        imagemUrl: undefined, // Quando backend estiver pronto, virá aqui
+        imagemUrl: imagemUrl, // Usa a imagem do mapeamento ou do backend
       }
       localStorage.setItem(`produto_cache_${produto.getId()}`, JSON.stringify(produtoCache))
       
@@ -74,9 +76,17 @@ export default function ProdutoDetalhesModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+      <div
+        className="rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+        style={{ backgroundColor: 'var(--cardapio-card-bg)' }}
+      >
         {/* Header com imagem */}
-        <div className="relative h-64 bg-gradient-to-br from-gray-100 to-gray-200">
+        <div
+          className="relative h-64"
+          style={{
+            background: 'linear-gradient(to bottom right, var(--cardapio-bg-secondary), var(--cardapio-bg-tertiary))',
+          }}
+        >
           {imagemUrl ? (
             <Image
               src={imagemUrl}
@@ -87,9 +97,13 @@ export default function ProdutoDetalhesModal({
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-32 h-32 bg-gray-300 rounded-full flex items-center justify-center">
+              <div
+                className="w-32 h-32 rounded-full flex items-center justify-center"
+                style={{ backgroundColor: 'var(--cardapio-bg-tertiary)' }}
+              >
                 <svg
-                  className="w-16 h-16 text-gray-500"
+                  className="w-16 h-16"
+                  style={{ color: 'var(--cardapio-text-tertiary)' }}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -108,14 +122,36 @@ export default function ProdutoDetalhesModal({
           {/* Botão fechar */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-full p-2 hover:bg-white transition-colors shadow-lg"
+            className="absolute top-4 right-4 backdrop-blur-sm rounded-full p-2 transition-colors shadow-lg"
+            style={{
+              backgroundColor: 'var(--cardapio-bg-elevated)',
+              opacity: 0.9,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--cardapio-bg-elevated)'
+              e.currentTarget.style.opacity = '1'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--cardapio-bg-elevated)'
+              e.currentTarget.style.opacity = '0.9'
+            }}
           >
-            <MdClose className="w-6 h-6 text-gray-700" />
+            <MdClose
+              className="w-6 h-6"
+              style={{ color: 'var(--cardapio-text-secondary)' }}
+            />
           </button>
 
           {/* Badge de disponibilidade */}
           {!ativo && (
-            <div className="absolute top-4 left-4 bg-gray-800/80 text-white px-4 py-2 rounded-full text-sm font-semibold">
+            <div
+              className="absolute top-4 left-4 px-4 py-2 rounded-full text-sm font-semibold"
+              style={{
+                backgroundColor: 'var(--cardapio-accent-error)',
+                color: 'var(--cardapio-btn-primary-text)',
+                opacity: 0.9,
+              }}
+            >
               Indisponível
             </div>
           )}
@@ -125,57 +161,131 @@ export default function ProdutoDetalhesModal({
         <div className="p-6">
           {/* Nome e Preço */}
           <div className="mb-4">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">{nome}</h2>
-            <div className="text-3xl font-bold text-primary">{formatarPreco(valor)}</div>
+            <h2
+              className="text-3xl font-bold mb-2"
+              style={{ color: 'var(--cardapio-text-primary)' }}
+            >
+              {nome}
+            </h2>
+            <div
+              className="text-3xl font-bold"
+              style={{ color: 'var(--cardapio-accent-primary)' }}
+            >
+              {formatarPreco(valor)}
+            </div>
           </div>
 
           {/* Descrição */}
           {descricao && (
             <div className="mb-6">
-              <p className="text-gray-700 leading-relaxed">{descricao}</p>
+              <p
+                className="leading-relaxed"
+                style={{ color: 'var(--cardapio-text-secondary)' }}
+              >
+                {descricao}
+              </p>
             </div>
           )}
 
           {/* Quantidade */}
           <div className="mb-6">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Quantidade</label>
+            <label
+              className="block text-sm font-semibold mb-2"
+              style={{ color: 'var(--cardapio-text-secondary)' }}
+            >
+              Quantidade
+            </label>
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setQuantidade(Math.max(1, quantidade - 1))}
-                className="bg-gray-100 hover:bg-gray-200 rounded-full p-2 transition-colors"
+                className="rounded-full p-2 transition-colors"
+                style={{ backgroundColor: 'var(--cardapio-bg-hover)' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--cardapio-bg-tertiary)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--cardapio-bg-hover)'
+                }}
                 disabled={quantidade <= 1}
               >
-                <MdRemove className="w-6 h-6 text-gray-700" />
+                <MdRemove
+                  className="w-6 h-6"
+                  style={{ color: 'var(--cardapio-text-secondary)' }}
+                />
               </button>
-              <span className="text-2xl font-bold text-gray-900 w-12 text-center">{quantidade}</span>
+              <span
+                className="text-2xl font-bold w-12 text-center"
+                style={{ color: 'var(--cardapio-text-primary)' }}
+              >
+                {quantidade}
+              </span>
               <button
                 onClick={() => setQuantidade(quantidade + 1)}
-                className="bg-gray-100 hover:bg-gray-200 rounded-full p-2 transition-colors"
+                className="rounded-full p-2 transition-colors"
+                style={{ backgroundColor: 'var(--cardapio-bg-hover)' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--cardapio-bg-tertiary)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--cardapio-bg-hover)'
+                }}
               >
-                <MdAdd className="w-6 h-6 text-gray-700" />
+                <MdAdd
+                  className="w-6 h-6"
+                  style={{ color: 'var(--cardapio-text-secondary)' }}
+                />
               </button>
             </div>
           </div>
 
           {/* Observações */}
           <div className="mb-6">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label
+              className="block text-sm font-semibold mb-2"
+              style={{ color: 'var(--cardapio-text-secondary)' }}
+            >
               Observações (opcional)
             </label>
             <textarea
               value={observacoes}
               onChange={(e) => setObservacoes(e.target.value)}
               placeholder="Ex: Sem cebola, bem passado..."
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+              className="w-full px-4 py-3 rounded-lg resize-none transition-colors"
+              style={{
+                backgroundColor: 'var(--cardapio-bg-secondary)',
+                borderColor: 'var(--cardapio-border)',
+                color: 'var(--cardapio-text-primary)',
+                borderWidth: '1px',
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = 'var(--cardapio-accent-primary)'
+                e.currentTarget.style.outline = 'none'
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = 'var(--cardapio-border)'
+              }}
               rows={3}
             />
           </div>
 
           {/* Total */}
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+          <div
+            className="mb-6 p-4 rounded-lg"
+            style={{ backgroundColor: 'var(--cardapio-bg-secondary)' }}
+          >
             <div className="flex items-center justify-between">
-              <span className="text-lg font-semibold text-gray-700">Total</span>
-              <span className="text-2xl font-bold text-primary">{formatarPreco(valorTotal)}</span>
+              <span
+                className="text-lg font-semibold"
+                style={{ color: 'var(--cardapio-text-secondary)' }}
+              >
+                Total
+              </span>
+              <span
+                className="text-2xl font-bold"
+                style={{ color: 'var(--cardapio-accent-primary)' }}
+              >
+                {formatarPreco(valorTotal)}
+              </span>
             </div>
           </div>
 
@@ -183,7 +293,19 @@ export default function ProdutoDetalhesModal({
           <button
             onClick={handleAdicionarAoCarrinho}
             disabled={!ativo || adicionando}
-            className="w-full bg-primary text-white py-4 px-6 rounded-xl font-semibold text-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105 transition-transform"
+            className="w-full py-4 px-6 rounded-xl font-semibold text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105"
+            style={{
+              backgroundColor: 'var(--cardapio-btn-primary)',
+              color: 'var(--cardapio-btn-primary-text)',
+            }}
+            onMouseEnter={(e) => {
+              if (!ativo || adicionando) return
+              e.currentTarget.style.backgroundColor = 'var(--cardapio-btn-hover)'
+            }}
+            onMouseLeave={(e) => {
+              if (!ativo || adicionando) return
+              e.currentTarget.style.backgroundColor = 'var(--cardapio-btn-primary)'
+            }}
           >
             {adicionando ? 'Adicionando...' : 'Adicionar ao Carrinho'}
           </button>
