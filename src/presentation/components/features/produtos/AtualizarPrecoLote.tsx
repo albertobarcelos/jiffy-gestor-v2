@@ -52,61 +52,6 @@ export function AtualizarPrecoLote() {
     isLoading: isLoadingGruposComplementos,
   } = useGruposComplementos({ limit: 100, ativo: null })
 
-  // Carregar impressoras disponíveis
-  const loadAllImpressoras = useCallback(async () => {
-    const token = auth?.getAccessToken()
-    if (!token) {
-      setImpressorasDisponiveis([])
-      return
-    }
-
-    setIsLoadingImpressoras(true)
-    try {
-      const allImpressoras: Impressora[] = []
-      let currentOffset = 0
-      let hasMore = true
-      const limit = 50
-
-      while (hasMore) {
-        const params = new URLSearchParams({
-          limit: limit.toString(),
-          offset: currentOffset.toString(),
-        })
-
-        const response = await fetch(`/api/impressoras?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.error || 'Erro ao buscar impressoras')
-        }
-
-        const data = await response.json()
-        const impressoras = (data.items || []).map((item: any) => Impressora.fromJSON(item))
-        allImpressoras.push(...impressoras)
-
-        hasMore = impressoras.length === limit
-        currentOffset += impressoras.length
-      }
-
-      setImpressorasDisponiveis(allImpressoras)
-    } catch (error) {
-      showToast.error('Erro ao carregar impressoras')
-    } finally {
-      setIsLoadingImpressoras(false)
-    }
-  }, [auth])
-
-  useEffect(() => {
-    if (activeTab === 'impressoras') {
-      loadAllImpressoras()
-    }
-  }, [activeTab, loadAllImpressoras])
-
   // Buscar produtos
   const buscarProdutos = useCallback(async () => {
     const token = auth?.getAccessToken()
@@ -118,10 +63,9 @@ export function AtualizarPrecoLote() {
     setProdutosSelecionados(new Set())
 
     try {
-      const limit = 50
       let hasMorePages = true
       let currentOffset = 0
-      const todosProdutos: Produto[] = []
+      const acumulado: Produto[] = []
       let totalFromApi: number | null = null
 
       const ativoFilter =
@@ -131,7 +75,6 @@ export function AtualizarPrecoLote() {
       const ativoDeliveryBoolean =
         ativoDeliveryFilter === 'Sim' ? true : ativoDeliveryFilter === 'Não' ? false : null
 
-      // Buscar todas as páginas de produtos (já vêm com impressoras na resposta)
       while (hasMorePages) {
         const params = new URLSearchParams({
           name: searchText,
@@ -162,6 +105,7 @@ export function AtualizarPrecoLote() {
         }
 
         const data = await response.json()
+        // A API retorna { success: true, items: [...], count: number }
         const produtosList = Array.isArray(data.items)
           ? data.items
           : Array.isArray(data.produtos)
@@ -170,41 +114,34 @@ export function AtualizarPrecoLote() {
               ? data
               : []
 
-        if (typeof data.count === 'number') {
-          totalFromApi = data.count
-        }
-
-        // Mapear produtos diretamente da listagem (já incluem impressoras)
-        const produtosMapeados = produtosList
-          .map((item: any) => {
+        const produtosParsed = produtosList
+          .map((p: any) => {
             try {
-              return Produto.fromJSON(item)
+              return Produto.fromJSON(p)
             } catch (error) {
-              // Ignorar produtos com erro de mapeamento
+              console.error('Erro ao parsear produto:', error, p)
               return null
             }
           })
           .filter((p: Produto | null): p is Produto => p !== null)
 
-        todosProdutos.push(...produtosMapeados)
+        acumulado.push(...produtosParsed)
+        if (typeof data.count === 'number') {
+          totalFromApi = data.count
+        }
 
-        // Atualizar progressivamente
-        setProdutos([...todosProdutos])
+        currentOffset += produtosParsed.length
+        hasMorePages = produtosParsed.length === limit && (totalFromApi ? currentOffset < totalFromApi : true)
 
-        currentOffset += produtosList.length
-
-        // Verificar se há mais páginas
-        hasMorePages = produtosList.length === limit && (totalFromApi ? currentOffset < totalFromApi : true)
-
-        // Parar se não há mais produtos
-        if (produtosList.length === 0) {
+        if (produtosParsed.length === 0) {
           hasMorePages = false
         }
       }
 
-      setTotal(totalFromApi ?? todosProdutos.length)
+      setProdutos(acumulado)
+      setTotal(totalFromApi ?? acumulado.length)
     } catch (error: any) {
-      showToast.error('Erro ao buscar produtos. Tente novamente.')
+      console.error('Erro ao buscar produtos', error)
     } finally {
       setIsLoading(false)
     }
@@ -396,7 +333,7 @@ export function AtualizarPrecoLote() {
     }
 
     setIsUpdating(true)
-    showToast.loading(`Atualizando preços de ${produtosSelecionados.size} produto(s)...`)
+    showToast.loading('Atualizando preços...')
 
     try {
       // Calcula novos valores para cada produto
@@ -710,20 +647,6 @@ export function AtualizarPrecoLote() {
     setAtivoDeliveryFilter('Todos')
     setGrupoProdutoFilter('')
   }, [])
-
-  const todasImpressorasSelecionadas =
-    impressorasDisponiveis.length > 0 &&
-    impressorasSelecionadas.size === impressorasDisponiveis.length
-  const algumasImpressorasSelecionadas =
-    impressorasSelecionadas.size > 0 &&
-    impressorasSelecionadas.size < impressorasDisponiveis.length
-
-  const todosGruposComplementosSelecionados =
-    gruposComplementos.length > 0 &&
-    gruposComplementosSelecionados.size === gruposComplementos.length
-  const algunsGruposComplementosSelecionados =
-    gruposComplementosSelecionados.size > 0 &&
-    gruposComplementosSelecionados.size < gruposComplementos.length
 
   return (
     <div className="flex flex-col h-full bg-info">
