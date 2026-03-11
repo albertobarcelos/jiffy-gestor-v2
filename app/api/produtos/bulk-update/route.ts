@@ -1,118 +1,140 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient } from '@/src/infrastructure/api/apiClient'
+import { getTokenInfo } from '@/src/shared/utils/getTokenInfo'
+
+/**
+ * Tipo da resposta da API externa de bulk-update
+ */
+interface BulkUpdateResponse {
+  totalUpdated?: number
+  produtosIds?: string[]
+}
 
 /**
  * POST /api/produtos/bulk-update
  * Atualiza múltiplos produtos em lote
  * 
- * Request Body:
+ * Body esperado:
  * Array<{
  *   produtoId: string;
- *   valor?: number;                              // Opcional - preço do produto
- *   impressorasIds?: string[];                   // Opcional - array de IDs das impressoras para adicionar
- *   impressorasIdsToRemove?: string[];           // Opcional - array de IDs das impressoras para remover
- *   gruposComplementosIds?: string[];            // Opcional - array de IDs dos grupos de complementos para adicionar
- *   gruposComplementosIdsToRemove?: string[];    // Opcional - array de IDs dos grupos de complementos para remover
+ *   valor?: number;
+ *   impressorasIds?: string[];
+ *   impressorasIdsToRemove?: string[];
+ *   gruposComplementosIds?: string[];
+ *   gruposComplementosIdsToRemove?: string[];
  * }>
- * 
- * Response:
- * {
- *   totalUpdated: number;    // Número de produtos únicos atualizados
- *   produtosIds: string[];    // Array de IDs dos produtos atualizados
- * }
  */
 export async function POST(req: NextRequest) {
   try {
-    const validation = validateRequest(req)
-    if (!validation.valid || !validation.tokenInfo) {
-      return validation.error || NextResponse.json({ message: 'Token inválido ou expirado' }, { status: 401 })
+    // Valida token e extrai informações
+    const tokenInfo = getTokenInfo(req)
+    if (!tokenInfo) {
+      return NextResponse.json({ message: 'Token inválido ou expirado' }, { status: 401 })
+    }
+
+    // Valida que empresaId está presente (requisito para multi-tenancy)
+    if (!tokenInfo.empresaId) {
+      return NextResponse.json({ message: 'Empresa não identificada no token' }, { status: 401 })
     }
 
     const body = await req.json()
 
-    // Validação: body deve ser um array
+    // Valida que body é um array
     if (!Array.isArray(body)) {
       return NextResponse.json(
-        { message: 'Body deve ser um array de objetos' },
+        { message: 'Body deve ser um array de atualizações' },
         { status: 400 }
       )
     }
 
-    // Validação: cada item deve ter produtoId e pelo menos um campo (valor, impressorasIds ou impressorasIdsToRemove)
-    for (const item of body) {
-      if (!item.produtoId) {
+    // Valida que array não está vazio
+    if (body.length === 0) {
+      return NextResponse.json(
+        { message: 'Array não pode estar vazio' },
+        { status: 400 }
+      )
+    }
+
+    // Valida cada item do array
+    for (let i = 0; i < body.length; i++) {
+      const item = body[i]
+
+      // Valida que tem produtoId
+      if (!item.produtoId || typeof item.produtoId !== 'string') {
         return NextResponse.json(
-          { message: 'Cada item deve ter um produtoId' },
+          { message: `Item ${i + 1}: produtoId é obrigatório e deve ser uma string` },
           { status: 400 }
         )
       }
 
-      const hasValor = 'valor' in item
-      const hasImpressorasIds = 'impressorasIds' in item
-      const hasImpressorasIdsToRemove = 'impressorasIdsToRemove' in item
-      const hasGruposComplementosIds = 'gruposComplementosIds' in item
-      const hasGruposComplementosIdsToRemove = 'gruposComplementosIdsToRemove' in item
+      // Valida que tem pelo menos um campo de atualização
+      const hasUpdate =
+        item.valor !== undefined ||
+        item.impressorasIds !== undefined ||
+        item.impressorasIdsToRemove !== undefined ||
+        item.gruposComplementosIds !== undefined ||
+        item.gruposComplementosIdsToRemove !== undefined
 
-      if (!hasValor && !hasImpressorasIds && !hasImpressorasIdsToRemove && !hasGruposComplementosIds && !hasGruposComplementosIdsToRemove) {
+      if (!hasUpdate) {
         return NextResponse.json(
-          { message: 'Cada item deve ter pelo menos um campo: valor, impressorasIds, impressorasIdsToRemove, gruposComplementosIds ou gruposComplementosIdsToRemove' },
+          { message: `Item ${i + 1}: deve ter pelo menos um campo de atualização` },
           { status: 400 }
         )
       }
 
-      // Validação: impressorasIds deve ser array de strings
-      if (hasImpressorasIds && !Array.isArray(item.impressorasIds)) {
+      // Valida tipos dos campos opcionais
+      if (item.valor !== undefined && typeof item.valor !== 'number') {
         return NextResponse.json(
-          { message: 'impressorasIds deve ser um array de strings' },
+          { message: `Item ${i + 1}: valor deve ser um número` },
           { status: 400 }
         )
       }
 
-      // Validação: impressorasIdsToRemove deve ser array de strings
-      if (hasImpressorasIdsToRemove && !Array.isArray(item.impressorasIdsToRemove)) {
+      if (item.impressorasIds !== undefined && !Array.isArray(item.impressorasIds)) {
         return NextResponse.json(
-          { message: 'impressorasIdsToRemove deve ser um array de strings' },
+          { message: `Item ${i + 1}: impressorasIds deve ser um array` },
           { status: 400 }
         )
       }
 
-      // Validação: gruposComplementosIds deve ser array de strings
-      if (hasGruposComplementosIds && !Array.isArray(item.gruposComplementosIds)) {
+      if (item.impressorasIdsToRemove !== undefined && !Array.isArray(item.impressorasIdsToRemove)) {
         return NextResponse.json(
-          { message: 'gruposComplementosIds deve ser um array de strings' },
+          { message: `Item ${i + 1}: impressorasIdsToRemove deve ser um array` },
           { status: 400 }
         )
       }
 
-      // Validação: gruposComplementosIdsToRemove deve ser array de strings
-      if (hasGruposComplementosIdsToRemove && !Array.isArray(item.gruposComplementosIdsToRemove)) {
+      if (item.gruposComplementosIds !== undefined && !Array.isArray(item.gruposComplementosIds)) {
         return NextResponse.json(
-          { message: 'gruposComplementosIdsToRemove deve ser um array de strings' },
+          { message: `Item ${i + 1}: gruposComplementosIds deve ser um array` },
+          { status: 400 }
+        )
+      }
+
+      if (item.gruposComplementosIdsToRemove !== undefined && !Array.isArray(item.gruposComplementosIdsToRemove)) {
+        return NextResponse.json(
+          { message: `Item ${i + 1}: gruposComplementosIdsToRemove deve ser um array` },
           { status: 400 }
         )
       }
     }
 
+    // Chama API externa
     const apiClient = new ApiClient()
-    
-    // Chama a API externa
-    const { data } = await apiClient.request<{
-      totalUpdated?: number
-      produtosIds?: string[]
-    }>('/api/v1/cardapio/produtos/bulk-update', {
+    const { data } = await apiClient.request<BulkUpdateResponse>('/api/v1/cardapio/produtos/bulk-update', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${validation.tokenInfo.token}`,
+        Authorization: `Bearer ${tokenInfo.token}`,
       },
       body: JSON.stringify(body),
     })
 
-    const result = data as Record<string, any>
+    // Retorna resposta
     return NextResponse.json({
-      totalUpdated: result.totalUpdated || body.length,
-      produtosIds: result.produtosIds || body.map((item: any) => item.produtoId),
+      success: true,
+      totalUpdated: data.totalUpdated || body.length,
+      produtosIds: data.produtosIds || body.map((item: any) => item.produtoId),
     })
   } catch (error: any) {
     console.error('Erro na API de bulk-update de produtos:', error)

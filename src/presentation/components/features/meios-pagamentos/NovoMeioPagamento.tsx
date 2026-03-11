@@ -45,6 +45,10 @@ export function NovoMeioPagamento({
     pix: 'PIX',
     cartao_credito: 'Cartão de Crédito',
     cartao_debito: 'Cartão de Débito',
+    vale_alimentacao: 'Vale Alimentação',
+    vale_refeicao: 'Vale Refeição',
+    vale_presente: 'Vale Presente',
+    vale_combustivel: 'Vale Combustível',
   }
 
   // Opções de forma de pagamento fiscal (apenas as aceitas pela API)

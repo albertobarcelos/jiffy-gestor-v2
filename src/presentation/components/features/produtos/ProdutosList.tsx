@@ -286,7 +286,6 @@ const ProdutoListItem = function ProdutoListItem({
         {/* Mobile: 3 ícones na primeira linha, 4 na segunda */}
         <div
           className="mt-2 inline-grid grid-cols-3 gap-2 w-fit md:hidden"
-          onClick={(e) => e.stopPropagation()}
         >
           {firstRowActions.map(({ key, label, Icon, field, modal }) => {
             if (field) {
@@ -303,7 +302,10 @@ const ProdutoListItem = function ProdutoListItem({
                   type="button"
                   title={label}
                   disabled={isLoading}
-                  onClick={() => onToggleBoolean?.(field, !isActive)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onToggleBoolean?.(field, !isActive)
+                  }}
                   className={`w-5 h-5 rounded-full flex items-center justify-center text-sm transition-all ${bgColor} ${iconColor} ${isLoading
                       ? 'opacity-60 cursor-not-allowed'
                       : 'hover:bg-primary/80 hover:text-white  focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/80'
@@ -328,7 +330,10 @@ const ProdutoListItem = function ProdutoListItem({
                   type="button"
                   title={label}
                   disabled={!handleModalClick}
-                  onClick={() => handleModalClick?.()}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleModalClick?.()
+                  }}
                   className={`w-5 h-5 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${!handleModalClick ? 'opacity-60 cursor-not-allowed' : 'hover:bg-primary/10'}`}
                 >
                   <Icon />
@@ -342,7 +347,10 @@ const ProdutoListItem = function ProdutoListItem({
                   key={`${produto.getId()}-${key}`}
                   type="button"
                   title={label}
-                  onClick={() => onCopyProduto?.(produto.getId())}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onCopyProduto?.(produto.getId())
+                  }}
                   className="w-5 h-5 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-sm hover:bg-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <Icon />
@@ -363,7 +371,6 @@ const ProdutoListItem = function ProdutoListItem({
         </div>
         <div
           className="mt-2 inline-grid grid-cols-4 gap-2 w-fit md:hidden"
-          onClick={(e) => e.stopPropagation()}
         >
           {secondRowActions.map(({ key, label, Icon, field, modal }) => {
             if (field) {
@@ -380,7 +387,10 @@ const ProdutoListItem = function ProdutoListItem({
                   type="button"
                   title={label}
                   disabled={isLoading}
-                  onClick={() => onToggleBoolean?.(field, !isActive)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onToggleBoolean?.(field, !isActive)
+                  }}
                   className={`w-5 h-5 rounded-full flex items-center justify-center text-sm transition-all ${bgColor} ${iconColor} ${
                     isLoading
                       ? 'opacity-60 cursor-not-allowed'
@@ -406,7 +416,10 @@ const ProdutoListItem = function ProdutoListItem({
                   type="button"
                   title={label}
                   disabled={!handleModalClick}
-                  onClick={() => handleModalClick?.()}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleModalClick?.()
+                  }}
                   className={`w-5 h-5 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                     !handleModalClick ? 'opacity-60 cursor-not-allowed' : 'hover:bg-primary/10'
                   }`}
@@ -422,7 +435,10 @@ const ProdutoListItem = function ProdutoListItem({
                   key={`${produto.getId()}-${key}`}
                   type="button"
                   title={label}
-                  onClick={() => onCopyProduto?.(produto.getId())}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onCopyProduto?.(produto.getId())
+                  }}
                   className="w-5 h-5 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-sm hover:bg-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <Icon />
@@ -443,7 +459,7 @@ const ProdutoListItem = function ProdutoListItem({
         </div>
 
         {/* Desktop: linha única */}
-        <div className="hidden md:flex items-center gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
+        <div className="hidden md:flex items-center gap-2 mt-2">
           {actionIcons.map(({ key, label, Icon, field, modal }) => {
             if (field) {
               const isActive = toggleStates[field]
@@ -459,7 +475,10 @@ const ProdutoListItem = function ProdutoListItem({
                   type="button"
                   title={label}
                   disabled={isLoading}
-                  onClick={() => onToggleBoolean?.(field, !isActive)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onToggleBoolean?.(field, !isActive)
+                  }}
                   className={`w-5 h-5 rounded-full flex items-center justify-center text-sm transition-all ${bgColor} ${iconColor} ${
                     isLoading
                       ? 'opacity-60 cursor-not-allowed'
@@ -485,7 +504,10 @@ const ProdutoListItem = function ProdutoListItem({
                   type="button"
                   title={label}
                   disabled={!handleModalClick}
-                  onClick={() => handleModalClick?.()}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleModalClick?.()
+                  }}
                   className={`w-5 h-5 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                     !handleModalClick ? 'opacity-60 cursor-not-allowed' : 'hover:bg-primary/10'
                   }`}
@@ -501,7 +523,10 @@ const ProdutoListItem = function ProdutoListItem({
                   key={`${produto.getId()}-${key}`}
                   type="button"
                   title={label}
-                  onClick={() => onCopyProduto?.(produto.getId())}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onCopyProduto?.(produto.getId())
+                  }}
                   className="w-5 h-5 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-sm hover:bg-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <Icon />
@@ -713,14 +738,16 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
 
   const openTabsModal = useCallback(
     (config: Partial<ProdutosTabsModalState>) => {
-      setTabsModalState(() => ({
+      // Sempre atualizar o estado de forma atômica, garantindo que o modal abra corretamente
+      // mesmo se foi fechado recentemente clicando fora
+      setTabsModalState({
         open: true,
         tab: config.tab ?? 'produto',
         mode: config.mode ?? 'create',
         produto: config.produto,
         prefillGrupoProdutoId: config.prefillGrupoProdutoId ?? undefined,
         grupoId: config.grupoId,
-      }))
+      })
 
       // Adicionar um parâmetro na URL para forçar o recarregamento ao fechar
       const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
@@ -731,13 +758,16 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
   )
 
   const closeTabsModal = useCallback(() => {
-    setTabsModalState((prev) => ({
-      ...prev,
+    // Resetar completamente o estado para garantir que o modal esteja realmente fechado
+    // Isso evita problemas quando o usuário tenta abrir novamente logo após fechar
+    setTabsModalState({
       open: false,
+      tab: 'produto',
+      mode: 'create',
       produto: undefined,
       prefillGrupoProdutoId: undefined,
       grupoId: undefined,
-    }))
+    })
 
     // Remover o parâmetro da URL
     const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
