@@ -6,14 +6,6 @@ function toImpostoConfig(ncm: any) {
   if (!ncm?.codigo) return null
 
   const impostos = ncm?.impostos ?? {}
-  const hasImpostos =
-    Boolean(impostos?.cfop) ||
-    Boolean(impostos?.csosn) ||
-    Boolean(impostos?.icms) ||
-    Boolean(impostos?.pis) ||
-    Boolean(impostos?.cofins)
-
-  if (!hasImpostos) return null
 
   return {
     ncm: {
@@ -49,11 +41,11 @@ export async function GET(request: NextRequest) {
       ? payload
       : Array.isArray(payload?.content)
         ? payload.content
-      : Array.isArray(payload?.items)
-        ? payload.items
-        : Array.isArray(payload?.data)
-          ? payload.data
-          : []
+        : Array.isArray(payload?.items)
+          ? payload.items
+          : Array.isArray(payload?.data)
+            ? payload.data
+            : []
 
     const configuracoes = items
       .map(toImpostoConfig)

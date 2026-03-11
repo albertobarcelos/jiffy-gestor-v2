@@ -89,11 +89,11 @@ export async function POST(
         body: JSON.stringify({ impostos: body }),
       })
     } catch (error) {
-      // Se o NCM ainda não existe, criamos com o payload de impostos.
       if (!(error instanceof ApiError) || error.status !== 404) {
         throw error
       }
 
+      // Se o NCM ainda não existe, criamos com o payload de impostos.
       response = await apiClient.request<any>('/api/v1/fiscal/configuracoes/ncms', {
         method: 'POST',
         headers: {
@@ -104,7 +104,11 @@ export async function POST(
       })
     }
 
-    const mapped = toImpostoConfigFromNcm(response.data)
+    const mapped =
+      response.data?.ncm && (response.data?.cfop || response.data?.csosn || response.data?.icms || response.data?.pis || response.data?.cofins)
+        ? response.data
+        : toImpostoConfigFromNcm(response.data)
+
     if (!mapped) {
       return NextResponse.json(
         { error: 'Configuração salva, mas sem dados de impostos no retorno da API.' },

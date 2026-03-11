@@ -29,25 +29,31 @@ interface ConfiguracaoImpostoNcm {
   }
 }
 
-function mapNcmToConfiguracaoImposto(item: any): ConfiguracaoImpostoNcm | null {
-  if (!item?.codigo) return null
+function mapNcmToConfiguracaoImposto(item: unknown): ConfiguracaoImpostoNcm | null {
+  if (!item || typeof item !== 'object') return null
 
-  const impostos = item?.impostos
-  if (!impostos) return null
+  const itemData = item as {
+    codigo?: string
+    descricao?: string
+    impostos?: {
+      cfop?: string
+      csosn?: string
+      icms?: ConfiguracaoImpostoNcm['icms']
+      pis?: ConfiguracaoImpostoNcm['pis']
+      cofins?: ConfiguracaoImpostoNcm['cofins']
+    }
+  }
 
-  const hasImpostos =
-    Boolean(impostos?.cfop) ||
-    Boolean(impostos?.csosn) ||
-    Boolean(impostos?.icms) ||
-    Boolean(impostos?.pis) ||
-    Boolean(impostos?.cofins)
+  if (!itemData.codigo) return null
 
-  if (!hasImpostos) return null
+  // NCM sem configuração de impostos também deve aparecer na listagem
+  // para permitir configuração manual pela UI.
+  const impostos = itemData.impostos ?? {}
 
   return {
     ncm: {
-      codigo: item.codigo,
-      descricao: item.descricao,
+      codigo: itemData.codigo,
+      descricao: itemData.descricao,
     },
     cfop: impostos.cfop,
     csosn: impostos.csosn,
@@ -141,10 +147,10 @@ export function MapearProdutosView() {
       }
 
       const result = await response.json()
-      const content = Array.isArray(result?.content) ? result.content : []
+      const content: unknown[] = Array.isArray(result?.content) ? result.content : []
       const configuracoes = content
         .map(mapNcmToConfiguracaoImposto)
-        .filter((item): item is ConfiguracaoImpostoNcm => Boolean(item))
+        .filter((item: ConfiguracaoImpostoNcm | null): item is ConfiguracaoImpostoNcm => item !== null)
 
       setConfiguracoesImpostos(configuracoes)
     } catch (error: any) {

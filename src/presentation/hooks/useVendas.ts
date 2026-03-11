@@ -213,12 +213,13 @@ async function resolveFiscalEmissionConfig(
       `Numeração fiscal não configurada para ${tipoDocumento}. Configure a série no Painel do Contador.`
     )
   }
-  const ambiente = numeracaoSelecionada?.ambiente
-  if (ambiente !== 'HOMOLOGACAO' && ambiente !== 'PRODUCAO') {
+  const ambienteConfigurado = numeracaoSelecionada?.ambiente
+  if (ambienteConfigurado !== 'HOMOLOGACAO' && ambienteConfigurado !== 'PRODUCAO') {
     throw new Error(
       `Ambiente fiscal não configurado em ${tipoDocumento}. Defina HOMOLOGACAO ou PRODUCAO na configuração de emissão.`
     )
   }
+  const ambiente: FiscalEmissionResolvedConfig['ambiente'] = ambienteConfigurado
 
   const empresaFiscalResponse = await fetch('/api/v1/fiscal/empresas-fiscais/me', {
     headers: authHeaders,
