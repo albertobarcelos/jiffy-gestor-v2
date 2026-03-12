@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { Button } from '@/src/presentation/components/ui/button'
@@ -40,6 +40,11 @@ export function Etapa3EmissorFiscal() {
   const { auth, isRehydrated } = useAuthStore()
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  
+  // Ref para controlar se já foi feito o carregamento inicial
+  const initialLoadDone = useRef(false)
+  const previousNfeAmbiente = useRef<AmbienteFiscal | ''>('')
+  const previousNfceAmbiente = useRef<AmbienteFiscal | ''>('')
   
   // Configurações de numeração
   const [nfeNumeracao, setNfeNumeracao] = useState<ConfiguracaoNumeracao | null>(null)
@@ -86,7 +91,13 @@ export function Etapa3EmissorFiscal() {
   useEffect(() => {
     // Aguardar reidratação do Zustand antes de fazer requisições
     if (!isRehydrated) return
-    loadData()
+    
+    const loadInitialData = async () => {
+      await loadData()
+      initialLoadDone.current = true
+    }
+    
+    loadInitialData()
   }, [auth, isRehydrated])
 
   const loadData = async () => {
@@ -117,11 +128,15 @@ export function Etapa3EmissorFiscal() {
           
           setNfeNumeracao(nfe)
           // Sempre atualizar o formulário com os valores do banco (garantir sincronização)
+          const ambienteNfe = nfe.ambiente ?? ''
           setNfeForm({
             serie: String(nfe.serie),
             proximoNumero: String(nfe.proximoNumero),
-            ambiente: nfe.ambiente ?? '',
+            ambiente: ambienteNfe,
           })
+          
+          // Salvar ambiente inicial para comparação futura
+          if (ambienteNfe) previousNfeAmbiente.current = ambienteNfe as AmbienteFiscal
           
           // Atualizar toggles da NF-e
           const nfeAtivoValue = nfe.nfeAtivo ?? false
@@ -147,14 +162,18 @@ export function Etapa3EmissorFiscal() {
           
           setNfceNumeracao(nfce)
           // Sempre atualizar o formulário com os valores do banco (garantir sincronização)
+          const ambienteNfce = nfce.ambiente ?? ''
           setNfceForm(prev => ({
             ...prev,
             serie: String(nfce.serie),
             proximoNumero: String(nfce.proximoNumero),
             cscId: nfce.nfceCscId || '',
             cscCodigo: nfce.nfceCscCodigo || '',
-            ambiente: nfce.ambiente ?? '',
+            ambiente: ambienteNfce,
           }))
+          
+          // Salvar ambiente inicial para comparação futura
+          if (ambienteNfce) previousNfceAmbiente.current = ambienteNfce as AmbienteFiscal
           
           // Atualizar toggles e CSC da NFC-e
           setEmissorFiscal(prev => ({
@@ -185,6 +204,134 @@ export function Etapa3EmissorFiscal() {
       setIsLoading(false)
     }
   }
+
+  // Função para buscar configuração específica por ambiente e modelo
+  const loadConfiguracaoPorAmbiente = async (
+    modelo: 55 | 65,
+    ambiente: AmbienteFiscal,
+    tipo: 'nfe' | 'nfce'
+  ) => {
+    if (!isRehydrated) return
+    
+    const token = auth?.getAccessToken()
+    if (!token) return
+
+    try {
+      const response = await fetch('/api/v1/fiscal/configuracoes/emissao', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (response.ok) {
+        const numeracoes: ConfiguracaoNumeracao[] = await response.json()
+        
+        // Filtrar por modelo, ambiente e terminalId null
+        const configuracao = numeracoes.find(
+          (n) => n.modelo === modelo && n.ambiente === ambiente && !n.terminalId
+        )
+
+        if (configuracao) {
+          if (tipo === 'nfe') {
+            setNfeNumeracao(configuracao)
+            setNfeForm({
+              serie: String(configuracao.serie),
+              proximoNumero: String(configuracao.proximoNumero),
+              ambiente: configuracao.ambiente ?? ambiente,
+            })
+            setEmissorFiscal(prev => ({
+              ...prev,
+              nfeAtivo: configuracao.nfeAtivo ?? false,
+            }))
+          } else {
+            setNfceNumeracao(configuracao)
+            setNfceForm(prev => ({
+              ...prev,
+              serie: String(configuracao.serie),
+              proximoNumero: String(configuracao.proximoNumero),
+              cscId: configuracao.nfceCscId || '',
+              cscCodigo: configuracao.nfceCscCodigo || '',
+              ambiente: configuracao.ambiente ?? ambiente,
+            }))
+            setEmissorFiscal(prev => ({
+              ...prev,
+              nfceAtivo: configuracao.nfceAtivo ?? false,
+            }))
+          }
+        } else {
+          // Se não encontrou configuração para o ambiente selecionado, limpar campos
+          if (tipo === 'nfe') {
+            setNfeNumeracao(null)
+            setNfeForm(prev => ({
+              ...prev,
+              serie: '',
+              proximoNumero: '',
+              ambiente: ambiente,
+            }))
+          } else {
+            setNfceNumeracao(null)
+            setNfceForm(prev => ({
+              ...prev,
+              serie: '',
+              proximoNumero: '',
+              cscId: '',
+              cscCodigo: '',
+              ambiente: ambiente,
+            }))
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Erro ao carregar configuração ${tipo} para ambiente ${ambiente}:`, error)
+      // Não mostrar toast para evitar spam de notificações
+    }
+  }
+
+  // useEffect para recarregar dados NF-e quando ambiente mudar
+  useEffect(() => {
+    // Só executar se já foi feito o carregamento inicial
+    if (!initialLoadDone.current) return
+
+    const ambienteAtual = nfeForm.ambiente
+    
+    // Verificar se o ambiente é válido (type guard)
+    if (ambienteAtual !== 'HOMOLOGACAO' && ambienteAtual !== 'PRODUCAO') {
+      return
+    }
+
+    // Verificar se o ambiente mudou
+    if (ambienteAtual === previousNfeAmbiente.current) {
+      return
+    }
+
+    // Atualizar referência do ambiente anterior
+    previousNfeAmbiente.current = ambienteAtual
+
+    // Buscar configuração específica do ambiente selecionado
+    loadConfiguracaoPorAmbiente(55, ambienteAtual, 'nfe')
+  }, [nfeForm.ambiente, isRehydrated, auth])
+
+  // useEffect para recarregar dados NFC-e quando ambiente mudar
+  useEffect(() => {
+    // Só executar se já foi feito o carregamento inicial
+    if (!initialLoadDone.current) return
+
+    const ambienteAtual = nfceForm.ambiente
+    
+    // Verificar se o ambiente é válido (type guard)
+    if (ambienteAtual !== 'HOMOLOGACAO' && ambienteAtual !== 'PRODUCAO') {
+      return
+    }
+
+    // Verificar se o ambiente mudou
+    if (ambienteAtual === previousNfceAmbiente.current) {
+      return
+    }
+
+    // Atualizar referência do ambiente anterior
+    previousNfceAmbiente.current = ambienteAtual
+
+    // Buscar configuração específica do ambiente selecionado
+    loadConfiguracaoPorAmbiente(65, ambienteAtual, 'nfce')
+  }, [nfceForm.ambiente, isRehydrated, auth])
 
   const handleSaveNfe = async () => {
     const token = auth?.getAccessToken()
@@ -582,11 +729,11 @@ export function Etapa3EmissorFiscal() {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 p-2 sm:p-4">
       {/* NF-e */}
-      <div className="rounded-lg border border-primary/20 bg-white p-2">
+      <div className="rounded-lg border border-alternate/20 bg-white px-2 py-1">
         <div className="flex items-center justify-between">
-          <h4 className="font-exo font-semibold text-primary text-base">NF-e (Nota Fiscal Eletrônica)</h4>
+          <h4 className="font-exo font-semibold text-alternate text-base">NF-e (Nota Fiscal Eletrônica)</h4>
           <div className="flex items-center gap-1">
             <Label htmlFor="nfe-ativo" className="text-sm">NF-e</Label>
             <Switch
@@ -596,10 +743,10 @@ export function Etapa3EmissorFiscal() {
               disabled={isSaving}
               sx={{
                 '& .MuiSwitch-switchBase.Mui-checked': {
-                  color: 'var(--color-primary)',
+                  color: 'var(--color-alternate)',
                 },
                 '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                  backgroundColor: 'var(--color-primary)',
+                  backgroundColor: 'var(--color-alternate)',
                 },
               }}
             />
@@ -609,7 +756,7 @@ export function Etapa3EmissorFiscal() {
         {/* Mostrar campos e botão apenas se NF-e estiver ativada */}
         {emissorFiscal.nfeAtivo && (
           <>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-2">
               <div className="">
                 <Label htmlFor="nfe-ambiente">Ambiente *</Label>
                 <select
@@ -643,6 +790,7 @@ export function Etapa3EmissorFiscal() {
                   }}
                   placeholder="1"
                   inputProps={{ min: 1 }}
+                  size="small"
                 />
               </div>
 
@@ -655,6 +803,7 @@ export function Etapa3EmissorFiscal() {
                   onChange={(e) => setNfeForm({ ...nfeForm, proximoNumero: e.target.value })}
                   placeholder="1"
                   inputProps={{ min: 1 }}
+                  size="small"
                 />
               </div>
             </div>
@@ -669,7 +818,7 @@ export function Etapa3EmissorFiscal() {
                   '&:hover': { backgroundColor: 'var(--color-alternate)' },
                 }}
               >
-                Salvar NF-e
+                Salvar Configuração NF-e
               </Button>
             </div>
           </>
@@ -677,9 +826,9 @@ export function Etapa3EmissorFiscal() {
       </div>
 
       {/* NFC-e */}
-      <div className="rounded-lg border border-primary/20 bg-white p-2">
+      <div className="rounded-lg border border-alternate/20 bg-white p-2">
         <div className="flex items-center justify-between">
-          <h4 className="font-exo font-semibold text-primary text-base">NFC-e (Nota Fiscal de Consumidor Eletrônica)</h4>
+          <h4 className="font-exo font-semibold text-alternate text-base">NFC-e (Nota Fiscal de Consumidor Eletrônica)</h4>
           <div className="flex items-center gap-1">
             <Label htmlFor="nfce-ativo" className="text-sm">NFC-e</Label>
             <Switch
@@ -689,10 +838,10 @@ export function Etapa3EmissorFiscal() {
               disabled={isSaving}
               sx={{
                 '& .MuiSwitch-switchBase.Mui-checked': {
-                  color: 'var(--color-primary)',
+                  color: 'var(--color-alternate)',
                 },
                 '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                  backgroundColor: 'var(--color-primary)',
+                  backgroundColor: 'var(--color-alternate)',
                 },
               }}
             />
@@ -742,6 +891,7 @@ export function Etapa3EmissorFiscal() {
                   }}
                   placeholder="1"
                   inputProps={{ min: 1 }}
+                  size="small"
                 />
               </div>
 
@@ -754,6 +904,7 @@ export function Etapa3EmissorFiscal() {
                   onChange={(e) => setNfceForm({ ...nfceForm, proximoNumero: e.target.value })}
                   placeholder="1"
                   inputProps={{ min: 1 }}
+                  size="small"
                 />
               </div>
             </div>
@@ -766,6 +917,7 @@ export function Etapa3EmissorFiscal() {
                   value={nfceForm.cscId}
                   onChange={(e) => setNfceForm({ ...nfceForm, cscId: e.target.value })}
                   placeholder="CODIGO-CSC-ID-CONTRIBUINTE"
+                  size="small"
                 />
                 <p className="text-xs text-secondary-text/70">
                   Obtido na SEFAZ da sua UF
@@ -779,6 +931,7 @@ export function Etapa3EmissorFiscal() {
                   value={nfceForm.cscCodigo}
                   onChange={(e) => setNfceForm({ ...nfceForm, cscCodigo: e.target.value })}
                   placeholder="12345678"
+                  size="small"
                 />
                 <p className="text-xs text-secondary-text/70">
                   Código de 8 dígitos obtido na SEFAZ

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { MdCheckCircle } from 'react-icons/md'
+import { MdCheckCircle, MdBusiness, MdReceipt, MdAssessment, MdNumbers, MdTableChart } from 'react-icons/md'
 import { useTabsStore } from '@/src/presentation/stores/tabsStore'
 import { ConfiguracaoImpostosView } from '@/src/presentation/components/features/impostos/ConfiguracaoImpostosView'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
@@ -65,6 +65,51 @@ export function PainelContadorView() {
   }, [isRehydrated])
 
 
+  // Estrutura de dados das etapas
+  const etapas = [
+    {
+      id: 'etapa-1-dados-fiscais',
+      title: 'Dados Fiscais e Certificado Digital',
+      label: 'Dados Fiscais e Certificado Digital',
+      path: '/painel-contador/etapa/dados-fiscais',
+      component: Etapa1DadosFiscaisEmpresa,
+      icon: MdBusiness,
+    },
+    {
+      id: 'etapa-2-emissor-fiscal',
+      title: 'Emissor Fiscal',
+      label: 'Emissor Fiscal',
+      path: '/painel-contador/etapa/emissor-fiscal',
+      component: Etapa3EmissorFiscal,
+      icon: MdReceipt,
+    },
+    {
+      id: 'etapa-3-cenario-fiscal',
+      title: 'Cenário Fiscal',
+      label: 'Cenário Fiscal',
+      path: '/painel-contador/etapa/cenario-fiscal',
+      component: Etapa4CenarioFiscal,
+      icon: MdAssessment,
+    },
+    {
+      id: 'etapa-4-numeracoes-fiscais',
+      title: 'Numerações Fiscais',
+      label: 'Numerações Fiscais',
+      path: '/painel-contador/etapa/numeracoes-fiscais',
+      component: Etapa5NumeracoesFiscais,
+      icon: MdNumbers,
+    },
+    {
+      id: 'etapa-5-tabela-ibpt',
+      title: 'Tabela IBPT',
+      label: 'Tabela IBPT',
+      path: '/painel-contador/etapa/tabela-ibpt',
+      component: Etapa5TabelaIbpt,
+      icon: MdTableChart,
+    },
+  ]
+
+  // Renderização condicional para views específicas
   if (activeTabId === 'impostos') {
     return <ConfiguracaoImpostosView />
   }
@@ -77,6 +122,25 @@ export function PainelContadorView() {
     return <ConfiguracaoEmpresaCompleta />
   }
 
+  // Renderização condicional para etapas
+  const etapaAtiva = etapas.find((etapa) => etapa.id === activeTabId)
+  if (etapaAtiva) {
+    const EtapaComponent = etapaAtiva.component
+    return <EtapaComponent />
+  }
+
+  // Handler para abrir etapa em nova aba
+  const handleOpenEtapa = (etapaId: string) => {
+    const etapa = etapas.find((e) => e.id === etapaId)
+    if (etapa) {
+      addTab({
+        id: etapa.id,
+        label: etapa.label,
+        path: etapa.path,
+        isFixed: false,
+      })
+    }
+  }
 
   const handleOpenNCMConfig = () => {
     addTab({
@@ -98,7 +162,7 @@ export function PainelContadorView() {
   return (
     <div className="pb-2 flex w-full flex-col items-stretch bg-info lg:flex-row lg:h-full">
       {/* Painel Esquerdo - Roxo */}
-      <div className="flex min-h-[350px] flex-1 md:w-[58%] w-full flex-col overflow-hidden rounded-tr-none rounded-br-none bg-secondary lg:h-full lg:rounded-tr-[48px] lg:rounded-br-[48px]">
+      <div className="flex min-h-[350px] flex-1 md:w-[70%] lg:w-[72%] w-full flex-col overflow-hidden rounded-tr-none rounded-br-none bg-secondary lg:h-full lg:rounded-tr-[48px] lg:rounded-br-[48px]">
         {/* Seção Superior com Título e Ilustração */}
         <div className="flex flex-col gap-3 sm:gap-4 lg:gap-6 border-b border-[#330468] bg-[rgba(131,56,236,0.4)] sm:rounded-tr-[24px] md:rounded-tr-[32px] lg:rounded-tr-[48px] p-3 sm:p-4">
           <div className="flex flex-row items-center gap-4 sm:gap-6">
@@ -189,57 +253,33 @@ export function PainelContadorView() {
         </div>
       </div>
 
-      {/* Painel Direito - Cards com stepper vertical */}
-      <div className="flex md:w-[42%] flex-col gap-4 p-2 sm:p-3 lg:h-full lg:overflow-y-auto">
-        {[
-          {
-            id: 1,
-            title: 'Dados Fiscais e Certificado Digital',
-            content: <Etapa1DadosFiscaisEmpresa />,
-          },
-          {
-            id: 2,
-            title: 'Emissor Fiscal',
-            content: <Etapa3EmissorFiscal />,
-          },
-          {
-            id: 3,
-            title: 'Cenário Fiscal',
-            content: <Etapa4CenarioFiscal />,
-          },
-          {
-            id: 4,
-            title: 'Numerações Fiscais',
-            content: <Etapa5NumeracoesFiscais />,
-          },
-          {
-            id: 5,
-            title: 'Tabela IBPT',
-            content: <Etapa5TabelaIbpt />,
-          },
-        ].map((step, index, arr) => (
-          <div key={step.id} className="flex items-stretch gap-3">
-            {/* coluna do stepper */}
-            <div className="flex h-full flex-col items-center self-stretch">
-              <div
-                className={`w-[2px] flex-1 ${index === 0 ? 'bg-transparent' : 'bg-gradient-to-b from-primary/30 to-primary/60'}`}
-              />
-              <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-primary text-primary font-bold bg-white my-1">
-                {step.id}
-              </div>
-              <div
-                className={`w-[2px] flex-1 ${index === arr.length - 1 ? 'bg-transparent' : 'bg-gradient-to-b from-primary to-primary/40'}`}
-              />
-            </div>
-            {/* card */}
-            <div className="flex-1 rounded-[24px] border border-primary bg-[#f6f8fc] p-3 sm:p-3.5 md:p-4 shadow-sm">
-              <h3 className="text-center font-exo font-medium text-primary text-sm sm:text-lg md:text-xl mb-2">
-                {step.title}
-              </h3>
-              <div className="flex flex-col gap-2">{step.content}</div>
-            </div>
-          </div>
-        ))}
+      {/* Painel Direito - Botões de Navegação */}
+      <div className="flex md:w-[30%] lg:w-[28%] flex-col gap-3 p-4 sm:p-5 lg:h-full lg:overflow-y-auto">
+        <div className="flex flex-col gap-3">
+          {etapas.map((etapa, index) => {
+            const IconComponent = etapa.icon
+            // Intercalar cores: índice par = bg-alternate, ímpar = bg-text-secondary
+            const bgColor = index % 2 === 0 
+              ? 'bg-secondary' // Primeiro, terceiro, quinto botão
+              : 'bg-alternate' // Segundo, quarto botão
+            
+            return (
+              <button
+                key={etapa.id}
+                onClick={() => handleOpenEtapa(etapa.id)}
+                className={`w-full rounded-[16px] border-2 border-alternate ${bgColor} hover:scale-105 active:scale-100 transition-transform duration-200 p-4 sm:p-5 shadow-sm hover:shadow-md text-center group flex flex-col items-center gap-3`}
+              >
+                <IconComponent 
+                  className="text-white" 
+                  size={42}
+                />
+                <span className="font-exo font-medium text-white text-sm sm:text-base md:text-lg">
+                  {etapa.title}
+                </span>
+              </button>
+            )
+          })}
+        </div>
       </div>
     </div>
   )

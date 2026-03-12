@@ -19,6 +19,8 @@ interface CidadeAutocompleteProps {
   required?: boolean
   disabled?: boolean
   onValidationChange?: (isValid: boolean) => void
+  // Callback quando uma cidade é selecionada da lista (passa nome e código IBGE)
+  onCidadeSelecionada?: (nomeCidade: string, codigoIbge: string) => void
   className?: string
   // Se true, usa input HTML nativo ao invés de Input do MUI
   useNativeInput?: boolean
@@ -54,6 +56,7 @@ export function CidadeAutocomplete({
   required = false,
   disabled = false,
   onValidationChange,
+  onCidadeSelecionada,
   className = '',
   useNativeInput = false,
   inputClassName = '',
@@ -80,6 +83,9 @@ export function CidadeAutocomplete({
   const containerRef = useRef<HTMLDivElement>(null)
   const inputWrapperRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
+  const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const valorNoBlurRef = useRef<string>('')
+  const cidadeSelecionadaDuranteBlurRef = useRef<boolean>(false)
 
   // Altura máxima aproximada do dropdown (max-h-52 = 208px + botões de scroll)
   const DROPDOWN_HEIGHT = 260
@@ -92,7 +98,13 @@ export function CidadeAutocomplete({
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      // Limpar timeout ao desmontar componente
+      if (blurTimeoutRef.current) {
+        clearTimeout(blurTimeoutRef.current)
+      }
+    }
   }, [])
 
   /**
@@ -123,7 +135,8 @@ export function CidadeAutocomplete({
     }
   }, [estado])
 
-  // Validar automaticamente quando receber um valor inicial e os municípios já foram carregados
+  // Validar automaticamente APENAS quando receber um valor inicial (ao carregar dados)
+  // NÃO validar durante a digitação - validação acontece apenas no blur
   useEffect(() => {
     // Só valida se:
     // 1. Há um valor preenchido
@@ -131,13 +144,17 @@ export function CidadeAutocomplete({
     // 3. Os municípios já foram carregados
     // 4. Ainda não foi validado (isValid === null)
     // 5. Não foi selecionado da lista (selectedFromList === false)
+    // 6. O valor tem pelo menos 2 caracteres (evita validar "B", "b", etc)
+    // 7. O valor não mudou recentemente (evita validar durante digitação)
     if (
       value &&
+      value.trim().length >= 2 && // IMPORTANTE: Só validar se tiver pelo menos 2 caracteres
       estado &&
       allMunicipios.length > 0 &&
       !isLoadingMunicipios &&
       isValid === null &&
-      !selectedFromList
+      !selectedFromList &&
+      !cidadeSelecionadaDuranteBlurRef.current // Não validar se uma cidade foi selecionada
     ) {
       // Verifica se o valor está na lista de municípios carregados
       const municipioEncontrado = allMunicipios.find(
@@ -150,37 +167,13 @@ export function CidadeAutocomplete({
         setErro(null)
         onValidationChange?.(true)
       } else {
-        // Se não encontrou na lista, valida via API
-        const validarCidadeInicial = async () => {
-          try {
-            setIsValidating(true)
-            const response = await fetch(
-              `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(value)}&uf=${estado}`
-            )
-
-            if (response.ok) {
-              const data = await response.json()
-              const valido = data.valido === true
-
-              setIsValid(valido)
-              setErro(valido ? null : `Cidade "${value}" não encontrada no estado ${estado}`)
-              onValidationChange?.(valido)
-            } else {
-              // Se a validação falhar, assumir como válida (já estava salva)
-              setIsValid(true)
-              onValidationChange?.(true)
-            }
-          } catch (error) {
-            console.error('Erro ao validar cidade inicial:', error)
-            // Se houver erro, assumir como válida (já estava salva)
-            setIsValid(true)
-            onValidationChange?.(true)
-          } finally {
-            setIsValidating(false)
-          }
-        }
-
-        validarCidadeInicial()
+        // IMPORTANTE: Não validar via API automaticamente durante digitação
+        // A validação via API acontece apenas no blur (handleBlur)
+        // Isso evita múltiplas requisições enquanto o usuário digita
+        // Apenas resetar o estado de validação
+        setIsValid(null)
+        setErro(null)
+        onValidationChange?.(null)
       }
     }
   }, [value, estado, allMunicipios, isLoadingMunicipios, isValid, selectedFromList, onValidationChange, normalizar])
@@ -264,17 +257,55 @@ export function CidadeAutocomplete({
 
   /**
    * Ao selecionar uma cidade do dropdown:
-   * - Preenche o campo com o nome oficial do IBGE
+   * - Primeiro limpa o campo para evitar validação com texto digitado
+   * - Depois preenche o campo com o nome oficial do IBGE
    * - Marca como válido imediatamente (sem nova chamada à API)
    * - Fecha o dropdown
+   * - Chama onCidadeSelecionada com nome e código IBGE
+   * - Cancela qualquer validação pendente do blur
    */
   const handleSelectSuggestion = (municipio: Municipio) => {
-    onChange(municipio.nomeCidade)
-    setIsValid(true)
-    setErro(null)
-    setSelectedFromList(true)
+    // IMPORTANTE: Marcar ANTES de qualquer outra coisa que uma cidade foi selecionada
+    // Isso garante que o handleBlur não execute nenhuma validação
+    cidadeSelecionadaDuranteBlurRef.current = true
+    
+    // Cancelar validação pendente do blur se houver
+    // Isso é CRÍTICO - cancela qualquer validação que possa estar aguardando
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current)
+      blurTimeoutRef.current = null
+    }
+    
+    // Fechar dropdown imediatamente
     setShowDropdown(false)
-    onValidationChange?.(true)
+    
+    // Primeiro limpar o campo para evitar que validação use texto digitado
+    // Isso garante que qualquer validação pendente não use o texto parcial digitado
+    onChange('')
+    setIsValid(null)
+    setErro(null)
+    setSelectedFromList(false) // Resetar temporariamente
+    
+    // Usar requestAnimationFrame duplo para garantir que o clear seja processado
+    // antes de definir o novo valor, evitando que validações usem o texto digitado
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        // Agora definir o nome oficial da cidade
+        onChange(municipio.nomeCidade)
+        setIsValid(true)
+        setErro(null)
+        setSelectedFromList(true)
+        valorNoBlurRef.current = municipio.nomeCidade // Atualizar valor de referência
+        
+        // IMPORTANTE: Chamar onCidadeSelecionada ANTES de onValidationChange
+        // Isso garante que o componente pai atualize o estado antes da validação
+        onCidadeSelecionada?.(municipio.nomeCidade, municipio.codigoCidadeIbge)
+        
+        // Chamar onValidationChange por último, após tudo estar atualizado
+        // O componente pai deve verificar se já tem código IBGE antes de fazer qualquer validação
+        onValidationChange?.(true)
+      })
+    })
   }
 
   /**
@@ -300,6 +331,12 @@ export function CidadeAutocomplete({
     setSelectedFromList(false)
     setDropdownDirection(calcularDirecao())
     setShowDropdown(true)
+    
+    // Cancelar validação pendente do blur se usuário continuar digitando
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current)
+      blurTimeoutRef.current = null
+    }
   }
 
   /**
@@ -315,49 +352,172 @@ export function CidadeAutocomplete({
   /**
    * Ao perder foco: fecha o dropdown e valida a cidade via API
    * apenas se o usuário não selecionou da lista
+   * Validação acontece APENAS no blur, não durante a digitação
    */
-  const handleBlur = async () => {
-    // Delay para permitir que o mouseDown no dropdown seja registrado antes do blur
-    await new Promise((resolve) => setTimeout(resolve, 150))
-
-    setShowDropdown(false)
-
-    // Se foi selecionado da lista, não precisa validar novamente
-    if (selectedFromList) return
-
-    if (!value || !estado) {
-      setIsValid(null)
-      onValidationChange?.(false)
-      return
+  const handleBlur = () => {
+    // NÃO resetar a flag aqui - ela será verificada dentro do timeout
+    // Se resetarmos aqui, perdemos a informação de que uma cidade foi selecionada
+    
+    // Salvar valor atual para comparar depois
+    const valorNoMomentoDoBlur = value
+    valorNoBlurRef.current = value
+    
+    // Limpar timeout anterior se houver
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current)
     }
+    
+    // Delay maior (600ms) para dar tempo suficiente para:
+    // 1. O mouseDown no dropdown ser registrado
+    // 2. O handleSelectSuggestion ser executado completamente
+    // 3. O campo ser limpo e depois preenchido com o nome oficial
+    // 4. Os callbacks onCidadeSelecionada e onValidationChange serem executados
+    blurTimeoutRef.current = setTimeout(async () => {
+      blurTimeoutRef.current = null
+      
+      setShowDropdown(false)
 
-    if (value.length < 2) {
-      setIsValid(false)
-      setErro('Digite pelo menos 2 caracteres')
-      onValidationChange?.(false)
+      // PRIORIDADE 1: Se uma cidade foi selecionada durante o delay, NÃO VALIDAR
+      // Esta é a verificação mais importante - se uma cidade foi selecionada,
+      // não devemos fazer nenhuma validação adicional
+      if (cidadeSelecionadaDuranteBlurRef.current || selectedFromList) {
+        // Resetar flags apenas após confirmar que não vamos validar
+        cidadeSelecionadaDuranteBlurRef.current = false
+        setSelectedFromList(false)
+        return // SAIR IMEDIATAMENTE - não fazer nenhuma validação
+      }
+
+      // PRIORIDADE 2: Verificar se o valor mudou durante o delay
+      // Se mudou significativamente, pode ser que uma cidade foi selecionada
+      if (valorNoMomentoDoBlur !== value) {
+        // Se o campo está vazio, não validar
+        if (!value || value.trim() === '') {
+          setIsValid(null)
+          setErro(null)
+          onValidationChange?.(null)
+          return
+        }
+        
+        // Se o valor mudou, verificar se corresponde a uma cidade da lista
+        // Se corresponder, significa que foi selecionada da lista (mesmo que a flag não tenha sido setada)
+        const normalizar = (str: string) => 
+          str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+        
+        const cidadeEncontrada = allMunicipios.find((m) => 
+          normalizar(m.nomeCidade) === normalizar(value)
+        )
+        
+        if (cidadeEncontrada) {
+          // Cidade encontrada na lista - foi selecionada da lista
+          // Marcar como válida SEM chamar API
+          setIsValid(true)
+          setErro(null)
+          onValidationChange?.(true)
+          onCidadeSelecionada?.(cidadeEncontrada.nomeCidade, cidadeEncontrada.codigoCidadeIbge)
+          return // SAIR - não validar via API
+        }
+        
+        // Valor mudou mas não corresponde a nenhuma cidade da lista
+        // Pode ser que o usuário editou manualmente, mas NÃO validar aqui
+        // porque pode ser que ainda esteja sendo processada a seleção da lista
+        // Deixar o usuário perder o foco novamente ou clicar em salvar para validar
+        return
+      }
+
+      // PRIORIDADE 3: Verificar se o valor atual corresponde a uma cidade da lista
+      // Se sim, não precisa validar via API (foi selecionada da lista ou digitada corretamente)
+      const normalizar = (str: string) => 
+        str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+      
+      const cidadeEncontrada = allMunicipios.find((m) => 
+        normalizar(m.nomeCidade) === normalizar(value)
+      )
+      
+      if (cidadeEncontrada) {
+        // Cidade encontrada na lista, marcar como válida sem chamar API
+        setIsValid(true)
+        setErro(null)
+        onValidationChange?.(true)
+        // Passar código IBGE se disponível
+        onCidadeSelecionada?.(cidadeEncontrada.nomeCidade, cidadeEncontrada.codigoCidadeIbge)
+        return // SAIR - não validar via API
+      }
+
+      // PRIORIDADE 4: Validar via API apenas se:
+      // - Não encontrou na lista
+      // - O valor não mudou durante o delay (usuário digitou e perdeu foco sem selecionar)
+      // - O valor tem pelo menos 2 caracteres (evita requisições desnecessárias)
+      if (!value || !estado) {
+        setIsValid(null)
+        onValidationChange?.(null)
+        return
+      }
+
+      // IMPORTANTE: Não validar valores com menos de 2 caracteres
+      // Isso evita requisições desnecessárias como "B", "b", etc
+      if (value.trim().length < 2) {
+        setIsValid(null) // null = não validado ainda (não é erro, apenas aguardando mais caracteres)
+        setErro(null)
+        onValidationChange?.(null)
+        return
+      }
+
+      // Apenas aqui validar via API - quando temos certeza de que:
+      // 1. Nenhuma cidade foi selecionada da lista
+      // 2. O valor não corresponde a nenhuma cidade da lista
+      // 3. O usuário digitou algo (pelo menos 2 caracteres) e perdeu o foco sem selecionar
+      await validarCidadeViaAPI(value.trim())
+    }, 600) // Aumentado para 600ms para dar mais tempo para seleção da lista
+  }
+
+  /**
+   * Função auxiliar para validar cidade via API
+   * IMPORTANTE: Só deve ser chamada quando temos certeza de que nenhuma cidade foi selecionada da lista
+   */
+  const validarCidadeViaAPI = async (nomeCidade: string) => {
+    if (!nomeCidade || !estado) return
+
+    // Verificação de segurança: se uma cidade foi selecionada durante a validação,
+    // não validar via API (pode estar usando texto digitado ao invés do nome oficial)
+    if (cidadeSelecionadaDuranteBlurRef.current || selectedFromList) {
+      // Cidade foi selecionada, não validar via API
       return
     }
 
     try {
       setIsValidating(true)
       const response = await fetch(
-        `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(value)}&uf=${estado}`
+        `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(nomeCidade)}&uf=${estado}`
       )
 
       if (response.ok) {
         const data = await response.json()
         const valido = data.valido === true
 
+        // Verificar novamente antes de atualizar o estado
+        // (pode ter sido selecionada durante a requisição)
+        if (cidadeSelecionadaDuranteBlurRef.current || selectedFromList) {
+          return // Cidade foi selecionada durante a validação, não atualizar
+        }
+
         setIsValid(valido)
-        setErro(valido ? null : `Cidade "${value}" não encontrada no estado ${estado}`)
+        setErro(valido ? null : `Cidade "${nomeCidade}" não encontrada no estado ${estado}`)
         onValidationChange?.(valido)
       } else {
+        // Verificar novamente antes de atualizar o estado
+        if (cidadeSelecionadaDuranteBlurRef.current || selectedFromList) {
+          return
+        }
         setIsValid(false)
         setErro('Erro ao validar cidade')
         onValidationChange?.(false)
       }
     } catch (error) {
       console.error('Erro ao validar cidade:', error)
+      // Verificar novamente antes de atualizar o estado
+      if (cidadeSelecionadaDuranteBlurRef.current || selectedFromList) {
+        return
+      }
       setIsValid(false)
       setErro('Erro ao validar cidade')
       onValidationChange?.(false)

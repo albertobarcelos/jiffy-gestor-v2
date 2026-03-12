@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { Button } from '@/src/presentation/components/ui/button'
@@ -107,6 +107,21 @@ export function ConfiguracaoEmpresaCompleta() {
 
   // Validação de cidade
   const [cidadeValida, setCidadeValida] = useState<boolean | null>(null)
+  
+  // Código IBGE da cidade
+  const [codigoCidadeIbge, setCodigoCidadeIbge] = useState<string | null>(null)
+  
+  // Ref para rastrear o código IBGE atual (garante valor atualizado em closures)
+  const codigoCidadeIbgeRef = useRef<string | null>(null)
+  
+  // Ref para rastrear o último valor de cidade usado para buscar código IBGE
+  const ultimaCidadeBuscada = useRef<string>('')
+  
+  // Função auxiliar para atualizar código IBGE (atualiza estado e ref)
+  const atualizarCodigoIbge = (codigo: string | null) => {
+    codigoCidadeIbgeRef.current = codigo
+    setCodigoCidadeIbge(codigo)
+  }
 
   useEffect(() => {
     if (!isRehydrated) return
@@ -139,6 +154,17 @@ export function ConfiguracaoEmpresaCompleta() {
           cidade: empresaData.endereco?.cidade || '',
           estado: empresaData.endereco?.estado || empresaData.endereco?.uf || '',
         })
+        
+        // Carregar código IBGE se cidade e estado estiverem preenchidos
+        if (empresaData.endereco?.cidade && (empresaData.endereco?.estado || empresaData.endereco?.uf)) {
+          const cidade = empresaData.endereco.cidade
+          const estado = empresaData.endereco.estado || empresaData.endereco.uf || ''
+          ultimaCidadeBuscada.current = cidade
+          buscarCodigoIbge(cidade, estado)
+        } else {
+          atualizarCodigoIbge(null)
+          ultimaCidadeBuscada.current = ''
+        }
         
         // Resetar validação - o CidadeAutocomplete validará automaticamente quando receber os valores
         setCidadeValida(null)
@@ -193,45 +219,99 @@ export function ConfiguracaoEmpresaCompleta() {
 
     // Validar cidade antes de salvar
     if (formDataEmpresa.cidade && formDataEmpresa.estado) {
-      if (cidadeValida === false) {
+      // PRIORIDADE 1: Se já temos código IBGE, significa que uma cidade foi selecionada da lista
+      // e podemos confiar que o nome está correto - NÃO VALIDAR NOVAMENTE
+      // Usar a ref para garantir valor atualizado mesmo em closures
+      if (codigoCidadeIbgeRef.current) {
+        // Cidade já foi selecionada da lista e código IBGE está disponível
+        // Garantir que o nome no formulário corresponde ao nome oficial
+        const nomeOficial = ultimaCidadeBuscada.current || formDataEmpresa.cidade.trim()
+        if (nomeOficial !== formDataEmpresa.cidade.trim()) {
+          // Atualizar com o nome oficial se diferente
+          setFormDataEmpresa((prev) => ({ ...prev, cidade: nomeOficial }))
+        }
+        // Não precisa validar - já temos código IBGE = cidade válida
+      } else if (cidadeValida === false) {
+        // Cidade foi validada e é inválida
+        // Usar ultimaCidadeBuscada se disponível, senão usar o valor do formulário
+        const nomeCidadeParaErro = ultimaCidadeBuscada.current || formDataEmpresa.cidade.trim()
         showToast.error(
-          `Cidade "${formDataEmpresa.cidade}" não encontrada no estado ${formDataEmpresa.estado}. ` +
+          `Cidade "${nomeCidadeParaErro}" não encontrada no estado ${formDataEmpresa.estado}. ` +
           `Por favor, selecione uma cidade válida da lista de sugestões.`
         )
         return
-      }
-
-      // Se ainda não foi validada, validar agora antes de salvar
-      if (cidadeValida === null) {
+      } else if (cidadeValida === null) {
+        // Se ainda não foi validada, validar agora antes de salvar
+        // SEMPRE usar ultimaCidadeBuscada se disponível (nome oficial), senão usar o valor do formulário
+        const nomeCidadeParaValidar = ultimaCidadeBuscada.current || formDataEmpresa.cidade.trim()
+        
+        if (!nomeCidadeParaValidar) {
+          showToast.error('Por favor, informe a cidade')
+          return
+        }
+        
         try {
           const response = await fetch(
-            `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(formDataEmpresa.cidade)}&uf=${formDataEmpresa.estado}`
+            `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(nomeCidadeParaValidar)}&uf=${formDataEmpresa.estado}`
           )
           if (response.ok) {
             const data = await response.json()
             if (!data.valido) {
               setCidadeValida(false)
               showToast.error(
-                `Cidade "${formDataEmpresa.cidade}" não encontrada no estado ${formDataEmpresa.estado}. ` +
+                `Cidade "${nomeCidadeParaValidar}" não encontrada no estado ${formDataEmpresa.estado}. ` +
                 `Por favor, selecione uma cidade válida da lista de sugestões.`
               )
               return
             } else {
               // Marcar como válida após validação bem-sucedida
               setCidadeValida(true)
+              ultimaCidadeBuscada.current = nomeCidadeParaValidar
+              // Buscar código IBGE usando o nome validado
+              await buscarCodigoIbge(nomeCidadeParaValidar, formDataEmpresa.estado)
+              // Atualizar formulário com o nome oficial
+              setFormDataEmpresa((prev) => ({ ...prev, cidade: nomeCidadeParaValidar }))
             }
           } else {
             // Se a validação falhar (erro de rede, etc), permitir salvar (cidade já estava no banco)
             console.warn('Não foi possível validar cidade antes de salvar, mas continuando...')
             setCidadeValida(true)
+            ultimaCidadeBuscada.current = nomeCidadeParaValidar
+            // Tentar buscar código IBGE mesmo assim
+            await buscarCodigoIbge(nomeCidadeParaValidar, formDataEmpresa.estado)
           }
         } catch (error) {
           console.error('Erro ao validar cidade:', error)
           // Se houver erro na validação, permitir salvar (cidade já estava no banco)
           setCidadeValida(true)
+          ultimaCidadeBuscada.current = nomeCidadeParaValidar
+          // Tentar buscar código IBGE mesmo assim
+          await buscarCodigoIbge(nomeCidadeParaValidar, formDataEmpresa.estado)
+        }
+      } else if (cidadeValida === true && !codigoCidadeIbgeRef.current) {
+        // Se já está válida mas não tem código IBGE, buscar
+        const nomeCidadeParaBuscar = ultimaCidadeBuscada.current || formDataEmpresa.cidade.trim()
+        if (nomeCidadeParaBuscar) {
+          const encontrou = await buscarCodigoIbge(nomeCidadeParaBuscar, formDataEmpresa.estado)
+          if (!encontrou) {
+            console.warn('Cidade válida mas código IBGE não encontrado:', nomeCidadeParaBuscar)
+          }
         }
       }
     }
+
+    // Verificar novamente o código IBGE antes de salvar
+    // Se ainda não temos código IBGE mas temos cidade e estado, tentar buscar uma última vez
+    // Usar a ref para verificar o valor atual
+    if (formDataEmpresa.cidade && formDataEmpresa.estado && !codigoCidadeIbgeRef.current) {
+      const nomeCidadeParaBuscar = ultimaCidadeBuscada.current || formDataEmpresa.cidade.trim()
+      if (nomeCidadeParaBuscar) {
+        console.log('Buscando código IBGE antes de salvar:', nomeCidadeParaBuscar, formDataEmpresa.estado)
+        await buscarCodigoIbge(nomeCidadeParaBuscar, formDataEmpresa.estado)
+      }
+    }
+
+    console.log('Salvando com código IBGE (estado):', codigoCidadeIbge, 'Ref:', codigoCidadeIbgeRef.current, 'Cidade:', ultimaCidadeBuscada.current || formDataEmpresa.cidade)
 
     setIsSaving(true)
     const toastId = showToast.loading('Salvando configurações...')
@@ -257,8 +337,12 @@ export function ConfiguracaoEmpresaCompleta() {
           numero: formDataEmpresa.numero.trim() || undefined,
           complemento: formDataEmpresa.complemento.trim() || undefined,
           bairro: formDataEmpresa.bairro.trim() || undefined,
-          cidade: formDataEmpresa.cidade.trim() || undefined,
+          // SEMPRE usar ultimaCidadeBuscada (nome oficial) se disponível, senão usar o valor do formulário
+          cidade: (ultimaCidadeBuscada.current || formDataEmpresa.cidade.trim()) || undefined,
           estado: formDataEmpresa.estado.toUpperCase() || undefined,
+          // IMPORTANTE: Incluir código IBGE - usar a ref para garantir valor atualizado
+          // A ref sempre terá o valor mais recente, mesmo em closures
+          codigoCidadeIbge: codigoCidadeIbgeRef.current || undefined,
         },
       }
 
@@ -319,6 +403,76 @@ export function ConfiguracaoEmpresaCompleta() {
       showToast.errorLoading(toastId, error.message || 'Erro ao salvar configurações')
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  // Função para buscar código IBGE da cidade
+  // Retorna true se encontrou a cidade e código IBGE, false caso contrário
+  const buscarCodigoIbge = async (nomeCidade: string, uf: string): Promise<boolean> => {
+    if (!nomeCidade || !uf) {
+      atualizarCodigoIbge(null)
+      ultimaCidadeBuscada.current = ''
+      return false
+    }
+
+    // Evitar buscar novamente se já foi buscado para este valor
+    if (ultimaCidadeBuscada.current === nomeCidade && codigoCidadeIbgeRef.current) {
+      return true
+    }
+
+    // Marcar que está buscando este valor
+    ultimaCidadeBuscada.current = nomeCidade
+
+    try {
+      // Buscar lista de municípios do estado
+      const response = await fetch(`/api/v1/ibge/municipios?uf=${uf}`)
+      if (response.ok) {
+        const data = await response.json()
+        const municipios = data.municipios || []
+        
+        // Normalizar nome da cidade para comparação (remover acentos, converter para minúsculas)
+        const normalizar = (str: string) => 
+          str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+        
+        const cidadeNormalizada = normalizar(nomeCidade.trim())
+        
+        // Buscar município correspondente
+        const municipio = municipios.find((m: any) => 
+          normalizar(m.nomeCidade) === cidadeNormalizada
+        )
+        
+        if (municipio && municipio.codigoCidadeIbge) {
+          console.log('✅ Código IBGE encontrado na lista:', municipio.codigoCidadeIbge, 'para', nomeCidade, uf)
+          atualizarCodigoIbge(municipio.codigoCidadeIbge)
+          return true
+        } else {
+          // Se não encontrou na lista, tentar via API de validação
+          const validacaoResponse = await fetch(
+            `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(nomeCidade.trim())}&uf=${uf}`
+          )
+          if (validacaoResponse.ok) {
+            const validacaoData = await validacaoResponse.json()
+            if (validacaoData.codigoCidadeIbge) {
+              console.log('✅ Código IBGE encontrado via API:', validacaoData.codigoCidadeIbge, 'para', nomeCidade, uf)
+              atualizarCodigoIbge(validacaoData.codigoCidadeIbge)
+              return true
+            } else {
+              atualizarCodigoIbge(null)
+              return false
+            }
+          } else {
+            atualizarCodigoIbge(null)
+            return false
+          }
+        }
+      } else {
+        atualizarCodigoIbge(null)
+        return false
+      }
+    } catch (error) {
+      console.error('Erro ao buscar código IBGE:', error)
+      atualizarCodigoIbge(null)
+      return false
     }
   }
 
@@ -491,10 +645,32 @@ export function ConfiguracaoEmpresaCompleta() {
                 <Label htmlFor="estado">Estado (UF) *</Label>
                 <Select
                   value={formDataEmpresa.estado}
-                  onValueChange={(value) => {
-                    // Limpa a cidade ao trocar o estado para evitar inconsistência
-                    setFormDataEmpresa({ ...formDataEmpresa, estado: value, cidade: '' })
+                  onValueChange={async (value) => {
+                    // Limpa código IBGE ao trocar o estado
+                    const cidadeAnterior = formDataEmpresa.cidade
+                    atualizarCodigoIbge(null) // Limpar estado e ref
+                    ultimaCidadeBuscada.current = ''
                     setCidadeValida(null)
+                    
+                    // Se havia uma cidade preenchida antes, tentar buscar código IBGE para o novo estado
+                    // Se encontrar, manter a cidade; se não encontrar, limpar
+                    if (cidadeAnterior && cidadeAnterior.trim()) {
+                      // Aguardar um pouco para garantir que o estado foi atualizado
+                      await new Promise(resolve => setTimeout(resolve, 100))
+                      // Tentar buscar código IBGE da cidade no novo estado
+                      const encontrou = await buscarCodigoIbge(cidadeAnterior.trim(), value)
+                      if (encontrou) {
+                        // Cidade existe no novo estado, manter ela
+                        setFormDataEmpresa({ ...formDataEmpresa, estado: value })
+                        setCidadeValida(true)
+                      } else {
+                        // Cidade não existe no novo estado, limpar
+                        setFormDataEmpresa({ ...formDataEmpresa, estado: value, cidade: '' })
+                      }
+                    } else {
+                      // Não havia cidade, apenas atualizar estado
+                      setFormDataEmpresa({ ...formDataEmpresa, estado: value })
+                    }
                   }}
                   required
                 >
@@ -514,15 +690,79 @@ export function ConfiguracaoEmpresaCompleta() {
               <div className="space-y-2">
                 <CidadeAutocomplete
                   value={formDataEmpresa.cidade}
-                  onChange={(cidade) =>
+                  onChange={(cidade) => {
+                    // Atualizar estado quando cidade é alterada (digitada ou selecionada)
+                    // IMPORTANTE: Se a cidade corresponde a ultimaCidadeBuscada, significa que
+                    // foi selecionada da lista e não devemos limpar o código IBGE
+                    const foiSelecionadaDaLista = ultimaCidadeBuscada.current && 
+                      ultimaCidadeBuscada.current.trim().toLowerCase() === cidade.trim().toLowerCase()
+                    
+                    console.log('onChange chamado:', cidade, 'foiSelecionadaDaLista:', foiSelecionadaDaLista, 'codigoCidadeIbge atual:', codigoCidadeIbge)
+                    
                     setFormDataEmpresa({ ...formDataEmpresa, cidade })
-                  }
+                    
+                    // Se a cidade foi apenas digitada (não selecionada da lista) ou foi limpa,
+                    // limpar código IBGE para forçar busca quando for validada/selecionada
+                    if (!cidade) {
+                      // Campo foi limpo
+                      console.log('Campo limpo, removendo código IBGE')
+                      atualizarCodigoIbge(null)
+                      ultimaCidadeBuscada.current = ''
+                    } else if (!foiSelecionadaDaLista && cidade.trim().toLowerCase() !== ultimaCidadeBuscada.current?.trim().toLowerCase()) {
+                      // Se o usuário está digitando algo diferente do nome oficial,
+                      // E não temos código IBGE ainda (ou seja, não foi selecionado da lista),
+                      // limpar código IBGE (será buscado novamente quando validar/selecionar)
+                      // IMPORTANTE: Só limpar se NÃO temos código IBGE, porque se temos,
+                      // significa que uma cidade foi selecionada e o onChange está apenas
+                      // atualizando o campo após a seleção
+                      if (!codigoCidadeIbge) {
+                        console.log('Usuário digitando cidade diferente, mas sem código IBGE - não limpar')
+                        // Não limpar - pode ser que o usuário esteja apenas editando
+                      }
+                      // Mas NÃO limpar ultimaCidadeBuscada ainda - pode ser que o usuário
+                      // esteja apenas editando e depois vai selecionar da lista
+                    } else if (foiSelecionadaDaLista) {
+                      // Cidade foi selecionada da lista - manter código IBGE
+                      console.log('Cidade corresponde à selecionada da lista - mantendo código IBGE')
+                    }
+                  }}
                   estado={formDataEmpresa.estado}
                   label="Cidade"
                   placeholder="Digite o nome da cidade"
                   required={false}
                   disabled={!formDataEmpresa.estado}
-                  onValidationChange={setCidadeValida}
+                  onCidadeSelecionada={(nomeCidade, codigoIbge) => {
+                    // Quando uma cidade é selecionada da lista, armazenar código IBGE imediatamente
+                    // e garantir que o estado do formulário seja atualizado com o nome oficial
+                    // IMPORTANTE: Isso acontece ANTES de qualquer validação, garantindo que
+                    // o nome oficial seja usado em todas as validações subsequentes
+                    console.log('✅ Cidade selecionada da lista:', nomeCidade, 'Código IBGE:', codigoIbge)
+                    atualizarCodigoIbge(codigoIbge)
+                    ultimaCidadeBuscada.current = nomeCidade
+                    setCidadeValida(true)
+                    // Atualizar o estado do formulário com o nome oficial da cidade selecionada
+                    // Isso garante que formDataEmpresa.cidade tenha o valor correto IMEDIATAMENTE
+                    setFormDataEmpresa((prev) => ({ ...prev, cidade: nomeCidade }))
+                  }}
+                  onValidationChange={async (isValid) => {
+                    // IMPORTANTE: Se já temos código IBGE, significa que uma cidade foi selecionada
+                    // da lista e não devemos fazer nada aqui (já foi tratado em onCidadeSelecionada)
+                    if (codigoCidadeIbgeRef.current) {
+                      // Cidade já foi selecionada da lista, não fazer nada
+                      return
+                    }
+                    
+                    setCidadeValida(isValid)
+                    // Se validou como true e não tem código IBGE ainda, buscar
+                    // Isso cobre o caso de validação via API (quando usuário digita e perde foco)
+                    // Mas usar ultimaCidadeBuscada se disponível (nome oficial)
+                    if (isValid && formDataEmpresa.estado) {
+                      const nomeCidadeParaBuscar = ultimaCidadeBuscada.current || formDataEmpresa.cidade?.trim()
+                      if (nomeCidadeParaBuscar) {
+                        await buscarCodigoIbge(nomeCidadeParaBuscar, formDataEmpresa.estado)
+                      }
+                    }
+                  }}
                 />
               </div>
             </div>
