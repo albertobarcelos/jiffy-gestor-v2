@@ -11,7 +11,7 @@ import { showToast } from '@/src/shared/utils/toast'
 
 export function Etapa1DadosFiscaisEmpresa() {
   const { addTab } = useTabsStore()
-  const { auth, isRehydrated } = useAuthStore()
+  const { isRehydrated } = useAuthStore()
   const [certificado, setCertificado] = useState<any>(null)
   const [isLoadingCertificado, setIsLoadingCertificado] = useState(true)
   const [showUploadModal, setShowUploadModal] = useState(false)
@@ -20,14 +20,9 @@ export function Etapa1DadosFiscaisEmpresa() {
 
   // Busca dados do certificado
   const loadCertificado = useCallback(async () => {
-    const token = auth?.getAccessToken()
-    if (!token) return
-
     setIsLoadingCertificado(true)
     try {
-      const response = await fetch('/api/certificado', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const response = await fetch('/api/certificado')
       
       const result = await response.json()
       
@@ -45,7 +40,7 @@ export function Etapa1DadosFiscaisEmpresa() {
     } finally {
       setIsLoadingCertificado(false)
     }
-  }, [auth])
+  }, [])
 
   useEffect(() => {
     if (isRehydrated) {
@@ -81,27 +76,13 @@ export function Etapa1DadosFiscaisEmpresa() {
   const handleConfirmRemover = async () => {
     if (!certificado) return
 
-    const token = auth?.getAccessToken()
-    if (!token) {
-      showToast.error('Sessão expirada. Faça login novamente.')
-      setShowConfirmModal(false)
-      return
-    }
-
     setIsRemoving(true)
     const toastId = showToast.loading('Removendo certificado...')
 
     try {
-      // UF não é mais necessária - uma empresa tem apenas UMA configuração por ambiente
-      const response = await fetch(
-        `/api/certificado?ambiente=${certificado.ambiente}`,
-        {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      )
+      const response = await fetch('/api/certificado', {
+        method: 'DELETE',
+      })
 
       if (!response.ok) {
         const error = await response.json()

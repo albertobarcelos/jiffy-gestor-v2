@@ -2,9 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 
+type ApiErrorData = {
+  message?: string
+  error?: string
+  codigo?: string
+  codigoErro?: string
+  codigoRejeicao?: string
+  categoria?: string
+}
+
 /**
- * POST /api/vendas/gestor/[id]/emitir-nota
- * Emite nota fiscal (NFC-e ou NF-e) para uma venda do gestor
+ * POST /api/vendas/[id]/reemitir
+ * Reemite nota fiscal para uma venda PDV rejeitada
  */
 export async function POST(
   request: NextRequest,
@@ -26,7 +35,7 @@ export async function POST(
     const apiClient = new ApiClient()
 
     const response = await apiClient.request<any>(
-      `/api/v1/gestor/vendas/${id}/emitir-nota`,
+      `/api/v1/operacao-pdv/vendas/${id}/reemitir`,
       {
         method: 'POST',
         headers: {
@@ -40,8 +49,18 @@ export async function POST(
     return NextResponse.json(response.data || {}, { status: response.status })
   } catch (error) {
     if (error instanceof ApiError) {
+      const errorData =
+        error.data && typeof error.data === 'object'
+          ? (error.data as ApiErrorData)
+          : {}
+
       return NextResponse.json(
-        { error: error.message || 'Erro ao emitir nota fiscal' },
+        {
+          error: error.message || errorData.message || errorData.error || 'Erro ao reemitir nota fiscal',
+          codigo: errorData.codigo ?? errorData.codigoErro ?? null,
+          codigoRejeicao: errorData.codigoRejeicao ?? null,
+          categoria: errorData.categoria ?? null,
+        },
         { status: error.status }
       )
     }

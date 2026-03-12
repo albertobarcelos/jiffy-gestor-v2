@@ -6,7 +6,6 @@ import { showToast } from '@/src/shared/utils/toast'
 import { ConfigurarNcmModal } from './ConfigurarNcmModal'
 import { HistoricoConfiguracaoNcmModal } from './HistoricoConfiguracaoNcmModal'
 import { CopiarConfiguracaoNcmModal } from './CopiarConfiguracaoNcmModal'
-import { extractTokenInfo } from '@/src/shared/utils/validateToken'
 
 interface ConfiguracaoImpostoNcm {
   ncm?: {
@@ -27,6 +26,40 @@ interface ConfiguracaoImpostoNcm {
   cofins?: {
     cst?: string
     aliquota?: number
+  }
+}
+
+function mapNcmToConfiguracaoImposto(item: unknown): ConfiguracaoImpostoNcm | null {
+  if (!item || typeof item !== 'object') return null
+
+  const itemData = item as {
+    codigo?: string
+    descricao?: string
+    impostos?: {
+      cfop?: string
+      csosn?: string
+      icms?: ConfiguracaoImpostoNcm['icms']
+      pis?: ConfiguracaoImpostoNcm['pis']
+      cofins?: ConfiguracaoImpostoNcm['cofins']
+    }
+  }
+
+  if (!itemData.codigo) return null
+
+  // NCM sem configuração de impostos também deve aparecer na listagem
+  // para permitir configuração manual pela UI.
+  const impostos = itemData.impostos ?? {}
+
+  return {
+    ncm: {
+      codigo: itemData.codigo,
+      descricao: itemData.descricao,
+    },
+    cfop: impostos.cfop,
+    csosn: impostos.csosn,
+    icms: impostos.icms,
+    pis: impostos.pis,
+    cofins: impostos.cofins,
   }
 }
 
@@ -51,37 +84,24 @@ export function MapearProdutosView() {
       if (!token) return
 
       try {
-        const tokenInfo = extractTokenInfo(token)
-        const empresaId = tokenInfo?.empresaId
-        if (!empresaId) return
-
-        // Segurança: empresaId é extraído do JWT pelo backend
-        const response = await fetch(`/api/v1/fiscal/empresas-fiscais/me/todas`, {
+        const response = await fetch('/api/v1/fiscal/empresas-fiscais/me', {
           headers: { Authorization: `Bearer ${token}` },
         })
 
         if (response.ok) {
-          const configs = await response.json()
-          if (configs && configs.length > 0) {
-            const codigoRegime = configs[0].codigoRegimeTributario
-            // Garantir que seja número (pode vir como string da API)
-            const regimeNumero = typeof codigoRegime === 'string' 
-              ? parseInt(codigoRegime, 10) 
+          const config = await response.json()
+          const codigoRegime = config?.codigoRegimeTributario
+          const regimeNumero =
+            typeof codigoRegime === 'string'
+              ? parseInt(codigoRegime, 10)
               : codigoRegime
-            // Validar se é um número válido (1, 2 ou 3)
-            if (regimeNumero === 1 || regimeNumero === 2 || regimeNumero === 3) {
-              console.log('[MapearProdutosView] Regime tributário carregado:', regimeNumero)
-              setRegimeTributario(regimeNumero)
-            } else {
-              console.warn('[MapearProdutosView] Regime tributário inválido:', codigoRegime, 'usando default: 1')
-              setRegimeTributario(1) // Default: Simples Nacional
-            }
+
+          if (regimeNumero === 1 || regimeNumero === 2 || regimeNumero === 3) {
+            setRegimeTributario(regimeNumero)
           } else {
-            console.warn('[MapearProdutosView] Nenhuma configuração encontrada, usando default: 1')
             setRegimeTributario(1) // Default: Simples Nacional
           }
         } else {
-          console.warn('[MapearProdutosView] Erro ao buscar regime tributário, usando default: 1')
           setRegimeTributario(1) // Default: Simples Nacional
         }
       } catch (error) {
@@ -115,7 +135,7 @@ export function MapearProdutosView() {
 
     setIsLoading(true)
     try {
-      const response = await fetch('/api/v1/fiscal/configuracoes/ncms/impostos', {
+      const response = await fetch('/api/v1/fiscal/configuracoes/ncms?page=0&size=1000', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -127,7 +147,12 @@ export function MapearProdutosView() {
       }
 
       const result = await response.json()
-      setConfiguracoesImpostos(result || [])
+      const content: unknown[] = Array.isArray(result?.content) ? result.content : []
+      const configuracoes = content
+        .map(mapNcmToConfiguracaoImposto)
+        .filter((item: ConfiguracaoImpostoNcm | null): item is ConfiguracaoImpostoNcm => item !== null)
+
+      setConfiguracoesImpostos(configuracoes)
     } catch (error: any) {
       console.error('Erro ao carregar configurações:', error)
       showToast.error(error.message || 'Erro ao carregar configurações de impostos')

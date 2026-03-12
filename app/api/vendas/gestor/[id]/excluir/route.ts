@@ -3,10 +3,10 @@ import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 
 /**
- * POST /api/vendas/gestor/[id]/emitir-nota
- * Emite nota fiscal (NFC-e ou NF-e) para uma venda do gestor
+ * DELETE /api/vendas/gestor/[id]/excluir
+ * Exclui definitivamente uma venda do gestor quando não há documento fiscal autorizado.
  */
-export async function POST(
+export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -15,33 +15,27 @@ export async function POST(
     if (!validation.valid || !validation.tokenInfo) {
       return validation.error!
     }
-    const { tokenInfo } = validation
 
     const { id } = await params
     if (!id) {
       return NextResponse.json({ error: 'ID da venda é obrigatório' }, { status: 400 })
     }
 
-    const body = await request.json()
     const apiClient = new ApiClient()
+    const response = await apiClient.request<any>(`/api/v1/gestor/vendas/${id}/excluir`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${validation.tokenInfo.token}`,
+        'Content-Type': 'application/json',
+      },
+    })
 
-    const response = await apiClient.request<any>(
-      `/api/v1/gestor/vendas/${id}/emitir-nota`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${tokenInfo.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      }
-    )
-
-    return NextResponse.json(response.data || {}, { status: response.status })
+    return NextResponse.json(response.data || { message: 'Venda excluída com sucesso' }, { status: 200 })
   } catch (error) {
+    console.error('Erro ao excluir venda gestor:', error)
     if (error instanceof ApiError) {
       return NextResponse.json(
-        { error: error.message || 'Erro ao emitir nota fiscal' },
+        { error: error.message || 'Erro ao excluir venda' },
         { status: error.status }
       )
     }
