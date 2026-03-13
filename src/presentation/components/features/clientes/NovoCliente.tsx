@@ -448,12 +448,10 @@ export function NovoCliente({
         ativo,
       }
 
-      // CPF e CNPJ: sempre envia se tiver valor, ou string vazia se estiver editando
-      // Isso garante que o campo seja atualizado mesmo que vazio
+      // CPF e CNPJ: lógica diferente para criação e edição
       if (isEditing) {
         // Em edição, sempre envia CPF e CNPJ (mesmo vazios) para garantir atualização
-        // IMPORTANTE: Envia string vazia explicitamente, não undefined
-        // Garante que o campo sempre exista no body, mesmo que vazio
+        // String vazia será convertida para null no repositório para limpar o valor na API externa
         body.cpf = cpfLimpo || ''
         body.cnpj = cnpjLimpo || ''
       } else {

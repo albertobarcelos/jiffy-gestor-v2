@@ -152,14 +152,23 @@ export class ClienteRepository implements IClienteRepository {
       if (data.nome) requestBody.nome = data.nome
       if (data.razaoSocial !== undefined) requestBody.razaoSocial = data.razaoSocial || ''
       
-      // CPF e CNPJ: só envia se tiver valor (não vazio)
-      // A API externa valida que se o campo está presente, não pode ser vazio
-      // Portanto, omitimos o campo completamente se for string vazia
-      if (data.cpf !== undefined && data.cpf !== null && data.cpf.trim() !== '') {
-        requestBody.cpf = data.cpf
+      // CPF e CNPJ: 
+      // - Se o campo estiver presente no DTO e for string vazia, envia null (para limpar/apagar)
+      // - Se o campo estiver presente e tiver valor, envia o valor
+      // - Se o campo não estiver presente, não envia (omitir - não atualiza)
+      if ('cpf' in data) {
+        if (data.cpf === null || (typeof data.cpf === 'string' && data.cpf.trim() === '')) {
+          requestBody.cpf = null
+        } else if (data.cpf) {
+          requestBody.cpf = data.cpf
+        }
       }
-      if (data.cnpj !== undefined && data.cnpj !== null && data.cnpj.trim() !== '') {
-        requestBody.cnpj = data.cnpj
+      if ('cnpj' in data) {
+        if (data.cnpj === null || (typeof data.cnpj === 'string' && data.cnpj.trim() === '')) {
+          requestBody.cnpj = null
+        } else if (data.cnpj) {
+          requestBody.cnpj = data.cnpj
+        }
       }
       
       if (data.telefone !== undefined) requestBody.telefone = data.telefone || ''
