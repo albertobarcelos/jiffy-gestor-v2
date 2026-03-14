@@ -496,7 +496,7 @@ export function ConfiguracaoEmpresaCompleta() {
   return (
     <div className="w-full px-6 pt-6 pb-4">
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 px-6 pt-6 pb-4">
-        <h2 className="text-2xl font-bold text-primary mb-6">Configuração Completa da Empresa</h2>
+        <h2 className="text-2xl font-bold text-alternate mb-6">Configuração Completa da Empresa</h2>
         
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Seção: Dados da Empresa */}
@@ -517,6 +517,7 @@ export function ConfiguracaoEmpresaCompleta() {
                   }}
                   placeholder="00.000.000/0000-00"
                   required
+                  size="small"
                 />
               </div>
 
@@ -530,6 +531,7 @@ export function ConfiguracaoEmpresaCompleta() {
                   }
                   placeholder="Nome da empresa"
                   required
+                  size="small"
                 />
               </div>
 
@@ -542,6 +544,7 @@ export function ConfiguracaoEmpresaCompleta() {
                     setFormDataEmpresa({ ...formDataEmpresa, nomeFantasia: e.target.value })
                   }
                   placeholder="Nome fantasia"
+                  size="small"
                 />
               </div>
 
@@ -555,6 +558,7 @@ export function ConfiguracaoEmpresaCompleta() {
                     setFormDataEmpresa({ ...formDataEmpresa, email: e.target.value })
                   }
                   placeholder="email@empresa.com"
+                  size="small"
                 />
               </div>
 
@@ -568,6 +572,7 @@ export function ConfiguracaoEmpresaCompleta() {
                     setFormDataEmpresa({ ...formDataEmpresa, telefone: value })
                   }}
                   placeholder="(00) 00000-0000"
+                  size="small"
                 />
               </div>
             </div>
@@ -590,6 +595,7 @@ export function ConfiguracaoEmpresaCompleta() {
                     setFormDataEmpresa({ ...formDataEmpresa, cep: value })
                   }}
                   placeholder="00000-000"
+                  size="small"
                 />
               </div>
 
@@ -602,6 +608,7 @@ export function ConfiguracaoEmpresaCompleta() {
                     setFormDataEmpresa({ ...formDataEmpresa, rua: e.target.value })
                   }
                   placeholder="Nome da rua"
+                  size="small"
                 />
               </div>
 
@@ -614,6 +621,7 @@ export function ConfiguracaoEmpresaCompleta() {
                     setFormDataEmpresa({ ...formDataEmpresa, numero: e.target.value })
                   }
                   placeholder="123"
+                  size="small"
                 />
               </div>
 
@@ -626,6 +634,7 @@ export function ConfiguracaoEmpresaCompleta() {
                     setFormDataEmpresa({ ...formDataEmpresa, complemento: e.target.value })
                   }
                   placeholder="Apto, Sala, etc."
+                  size="small"
                 />
               </div>
 
@@ -638,6 +647,7 @@ export function ConfiguracaoEmpresaCompleta() {
                     setFormDataEmpresa({ ...formDataEmpresa, bairro: e.target.value })
                   }
                   placeholder="Nome do bairro"
+                  size="small"
                 />
               </div>
 
@@ -674,7 +684,7 @@ export function ConfiguracaoEmpresaCompleta() {
                   }}
                   required
                 >
-                  <SelectTrigger id="estado">
+                  <SelectTrigger id="estado" className="h-10">
                     <SelectValue placeholder="Selecione o estado" />
                   </SelectTrigger>
                   <SelectContent>
@@ -811,6 +821,7 @@ export function ConfiguracaoEmpresaCompleta() {
                   inputProps={{ maxLength: 15 }}
                   disabled={formDataFiscal.isento}
                   required={!formDataFiscal.isento}
+                  size="small"
                 />
               </div>
 
@@ -825,6 +836,7 @@ export function ConfiguracaoEmpresaCompleta() {
                     setFormDataFiscal({ ...formDataFiscal, inscricaoMunicipal: value })
                   }}
                   placeholder="987654"
+                  size="small"
                 />
               </div>
 
@@ -837,7 +849,7 @@ export function ConfiguracaoEmpresaCompleta() {
                     setFormDataFiscal({ ...formDataFiscal, codigoRegimeTributario: value as '1' | '2' | '3' })
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

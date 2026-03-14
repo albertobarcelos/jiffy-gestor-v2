@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
-
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000'
+import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 
 /**
  * POST /api/v1/fiscal/configuracoes/ncms/[codigo]/impostos/copiar
@@ -33,36 +32,34 @@ export async function POST(
       )
     }
 
-    const response = await fetch(
-      `${BACKEND_URL}/api/v1/fiscal/configuracoes/ncms/${codigo}/impostos/copiar`,
+    const apiClient = new ApiClient()
+    const response = await apiClient.request<any[]>(
+      `/api/v1/fiscal/configuracoes/ncms/${codigo}/impostos/copiar`,
       {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${tokenInfo.token}`,
-          'Content-Type': 'application/json',
         },
         body: JSON.stringify(body),
       }
     )
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => '')
-      let errorData: any = {}
-      try {
-        errorData = errorText ? JSON.parse(errorText) : {}
-      } catch {
-        errorData = { message: errorText || `Erro ${response.status}` }
-      }
-      return NextResponse.json(
-        { error: errorData.message || errorData.error || 'Erro ao copiar configuração' },
-        { status: response.status }
-      )
-    }
-
-    const data = await response.json()
-    return NextResponse.json(data || [])
+    return NextResponse.json(response.data || [])
   } catch (error) {
     console.error('Erro ao copiar configuração:', error)
+    
+    // Se for timeout, retorna array vazio ao invés de erro para não quebrar a UI
+    if (error instanceof ApiError) {
+      if (error.status === 504 && error.data && typeof error.data === 'object' && 'timeout' in error.data) {
+        console.warn('Timeout ao copiar configuração - retornando array vazio')
+        return NextResponse.json([], { status: 200 })
+      }
+      return NextResponse.json(
+        { error: error.message || 'Erro ao copiar configuração' },
+        { status: error.status }
+      )
+    }
+    
     return NextResponse.json(
       { error: 'Erro interno do servidor' },
       { status: 500 }

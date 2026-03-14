@@ -256,20 +256,20 @@ export function MapearProdutosView() {
 
       <div className="flex flex-col h-full w-full p-6 bg-info">
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-secondary-text mb-2">
+          <h2 className="text-2xl font-bold text-alternate mb-2">
             Configurações de Impostos por NCM
           </h2>
-          <p className="text-sm text-secondary-text/70">
+          <p className="text-sm text-secondary-text">
             Configure impostos por NCM. Uma configuração vale para todos os produtos com o mesmo NCM.
           </p>
         </div>
 
         {configuracoesImpostos.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
-            <p className="text-secondary-text/70 mb-4">
+            <p className="text-alternate mb-4">
               Nenhuma configuração de impostos cadastrada ainda.
             </p>
-            <p className="text-sm text-secondary-text/50">
+            <p className="text-sm text-alternate">
               As configurações aparecerão aqui quando forem criadas.
             </p>
           </div>
@@ -278,34 +278,36 @@ export function MapearProdutosView() {
             <div className="bg-white rounded-lg shadow-sm border border-secondary/10">
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-secondary/5">
+                  <thead className="bg-alternate/10">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-secondary-text uppercase">
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-alternate uppercase">
                         NCM
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-secondary-text uppercase">
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-alternate uppercase">
                         CFOP
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-secondary-text uppercase">
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-alternate uppercase">
                         CSOSN/CST
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-secondary-text uppercase">
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-alternate uppercase">
                         PIS/COFINS
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-secondary-text uppercase">
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-alternate uppercase">
                         Alíquota ICMS (%)
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-secondary-text uppercase">
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-alternate uppercase">
                         Ações
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-secondary/10">
+                  <tbody className="">
                     {configuracoesImpostos.map((config, index) => (
                       <tr
                         key={config.ncm?.codigo || index}
                         onDoubleClick={() => handleDoubleClick(config)}
-                        className="hover:bg-secondary/5 cursor-pointer transition-colors"
+                        className={`hover:bg-alternate/10 cursor-pointer transition-colors ${
+                          index % 2 === 0 ? 'bg-white' : 'bg-alternate/5'
+                        }`}
                       >
                         <td className="px-4 py-3 text-sm text-secondary-text font-mono">
                           {config.ncm?.codigo || '--'}

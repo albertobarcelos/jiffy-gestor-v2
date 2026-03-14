@@ -341,9 +341,9 @@ export function ConfigurarNcmModal({
         }}
       >
         <div style={{ padding: '24px 24px 16px 24px', flexShrink: 0 }}>
-          <DialogTitle>
+          <h1 className="text-alternate font-exo font-bold text-lg sm:text-xl">
             {configuracaoImposto ? 'Editar Configuração de Impostos por NCM' : 'Nova Configuração de Impostos por NCM'}
-          </DialogTitle>
+          </h1>
         </div>
 
         <div 
@@ -370,6 +370,7 @@ export function ConfigurarNcmModal({
               inputProps={{ maxLength: 8 }}
               required
               disabled={!!configuracaoImposto}
+              size="small"
             />
             <p className="text-xs text-secondary-text/70">8 dígitos</p>
           </div>
@@ -386,6 +387,7 @@ export function ConfigurarNcmModal({
                 }}
                 placeholder="5102"
                 inputProps={{ maxLength: 4 }}
+                size="small"
               />
               <p className="text-xs text-secondary-text/70">4 dígitos</p>
             </div>
@@ -407,7 +409,7 @@ export function ConfigurarNcmModal({
                     setFormData({ ...formData, csosn: value, icmsCst: '' })
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10">
                     <SelectValue placeholder="Selecione o CSOSN" />
                   </SelectTrigger>
                   <SelectContent>
@@ -431,7 +433,7 @@ export function ConfigurarNcmModal({
                     setFormData({ ...formData, icmsCst: value, csosn: '' })
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10">
                     <SelectValue placeholder="Selecione o CST" />
                   </SelectTrigger>
                   <SelectContent>
@@ -461,6 +463,7 @@ export function ConfigurarNcmModal({
                   setFormData({ ...formData, icmsAliquota: e.target.value })
                 }
                 placeholder="18.00"
+                size="small"
               />
             </div>
             <div className="space-y-2">
@@ -477,7 +480,7 @@ export function ConfigurarNcmModal({
                   setFormData({ ...formData, pisCst: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-10">
                   <SelectValue placeholder="Selecione o CST PIS" />
                 </SelectTrigger>
                 <SelectContent>
@@ -501,6 +504,7 @@ export function ConfigurarNcmModal({
                   setFormData({ ...formData, pisAliquota: e.target.value })
                 }
                 placeholder="1.65"
+                size="small"
               />
             </div>
           </div>
@@ -514,7 +518,7 @@ export function ConfigurarNcmModal({
                   setFormData({ ...formData, cofinsCst: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-10">
                   <SelectValue placeholder="Selecione o CST COFINS" />
                 </SelectTrigger>
                 <SelectContent>
@@ -538,6 +542,7 @@ export function ConfigurarNcmModal({
                   setFormData({ ...formData, cofinsAliquota: e.target.value })
                 }
                 placeholder="7.60"
+                size="small"
               />
             </div>
           </div>
@@ -551,6 +556,14 @@ export function ConfigurarNcmModal({
             variant="outlined"
             onClick={onClose}
             disabled={isLoading}
+            sx={{
+              backgroundColor: 'rgba(131, 56, 236, 0.1)',
+              color: 'var(--color-alternate)',
+              borderColor: 'var(--color-alternate)',
+              '&:hover': { 
+                backgroundColor: 'rgba(131, 56, 236, 0.2)' 
+              },
+            }}
           >
             Cancelar
           </Button>
@@ -564,6 +577,13 @@ export function ConfigurarNcmModal({
               }
             }}
             disabled={isLoading}
+            sx={{
+              backgroundColor: 'var(--color-alternate)',
+              color: '#ffffff',
+              '&:hover': { 
+                backgroundColor: 'rgba(131, 56, 236, 0.8)' 
+              },
+            }}
           >
             {isLoading ? 'Salvando...' : 'Salvar'}
           </Button>

@@ -8,7 +8,6 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { MapearProdutosView } from './MapearProdutosView'
 import { Etapa1DadosFiscaisEmpresa } from './Etapa1DadosFiscaisEmpresa'
 import { Etapa3EmissorFiscal } from './Etapa2EmissorFiscal'
-import { Etapa4CenarioFiscal } from './Etapa3CenarioFiscal'
 import { Etapa5NumeracoesFiscais } from './Etapa5NumeracoesFiscais'
 import { Etapa5TabelaIbpt } from './Etapa4TabelaIbpt'
 import { ConfiguracaoEmpresaCompleta } from './ConfiguracaoEmpresaCompleta'
@@ -69,6 +68,7 @@ export function PainelContadorView() {
   const etapas = [
     {
       id: 'etapa-1-dados-fiscais',
+      step: 1,
       title: 'Dados Fiscais e Certificado Digital',
       label: 'Dados Fiscais e Certificado Digital',
       path: '/painel-contador/etapa/dados-fiscais',
@@ -77,6 +77,7 @@ export function PainelContadorView() {
     },
     {
       id: 'etapa-2-emissor-fiscal',
+      step: 2,
       title: 'Emissor Fiscal',
       label: 'Emissor Fiscal',
       path: '/painel-contador/etapa/emissor-fiscal',
@@ -85,14 +86,16 @@ export function PainelContadorView() {
     },
     {
       id: 'etapa-3-cenario-fiscal',
-      title: 'Cenário Fiscal',
-      label: 'Cenário Fiscal',
+      step: 3,
+      title: 'Cenário Fiscal (NCMs)',
+      label: 'Cenário Fiscal (NCMs)',
       path: '/painel-contador/etapa/cenario-fiscal',
-      component: Etapa4CenarioFiscal,
+      component: MapearProdutosView,
       icon: MdAssessment,
     },
     {
       id: 'etapa-4-numeracoes-fiscais',
+      step: 4,
       title: 'Numerações Fiscais',
       label: 'Numerações Fiscais',
       path: '/painel-contador/etapa/numeracoes-fiscais',
@@ -101,6 +104,7 @@ export function PainelContadorView() {
     },
     {
       id: 'etapa-5-tabela-ibpt',
+      step: 5,
       title: 'Tabela IBPT',
       label: 'Tabela IBPT',
       path: '/painel-contador/etapa/tabela-ibpt',
@@ -165,18 +169,18 @@ export function PainelContadorView() {
       <div className="flex min-h-[350px] flex-1 md:w-[70%] lg:w-[72%] w-full flex-col overflow-hidden rounded-tr-none rounded-br-none bg-secondary lg:h-full lg:rounded-tr-[48px] lg:rounded-br-[48px]">
         {/* Seção Superior com Título e Ilustração */}
         <div className="flex flex-col gap-3 sm:gap-4 lg:gap-6 border-b border-[#330468] bg-[rgba(131,56,236,0.4)] sm:rounded-tr-[24px] md:rounded-tr-[32px] lg:rounded-tr-[48px] p-3 sm:p-4">
-          <div className="flex flex-row items-center gap-4 sm:gap-6">
+          <div className="flex flex-row items-center justify-center gap-4 sm:gap-16">
             {/* Ilustração */}
-            <div className="flex-shrink-0 w-[30%] sm:w-[35%] md:w-[38%] lg:w-[280px] max-w-[319px] aspect-square">
+            <div className="flex  aspect-square">
               <img
                 src="/images/jiffy-contador.png"
                 alt="Jiffy Contador"
-                className="h-full w-full p-2 object-contain object-left-top"
+                className="w-64 h-64 p-2 object-contain object-left-top"
               />
             </div>
 
             {/* Título e infos */}
-            <div className="flex-1 flex flex-col gap-3 sm:gap-4">
+            <div className=" flex flex-col gap-3 sm:gap-4">
               <h1 className="font-manrope font-bold text-white text-2xl sm:text-3xl md:text-4xl lg:text-6xl">
                 Portal do <p className='md:py-2'>Contador</p>
               </h1>
@@ -210,17 +214,6 @@ export function PainelContadorView() {
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Indicadores de paginação */}
-          <div className="flex items-center justify-center gap-3 sm:gap-4">
-            <span className="w-[8px] h-[8px] sm:w-[9px] sm:h-[9px] lg:w-[10px] lg:h-[10px] rounded-full bg-white" />
-            {[1, 2].map((i) => (
-              <span
-                key={i}
-                className="w-[8px] h-[8px] sm:w-[9px] sm:h-[9px] lg:w-[10px] lg:h-[10px] rounded-full border border-[rgba(255,255,255,0.5)]"
-              />
-            ))}
           </div>
         </div>
 
@@ -267,15 +260,22 @@ export function PainelContadorView() {
               <button
                 key={etapa.id}
                 onClick={() => handleOpenEtapa(etapa.id)}
-                className={`w-full rounded-[16px] border-2 border-alternate ${bgColor} hover:scale-105 active:scale-100 transition-transform duration-200 p-4 sm:p-5 shadow-sm hover:shadow-md text-center group flex flex-col items-center gap-3`}
+                className={`relative w-full rounded-[16px] border-2 border-alternate ${bgColor} hover:scale-105 active:scale-100 transition-transform duration-200 p-4 sm:p-5 shadow-sm hover:shadow-md text-center group flex flex-col items-center gap-3`}
               >
+                <span className="absolute top-3 left-3 sm:top-4 sm:left-4 font-exo font-medium text-alternate text-sm sm:text-base md:text-lg rounded-full bg-white w-8 h-8 flex items-center justify-center">
+                  {etapa.step}
+                </span>
+
+                <div className="flex flex-col items-center justify-center gap-2">
                 <IconComponent 
                   className="text-white" 
-                  size={42}
+                  size={52}
                 />
+                
                 <span className="font-exo font-medium text-white text-sm sm:text-base md:text-lg">
                   {etapa.title}
                 </span>
+                </div>
               </button>
             )
           })}

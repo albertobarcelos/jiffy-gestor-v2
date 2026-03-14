@@ -356,8 +356,10 @@ export function Etapa5NumeracoesFiscais() {
   }, [gapsHistoricos])
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 p-4">
+      
       <div className="rounded-lg border border-primary/20 bg-white p-3 space-y-2">
+      <h1 className="text-alternate font-exo font-bold text-lg sm:text-xl">Numerações Fiscais</h1>
         <p className="font-inter text-xs lg:text-sm text-secondary-text">
           Consulte lacunas de numeração e histórico de inutilizações por modelo/série.
         </p>
@@ -464,7 +466,7 @@ export function Etapa5NumeracoesFiscais() {
       </div>
 
       <div className="rounded-lg border border-primary/20 bg-white p-3">
-        <h4 className="font-exo font-semibold text-primary text-sm mb-2">Lacunas detectadas</h4>
+        <h4 className="font-exo font-semibold text-alternate text-sm mb-2">Lacunas detectadas</h4>
 
         {isLoadingGaps ? (
           <p className="text-xs text-secondary-text">Carregando lacunas...</p>
@@ -564,7 +566,7 @@ export function Etapa5NumeracoesFiscais() {
       </div>
 
       <div className="rounded-lg border border-primary/20 bg-white p-3">
-        <h4 className="font-exo font-semibold text-primary text-sm mb-2">Histórico de inutilizações</h4>
+        <h4 className="font-exo font-semibold text-alternate text-sm mb-2">Histórico de inutilizações</h4>
 
         {isLoadingHistorico ? (
           <p className="text-xs text-secondary-text">Carregando histórico...</p>

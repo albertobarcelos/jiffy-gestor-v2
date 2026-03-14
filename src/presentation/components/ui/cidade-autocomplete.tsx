@@ -527,7 +527,7 @@ export function CidadeAutocomplete({
   }
 
   const inputClasses = `
-    ${useNativeInput ? 'w-full h-8 px-4 rounded-lg border bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50' : ''}
+    ${useNativeInput ? 'w-full h-10 px-4 rounded-lg border bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50' : ''}
     ${isValid === false ? 'border-red-500 focus:border-red-500' : ''}
     ${isValid === true ? 'border-green-500 focus:border-green-500' : ''}
     ${inputClassName}
@@ -573,6 +573,7 @@ export function CidadeAutocomplete({
             required={required}
             disabled={disabled || !estado || isLoadingMunicipios}
             autoComplete="off"
+            size="small"
             className={
               isValid === false
                 ? 'border-red-500 focus:border-red-500'
