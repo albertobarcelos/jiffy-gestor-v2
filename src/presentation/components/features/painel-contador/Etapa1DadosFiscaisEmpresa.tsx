@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useTabsStore } from '@/src/presentation/stores/tabsStore'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Button } from '@/src/presentation/components/ui/button'
-import { MdSettings, MdWarning, MdDelete, MdInfo, MdCheckCircle } from 'react-icons/md'
+import { MdSettings, MdWarning, MdDelete, MdInfo, MdCheckCircle, MdRefresh } from 'react-icons/md'
 import { CertificadoUploadModal } from './CertificadoUploadModal'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/src/presentation/components/ui/dialog'
 import { showToast } from '@/src/shared/utils/toast'
@@ -17,6 +17,10 @@ export function Etapa1DadosFiscaisEmpresa() {
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [isRemoving, setIsRemoving] = useState(false)
+  
+  // Estado para verificação de dados completos
+  const [dadosCompletos, setDadosCompletos] = useState<boolean | null>(null)
+  const [isVerificandoDados, setIsVerificandoDados] = useState(false)
 
   // Busca dados do certificado
   const loadCertificado = useCallback(async () => {
@@ -42,11 +46,73 @@ export function Etapa1DadosFiscaisEmpresa() {
     }
   }, [])
 
+  // Função para verificar se todos os dados obrigatórios estão preenchidos
+  const verificarDadosCompletos = useCallback(async () => {
+    setIsVerificandoDados(true)
+    try {
+      // Buscar dados da empresa
+      const empresaResponse = await fetch('/api/empresas/me')
+      if (!empresaResponse.ok) {
+        setDadosCompletos(false)
+        return
+      }
+
+      const empresaData = await empresaResponse.json()
+
+      // Buscar configuração fiscal
+      const fiscalResponse = await fetch('/api/v1/fiscal/empresas-fiscais/me')
+      let configFiscal = null
+      if (fiscalResponse.ok) {
+        configFiscal = await fiscalResponse.json()
+      }
+
+      // Verificar campos obrigatórios da empresa
+      const cnpjPreenchido = empresaData?.cnpj && empresaData.cnpj.trim().length >= 14
+      const razaoSocialPreenchida = empresaData?.razaoSocial?.trim() || empresaData?.nome?.trim()
+      const estadoPreenchido = empresaData?.endereco?.estado?.trim() || empresaData?.endereco?.uf?.trim()
+
+      // Verificar campos obrigatórios fiscais
+      const inscricaoEstadualPreenchida = configFiscal?.inscricaoEstadual === 'ISENTO' || 
+                                         (configFiscal?.inscricaoEstadual && configFiscal.inscricaoEstadual.trim().length > 0)
+      const regimeTributarioPreenchido = configFiscal?.codigoRegimeTributario && 
+                                        [1, 2, 3].includes(configFiscal.codigoRegimeTributario)
+
+      // Todos os campos obrigatórios devem estar preenchidos
+      const completo = cnpjPreenchido && 
+                      razaoSocialPreenchida && 
+                      estadoPreenchido && 
+                      inscricaoEstadualPreenchida && 
+                      regimeTributarioPreenchido
+
+      setDadosCompletos(completo)
+    } catch (error) {
+      console.error('Erro ao verificar dados completos:', error)
+      setDadosCompletos(false)
+    } finally {
+      setIsVerificandoDados(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (isRehydrated) {
       loadCertificado()
+      verificarDadosCompletos()
     }
-  }, [isRehydrated, loadCertificado])
+  }, [isRehydrated, loadCertificado, verificarDadosCompletos])
+
+  // Recarregar verificação quando a página receber foco (usuário voltou da configuração)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (isRehydrated) {
+        verificarDadosCompletos()
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+    }
+  }, [isRehydrated, verificarDadosCompletos])
 
   // Calcula dias restantes até expiração
   const calcularDiasRestantes = (dataValidade: string | null | undefined): number | null => {
@@ -107,6 +173,8 @@ export function Etapa1DadosFiscaisEmpresa() {
     await new Promise(resolve => setTimeout(resolve, 500))
     // Recarregar dados do certificado
     await loadCertificado()
+    // Recarregar verificação de dados (caso tenha mudado algo)
+    await verificarDadosCompletos()
   }
 
   return (
@@ -226,6 +294,48 @@ export function Etapa1DadosFiscaisEmpresa() {
                     Os dados fiscais são essenciais para a emissão de notas fiscais.
                   </p>
                 </div>
+                
+                {/* Status dos Dados Fiscais */}
+                {isVerificandoDados ? (
+                  <div className="flex items-start gap-2 mt-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <div className="w-4 h-4 border-2 border-alternate border-t-transparent rounded-full animate-spin flex-shrink-0 mt-0.5" />
+                    <p className="font-inter font-medium text-gray-700 text-xs sm:text-sm">
+                      Verificando dados fiscais...
+                    </p>
+                  </div>
+                ) : dadosCompletos === true ? (
+                  <div className="flex items-start gap-2 mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <MdCheckCircle className="text-green-600 flex-shrink-0 mt-0.5" size={20} />
+                    <div className="flex-1">
+                      <p className="font-inter font-semibold text-green-800 text-xs sm:text-sm mb-2">
+                        ✓ Todos os dados fiscais estão preenchidos corretamente. Você pode prosseguir para o cadastro do certificado digital.
+                      </p>
+                      <button
+                        onClick={verificarDadosCompletos}
+                        className="flex items-center gap-1 text-green-700 hover:text-green-900 text-xs font-medium transition-colors"
+                      >
+                        <MdRefresh size={14} />
+                        Verificar novamente
+                      </button>
+                    </div>
+                  </div>
+                ) : dadosCompletos === false ? (
+                  <div className="flex items-start gap-2 mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <MdWarning className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
+                    <div className="flex-1">
+                      <p className="font-inter font-semibold text-amber-800 text-xs sm:text-sm mb-2">
+                        ⚠️ Alguns dados fiscais obrigatórios estão faltando. Clique em "Configurar Dados Fiscais" para completar as informações necessárias.
+                      </p>
+                      <button
+                        onClick={verificarDadosCompletos}
+                        className="flex items-center gap-1 text-amber-700 hover:text-amber-900 text-xs font-medium transition-colors"
+                      >
+                        <MdRefresh size={14} />
+                        Verificar novamente
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
               <div className="flex justify-end">
                 <Button

@@ -186,7 +186,23 @@ export function HistoricoConfiguracaoNcmModal({
     >
       <DialogContent sx={{ maxHeight: '90vh', overflowY: 'auto' }}>
         <DialogHeader>
+          <div className="flex items-center justify-between">
           <h1 className="text-alternate font-exo font-bold text-lg sm:text-xl">Histórico de Alterações - NCM {codigoNcm}</h1>
+          <Button 
+            onClick={onClose} 
+            variant="outlined"
+            sx={{
+              backgroundColor: 'rgba(131, 56, 236, 0.1)',
+              color: 'var(--color-alternate)',
+              borderColor: 'var(--color-alternate)',
+              '&:hover': { 
+                backgroundColor: 'rgba(131, 56, 236, 0.2)' 
+              },
+            }}
+          >
+            Fechar
+          </Button>
+          </div>
         </DialogHeader>
 
         {isLoading ? (
@@ -264,23 +280,6 @@ export function HistoricoConfiguracaoNcmModal({
             ))}
           </div>
         )}
-
-        <DialogFooter>
-          <Button 
-            onClick={onClose} 
-            variant="outlined"
-            sx={{
-              backgroundColor: 'rgba(131, 56, 236, 0.1)',
-              color: 'var(--color-alternate)',
-              borderColor: 'var(--color-alternate)',
-              '&:hover': { 
-                backgroundColor: 'rgba(131, 56, 236, 0.2)' 
-              },
-            }}
-          >
-            Fechar
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
