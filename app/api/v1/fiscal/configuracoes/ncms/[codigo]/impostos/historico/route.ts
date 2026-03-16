@@ -10,6 +10,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ codigo: string }> }
 ) {
+  let codigo: string | undefined
   try {
     const validation = validateRequest(request)
     if (!validation.valid || !validation.tokenInfo) {
@@ -17,7 +18,8 @@ export async function GET(
     }
 
     const { tokenInfo } = validation
-    const { codigo } = await params
+    const paramsResolved = await params
+    codigo = paramsResolved.codigo
 
     if (!codigo) {
       return NextResponse.json({ error: 'Código NCM é obrigatório' }, { status: 400 })
@@ -44,6 +46,14 @@ export async function GET(
         console.warn('Timeout ao buscar histórico de configuração - retornando array vazio')
         return NextResponse.json([], { status: 200 })
       }
+      
+      // Se for 404 (NCM não encontrado ou sem histórico), retorna array vazio ao invés de erro
+      // Isso é um caso válido: NCM novo sem histórico ainda
+      if (error.status === 404) {
+        console.log(`NCM ${codigo || 'desconhecido'} não possui histórico de configurações - retornando array vazio`)
+        return NextResponse.json([], { status: 200 })
+      }
+      
       return NextResponse.json(
         { error: error.message || 'Erro ao buscar histórico' },
         { status: error.status }

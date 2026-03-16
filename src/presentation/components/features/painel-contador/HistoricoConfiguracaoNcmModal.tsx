@@ -102,6 +102,14 @@ export function HistoricoConfiguracaoNcmModal({
         return
       }
 
+      // Se for 404, trata como "sem histórico" (caso válido para NCM novo)
+      if (response.status === 404) {
+        if (!abortController.signal.aborted) {
+          setHistorico([])
+        }
+        return
+      }
+
       if (!response.ok) {
         throw new Error('Erro ao carregar histórico')
       }
@@ -210,8 +218,11 @@ export function HistoricoConfiguracaoNcmModal({
             <div className="text-secondary-text">Carregando histórico...</div>
           </div>
         ) : historico.length === 0 ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="text-secondary-text/70">Nenhum histórico encontrado</div>
+          <div className="flex flex-col items-center justify-center py-8">
+            <div className="text-secondary-text/70 text-center">
+              <p className="font-medium mb-2">Este NCM ainda não possui histórico de configurações.</p>
+              <p className="text-sm">Após realizar a primeira configuração, o histórico de alterações será exibido aqui.</p>
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
