@@ -18,7 +18,7 @@ interface CidadeAutocompleteProps {
   placeholder?: string
   required?: boolean
   disabled?: boolean
-  onValidationChange?: (isValid: boolean) => void
+  onValidationChange?: (isValid: boolean | null) => void
   // Callback quando uma cidade é selecionada da lista (passa nome e código IBGE)
   onCidadeSelecionada?: (nomeCidade: string, codigoIbge: string) => void
   className?: string
