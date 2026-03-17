@@ -122,8 +122,9 @@ export function NovaImpressora({
 
   /**
    * Formata IP a partir de apenas dígitos
-   * Lógica: sempre assume terceiro grupo com 1 dígito
-   * Exemplo: 1921681100 → 192.168.1.100
+   * Lógica inteligente: tenta dividir os dígitos de forma que cada grupo tenha 1-3 dígitos
+   * Prioriza completar grupos anteriores antes de avançar para o próximo
+   * Exemplo: 192168101 → 192.168.10.1 (não 192.168.1.01)
    */
   const formatIPFromDigits = (digits: string): string => {
     // Limita a 12 dígitos (máximo para IP: 3+3+3+3)
@@ -143,7 +144,7 @@ export function NovaImpressora({
     }
     
     // A partir daqui, temos pelo menos 7 dígitos
-    // ESTRATÉGIA: Sempre assume terceiro grupo com 1 dígito
+    // ESTRATÉGIA: Tenta completar grupos de forma inteligente
     const secondGroup = afterFirst.slice(0, 3)
     const afterSecond = afterFirst.slice(3) // Dígitos após o segundo grupo
     
@@ -152,42 +153,101 @@ export function NovaImpressora({
       return `${firstGroup}.${secondGroup}.${afterSecond}`
     }
     
-    // Se temos 8 dígitos: 192.168.1.1
+    // Se temos 8 dígitos: pode ser 192.168.1.1 ou 192.168.10
     if (limited.length === 8) {
-      const thirdGroup = afterSecond.slice(0, 1) // Terceiro grupo com 1 dígito
-      const fourthGroup = afterSecond.slice(1, 2) // Quarto grupo com 1 dígito
-      return `${firstGroup}.${secondGroup}.${thirdGroup}.${fourthGroup}`
+      // Tenta completar o terceiro grupo primeiro (prioriza 192.168.10)
+      const thirdGroup = afterSecond.slice(0, 2) // Tenta 2 dígitos
+      const fourthGroup = afterSecond.slice(2) // Resto
+      if (fourthGroup.length > 0) {
+        return `${firstGroup}.${secondGroup}.${thirdGroup}.${fourthGroup}`
+      }
+      // Se não há quarto grupo, deixa incompleto
+      return `${firstGroup}.${secondGroup}.${thirdGroup}`
     }
     
-    // Se temos 9 dígitos: 192.168.1.10
+    // Se temos 9 dígitos: pode ser 192.168.10.1 ou 192.168.100
     if (limited.length === 9) {
-      const thirdGroup = afterSecond.slice(0, 1) // Terceiro grupo com 1 dígito
-      const fourthGroup = afterSecond.slice(1, 3) // Quarto grupo com 2 dígitos
-      return `${firstGroup}.${secondGroup}.${thirdGroup}.${fourthGroup}`
+      const thirdGroup = afterSecond.slice(0, 2) // Tenta 2 dígitos primeiro
+      const fourthGroup = afterSecond.slice(2) // Resto
+      if (fourthGroup.length > 0) {
+        return `${firstGroup}.${secondGroup}.${thirdGroup}.${fourthGroup}`
+      }
+      // Se não há quarto grupo, tenta 3 dígitos no terceiro
+      return `${firstGroup}.${secondGroup}.${afterSecond}`
     }
     
-    // Se temos 10 dígitos: 192.168.1.100
+    // Se temos 10 dígitos: pode ser 192.168.10.10 ou 192.168.100.1 ou 192.168.1.100
     if (limited.length === 10) {
-      const thirdGroup = afterSecond.slice(0, 1) // Terceiro grupo com 1 dígito
-      const fourthGroup = afterSecond.slice(1, 4) // Quarto grupo com 3 dígitos
+      // Tenta diferentes combinações
+      // Opção 1: 2+2 (192.168.10.10)
+      const thirdGroup2 = afterSecond.slice(0, 2)
+      const fourthGroup2 = afterSecond.slice(2, 4)
+      if (fourthGroup2.length === 2) {
+        return `${firstGroup}.${secondGroup}.${thirdGroup2}.${fourthGroup2}`
+      }
+      // Opção 2: 3+1 (192.168.100.1)
+      const thirdGroup3 = afterSecond.slice(0, 3)
+      const fourthGroup1 = afterSecond.slice(3)
+      if (fourthGroup1.length > 0) {
+        return `${firstGroup}.${secondGroup}.${thirdGroup3}.${fourthGroup1}`
+      }
+      // Opção 3: 1+3 (192.168.1.100) - fallback
+      const thirdGroup1 = afterSecond.slice(0, 1)
+      const fourthGroup3Fallback = afterSecond.slice(1, 4)
+      return `${firstGroup}.${secondGroup}.${thirdGroup1}.${fourthGroup3Fallback}`
+    }
+    
+    // Se temos 11 dígitos: pode ser 192.168.10.100 ou 192.168.100.10 ou 192.168.1.100 (com 1 extra)
+    if (limited.length === 11) {
+      // Opção 1: 2+3 (192.168.10.100) - mais comum
+      const thirdGroup2 = afterSecond.slice(0, 2)
+      const fourthGroup3 = afterSecond.slice(2, 5)
+      if (fourthGroup3.length === 3) {
+        return `${firstGroup}.${secondGroup}.${thirdGroup2}.${fourthGroup3}`
+      }
+      // Opção 2: 3+2 (192.168.100.10)
+      const thirdGroup3 = afterSecond.slice(0, 3)
+      const fourthGroup2Alt = afterSecond.slice(3, 5)
+      if (fourthGroup2Alt.length === 2) {
+        return `${firstGroup}.${secondGroup}.${thirdGroup3}.${fourthGroup2Alt}`
+      }
+      // Opção 3: 1+3 (192.168.1.100) - ignora o dígito extra
+      const thirdGroup1 = afterSecond.slice(0, 1)
+      const fourthGroup3Fallback = afterSecond.slice(1, 4)
+      return `${firstGroup}.${secondGroup}.${thirdGroup1}.${fourthGroup3Fallback}`
+    }
+    
+    // Se temos 12 dígitos: 192.168.100.100 (máximo)
+    if (limited.length === 12) {
+      const thirdGroup = afterSecond.slice(0, 3)
+      const fourthGroup = afterSecond.slice(3, 6)
       return `${firstGroup}.${secondGroup}.${thirdGroup}.${fourthGroup}`
     }
     
-    // Se temos 11 ou mais dígitos: 192.168.1.100 (ignora extras)
-    if (limited.length >= 11) {
-      const thirdGroup = afterSecond.slice(0, 1) // Terceiro grupo com 1 dígito
-      const fourthGroup = afterSecond.slice(1, 4) // Quarto grupo com 3 dígitos (máximo)
-      return `${firstGroup}.${secondGroup}.${thirdGroup}.${fourthGroup}`
-    }
-    
-    // Fallback: se temos mais de 3 dígitos após o segundo grupo, assume terceiro grupo com 1 dígito
+    // Fallback para casos não cobertos
+    // Tenta dividir de forma equilibrada
     if (afterSecond.length <= 3) {
       return `${firstGroup}.${secondGroup}.${afterSecond}`
     }
     
-    // Último fallback: terceiro grupo com 1 dígito, resto no quarto
-    const thirdGroup = afterSecond.slice(0, 1)
-    const fourthGroup = afterSecond.slice(1, 4)
+    // Divide o que sobra entre terceiro e quarto grupos
+    // Prioriza completar o terceiro grupo primeiro
+    let thirdGroup = ''
+    let fourthGroup = ''
+    
+    if (afterSecond.length <= 4) {
+      // Se temos 4 dígitos, tenta 2+2
+      thirdGroup = afterSecond.slice(0, 2)
+      fourthGroup = afterSecond.slice(2)
+    } else if (afterSecond.length <= 5) {
+      // Se temos 5 dígitos, tenta 2+3
+      thirdGroup = afterSecond.slice(0, 2)
+      fourthGroup = afterSecond.slice(2, 5)
+    } else {
+      // Se temos 6 ou mais, tenta 3+3
+      thirdGroup = afterSecond.slice(0, 3)
+      fourthGroup = afterSecond.slice(3, 6)
+    }
     
     return `${firstGroup}.${secondGroup}.${thirdGroup}.${fourthGroup}`
   }
@@ -723,7 +783,8 @@ export function NovaImpressora({
         // Não precisa processar, já é string
         processedValue = value as string
       } else if (field === 'ip') {
-        processedValue = formatIP(value as string)
+        // IP sem formatação automática - usuário digita manualmente
+        processedValue = value as string
       } else if (field === 'porta') {
         const digits = (value as string).replace(/\D/g, '').slice(0, 5)
         processedValue = digits
@@ -808,7 +869,8 @@ export function NovaImpressora({
       if (field === 'modeloDisplay') {
         processedValue = value as string
       } else if (field === 'ip') {
-        processedValue = formatIP(value as string)
+        // IP sem formatação automática - usuário digita manualmente
+        processedValue = value as string
       } else if (field === 'porta') {
         const digits = (value as string).replace(/\D/g, '').slice(0, 5)
         processedValue = digits
@@ -1158,8 +1220,8 @@ export function NovaImpressora({
                             type="text"
                             value={bulkIP}
                             onChange={(e) => {
-                              // Apenas formata durante a digitação
-                              setBulkIP(formatIP(e.target.value))
+                              // Permite digitação livre sem formatação automática
+                              setBulkIP(e.target.value)
                             }}
                             onBlur={(e) => {
                               // Valida apenas quando perde o foco
@@ -1357,9 +1419,8 @@ export function NovaImpressora({
                         type="text"
                         value={config.ip}
                         onChange={(e) => {
-                          // Apenas formata durante a digitação, sem validar
-                          const formatted = formatIP(e.target.value)
-                          updateTerminalConfig(index, 'ip', formatted)
+                          // Permite digitação livre sem formatação automática
+                          updateTerminalConfig(index, 'ip', e.target.value)
                         }}
                         onBlur={(e) => {
                           // Valida apenas quando perde o foco
@@ -1463,9 +1524,8 @@ export function NovaImpressora({
                             type="text"
                             value={config.ip}
                             onChange={(e) => {
-                              // Apenas formata durante a digitação, sem validar
-                              const formatted = formatIP(e.target.value)
-                              updateTerminalConfig(index, 'ip', formatted)
+                              // Permite digitação livre sem formatação automática
+                              updateTerminalConfig(index, 'ip', e.target.value)
                             }}
                             onBlur={(e) => {
                               const ip = e.target.value
