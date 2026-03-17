@@ -452,6 +452,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
   }
 
   // Função para formatar desconto/acréscimo para exibição
+  // Em tipo porcentagem exibe "Desc. X%" ou "Acres. X%"; em tipo fixo exibe o valor em R$
   const formatarDescontoAcrescimo = (produto: ProdutoSelecionado): string => {
     const valorProduto = produto.valorUnitario * produto.quantidade
     const valorComplementos = calcularTotalComplementos(produto)
@@ -459,12 +460,11 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
     
     // Verificar desconto
     if (produto.tipoDesconto && produto.valorDesconto) {
-      let valorDesconto = 0
       if (produto.tipoDesconto === 'porcentagem') {
-        valorDesconto = subtotal * (produto.valorDesconto / 100)
-      } else {
-        valorDesconto = produto.valorDesconto
+        const pct = produto.valorDesconto
+        return `Desc. ${Number.isInteger(pct) ? pct : formatarNumeroComMilhar(pct)}%`
       }
+      const valorDesconto = produto.valorDesconto
       if (valorDesconto > 0) {
         return `Desc. -${formatarNumeroComMilhar(valorDesconto)}`
       }
@@ -472,12 +472,11 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
     
     // Verificar acréscimo
     if (produto.tipoAcrescimo && produto.valorAcrescimo) {
-      let valorAcrescimo = 0
       if (produto.tipoAcrescimo === 'porcentagem') {
-        valorAcrescimo = subtotal * (produto.valorAcrescimo / 100)
-      } else {
-        valorAcrescimo = produto.valorAcrescimo
+        const pct = produto.valorAcrescimo
+        return `Acres. ${Number.isInteger(pct) ? pct : formatarNumeroComMilhar(pct)}%`
       }
+      const valorAcrescimo = produto.valorAcrescimo
       if (valorAcrescimo > 0) {
         return `Acres. +${formatarNumeroComMilhar(valorAcrescimo)}`
       }
@@ -936,54 +935,50 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
     }
 
     try {
-      // Construir payload para venda_gestor
+      // Mapear produtos para o payload (valorFinal por produto = total já calculado da linha)
+      const produtosLancados = produtos.map(p => {
+        // Converter valores de desconto/acréscimo para o formato esperado pelo backend
+        let valorDescontoFinal: number | null = null
+        let valorAcrescimoFinal: number | null = null
+
+        if (p.tipoDesconto && p.valorDesconto !== null && p.valorDesconto !== undefined) {
+          valorDescontoFinal =
+            p.tipoDesconto === 'porcentagem' ? p.valorDesconto / 100 : p.valorDesconto
+        }
+        if (p.tipoAcrescimo && p.valorAcrescimo !== null && p.valorAcrescimo !== undefined) {
+          valorAcrescimoFinal =
+            p.tipoAcrescimo === 'porcentagem' ? p.valorAcrescimo / 100 : p.valorAcrescimo
+        }
+
+        // valorFinal do produto = total da linha (unitário + complementos + desconto/acréscimo)
+        const valorFinalProduto = calcularTotalProduto(p)
+
+        return {
+          produtoId: p.produtoId,
+          quantidade: p.quantidade,
+          valorUnitario: p.valorUnitario,
+          valorFinal: valorFinalProduto,
+          tipoDesconto: p.tipoDesconto || null,
+          valorDesconto: valorDescontoFinal,
+          tipoAcrescimo: p.tipoAcrescimo || null,
+          valorAcrescimo: valorAcrescimoFinal,
+          complementos: (p.complementos || []).map(comp => ({
+            complementoId: comp.id,
+            grupoComplementoId: comp.grupoId,
+            valorUnitario: comp.valor,
+            quantidade: comp.quantidade,
+          })),
+        }
+      })
+
+      // Payload: valorFinal (raiz) = total da venda; produtosLancados = array com valorFinal por produto
       const vendaData: any = {
         origem,
         valorFinal: totalProdutos,
         totalDesconto: 0,
         totalAcrescimo: 0,
-        produtos: produtos.map(p => {
-          // Converter valores de desconto/acréscimo para o formato esperado pelo backend
-          // Se for porcentagem, converter de 0-100 para 0-1 (decimal)
-          let valorDescontoFinal: number | null = null
-          let valorAcrescimoFinal: number | null = null
-          
-          if (p.tipoDesconto && p.valorDesconto !== null && p.valorDesconto !== undefined) {
-            if (p.tipoDesconto === 'porcentagem') {
-              // Converter de porcentagem (10 = 10%) para decimal (0.1 = 10%)
-              valorDescontoFinal = p.valorDesconto / 100
-            } else {
-              // Valor fixo, manter como está
-              valorDescontoFinal = p.valorDesconto
-            }
-          }
-          
-          if (p.tipoAcrescimo && p.valorAcrescimo !== null && p.valorAcrescimo !== undefined) {
-            if (p.tipoAcrescimo === 'porcentagem') {
-              // Converter de porcentagem (10 = 10%) para decimal (0.1 = 10%)
-              valorAcrescimoFinal = p.valorAcrescimo / 100
-            } else {
-              // Valor fixo, manter como está
-              valorAcrescimoFinal = p.valorAcrescimo
-            }
-          }
-          
-          return {
-            produtoId: p.produtoId,
-            quantidade: p.quantidade,
-            valorUnitario: p.valorUnitario,
-            tipoDesconto: p.tipoDesconto || null,
-            valorDesconto: valorDescontoFinal,
-            tipoAcrescimo: p.tipoAcrescimo || null,
-            valorAcrescimo: valorAcrescimoFinal,
-            complementos: (p.complementos || []).map(comp => ({
-              complementoId: comp.id,
-              grupoComplementoId: comp.grupoId,
-              valorUnitario: comp.valor,
-              quantidade: comp.quantidade,
-            })),
-          };
-        }),
+        produtosLancados,
+        produtos: produtosLancados, // alias para compatibilidade
       }
       
       // Log para debug
@@ -1254,22 +1249,84 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
             let tipoAcrescimoFinal = prod.tipoAcrescimo || null
             let valorAcrescimoFinal: number | null = typeof prod.valorAcrescimo === 'string' ? parseFloat(prod.valorAcrescimo) : (prod.valorAcrescimo || null)
             
+            // Subtotal do produto (para detectar se backend salvou valor em R$ em vez de taxa)
+            const valorProdutoSubtotal = (prod.valorUnitario || 0) * (prod.quantidade || 1)
+            const valorComplementosSubtotal = (complementosMapeados as ComplementoSelecionado[]).reduce(
+              (sum, comp) => {
+                const tipo = comp.tipoImpactoPreco || 'nenhum'
+                const valorTotal = comp.valor * comp.quantidade * (prod.quantidade || 1)
+                if (tipo === 'aumenta') return sum + valorTotal
+                if (tipo === 'diminui') return sum - valorTotal
+                return sum
+              },
+              0
+            )
+            const subtotalProduto = valorProdutoSubtotal + valorComplementosSubtotal
+
             // Se o backend retorna porcentagem como decimal (0.1 = 10%), converter para porcentagem (10 = 10%)
             // O frontend trabalha com porcentagem 0-100, não decimal 0-1
+            // Se o backend salvou errado o valor em R$ (ex.: 2.10) em vez da taxa (0.1), detectar e converter para %
             if (tipoDescontoFinal === 'porcentagem' && valorDescontoFinal !== null && valorDescontoFinal !== undefined) {
-              // Se o valor é menor que 1, provavelmente está em decimal (0.1), converter para porcentagem (10)
               if (valorDescontoFinal < 1 && valorDescontoFinal > 0) {
                 valorDescontoFinal = valorDescontoFinal * 100
+              } else if (
+                subtotalProduto > 0 &&
+                valorDescontoFinal >= 1 &&
+                valorDescontoFinal <= subtotalProduto
+              ) {
+                // Valor entre 1 e subtotal: provavelmente backend salvou valor em R$ (ex.: 2.10) em vez de taxa (0.1)
+                const taxaDecimal = valorDescontoFinal / subtotalProduto
+                if (taxaDecimal >= 0.01 && taxaDecimal <= 1) {
+                  valorDescontoFinal = Math.round(taxaDecimal * 1000) / 10
+                }
               }
             }
-            
+
             if (tipoAcrescimoFinal === 'porcentagem' && valorAcrescimoFinal !== null && valorAcrescimoFinal !== undefined) {
-              // Se o valor é menor que 1, provavelmente está em decimal (0.1), converter para porcentagem (10)
               if (valorAcrescimoFinal < 1 && valorAcrescimoFinal > 0) {
                 valorAcrescimoFinal = valorAcrescimoFinal * 100
+              } else if (
+                subtotalProduto > 0 &&
+                valorAcrescimoFinal >= 1 &&
+                valorAcrescimoFinal <= subtotalProduto
+              ) {
+                const taxaDecimal = valorAcrescimoFinal / subtotalProduto
+                if (taxaDecimal >= 0.01 && taxaDecimal <= 1) {
+                  valorAcrescimoFinal = Math.round(taxaDecimal * 1000) / 10
+                }
               }
             }
-            
+
+            // Se backend enviou taxa decimal (0.03 = 3%) mas tipo veio fixo ou null, tratar como porcentagem
+            if (
+              valorDescontoFinal !== null &&
+              valorDescontoFinal !== undefined &&
+              valorDescontoFinal > 0 &&
+              valorDescontoFinal < 1 &&
+              tipoDescontoFinal !== 'porcentagem'
+            ) {
+              tipoDescontoFinal = 'porcentagem'
+              valorDescontoFinal = Math.round(valorDescontoFinal * 1000) / 10
+            }
+            if (
+              valorAcrescimoFinal !== null &&
+              valorAcrescimoFinal !== undefined &&
+              valorAcrescimoFinal > 0 &&
+              valorAcrescimoFinal < 1 &&
+              tipoAcrescimoFinal !== 'porcentagem'
+            ) {
+              tipoAcrescimoFinal = 'porcentagem'
+              valorAcrescimoFinal = Math.round(valorAcrescimoFinal * 1000) / 10
+            }
+
+            // valorFinal do produto (dentro de produtosLancados): total já calculado da linha
+            const valorFinalProduto =
+              prod.valorFinal !== undefined && prod.valorFinal !== null
+                ? Number(prod.valorFinal)
+                : (prod.valor_final !== undefined && prod.valor_final !== null
+                    ? Number(prod.valor_final)
+                    : null)
+
             return {
               produtoId: prod.produtoId || prod.id || '',
               nome: nomeProduto,
@@ -1280,7 +1337,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
               valorDesconto: valorDescontoFinal,
               tipoAcrescimo: tipoAcrescimoFinal,
               valorAcrescimo: valorAcrescimoFinal,
-              valorFinal: prod.valorFinal || null, // Valor final do produto (já calculado pelo backend)
+              valorFinal: valorFinalProduto,
             }
           })
         
@@ -2528,11 +2585,11 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
                       {/* Linhas de produtos */}
                       <div className="space-y-1">
                         {produtos.map((produto, index) => {
-                          // Se temos valorFinal do produto (pedido existente), usar ele
-                          // Caso contrário, calcular (novo pedido)
-                          const totalProdutoComComplementos = produto.valorFinal !== null && produto.valorFinal !== undefined
-                            ? produto.valorFinal
-                            : calcularTotalProduto(produto)
+                          // Total do produto: usar valorFinal vindo do backend (já calculado com desconto/acréscimo)
+                          const totalProdutoComComplementos =
+                            produto.valorFinal !== null && produto.valorFinal !== undefined
+                              ? produto.valorFinal
+                              : calcularTotalProduto(produto)
                           
                           return (
                             <div key={index} className="space-y-0">
