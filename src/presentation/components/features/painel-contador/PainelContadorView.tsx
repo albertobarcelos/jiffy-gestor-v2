@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { MdCheckCircle, MdBusiness, MdReceipt, MdAssessment, MdNumbers, MdTableChart, MdKeyboardArrowDown, MdKeyboardArrowUp } from 'react-icons/md'
-import { CircularProgress } from '@mui/material'
 import { useTabsStore } from '@/src/presentation/stores/tabsStore'
 import { ConfiguracaoImpostosView } from '@/src/presentation/components/features/impostos/ConfiguracaoImpostosView'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
@@ -12,6 +11,7 @@ import { Etapa3EmissorFiscal } from './Etapa2EmissorFiscal'
 import { Etapa5NumeracoesFiscais } from './Etapa5NumeracoesFiscais'
 import { Etapa5TabelaIbpt } from './Etapa4TabelaIbpt'
 import { ConfiguracaoEmpresaCompleta } from './ConfiguracaoEmpresaCompleta'
+import { showToast } from '@/src/shared/utils/toast'
 
 /**
  * Componente SectionBox para agrupar conteúdo com título separador
@@ -526,6 +526,60 @@ export function PainelContadorView() {
     },
   ]
 
+  // Função para verificar se uma etapa está habilitada (pode ser acessada)
+  const isEtapaHabilitada = useCallback((etapaId: string): boolean => {
+    // Etapa 1 sempre está habilitada
+    if (etapaId === 'etapa-1-dados-fiscais') {
+      return true
+    }
+    
+    // Etapa 2 só está habilitada se a etapa 1 estiver concluída
+    if (etapaId === 'etapa-2-emissor-fiscal') {
+      return etapasConcluidas['etapa-1-dados-fiscais'] === true
+    }
+    
+    // Etapa 3 só está habilitada se a etapa 2 estiver concluída
+    if (etapaId === 'etapa-3-cenario-fiscal') {
+      return etapasConcluidas['etapa-2-emissor-fiscal'] === true
+    }
+    
+    // Etapas 4 e 5 não têm bloqueio sequencial (são opcionais)
+    return true
+  }, [etapasConcluidas])
+
+  // Função para obter mensagem de bloqueio para uma etapa
+  const getMensagemBloqueio = useCallback((etapaId: string): string => {
+    if (etapaId === 'etapa-2-emissor-fiscal') {
+      return 'Complete primeiro a etapa "Dados Fiscais e Certificado Digital" para acessar o Emissor Fiscal.'
+    }
+    
+    if (etapaId === 'etapa-3-cenario-fiscal') {
+      return 'Complete primeiro a etapa "Emissor Fiscal" (ative pelo menos um modelo de nota) para acessar o Cenário Fiscal.'
+    }
+    
+    return 'Esta etapa não está disponível no momento.'
+  }, [])
+
+  // Handler para abrir etapa em nova aba
+  const handleOpenEtapa = (etapaId: string) => {
+    // Verificar se a etapa está habilitada
+    if (!isEtapaHabilitada(etapaId)) {
+      const mensagem = getMensagemBloqueio(etapaId)
+      showToast.warning(mensagem)
+      return
+    }
+    
+    const etapa = etapas.find((e) => e.id === etapaId)
+    if (etapa) {
+      addTab({
+        id: etapa.id,
+        label: etapa.label,
+        path: etapa.path,
+        isFixed: false,
+      })
+    }
+  }
+
   // Renderização condicional para views específicas
   if (activeTabId === 'impostos') {
     return <ConfiguracaoImpostosView />
@@ -544,19 +598,6 @@ export function PainelContadorView() {
   if (etapaAtiva) {
     const EtapaComponent = etapaAtiva.component
     return <EtapaComponent />
-  }
-
-  // Handler para abrir etapa em nova aba
-  const handleOpenEtapa = (etapaId: string) => {
-    const etapa = etapas.find((e) => e.id === etapaId)
-    if (etapa) {
-      addTab({
-        id: etapa.id,
-        label: etapa.label,
-        path: etapa.path,
-        isFixed: false,
-      })
-    }
   }
 
   const handleOpenNCMConfig = () => {
@@ -666,20 +707,29 @@ export function PainelContadorView() {
               const temMensagemEtapa2 = isEtapa2 && !estaConcluida
               const temMensagemEtapa3 = isEtapa3 && !estaConcluida
               const estaVerificando = etapaVerificando === etapa.id
+              const estaHabilitada = isEtapaHabilitada(etapa.id)
               
               return (
                 <div key={etapa.id} className="flex flex-col gap-1">
                   <div className="flex items-center gap-[0.375rem] sm:gap-[0.5rem] md:gap-[0.75rem] group">
                     <button
                       onClick={() => handleOpenEtapa(etapa.id)}
-                      className="flex items-center gap-[0.375rem] sm:gap-[0.5rem] md:gap-[0.625rem] hover:opacity-80 transition-opacity cursor-pointer text-left"
+                      className={`flex items-center gap-[0.375rem] sm:gap-[0.5rem] md:gap-[0.625rem] transition-opacity text-left ${
+                        estaHabilitada 
+                          ? 'hover:opacity-80 cursor-pointer' 
+                          : 'opacity-50 cursor-not-allowed'
+                      }`}
                     >
                       {estaConcluida ? (
                         <MdCheckCircle className="flex-shrink-0 text-white group-hover:scale-110 transition-transform" size={16} />
                       ) : (
                         <div className="flex-shrink-0 w-4 h-4 rounded-full border-2 border-white/50 group-hover:border-white transition-colors" />
                       )}
-                      <span className={`font-manrope font-bold text-white text-[clamp(10px,1.8vw,12px)] sm:text-[clamp(11px,2vw,13px)] md:text-[clamp(12px,2.2vw,14px)] lg:text-lg tracking-[-0.2px] leading-[1.3] ${estaConcluida ? '' : 'opacity-75'} group-hover:underline`}>
+                      <span className={`font-manrope font-bold text-white text-[clamp(10px,1.8vw,12px)] sm:text-[clamp(11px,2vw,13px)] md:text-[clamp(12px,2.2vw,14px)] lg:text-lg tracking-[-0.2px] leading-[1.3] ${
+                        estaConcluida ? '' : 'opacity-75'
+                      } ${
+                        estaHabilitada ? 'group-hover:underline' : ''
+                      }`}>
                        {etapa.step} - {etapa.title}
                       </span>
                       
@@ -740,12 +790,10 @@ export function PainelContadorView() {
                       {/* Loading individual para cada etapa - após a seta (se existir) ou após o título */}
                       {estaVerificando && (
                         <div className="flex-shrink-0 ml-1">
-                          <CircularProgress 
-                            size={14} 
-                            thickness={4}
-                            sx={{ 
-                              color: 'rgba(255, 255, 255, 0.8)',
-                            }} 
+                          <img 
+                            src="/images/jiffy-loading.gif" 
+                            alt="Carregando..." 
+                            className="w-6 h-6"
                           />
                         </div>
                       )}
@@ -796,11 +844,17 @@ export function PainelContadorView() {
               ? 'bg-secondary' // Primeiro, terceiro botão
               : 'bg-alternate' // Segundo botão
             
+            const estaHabilitada = isEtapaHabilitada(etapa.id)
+            
             return (
               <button
                 key={etapa.id}
                 onClick={() => handleOpenEtapa(etapa.id)}
-                className={`relative w-full rounded-[16px] border-2 border-alternate ${bgColor} hover:scale-105 active:scale-100 transition-transform duration-200 p-4 sm:p-5 shadow-sm hover:shadow-md text-center group flex flex-col items-center gap-3`}
+                className={`relative w-full rounded-[16px] border-2 border-alternate ${bgColor} transition-transform duration-200 p-4 sm:p-5 shadow-sm text-center group flex flex-col items-center gap-3 ${
+                  estaHabilitada
+                    ? 'hover:scale-105 active:scale-100 hover:shadow-md cursor-pointer'
+                    : 'opacity-50 cursor-not-allowed'
+                }`}
               >
                 <span className="absolute top-3 left-3 sm:top-4 sm:left-4 font-exo font-medium text-alternate text-sm sm:text-base md:text-lg rounded-full bg-white w-8 h-8 flex items-center justify-center">
                   {etapa.step}

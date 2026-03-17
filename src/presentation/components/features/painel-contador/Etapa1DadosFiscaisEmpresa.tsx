@@ -131,6 +131,18 @@ export function Etapa1DadosFiscaisEmpresa() {
   }
 
   const handleOpenCertificadoConfig = () => {
+    // Verificar se os dados fiscais estão completos antes de permitir cadastrar certificado
+    if (dadosCompletos === false) {
+      showToast.warning('Complete primeiro todos os dados fiscais da empresa antes de cadastrar o certificado digital.')
+      return
+    }
+    
+    // Se dadosCompletos ainda está sendo verificado (null), aguardar
+    if (dadosCompletos === null && !isVerificandoDados) {
+      showToast.warning('Aguarde a verificação dos dados fiscais.')
+      return
+    }
+    
     setShowUploadModal(true)
   }
 
@@ -428,51 +440,72 @@ export function Etapa1DadosFiscaisEmpresa() {
                     </div>
                   )
                 })()}
-                <div className="flex flex-row items-center gap-3">
-                  {certificado ? (
-                    <Button
-                      onClick={handleOpenConfirmRemover}
-                      className="rounded-lg px-4 py-2.5 text-white text-sm font-medium flex-1 flex items-center justify-center gap-2"
-                      disabled={isLoadingCertificado}
-                      sx={{
-                        backgroundColor: '#dc2626',
-                        '&:hover': { backgroundColor: '#b91c1c' },
-                        '&:disabled': { backgroundColor: '#fca5a5', cursor: 'not-allowed' },
-                      }}
-                    >
-                      <MdDelete size={18} />
-                      Remover Certificado
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={handleOpenCertificadoConfig}
-                      className="rounded-lg px-4 py-2.5 text-white text-sm font-medium flex-1 flex items-center justify-center gap-2"
-                      disabled={isLoadingCertificado}
-                      sx={{
-                        backgroundColor: 'var(--color-secondary)',
-                        '&:hover': { backgroundColor: 'var(--color-alternate)' },
-                        '&:disabled': { backgroundColor: '#cbd5e1', cursor: 'not-allowed' },
-                      }}
-                    >
-                      <MdSettings size={18} />
-                      {isLoadingCertificado ? 'Carregando...' : 'Cadastrar Certificado'}
-                    </Button>
+                <div className="flex flex-col gap-3">
+                  {/* Mensagem de aviso se dados não estiverem completos e não houver certificado */}
+                  {!certificado && dadosCompletos === false && (
+                    <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <MdWarning className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
+                      <p className="font-inter font-medium text-red-800 text-xs sm:text-sm">
+                        <strong>Atenção:</strong> Complete primeiro todos os dados fiscais da empresa (Passo 1) antes de cadastrar o certificado digital.
+                      </p>
+                    </div>
                   )}
-                  {certificado && (
-                    <Button
-                      onClick={handleOpenCertificadoConfig}
-                      className="rounded-lg px-4 py-2.5 text-white text-sm font-medium flex-1 flex items-center justify-center gap-2"
-                      disabled={isLoadingCertificado}
-                      sx={{
-                        backgroundColor: 'var(--color-secondary)',
-                        '&:hover': { backgroundColor: 'var(--color-alternate)' },
-                        '&:disabled': { backgroundColor: '#cbd5e1', cursor: 'not-allowed' },
-                      }}
-                    >
-                      <MdSettings size={18} />
-                      Atualizar Certificado
-                    </Button>
-                  )}
+                  
+                  <div className="flex flex-row items-center gap-3">
+                    {certificado ? (
+                      <Button
+                        onClick={handleOpenConfirmRemover}
+                        className="rounded-lg px-4 py-2.5 text-white text-sm font-medium flex-1 flex items-center justify-center gap-2"
+                        disabled={isLoadingCertificado}
+                        sx={{
+                          backgroundColor: '#dc2626',
+                          '&:hover': { backgroundColor: '#b91c1c' },
+                          '&:disabled': { backgroundColor: '#fca5a5', cursor: 'not-allowed' },
+                        }}
+                      >
+                        <MdDelete size={18} />
+                        Remover Certificado
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={handleOpenCertificadoConfig}
+                        className="rounded-lg px-4 py-2.5 text-white text-sm font-medium flex-1 flex items-center justify-center gap-2"
+                        disabled={isLoadingCertificado}
+                        sx={{
+                          backgroundColor: (dadosCompletos === false || (dadosCompletos === null && !isVerificandoDados))
+                            ? '#cbd5e1'
+                            : 'var(--color-secondary)',
+                          '&:hover': { 
+                            backgroundColor: (dadosCompletos === false || (dadosCompletos === null && !isVerificandoDados))
+                              ? '#cbd5e1'
+                              : 'var(--color-alternate)' 
+                          },
+                          '&:disabled': { backgroundColor: '#cbd5e1', cursor: 'not-allowed' },
+                          cursor: (dadosCompletos === false || (dadosCompletos === null && !isVerificandoDados))
+                            ? 'not-allowed'
+                            : 'pointer',
+                        }}
+                      >
+                        <MdSettings size={18} />
+                        {isLoadingCertificado ? 'Carregando...' : 'Cadastrar Certificado'}
+                      </Button>
+                    )}
+                    {certificado && (
+                      <Button
+                        onClick={handleOpenCertificadoConfig}
+                        className="rounded-lg px-4 py-2.5 text-white text-sm font-medium flex-1 flex items-center justify-center gap-2"
+                        disabled={isLoadingCertificado}
+                        sx={{
+                          backgroundColor: 'var(--color-secondary)',
+                          '&:hover': { backgroundColor: 'var(--color-alternate)' },
+                          '&:disabled': { backgroundColor: '#cbd5e1', cursor: 'not-allowed' },
+                        }}
+                      >
+                        <MdSettings size={18} />
+                        Atualizar Certificado
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
