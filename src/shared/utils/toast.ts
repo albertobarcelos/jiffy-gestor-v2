@@ -39,6 +39,17 @@ export const showToast = {
     toast(message, {
       icon: '⚠️',
       duration: 4000,
+      style: {
+        background: '#fff',
+        color: '#333',
+        borderRadius: '8px',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+        border: '1px solid #fbbf24',
+      },
+      iconTheme: {
+        primary: '#f59e0b',
+        secondary: '#fff',
+      },
     })
   },
 

@@ -44,34 +44,54 @@ export async function GET(request: NextRequest) {
     const modelos = modeloQuery ? [parseModelo(modeloQuery)] : [55, 65]
     const result: any[] = []
 
+    // Criar array de promessas para fazer requisições em paralelo
+    const promises: Promise<void>[] = []
+
     for (const modelo of modelos) {
       if (![55, 65].includes(modelo)) continue
 
       for (const ambiente of AMBIENTES) {
-        try {
-          const response = await apiClient.request<EmissaoResponse>(
-            `/api/v1/fiscal/configuracoes/emissao/${modelo}?ambiente=${ambiente}`,
-            {
-              method: 'GET',
-              headers: {
-                Authorization: `Bearer ${tokenInfo.token}`,
-              },
-            }
-          )
-          // Garante ambiente canônico na resposta
-          const data = { ...response.data, ambiente: normalizeAmbiente(response.data?.ambiente ?? ambiente) }
-          result.push(toNumeracaoView(data))
-        } catch (error) {
-          if (isAmbienteNaoDisponivel(error)) continue
-          throw error
-        }
+        // Adicionar promessa ao array (execução em paralelo)
+        promises.push(
+          apiClient
+            .request<EmissaoResponse>(
+              `/api/v1/fiscal/configuracoes/emissao/${modelo}?ambiente=${ambiente}`,
+              {
+                method: 'GET',
+                headers: {
+                  Authorization: `Bearer ${tokenInfo.token}`,
+                },
+              }
+            )
+            .then((response) => {
+              // Garante ambiente canônico na resposta
+              const data = { ...response.data, ambiente: normalizeAmbiente(response.data?.ambiente ?? ambiente) }
+              result.push(toNumeracaoView(data))
+            })
+            .catch((error) => {
+              // Se o ambiente não estiver disponível, apenas ignora (não adiciona ao resultado)
+              if (isAmbienteNaoDisponivel(error)) {
+                return // Continua sem adicionar nada ao resultado
+              }
+              // Para outros erros, apenas loga mas não quebra todas as requisições
+              console.warn(`Erro ao buscar configuração de emissão para modelo ${modelo} e ambiente ${ambiente}:`, error)
+            })
+        )
       }
     }
+
+    // Aguardar todas as requisições em paralelo
+    await Promise.allSettled(promises)
 
     return NextResponse.json(result)
   } catch (error) {
     console.error('Erro ao buscar configurações de emissão:', error)
     if (error instanceof ApiError) {
+      // Se for timeout, retorna array vazio ao invés de erro para não quebrar a UI
+      if (error.status === 504 && error.data && typeof error.data === 'object' && 'timeout' in error.data) {
+        console.warn('Timeout ao buscar configurações de emissão - retornando array vazio')
+        return NextResponse.json([], { status: 200 })
+      }
       return NextResponse.json(
         { error: error.message || 'Erro ao buscar configurações de emissão' },
         { status: error.status }

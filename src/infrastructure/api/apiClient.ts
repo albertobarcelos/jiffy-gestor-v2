@@ -76,8 +76,9 @@ export class ApiClient {
       Accept: 'application/json',
     }
 
-    // Timeout de 10 segundos para evitar espera indefinida se backend externo estiver lento
+    // Timeout de 30 segundos para evitar espera indefinida se backend externo estiver lento
     // (ex: quando microserviço fiscal está off e backend está tentando chamá-lo)
+    // Aumentado de 10s para 30s para dar mais tempo para serviços externos lentos responderem
     // Se já houver um signal nas options, não criar um novo (permite cancelamento externo)
     const hasExistingSignal = options.signal !== undefined
     let controller: AbortController | undefined
@@ -85,7 +86,7 @@ export class ApiClient {
     
     if (!hasExistingSignal) {
       controller = new AbortController()
-      timeoutId = setTimeout(() => controller!.abort(), 10000)
+      timeoutId = setTimeout(() => controller!.abort(), 30000) // 30 segundos
     }
 
     try {

@@ -11,7 +11,7 @@ export default function PainelContadorLayout({
   return (
     <div className="fixed inset-0 flex flex-col overflow-hidden bg-gray-50">
       {/* TopNav fixo no topo */}
-      <div className="flex-shrink-0 z-10">
+      <div className="flex-shrink-0 z-30">
         <TopNav />
       </div>
       

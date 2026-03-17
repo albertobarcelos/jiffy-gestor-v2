@@ -26,6 +26,11 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Erro ao buscar configuração fiscal:', error)
     if (error instanceof ApiError) {
+      // Se for timeout, retorna resposta vazia ao invés de erro para não quebrar a UI
+      if (error.status === 504 && error.data && typeof error.data === 'object' && 'timeout' in error.data) {
+        console.warn('Timeout ao buscar configuração fiscal - retornando resposta vazia')
+        return NextResponse.json(null, { status: 200 })
+      }
       return NextResponse.json(
         { error: error.message || 'Erro ao buscar configuração fiscal' },
         { status: error.status }

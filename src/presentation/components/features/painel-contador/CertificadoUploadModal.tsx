@@ -190,6 +190,7 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
                 disabled={isUploading}
+                size="small"
                 sx={{
                   '& .MuiOutlinedInput-input': {
                     paddingLeft: '2rem', // 56px (equivalente ao pl-14 do Tailwind)

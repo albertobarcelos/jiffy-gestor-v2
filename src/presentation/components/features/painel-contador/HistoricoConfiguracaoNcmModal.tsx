@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -70,14 +70,21 @@ export function HistoricoConfiguracaoNcmModal({
   const { auth } = useAuthStore()
   const [isLoading, setIsLoading] = useState(false)
   const [historico, setHistorico] = useState<ConfiguracaoImpostoNcmHistorico[]>([])
+  
+  // Ref para armazenar o AbortController e cancelar requisições pendentes
+  const abortControllerRef = useRef<AbortController | null>(null)
 
-  useEffect(() => {
-    if (open && codigoNcm) {
-      loadHistorico()
+  // Memoizar loadHistorico para evitar recriações desnecessárias
+  const loadHistorico = useCallback(async () => {
+    // Cancelar requisição anterior se existir
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
     }
-  }, [open, codigoNcm])
 
-  const loadHistorico = async () => {
+    // Criar novo AbortController para esta requisição
+    const abortController = new AbortController()
+    abortControllerRef.current = abortController
+
     const token = auth?.getAccessToken()
     if (!token) return
 
@@ -87,21 +94,64 @@ export function HistoricoConfiguracaoNcmModal({
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        signal: abortController.signal, // Adicionar signal para permitir cancelamento
       })
+
+      // Verificar se foi cancelado
+      if (abortController.signal.aborted) {
+        return
+      }
+
+      // Se for 404, trata como "sem histórico" (caso válido para NCM novo)
+      if (response.status === 404) {
+        if (!abortController.signal.aborted) {
+          setHistorico([])
+        }
+        return
+      }
 
       if (!response.ok) {
         throw new Error('Erro ao carregar histórico')
       }
 
       const data = await response.json()
-      setHistorico(data || [])
+      
+      // Verificar novamente se foi cancelado antes de atualizar estado
+      if (!abortController.signal.aborted) {
+        setHistorico(data || [])
+      }
     } catch (error: any) {
+      // Ignorar erros de cancelamento (AbortError)
+      if (error.name === 'AbortError' || abortController.signal.aborted) {
+        return
+      }
       console.error('Erro ao carregar histórico:', error)
       showToast.error(error.message || 'Erro ao carregar histórico')
     } finally {
+      // Só atualizar loading se não foi cancelado
+      if (!abortController.signal.aborted) {
+        setIsLoading(false)
+      }
+    }
+  }, [auth, codigoNcm])
+
+  useEffect(() => {
+    if (open && codigoNcm) {
+      loadHistorico()
+    } else {
+      // Limpar estado quando o modal fechar
+      setHistorico([])
       setIsLoading(false)
     }
-  }
+
+    // Cleanup: cancelar requisições pendentes quando o componente desmontar ou o modal fechar
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+        abortControllerRef.current = null
+      }
+    }
+  }, [open, codigoNcm, loadHistorico])
 
   const formatarData = (data: string) => {
     try {
@@ -144,7 +194,23 @@ export function HistoricoConfiguracaoNcmModal({
     >
       <DialogContent sx={{ maxHeight: '90vh', overflowY: 'auto' }}>
         <DialogHeader>
-          <DialogTitle>Histórico de Alterações - NCM {codigoNcm}</DialogTitle>
+          <div className="flex items-center justify-between">
+          <h1 className="text-alternate font-exo font-bold text-lg sm:text-xl">Histórico de Alterações - NCM {codigoNcm}</h1>
+          <Button 
+            onClick={onClose} 
+            variant="outlined"
+            sx={{
+              backgroundColor: 'rgba(131, 56, 236, 0.1)',
+              color: 'var(--color-alternate)',
+              borderColor: 'var(--color-alternate)',
+              '&:hover': { 
+                backgroundColor: 'rgba(131, 56, 236, 0.2)' 
+              },
+            }}
+          >
+            Fechar
+          </Button>
+          </div>
         </DialogHeader>
 
         {isLoading ? (
@@ -152,8 +218,11 @@ export function HistoricoConfiguracaoNcmModal({
             <div className="text-secondary-text">Carregando histórico...</div>
           </div>
         ) : historico.length === 0 ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="text-secondary-text/70">Nenhum histórico encontrado</div>
+          <div className="flex flex-col items-center justify-center py-8">
+            <div className="text-secondary-text/70 text-center">
+              <p className="font-medium mb-2">Este NCM ainda não possui histórico de configurações.</p>
+              <p className="text-sm">Após realizar a primeira configuração, o histórico de alterações será exibido aqui.</p>
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
@@ -222,12 +291,6 @@ export function HistoricoConfiguracaoNcmModal({
             ))}
           </div>
         )}
-
-        <DialogFooter>
-          <Button onClick={onClose} variant="outlined">
-            Fechar
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

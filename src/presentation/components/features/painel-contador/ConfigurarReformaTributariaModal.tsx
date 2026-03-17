@@ -152,6 +152,7 @@ export function ConfigurarReformaTributariaModal({
               inputProps={{ maxLength: 8 }}
               required
               disabled={!!configuracao}
+              size="small"
             />
             <p className="text-xs text-secondary-text/70">8 dígitos</p>
           </div>
@@ -165,7 +166,7 @@ export function ConfigurarReformaTributariaModal({
                   setFormData({ ...formData, cst: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-10">
                   <SelectValue placeholder="Selecione o CST" />
                 </SelectTrigger>
                 <SelectContent>
@@ -187,6 +188,7 @@ export function ConfigurarReformaTributariaModal({
                   setFormData({ ...formData, codigoClassificacaoFiscal: e.target.value })
                 }
                 placeholder="123456"
+                size="small"
               />
             </div>
           </div>
