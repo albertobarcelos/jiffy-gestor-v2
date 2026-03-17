@@ -603,13 +603,12 @@ export function useMarcarEmissaoFiscal() {
         throw new Error('Token não encontrado')
       }
 
-      // Vendas do gestor não precisam ser marcadas, pois já aparecem no gestor por padrão
-      // Apenas vendas PDV precisam ser marcadas
-      if (params.tabelaOrigem === 'venda_gestor') {
-        throw new Error('Vendas do gestor não podem ser marcadas para emissão fiscal')
-      }
+      const url =
+        params.tabelaOrigem === 'venda_gestor'
+          ? `/api/vendas/gestor/${params.id}/marcar-emissao-fiscal`
+          : `/api/vendas/${params.id}/marcar-emissao-fiscal`
 
-      const response = await fetch(`/api/vendas/${params.id}/marcar-emissao-fiscal`, {
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

@@ -16,7 +16,7 @@ import { useCreateVendaGestor } from '@/src/presentation/hooks/useVendas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { extractTokenInfo } from '@/src/shared/utils/validateToken'
-import { MdLaunch, MdDelete, MdClear, MdSearch, MdArrowForward, MdArrowBack, MdCheckCircle, MdAttachMoney, MdCreditCard, MdQrCode, MdPerson, MdStore, MdPersonOutline, MdInfo, MdAdd, MdRemove, MdClose, MdEdit } from 'react-icons/md'
+import { MdLaunch, MdDelete, MdClear, MdSearch, MdArrowForward, MdArrowBack, MdCheckCircle, MdAttachMoney, MdCreditCard, MdQrCode, MdPerson, MdStore, MdPersonOutline, MdInfo, MdAdd, MdRemove, MdClose, MdEdit, MdExpandLess, MdExpandMore } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { SeletorClienteModal } from './SeletorClienteModal'
@@ -73,6 +73,8 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
   const [meioPagamentoId, setMeioPagamentoId] = useState<string>('')
   const [valorRecebido, setValorRecebido] = useState<string>('')
   const [grupoSelecionadoId, setGrupoSelecionadoId] = useState<string | null>(null)
+  // Lista de grupos recolhível no passo 2: quando oculta, a área de produtos selecionados aumenta
+  const [gruposExpandido, setGruposExpandido] = useState(true)
   const [seletorClienteOpen, setSeletorClienteOpen] = useState(false)
   const [tooltipGrupoId, setTooltipGrupoId] = useState<string | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null)
@@ -972,15 +974,20 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
       })
 
       // Payload: valorFinal (raiz) = total da venda; produtosLancados = array com valorFinal por produto
+      // statusVenda = valor escolhido no passo 1 (ABERTA | FINALIZADA | PENDENTE_EMISSAO)
       const vendaData: any = {
         origem,
+        statusVenda: status,
         valorFinal: totalProdutos,
         totalDesconto: 0,
         totalAcrescimo: 0,
         produtosLancados,
         produtos: produtosLancados, // alias para compatibilidade
       }
-      
+
+      // solicitarEmissaoFiscal: true apenas quando status é PENDENTE_EMISSAO, false nos demais casos
+      vendaData.solicitarEmissaoFiscal = status === 'PENDENTE_EMISSAO'
+
       // Log para debug
       console.log('📤 Payload sendo enviado:', JSON.stringify(vendaData, null, 2))
 
@@ -999,11 +1006,6 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
       } else {
         // Venda aberta não tem pagamentos
         vendaData.pagamentos = []
-      }
-
-      // Se PENDENTE_EMISSAO, marcar flag para criar resumo fiscal automaticamente
-      if (status === 'PENDENTE_EMISSAO') {
-        vendaData.solicitarEmissaoFiscal = true
       }
 
       const resultado = await createVendaGestor.mutateAsync(vendaData)
@@ -1815,10 +1817,12 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
 
           {/* STEP 2: Seleção de Produtos */}
           {!modoVisualizacao && currentStep === 2 && (
-            <div className="space-y-2 py-2">
-              {/* Área de Edição de Produtos Selecionados */}
+            <div className="flex flex-col flex-1 min-h-0 gap-2 py-2">
+              {/* Área de Edição de Produtos Selecionados: altura fixa quando grupos visíveis, cresce quando grupos ocultos */}
               <div 
-                className="h-48 border rounded-lg bg-gray-50 overflow-y-auto scrollbar-thin"
+                className={`border rounded-lg bg-gray-50 overflow-y-auto scrollbar-thin ${
+                  gruposExpandido ? 'h-48 flex-shrink-0' : 'flex-1 min-h-64'
+                }`}
               >
                 {produtos.length > 0 ? (
                   <div className="p-2">
@@ -2160,15 +2164,38 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
               </div>
 
               {/* Total do Pedido */}
-              <div className="flex justify-end items-center gap-2">
+              <div className="flex justify-end items-center gap-2 flex-shrink-0">
                 <span className="text-sm font-semibold text-gray-700">Total do Pedido:</span>
                 <span className="text-lg font-bold text-primary">
                   {transformarParaReal(totalProdutos)}
                 </span>
               </div>
 
-              {/* Produtos - Seleção por Grupos */}
-              <div className="space-y-2">
+              {/* Seção recolhível: Grupos de produtos — ao ocultar, a área de produtos selecionados acima ganha mais altura */}
+              <div className="border rounded-lg bg-gray-50 flex-shrink-0 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setGruposExpandido(!gruposExpandido)}
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2 hover:bg-gray-100/80 transition-colors text-left border-b border-gray-200/50"
+                  aria-expanded={gruposExpandido}
+                >
+                  <span className="text-sm font-semibold text-gray-700">Grupos de produtos</span>
+                  <span className="flex items-center gap-2 ml-auto">
+                    {gruposExpandido ? (
+                      <>
+                        <span className="text-xs text-gray-500">Ocultar</span>
+                        <MdExpandLess className="w-5 h-5 text-gray-600 flex-shrink-0" />
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-xs text-gray-500">Mostrar grupos</span>
+                        <MdExpandMore className="w-5 h-5 text-gray-600 flex-shrink-0" />
+                      </>
+                    )}
+                  </span>
+                </button>
+                {gruposExpandido && (
+              <div className="space-y-2 px-3 pb-3 pt-1">
                 {/* Grid ou Lista Horizontal de Grupos */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2"> 
@@ -2336,6 +2363,8 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
                 </div>
               )
                 })()}
+              </div>
+                )}
               </div>
             </div>
           )}

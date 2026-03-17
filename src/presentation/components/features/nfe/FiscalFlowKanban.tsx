@@ -1017,8 +1017,8 @@ export function FiscalFlowKanban() {
                               </div>
                             )}
 
-                            {/* Botão "Marcar para Emissão" aparece apenas para vendas PDV finalizadas */}
-                            {column.id === 'FINALIZADAS' && venda.tabelaOrigem === 'venda' && (
+                            {/* Botão "Marcar para Emissão" para vendas PDV e Gestor finalizadas (sem solicitação fiscal ainda) */}
+                            {column.id === 'FINALIZADAS' && (venda.tabelaOrigem === 'venda' || venda.tabelaOrigem === 'venda_gestor') && (
                               <Button
                                 size="sm"
                                 variant="outlined"

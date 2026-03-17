@@ -44,7 +44,7 @@ export class VendaUnificadaDTO {
     }
 
     isPendenteEmissao(): boolean {
-        // Vendas GESTOR: sempre pendentes de emissão quando finalizadas (exceto se já emitida)
+        // Vendas GESTOR: pendentes apenas quando foram marcadas para emissão (solicitarEmissaoFiscal), igual ao PDV
         // Vendas PDV: pendentes apenas se foram marcadas para emissão
         if (this.dataCancelamento) {
             return false
@@ -55,7 +55,7 @@ export class VendaUnificadaDTO {
         }
 
         if (this.isVendaGestor()) {
-            return !!this.dataFinalizacao && this.statusFiscal !== 'EMITIDA';
+            return !!this.solicitarEmissaoFiscal && this.statusFiscal !== 'EMITIDA';
         }
 
         return this.solicitarEmissaoFiscal && this.statusFiscal !== 'EMITIDA';
