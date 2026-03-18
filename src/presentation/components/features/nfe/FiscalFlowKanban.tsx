@@ -1,6 +1,18 @@
 'use client'
 
 import { useState } from 'react'
+import {
+  DndContext,
+  DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  useDraggable,
+  useDroppable,
+} from '@dnd-kit/core'
 import { useMarcarEmissaoFiscal, useDuplicateVenda, useExcluirVendaGestor, useEmitirNfe, useEmitirNfeGestor, useReemitirNfe, useReemitirNfeGestor } from '@/src/presentation/hooks/useVendas'
 import { useVendasUnificadas, VendaUnificadaDTO } from '@/src/presentation/hooks/useVendasUnificadas'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
@@ -35,6 +47,93 @@ type Venda = VendaUnificadaDTO
 type TipoVendaFiltro = 'balcao' | 'mesa' | 'delivery'
 type StatusVendaFiltro = 'TODAS' | 'ATIVAS' | 'CANCELADAS'
 
+/** Coluna droppable: recebe cards arrastados; em Pendente Emissão mostra slot "Solte aqui" quando isOver */
+function DroppableColumnContent({
+  columnId,
+  children,
+  className,
+}: {
+  columnId: string
+  children: React.ReactNode
+  className?: string
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: columnId })
+  const showDropSlot = columnId === 'PENDENTE_EMISSAO' && isOver
+  return (
+    <div
+      ref={setNodeRef}
+      className={`${className ?? ''} ${isOver ? 'ring-2 ring-yellow-400 ring-inset bg-yellow-50/50' : ''}`}
+    >
+      {showDropSlot && (
+        <div className="min-h-[72px] border-2 border-dashed border-yellow-400 rounded-lg flex items-center justify-center bg-yellow-50/90 text-yellow-700 text-sm font-medium mb-2 transition-all">
+          Solte aqui para marcar para emissão
+        </div>
+      )}
+      {children}
+    </div>
+  )
+}
+
+/** Preview do card durante o arraste (segue o cursor com sombra e leve escala) */
+function VendaCardDragPreview({ venda }: { venda: VendaUnificadaDTO }) {
+  const valorFormatado = transformarParaReal(venda.valorFinal)
+  const clienteNome = venda.cliente?.nome || 'Sem cliente'
+  return (
+    <div
+      className="bg-white rounded border-2 border-gray-300 p-2.5 shadow-xl cursor-grabbing w-64 opacity-95"
+      style={{ transform: 'scale(1.02) rotate(1deg)' }}
+    >
+      <p className="text-xs text-gray-600 mb-0.5">Venda #{venda.numeroVenda}</p>
+      <p className="text-sm font-semibold text-gray-900 mb-0.5 uppercase truncate">{clienteNome}</p>
+      <div className="mb-1.5 pb-1.5 border-b border-gray-200">
+        <p className="text-xs text-gray-600">
+          <span className="text-sm font-semibold text-gray-900">{valorFormatado}</span>
+        </p>
+      </div>
+      {venda.origem && (
+        <p className="text-xs text-gray-500">Origem: {venda.origem}</p>
+      )}
+    </div>
+  )
+}
+
+/** Card draggable apenas na coluna Finalizadas (PDV ou Gestor) — arrastar para Pendente Emissão chama Marcar para Emissão */
+function DraggableVendaCard({
+  venda,
+  column,
+  children,
+}: {
+  venda: VendaUnificadaDTO
+  column: KanbanColumn
+  children: React.ReactNode
+}) {
+  const isDraggable =
+    column.id === 'FINALIZADAS' &&
+    (venda.tabelaOrigem === 'venda' || venda.tabelaOrigem === 'venda_gestor')
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `venda-${venda.id}`,
+    data: { venda },
+    disabled: !isDraggable,
+  })
+  if (!isDraggable) return <>{children}</>
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      className="cursor-grab active:cursor-grabbing"
+    >
+      {isDragging ? (
+        <div className="min-h-[100px] rounded border-2 border-dashed border-gray-300 bg-gray-50/80 flex items-center justify-center">
+          <span className="text-xs text-gray-400">Arrastando...</span>
+        </div>
+      ) : (
+        children
+      )}
+    </div>
+  )
+}
+
 export function FiscalFlowKanban() {
   const [selectedVendaId, setSelectedVendaId] = useState<string | null>(null)
   const [vendaSelecionadaParaEmissao, setVendaSelecionadaParaEmissao] = useState<{
@@ -56,7 +155,10 @@ export function FiscalFlowKanban() {
   const [vendaIdParaVisualizacao, setVendaIdParaVisualizacao] = useState<string | null>(null)
   const [menuAcoesVendaIdAberto, setMenuAcoesVendaIdAberto] = useState<string | null>(null)
   const [acaoFiscalEmAndamentoPorVenda, setAcaoFiscalEmAndamentoPorVenda] = useState<Record<string, 'emitindo' | 'reemitindo'>>({})
-  
+  const [draggingVenda, setDraggingVenda] = useState<Venda | null>(null)
+  // ID da venda recém solta na coluna Pendente Emissão (para exibir no topo da lista)
+  const [vendaRecemMovidaParaPendenteId, setVendaRecemMovidaParaPendenteId] = useState<string | null>(null)
+
   // Função para alternar filtro (seleção múltipla)
   const toggleFiltro = (tipo: TipoVendaFiltro) => {
     setTipoVendaFiltros(prev => {
@@ -103,6 +205,12 @@ export function FiscalFlowKanban() {
   const emitirNfeGestor = useEmitirNfeGestor()
   const reemitirNfePdv = useReemitirNfe()
   const reemitirNfeGestor = useReemitirNfeGestor()
+
+  // Sensores para drag-and-drop: evita conflito com clique (abrir detalhes)
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 100, tolerance: 8 } })
+  )
 
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -558,6 +666,26 @@ export function FiscalFlowKanban() {
     }
   }
 
+  // Ao soltar card da coluna Finalizadas na coluna Pendente Emissão, marcar para emissão
+  const handleDragEnd = (event: DragEndEvent) => {
+    setDraggingVenda(null)
+    const { active, over } = event
+    if (!over || over.id !== 'PENDENTE_EMISSAO') return
+    const venda = active.data.current?.venda as Venda | undefined
+    if (!venda) return
+    setVendaRecemMovidaParaPendenteId(venda.id)
+    handleMarcarEmissaoFiscal(venda.id, venda.tabelaOrigem)
+  }
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const venda = event.active.data.current?.venda as Venda | undefined
+    if (venda) setDraggingVenda(venda)
+  }
+
+  const handleDragCancel = () => {
+    setDraggingVenda(null)
+  }
+
   const handleEmitirNfe = async (venda: Venda) => {
     const modeloInicial: 55 | 65 = venda.tipoDocFiscal === 'NFE' ? 55 : 65
 
@@ -772,12 +900,21 @@ export function FiscalFlowKanban() {
           return etapa === 'FINALIZADAS'
         })
         break
-      case 'PENDENTE_EMISSAO':
+      case 'PENDENTE_EMISSAO': {
         vendas = vendasParaFiltrar.filter((v: Venda) => {
           const etapa = v.getEtapaKanban()
           return etapa === 'PENDENTE_EMISSAO'
         })
+        // Colocar a venda recém solta (drag) no topo da coluna
+        if (vendaRecemMovidaParaPendenteId && vendas.length > 0) {
+          const idx = vendas.findIndex((v: Venda) => v.id === vendaRecemMovidaParaPendenteId)
+          if (idx > 0) {
+            const recemMovida = vendas[idx]
+            vendas = [recemMovida, ...vendas.filter((v: Venda) => v.id !== vendaRecemMovidaParaPendenteId)]
+          }
+        }
         break
+      }
       case 'COM_NFE':
         vendas = vendasParaFiltrar.filter((v: Venda) => {
           const etapa = v.getEtapaKanban()
@@ -893,6 +1030,12 @@ export function FiscalFlowKanban() {
 
       {/* Kanban Board */}
         <div className="flex-1 overflow-x-auto p-4 pb-4 mb-[10px] min-h-0 scrollbar-thin">
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
+        >
         <div className="flex gap-3 min-w-max h-full">
           {columns.map((column) => {
             const columnVendas = getVendasByColumn(column.id)
@@ -914,8 +1057,11 @@ export function FiscalFlowKanban() {
                   </div>
                 </div>
 
-                {/* Column Content - Fundo branco com scroll interno */}
-                <div className="flex-1 overflow-y-auto p-2.5 space-y-2 bg-white min-h-0 scrollbar-thin">
+                {/* Column Content - Área droppable (Pendente Emissão aceita cards arrastados) */}
+                <DroppableColumnContent
+                  columnId={column.id}
+                  className="flex-1 overflow-y-auto p-2.5 space-y-2 bg-white min-h-0 scrollbar-thin"
+                >
                   {columnVendas.length === 0 ? (
                     <div className="text-center py-6">
                       <p className="text-xs text-gray-500">{column.placeholder}</p>
@@ -926,8 +1072,8 @@ export function FiscalFlowKanban() {
                       const clienteNome = venda.cliente?.nome || 'Sem cliente'
 
                       return (
+                        <DraggableVendaCard key={venda.id} venda={venda} column={column}>
                         <div
-                          key={venda.id}
                           className={`bg-white rounded border-l-2 ${column.borderColorClass} border-t border-r border-b border-gray-200 p-2.5 hover:shadow-sm transition-shadow relative cursor-pointer`}
                           onClick={() => handleViewDetails(venda)}
                         >
@@ -1221,14 +1367,19 @@ export function FiscalFlowKanban() {
                             </Button>
                           </div>
                         </div>
+                        </DraggableVendaCard>
                       )
                     })
                   )}
-                </div>
+                </DroppableColumnContent>
               </div>
             )
           })}
         </div>
+        <DragOverlay dropAnimation={null}>
+          {draggingVenda ? <VendaCardDragPreview venda={draggingVenda} /> : null}
+        </DragOverlay>
+        </DndContext>
       </div>
 
       {/* Modal de Emissão de NFe */}
