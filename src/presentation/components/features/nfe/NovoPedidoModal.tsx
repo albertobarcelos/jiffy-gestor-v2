@@ -976,6 +976,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisuali
       // Payload: valorFinal (raiz) = total da venda; produtosLancados = array com valorFinal por produto
       // statusVenda = valor escolhido no passo 1 (ABERTA | FINALIZADA | PENDENTE_EMISSAO)
       const vendaData: any = {
+        tipoVenda: 'balcao',
         origem,
         statusVenda: status,
         valorFinal: totalProdutos,

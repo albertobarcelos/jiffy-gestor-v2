@@ -591,8 +591,8 @@ export function useDuplicateVenda() {
 
 /**
  * Hook para marcar uma venda para emissão fiscal (solicitarEmissaoFiscal = true).
- * Gestor: usa PATCH /api/vendas/gestor/:id com body { solicitarEmissaoFiscal: true }.
- * PDV: usa POST /api/vendas/:id/marcar-emissao-fiscal.
+ * PDV: PATCH /api/vendas/:id com body { solicitarEmissaoFiscal: true }.
+ * Gestor: PATCH /api/vendas/gestor/:id com body { solicitarEmissaoFiscal: true }.
  */
 export function useMarcarEmissaoFiscal() {
   const { auth } = useAuthStore()
@@ -605,18 +605,18 @@ export function useMarcarEmissaoFiscal() {
         throw new Error('Token não encontrado')
       }
 
-      const isGestor = params.tabelaOrigem === 'venda_gestor'
-      const url = isGestor
-        ? `/api/vendas/gestor/${params.id}`
-        : `/api/vendas/${params.id}/marcar-emissao-fiscal`
+      const url =
+        params.tabelaOrigem === 'venda_gestor'
+          ? `/api/vendas/gestor/${params.id}`
+          : `/api/vendas/${params.id}`
 
       const response = await fetch(url, {
-        method: isGestor ? 'PATCH' : 'POST',
+        method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: isGestor ? JSON.stringify({ solicitarEmissaoFiscal: true }) : undefined,
+        body: JSON.stringify({ solicitarEmissaoFiscal: true }),
       })
 
       if (!response.ok) {
@@ -645,8 +645,8 @@ export function useMarcarEmissaoFiscal() {
 /**
  * Hook para desmarcar uma venda da emissão fiscal (solicitarEmissaoFiscal = false).
  * Usado ao arrastar um card da coluna Pendente Emissão de volta para Finalizadas.
- * Gestor: usa PATCH /api/vendas/gestor/:id com body { solicitarEmissaoFiscal: false }.
- * PDV: usa POST /api/vendas/:id/desmarcar-emissao-fiscal.
+ * PDV: PATCH /api/vendas/:id com body { solicitarEmissaoFiscal: false }.
+ * Gestor: PATCH /api/vendas/gestor/:id com body { solicitarEmissaoFiscal: false }.
  */
 export function useDesmarcarEmissaoFiscal() {
   const { auth } = useAuthStore()
@@ -659,18 +659,18 @@ export function useDesmarcarEmissaoFiscal() {
         throw new Error('Token não encontrado')
       }
 
-      const isGestor = params.tabelaOrigem === 'venda_gestor'
-      const url = isGestor
-        ? `/api/vendas/gestor/${params.id}`
-        : `/api/vendas/${params.id}/desmarcar-emissao-fiscal`
+      const url =
+        params.tabelaOrigem === 'venda_gestor'
+          ? `/api/vendas/gestor/${params.id}`
+          : `/api/vendas/${params.id}`
 
       const response = await fetch(url, {
-        method: isGestor ? 'PATCH' : 'POST',
+        method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: isGestor ? JSON.stringify({ solicitarEmissaoFiscal: false }) : undefined,
+        body: JSON.stringify({ solicitarEmissaoFiscal: false }),
       })
 
       if (!response.ok) {
