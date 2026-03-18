@@ -13,7 +13,7 @@ import {
   useDraggable,
   useDroppable,
 } from '@dnd-kit/core'
-import { useMarcarEmissaoFiscal, useDuplicateVenda, useExcluirVendaGestor, useEmitirNfe, useEmitirNfeGestor, useReemitirNfe, useReemitirNfeGestor } from '@/src/presentation/hooks/useVendas'
+import { useMarcarEmissaoFiscal, useDesmarcarEmissaoFiscal, useDuplicateVenda, useExcluirVendaGestor, useEmitirNfe, useEmitirNfeGestor, useReemitirNfe, useReemitirNfeGestor } from '@/src/presentation/hooks/useVendas'
 import { useVendasUnificadas, VendaUnificadaDTO } from '@/src/presentation/hooks/useVendasUnificadas'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { MdReceipt, MdAdd, MdVisibility, MdSchedule, MdRefresh, MdCheckCircle, MdError, MdCancel, MdMoreVert } from 'react-icons/md'
@@ -47,7 +47,7 @@ type Venda = VendaUnificadaDTO
 type TipoVendaFiltro = 'balcao' | 'mesa' | 'delivery'
 type StatusVendaFiltro = 'TODAS' | 'ATIVAS' | 'CANCELADAS'
 
-/** Coluna droppable: recebe cards arrastados; em Pendente Emissão mostra slot "Solte aqui" quando isOver */
+/** Coluna droppable: Pendente Emissão = "marcar para emissão"; Finalizadas = "desmarcar da emissão" */
 function DroppableColumnContent({
   columnId,
   children,
@@ -58,15 +58,24 @@ function DroppableColumnContent({
   className?: string
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: columnId })
-  const showDropSlot = columnId === 'PENDENTE_EMISSAO' && isOver
+  const showDropSlotPendente = columnId === 'PENDENTE_EMISSAO' && isOver
+  const showDropSlotFinalizadas = columnId === 'FINALIZADAS' && isOver
+  const isOverClass =
+    showDropSlotPendente
+      ? 'ring-2 ring-yellow-400 ring-inset bg-yellow-50/50'
+      : showDropSlotFinalizadas
+        ? 'ring-2 ring-blue-400 ring-inset bg-blue-50/50'
+        : ''
   return (
-    <div
-      ref={setNodeRef}
-      className={`${className ?? ''} ${isOver ? 'ring-2 ring-yellow-400 ring-inset bg-yellow-50/50' : ''}`}
-    >
-      {showDropSlot && (
+    <div ref={setNodeRef} className={`${className ?? ''} ${isOverClass}`}>
+      {showDropSlotPendente && (
         <div className="min-h-[72px] border-2 border-dashed border-yellow-400 rounded-lg flex items-center justify-center bg-yellow-50/90 text-yellow-700 text-sm font-medium mb-2 transition-all">
           Solte aqui para marcar para emissão
+        </div>
+      )}
+      {showDropSlotFinalizadas && (
+        <div className="min-h-[72px] border-2 border-dashed border-blue-400 rounded-lg flex items-center justify-center bg-blue-50/90 text-blue-700 text-sm font-medium mb-2 transition-all">
+          Solte aqui para voltar à coluna Finalizadas
         </div>
       )}
       {children}
@@ -74,17 +83,14 @@ function DroppableColumnContent({
   )
 }
 
-/** Preview do card durante o arraste (segue o cursor com sombra e leve escala) */
+/** Preview do card durante o arraste: inclinado e com leve tremor (efeito de “arrastando na tela”) */
 function VendaCardDragPreview({ venda }: { venda: VendaUnificadaDTO }) {
   const valorFormatado = transformarParaReal(venda.valorFinal)
   const clienteNome = venda.cliente?.nome || 'Sem cliente'
   return (
-    <div
-      className="bg-white rounded border-2 border-gray-300 p-2.5 shadow-xl cursor-grabbing w-64 opacity-95"
-      style={{ transform: 'scale(1.02) rotate(1deg)' }}
-    >
-      <p className="text-xs text-gray-600 mb-0.5">Venda #{venda.numeroVenda}</p>
-      <p className="text-sm font-semibold text-gray-900 mb-0.5 uppercase truncate">{clienteNome}</p>
+    <div className="drag-preview-card bg-white rounded-lg border-2 border-gray-300 p-2.5 cursor-grabbing w-64 opacity-95 shadow-lg">
+      <p className="text-xs text-gray-500 mb-0.5">Venda #{venda.numeroVenda}</p>
+      <p className="text-sm font-semibold text-primary mb-0.5 uppercase truncate">{clienteNome}</p>
       <div className="mb-1.5 pb-1.5 border-b border-gray-200">
         <p className="text-xs text-gray-600">
           <span className="text-sm font-semibold text-gray-900">{valorFormatado}</span>
@@ -97,7 +103,7 @@ function VendaCardDragPreview({ venda }: { venda: VendaUnificadaDTO }) {
   )
 }
 
-/** Card draggable apenas na coluna Finalizadas (PDV ou Gestor) — arrastar para Pendente Emissão chama Marcar para Emissão */
+/** Card draggable em Finalizadas (→ Pendente Emissão) e em Pendente Emissão (→ Finalizadas); PDV e Gestor */
 function DraggableVendaCard({
   venda,
   column,
@@ -108,7 +114,7 @@ function DraggableVendaCard({
   children: React.ReactNode
 }) {
   const isDraggable =
-    column.id === 'FINALIZADAS' &&
+    (column.id === 'FINALIZADAS' || column.id === 'PENDENTE_EMISSAO') &&
     (venda.tabelaOrigem === 'venda' || venda.tabelaOrigem === 'venda_gestor')
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `venda-${venda.id}`,
@@ -173,7 +179,8 @@ export function FiscalFlowKanban() {
   }
   
   // Verificar se todos os filtros estão selecionados (equivalente a "todos")
-  const todosFiltrosSelecionados = tipoVendaFiltros.length === 3
+  // Por enquanto sem Delivery: "todos" = Balcão + Mesa (2). Quando reativar delivery, usar === 3
+  const todosFiltrosSelecionados = tipoVendaFiltros.length === 2
   
   // Calcular período do mês atual (formato ISO para o backend)
   const agora = new Date()
@@ -183,7 +190,8 @@ export function FiscalFlowKanban() {
   // Mapear filtros de tipo de venda para origem (sem "TODOS" — undefined = backend retorna tudo)
   const getOrigemFiltro = (): 'PDV' | 'GESTOR' | 'DELIVERY' | undefined => {
     if (todosFiltrosSelecionados || tipoVendaFiltros.length === 0) return undefined
-    if (tipoVendaFiltros.includes('delivery')) return 'DELIVERY'
+    // Por enquanto delivery não utilizado
+    // if (tipoVendaFiltros.includes('delivery')) return 'DELIVERY'
     if (tipoVendaFiltros.includes('balcao') || tipoVendaFiltros.includes('mesa')) return 'PDV'
     return undefined
   }
@@ -199,6 +207,7 @@ export function FiscalFlowKanban() {
   })
   
   const marcarEmissaoFiscal = useMarcarEmissaoFiscal()
+  const desmarcarEmissaoFiscal = useDesmarcarEmissaoFiscal()
   const duplicarVenda = useDuplicateVenda()
   const excluirVendaGestor = useExcluirVendaGestor()
   const emitirNfePdv = useEmitirNfe()
@@ -262,11 +271,11 @@ export function FiscalFlowKanban() {
         return tipoVendaFiltros.includes('balcao') || tipoVendaFiltros.includes('mesa')
       }
       
-      // Para delivery
-      if (v.isDelivery()) {
-        return tipoVendaFiltros.includes('delivery')
-      }
-      
+      // Por enquanto delivery não utilizado
+      // if (v.isDelivery()) {
+      //   return tipoVendaFiltros.includes('delivery')
+      // }
+      //
       // Para vendas do PDV, usar tipoVenda
       if (v.isVendaPdv()) {
         const tipoVenda = v.tipoVenda?.toLowerCase()
@@ -290,46 +299,10 @@ export function FiscalFlowKanban() {
 
   // Função para obter colunas baseadas no filtro de tipo de venda
   const getColumns = (): KanbanColumn[] => {
-    // Se nenhum filtro está selecionado, mostrar todas as colunas (incluindo delivery)
+    // Por enquanto sem colunas de delivery (Em análise, Em Produção, Prontos para Entrega, Com entregador)
+    // Se nenhum filtro está selecionado, mostrar apenas as 3 colunas finais
     if (tipoVendaFiltros.length === 0) {
-      // Sem filtro: mostrar todas as colunas (delivery + finais)
       return [
-        {
-          id: 'EM_ANALISE',
-          title: 'Em análise',
-          color: 'bg-blue-50',
-          borderColor: 'border-blue-400',
-          borderColorClass: 'border-l-blue-400',
-          icon: <MdSchedule className="w-4 h-4 text-blue-600" />,
-          placeholder: 'Pedidos em análise',
-        },
-        {
-          id: 'EM_PRODUCAO',
-          title: 'Em Produção',
-          color: 'bg-orange-50',
-          borderColor: 'border-orange-400',
-          borderColorClass: 'border-l-orange-400',
-          icon: <MdSchedule className="w-4 h-4 text-orange-600" />,
-          placeholder: 'Pedidos em produção',
-        },
-        {
-          id: 'PRONTOS_ENTREGA',
-          title: 'Prontos para Entrega',
-          color: 'bg-purple-50',
-          borderColor: 'border-purple-400',
-          borderColorClass: 'border-l-purple-400',
-          icon: <MdCheckCircle className="w-4 h-4 text-purple-600" />,
-          placeholder: 'Pedidos prontos para entrega',
-        },
-        {
-          id: 'COM_ENTREGADOR',
-          title: 'Com entregador',
-          color: 'bg-indigo-50',
-          borderColor: 'border-indigo-400',
-          borderColorClass: 'border-l-indigo-400',
-          icon: <MdSchedule className="w-4 h-4 text-indigo-600" />,
-          placeholder: 'Pedidos com entregador',
-        },
         {
           id: 'FINALIZADAS',
           title: 'Finalizadas',
@@ -359,46 +332,10 @@ export function FiscalFlowKanban() {
         },
       ]
     }
-    
-    // Se todos os filtros estão selecionados, mostrar todas as colunas
+
+    // Se todos os filtros estão selecionados (Balcão + Mesa), mostrar as 3 colunas finais
     if (todosFiltrosSelecionados) {
       return [
-        {
-          id: 'EM_ANALISE',
-          title: 'Em análise',
-          color: 'bg-blue-50',
-          borderColor: 'border-blue-400',
-          borderColorClass: 'border-l-blue-400',
-          icon: <MdSchedule className="w-4 h-4 text-blue-600" />,
-          placeholder: 'Pedidos em análise',
-        },
-        {
-          id: 'EM_PRODUCAO',
-          title: 'Em Produção',
-          color: 'bg-orange-50',
-          borderColor: 'border-orange-400',
-          borderColorClass: 'border-l-orange-400',
-          icon: <MdSchedule className="w-4 h-4 text-orange-600" />,
-          placeholder: 'Pedidos em produção',
-        },
-        {
-          id: 'PRONTOS_ENTREGA',
-          title: 'Prontos para Entrega',
-          color: 'bg-purple-50',
-          borderColor: 'border-purple-400',
-          borderColorClass: 'border-l-purple-400',
-          icon: <MdCheckCircle className="w-4 h-4 text-purple-600" />,
-          placeholder: 'Pedidos prontos para entrega',
-        },
-        {
-          id: 'COM_ENTREGADOR',
-          title: 'Com entregador',
-          color: 'bg-indigo-50',
-          borderColor: 'border-indigo-400',
-          borderColorClass: 'border-l-indigo-400',
-          icon: <MdSchedule className="w-4 h-4 text-indigo-600" />,
-          placeholder: 'Pedidos com entregador',
-        },
         {
           id: 'FINALIZADAS',
           title: 'Finalizadas',
@@ -428,52 +365,27 @@ export function FiscalFlowKanban() {
         },
       ]
     }
-    
-    // Verificar se delivery está selecionado
+
+    // Verificar se delivery está selecionado (código comentado: colunas de delivery não usadas por enquanto)
     const isDelivery = tipoVendaFiltros.includes('delivery')
-    
     // Verificar se balcão ou mesa estão selecionados (mas não delivery)
     const isBalcaoOuMesa = (tipoVendaFiltros.includes('balcao') || tipoVendaFiltros.includes('mesa')) && !isDelivery
 
-    // Colunas para Delivery (com etapas adicionais) - quando delivery está selecionado
+    // Colunas para Delivery (com etapas adicionais) - COMENTADO: não utilizado por enquanto
+    // if (isDelivery) {
+    //   return [
+    //     { id: 'EM_ANALISE', title: 'Em análise', ... },
+    //     { id: 'EM_PRODUCAO', title: 'Em Produção', ... },
+    //     { id: 'PRONTOS_ENTREGA', title: 'Prontos para Entrega', ... },
+    //     { id: 'COM_ENTREGADOR', title: 'Com entregador', ... },
+    //     { id: 'FINALIZADAS', ... },
+    //     { id: 'PENDENTE_EMISSAO', ... },
+    //     { id: 'COM_NFE', ... },
+    //   ]
+    // }
     if (isDelivery) {
+      // Quando reativar delivery, descomentar o bloco acima e remover este return
       return [
-        {
-          id: 'EM_ANALISE',
-          title: 'Em análise',
-          color: 'bg-blue-50',
-          borderColor: 'border-blue-400',
-          borderColorClass: 'border-l-blue-400',
-          icon: <MdSchedule className="w-4 h-4 text-blue-600" />,
-          placeholder: 'Pedidos em análise',
-        },
-        {
-          id: 'EM_PRODUCAO',
-          title: 'Em Produção',
-          color: 'bg-orange-50',
-          borderColor: 'border-orange-400',
-          borderColorClass: 'border-l-orange-400',
-          icon: <MdSchedule className="w-4 h-4 text-orange-600" />,
-          placeholder: 'Pedidos em produção',
-        },
-        {
-          id: 'PRONTOS_ENTREGA',
-          title: 'Prontos para Entrega',
-          color: 'bg-purple-50',
-          borderColor: 'border-purple-400',
-          borderColorClass: 'border-l-purple-400',
-          icon: <MdCheckCircle className="w-4 h-4 text-purple-600" />,
-          placeholder: 'Pedidos prontos para entrega',
-        },
-        {
-          id: 'COM_ENTREGADOR',
-          title: 'Com entregador',
-          color: 'bg-indigo-50',
-          borderColor: 'border-indigo-400',
-          borderColorClass: 'border-l-indigo-400',
-          icon: <MdSchedule className="w-4 h-4 text-indigo-600" />,
-          placeholder: 'Pedidos com entregador',
-        },
         {
           id: 'FINALIZADAS',
           title: 'Finalizadas',
@@ -537,45 +449,9 @@ export function FiscalFlowKanban() {
       ]
     }
 
-    // Se chegou aqui, deve ser delivery (já tratado acima) ou combinação delivery + balcão/mesa
-    // Nesse caso, mostrar todas as colunas
+    // Se chegou aqui (ex.: combinação delivery + balcão/mesa). Por enquanto sem colunas de delivery.
+    // return [ EM_ANALISE, EM_PRODUCAO, PRONTOS_ENTREGA, COM_ENTREGADOR, FINALIZADAS, PENDENTE_EMISSAO, COM_NFE ]
     return [
-      {
-        id: 'EM_ANALISE',
-        title: 'Em análise',
-        color: 'bg-blue-50',
-        borderColor: 'border-blue-400',
-        borderColorClass: 'border-l-blue-400',
-        icon: <MdSchedule className="w-4 h-4 text-blue-600" />,
-        placeholder: 'Pedidos em análise',
-      },
-      {
-        id: 'EM_PRODUCAO',
-        title: 'Em Produção',
-        color: 'bg-orange-50',
-        borderColor: 'border-orange-400',
-        borderColorClass: 'border-l-orange-400',
-        icon: <MdSchedule className="w-4 h-4 text-orange-600" />,
-        placeholder: 'Pedidos em produção',
-      },
-      {
-        id: 'PRONTOS_ENTREGA',
-        title: 'Prontos para Entrega',
-        color: 'bg-purple-50',
-        borderColor: 'border-purple-400',
-        borderColorClass: 'border-l-purple-400',
-        icon: <MdCheckCircle className="w-4 h-4 text-purple-600" />,
-        placeholder: 'Pedidos prontos para entrega',
-      },
-      {
-        id: 'COM_ENTREGADOR',
-        title: 'Com entregador',
-        color: 'bg-indigo-50',
-        borderColor: 'border-indigo-400',
-        borderColorClass: 'border-l-indigo-400',
-        icon: <MdSchedule className="w-4 h-4 text-indigo-600" />,
-        placeholder: 'Pedidos com entregador',
-      },
       {
         id: 'FINALIZADAS',
         title: 'Finalizadas',
@@ -656,6 +532,33 @@ export function FiscalFlowKanban() {
     return `${Math.floor(days / 365)}a`
   }
 
+  // Formatar data ISO para exibição no card (dd/MM/yyyy HH:mm)
+  const formatarDataCard = (dataISO: string | null | undefined): string => {
+    if (!dataISO) return '—'
+    try {
+      const d = new Date(dataISO)
+      if (Number.isNaN(d.getTime())) return '—'
+      return d.toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    } catch {
+      return '—'
+    }
+  }
+
+  // Capitalizar tipo de venda para exibição (balcao → Balcão, mesa → Mesa)
+  const formatarTipoVenda = (tipo: string | null | undefined): string => {
+    if (!tipo) return '—'
+    const t = tipo.toLowerCase()
+    if (t === 'balcao') return 'Balcão'
+    if (t === 'mesa') return 'Mesa'
+    return tipo.charAt(0).toUpperCase() + tipo.slice(1).toLowerCase()
+  }
+
 
 
   const handleMarcarEmissaoFiscal = async (vendaId: string, tabelaOrigem: 'venda' | 'venda_gestor') => {
@@ -666,15 +569,29 @@ export function FiscalFlowKanban() {
     }
   }
 
-  // Ao soltar card da coluna Finalizadas na coluna Pendente Emissão, marcar para emissão
+  // Ao soltar: Finalizadas → Pendente Emissão = marcar para emissão; Pendente Emissão → Finalizadas = desmarcar
+  // Só chama desmarcar se a venda estava marcada para emissão (solicitarEmissaoFiscal === true), evitando
+  // chamar o endpoint quando o usuário apenas solta de volta na coluna Finalizadas sem ter mudado de coluna.
   const handleDragEnd = (event: DragEndEvent) => {
     setDraggingVenda(null)
     const { active, over } = event
-    if (!over || over.id !== 'PENDENTE_EMISSAO') return
+    if (!over) return
     const venda = active.data.current?.venda as Venda | undefined
     if (!venda) return
-    setVendaRecemMovidaParaPendenteId(venda.id)
-    handleMarcarEmissaoFiscal(venda.id, venda.tabelaOrigem)
+    if (over.id === 'PENDENTE_EMISSAO') {
+      setVendaRecemMovidaParaPendenteId(venda.id)
+      handleMarcarEmissaoFiscal(venda.id, venda.tabelaOrigem)
+    } else if (over.id === 'FINALIZADAS' && venda.solicitarEmissaoFiscal === true) {
+      handleDesmarcarEmissaoFiscal(venda.id, venda.tabelaOrigem)
+    }
+  }
+
+  const handleDesmarcarEmissaoFiscal = async (vendaId: string, tabelaOrigem: 'venda' | 'venda_gestor') => {
+    try {
+      await desmarcarEmissaoFiscal.mutateAsync({ id: vendaId, tabelaOrigem })
+    } catch (error) {
+      console.error('Erro ao desmarcar emissão fiscal:', error)
+    }
   }
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -797,49 +714,14 @@ export function FiscalFlowKanban() {
 
 
 
-  // Obter vendas de delivery por status
+  // Obter vendas de delivery por status — COMENTADO: delivery não utilizado por enquanto
   // NOTA: Para delivery, o backend retorna vendas finalizadas OU com status '4' sem dataFinalizacao (COM_ENTREGADOR)
-  const getVendasDeliveryPorStatus = (status: string | number): Venda[] => {
-    // Usar todas as vendas unificadas
-    const todasVendasUnificadas = todasVendas
-    
-    // Se delivery está selecionado ou todos estão selecionados, filtrar delivery
-    const mostrarDelivery = todosFiltrosSelecionados || tipoVendaFiltros.length === 0 || tipoVendaFiltros.includes('delivery')
-    
-    const vendasFiltradas = mostrarDelivery
-      ? todasVendasUnificadas.filter((v: Venda) => v.isDelivery())
-      : []
-    
-    return vendasFiltradas.filter((venda: Venda) => {
-      // Delivery: verificar origem
-      if (!venda.isDelivery()) return false
-      
-      // Para delivery, as etapas são controladas por resumo_fiscal e dataFinalizacao
-      // Por enquanto, vamos usar a lógica baseada em dataFinalizacao e statusFiscal
-      // TODO: Implementar status_venda quando necessário
-      
-      const statusProcurado = status.toString()
-      
-      // Mapear status para etapas
-      if (statusProcurado === '1') {
-        // EM_ANALISE - vendas delivery sem dataFinalizacao e sem resumo fiscal
-        return !venda.dataFinalizacao && !venda.statusFiscal
-      }
-      if (statusProcurado === '2') {
-        // EM_PRODUCAO - similar
-        return !venda.dataFinalizacao && !venda.statusFiscal
-      }
-      if (statusProcurado === '3') {
-        // PRONTOS_ENTREGA
-        return !venda.dataFinalizacao && !venda.statusFiscal
-      }
-      if (statusProcurado === '4') {
-        // COM_ENTREGADOR - status 4 sem dataFinalizacao
-        return !venda.dataFinalizacao
-      }
-      
-      return false
-    })
+  const getVendasDeliveryPorStatus = (_status: string | number): Venda[] => {
+    // const todasVendasUnificadas = todasVendas
+    // const mostrarDelivery = todosFiltrosSelecionados || tipoVendaFiltros.length === 0 || tipoVendaFiltros.includes('delivery')
+    // const vendasFiltradas = mostrarDelivery ? todasVendasUnificadas.filter((v: Venda) => v.isDelivery()) : []
+    // return vendasFiltradas.filter((venda: Venda) => { ... })
+    return []
   }
 
   const getVendasByColumn = (columnId: string): Venda[] => {
@@ -855,43 +737,40 @@ export function FiscalFlowKanban() {
     const isBalcaoOuMesa = (tipoVendaFiltros.includes('balcao') || tipoVendaFiltros.includes('mesa')) && !isDelivery
     
     switch (columnId) {
-      // Colunas de Delivery - apenas se delivery estiver selecionado
-      case 'EM_ANALISE':
-        if (isDelivery || tipoVendaFiltros.length === 0 || todosFiltrosSelecionados) {
-          vendas = vendasParaFiltrar.filter((v: Venda) => {
-            if (!v.isDelivery()) return false
-            // Delivery sem dataFinalizacao e sem status fiscal = em análise
-            return !v.dataFinalizacao && !v.statusFiscal
-          })
-        }
-        break
-      case 'EM_PRODUCAO':
-        if (isDelivery || tipoVendaFiltros.length === 0 || todosFiltrosSelecionados) {
-          vendas = vendasParaFiltrar.filter((v: Venda) => {
-            if (!v.isDelivery()) return false
-            // Similar - por enquanto usar mesma lógica
-            return !v.dataFinalizacao && !v.statusFiscal
-          })
-        }
-        break
-      case 'PRONTOS_ENTREGA':
-        if (isDelivery || tipoVendaFiltros.length === 0 || todosFiltrosSelecionados) {
-          vendas = vendasParaFiltrar.filter((v: Venda) => {
-            if (!v.isDelivery()) return false
-            return !v.dataFinalizacao && !v.statusFiscal
-          })
-        }
-        break
-      case 'COM_ENTREGADOR':
-        if (isDelivery || tipoVendaFiltros.length === 0 || todosFiltrosSelecionados) {
-          // Delivery com dataFinalizacao mas sem status fiscal emitido
-          vendas = vendasParaFiltrar.filter((v: Venda) => {
-            if (!v.isDelivery()) return false
-            return v.dataFinalizacao && v.statusFiscal !== 'EMITIDA'
-          })
-        }
-        break
-      
+      // Colunas de Delivery — COMENTADO: não utilizado por enquanto
+      // case 'EM_ANALISE':
+      //   if (isDelivery || tipoVendaFiltros.length === 0 || todosFiltrosSelecionados) {
+      //     vendas = vendasParaFiltrar.filter((v: Venda) => {
+      //       if (!v.isDelivery()) return false
+      //       return !v.dataFinalizacao && !v.statusFiscal
+      //     })
+      //   }
+      //   break
+      // case 'EM_PRODUCAO':
+      //   if (isDelivery || tipoVendaFiltros.length === 0 || todosFiltrosSelecionados) {
+      //     vendas = vendasParaFiltrar.filter((v: Venda) => {
+      //       if (!v.isDelivery()) return false
+      //       return !v.dataFinalizacao && !v.statusFiscal
+      //     })
+      //   }
+      //   break
+      // case 'PRONTOS_ENTREGA':
+      //   if (isDelivery || tipoVendaFiltros.length === 0 || todosFiltrosSelecionados) {
+      //     vendas = vendasParaFiltrar.filter((v: Venda) => {
+      //       if (!v.isDelivery()) return false
+      //       return !v.dataFinalizacao && !v.statusFiscal
+      //     })
+      //   }
+      //   break
+      // case 'COM_ENTREGADOR':
+      //   if (isDelivery || tipoVendaFiltros.length === 0 || todosFiltrosSelecionados) {
+      //     vendas = vendasParaFiltrar.filter((v: Venda) => {
+      //       if (!v.isDelivery()) return false
+      //       return v.dataFinalizacao && v.statusFiscal !== 'EMITIDA'
+      //     })
+      //   }
+      //   break
+
       // Colunas comuns (FINALIZADAS, PENDENTE_EMISSAO, COM_NFE)
       case 'FINALIZADAS':
         // Vendas finalizadas sem solicitação fiscal e sem NFe emitida
@@ -1000,20 +879,21 @@ export function FiscalFlowKanban() {
           >
             Mesa
           </button>
-          <button
+          {/* Filtro Delivery — COMENTADO: não utilizado por enquanto */}
+          {/* <button
             onClick={() => toggleFiltro('delivery')}
             className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
               tipoVendaFiltros.includes('delivery')
                 ? 'bg-blue-600 text-white shadow-md'
                 : 'bg-white text-gray-700 hover:bg-gray-50'
             }`}
-            style={tipoVendaFiltros.includes('delivery') ? {} : { 
+            style={tipoVendaFiltros.includes('delivery') ? {} : {
               border: '2px dotted #9ca3af',
               borderStyle: 'dotted',
             }}
           >
             Delivery
-          </button>
+          </button> */}
           <div className="ml-3">
             <select
               value={statusVendaFiltro}
@@ -1074,7 +954,7 @@ export function FiscalFlowKanban() {
                       return (
                         <DraggableVendaCard key={venda.id} venda={venda} column={column}>
                         <div
-                          className={`bg-white rounded border-l-2 ${column.borderColorClass} border-t border-r border-b border-gray-200 p-2.5 hover:shadow-sm transition-shadow relative cursor-pointer`}
+                          className={`bg-white rounded-lg border-l-4 ${column.borderColorClass} border border-gray-200 p-3 hover:shadow-md transition-all relative cursor-pointer`}
                           onClick={() => handleViewDetails(venda)}
                         >
                           {/* Menu de três pontos no canto superior direito */}
@@ -1083,7 +963,7 @@ export function FiscalFlowKanban() {
                               e.stopPropagation()
                               toggleMenuAcoes(venda.id)
                             }}
-                            className="absolute top-1.5 right-1.5 p-0.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                            className="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
                             title="Mais opções"
                           >
                             <MdMoreVert className="w-4 h-4" />
@@ -1091,7 +971,7 @@ export function FiscalFlowKanban() {
 
                           {menuAcoesVendaIdAberto === venda.id && (
                             <div
-                              className="absolute top-7 right-2 z-20 w-36 bg-white border border-gray-200 rounded-lg shadow-lg py-1"
+                              className="absolute top-9 right-2 z-20 w-36 bg-white border border-gray-200 rounded-lg shadow-lg py-1"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <button
@@ -1116,17 +996,24 @@ export function FiscalFlowKanban() {
                             </div>
                           )}
 
-                          {/* Venda N° */}
-                          <p className="text-xs text-gray-600 mb-0.5">Venda #{venda.numeroVenda}</p>
+                          {/* Venda N° e Tipo */}
+                          <div className="flex items-center justify-between gap-2 mb-1 pr-6">
+                            <p className="text-xs text-gray-500">Venda #{venda.numeroVenda}</p>
+                            {venda.tipoVenda && (
+                              <span className="text-xs font-medium text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">
+                                {formatarTipoVenda(venda.tipoVenda)}
+                              </span>
+                            )}
+                          </div>
 
-                          {/* Nome do Cliente em destaque */}
-                          <p className="text-sm font-semibold text-gray-900 mb-0.5 uppercase truncate">
+                          {/* Nome do Cliente em destaque (cor primary) */}
+                          <p className="text-sm font-semibold text-primary mb-1 uppercase truncate pr-6">
                             {clienteNome}
                           </p>
 
                           {/* Status Fiscal e Número da Nota */}
                           {venda.statusFiscal && (
-                            <div className="mb-1">
+                            <div className="mb-1.5">
                               <StatusFiscalBadge status={venda.statusFiscal} />
                               {venda.numeroFiscal && venda.statusFiscal === 'EMITIDA' && (
                                 <div className="mt-1 inline-flex items-center gap-1 bg-green-100 text-green-800 px-2 py-0.5 rounded-md">
@@ -1141,7 +1028,7 @@ export function FiscalFlowKanban() {
                           )}
 
                           {/* Valor */}
-                          <div className="mb-1.5 pb-1.5 border-b border-gray-200">
+                          <div className="mb-1.5 pb-1.5 border-b border-gray-100">
                             <p className="text-xs text-gray-600">
                               <span className="text-sm font-semibold text-gray-900">
                                 {valorFormatado}
@@ -1149,26 +1036,38 @@ export function FiscalFlowKanban() {
                             </p>
                           </div>
 
-                          {/* Origem */}
-                          {venda.origem && (
-                            <p className="text-xs text-gray-500 mb-2">Origem: {venda.origem}</p>
-                          )}
+                          {/* Novos campos: Data finalização, Aberto por; Origem */}
+                          <div className="space-y-0.5 mb-2">
+                            {venda.dataFinalizacao && (
+                              <p className="text-xs text-gray-500">
+                                Finalizada: {formatarDataCard(venda.dataFinalizacao)}
+                              </p>
+                            )}
+                            {venda.abertoPor?.nome && (
+                              <p className="text-xs text-gray-500">
+                                Aberto por: {venda.abertoPor.nome}
+                              </p>
+                            )}
+                            {venda.origem && (
+                              <p className="text-xs text-gray-500">Origem: {venda.origem}</p>
+                            )}
+                          </div>
 
                           {/* Ações baseadas na coluna */}
                           <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
-                            {/* Ações para colunas de delivery (não mostram ações fiscais até finalizar) */}
-                            {['EM_ANALISE', 'EM_PRODUCAO', 'PRONTOS_ENTREGA', 'COM_ENTREGADOR'].includes(column.id) && (
+                            {/* Ações para colunas de delivery — COMENTADO: colunas não utilizadas por enquanto */}
+                            {/* {['EM_ANALISE', 'EM_PRODUCAO', 'PRONTOS_ENTREGA', 'COM_ENTREGADOR'].includes(column.id) && (
                               <div className="text-xs text-gray-500 italic w-full text-center py-1">
                                 Em andamento
                               </div>
-                            )}
+                            )} */}
 
-                            {/* Botão "Marcar para Emissão" para vendas PDV e Gestor finalizadas (sem solicitação fiscal ainda) */}
+                            {/* Botão "Marcar para Emissão" (primary) */}
                             {column.id === 'FINALIZADAS' && (venda.tabelaOrigem === 'venda' || venda.tabelaOrigem === 'venda_gestor') && (
                               <Button
                                 size="sm"
                                 variant="outlined"
-                                className="flex-1"
+                                className="flex-1 !border-primary !text-primary hover:!bg-primary/5"
                                 onClick={() => handleMarcarEmissaoFiscal(venda.id, venda.tabelaOrigem)}
                                 isLoading={marcarEmissaoFiscal.isPending}
                               >
@@ -1180,7 +1079,7 @@ export function FiscalFlowKanban() {
                               <Button
                                 size="sm"
                                 variant="contained"
-                                className="flex-1"
+                                className="flex-1 !bg-primary hover:!bg-primary/90"
                                 onClick={() => handleEmitirNfe(venda)}
                                 disabled={
                                   !!acaoFiscalEmAndamentoPorVenda[venda.id] ||
@@ -1220,7 +1119,7 @@ export function FiscalFlowKanban() {
                               <Button
                                 size="sm"
                                 variant="outlined"
-                                className="flex-1"
+                                className="flex-1 !border-primary !text-primary hover:!bg-primary/5"
                                 onClick={async () => {
                                   const url = `/api/nfe/${venda.documentoFiscalId}`
                                   const documentoLabel = venda.tipoDocFiscal === 'NFE' ? 'DANFE' : 'DANFCE'
@@ -1355,12 +1254,12 @@ export function FiscalFlowKanban() {
                               </Button>
                             )}
                             
-                            {/* Botão de visualizar detalhes sempre visível */}
+                            {/* Botão de visualizar detalhes (primary) */}
                             <Button
                               size="sm"
                               variant="text"
                               onClick={() => handleViewDetails(venda)}
-                              className="px-2"
+                              className="px-2 !text-primary hover:!bg-primary/10 min-w-0"
                               title="Ver detalhes"
                             >
                               <MdVisibility className="w-4 h-4" />

@@ -590,7 +590,9 @@ export function useDuplicateVenda() {
 }
 
 /**
- * Hook para marcar uma venda para emissão fiscal
+ * Hook para marcar uma venda para emissão fiscal (solicitarEmissaoFiscal = true).
+ * Gestor: usa PATCH /api/vendas/gestor/:id com body { solicitarEmissaoFiscal: true }.
+ * PDV: usa POST /api/vendas/:id/marcar-emissao-fiscal.
  */
 export function useMarcarEmissaoFiscal() {
   const { auth } = useAuthStore()
@@ -603,17 +605,18 @@ export function useMarcarEmissaoFiscal() {
         throw new Error('Token não encontrado')
       }
 
-      const url =
-        params.tabelaOrigem === 'venda_gestor'
-          ? `/api/vendas/gestor/${params.id}/marcar-emissao-fiscal`
-          : `/api/vendas/${params.id}/marcar-emissao-fiscal`
+      const isGestor = params.tabelaOrigem === 'venda_gestor'
+      const url = isGestor
+        ? `/api/vendas/gestor/${params.id}`
+        : `/api/vendas/${params.id}/marcar-emissao-fiscal`
 
       const response = await fetch(url, {
-        method: 'POST',
+        method: isGestor ? 'PATCH' : 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        body: isGestor ? JSON.stringify({ solicitarEmissaoFiscal: true }) : undefined,
       })
 
       if (!response.ok) {
@@ -639,6 +642,59 @@ export function useMarcarEmissaoFiscal() {
   })
 }
 
+/**
+ * Hook para desmarcar uma venda da emissão fiscal (solicitarEmissaoFiscal = false).
+ * Usado ao arrastar um card da coluna Pendente Emissão de volta para Finalizadas.
+ * Gestor: usa PATCH /api/vendas/gestor/:id com body { solicitarEmissaoFiscal: false }.
+ * PDV: usa POST /api/vendas/:id/desmarcar-emissao-fiscal.
+ */
+export function useDesmarcarEmissaoFiscal() {
+  const { auth } = useAuthStore()
+  const queryClient = useQueryClient()
+  const token = auth?.getAccessToken()
+
+  return useMutation({
+    mutationFn: async (params: { id: string; tabelaOrigem?: 'venda' | 'venda_gestor' }) => {
+      if (!token) {
+        throw new Error('Token não encontrado')
+      }
+
+      const isGestor = params.tabelaOrigem === 'venda_gestor'
+      const url = isGestor
+        ? `/api/vendas/gestor/${params.id}`
+        : `/api/vendas/${params.id}/desmarcar-emissao-fiscal`
+
+      const response = await fetch(url, {
+        method: isGestor ? 'PATCH' : 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: isGestor ? JSON.stringify({ solicitarEmissaoFiscal: false }) : undefined,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = resolveDomainErrorMessage(
+          errorData,
+          `Erro ${response.status}: ${response.statusText}`
+        )
+        throw new Error(errorMessage)
+      }
+
+      return await response.json()
+    },
+    onSuccess: (_, params) => {
+      queryClient.invalidateQueries({ queryKey: ['vendas'] })
+      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      queryClient.invalidateQueries({ queryKey: ['venda', params.id] })
+      showToast.success('Venda desmarcada da emissão fiscal.')
+    },
+    onError: (error: Error) => {
+      showToast.error(error.message || 'Erro ao desmarcar emissão fiscal')
+    },
+  })
+}
 
 /**
  * Hook para emitir NFe (NFC-e ou NF-e) para uma venda PDV.
