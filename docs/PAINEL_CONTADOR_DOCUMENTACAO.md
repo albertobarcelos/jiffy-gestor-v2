@@ -211,8 +211,8 @@ Cada etapa é um componente independente:
 | Método | Endpoint | Descrição | Headers | Body |
 |--------|----------|-----------|---------|------|
 | `GET` | `/api/v1/fiscal/configuracoes/emissao` | Lista todas configurações de numeração | `Authorization: Bearer {token}` | - |
-| `PUT` | `/api/v1/fiscal/configuracoes/emissao/55` | Cria/atualiza configuração NF-e (modelo 55) | `Authorization: Bearer {token}`, `Content-Type: application/json` | `{ modelo: 55, serie, numeroInicial, terminalId: null, nfeAtivo, ambiente }` |
-| `PUT` | `/api/v1/fiscal/configuracoes/emissao/65` | Cria/atualiza configuração NFC-e (modelo 65) | `Authorization: Bearer {token}`, `Content-Type: application/json` | `{ modelo: 65, serie, numeroInicial, terminalId: null, nfceAtivo, nfceCscId, nfceCscCodigo, ambiente }` |
+| `PUT` | `/api/v1/fiscal/configuracoes/emissao/55` | Cria/atualiza configuração NF-e (modelo 55) | `Authorization: Bearer {token}`, `Content-Type: application/json` | Body do gestor: `{ modelo, serie, numeroInicial, terminalId: null, nfeAtivo, ambiente }`. O BFF repassa ao microserviço JSON alinhado ao OpenAPI (`serie`, `numeroInicial`, `ativo` ← `nfeAtivo`, **`ambiente`**, etc.) e mantém `?ambiente=` na URL. |
+| `PUT` | `/api/v1/fiscal/configuracoes/emissao/65` | Cria/atualiza configuração NFC-e (modelo 65) | `Authorization: Bearer {token}`, `Content-Type: application/json` | Idem, com `nfceAtivo` → `ativo` e CSC quando aplicável; **`ambiente`** vai no JSON enviado ao fiscal. |
 
 **Resposta GET `/api/v1/fiscal/configuracoes/emissao`:**
 ```json
@@ -817,7 +817,7 @@ useEffect(() => {
 1. Componente monta
 2. Verifica isRehydrated e token
 3. Busca configurações: GET /api/v1/fiscal/configuracoes/emissao
-4. Seleciona configuração principal para NF-e (modelo 55) e NFC-e (modelo 65)
+4. Seleciona uma linha inicial por modelo (55/65) a partir do GET: se **apenas uma** configuração vier com `ativo === true`, usa essa; senão, produção antes de homologação. Série, próxima emissão (e CSC na NFC-e) vêm dessa linha ao abrir/recarregar. **Trocar só o select de ambiente não dispara novo fetch** — mantém os valores atuais do formulário; persistência no banco ocorre ao clicar em Salvar para o ambiente selecionado.
 5. Preenche formulários com dados encontrados
 6. Usuário pode:
    - Ativar/desativar NF-e via toggle
