@@ -73,15 +73,21 @@ export function toNumeracaoView(data: EmissaoResponse): NumeracaoView {
   }
 }
 
+/**
+ * Monta o JSON enviado ao microserviço. O OpenAPI documenta `ambiente` no body;
+ * sem esse campo, alguns backends aplicam a alteração só em produção mesmo com ?ambiente= na URL.
+ */
 export function buildEmissaoPayload(
   body: any,
   modelo: number,
+  ambiente: AmbienteFiscal,
   fallbackSerie?: number
 ) {
   return {
     serie: Number(body?.serie ?? fallbackSerie ?? 1),
     numeroInicial: Number(body?.numeroInicial),
     ativo: modelo === 55 ? Boolean(body?.nfeAtivo) : Boolean(body?.nfceAtivo),
+    ambiente,
     nfceCscId: body?.nfceCscId || undefined,
     nfceCscCodigo: body?.nfceCscCodigo || undefined,
   }

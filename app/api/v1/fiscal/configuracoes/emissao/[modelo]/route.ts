@@ -88,7 +88,7 @@ export async function PUT(
     }
     const ambiente = normalizeAmbiente(ambienteValue)
     const apiClient = new ApiClient()
-    const payload = buildEmissaoPayload(body, modeloNumber)
+    const payload = buildEmissaoPayload(body, modeloNumber, ambiente)
 
     const response = await apiClient.request<EmissaoResponse>(
       `/api/v1/fiscal/configuracoes/emissao/${modeloNumber}?ambiente=${ambiente}`,

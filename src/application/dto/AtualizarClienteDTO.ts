@@ -24,6 +24,8 @@ export const AtualizarClienteSchema = z.object({
       estado: z.string().optional(),
       cep: z.string().optional(),
       complemento: z.string().optional(),
+      codigoCidadeIbge: z.string().optional(),
+      codigoEstadoIbge: z.string().optional(),
     })
     .optional(),
 })

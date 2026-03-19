@@ -44,18 +44,12 @@ export class VendaUnificadaDTO {
     }
 
     isPendenteEmissao(): boolean {
-        // Vendas GESTOR: sempre pendentes de emissão quando finalizadas (exceto se já emitida)
+        // Vendas GESTOR: pendentes apenas quando foram marcadas para emissão (solicitarEmissaoFiscal), igual ao PDV
         // Vendas PDV: pendentes apenas se foram marcadas para emissão
-        if (this.dataCancelamento) {
-            return false
-        }
-
-        if (this.statusFiscal === 'CANCELADA') {
-            return false
-        }
+        if (this.isCancelada()) return false
 
         if (this.isVendaGestor()) {
-            return !!this.dataFinalizacao && this.statusFiscal !== 'EMITIDA';
+            return !!this.solicitarEmissaoFiscal && this.statusFiscal !== 'EMITIDA';
         }
 
         return this.solicitarEmissaoFiscal && this.statusFiscal !== 'EMITIDA';
@@ -80,6 +74,11 @@ export class VendaUnificadaDTO {
         return this.origem === 'DELIVERY_IFOOD' || this.origem === 'DELIVERY_UBER';
     }
 
+    /** Venda cancelada: por dataCancelamento ou por statusFiscal CANCELADA (API pode não enviar dataCancelamento) */
+    isCancelada(): boolean {
+        return !!this.dataCancelamento || this.statusFiscal === 'CANCELADA';
+    }
+
     getEtapaKanban(): string {
         if (this.temNFeEmitida()) return 'COM_NFE';
         if (this.isPendenteEmissao()) return 'PENDENTE_EMISSAO';
@@ -89,17 +88,19 @@ export class VendaUnificadaDTO {
 }
 
 /**
- * Parâmetros alinhados ao contrato do backend:
- * - Filtros: origem, statusFiscal, periodoInicial, periodoFinal
- * - Paginação: offset, limit
- * - empresaId vem do JWT (backend extrai de req.user)
+ * Parâmetros alinhados ao contrato do backend GET /vendas/unificado:
+ * - origem, statusFiscal, periodoInicial, periodoFinal (dataCriacao)
+ * - dataFinalizacaoInicio, dataFinalizacaoFim
+ * - q (busca), offset, limit
  */
 interface VendasUnificadasQueryParams {
     origem?: 'PDV' | 'GESTOR' | 'DELIVERY'
     statusFiscal?: string
-    incluirCanceladas?: boolean
-    periodoInicial?: string // ISO date string
-    periodoFinal?: string   // ISO date string
+    periodoInicial?: string // ISO date string (dataCriacao)
+    periodoFinal?: string   // ISO date string (dataCriacao)
+    dataFinalizacaoInicio?: string // ISO date string
+    dataFinalizacaoFim?: string    // ISO date string
+    q?: string                     // termo de busca
     offset?: number
     limit?: number
 }
@@ -135,9 +136,11 @@ export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
             const searchParams = new URLSearchParams()
             if (params.origem) searchParams.append('origem', params.origem)
             if (params.statusFiscal) searchParams.append('statusFiscal', params.statusFiscal)
-            if (params.incluirCanceladas) searchParams.append('incluirCanceladas', 'true')
             if (params.periodoInicial) searchParams.append('periodoInicial', params.periodoInicial)
             if (params.periodoFinal) searchParams.append('periodoFinal', params.periodoFinal)
+            if (params.dataFinalizacaoInicio) searchParams.append('dataFinalizacaoInicio', params.dataFinalizacaoInicio)
+            if (params.dataFinalizacaoFim) searchParams.append('dataFinalizacaoFim', params.dataFinalizacaoFim)
+            if (params.q?.trim()) searchParams.append('q', params.q.trim())
             if (params.offset != null) searchParams.append('offset', params.offset.toString())
             if (params.limit) searchParams.append('limit', params.limit.toString())
 
@@ -170,7 +173,7 @@ export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
                 v.totalAcrescimo,
                 v.dataCriacao,
                 v.dataFinalizacao,
-                v.dataCancelamento,
+                v.dataCancelamento ?? null, // API pode não retornar; considerar cancelada por statusFiscal
                 v.cliente,
                 v.solicitarEmissaoFiscal,
                 v.statusFiscal,

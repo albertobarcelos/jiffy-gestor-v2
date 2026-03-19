@@ -66,6 +66,27 @@
     opacity: 1;
     transform: translate(-50%, -50%);
   }
+
+  /* Efeito visual ao arrastar card no Kanban: inclinado + leve tremor como se estivesse sendo puxado */
+  @keyframes drag-card-shake {
+    0%,
+    100% {
+      transform: scale(1.05) rotate(-5deg) translateY(0);
+    }
+    25% {
+      transform: scale(1.05) rotate(-6deg) translateY(-2px);
+    }
+    50% {
+      transform: scale(1.05) rotate(-4deg) translateY(0);
+    }
+    75% {
+      transform: scale(1.05) rotate(-6deg) translateY(-2px);
+    }
+  }
+  .drag-preview-card {
+    animation: drag-card-shake 0.18s ease-in-out infinite;
+    box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  }
 }
 
 /**

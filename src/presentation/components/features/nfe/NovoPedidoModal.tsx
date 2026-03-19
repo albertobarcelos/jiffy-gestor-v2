@@ -16,7 +16,7 @@ import { useCreateVendaGestor } from '@/src/presentation/hooks/useVendas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { extractTokenInfo } from '@/src/shared/utils/validateToken'
-import { MdLaunch, MdDelete, MdClear, MdSearch, MdArrowForward, MdArrowBack, MdCheckCircle, MdAttachMoney, MdCreditCard, MdQrCode, MdPerson, MdStore, MdPersonOutline, MdInfo, MdAdd, MdRemove, MdClose, MdEdit } from 'react-icons/md'
+import { MdLaunch, MdDelete, MdClear, MdSearch, MdArrowForward, MdArrowBack, MdCheckCircle, MdAttachMoney, MdCreditCard, MdQrCode, MdPerson, MdStore, MdPersonOutline, MdInfo, MdAdd, MdRemove, MdClose, MdEdit, MdExpandLess, MdExpandMore } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { SeletorClienteModal } from './SeletorClienteModal'
@@ -25,6 +25,9 @@ interface NovoPedidoModalProps {
   open: boolean
   onClose: () => void
   onSuccess: () => void
+  // Props opcionais para visualizar venda existente
+  vendaId?: string // ID da venda_gestor para carregar e visualizar
+  modoVisualizacao?: boolean // Se true, abre direto na step 4 em modo apenas visualização
 }
 
 interface ComplementoSelecionado {
@@ -46,6 +49,7 @@ interface ProdutoSelecionado {
   valorDesconto?: number | null
   tipoAcrescimo?: 'fixo' | 'porcentagem' | null
   valorAcrescimo?: number | null
+  valorFinal?: number | null // Valor final do produto quando carregado do backend (já calculado)
 }
 
 interface PagamentoSelecionado {
@@ -56,7 +60,7 @@ interface PagamentoSelecionado {
 type OrigemVenda = 'GESTOR' | 'IFOOD' | 'RAPPI' | 'OUTROS'
 type StatusVenda = 'ABERTA' | 'FINALIZADA' | 'PENDENTE_EMISSAO'
 
-export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalProps) {
+export function NovoPedidoModal({ open, onClose, onSuccess, vendaId, modoVisualizacao }: NovoPedidoModalProps) {
   const { auth } = useAuthStore()
   const createVendaGestor = useCreateVendaGestor()
   
@@ -69,12 +73,19 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
   const [meioPagamentoId, setMeioPagamentoId] = useState<string>('')
   const [valorRecebido, setValorRecebido] = useState<string>('')
   const [grupoSelecionadoId, setGrupoSelecionadoId] = useState<string | null>(null)
+  // Lista de grupos recolhível no passo 2: quando oculta, a área de produtos selecionados aumenta
+  const [gruposExpandido, setGruposExpandido] = useState(true)
   const [seletorClienteOpen, setSeletorClienteOpen] = useState(false)
   const [tooltipGrupoId, setTooltipGrupoId] = useState<string | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null)
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1)
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1)
   const [nomeUsuario, setNomeUsuario] = useState<string>('')
   const [isLoadingUsuario, setIsLoadingUsuario] = useState(false)
+  
+  // Estados para carregamento de venda existente
+  const [isLoadingVenda, setIsLoadingVenda] = useState(false)
+  const [dataVenda, setDataVenda] = useState<string>('') // Data da venda para exibição
+  const [valorFinalVenda, setValorFinalVenda] = useState<number | null>(null) // Valor final da venda do backend (quando carregando pedido existente)
   
   // Estado para controlar valores em edição (índice do produto ou chave do complemento -> valor string)
   const [valoresEmEdicao, setValoresEmEdicao] = useState<Record<string | number, string>>({})
@@ -123,7 +134,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
   const hasMovedMeiosPagamentoRef = useRef(false)
 
   // Buscar grupos de produtos
-  const { data: gruposData, isLoading: isLoadingGrupos } = useGruposProdutos({
+  const { data: gruposData, isLoading: isLoadingGrupos, refetch: refetchGrupos } = useGruposProdutos({
     ativo: true,
     limit: 100,
   })
@@ -302,10 +313,31 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     document.addEventListener('mouseup', handleGlobalMouseUp)
   }, [])
   
-  // Ordenar grupos por nome
+  // Ordenar grupos por ordem (campo ordem da API)
   const grupos = useMemo(() => {
     if (!gruposData) return []
-    return [...gruposData].sort((a, b) => a.getNome().localeCompare(b.getNome()))
+    return [...gruposData].sort((a, b) => {
+      const ordemA = a.getOrdem()
+      const ordemB = b.getOrdem()
+      
+      // Se ambos têm ordem, ordenar numericamente
+      if (ordemA !== undefined && ordemB !== undefined) {
+        return ordemA - ordemB
+      }
+      
+      // Se apenas A tem ordem, A vem primeiro
+      if (ordemA !== undefined && ordemB === undefined) {
+        return -1
+      }
+      
+      // Se apenas B tem ordem, B vem primeiro
+      if (ordemA === undefined && ordemB !== undefined) {
+        return 1
+      }
+      
+      // Se nenhum tem ordem, usar ordem alfabética como fallback
+      return a.getNome().localeCompare(b.getNome())
+    })
   }, [gruposData])
   
   // Ordenar produtos por nome
@@ -422,6 +454,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
   }
 
   // Função para formatar desconto/acréscimo para exibição
+  // Em tipo porcentagem exibe "Desc. X%" ou "Acres. X%"; em tipo fixo exibe o valor em R$
   const formatarDescontoAcrescimo = (produto: ProdutoSelecionado): string => {
     const valorProduto = produto.valorUnitario * produto.quantidade
     const valorComplementos = calcularTotalComplementos(produto)
@@ -429,12 +462,11 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     
     // Verificar desconto
     if (produto.tipoDesconto && produto.valorDesconto) {
-      let valorDesconto = 0
       if (produto.tipoDesconto === 'porcentagem') {
-        valorDesconto = subtotal * (produto.valorDesconto / 100)
-      } else {
-        valorDesconto = produto.valorDesconto
+        const pct = produto.valorDesconto
+        return `Desc. ${Number.isInteger(pct) ? pct : formatarNumeroComMilhar(pct)}%`
       }
+      const valorDesconto = produto.valorDesconto
       if (valorDesconto > 0) {
         return `Desc. -${formatarNumeroComMilhar(valorDesconto)}`
       }
@@ -442,12 +474,11 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     
     // Verificar acréscimo
     if (produto.tipoAcrescimo && produto.valorAcrescimo) {
-      let valorAcrescimo = 0
       if (produto.tipoAcrescimo === 'porcentagem') {
-        valorAcrescimo = subtotal * (produto.valorAcrescimo / 100)
-      } else {
-        valorAcrescimo = produto.valorAcrescimo
+        const pct = produto.valorAcrescimo
+        return `Acres. ${Number.isInteger(pct) ? pct : formatarNumeroComMilhar(pct)}%`
       }
+      const valorAcrescimo = produto.valorAcrescimo
       if (valorAcrescimo > 0) {
         return `Acres. +${formatarNumeroComMilhar(valorAcrescimo)}`
       }
@@ -456,14 +487,21 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     return ''
   }
 
-  // Calcular totais do pedido (produtos com desconto/acréscimo já incluindo complementos)
+  // Calcular totais do pedido
+  // Se estiver carregando um pedido existente, usar valorFinal do backend
+  // Caso contrário, calcular a partir dos produtos
   const totalProdutos = useMemo(() => {
+    // Se temos valorFinal da venda (pedido existente), usar ele diretamente
+    if (valorFinalVenda !== null) {
+      return valorFinalVenda
+    }
+    // Para novo pedido, calcular a partir dos produtos
     return produtos.reduce((sum, p) => {
       // calcularTotalProduto já inclui complementos e aplica desconto/acréscimo sobre o total
       const totalProduto = calcularTotalProduto(p)
       return sum + totalProduto
     }, 0)
-  }, [produtos])
+  }, [produtos, valorFinalVenda])
 
   const totalPagamentos = useMemo(() => {
     return pagamentos.reduce((sum, p) => sum + p.valor, 0)
@@ -899,30 +937,60 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     }
 
     try {
-      // Construir payload para venda_gestor
+      // Mapear produtos para o payload (valorFinal por produto = total já calculado da linha)
+      const produtosLancados = produtos.map(p => {
+        // Converter valores de desconto/acréscimo para o formato esperado pelo backend
+        let valorDescontoFinal: number | null = null
+        let valorAcrescimoFinal: number | null = null
+
+        if (p.tipoDesconto && p.valorDesconto !== null && p.valorDesconto !== undefined) {
+          valorDescontoFinal =
+            p.tipoDesconto === 'porcentagem' ? p.valorDesconto / 100 : p.valorDesconto
+        }
+        if (p.tipoAcrescimo && p.valorAcrescimo !== null && p.valorAcrescimo !== undefined) {
+          valorAcrescimoFinal =
+            p.tipoAcrescimo === 'porcentagem' ? p.valorAcrescimo / 100 : p.valorAcrescimo
+        }
+
+        // valorFinal do produto = total da linha (unitário + complementos + desconto/acréscimo)
+        const valorFinalProduto = calcularTotalProduto(p)
+
+        return {
+          produtoId: p.produtoId,
+          quantidade: p.quantidade,
+          valorUnitario: p.valorUnitario,
+          valorFinal: valorFinalProduto,
+          tipoDesconto: p.tipoDesconto || null,
+          valorDesconto: valorDescontoFinal,
+          tipoAcrescimo: p.tipoAcrescimo || null,
+          valorAcrescimo: valorAcrescimoFinal,
+          complementos: (p.complementos || []).map(comp => ({
+            complementoId: comp.id,
+            grupoComplementoId: comp.grupoId,
+            valorUnitario: comp.valor,
+            quantidade: comp.quantidade,
+          })),
+        }
+      })
+
+      // Payload: valorFinal (raiz) = total da venda; produtosLancados = array com valorFinal por produto
+      // statusVenda = valor escolhido no passo 1 (ABERTA | FINALIZADA | PENDENTE_EMISSAO)
       const vendaData: any = {
+        tipoVenda: 'balcao',
         origem,
+        statusVenda: status,
         valorFinal: totalProdutos,
         totalDesconto: 0,
         totalAcrescimo: 0,
-        produtos: produtos.map(p => {
-          return {
-            produtoId: p.produtoId,
-            quantidade: p.quantidade,
-            valorUnitario: p.valorUnitario,
-            tipoDesconto: p.tipoDesconto || null,
-            valorDesconto: p.valorDesconto || null,
-            tipoAcrescimo: p.tipoAcrescimo || null,
-            valorAcrescimo: p.valorAcrescimo || null,
-            complementos: (p.complementos || []).map(comp => ({
-              complementoId: comp.id,
-              grupoComplementoId: comp.grupoId,
-              valorUnitario: comp.valor,
-              quantidade: comp.quantidade,
-            })),
-          };
-        }),
+        produtosLancados,
+        produtos: produtosLancados, // alias para compatibilidade
       }
+
+      // solicitarEmissaoFiscal: true apenas quando status é PENDENTE_EMISSAO, false nos demais casos
+      vendaData.solicitarEmissaoFiscal = status === 'PENDENTE_EMISSAO'
+
+      // Log para debug
+      console.log('📤 Payload sendo enviado:', JSON.stringify(vendaData, null, 2))
 
       // Adicionar clienteId se selecionado
       if (clienteId) {
@@ -941,16 +1009,11 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
         vendaData.pagamentos = []
       }
 
-      // Se PENDENTE_EMISSAO, marcar flag para criar resumo fiscal automaticamente
-      if (status === 'PENDENTE_EMISSAO') {
-        vendaData.solicitarEmissaoFiscal = true
-      }
-
       const resultado = await createVendaGestor.mutateAsync(vendaData)
       console.log('✅ Venda criada com sucesso:', resultado)
       showToast.success('Pedido criado com sucesso!')
-      resetForm()
-      onSuccess()
+      // Ir para step 4 (Detalhes da Venda) após criar o pedido
+      setCurrentStep(4)
     } catch (error: any) {
       console.error('❌ Erro ao criar pedido:', error)
       console.error('❌ Detalhes do erro:', {
@@ -1002,6 +1065,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     setEhAcrescimo(false)
     setEhPorcentagem(false)
     setValorDescontoAcrescimo('0')
+    setValorFinalVenda(null) // Limpar valor final ao resetar
     
     // Limpar timeouts de long press de complementos
     if (longPressComplementoTimeoutRef.current) {
@@ -1025,10 +1089,21 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
 
   // Verifica se há dados da venda que seriam perdidos
   const temDadosVenda = () => {
+    // Em modo visualização, não há dados a perder
+    if (vendaId && modoVisualizacao) {
+      return false
+    }
     return produtos.length > 0 || pagamentos.length > 0 || clienteId !== '' || currentStep > 1
   }
 
   const handleClose = () => {
+    // Em modo visualização, fechar diretamente sem confirmação
+    if (vendaId && modoVisualizacao) {
+      resetForm()
+      onClose()
+      return
+    }
+    
     if (temDadosVenda()) {
       setModalConfirmacaoSaidaOpen(true)
     } else {
@@ -1048,10 +1123,284 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     setModalConfirmacaoSaidaOpen(false)
   }
 
+  // Função para carregar dados de uma venda existente
+  const carregarVendaExistente = useCallback(async () => {
+    if (!vendaId || !open || !auth) return
+
+    const token = auth.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado')
+      return
+    }
+
+    setIsLoadingVenda(true)
+
+    try {
+      // Buscar dados da venda_gestor
+      const response = await fetch(`/api/vendas/gestor/${vendaId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || errorData.message || 'Erro ao carregar venda')
+      }
+
+      const vendaData = await response.json()
+
+      // Debug: verificar estrutura dos dados retornados
+      console.log('📦 Dados da venda carregados:', {
+        produtosLancados: vendaData.produtosLancados,
+        produtos: vendaData.produtos,
+        produtosLancadosLength: vendaData.produtosLancados?.length,
+        produtosLength: vendaData.produtos?.length,
+      })
+
+      // Mapear dados da venda para os estados do componente
+      // Origem
+      if (vendaData.origem) {
+        setOrigem(vendaData.origem as OrigemVenda)
+      }
+
+      // Status
+      if (vendaData.statusVenda) {
+        setStatus(vendaData.statusVenda as StatusVenda)
+      } else if (vendaData.dataFinalizacao) {
+        setStatus('FINALIZADA')
+      } else {
+        setStatus('ABERTA')
+      }
+
+      // Cliente
+      if (vendaData.clienteId) {
+        setClienteId(vendaData.clienteId)
+        // Buscar nome do cliente
+        try {
+          const clienteResponse = await fetch(`/api/clientes/${vendaData.clienteId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          })
+          if (clienteResponse.ok) {
+            const clienteData = await clienteResponse.json()
+            setClienteNome(clienteData.nome || clienteData.name || '')
+          }
+        } catch (error) {
+          console.error('Erro ao buscar nome do cliente:', error)
+        }
+      }
+
+      // Data da venda
+      if (vendaData.dataCriacao) {
+        setDataVenda(vendaData.dataCriacao)
+      } else if (vendaData.dataFinalizacao) {
+        setDataVenda(vendaData.dataFinalizacao)
+      }
+
+      // Valor final da venda (já calculado pelo backend)
+      if (vendaData.valorFinal !== undefined && vendaData.valorFinal !== null) {
+        setValorFinalVenda(vendaData.valorFinal)
+      } else {
+        setValorFinalVenda(null)
+      }
+
+      // Produtos - Verificar tanto produtosLancados quanto produtos
+      // A API pode retornar em qualquer um dos formatos
+      const produtosRaw = vendaData.produtosLancados || vendaData.produtos
+      
+      if (produtosRaw && Array.isArray(produtosRaw)) {
+        const produtosMapeados: ProdutoSelecionado[] = produtosRaw
+          .filter((prod: any) => !prod.removido) // Filtrar produtos removidos
+          .map((prod: any) => {
+            // Buscar nome do produto
+            let nomeProduto = prod.nomeProduto || prod.nome || 'Produto sem nome'
+            
+            // Mapear complementos garantindo que todos os campos estejam presentes
+            const complementosMapeados: ComplementoSelecionado[] = Array.isArray(prod.complementos) 
+              ? prod.complementos.map((comp: any) => {
+                  // Normalizar tipoImpactoPreco (pode vir como string ou já no formato correto)
+                  let tipoImpactoPreco: 'aumenta' | 'diminui' | 'nenhum' = 'nenhum'
+                  if (comp.tipoImpactoPreco) {
+                    const tipo = String(comp.tipoImpactoPreco).toLowerCase()
+                    if (tipo === 'aumenta' || tipo === 'increase') {
+                      tipoImpactoPreco = 'aumenta'
+                    } else if (tipo === 'diminui' || tipo === 'decrease') {
+                      tipoImpactoPreco = 'diminui'
+                    } else {
+                      tipoImpactoPreco = 'nenhum'
+                    }
+                  }
+                  
+                  return {
+                    id: comp.complementoId || comp.id || '',
+                    grupoId: comp.grupoComplementoId || comp.grupoId || '',
+                    nome: comp.nomeComplemento || comp.nome || 'Complemento',
+                    valor: comp.valorUnitario || comp.valor || 0,
+                    quantidade: comp.quantidade || 1,
+                    tipoImpactoPreco,
+                  }
+                })
+              : []
+
+            // Mapear campos de desconto/acréscimo diretamente do backend
+            let tipoDescontoFinal = prod.tipoDesconto || null
+            let valorDescontoFinal: number | null = typeof prod.valorDesconto === 'string' ? parseFloat(prod.valorDesconto) : (prod.valorDesconto || null)
+            let tipoAcrescimoFinal = prod.tipoAcrescimo || null
+            let valorAcrescimoFinal: number | null = typeof prod.valorAcrescimo === 'string' ? parseFloat(prod.valorAcrescimo) : (prod.valorAcrescimo || null)
+            
+            // Subtotal do produto (para detectar se backend salvou valor em R$ em vez de taxa)
+            const valorProdutoSubtotal = (prod.valorUnitario || 0) * (prod.quantidade || 1)
+            const valorComplementosSubtotal = (complementosMapeados as ComplementoSelecionado[]).reduce(
+              (sum, comp) => {
+                const tipo = comp.tipoImpactoPreco || 'nenhum'
+                const valorTotal = comp.valor * comp.quantidade * (prod.quantidade || 1)
+                if (tipo === 'aumenta') return sum + valorTotal
+                if (tipo === 'diminui') return sum - valorTotal
+                return sum
+              },
+              0
+            )
+            const subtotalProduto = valorProdutoSubtotal + valorComplementosSubtotal
+
+            // Se o backend retorna porcentagem como decimal (0.1 = 10%), converter para porcentagem (10 = 10%)
+            // O frontend trabalha com porcentagem 0-100, não decimal 0-1
+            // Se o backend salvou errado o valor em R$ (ex.: 2.10) em vez da taxa (0.1), detectar e converter para %
+            if (tipoDescontoFinal === 'porcentagem' && valorDescontoFinal !== null && valorDescontoFinal !== undefined) {
+              if (valorDescontoFinal < 1 && valorDescontoFinal > 0) {
+                valorDescontoFinal = valorDescontoFinal * 100
+              } else if (
+                subtotalProduto > 0 &&
+                valorDescontoFinal >= 1 &&
+                valorDescontoFinal <= subtotalProduto
+              ) {
+                // Valor entre 1 e subtotal: provavelmente backend salvou valor em R$ (ex.: 2.10) em vez de taxa (0.1)
+                const taxaDecimal = valorDescontoFinal / subtotalProduto
+                if (taxaDecimal >= 0.01 && taxaDecimal <= 1) {
+                  valorDescontoFinal = Math.round(taxaDecimal * 1000) / 10
+                }
+              }
+            }
+
+            if (tipoAcrescimoFinal === 'porcentagem' && valorAcrescimoFinal !== null && valorAcrescimoFinal !== undefined) {
+              if (valorAcrescimoFinal < 1 && valorAcrescimoFinal > 0) {
+                valorAcrescimoFinal = valorAcrescimoFinal * 100
+              } else if (
+                subtotalProduto > 0 &&
+                valorAcrescimoFinal >= 1 &&
+                valorAcrescimoFinal <= subtotalProduto
+              ) {
+                const taxaDecimal = valorAcrescimoFinal / subtotalProduto
+                if (taxaDecimal >= 0.01 && taxaDecimal <= 1) {
+                  valorAcrescimoFinal = Math.round(taxaDecimal * 1000) / 10
+                }
+              }
+            }
+
+            // Se backend enviou taxa decimal (0.03 = 3%) mas tipo veio fixo ou null, tratar como porcentagem
+            if (
+              valorDescontoFinal !== null &&
+              valorDescontoFinal !== undefined &&
+              valorDescontoFinal > 0 &&
+              valorDescontoFinal < 1 &&
+              tipoDescontoFinal !== 'porcentagem'
+            ) {
+              tipoDescontoFinal = 'porcentagem'
+              valorDescontoFinal = Math.round(valorDescontoFinal * 1000) / 10
+            }
+            if (
+              valorAcrescimoFinal !== null &&
+              valorAcrescimoFinal !== undefined &&
+              valorAcrescimoFinal > 0 &&
+              valorAcrescimoFinal < 1 &&
+              tipoAcrescimoFinal !== 'porcentagem'
+            ) {
+              tipoAcrescimoFinal = 'porcentagem'
+              valorAcrescimoFinal = Math.round(valorAcrescimoFinal * 1000) / 10
+            }
+
+            // valorFinal do produto (dentro de produtosLancados): total já calculado da linha
+            const valorFinalProduto =
+              prod.valorFinal !== undefined && prod.valorFinal !== null
+                ? Number(prod.valorFinal)
+                : (prod.valor_final !== undefined && prod.valor_final !== null
+                    ? Number(prod.valor_final)
+                    : null)
+
+            return {
+              produtoId: prod.produtoId || prod.id || '',
+              nome: nomeProduto,
+              quantidade: prod.quantidade || 1,
+              valorUnitario: prod.valorUnitario || 0,
+              complementos: complementosMapeados,
+              tipoDesconto: tipoDescontoFinal,
+              valorDesconto: valorDescontoFinal,
+              tipoAcrescimo: tipoAcrescimoFinal,
+              valorAcrescimo: valorAcrescimoFinal,
+              valorFinal: valorFinalProduto,
+            }
+          })
+        
+        console.log('✅ Produtos mapeados:', produtosMapeados)
+        setProdutos(produtosMapeados)
+      } else {
+        console.warn('⚠️ Nenhum produto encontrado na resposta da API. Campos disponíveis:', Object.keys(vendaData))
+        setProdutos([])
+      }
+
+      // Pagamentos
+      if (vendaData.pagamentos && Array.isArray(vendaData.pagamentos)) {
+        const pagamentosMapeados: PagamentoSelecionado[] = vendaData.pagamentos
+          .filter((pag: any) => !pag.cancelado) // Filtrar pagamentos cancelados
+          .map((pag: any) => ({
+            meioPagamentoId: pag.meioPagamentoId || pag.id || '',
+            valor: pag.valor || 0,
+          }))
+        setPagamentos(pagamentosMapeados)
+      }
+
+      // Se estiver em modo visualização, ir direto para step 4
+      if (modoVisualizacao) {
+        setCurrentStep(4)
+      }
+    } catch (error: any) {
+      console.error('Erro ao carregar venda:', error)
+      showToast.error(error.message || 'Erro ao carregar dados da venda')
+      onClose()
+    } finally {
+      setIsLoadingVenda(false)
+    }
+  }, [vendaId, open, auth, modoVisualizacao, onClose])
+
   // Sincroniza o estado interno com o prop open
   useEffect(() => {
     setInternalDialogOpen(open)
   }, [open])
+
+  // Carregar venda existente quando modal abrir com vendaId
+  useEffect(() => {
+    if (open && vendaId) {
+      // Se estiver em modo visualização, definir currentStep como 4 imediatamente
+      // Mas ainda mostrar loading até os dados carregarem
+      if (modoVisualizacao) {
+        setCurrentStep(4)
+      } else {
+        setCurrentStep(1)
+      }
+      carregarVendaExistente()
+    } else if (!open) {
+      // Limpar dados quando modal fechar
+      setDataVenda('')
+      setValorFinalVenda(null) // Limpar valor final quando modal fechar
+      // Resetar step apenas se não estiver em modo visualização
+      if (!modoVisualizacao) {
+        setCurrentStep(1)
+      }
+    }
+  }, [open, vendaId, modoVisualizacao, carregarVendaExistente])
 
   // Buscar nome do usuário gestor quando o modal abrir
   useEffect(() => {
@@ -1121,6 +1470,14 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
     fetchNomeUsuario()
   }, [open, auth])
 
+  // Refetch grupos de produtos quando modal abrir e estiver na Step 2
+  // Isso garante que a ordem dos grupos esteja atualizada após reordenação
+  useEffect(() => {
+    if (open && currentStep === 2 && !modoVisualizacao) {
+      refetchGrupos()
+    }
+  }, [open, currentStep, modoVisualizacao, refetchGrupos])
+
   // Intercepta o fechamento do Dialog
   const handleDialogOpenChange = (isOpen: boolean) => {
     if (!isOpen) {
@@ -1175,6 +1532,11 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
 
   // Navegação entre steps
   const handleNextStep = () => {
+    // Não permitir navegação em modo visualização
+    if (vendaId && modoVisualizacao) {
+      return
+    }
+    
     if (currentStep === 1 && canGoToStep2()) {
       setCurrentStep(2)
     } else if (currentStep === 2 && canGoToStep3()) {
@@ -1185,6 +1547,11 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
   }
 
   const handlePreviousStep = () => {
+    // Não permitir navegação em modo visualização
+    if (vendaId && modoVisualizacao) {
+      return
+    }
+    
     if (currentStep === 2) {
       setCurrentStep(1)
     } else if (currentStep === 3) {
@@ -1244,7 +1611,7 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
       >
         <div className="px-4 py-2">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold">Novo Pedido</h1>
+            <h1 className="text-2xl font-bold">{modoVisualizacao ? 'Detalhes do Pedido' : 'Novo Pedido'}</h1>
             {nomeUsuario && (
               <div className="flex items-center gap-2">
                 <MdPerson className="w-4 h-4 text-primary" />
@@ -1304,10 +1671,31 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
                   ? 'bg-primary border-primary text-white' 
                   : 'bg-white border-gray-300 text-gray-400'
               }`}>
-                <span className="text-sm font-semibold">3</span>
+                {currentStep > 3 ? (
+                  <MdCheckCircle className="w-5 h-5" />
+                ) : (
+                  <span className="text-sm font-semibold">3</span>
+                )}
               </div>
               <span className={`text-sm font-medium ${currentStep >= 3 ? 'text-primary' : 'text-gray-400'}`}>
                 Pagamento
+              </span>
+            </div>
+            
+            {/* Linha */}
+            <div className={`h-0.5 w-12 ${currentStep >= 4 ? 'bg-primary' : 'bg-gray-300'}`} />
+            
+            {/* Step 4 */}
+            <div className="flex items-center gap-2">
+              <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
+                currentStep >= 4 
+                  ? 'bg-primary border-primary text-white' 
+                  : 'bg-white border-gray-300 text-gray-400'
+              }`}>
+                <span className="text-sm font-semibold">4</span>
+              </div>
+              <span className={`text-sm font-medium ${currentStep >= 4 ? 'text-primary' : 'text-gray-400'}`}>
+                Detalhes
               </span>
             </div>
           </div>
@@ -1317,8 +1705,22 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
           style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 24px', minHeight: 0 }}
           className="scrollbar-thin"
         >
+          {/* Loading em modo visualização - não mostrar steps até carregar */}
+          {modoVisualizacao && isLoadingVenda && (
+            <div className="flex items-center justify-center py-16">
+              <div className="text-center">
+                <img 
+                  src="/images/jiffy-loading.gif" 
+                  alt="Carregando..." 
+                  className="w-32 h-32 mx-auto mb-4"
+                />
+                <p className="text-sm text-gray-600">Carregando detalhes da venda...</p>
+              </div>
+            </div>
+          )}
+
           {/* STEP 1: Informações do Pedido */}
-          {currentStep === 1 && (
+          {!modoVisualizacao && currentStep === 1 && (
             <div className="py-2 space-y-3">
               
 
@@ -1415,11 +1817,13 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
           )}
 
           {/* STEP 2: Seleção de Produtos */}
-          {currentStep === 2 && (
-            <div className="space-y-2 py-2">
-              {/* Área de Edição de Produtos Selecionados */}
+          {!modoVisualizacao && currentStep === 2 && (
+            <div className="flex flex-col flex-1 min-h-0 gap-2 py-2">
+              {/* Área de Edição de Produtos Selecionados: altura fixa quando grupos visíveis, cresce quando grupos ocultos */}
               <div 
-                className="h-48 border rounded-lg bg-gray-50 overflow-y-auto scrollbar-thin"
+                className={`border rounded-lg bg-gray-50 overflow-y-auto scrollbar-thin ${
+                  gruposExpandido ? 'h-48 flex-shrink-0' : 'flex-1 min-h-64'
+                }`}
               >
                 {produtos.length > 0 ? (
                   <div className="p-2">
@@ -1761,15 +2165,38 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
               </div>
 
               {/* Total do Pedido */}
-              <div className="flex justify-end items-center gap-2">
+              <div className="flex justify-end items-center gap-2 flex-shrink-0">
                 <span className="text-sm font-semibold text-gray-700">Total do Pedido:</span>
                 <span className="text-lg font-bold text-primary">
                   {transformarParaReal(totalProdutos)}
                 </span>
               </div>
 
-              {/* Produtos - Seleção por Grupos */}
-              <div className="space-y-2">
+              {/* Seção recolhível: Grupos de produtos — ao ocultar, a área de produtos selecionados acima ganha mais altura */}
+              <div className="border rounded-lg bg-gray-50 flex-shrink-0 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setGruposExpandido(!gruposExpandido)}
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2 hover:bg-gray-100/80 transition-colors text-left border-b border-gray-200/50"
+                  aria-expanded={gruposExpandido}
+                >
+                  <span className="text-sm font-semibold text-gray-700">Grupos de produtos</span>
+                  <span className="flex items-center gap-2 ml-auto">
+                    {gruposExpandido ? (
+                      <>
+                        <span className="text-xs text-gray-500">Ocultar</span>
+                        <MdExpandLess className="w-5 h-5 text-gray-600 flex-shrink-0" />
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-xs text-gray-500">Mostrar grupos</span>
+                        <MdExpandMore className="w-5 h-5 text-gray-600 flex-shrink-0" />
+                      </>
+                    )}
+                  </span>
+                </button>
+                {gruposExpandido && (
+              <div className="space-y-2 px-3 pb-3 pt-1">
                 {/* Grid ou Lista Horizontal de Grupos */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2"> 
@@ -1938,11 +2365,13 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
               )
                 })()}
               </div>
+                )}
+              </div>
             </div>
           )}
 
           {/* STEP 3: Pagamento */}
-          {currentStep === 3 && (
+          {!modoVisualizacao && currentStep === 3 && (
             <div className="space-y-2">
               {/* Informações do Pedido */}
               <div className="border rounded-lg px-4 bg-gray-50">
@@ -2118,45 +2547,280 @@ export function NovoPedidoModal({ open, onClose, onSuccess }: NovoPedidoModalPro
               )}
             </div>
           )}
+
+          {/* STEP 4: Detalhes da Venda (Apenas Visualização) */}
+          {currentStep === 4 && !isLoadingVenda && (
+            <div className="space-y-4 py-2">
+              <>
+              {/* Informações do Pedido */}
+              <div className="border rounded-lg px-4 bg-gray-50">
+                <h3 className="font-semibold text-lg">Informações do Pedido</h3>
+                <div className="text-sm">
+                  <div className="flex justify-between bg-white rounded-lg px-1">
+                    <span className="text-gray-600">Data:</span>
+                    <span className="font-medium">{(dataVenda ? new Date(dataVenda) : new Date()).toLocaleString('pt-BR', { 
+                      day: '2-digit', 
+                      month: '2-digit', 
+                      year: 'numeric', 
+                      hour: '2-digit', 
+                      minute: '2-digit' 
+                    })}</span>
+                  </div>
+                  <div className="flex justify-between px-1">
+                    <span className="text-gray-600">Origem:</span>
+                    <span className="font-medium">{origem}</span>
+                  </div>
+                  <div className="flex justify-between bg-white rounded-lg px-1">
+                    <span className="text-gray-600">Status:</span>
+                    <span className="font-medium">{statusDisponiveis.find(s => s.value === status)?.label}</span>
+                  </div>
+                  {clienteNome && (
+                    <div className="flex justify-between px-1">
+                      <span className="text-gray-600">Cliente:</span>
+                      <span className="font-medium">{clienteNome}</span>
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-between bg-white rounded-lg px-1">
+                    <span className="text-gray-600">Total de Itens:</span>
+                    <span className="font-medium">{produtos.length} {produtos.length === 1 ? 'produto' : 'produtos'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lista de Produtos (Visualização) */}
+              <div className="border rounded-lg bg-gray-50 overflow-hidden">
+                <div className="p-2">
+                  <h3 className="font-semibold text-lg mb-2">Produtos do Pedido</h3>
+                  {produtos.length > 0 ? (
+                    <div className="space-y-1">
+                      {/* Cabeçalho da tabela */}
+                      <div className="flex gap-2 pb-2 border-b border-gray-300 mb-2">
+                        <div className="w-[60px] flex-shrink-0 flex items-center justify-center">
+                          <span className="text-xs text-center font-semibold text-gray-700">Qtd</span>
+                        </div>
+                        <div className="flex-[4]">
+                          <span className="text-xs font-semibold text-gray-700">Produto</span>
+                        </div>
+                        <div className="flex-1 flex justify-end">
+                          <span className="text-xs font-semibold text-gray-700 text-right">Desc./Acres.</span>
+                        </div>
+                        <div className="flex-1 flex justify-end">
+                          <span className="text-xs font-semibold text-gray-700 text-right">Val Unit.</span>
+                        </div>
+                        <div className="flex-1 flex justify-end">
+                          <span className="text-xs font-semibold text-gray-700 text-right">Total</span>
+                        </div>
+                      </div>
+                      {/* Linhas de produtos */}
+                      <div className="space-y-1">
+                        {produtos.map((produto, index) => {
+                          // Total do produto: usar valorFinal vindo do backend (já calculado com desconto/acréscimo)
+                          const totalProdutoComComplementos =
+                            produto.valorFinal !== null && produto.valorFinal !== undefined
+                              ? produto.valorFinal
+                              : calcularTotalProduto(produto)
+                          
+                          return (
+                            <div key={index} className="space-y-0">
+                              {/* Linha do Produto Principal */}
+                              <div 
+                                className={`flex gap-1 items-center rounded ${
+                                  index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                                }`}
+                              >
+                                {/* Quantidade */}
+                                <div className="w-[60px] flex-shrink-0">
+                                  <span className="text-xs text-gray-900 text-center block">{Math.floor(produto.quantidade)}</span>
+                                </div>
+                                {/* Nome do Produto */}
+                                <div className="flex-[4] min-w-0">
+                                  <span className="text-xs text-gray-900 truncate block">{produto.nome}</span>
+                                </div>
+                                {/* Desconto/Acréscimo */}
+                                <div className="flex-1">
+                                  <span className="text-xs text-gray-600 text-right block">
+                                    {formatarDescontoAcrescimo(produto)}
+                                  </span>
+                                </div>
+                                {/* Valor Unitário */}
+                                <div className="flex-1">
+                                  <span className="text-xs text-gray-900 text-right block">
+                                    {formatarNumeroComMilhar(produto.valorUnitario)}
+                                  </span>
+                                </div>
+                                {/* Total */}
+                                <div className="flex-1">
+                                  <span className="text-xs font-semibold text-gray-900 text-right block">
+                                    R$ {formatarNumeroComMilhar(totalProdutoComComplementos)}
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              {/* Linhas dos Complementos */}
+                              {produto.complementos.map((complemento, compIndex) => {
+                                const compKey = `comp-${index}-${complemento.grupoId}-${complemento.id}`
+                                
+                                return (
+                                  <div
+                                    key={compKey}
+                                    className={`flex gap-1 items-center rounded -mt-0.5 ${
+                                      index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                                    }`}
+                                    style={{ minHeight: '24px' }}
+                                  >
+                                    {/* Quantidade do Complemento */}
+                                    <div className="w-[60px] flex-shrink-0 pl-4">
+                                      <span className="text-xs text-gray-600 text-right block">{complemento.quantidade}</span>
+                                    </div>
+                                    {/* Nome do Complemento com indentação */}
+                                    <div className="flex-[4] min-w-0 pl-4">
+                                      <span className="text-xs text-gray-600 truncate block leading-tight">
+                                        {complemento.nome}
+                                      </span>
+                                    </div>
+                                    {/* Espaço vazio para Desconto/Acréscimo (complementos não têm) */}
+                                    <div className="flex-1"></div>
+                                    {/* Valor Unitário do Complemento - Apenas exibição */}
+                                    <div className="flex-1">
+                                      <span className="text-xs text-gray-600 text-right block leading-tight">
+                                        {formatarValorComplemento(complemento.valor, complemento.tipoImpactoPreco)}
+                                      </span>
+                                    </div>
+                                    {/* Espaço vazio onde seria o Total (complementos não têm total próprio) */}
+                                    <div className="flex-1"></div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center py-4">
+                      <p className="text-sm text-gray-500">Nenhum produto selecionado</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Total do Pedido */}
+              <div className="flex justify-end items-center gap-2">
+                <span className="text-sm font-semibold text-gray-700">Total do Pedido:</span>
+                <span className="text-lg font-bold text-primary">
+                  {transformarParaReal(totalProdutos)}
+                </span>
+              </div>
+
+              {/* Pagamentos (se status finalizada ou pendente emissão) */}
+              {(status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') && pagamentos.length > 0 && (
+                <div className="border rounded-lg px-4 bg-white">
+                  <h3 className="font-semibold text-lg mb-2">Pagamentos</h3>
+                  
+                  {/* Total Pago e Troco */}
+                  <div className="border-t pt-2 text-sm mb-2">
+                    <div className="flex justify-between items-center bg-gray-100 rounded-lg p-1">
+                      <span className="text-gray-700 font-semibold">Total Pago:</span>
+                      <span className="text-base font-bold text-gray-900">
+                        {transformarParaReal(totalPagamentos)}
+                      </span>
+                    </div>
+                    {troco > 0 && (
+                      <div className="flex justify-between items-center mt-2">
+                        <span className="text-gray-700 font-semibold">Troco:</span>
+                        <span className="text-base font-bold text-green-600">
+                          {transformarParaReal(troco)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Cards das Formas de Pagamento */}
+                  <div className="mb-2">
+                    <Label className="text-base font-semibold mb-2 block">Formas de Pagamento Utilizadas</Label>
+                    <div className="flex flex-wrap gap-3">
+                      {pagamentos.map((pagamento, index) => {
+                        const meio = meiosPagamento.find(m => m.getId() === pagamento.meioPagamentoId)
+                        const Icone = meio ? obterIconeMeioPagamento(meio.getNome()) : MdCreditCard
+                        
+                        return (
+                          <div
+                            key={index}
+                            className="flex flex-col items-center justify-center gap-1 p-3 border-2 rounded-lg bg-white border-primary min-w-[120px]"
+                          >
+                            <Icone className="w-8 h-8 text-primary" />
+                            <span className="text-xs font-medium text-center">
+                              {meio?.getNome() || 'Meio de pagamento'}
+                            </span>
+                            <span className="text-sm font-bold text-primary">
+                              {transformarParaReal(pagamento.valor)}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+              </>
+            </div>
+          )}
         </div>
 
         <DialogFooter sx={{ padding: '16px 24px 24px 24px', flexShrink: 0, borderTop: '1px solid #e5e7eb', marginTop: 0 }}>
-          <Button variant="outlined" onClick={handleClose} disabled={createVendaGestor.isPending}>
-            Cancelar
-          </Button>
-          
-          {currentStep > 1 && (
+          {/* Step 4: Apenas botão Concluir */}
+          {currentStep === 4 ? (
             <Button 
-              variant="outlined" 
-              onClick={handlePreviousStep} 
-              disabled={createVendaGestor.isPending}
+              onClick={() => {
+                resetForm()
+                onSuccess()
+                onClose()
+              }}
               className="flex items-center gap-2"
             >
-              <MdArrowBack className="w-4 h-4" />
-              Anterior
-            </Button>
-          )}
-          
-          {currentStep < 3 ? (
-            <Button 
-              onClick={handleNextStep} 
-              disabled={
-                createVendaGestor.isPending || 
-                (currentStep === 2 && !canGoToStep3())
-              }
-              className="flex items-center gap-2"
-            >
-              Próximo
-              <MdArrowForward className="w-4 h-4" />
+              Concluir
             </Button>
           ) : (
-            <Button 
-              onClick={handleSubmit} 
-              disabled={createVendaGestor.isPending || !canSubmit()}
-              className="flex items-center gap-2"
-            >
-              {createVendaGestor.isPending ? 'Criando...' : 'Criar Pedido'}
-            </Button>
+            <>
+              <Button variant="outlined" onClick={handleClose} disabled={createVendaGestor.isPending}>
+                Cancelar
+              </Button>
+              
+              {currentStep > 1 && (
+                <Button 
+                  variant="outlined" 
+                  onClick={handlePreviousStep} 
+                  disabled={createVendaGestor.isPending}
+                  className="flex items-center gap-2"
+                >
+                  <MdArrowBack className="w-4 h-4" />
+                  Anterior
+                </Button>
+              )}
+              
+              {currentStep < 3 ? (
+                <Button 
+                  onClick={handleNextStep} 
+                  disabled={
+                    createVendaGestor.isPending || 
+                    (currentStep === 2 && !canGoToStep3())
+                  }
+                  className="flex items-center gap-2"
+                >
+                  Próximo
+                  <MdArrowForward className="w-4 h-4" />
+                </Button>
+              ) : (
+                <Button 
+                  onClick={handleSubmit} 
+                  disabled={createVendaGestor.isPending || !canSubmit()}
+                  className="flex items-center gap-2"
+                >
+                  {createVendaGestor.isPending ? 'Criando...' : 'Criar Pedido'}
+                </Button>
+              )}
+            </>
           )}
         </DialogFooter>
       </DialogContent>

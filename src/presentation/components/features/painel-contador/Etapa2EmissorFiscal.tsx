@@ -1,13 +1,12 @@
 'use client'
 
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Label } from '@/src/presentation/components/ui/label'
 import { Switch } from '@/src/presentation/components/ui/switch'
-import { MdCheckCircle, MdError } from 'react-icons/md'
 
 interface ConfiguracaoNumeracao {
   id: string
@@ -41,11 +40,6 @@ export function Etapa3EmissorFiscal() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   
-  // Ref para controlar se já foi feito o carregamento inicial
-  const initialLoadDone = useRef(false)
-  const previousNfeAmbiente = useRef<AmbienteFiscal | ''>('')
-  const previousNfceAmbiente = useRef<AmbienteFiscal | ''>('')
-  
   // Configurações de numeração
   const [nfeNumeracao, setNfeNumeracao] = useState<ConfiguracaoNumeracao | null>(null)
   const [nfceNumeracao, setNfceNumeracao] = useState<ConfiguracaoNumeracao | null>(null)
@@ -72,12 +66,21 @@ export function Etapa3EmissorFiscal() {
     ambiente: '' as AmbienteFiscal | '',
   })
 
+  /**
+   * Escolhe qual linha (PROD vs HOMO) usar ao carregar do servidor (abrir tela / recarregar).
+   * Troca só pelo select não recarrega série/próximo — esses valores vêm desta linha inicial.
+   */
   const selectConfiguracaoPrincipal = (
     numeracoes: ConfiguracaoNumeracao[],
     modelo: 55 | 65
   ): ConfiguracaoNumeracao | null => {
     const candidatas = numeracoes.filter((n) => n.modelo === modelo && !n.terminalId)
     if (candidatas.length === 0) return null
+
+    const comAtivo = candidatas.filter((n) => n.ativo)
+    if (comAtivo.length === 1) {
+      return comAtivo[0]
+    }
 
     return (
       candidatas.find((n) => n.ativo && n.ambiente === 'PRODUCAO') ||
@@ -92,12 +95,7 @@ export function Etapa3EmissorFiscal() {
     // Aguardar reidratação do Zustand antes de fazer requisições
     if (!isRehydrated) return
     
-    const loadInitialData = async () => {
-      await loadData()
-      initialLoadDone.current = true
-    }
-    
-    loadInitialData()
+    void loadData()
   }, [auth, isRehydrated])
 
   const loadData = async () => {
@@ -135,9 +133,6 @@ export function Etapa3EmissorFiscal() {
             ambiente: ambienteNfe,
           })
           
-          // Salvar ambiente inicial para comparação futura
-          if (ambienteNfe) previousNfeAmbiente.current = ambienteNfe as AmbienteFiscal
-          
           // Atualizar toggles da NF-e
           const nfeAtivoValue = nfe.nfeAtivo ?? false
           
@@ -172,9 +167,6 @@ export function Etapa3EmissorFiscal() {
             ambiente: ambienteNfce,
           }))
           
-          // Salvar ambiente inicial para comparação futura
-          if (ambienteNfce) previousNfceAmbiente.current = ambienteNfce as AmbienteFiscal
-          
           // Atualizar toggles e CSC da NFC-e
           setEmissorFiscal(prev => ({
             ...prev,
@@ -205,135 +197,11 @@ export function Etapa3EmissorFiscal() {
     }
   }
 
-  // Função para buscar configuração específica por ambiente e modelo
-  const loadConfiguracaoPorAmbiente = async (
-    modelo: 55 | 65,
-    ambiente: AmbienteFiscal,
-    tipo: 'nfe' | 'nfce'
+  const handleSaveNfe = async (
+    ambienteOverride?: AmbienteFiscal,
+    options?: { showFeedback?: boolean }
   ) => {
-    if (!isRehydrated) return
-    
-    const token = auth?.getAccessToken()
-    if (!token) return
-
-    try {
-      const response = await fetch('/api/v1/fiscal/configuracoes/emissao', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (response.ok) {
-        const numeracoes: ConfiguracaoNumeracao[] = await response.json()
-        
-        // Filtrar por modelo, ambiente e terminalId null
-        const configuracao = numeracoes.find(
-          (n) => n.modelo === modelo && n.ambiente === ambiente && !n.terminalId
-        )
-
-        if (configuracao) {
-          if (tipo === 'nfe') {
-            setNfeNumeracao(configuracao)
-            setNfeForm({
-              serie: String(configuracao.serie),
-              proximoNumero: String(configuracao.proximoNumero),
-              ambiente: configuracao.ambiente ?? ambiente,
-            })
-            setEmissorFiscal(prev => ({
-              ...prev,
-              nfeAtivo: configuracao.nfeAtivo ?? false,
-            }))
-          } else {
-            setNfceNumeracao(configuracao)
-            setNfceForm(prev => ({
-              ...prev,
-              serie: String(configuracao.serie),
-              proximoNumero: String(configuracao.proximoNumero),
-              cscId: configuracao.nfceCscId || '',
-              cscCodigo: configuracao.nfceCscCodigo || '',
-              ambiente: configuracao.ambiente ?? ambiente,
-            }))
-            setEmissorFiscal(prev => ({
-              ...prev,
-              nfceAtivo: configuracao.nfceAtivo ?? false,
-            }))
-          }
-        } else {
-          // Se não encontrou configuração para o ambiente selecionado, limpar campos
-          if (tipo === 'nfe') {
-            setNfeNumeracao(null)
-            setNfeForm(prev => ({
-              ...prev,
-              serie: '',
-              proximoNumero: '',
-              ambiente: ambiente,
-            }))
-          } else {
-            setNfceNumeracao(null)
-            setNfceForm(prev => ({
-              ...prev,
-              serie: '',
-              proximoNumero: '',
-              cscId: '',
-              cscCodigo: '',
-              ambiente: ambiente,
-            }))
-          }
-        }
-      }
-    } catch (error) {
-      console.error(`Erro ao carregar configuração ${tipo} para ambiente ${ambiente}:`, error)
-      // Não mostrar toast para evitar spam de notificações
-    }
-  }
-
-  // useEffect para recarregar dados NF-e quando ambiente mudar
-  useEffect(() => {
-    // Só executar se já foi feito o carregamento inicial
-    if (!initialLoadDone.current) return
-
-    const ambienteAtual = nfeForm.ambiente
-    
-    // Verificar se o ambiente é válido (type guard)
-    if (ambienteAtual !== 'HOMOLOGACAO' && ambienteAtual !== 'PRODUCAO') {
-      return
-    }
-
-    // Verificar se o ambiente mudou
-    if (ambienteAtual === previousNfeAmbiente.current) {
-      return
-    }
-
-    // Atualizar referência do ambiente anterior
-    previousNfeAmbiente.current = ambienteAtual
-
-    // Buscar configuração específica do ambiente selecionado
-    loadConfiguracaoPorAmbiente(55, ambienteAtual, 'nfe')
-  }, [nfeForm.ambiente, isRehydrated, auth])
-
-  // useEffect para recarregar dados NFC-e quando ambiente mudar
-  useEffect(() => {
-    // Só executar se já foi feito o carregamento inicial
-    if (!initialLoadDone.current) return
-
-    const ambienteAtual = nfceForm.ambiente
-    
-    // Verificar se o ambiente é válido (type guard)
-    if (ambienteAtual !== 'HOMOLOGACAO' && ambienteAtual !== 'PRODUCAO') {
-      return
-    }
-
-    // Verificar se o ambiente mudou
-    if (ambienteAtual === previousNfceAmbiente.current) {
-      return
-    }
-
-    // Atualizar referência do ambiente anterior
-    previousNfceAmbiente.current = ambienteAtual
-
-    // Buscar configuração específica do ambiente selecionado
-    loadConfiguracaoPorAmbiente(65, ambienteAtual, 'nfce')
-  }, [nfceForm.ambiente, isRehydrated, auth])
-
-  const handleSaveNfe = async () => {
+    const showFeedback = options?.showFeedback ?? true
     const token = auth?.getAccessToken()
     if (!token) {
       showToast.error('Sessão expirada. Faça login novamente.')
@@ -346,10 +214,10 @@ export function Etapa3EmissorFiscal() {
     }
 
     setIsSaving(true)
-    const toastId = showToast.loading('Salvando configuração NF-e...')
+    const toastId = showFeedback ? showToast.loading('Salvando configuração NF-e...') : null
 
     try {
-      const ambiente = nfeForm.ambiente
+      const ambiente = ambienteOverride ?? nfeForm.ambiente
       if (ambiente !== 'HOMOLOGACAO' && ambiente !== 'PRODUCAO') {
         throw new Error('Selecione o ambiente da NF-e (HOMOLOGACAO ou PRODUCAO).')
       }
@@ -432,13 +300,15 @@ export function Etapa3EmissorFiscal() {
       }))
       
       // Atualizar formulário com os valores salvos (importante: usar a série que foi salva)
+      const ambientePersistido = (data.ambiente ?? ambiente) as AmbienteFiscal
       setNfeForm({
         serie: String(data.serie),
         proximoNumero: String(data.proximoNumero),
-        ambiente: data.ambiente ?? ambiente,
+        ambiente: ambientePersistido,
       })
-
-      showToast.successLoading(toastId, 'Configuração NF-e salva com sucesso!')
+      if (toastId) {
+        showToast.successLoading(toastId, 'Configuração NF-e salva com sucesso!')
+      }
       
       // Não recarregar dados aqui para evitar sobrescrever os valores que acabamos de salvar
       // Os dados já foram atualizados acima com os valores retornados do servidor
@@ -454,13 +324,21 @@ export function Etapa3EmissorFiscal() {
       // Não deslogar o usuário por erros de validação ou comunicação
       // Apenas mostrar mensagem de erro
       const errorMessage = error?.message || 'Erro ao salvar configuração NF-e'
-      showToast.errorLoading(toastId, errorMessage)
+      if (toastId) {
+        showToast.errorLoading(toastId, errorMessage)
+      } else {
+        showToast.error(errorMessage)
+      }
     } finally {
       setIsSaving(false)
     }
   }
 
-  const handleSaveNfce = async () => {
+  const handleSaveNfce = async (
+    ambienteOverride?: AmbienteFiscal,
+    options?: { showFeedback?: boolean }
+  ) => {
+    const showFeedback = options?.showFeedback ?? true
     const token = auth?.getAccessToken()
     if (!token) {
       showToast.error('Sessão expirada. Faça login novamente.')
@@ -496,10 +374,10 @@ export function Etapa3EmissorFiscal() {
     }
 
     setIsSaving(true)
-    const toastId = showToast.loading('Salvando configuração NFC-e...')
+    const toastId = showFeedback ? showToast.loading('Salvando configuração NFC-e...') : null
 
     try {
-      const ambiente = nfceForm.ambiente
+      const ambiente = ambienteOverride ?? nfceForm.ambiente
       if (ambiente !== 'HOMOLOGACAO' && ambiente !== 'PRODUCAO') {
         throw new Error('Selecione o ambiente da NFC-e (HOMOLOGACAO ou PRODUCAO).')
       }
@@ -600,17 +478,41 @@ export function Etapa3EmissorFiscal() {
           ...prev,
           nfceAtivo: numeracaoData.nfceAtivo ?? false,
         }))
+
       }
 
-      showToast.successLoading(toastId, 'Configuração NFC-e salva com sucesso!')
+      if (toastId) {
+        showToast.successLoading(toastId, 'Configuração NFC-e salva com sucesso!')
+      }
       // Não recarregar dados aqui para evitar sobrescrever os valores que acabamos de salvar
       // Os dados já foram atualizados acima com os valores retornados do servidor
     } catch (error: any) {
       console.error('Erro ao salvar NFC-e:', error)
-      showToast.errorLoading(toastId, error.message || 'Erro ao salvar configuração NFC-e')
+      const errorMessage = error?.message || 'Erro ao salvar configuração NFC-e'
+      if (toastId) {
+        showToast.errorLoading(toastId, errorMessage)
+      } else {
+        showToast.error(errorMessage)
+      }
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const handleChangeNfeAmbiente = (value: AmbienteFiscal | '') => {
+    setNfeForm(prev => ({ ...prev, ambiente: value }))
+
+    if (value !== 'HOMOLOGACAO' && value !== 'PRODUCAO') return
+    if (isSaving) return
+    void handleSaveNfe(value, { showFeedback: false })
+  }
+
+  const handleChangeNfceAmbiente = (value: AmbienteFiscal | '') => {
+    setNfceForm(prev => ({ ...prev, ambiente: value }))
+
+    if (value !== 'HOMOLOGACAO' && value !== 'PRODUCAO') return
+    if (isSaving) return
+    void handleSaveNfce(value, { showFeedback: false })
   }
 
   const handleToggleNfe = async (ativo: boolean) => {
@@ -762,12 +664,7 @@ export function Etapa3EmissorFiscal() {
                 <select
                   id="nfe-ambiente"
                   value={nfeForm.ambiente}
-                  onChange={(e) =>
-                    setNfeForm({
-                      ...nfeForm,
-                      ambiente: e.target.value as AmbienteFiscal | '',
-                    })
-                  }
+                  onChange={e => handleChangeNfeAmbiente(e.target.value as AmbienteFiscal | '')}
                   className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 >
                   <option value="">Selecione</option>
@@ -810,7 +707,7 @@ export function Etapa3EmissorFiscal() {
 
             <div className="mt-2 flex justify-end">
               <Button
-                onClick={handleSaveNfe}
+                onClick={() => void handleSaveNfe()}
                 disabled={isSaving || !nfeForm.ambiente || !nfeForm.serie || !nfeForm.proximoNumero}
                 className="rounded-lg px-4 py-2 text-white text-sm font-medium"
                 sx={{
@@ -863,12 +760,7 @@ export function Etapa3EmissorFiscal() {
                 <select
                   id="nfce-ambiente"
                   value={nfceForm.ambiente}
-                  onChange={(e) =>
-                    setNfceForm({
-                      ...nfceForm,
-                      ambiente: e.target.value as AmbienteFiscal | '',
-                    })
-                  }
+                  onChange={e => handleChangeNfceAmbiente(e.target.value as AmbienteFiscal | '')}
                   className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 >
                   <option value="">Selecione</option>
@@ -941,7 +833,7 @@ export function Etapa3EmissorFiscal() {
 
             <div className="mt-2 flex justify-end">
               <Button
-                onClick={handleSaveNfce}
+                onClick={() => void handleSaveNfce()}
                 disabled={isSaving || (emissorFiscal.nfceAtivo && (!nfceForm.ambiente || !nfceForm.serie || !nfceForm.proximoNumero || !nfceForm.cscId || !nfceForm.cscCodigo))}
                 className="rounded-lg px-4 py-2 text-white text-sm font-medium"
                 sx={{

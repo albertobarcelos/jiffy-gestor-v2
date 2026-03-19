@@ -263,6 +263,7 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
   /**
    * Calcula valor total de um produto com descontos e acréscimos
    * NOTA: Não inclui complementos no cálculo - eles são exibidos separadamente
+   * IMPORTANTE: O banco salva porcentagens como decimal (0.1 = 10%), não precisa dividir por 100
    */
   const calcularValorProduto = (produto: ProdutoLancado): number => {
     let valor = produto.valorUnitario * produto.quantidade
@@ -271,7 +272,8 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
     if (produto.desconto) {
       const descontoValue = typeof produto.desconto === 'string' ? parseFloat(produto.desconto) : produto.desconto
       if (produto.tipoDesconto === 'porcentagem') {
-        valor -= valor * (descontoValue / 100)
+        // O banco salva porcentagem como decimal (0.1 = 10%), então usa diretamente
+        valor -= valor * descontoValue
       } else {
         valor -= descontoValue
       }
@@ -281,7 +283,8 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
     if (produto.acrescimo) {
       const acrescimoValue = typeof produto.acrescimo === 'string' ? parseFloat(produto.acrescimo) : produto.acrescimo
       if (produto.tipoAcrescimo === 'porcentagem') {
-        valor += valor * (acrescimoValue / 100)
+        // O banco salva porcentagem como decimal (0.1 = 10%), então usa diretamente
+        valor += valor * acrescimoValue
       } else {
         valor += acrescimoValue
       }
