@@ -23,6 +23,7 @@ import { Button } from '@/src/presentation/components/ui/button'
 import { Badge } from '@/src/presentation/components/ui/badge'
 import { StatusFiscalBadge } from './StatusFiscalBadge'
 import { DetalhesVendas } from '@/src/presentation/components/features/vendas/DetalhesVendas'
+import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 import { NovoPedidoModal } from './NovoPedidoModal'
 import { EscolheDatasModal } from '@/src/presentation/components/features/vendas/EscolheDatasModal'
 import { showToast } from '@/src/shared/utils/toast'
@@ -960,47 +961,51 @@ export function FiscalFlowKanban() {
                             </div>
                           )}
 
-                          {/* Venda N° e Tipo */}
-                          <div className="flex items-center justify-between gap-2 mb-1 pr-6">
-                            <p className="text-xs text-gray-500">
-                              Venda {venda.numeroVenda}
-                              {venda.codigoVenda ? ` - #${venda.codigoVenda}` : ''}
-                            </p>
-                            {tipoVendaExibicao && (
-                              <span className="text-xs font-medium text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">
-                                {formatarTipoVenda(tipoVendaExibicao)}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Nome do Cliente em destaque (cor primary) */}
-                          <p className="text-sm font-semibold text-primary mb-1 uppercase truncate pr-6">
-                            {clienteNome}
-                          </p>
-
-                          {/* Status Fiscal e Número da Nota */}
-                          {venda.statusFiscal && (
-                            <div className="mb-1.5">
-                              <StatusFiscalBadge status={venda.statusFiscal} />
-                              {venda.numeroFiscal && venda.statusFiscal === 'EMITIDA' && (
-                                <div className="mt-1 inline-flex items-center gap-1 bg-green-100 text-green-800 px-2 py-0.5 rounded-md">
-                                  <MdCheckCircle className="w-3.5 h-3.5" />
-                                  <span className="text-xs font-semibold">
-                                    {venda.tipoDocFiscal || 'NFe'} Nº {venda.numeroFiscal}
-                                    {venda.serieFiscal && ` / Série ${venda.serieFiscal}`}
-                                  </span>
+                          {/* Bloco número da venda até valor, com ícone ao lado */}
+                          <div className="flex gap-3 mb-2 pr-6">
+                            <div className="flex-1 min-w-0 border-b border-gray-100 pb-1.5">
+                              <p className="text-xs text-gray-500 mb-0.5">
+                                Venda {venda.numeroVenda}
+                                {venda.codigoVenda ? ` - #${venda.codigoVenda}` : ''}
+                              </p>
+                              <p className="text-sm font-semibold text-primary mb-1 uppercase truncate">
+                                {clienteNome}
+                              </p>
+                              {venda.statusFiscal && (
+                                <div className="mb-1">
+                                  <StatusFiscalBadge status={venda.statusFiscal} />
+                                  {venda.numeroFiscal && venda.statusFiscal === 'EMITIDA' && (
+                                    <div className="mt-1 inline-flex items-center gap-1 bg-green-100 text-green-800 px-2 py-0.5 rounded-md">
+                                      <MdCheckCircle className="w-3.5 h-3.5" />
+                                      <span className="text-xs font-semibold">
+                                        {venda.tipoDocFiscal || 'NFe'} Nº {venda.numeroFiscal}
+                                        {venda.serieFiscal && ` / Série ${venda.serieFiscal}`}
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
                               )}
+                              <p className="text-xs text-gray-600">
+                                <span className="text-sm font-semibold text-gray-900">
+                                  {valorFormatado}
+                                </span>
+                              </p>
                             </div>
-                          )}
-
-                          {/* Valor */}
-                          <div className="mb-1.5 pb-1.5 border-b border-gray-100">
-                            <p className="text-xs text-gray-600">
-                              <span className="text-sm font-semibold text-gray-900">
-                                {valorFormatado}
-                              </span>
-                            </p>
+                            {tipoVendaExibicao && (tipoVendaExibicao === 'balcao' || tipoVendaExibicao === 'mesa') && (
+                              <div className="flex-shrink-0 flex items-center justify-center">
+                                <TipoVendaIcon
+                                  tipoVenda={tipoVendaExibicao as 'balcao' | 'mesa'}
+                                  numeroMesa={undefined}
+                                  size={64}
+                                  containerScale={0.9}
+                                  title={formatarTipoVenda(tipoVendaExibicao)}
+                                  corPrincipal="var(--color-primary)"
+                                  corTexto="var(--color-primary)"
+                                  corBalcao="var(--color-primary)"
+                                  corBorda="var(--color-primary)"
+                                />
+                              </div>
+                            )}
                           </div>
 
                           {/* Novos campos: Data finalização, Aberto por; Origem */}
