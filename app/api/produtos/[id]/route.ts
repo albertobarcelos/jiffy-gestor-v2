@@ -103,15 +103,6 @@ export async function PATCH(
     const { id } = await params
     const body = await req.json()
 
-    // Log para debug: verificar o que está sendo enviado
-    console.log('[API PATCH Produto] Body recebido:', {
-      id,
-      gruposComplementosIds: body.gruposComplementosIds,
-      impressorasIds: body.impressorasIds,
-      hasGruposComplementosIds: 'gruposComplementosIds' in body,
-      gruposComplementosIdsLength: Array.isArray(body.gruposComplementosIds) ? body.gruposComplementosIds.length : 'not array',
-    })
-
     const apiClient = new ApiClient()
     const { data } = await apiClient.request(`/api/v1/cardapio/produtos/${id}`, {
       method: 'PATCH',

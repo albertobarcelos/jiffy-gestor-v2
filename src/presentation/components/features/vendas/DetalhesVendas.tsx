@@ -3,10 +3,20 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
-import { MdClose, MdRestaurant, MdAttachMoney } from 'react-icons/md'
-import { CircularProgress } from '@mui/material'
+import { MdClose, MdRestaurant, MdAttachMoney, MdCancel } from 'react-icons/md'
+import { 
+  CircularProgress, 
+  TextField, 
+  Button, 
+  Dialog as MuiDialog,
+  DialogTitle,
+  DialogContent as MuiDialogContent,
+  DialogActions
+} from '@mui/material'
 import { showToast } from '@/src/shared/utils/toast'
 import { TipoVendaIcon } from './TipoVendaIcon'
+import { useCancelarVendaGestor } from '@/src/presentation/hooks/useVendas'
+import { StatusFiscalBadge } from '@/src/presentation/components/features/nfe/StatusFiscalBadge'
 
 // Tipos
 interface VendaDetalhes {
@@ -30,6 +40,13 @@ interface VendaDetalhes {
   troco?: number
   produtosLancados: ProdutoLancado[]
   pagamentos: Pagamento[]
+  // Campos fiscais
+  statusVenda?: string | null
+  origem?: string | null
+  solicitarEmissaoFiscal?: boolean | null
+  statusFiscal?: string | null
+  documentoFiscalId?: string | null
+  retornoSefaz?: string | null
 }
 
 interface ProdutoLancado {
@@ -88,19 +105,25 @@ interface DetalhesVendasProps {
   vendaId: string
   open: boolean
   onClose: () => void
+  tabelaOrigem?: 'venda' | 'venda_gestor' // Indica de qual tabela buscar
 }
 
 /**
  * Modal de detalhes da venda
  * Exibe informações completas da venda, produtos lançados e pagamentos
  */
-export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) {
+export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' }: DetalhesVendasProps) {
   const { auth } = useAuthStore()
   const [venda, setVenda] = useState<VendaDetalhes | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [nomesUsuarios, setNomesUsuarios] = useState<Record<string, string>>({})
   const [nomesMeiosPagamento, setNomesMeiosPagamento] = useState<Record<string, MeioPagamentoDetalhes>>({})
   const [nomeCliente, setNomeCliente] = useState<string | null>(null)
+  
+  // Estados para modal de cancelamento
+  const [isCancelarModalOpen, setIsCancelarModalOpen] = useState(false)
+  const [justificativa, setJustificativa] = useState('')
+  const cancelarVenda = useCancelarVendaGestor()
 
   /**
    * Formata valor como moeda brasileira
@@ -145,7 +168,12 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
       if (!token) return null
 
       try {
-        const response = await fetch(`/api/usuarios/${usuarioId}`, {
+        // Usa endpoint diferente dependendo da origem da venda
+        const endpoint = tabelaOrigem === 'venda_gestor'
+          ? `/api/pessoas/usuarios-gestor/${usuarioId}`
+          : `/api/usuarios/${usuarioId}`
+        
+        const response = await fetch(endpoint, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -161,7 +189,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
         return null
       }
     },
-    [auth]
+    [auth, tabelaOrigem]
   )
 
   /**
@@ -235,8 +263,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
   /**
    * Calcula valor total de um produto com descontos e acréscimos
    * NOTA: Não inclui complementos no cálculo - eles são exibidos separadamente
-   * IMPORTANTE: Quando tipoDesconto/tipoAcrescimo é 'porcentagem', o backend retorna
-   * o valor já como decimal (ex: 0.1 para 10%), então NÃO deve dividir por 100
+   * IMPORTANTE: O banco salva porcentagens como decimal (0.1 = 10%), não precisa dividir por 100
    */
   const calcularValorProduto = useCallback((produto: ProdutoLancado): number => {
     let valor = produto.valorUnitario * produto.quantidade
@@ -245,7 +272,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
     if (produto.desconto) {
       const descontoValue = typeof produto.desconto === 'string' ? parseFloat(produto.desconto) : produto.desconto
       if (produto.tipoDesconto === 'porcentagem') {
-        // Backend retorna 0.1 para 10%, então não divide por 100
+        // O banco salva porcentagem como decimal (0.1 = 10%), então usa diretamente
         valor -= valor * descontoValue
       } else {
         // Desconto fixo: subtrai o valor diretamente
@@ -257,7 +284,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
     if (produto.acrescimo) {
       const acrescimoValue = typeof produto.acrescimo === 'string' ? parseFloat(produto.acrescimo) : produto.acrescimo
       if (produto.tipoAcrescimo === 'porcentagem') {
-        // Backend retorna 0.1 para 10%, então não divide por 100
+        // O banco salva porcentagem como decimal (0.1 = 10%), então usa diretamente
         valor += valor * acrescimoValue
       } else {
         // Acréscimo fixo: adiciona o valor diretamente
@@ -290,7 +317,12 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
     setNomesMeiosPagamento({}) // Limpa meios de pagamento anteriores
 
     try {
-      const response = await fetch(`/api/vendas/${vendaId}`, {
+      // Determinar endpoint baseado na tabela de origem
+      const endpoint = tabelaOrigem === 'venda_gestor'
+        ? `/api/vendas/gestor/${vendaId}`
+        : `/api/vendas/${vendaId}`
+
+      const response = await fetch(endpoint, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -303,22 +335,54 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
       }
 
       const dataRaw = await response.json()
+
+      // Busca status fiscal atualizado para exibir motivo de rejeição no modal
+      let statusFiscal = dataRaw.statusFiscal ?? null
+      let documentoFiscalId = dataRaw.documentoFiscalId ?? null
+      let retornoSefaz = dataRaw.retornoSefaz ?? null
+
+      try {
+        const statusEndpoint = tabelaOrigem === 'venda_gestor'
+          ? `/api/vendas/gestor/${vendaId}/status-emissao`
+          : `/api/vendas/${vendaId}/status-emissao`
+
+        const statusResponse = await fetch(statusEndpoint, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (statusResponse.ok) {
+          const statusData = await statusResponse.json()
+          statusFiscal = statusData.status ?? statusFiscal
+          documentoFiscalId = statusData.documentoFiscalId ?? documentoFiscalId
+          retornoSefaz = statusData.retornoSefaz ?? retornoSefaz
+        }
+      } catch {
+        // Mantém dados já retornados pela API principal em caso de falha no endpoint de status.
+      }
       
-      // Mapeia os dados da API para o formato esperado, garantindo que campos sejam capturados corretamente
-      // Verifica diferentes possíveis estruturas do codigoTerminal na resposta da API
-      let codigoTerminal = dataRaw.codigoTerminal || 
-                          dataRaw.terminal?.codigo || 
-                          dataRaw.terminal?.codigoInterno ||
-                          dataRaw.terminal?.codigoTerminal ||
-                          dataRaw.terminal?.code ||
-                          dataRaw.terminalCodigo || 
-                          dataRaw.codigoInterno ||
-                          dataRaw.codigo ||
-                          dataRaw.code ||
-                          ''
+      // Venda do gestor não possui terminal no modelo atual.
+      // Evita warning falso-positivo e tentativa de lookup desnecessária.
+      let codigoTerminal = ''
+      if (tabelaOrigem === 'venda') {
+        // Mapeia os dados da API para o formato esperado, garantindo que campos sejam capturados corretamente
+        // Verifica diferentes possíveis estruturas do codigoTerminal na resposta da API
+        codigoTerminal = dataRaw.codigoTerminal || 
+                        dataRaw.terminal?.codigo || 
+                        dataRaw.terminal?.codigoInterno ||
+                        dataRaw.terminal?.codigoTerminal ||
+                        dataRaw.terminal?.code ||
+                        dataRaw.terminalCodigo || 
+                        dataRaw.codigoInterno ||
+                        dataRaw.codigo ||
+                        dataRaw.code ||
+                        ''
+      }
       
       // Se não encontrou o codigoTerminal e temos terminalId, busca os detalhes do terminal
-      if (!codigoTerminal && dataRaw.terminalId) {
+      if (tabelaOrigem === 'venda' && !codigoTerminal && dataRaw.terminalId) {
         try {
           const terminalResponse = await fetch(`/api/terminais/${dataRaw.terminalId}/detalhes`, {
             headers: {
@@ -344,7 +408,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
       }
       
       // Se ainda não tem código, usa terminalId como fallback
-      if (!codigoTerminal && dataRaw.terminalId) {
+      if (tabelaOrigem === 'venda' && !codigoTerminal && dataRaw.terminalId) {
         codigoTerminal = String(dataRaw.terminalId)
       }
       
@@ -397,11 +461,14 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
       const data: VendaDetalhes = {
         ...dataRaw,
         codigoTerminal: codigoTerminal,
+        statusFiscal,
+        documentoFiscalId,
+        retornoSefaz,
         produtosLancados: produtosLancadosMapeados,
       }
       
       // Debug: log para verificar se o campo está sendo capturado
-      if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+      if (typeof window !== 'undefined' && tabelaOrigem === 'venda' && !codigoTerminal) {
         if (!codigoTerminal) {
           console.warn('DetalhesVendas: codigoTerminal não encontrado na resposta da API', {
             vendaId,
@@ -481,7 +548,33 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
     } finally {
       setIsLoading(false)
     }
-  }, [vendaId, open, auth, fetchUsuarioNome, fetchMeioPagamento, fetchClienteNome, onClose])
+  }, [vendaId, open, auth, fetchUsuarioNome, fetchMeioPagamento, fetchClienteNome, onClose, tabelaOrigem])
+
+  /**
+   * Confirma cancelamento da venda
+   */
+  const handleConfirmarCancelamento = async () => {
+    if (!venda) return
+
+    if (justificativa.trim().length < 15) {
+      showToast.error('Justificativa deve ter no mínimo 15 caracteres')
+      return
+    }
+
+    try {
+      await cancelarVenda.mutateAsync({
+        id: venda.id,
+        motivo: justificativa.trim(),
+      })
+      
+      setIsCancelarModalOpen(false)
+      setJustificativa('')
+      onClose() // Fecha o modal de detalhes após cancelamento bem-sucedido
+    } catch (error) {
+      // Erro já tratado pelo hook
+      console.error('Erro ao cancelar venda:', error)
+    }
+  }
 
   useEffect(() => {
     if (open && vendaId) {
@@ -492,6 +585,8 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
       setNomeCliente(null)
       setNomesUsuarios({}) // Limpa cache de usuários
       setNomesMeiosPagamento({}) // Limpa cache de meios de pagamento
+      setIsCancelarModalOpen(false)
+      setJustificativa('')
     }
   }, [open, vendaId, fetchVendaDetalhes])
 
@@ -877,6 +972,60 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                       <span>{venda.identificacao}</span>
                     </div>
                   )}
+
+                  {/* Origem da Venda */}
+                  {venda.origem && (
+                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                      <span>
+                        Origem: 
+                      </span>
+                      <span>{venda.origem}</span>
+                    </div>
+                  )}
+
+                  {/* Status Fiscal */}
+                  {venda.statusFiscal && (
+                    <div className="flex justify-between items-center text-sm text-primary-text font-nunito px-3 rounded-lg bg-white">
+                      <span>
+                        Status Fiscal: 
+                      </span>
+                      <StatusFiscalBadge status={venda.statusFiscal} />
+                    </div>
+                  )}
+
+                  {/* Solicitar Emissão Fiscal */}
+                  {venda.solicitarEmissaoFiscal && (
+                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-yellow-50">
+                      <span>
+                        Solicitar Emissão Fiscal: 
+                      </span>
+                      <span className="font-semibold text-yellow-600">Sim</span>
+                    </div>
+                  )}
+
+                  {/* Documento Fiscal ID */}
+                  {venda.documentoFiscalId && (
+                    <div className="flex justify-between text-sm text-primary-text font-nunito px-3 rounded-lg bg-green-50">
+                      <span>
+                        Documento Fiscal ID: 
+                      </span>
+                      <span className="font-mono text-xs">{venda.documentoFiscalId}</span>
+                    </div>
+                  )}
+
+                  {/* Retorno SEFAZ (motivo da rejeição/autorização) */}
+                  {venda.retornoSefaz && (
+                    <div
+                      className={`text-sm font-nunito px-3 py-2 rounded-lg ${
+                        venda.statusFiscal === 'REJEITADA'
+                          ? 'bg-red-50 text-red-700'
+                          : 'bg-blue-50 text-primary-text'
+                      }`}
+                    >
+                      <span className="font-semibold">Retorno SEFAZ: </span>
+                      <span>{venda.retornoSefaz}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1001,14 +1150,19 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                           </div>
 
                           {/* Linhas dos complementos */}
-                          {produto.complementos && produto.complementos.length > 0 && (
+                          {produto.complementos && produto.complementos.length > 0 ? (
                             <div className="space-y-1 md:ml-7 ml-2">
                               {produto.complementos.map((complemento, compIndex) => {
+                                console.log(`  🎨 Renderizando complemento ${compIndex}:`, complemento)
+                                
                                 const valorTotalComplemento = calcularValorComplemento(complemento)
                                 const temImpactoPreco = complemento.tipoImpactoPreco !== 'nenhum'
-                                const prefix = temImpactoPreco
-                                  ? (complemento.tipoImpactoPreco === 'aumenta' ? '+ ' : '- ')
-                                  : ''
+                                
+                                // Determina o prefixo baseado no tipo de impacto
+                                let prefix = ''
+                                if (temImpactoPreco) {
+                                  prefix = complemento.tipoImpactoPreco === 'aumenta' ? '+ ' : '- '
+                                }
                                 
                                 return (
                                   <div key={compIndex} className="flex items-center justify-between gap-2">
@@ -1023,7 +1177,7 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
                                 )
                               })}
                             </div>
-                          )}
+                          ) : null}
 
                           {/* Informações de lançamento */}
                           <div className="flex flex-col md:flex-row text-xs text-secondary-text mt-1 md:ml-7">
@@ -1232,6 +1386,65 @@ export function DetalhesVendas({ vendaId, open, onClose }: DetalhesVendasProps) 
           )}
         </div>
       </DialogContent>
+
+      {/* Modal de Justificativa de Cancelamento */}
+      <MuiDialog
+        open={isCancelarModalOpen}
+        onClose={() => setIsCancelarModalOpen(false)}
+        maxWidth="sm"
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            maxWidth: '500px',
+          },
+        }}
+      >
+        <DialogTitle sx={{ backgroundColor: 'var(--color-error)', color: 'white', fontFamily: 'Exo, sans-serif' }}>
+          Cancelar Venda
+        </DialogTitle>
+        <MuiDialogContent sx={{ p: 3, backgroundColor: 'var(--color-info)' }}>
+          <div className="space-y-4 pt-4">
+            <p className="text-sm text-secondary-text font-nunito">
+              Esta ação cancelará a venda e, se houver nota fiscal emitida, também a cancelará na SEFAZ.
+            </p>
+            <p className="text-sm font-bold text-error font-nunito">
+              Esta ação não pode ser desfeita!
+            </p>
+            <TextField
+              label="Justificativa do Cancelamento"
+              multiline
+              rows={4}
+              fullWidth
+              value={justificativa}
+              onChange={(e) => setJustificativa(e.target.value)}
+              placeholder="Digite o motivo do cancelamento (mínimo 15 caracteres)"
+              helperText={`${justificativa.length}/15 caracteres mínimos`}
+              error={justificativa.length > 0 && justificativa.length < 15}
+            />
+          </div>
+        </MuiDialogContent>
+        <DialogActions sx={{ p: 2, backgroundColor: 'var(--color-info)' }}>
+          <Button
+            onClick={() => {
+              setIsCancelarModalOpen(false)
+              setJustificativa('')
+            }}
+            variant="outlined"
+            disabled={cancelarVenda.isPending}
+          >
+            Voltar
+          </Button>
+          <Button
+            onClick={handleConfirmarCancelamento}
+            variant="contained"
+            color="error"
+            disabled={cancelarVenda.isPending || justificativa.trim().length < 15}
+            startIcon={cancelarVenda.isPending ? <CircularProgress size={20} /> : <MdCancel />}
+          >
+            {cancelarVenda.isPending ? 'Cancelando...' : 'Confirmar Cancelamento'}
+          </Button>
+        </DialogActions>
+      </MuiDialog>
     </Dialog>
   )
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { MdSearch, MdDelete, MdAdd } from 'react-icons/md'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { Complemento } from '@/src/domain/entities/Complemento'
@@ -27,6 +28,7 @@ interface GrupoComplementoItemResumo {
   descricao?: string | null
   valor?: number | null
   tipoImpactoPreco?: string | null
+  ativo?: boolean
 }
 
 const parseComplementosFromGrupo = (items: any[] | undefined): GrupoComplementoItemResumo[] => {
@@ -45,6 +47,7 @@ const parseComplementosFromGrupo = (items: any[] | undefined): GrupoComplementoI
             ? Number(item.valor)
             : null,
       tipoImpactoPreco: item.tipoImpactoPreco?.toString() || null,
+      ativo: item.ativo === true || item.ativo === 'true' || item.ativo === undefined ? true : false,
     }))
     .filter((item) => item.id)
 }
@@ -61,12 +64,19 @@ export function GrupoComplementoComplementosModal({
   isEmbedded = false,
 }: GrupoComplementoComplementosModalProps) {
   const { auth } = useAuthStore()
+  const queryClient = useQueryClient()
   const [searchTerm, setSearchTerm] = useState('')
   const [isLoadingComplementos, setIsLoadingComplementos] = useState(false)
   const [complementosGrupo, setComplementosGrupo] = useState<GrupoComplementoItemResumo[]>([])
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [selectedAddIds, setSelectedAddIds] = useState<string[]>([])
+
+  // Estados para edição inline
+  const [valorInputs, setValorInputs] = useState<Record<string, string>>({})
+  const [descricaoInputs, setDescricaoInputs] = useState<Record<string, string>>({})
+  const [savingMap, setSavingMap] = useState<Record<string, { valor?: boolean; descricao?: boolean; tipo?: boolean }>>({})
+  const [togglingStatus, setTogglingStatus] = useState<Record<string, boolean>>({})
 
   const {
     data: todosComplementos = [],
@@ -253,6 +263,340 @@ export function GrupoComplementoComplementosModal({
     await refetchComplementos()
   }, [refetchComplementos])
 
+  // Funções de formatação monetária
+  const formatValorInput = useCallback((value: string) => {
+    // Remove tudo exceto dígitos
+    const digits = value.replace(/\D/g, '')
+    if (!digits) return 'R$ 0,00'
+    const numberValue = parseInt(digits, 10)
+    // Formata como moeda brasileira
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(numberValue / 100)
+  }, [])
+
+  const formatValorFromNumber = useCallback((value: number | null | undefined) => {
+    if (value === null || value === undefined) return 'R$ 0,00'
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value || 0)
+  }, [])
+
+  const parseValorToNumber = useCallback((value: string) => {
+    // Remove R$ e espaços, depois remove pontos (milhares) e substitui vírgula por ponto
+    const normalized = value.replace(/R\$/g, '').trim().replace(/\./g, '').replace(',', '.')
+    const parsed = parseFloat(normalized)
+    return Number.isNaN(parsed) ? 0 : parsed
+  }, [])
+
+  // Normalizar tipoImpactoPreco
+  const normalizeTipoImpacto = useCallback((tipo: string | null | undefined): 'nenhum' | 'aumenta' | 'diminui' => {
+    if (!tipo) return 'nenhum'
+    const tipoLower = tipo.toLowerCase()
+    if (tipoLower === 'aumenta' || tipoLower === 'diminui') {
+      return tipoLower
+    }
+    return 'nenhum'
+  }, [])
+
+  // Handler para atualizar valor
+  const handleUpdateValor = useCallback(
+    async (complementoId: string) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      const valorString = valorInputs[complementoId]
+      const novoValor = parseValorToNumber(valorString ?? '')
+      if (Number.isNaN(novoValor)) {
+        showToast.error('Informe um valor válido.')
+        return
+      }
+
+      const complementoAtual = complementosGrupo.find((item) => item.id === complementoId)
+      if (!complementoAtual) {
+        showToast.error('Complemento não encontrado.')
+        return
+      }
+
+      const valorAtual = complementoAtual.valor ?? 0
+      if (novoValor === valorAtual) {
+        return
+      }
+
+      setSavingMap((prev) => ({ ...prev, [complementoId]: { ...prev[complementoId], valor: true } }))
+
+      try {
+        const response = await fetch(`/api/complementos/${complementoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ valor: novoValor }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || errorData.error || 'Erro ao atualizar valor')
+        }
+
+        showToast.success('Valor atualizado com sucesso!')
+        setComplementosGrupo((prev) =>
+          prev.map((item) =>
+            item.id === complementoId
+              ? { ...item, valor: novoValor }
+              : item
+          )
+        )
+        // Invalida cache do React Query para refletir mudanças em outras telas
+        queryClient.invalidateQueries({ queryKey: ['complementos'], exact: false })
+        queryClient.invalidateQueries({ queryKey: ['complemento', complementoId] })
+      } catch (error: any) {
+        console.error('Erro ao atualizar valor do complemento:', error)
+        const message = handleApiError(error)
+        showToast.error(message)
+        // Restaura valor anterior
+        setValorInputs((prev) => ({
+          ...prev,
+          [complementoId]: formatValorFromNumber(complementoAtual.valor),
+        }))
+      } finally {
+        setSavingMap((prev) => {
+          const current = prev[complementoId] || {}
+          const { valor: _, ...rest } = current
+          return { ...prev, [complementoId]: rest }
+        })
+      }
+    },
+    [auth, valorInputs, parseValorToNumber, complementosGrupo, formatValorFromNumber, queryClient]
+  )
+
+  // Handler para atualizar descrição
+  const handleUpdateDescricao = useCallback(
+    async (complementoId: string) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      const novaDescricao = descricaoInputs[complementoId] ?? ''
+
+      const complementoAtual = complementosGrupo.find((item) => item.id === complementoId)
+      if (!complementoAtual) {
+        showToast.error('Complemento não encontrado.')
+        return
+      }
+
+      const descricaoAtual = complementoAtual.descricao || ''
+      if (novaDescricao === descricaoAtual) {
+        return
+      }
+
+      setSavingMap((prev) => ({ ...prev, [complementoId]: { ...prev[complementoId], descricao: true } }))
+
+      try {
+        const response = await fetch(`/api/complementos/${complementoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ descricao: novaDescricao || null }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || errorData.error || 'Erro ao atualizar descrição')
+        }
+
+        showToast.success('Descrição atualizada com sucesso!')
+        setComplementosGrupo((prev) =>
+          prev.map((item) =>
+            item.id === complementoId
+              ? { ...item, descricao: novaDescricao || null }
+              : item
+          )
+        )
+        // Invalida cache do React Query para refletir mudanças em outras telas
+        queryClient.invalidateQueries({ queryKey: ['complementos'], exact: false })
+        queryClient.invalidateQueries({ queryKey: ['complemento', complementoId] })
+      } catch (error: any) {
+        console.error('Erro ao atualizar descrição do complemento:', error)
+        const message = handleApiError(error)
+        showToast.error(message)
+        // Restaura descrição anterior
+        setDescricaoInputs((prev) => ({
+          ...prev,
+          [complementoId]: complementoAtual.descricao || '',
+        }))
+      } finally {
+        setSavingMap((prev) => {
+          const current = prev[complementoId] || {}
+          const { descricao: _, ...rest } = current
+          return { ...prev, [complementoId]: rest }
+        })
+      }
+    },
+    [auth, descricaoInputs, complementosGrupo, queryClient]
+  )
+
+  // Handler para atualizar status ativo
+  const handleToggleAtivo = useCallback(
+    async (complementoId: string, novoStatus: boolean) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      const complementoAtual = complementosGrupo.find((item) => item.id === complementoId)
+      if (!complementoAtual) {
+        showToast.error('Complemento não encontrado.')
+        return
+      }
+
+      if (complementoAtual.ativo === novoStatus) {
+        return
+      }
+
+      setTogglingStatus((prev) => ({ ...prev, [complementoId]: true }))
+
+      // Atualização otimista
+      setComplementosGrupo((prev) =>
+        prev.map((item) =>
+          item.id === complementoId
+            ? { ...item, ativo: novoStatus }
+            : item
+        )
+      )
+
+      try {
+        const response = await fetch(`/api/complementos/${complementoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ ativo: novoStatus }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || errorData.error || 'Erro ao atualizar status do complemento')
+        }
+
+        showToast.success(
+          novoStatus ? 'Complemento ativado com sucesso!' : 'Complemento desativado com sucesso!'
+        )
+        // Invalida cache do React Query para refletir mudanças em outras telas
+        queryClient.invalidateQueries({ queryKey: ['complementos'], exact: false })
+        queryClient.invalidateQueries({ queryKey: ['complemento', complementoId] })
+      } catch (error: any) {
+        console.error('Erro ao atualizar status do complemento:', error)
+        const message = handleApiError(error)
+        showToast.error(message)
+        // Reverte atualização otimista
+        setComplementosGrupo((prev) =>
+          prev.map((item) =>
+            item.id === complementoId
+              ? { ...item, ativo: complementoAtual.ativo ?? true }
+              : item
+          )
+        )
+      } finally {
+        setTogglingStatus((prev) => {
+          const { [complementoId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [auth, complementosGrupo, queryClient]
+  )
+
+  // Handler para atualizar tipoImpactoPreco
+  const handleUpdateTipoImpacto = useCallback(
+    async (complementoId: string, novoTipo: 'nenhum' | 'aumenta' | 'diminui') => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      const complementoAtual = complementosGrupo.find((item) => item.id === complementoId)
+      if (!complementoAtual) {
+        showToast.error('Complemento não encontrado.')
+        return
+      }
+
+      const tipoAtual = normalizeTipoImpacto(complementoAtual.tipoImpactoPreco)
+      if (tipoAtual === novoTipo) {
+        return
+      }
+
+      setSavingMap((prev) => ({ ...prev, [complementoId]: { ...prev[complementoId], tipo: true } }))
+
+      try {
+        const payloadTipo = novoTipo.toLowerCase()
+        const response = await fetch(`/api/complementos/${complementoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ tipoImpactoPreco: payloadTipo }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || errorData.error || 'Erro ao atualizar tipo de impacto')
+        }
+
+        showToast.success('Tipo de impacto atualizado com sucesso!')
+        setComplementosGrupo((prev) =>
+          prev.map((item) =>
+            item.id === complementoId
+              ? { ...item, tipoImpactoPreco: payloadTipo }
+              : item
+          )
+        )
+        // Invalida cache do React Query para refletir mudanças em outras telas
+        queryClient.invalidateQueries({ queryKey: ['complementos'], exact: false })
+        queryClient.invalidateQueries({ queryKey: ['complemento', complementoId] })
+      } catch (error: any) {
+        console.error('Erro ao atualizar tipo de impacto:', error)
+        const message = handleApiError(error)
+        showToast.error(message)
+      } finally {
+        setSavingMap((prev) => {
+          const current = prev[complementoId] || {}
+          const { tipo: _, ...rest } = current
+          return { ...prev, [complementoId]: rest }
+        })
+      }
+    },
+    [auth, complementosGrupo, normalizeTipoImpacto, queryClient]
+  )
+
+  // Inicializar valores dos inputs quando complementosGrupo mudar
+  useEffect(() => {
+    const novosValorInputs: Record<string, string> = {}
+    const novasDescricaoInputs: Record<string, string> = {}
+    
+    complementosGrupo.forEach((complemento) => {
+      novosValorInputs[complemento.id] = formatValorFromNumber(complemento.valor)
+      novasDescricaoInputs[complemento.id] = complemento.descricao || ''
+    })
+    
+    setValorInputs((prev) => ({ ...prev, ...novosValorInputs }))
+    setDescricaoInputs((prev) => ({ ...prev, ...novasDescricaoInputs }))
+  }, [complementosGrupo, formatValorFromNumber])
+
   if (!isVisible || !grupo) {
     return null
   }
@@ -327,22 +671,93 @@ export function GrupoComplementoComplementosModal({
               </button>
               <div className="flex-1">
                 <div className="flex items-start justify-between gap-3">
-                  <p className="text-sm font-semibold text-primary-text">{complemento.nome}</p>
-                  {typeof complemento.valor === 'number' && (
-                    <p className="text-xs font-semibold text-primary-text">
-                      R$ {complemento.valor.toFixed(2)}
-                    </p>
-                  )}
+                
+                  <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-primary-text mr-4">{complemento.nome}</p>
+                    <label
+                      className={`relative inline-flex h-5 w-12 items-center ${
+                        togglingStatus[complemento.id]
+                          ? 'cursor-not-allowed opacity-60'
+                          : 'cursor-pointer'
+                      }`}
+                      title={complemento.ativo ? 'Complemento Ativo' : 'Complemento Desativado'}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={complemento.ativo ?? true}
+                        onChange={(event) => {
+                          event.stopPropagation()
+                          handleToggleAtivo(complemento.id, event.target.checked)
+                        }}
+                        disabled={!!togglingStatus[complemento.id]}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
+                      <span className="absolute left-1 top-1/2 block h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-6" />
+                    </label>
+                    
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={valorInputs[complemento.id] ?? formatValorFromNumber(complemento.valor)}
+                      onChange={(e) => {
+                        setValorInputs((prev) => ({
+                          ...prev,
+                          [complemento.id]: formatValorInput(e.target.value),
+                        }))
+                      }}
+                      onFocus={(e) => e.target.select()}
+                      onBlur={() => handleUpdateValor(complemento.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.currentTarget.blur()
+                        }
+                      }}
+                      disabled={!!savingMap[complemento.id]?.valor}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-xs font-semibold text-primary-text px-2 py-1 rounded border border-gray-200 bg-primary-bg focus:outline-none focus:border-primary disabled:opacity-60 disabled:cursor-not-allowed min-w-[100px]"
+                    />
+                  </div>
                 </div>
                 <div className="mt-1 flex items-center justify-between gap-3">
-                  <p className="text-xs text-secondary-text">
-                    {complemento.descricao || 'Sem descrição'}
-                  </p>
-                  {complemento.tipoImpactoPreco && (
-                    <p className="text-[11px] font-semibold text-primary uppercase tracking-wide">
-                      {complemento.tipoImpactoPreco}
-                    </p>
-                  )}
+                  <input
+                    type="text"
+                    value={descricaoInputs[complemento.id] ?? complemento.descricao ?? ''}
+                    onChange={(e) => {
+                      setDescricaoInputs((prev) => ({
+                        ...prev,
+                        [complemento.id]: e.target.value,
+                      }))
+                    }}
+                    onFocus={(e) => e.target.select()}
+                    onBlur={() => handleUpdateDescricao(complemento.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.currentTarget.blur()
+                      }
+                    }}
+                    disabled={!!savingMap[complemento.id]?.descricao}
+                    onClick={(e) => e.stopPropagation()}
+                    placeholder="Sem descrição"
+                    className="text-xs text-secondary-text px-2 py-1 rounded border border-gray-200 bg-primary-bg focus:outline-none focus:border-primary disabled:opacity-60 disabled:cursor-not-allowed flex-1 max-w-[200px]"
+                  />
+                  <select
+                    value={normalizeTipoImpacto(complemento.tipoImpactoPreco)}
+                    onChange={(e) => {
+                      const novoValor = e.target.value as 'nenhum' | 'aumenta' | 'diminui'
+                      handleUpdateTipoImpacto(complemento.id, novoValor)
+                    }}
+                    disabled={!!savingMap[complemento.id]?.tipo}
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-[11px] font-semibold text-primary uppercase tracking-wide px-2 py-1 rounded border border-gray-200 bg-primary-bg focus:outline-none focus:border-primary disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <option value="nenhum">Nenhum</option>
+                    <option value="aumenta">Aumenta</option>
+                    <option value="diminui">Diminui</option>
+                  </select>
                 </div>
               </div>
             </div>

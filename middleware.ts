@@ -24,7 +24,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  const token = request.cookies.get('auth-token')?.value
+  // Verificar token no cookie OU no header Authorization
+  const cookieToken = request.cookies.get('auth-token')?.value
+  const authHeader = request.headers.get('authorization')
+  const headerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null
+  
+  const token = cookieToken || headerToken
   const isApiRoute = pathname.startsWith('/api/')
   
   // Rotas protegidas - verificação mínima

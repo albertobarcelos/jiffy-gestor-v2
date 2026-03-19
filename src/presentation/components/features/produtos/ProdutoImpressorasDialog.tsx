@@ -11,7 +11,7 @@ import {
 } from '@/src/presentation/components/ui/dialog'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
-import { MdAdd, MdClose, MdDelete, MdPrint, MdSearch } from 'react-icons/md'
+import { MdAdd, MdClose, MdDelete, MdPrint, MdSearch, MdEdit } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import {
   ImpressorasTabsModal,
@@ -255,12 +255,25 @@ export function ProdutoImpressorasDialog({
 
   const handleCloseImpressorasModal = () => {
     setImpressorasModalState((prev) => ({ ...prev, open: false }))
+    // Recarregar impressoras após fechar o modal de edição
+    loadImpressoras()
   }
 
   const handleImpressorasModalReload = () => {
     // Recarregar lista de impressoras disponíveis quando uma nova for criada
     loadAllImpressoras()
+    // Recarregar também as impressoras vinculadas ao produto
+    loadImpressoras()
   }
+
+  const handleEditImpressora = useCallback((impressora: ProdutoImpressora) => {
+    setImpressorasModalState({
+      open: true,
+      tab: 'impressora',
+      mode: 'edit',
+      impressoraId: impressora.id,
+    })
+  }, [])
 
   const handleImpressorasTabChange = (tab: 'impressora') => {
     setImpressorasModalState((prev) => ({ ...prev, tab }))
@@ -409,7 +422,19 @@ export function ProdutoImpressorasDialog({
                 <MdPrint />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-semibold text-primary-text">{impressora.nome}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-primary-text">{impressora.nome}</p>
+                  <button
+                    type="button"
+                    onClick={() => handleEditImpressora(impressora)}
+                    disabled={isUpdating}
+                    className="text-primary hover:text-primary/80 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    aria-label={`Editar ${impressora.nome}`}
+                    title="Editar impressora"
+                  >
+                    <MdEdit size={16} />
+                  </button>
+                </div>
                 <p className="text-xs text-secondary-text">
                   {impressora.modelo || 'Modelo não informado'}
                 </p>

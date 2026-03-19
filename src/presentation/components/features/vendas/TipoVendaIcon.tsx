@@ -42,7 +42,7 @@ export function TipoVendaIcon({
   corSecundaria = 'var(--color-info)',
   corTexto = 'var(--color-alternate)',
   corCirculoInterno,
-  corBorda = 'rgba(131, 56, 236, 0.5)',
+  corBorda = 'var(--color-alternate)',
   corFundo = 'var(--color-primary-background)',
   corBalcao = 'var(--color-alternate)',
   title,

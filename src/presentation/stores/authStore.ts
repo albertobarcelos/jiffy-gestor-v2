@@ -9,6 +9,7 @@ interface AuthState {
   auth: Auth | null
   isAuthenticated: boolean
   isLoading: boolean
+  isRehydrated: boolean
   error: string | null
   login: (auth: Auth) => void
   logout: () => Promise<void>
@@ -40,6 +41,7 @@ export const useAuthStore = create<AuthState>()(
       auth: null,
       isAuthenticated: false,
       isLoading: false,
+      isRehydrated: false,
       error: null,
 
       login: (auth: Auth) => {
@@ -122,6 +124,10 @@ export const useAuthStore = create<AuthState>()(
             )
             state.auth = auth
           }
+        }
+        // Marca como reidratado após processar o estado (sempre, mesmo se não houver dados)
+        if (state) {
+          state.isRehydrated = true
         }
       },
     }

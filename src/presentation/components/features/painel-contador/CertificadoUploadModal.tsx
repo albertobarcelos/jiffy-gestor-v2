@@ -1,0 +1,229 @@
+'use client'
+
+import React, { useState } from 'react'
+import { Button } from '@/src/presentation/components/ui/button'
+import { Input } from '@/src/presentation/components/ui/input'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/src/presentation/components/ui/dialog'
+import { showToast } from '@/src/shared/utils/toast'
+import { MdUploadFile, MdLock } from 'react-icons/md'
+
+interface CertificadoUploadModalProps {
+  open: boolean
+  onClose: () => void
+  onSuccess: () => void
+}
+
+export function CertificadoUploadModal({ open, onClose, onSuccess }: CertificadoUploadModalProps) {
+  const [file, setFile] = useState<File | null>(null)
+  const [senha, setSenha] = useState('')
+  const [isUploading, setIsUploading] = useState(false)
+  const [cnpj, setCnpj] = useState('')
+
+  // Buscar dados da empresa ao abrir modal
+  React.useEffect(() => {
+    if (open) {
+      const loadEmpresa = async () => {
+        try {
+          const response = await fetch('/api/empresas/me')
+          if (!response.ok) return
+          const data = await response.json()
+          if (data?.cnpj) {
+            // Remove caracteres especiais do CNPJ
+            const cnpjNumeros = data.cnpj.replace(/\D/g, '')
+            setCnpj(cnpjNumeros)
+          }
+        } catch (error) {
+          console.error('Erro ao carregar empresa:', error)
+        }
+      }
+      loadEmpresa()
+    }
+  }, [open])
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0]
+    if (selectedFile) {
+      // Validar extensão (apenas .pfx ou .p12)
+      const ext = selectedFile.name.split('.').pop()?.toLowerCase()
+      if (ext !== 'pfx' && ext !== 'p12') {
+        showToast.error('Arquivo inválido. Selecione um certificado .pfx ou .p12')
+        return
+      }
+      setFile(selectedFile)
+    }
+  }
+
+  const handleUpload = async () => {
+    if (!file) {
+      showToast.error('Selecione um arquivo de certificado')
+      return
+    }
+
+    if (!senha || senha.trim() === '') {
+      showToast.error('Digite a senha do certificado')
+      return
+    }
+
+    const toastId = showToast.loading('Enviando certificado...')
+    setIsUploading(true)
+
+    try {
+      // Converter arquivo para base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const result = reader.result as string
+          // Remove o prefixo "data:application/...;base64,"
+          const base64Data = result.split(',')[1]
+          resolve(base64Data)
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+
+      // Preparar dados para envio
+      const requestBody = {
+        cnpj: cnpj,
+        certificadoPfx: base64,
+        senhaCertificado: senha,
+        aliasCertificado: file.name.replace(/\.(pfx|p12)$/i, ''),
+      }
+
+      console.log('📤 Enviando certificado:', {
+        cnpj: requestBody.cnpj,
+        aliasCertificado: requestBody.aliasCertificado,
+      })
+
+      // Enviar para o fiscal service via backend proxy
+      const response = await fetch('/api/certificado', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        console.error('❌ Erro do servidor:', error)
+        throw new Error(error.message || error.error || 'Erro ao cadastrar certificado')
+      }
+
+      showToast.successLoading(toastId, 'Certificado cadastrado com sucesso!')
+      
+      // Resetar form
+      setFile(null)
+      setSenha('')
+      
+      // Chamar callback de sucesso e fechar modal
+      onSuccess()
+      onClose()
+    } catch (error: any) {
+      console.error('Erro ao enviar certificado:', error)
+      showToast.errorLoading(toastId, error.message || 'Erro ao enviar certificado')
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const handleClose = () => {
+    if (!isUploading) {
+      setFile(null)
+      setSenha('')
+      onClose()
+    }
+  }
+
+  return (
+    <Dialog open={open} onClose={handleClose}>
+      <div className="max-w-md px-4">
+        <div>
+          <p className="text-2xl text-center font-bold text-primary pt-4">
+            Cadastrar Certificado Digital
+          </p>
+          <p className="text-secondary-text">
+            Faça upload do arquivo .pfx ou .p12 e informe a senha do certificado
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-4 py-4">
+          {/* Upload de arquivo */}
+          <div className="flex flex-col gap-2 px-8">
+            <label className="text-sm font-medium text-primary">
+              Arquivo do Certificado
+            </label>
+            <div className="flex flex-col gap-2">
+              <label 
+                htmlFor="certificado-file" 
+                className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-primary/30 bg-primary/5 px-4 py-8 cursor-pointer hover:border-primary/50 hover:bg-primary/10 transition-colors"
+              >
+                <MdUploadFile className="text-primary" size={24} />
+                <span className="text-sm font-medium text-primary">
+                  {file ? file.name : 'Clique para selecionar o arquivo'}
+                </span>
+              </label>
+              <input
+                id="certificado-file"
+                type="file"
+                accept=".pfx,.p12"
+                onChange={handleFileChange}
+                className="hidden"
+                disabled={isUploading}
+              />
+              <p className="text-xs text-secondary-text">
+                Formatos aceitos: .pfx, .p12 (Certificado A1)
+              </p>
+            </div>
+          </div>
+
+          {/* Campo de senha */}
+          <div className="flex flex-col gap-2">
+            <label htmlFor="senha-cert" className="text-sm font-medium text-primary">
+              Senha do Certificado
+            </label>
+            <div className="relative">
+              <MdLock className="absolute left-2 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
+              <Input
+                id="senha-cert"
+                type="password"
+                placeholder="Digite a senha"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                disabled={isUploading}
+                size="small"
+                sx={{
+                  '& .MuiOutlinedInput-input': {
+                    paddingLeft: '2rem', // 56px (equivalente ao pl-14 do Tailwind)
+                  },
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Botões */}
+          <div className="flex gap-3 mt-4">
+            <Button
+              onClick={handleClose}
+              disabled={isUploading}
+              variant="outlined"
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleUpload}
+              disabled={isUploading || !file || !senha}
+              className="flex-1"
+              sx={{
+                backgroundColor: 'var(--color-secondary)',
+                '&:hover': { backgroundColor: 'var(--color-alternate)' },
+              }}
+            >
+              {isUploading ? 'Enviando...' : 'Cadastrar'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Dialog>
+  )
+}
