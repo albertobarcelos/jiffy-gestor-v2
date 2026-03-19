@@ -5,6 +5,7 @@ import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 /**
  * POST /api/vendas/[id]/marcar-emissao-fiscal
  * Marca uma venda finalizada para emissão fiscal
+ * O backend internamente atualiza solicitarEmissaoFiscal = true
  */
 export async function POST(
   request: NextRequest,

@@ -1,36 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
+import { buildInutilizacoesQuery } from '@/src/server/fiscal/numeracaoOperacoesMapper'
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ modelo: string; serie: string }> }
-) {
+export async function GET(request: NextRequest) {
   try {
     const validation = validateRequest(request)
     if (!validation.valid || !validation.tokenInfo) {
       return validation.error!
     }
     const { tokenInfo } = validation
-    const { modelo, serie } = await params
-    const body = await request.json()
+
+    let url = '/api/v1/fiscal/inutilizacoes'
+    const params = buildInutilizacoesQuery(request.nextUrl.searchParams)
+    if (params.toString()) url += `?${params.toString()}`
 
     const apiClient = new ApiClient()
-    const response = await apiClient.request<any>(`/api/v1/fiscal/configuracoes/numeracao/${modelo}/${serie}`, {
-      method: 'PUT',
+    const response = await apiClient.request<any>(url, {
+      method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
         Authorization: `Bearer ${tokenInfo.token}`,
       },
-      body: JSON.stringify(body),
     })
 
     return NextResponse.json(response.data)
   } catch (error) {
-    console.error('Erro ao atualizar configuração de numeração:', error)
+    console.error('Erro ao buscar histórico de inutilizações:', error)
     if (error instanceof ApiError) {
       return NextResponse.json(
-        { error: error.message || 'Erro ao atualizar configuração de numeração' },
+        { error: error.message || 'Erro ao buscar histórico de inutilizações' },
         { status: error.status }
       )
     }

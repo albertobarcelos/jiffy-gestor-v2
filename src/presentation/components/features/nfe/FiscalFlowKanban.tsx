@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useVendas, useMarcarEmissaoFiscal } from '@/src/presentation/hooks/useVendas'
+import { useMarcarEmissaoFiscal, useDuplicateVenda, useExcluirVendaGestor, useEmitirNfe, useEmitirNfeGestor, useReemitirNfe, useReemitirNfeGestor } from '@/src/presentation/hooks/useVendas'
 import { useVendasUnificadas, VendaUnificadaDTO } from '@/src/presentation/hooks/useVendasUnificadas'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { MdReceipt, MdAdd, MdVisibility, MdSchedule, MdRefresh, MdCheckCircle, MdError, MdCancel, MdMoreVert } from 'react-icons/md'
@@ -11,7 +11,7 @@ import { Badge } from '@/src/presentation/components/ui/badge'
 import { StatusFiscalBadge } from './StatusFiscalBadge'
 import { DetalhesVendas } from '@/src/presentation/components/features/vendas/DetalhesVendas'
 import { NovoPedidoModal } from './NovoPedidoModal'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { showToast } from '@/src/shared/utils/toast'
 
 type Priority = 'high' | 'medium' | 'low'
 
@@ -33,6 +33,7 @@ type Venda = VendaUnificadaDTO
  * Baseado no modelo de Kanban moderno e limpo
  */
 type TipoVendaFiltro = 'balcao' | 'mesa' | 'delivery'
+type StatusVendaFiltro = 'TODAS' | 'ATIVAS' | 'CANCELADAS'
 
 export function FiscalFlowKanban() {
   const [selectedVendaId, setSelectedVendaId] = useState<string | null>(null)
@@ -40,6 +41,7 @@ export function FiscalFlowKanban() {
     id: string
     tabelaOrigem: 'venda' | 'venda_gestor'
     numeroVenda?: number
+    modeloInicial?: 55 | 65
   } | null>(null)
   const [emitirNfeModalOpen, setEmitirNfeModalOpen] = useState(false)
   const [detalhesVendaModalOpen, setDetalhesVendaModalOpen] = useState(false)
@@ -48,7 +50,10 @@ export function FiscalFlowKanban() {
     tabelaOrigem: 'venda' | 'venda_gestor'
   } | null>(null)
   const [tipoVendaFiltros, setTipoVendaFiltros] = useState<TipoVendaFiltro[]>([])
+  const [statusVendaFiltro, setStatusVendaFiltro] = useState<StatusVendaFiltro>('ATIVAS')
   const [novoPedidoModalOpen, setNovoPedidoModalOpen] = useState(false)
+  const [menuAcoesVendaIdAberto, setMenuAcoesVendaIdAberto] = useState<string | null>(null)
+  const [acaoFiscalEmAndamentoPorVenda, setAcaoFiscalEmAndamentoPorVenda] = useState<Record<string, 'emitindo' | 'reemitindo'>>({})
   
   // Função para alternar filtro (seleção múltipla)
   const toggleFiltro = (tipo: TipoVendaFiltro) => {
@@ -66,25 +71,6 @@ export function FiscalFlowKanban() {
   // Verificar se todos os filtros estão selecionados (equivalente a "todos")
   const todosFiltrosSelecionados = tipoVendaFiltros.length === 3
   
-  // Obter empresaId do token decodificado
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-  
-  // Decodificar token JWT para obter empresaId (decodificação simples base64)
-  let empresaId = ''
-  if (token) {
-    try {
-      const parts = token.split('.')
-      if (parts.length === 3) {
-        const payload = JSON.parse(atob(parts[1]))
-        empresaId = payload.empresaId || ''
-      }
-    } catch (e) {
-      console.error('Erro ao decodificar token:', e)
-    }
-  }
-
-  
   // Calcular período do mês atual (formato ISO para o backend)
   const agora = new Date()
   const periodoInicial = new Date(agora.getFullYear(), agora.getMonth(), 1).toISOString()
@@ -101,6 +87,7 @@ export function FiscalFlowKanban() {
   // Buscar vendas unificadas (PDV + Gestor)
   const { data: vendasUnificadasData, isLoading, refetch } = useVendasUnificadas({
     origem: getOrigemFiltro(),
+    incluirCanceladas: true,
     periodoInicial,
     periodoFinal,
     offset: 0,
@@ -108,33 +95,237 @@ export function FiscalFlowKanban() {
   })
   
   const marcarEmissaoFiscal = useMarcarEmissaoFiscal()
+  const duplicarVenda = useDuplicateVenda()
+  const excluirVendaGestor = useExcluirVendaGestor()
+  const emitirNfePdv = useEmitirNfe()
+  const emitirNfeGestor = useEmitirNfeGestor()
+  const reemitirNfePdv = useReemitirNfe()
+  const reemitirNfeGestor = useReemitirNfeGestor()
+
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+  const setAcaoFiscalEmAndamento = (
+    vendaId: string,
+    acao: 'emitindo' | 'reemitindo' | null
+  ) => {
+    setAcaoFiscalEmAndamentoPorVenda((prev) => {
+      if (!acao) {
+        const { [vendaId]: _, ...rest } = prev
+        return rest
+      }
+      return { ...prev, [vendaId]: acao }
+    })
+  }
+
+  const refetchAteMudarStatusFiscal = async (
+    vendaId: string,
+    statusAnterior: Venda['statusFiscal'],
+    tentativasMaximas = 6,
+    intervaloMs = 2000
+  ) => {
+    for (let tentativa = 0; tentativa < tentativasMaximas; tentativa++) {
+      const result = await refetch()
+      const vendaAtualizada = result.data?.items?.find((item: Venda) => item.id === vendaId)
+      if (!vendaAtualizada) return
+
+      if (vendaAtualizada.statusFiscal !== statusAnterior) {
+        return
+      }
+
+      await sleep(intervaloMs)
+    }
+  }
   
   // Todas as vendas unificadas
   const todasVendas: Venda[] = vendasUnificadasData?.items || []
   
-  // Filtrar vendas por coluna usando os métodos auxiliares do DTO
-  const vendasFinalizadas: Venda[] = todasVendas.filter(v => v.getEtapaKanban() === 'FINALIZADAS')
-  const vendasPendentes: Venda[] = todasVendas.filter(v => v.getEtapaKanban() === 'PENDENTE_EMISSAO')
-  const vendasComNfe: Venda[] = todasVendas.filter(v => v.getEtapaKanban() === 'COM_NFE')
+  // Filtrar vendas por tipo (se filtro ativo)
+  const filtrarPorTipo = (vendas: Venda[]): Venda[] => {
+    // Se todos os filtros estão selecionados ou nenhum, não filtrar
+    if (todosFiltrosSelecionados || tipoVendaFiltros.length === 0) return vendas
+    
+    // Filtrar por tipos selecionados
+    return vendas.filter(v => {
+      // Para vendas do gestor, não temos tipoVenda, usar origem
+      if (v.isVendaGestor() && !v.isDelivery()) {
+        // Vendas do gestor aparecem quando filtro inclui balcão ou mesa
+        return tipoVendaFiltros.includes('balcao') || tipoVendaFiltros.includes('mesa')
+      }
+      
+      // Para delivery
+      if (v.isDelivery()) {
+        return tipoVendaFiltros.includes('delivery')
+      }
+      
+      // Para vendas do PDV, usar tipoVenda
+      if (v.isVendaPdv()) {
+        const tipoVenda = v.tipoVenda?.toLowerCase()
+        return tipoVenda && tipoVendaFiltros.some(filtro => filtro.toLowerCase() === tipoVenda)
+      }
+      
+      return false
+    })
+  }
+
+  const filtrarPorStatusVenda = (vendas: Venda[]): Venda[] => {
+    if (statusVendaFiltro === 'TODAS') return vendas
+    if (statusVendaFiltro === 'ATIVAS') {
+      return vendas.filter((v) => !v.dataCancelamento)
+    }
+    return vendas.filter((v) => !!v.dataCancelamento)
+  }
   
-  // Criar Sets para evitar duplicação
-  const vendasPendentesIds = new Set(vendasPendentes.map(v => v.id))
-  const vendasComNfeIds = new Set(vendasComNfe.map(v => v.id))
+  // Filtrar vendas por tipo (Mesa, Balcão, Delivery) - aplica filtros do frontend
+  const vendasFiltradasPorTipo: Venda[] = filtrarPorStatusVenda(filtrarPorTipo(todasVendas))
 
   // Função para obter colunas baseadas no filtro de tipo de venda
   const getColumns = (): KanbanColumn[] => {
-    // Se todos os filtros estão selecionados ou nenhum, mostrar todas as colunas
-    const mostrarTodasColunas = todosFiltrosSelecionados || tipoVendaFiltros.length === 0
+    // Se nenhum filtro está selecionado, mostrar todas as colunas (incluindo delivery)
+    if (tipoVendaFiltros.length === 0) {
+      // Sem filtro: mostrar todas as colunas (delivery + finais)
+      return [
+        {
+          id: 'EM_ANALISE',
+          title: 'Em análise',
+          color: 'bg-blue-50',
+          borderColor: 'border-blue-400',
+          borderColorClass: 'border-l-blue-400',
+          icon: <MdSchedule className="w-4 h-4 text-blue-600" />,
+          placeholder: 'Pedidos em análise',
+        },
+        {
+          id: 'EM_PRODUCAO',
+          title: 'Em Produção',
+          color: 'bg-orange-50',
+          borderColor: 'border-orange-400',
+          borderColorClass: 'border-l-orange-400',
+          icon: <MdSchedule className="w-4 h-4 text-orange-600" />,
+          placeholder: 'Pedidos em produção',
+        },
+        {
+          id: 'PRONTOS_ENTREGA',
+          title: 'Prontos para Entrega',
+          color: 'bg-purple-50',
+          borderColor: 'border-purple-400',
+          borderColorClass: 'border-l-purple-400',
+          icon: <MdCheckCircle className="w-4 h-4 text-purple-600" />,
+          placeholder: 'Pedidos prontos para entrega',
+        },
+        {
+          id: 'COM_ENTREGADOR',
+          title: 'Com entregador',
+          color: 'bg-indigo-50',
+          borderColor: 'border-indigo-400',
+          borderColorClass: 'border-l-indigo-400',
+          icon: <MdSchedule className="w-4 h-4 text-indigo-600" />,
+          placeholder: 'Pedidos com entregador',
+        },
+        {
+          id: 'FINALIZADAS',
+          title: 'Finalizadas',
+          color: 'bg-gray-50',
+          borderColor: 'border-gray-400',
+          borderColorClass: 'border-l-gray-400',
+          icon: <MdReceipt className="w-4 h-4 text-gray-600" />,
+          placeholder: 'Vendas finalizadas aguardando ação',
+        },
+        {
+          id: 'PENDENTE_EMISSAO',
+          title: 'Pendente Emissão Fiscal',
+          color: 'bg-yellow-50',
+          borderColor: 'border-yellow-400',
+          borderColorClass: 'border-l-yellow-400',
+          icon: <MdSchedule className="w-4 h-4 text-yellow-600" />,
+          placeholder: 'Vendas aguardando emissão de NFe',
+        },
+        {
+          id: 'COM_NFE',
+          title: 'Com NFe Emitida',
+          color: 'bg-green-50',
+          borderColor: 'border-green-400',
+          borderColorClass: 'border-l-green-400',
+          icon: <MdCheckCircle className="w-4 h-4 text-green-600" />,
+          placeholder: 'Vendas com nota fiscal emitida',
+        },
+      ]
+    }
     
-    // Verificar se delivery está selecionado (ou todos)
-    const isDelivery = mostrarTodasColunas || tipoVendaFiltros.includes('delivery')
+    // Se todos os filtros estão selecionados, mostrar todas as colunas
+    if (todosFiltrosSelecionados) {
+      return [
+        {
+          id: 'EM_ANALISE',
+          title: 'Em análise',
+          color: 'bg-blue-50',
+          borderColor: 'border-blue-400',
+          borderColorClass: 'border-l-blue-400',
+          icon: <MdSchedule className="w-4 h-4 text-blue-600" />,
+          placeholder: 'Pedidos em análise',
+        },
+        {
+          id: 'EM_PRODUCAO',
+          title: 'Em Produção',
+          color: 'bg-orange-50',
+          borderColor: 'border-orange-400',
+          borderColorClass: 'border-l-orange-400',
+          icon: <MdSchedule className="w-4 h-4 text-orange-600" />,
+          placeholder: 'Pedidos em produção',
+        },
+        {
+          id: 'PRONTOS_ENTREGA',
+          title: 'Prontos para Entrega',
+          color: 'bg-purple-50',
+          borderColor: 'border-purple-400',
+          borderColorClass: 'border-l-purple-400',
+          icon: <MdCheckCircle className="w-4 h-4 text-purple-600" />,
+          placeholder: 'Pedidos prontos para entrega',
+        },
+        {
+          id: 'COM_ENTREGADOR',
+          title: 'Com entregador',
+          color: 'bg-indigo-50',
+          borderColor: 'border-indigo-400',
+          borderColorClass: 'border-l-indigo-400',
+          icon: <MdSchedule className="w-4 h-4 text-indigo-600" />,
+          placeholder: 'Pedidos com entregador',
+        },
+        {
+          id: 'FINALIZADAS',
+          title: 'Finalizadas',
+          color: 'bg-gray-50',
+          borderColor: 'border-gray-400',
+          borderColorClass: 'border-l-gray-400',
+          icon: <MdReceipt className="w-4 h-4 text-gray-600" />,
+          placeholder: 'Pedidos finalizados',
+        },
+        {
+          id: 'PENDENTE_EMISSAO',
+          title: 'Pendente Emissão Fiscal',
+          color: 'bg-yellow-50',
+          borderColor: 'border-yellow-400',
+          borderColorClass: 'border-l-yellow-400',
+          icon: <MdSchedule className="w-4 h-4 text-yellow-600" />,
+          placeholder: 'Pedidos aguardando emissão de NFe',
+        },
+        {
+          id: 'COM_NFE',
+          title: 'Com NFe Emitida',
+          color: 'bg-green-50',
+          borderColor: 'border-green-400',
+          borderColorClass: 'border-l-green-400',
+          icon: <MdCheckCircle className="w-4 h-4 text-green-600" />,
+          placeholder: 'Pedidos com nota fiscal emitida',
+        },
+      ]
+    }
+    
+    // Verificar se delivery está selecionado
+    const isDelivery = tipoVendaFiltros.includes('delivery')
     
     // Verificar se balcão ou mesa estão selecionados (mas não delivery)
-    const isBalcaoOuMesa = !mostrarTodasColunas && 
-      (tipoVendaFiltros.includes('balcao') || tipoVendaFiltros.includes('mesa')) &&
-      !tipoVendaFiltros.includes('delivery')
+    const isBalcaoOuMesa = (tipoVendaFiltros.includes('balcao') || tipoVendaFiltros.includes('mesa')) && !isDelivery
 
-    // Colunas para Delivery (com etapas adicionais)
+    // Colunas para Delivery (com etapas adicionais) - quando delivery está selecionado
     if (isDelivery) {
       return [
         {
@@ -203,7 +394,7 @@ export function FiscalFlowKanban() {
       ]
     }
 
-    // Colunas para Balcão e Mesa (apenas as 3 finais)
+    // Colunas para Balcão e Mesa (apenas as 3 finais) - quando Mesa ou Balcão estão selecionados (sem delivery)
     if (isBalcaoOuMesa) {
       return [
         {
@@ -236,7 +427,8 @@ export function FiscalFlowKanban() {
       ]
     }
 
-    // Sem filtro: mostrar todas as colunas (delivery + finais)
+    // Se chegou aqui, deve ser delivery (já tratado acima) ou combinação delivery + balcão/mesa
+    // Nesse caso, mostrar todas as colunas
     return [
       {
         id: 'EM_ANALISE',
@@ -364,17 +556,57 @@ export function FiscalFlowKanban() {
     }
   }
 
-  const handleEmitirNfe = (venda: Venda) => {
+  const handleEmitirNfe = async (venda: Venda) => {
+    const modeloInicial: 55 | 65 = venda.tipoDocFiscal === 'NFE' ? 55 : 65
+
+    // Reemissão: rota explícita dedicada.
+    if (
+      venda.statusFiscal === 'REJEITADA' &&
+      venda.tipoDocFiscal
+    ) {
+      setAcaoFiscalEmAndamento(venda.id, 'reemitindo')
+      try {
+        const serieReemissao = Number(venda.serieFiscal)
+        if (!Number.isFinite(serieReemissao) || serieReemissao <= 0) {
+          showToast.error('Série fiscal da rejeição não encontrada. Não foi possível reemitir automaticamente.')
+          return
+        }
+
+        const payload = {
+          id: venda.id,
+          modelo: modeloInicial,
+          tipoDocumento: venda.tipoDocFiscal,
+          serie: serieReemissao,
+        }
+
+        if (venda.tabelaOrigem === 'venda_gestor') {
+          await reemitirNfeGestor.mutateAsync(payload)
+        } else {
+          await reemitirNfePdv.mutateAsync(payload)
+        }
+        await refetch()
+        await refetchAteMudarStatusFiscal(venda.id, 'REJEITADA')
+        return
+      } catch (error) {
+        console.error('Erro ao tentar reemitir:', error)
+        return
+      } finally {
+        setAcaoFiscalEmAndamento(venda.id, null)
+      }
+    }
+
     setVendaSelecionadaParaEmissao({
       id: venda.id,
       tabelaOrigem: venda.tabelaOrigem,
       numeroVenda: venda.numeroVenda,
+      modeloInicial,
     })
     setSelectedVendaId(venda.id) // Mantém para compatibilidade
     setEmitirNfeModalOpen(true)
   }
 
   const handleViewDetails = (venda: Venda) => {
+    setMenuAcoesVendaIdAberto(null)
     setVendaSelecionadaParaDetalhes({
       id: venda.id,
       tabelaOrigem: venda.tabelaOrigem,
@@ -382,33 +614,50 @@ export function FiscalFlowKanban() {
     setDetalhesVendaModalOpen(true)
   }
 
-  // Filtrar vendas por tipo (se filtro ativo)
-  const filtrarPorTipo = (vendas: Venda[]): Venda[] => {
-    // Se todos os filtros estão selecionados ou nenhum, não filtrar
-    if (todosFiltrosSelecionados || tipoVendaFiltros.length === 0) return vendas
-    
-    // Filtrar por tipos selecionados
-    return vendas.filter(v => {
-      // Para vendas do gestor, não temos tipoVenda, usar origem
-      if (v.isVendaGestor && !v.isDelivery()) {
-        // Vendas do gestor aparecem quando filtro inclui balcão ou mesa
-        return tipoVendaFiltros.includes('balcao') || tipoVendaFiltros.includes('mesa')
-      }
-      
-      // Para delivery
-      if (v.isDelivery && v.isDelivery()) {
-        return tipoVendaFiltros.includes('delivery')
-      }
-      
-      // Para vendas do PDV, usar tipoVenda
-      if (v.isVendaPdv && v.isVendaPdv()) {
-        const tipoVenda = v.tipoVenda?.toLowerCase()
-        return tipoVenda && tipoVendaFiltros.some(filtro => filtro.toLowerCase() === tipoVenda)
-      }
-      
-      return false
-    })
+  const toggleMenuAcoes = (vendaId: string) => {
+    setMenuAcoesVendaIdAberto((prev) => (prev === vendaId ? null : vendaId))
   }
+
+  const handleDuplicarVenda = async (venda: Venda) => {
+    setMenuAcoesVendaIdAberto(null)
+
+    try {
+      await duplicarVenda.mutateAsync({
+        id: venda.id,
+        tabelaOrigem: venda.tabelaOrigem,
+      })
+      await refetch()
+    } catch (error) {
+      console.error('Erro ao duplicar venda:', error)
+    }
+  }
+
+  const handleExcluirVenda = async (venda: Venda) => {
+    setMenuAcoesVendaIdAberto(null)
+    if (venda.tabelaOrigem !== 'venda_gestor') {
+      showToast.error('Exclusão disponível apenas para vendas do Gestor.')
+      return
+    }
+
+    if (venda.statusFiscal === 'EMITIDA' || venda.statusFiscal === 'CANCELADA') {
+      showToast.error('Venda com documento fiscal autorizado/cancelado não pode ser excluída. Use cancelamento.')
+      return
+    }
+
+    const confirmou = window.confirm('Deseja realmente excluir esta venda de forma definitiva?')
+    if (!confirmou) return
+
+    try {
+      await excluirVendaGestor.mutateAsync({
+        id: venda.id,
+      })
+      await refetch()
+    } catch (error) {
+      console.error('Erro ao excluir venda:', error)
+    }
+  }
+
+
 
   // Obter vendas de delivery por status
   // NOTA: Para delivery, o backend retorna vendas finalizadas OU com status '4' sem dataFinalizacao (COM_ENTREGADOR)
@@ -458,98 +707,71 @@ export function FiscalFlowKanban() {
   const getVendasByColumn = (columnId: string): Venda[] => {
     let vendas: Venda[] = []
     
-    // Se todos os filtros estão selecionados ou nenhum, mostrar todas as colunas
-    const mostrarTodasColunas = todosFiltrosSelecionados || tipoVendaFiltros.length === 0
+    // Usar vendas já filtradas por tipo (Mesa, Balcão, Delivery)
+    const vendasParaFiltrar = vendasFiltradasPorTipo
     
-    // Verificar se delivery está selecionado (ou todos)
-    const isDelivery = mostrarTodasColunas || tipoVendaFiltros.includes('delivery')
+    // Verificar se delivery está selecionado
+    const isDelivery = tipoVendaFiltros.includes('delivery')
     
     // Verificar se balcão ou mesa estão selecionados (mas não delivery)
-    const isBalcaoOuMesa = !mostrarTodasColunas && 
-      (tipoVendaFiltros.includes('balcao') || tipoVendaFiltros.includes('mesa')) &&
-      !tipoVendaFiltros.includes('delivery')
+    const isBalcaoOuMesa = (tipoVendaFiltros.includes('balcao') || tipoVendaFiltros.includes('mesa')) && !isDelivery
     
     switch (columnId) {
-      // Colunas de Delivery
+      // Colunas de Delivery - apenas se delivery estiver selecionado
       case 'EM_ANALISE':
-        // Mostrar apenas se filtro for delivery ou sem filtro (mostra todas)
-        if (isDelivery) {
-          vendas = todasVendas.filter((v: Venda) => {
-            if (!v.isDelivery || !v.isDelivery()) return false
+        if (isDelivery || tipoVendaFiltros.length === 0 || todosFiltrosSelecionados) {
+          vendas = vendasParaFiltrar.filter((v: Venda) => {
+            if (!v.isDelivery()) return false
             // Delivery sem dataFinalizacao e sem status fiscal = em análise
             return !v.dataFinalizacao && !v.statusFiscal
           })
         }
         break
       case 'EM_PRODUCAO':
-        if (isDelivery) {
-          vendas = todasVendas.filter((v: Venda) => {
-            if (!v.isDelivery || !v.isDelivery()) return false
+        if (isDelivery || tipoVendaFiltros.length === 0 || todosFiltrosSelecionados) {
+          vendas = vendasParaFiltrar.filter((v: Venda) => {
+            if (!v.isDelivery()) return false
             // Similar - por enquanto usar mesma lógica
             return !v.dataFinalizacao && !v.statusFiscal
           })
         }
         break
       case 'PRONTOS_ENTREGA':
-        if (isDelivery) {
-          vendas = todasVendas.filter((v: Venda) => {
-            if (!v.isDelivery || !v.isDelivery()) return false
+        if (isDelivery || tipoVendaFiltros.length === 0 || todosFiltrosSelecionados) {
+          vendas = vendasParaFiltrar.filter((v: Venda) => {
+            if (!v.isDelivery()) return false
             return !v.dataFinalizacao && !v.statusFiscal
           })
         }
         break
       case 'COM_ENTREGADOR':
-        if (isDelivery) {
+        if (isDelivery || tipoVendaFiltros.length === 0 || todosFiltrosSelecionados) {
           // Delivery com dataFinalizacao mas sem status fiscal emitido
-          vendas = todasVendas.filter((v: Venda) => {
-            if (!v.isDelivery || !v.isDelivery()) return false
+          vendas = vendasParaFiltrar.filter((v: Venda) => {
+            if (!v.isDelivery()) return false
             return v.dataFinalizacao && v.statusFiscal !== 'EMITIDA'
           })
         }
         break
       
-      // Colunas comuns
+      // Colunas comuns (FINALIZADAS, PENDENTE_EMISSAO, COM_NFE)
       case 'FINALIZADAS':
         // Vendas finalizadas sem solicitação fiscal e sem NFe emitida
-        vendas = todasVendas.filter((v: Venda) => {
+        vendas = vendasParaFiltrar.filter((v: Venda) => {
           const etapa = v.getEtapaKanban()
-          if (etapa !== 'FINALIZADAS') return false
-          
-          // Filtrar por tipo se necessário
-          if (tipoVendaFiltros.length > 0 && !todosFiltrosSelecionados) {
-            if (isDelivery && !v.isDelivery()) return false
-            if (isBalcaoOuMesa && v.isDelivery()) return false
-          }
-          
-          return true
+          return etapa === 'FINALIZADAS'
         })
         break
       case 'PENDENTE_EMISSAO':
-        vendas = todasVendas.filter((v: Venda) => {
+        vendas = vendasParaFiltrar.filter((v: Venda) => {
           const etapa = v.getEtapaKanban()
-          if (etapa !== 'PENDENTE_EMISSAO') return false
-          
-          // Filtrar por tipo se necessário
-          if (tipoVendaFiltros.length > 0 && !todosFiltrosSelecionados) {
-            if (isDelivery && !v.isDelivery()) return false
-            if (isBalcaoOuMesa && v.isDelivery()) return false
-          }
-          
-          return true
+          return etapa === 'PENDENTE_EMISSAO'
         })
         break
       case 'COM_NFE':
-        vendas = todasVendas.filter((v: Venda) => {
+        vendas = vendasParaFiltrar.filter((v: Venda) => {
           const etapa = v.getEtapaKanban()
-          if (etapa !== 'COM_NFE') return false
-          
-          // Filtrar por tipo se necessário
-          if (tipoVendaFiltros.length > 0 && !todosFiltrosSelecionados) {
-            if (isDelivery && !v.isDelivery()) return false
-            if (isBalcaoOuMesa && v.isDelivery()) return false
-          }
-          
-          return true
+          return etapa === 'COM_NFE'
         })
         break
       default:
@@ -645,6 +867,17 @@ export function FiscalFlowKanban() {
           >
             Delivery
           </button>
+          <div className="ml-3">
+            <select
+              value={statusVendaFiltro}
+              onChange={(e) => setStatusVendaFiltro(e.target.value as StatusVendaFiltro)}
+              className="px-3 py-2 text-sm font-medium rounded-lg bg-white text-gray-700 border border-gray-300"
+            >
+              <option value="TODAS">Todas</option>
+              <option value="ATIVAS">Ativas</option>
+              <option value="CANCELADAS">Canceladas</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -692,13 +925,40 @@ export function FiscalFlowKanban() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              // TODO: Abrir menu de opções
+                              toggleMenuAcoes(venda.id)
                             }}
                             className="absolute top-1.5 right-1.5 p-0.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
                             title="Mais opções"
                           >
                             <MdMoreVert className="w-4 h-4" />
                           </button>
+
+                          {menuAcoesVendaIdAberto === venda.id && (
+                            <div
+                              className="absolute top-7 right-2 z-20 w-36 bg-white border border-gray-200 rounded-lg shadow-lg py-1"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                onClick={() => handleDuplicarVenda(venda)}
+                                className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={duplicarVenda.isPending || excluirVendaGestor.isPending}
+                              >
+                                Duplicar
+                              </button>
+                              <button
+                                onClick={() => handleExcluirVenda(venda)}
+                                className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={
+                                  duplicarVenda.isPending ||
+                                  excluirVendaGestor.isPending ||
+                                  venda.statusFiscal === 'EMITIDA' ||
+                                  venda.statusFiscal === 'CANCELADA'
+                                }
+                              >
+                                Excluir
+                              </button>
+                            </div>
+                          )}
 
                           {/* Venda N° */}
                           <p className="text-xs text-gray-600 mb-0.5">Venda #{venda.numeroVenda}</p>
@@ -767,12 +1027,36 @@ export function FiscalFlowKanban() {
                                 className="flex-1"
                                 onClick={() => handleEmitirNfe(venda)}
                                 disabled={
+                                  !!acaoFiscalEmAndamentoPorVenda[venda.id] ||
+                                  emitirNfePdv.isPending ||
+                                  emitirNfeGestor.isPending ||
+                                  reemitirNfePdv.isPending ||
+                                  reemitirNfeGestor.isPending ||
+                                  venda.statusFiscal === 'PENDENTE' ||
+                                  venda.statusFiscal === 'PENDENTE_EMISSAO' ||
                                   venda.statusFiscal === 'EMITINDO' || 
                                   venda.statusFiscal === 'PENDENTE_AUTORIZACAO' ||
+                                  venda.statusFiscal === 'CONTINGENCIA' ||
                                   venda.statusFiscal === 'EMITIDA'
                                 }
                               >
-                                {venda.statusFiscal === 'REJEITADA' ? 'Reemitir NFe' : 'Emitir NFe'}
+                                {(() => {
+                                  const acaoEmAndamento = acaoFiscalEmAndamentoPorVenda[venda.id]
+                                  if (acaoEmAndamento === 'reemitindo') return 'Reemitindo...'
+                                  if (acaoEmAndamento === 'emitindo') return 'Emitindo...'
+                                  const documentoLabel = venda.tipoDocFiscal === 'NFE' ? 'NFe' : 'NFCe'
+                                  if (venda.statusFiscal === 'REJEITADA') return `Reemitir ${documentoLabel}`
+                                  if (
+                                    venda.statusFiscal === 'PENDENTE' ||
+                                    venda.statusFiscal === 'PENDENTE_EMISSAO' ||
+                                    venda.statusFiscal === 'EMITINDO' ||
+                                    venda.statusFiscal === 'PENDENTE_AUTORIZACAO' ||
+                                    venda.statusFiscal === 'CONTINGENCIA'
+                                  ) {
+                                    return 'Aguardando...'
+                                  }
+                                  return `Emitir ${documentoLabel}`
+                                })()}
                               </Button>
                             )}
 
@@ -783,8 +1067,9 @@ export function FiscalFlowKanban() {
                                 className="flex-1"
                                 onClick={async () => {
                                   const url = `/api/nfe/${venda.documentoFiscalId}`
+                                  const documentoLabel = venda.tipoDocFiscal === 'NFE' ? 'DANFE' : 'DANFCE'
                                   
-                                  // Verificar se o DANFE está disponível antes de abrir
+                                  // Verificar se o PDF fiscal está disponível antes de abrir
                                   try {
                                     const response = await fetch(url)
                                     
@@ -792,28 +1077,28 @@ export function FiscalFlowKanban() {
                                       // Verificar se é realmente um PDF
                                       const contentType = response.headers.get('content-type')
                                       if (contentType?.includes('application/pdf')) {
-                                        // DANFE disponível, abrir normalmente
+                                        // PDF fiscal disponível, abrir normalmente
                                         window.open(url, '_blank')
                                       } else {
                                         // Resposta inesperada
                                         const errorData = await response.json().catch(() => ({}))
-                                        alert(errorData.error || 'Erro ao buscar DANFE. Tente novamente mais tarde.')
+                                        alert(errorData.error || `Erro ao buscar ${documentoLabel}. Tente novamente mais tarde.`)
                                       }
                                     } else if (response.status === 404) {
-                                      // DANFE ainda não foi gerado
+                                      // PDF fiscal ainda não foi gerado
                                       const errorData = await response.json().catch(() => ({}))
-                                      const errorMessage = errorData.error || 'O DANFE ainda não foi gerado.'
+                                      const errorMessage = errorData.error || `O ${documentoLabel} ainda não foi gerado.`
                                       
                                       // Oferecer opção de regenerar ou aguardar
                                       const opcao = confirm(
                                         `${errorMessage}\n\n` +
                                         `Escolha uma opção:\n` +
-                                        `OK = Regenerar DANFE agora\n` +
+                                        `OK = Regenerar ${documentoLabel} agora\n` +
                                         `Cancelar = Aguardar e tentar novamente automaticamente`
                                       )
                                       
                                       if (opcao) {
-                                        // Regenerar DANFE via Next.js API route (proxy)
+                                        // Regenerar PDF fiscal via Next.js API route (proxy)
                                         try {
                                           const regenerarUrl = `/api/nfe/${venda.documentoFiscalId}/regenerar`
                                           
@@ -826,14 +1111,14 @@ export function FiscalFlowKanban() {
                                           
                                           if (regenerarResponse.ok) {
                                             const regenerarData = await regenerarResponse.json()
-                                            alert(`✅ ${regenerarData.mensagem || 'Geração de DANFE iniciada. Aguarde alguns segundos e tente novamente.'}`)
+                                            alert(`✅ ${regenerarData.mensagem || `Geração de ${documentoLabel} iniciada. Aguarde alguns segundos e tente novamente.`}`)
                                             
                                             // Aguardar 5 segundos e tentar abrir
                                             setTimeout(async () => {
                                               let tentativas = 0
                                               const maxTentativas = 6 // 30 segundos no total (6 x 5s)
                                               
-                                              const verificarDanfe = async () => {
+                                              const verificarPdfFiscal = async () => {
                                                 tentativas++
                                                 try {
                                                   const retryResponse = await fetch(url)
@@ -846,33 +1131,33 @@ export function FiscalFlowKanban() {
                                                   }
                                                   
                                                   if (tentativas < maxTentativas) {
-                                                    setTimeout(verificarDanfe, 5000) // Tentar novamente em 5 segundos
+                                                    setTimeout(verificarPdfFiscal, 5000) // Tentar novamente em 5 segundos
                                                   } else {
-                                                    alert('O DANFE ainda não foi gerado após 30 segundos. Por favor, tente novamente mais tarde.')
+                                                    alert(`O ${documentoLabel} ainda não foi gerado após 30 segundos. Por favor, tente novamente mais tarde.`)
                                                   }
                                                 } catch {
                                                   if (tentativas < maxTentativas) {
-                                                    setTimeout(verificarDanfe, 5000)
+                                                    setTimeout(verificarPdfFiscal, 5000)
                                                   }
                                                 }
                                               }
                                               
-                                              setTimeout(verificarDanfe, 5000)
+                                              setTimeout(verificarPdfFiscal, 5000)
                                             }, 5000)
                                           } else {
                                             const errorRegenerar = await regenerarResponse.json().catch(() => ({}))
-                                            alert(`Erro ao regenerar DANFE: ${errorRegenerar.error || errorRegenerar.message || 'Erro desconhecido'}`)
+                                            alert(`Erro ao regenerar ${documentoLabel}: ${errorRegenerar.error || errorRegenerar.message || 'Erro desconhecido'}`)
                                           }
                                         } catch (error) {
-                                          console.error('Erro ao regenerar DANFE:', error)
-                                          alert('Erro ao regenerar DANFE. Tente novamente mais tarde.')
+                                          console.error(`Erro ao regenerar ${documentoLabel}:`, error)
+                                          alert(`Erro ao regenerar ${documentoLabel}. Tente novamente mais tarde.`)
                                         }
                                       } else {
                                         // Aguardar e tentar novamente automaticamente
                                         let tentativas = 0
                                         const maxTentativas = 6 // 30 segundos no total (6 x 5s)
                                         
-                                        const verificarDanfe = async () => {
+                                        const verificarPdfFiscal = async () => {
                                           tentativas++
                                           try {
                                             const retryResponse = await fetch(url)
@@ -885,32 +1170,32 @@ export function FiscalFlowKanban() {
                                             }
                                             
                                             if (tentativas < maxTentativas) {
-                                              setTimeout(verificarDanfe, 5000) // Tentar novamente em 5 segundos
+                                              setTimeout(verificarPdfFiscal, 5000) // Tentar novamente em 5 segundos
                                             } else {
-                                              alert('O DANFE ainda não foi gerado após 30 segundos. Por favor, tente novamente mais tarde.')
+                                              alert(`O ${documentoLabel} ainda não foi gerado após 30 segundos. Por favor, tente novamente mais tarde.`)
                                             }
                                           } catch {
                                             if (tentativas < maxTentativas) {
-                                              setTimeout(verificarDanfe, 5000)
+                                              setTimeout(verificarPdfFiscal, 5000)
                                             }
                                           }
                                         }
                                         
-                                        setTimeout(verificarDanfe, 5000)
+                                        setTimeout(verificarPdfFiscal, 5000)
                                       }
                                     } else {
                                       // Outro erro
                                       const errorData = await response.json().catch(() => ({}))
-                                      alert(errorData.error || 'Erro ao buscar DANFE. Tente novamente mais tarde.')
+                                      alert(errorData.error || `Erro ao buscar ${documentoLabel}. Tente novamente mais tarde.`)
                                     }
                                   } catch (error) {
                                     // Erro de rede, tentar abrir mesmo assim
-                                    console.error('Erro ao verificar DANFE:', error)
+                                    console.error(`Erro ao verificar ${documentoLabel}:`, error)
                                     window.open(url, '_blank')
                                   }
                                 }}
                               >
-                                Ver NFe
+                                Ver {venda.tipoDocFiscal === 'NFE' ? 'NFe' : 'NFCe'}
                               </Button>
                             )}
                             
@@ -948,6 +1233,7 @@ export function FiscalFlowKanban() {
           vendaId={vendaSelecionadaParaEmissao.id}
           vendaNumero={vendaSelecionadaParaEmissao.numeroVenda?.toString()}
           tabelaOrigem={vendaSelecionadaParaEmissao.tabelaOrigem}
+          modeloInicial={vendaSelecionadaParaEmissao.modeloInicial ?? 65}
         />
       )}
 

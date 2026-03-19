@@ -4,7 +4,6 @@ import React, { useState } from 'react'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/src/presentation/components/ui/dialog'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdUploadFile, MdLock } from 'react-icons/md'
 
@@ -15,24 +14,17 @@ interface CertificadoUploadModalProps {
 }
 
 export function CertificadoUploadModal({ open, onClose, onSuccess }: CertificadoUploadModalProps) {
-  const { auth } = useAuthStore()
   const [file, setFile] = useState<File | null>(null)
   const [senha, setSenha] = useState('')
   const [isUploading, setIsUploading] = useState(false)
   const [cnpj, setCnpj] = useState('')
-  const [uf, setUf] = useState('SP')
-  const [ambiente, setAmbiente] = useState<'HOMOLOGACAO' | 'PRODUCAO'>('HOMOLOGACAO')
 
   // Buscar dados da empresa ao abrir modal
   React.useEffect(() => {
     if (open) {
       const loadEmpresa = async () => {
-        const token = auth?.getAccessToken()
-        if (!token) return
         try {
-          const response = await fetch('/api/empresas/me', {
-            headers: { Authorization: `Bearer ${token}` },
-          })
+          const response = await fetch('/api/empresas/me')
           if (!response.ok) return
           const data = await response.json()
           if (data?.cnpj) {
@@ -40,14 +32,13 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
             const cnpjNumeros = data.cnpj.replace(/\D/g, '')
             setCnpj(cnpjNumeros)
           }
-          if (data?.uf) setUf(data.uf)
         } catch (error) {
           console.error('Erro ao carregar empresa:', error)
         }
       }
       loadEmpresa()
     }
-  }, [open, auth])
+  }, [open])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
@@ -77,12 +68,6 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
     setIsUploading(true)
 
     try {
-      const token = auth?.getAccessToken()
-      if (!token) {
-        showToast.errorLoading(toastId, 'Sessão expirada. Faça login novamente.')
-        return
-      }
-
       // Converter arquivo para base64
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader()
@@ -98,8 +83,6 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
 
       // Preparar dados para envio
       const requestBody = {
-        uf: uf.toUpperCase(), // Garantir maiúsculo
-        ambiente: ambiente, // Já está como 'HOMOLOGACAO' ou 'PRODUCAO'
         cnpj: cnpj,
         certificadoPfx: base64,
         senhaCertificado: senha,
@@ -107,8 +90,6 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
       }
 
       console.log('📤 Enviando certificado:', {
-        uf: requestBody.uf,
-        ambiente: requestBody.ambiente,
         cnpj: requestBody.cnpj,
         aliasCertificado: requestBody.aliasCertificado,
       })
@@ -118,7 +99,6 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(requestBody),
       })
@@ -156,26 +136,26 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
 
   return (
     <Dialog open={open} onClose={handleClose}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-primary">
+      <div className="max-w-md px-4">
+        <div>
+          <p className="text-2xl text-center font-bold text-primary pt-4">
             Cadastrar Certificado Digital
-          </DialogTitle>
-          <DialogDescription className="text-secondary-text">
+          </p>
+          <p className="text-secondary-text">
             Faça upload do arquivo .pfx ou .p12 e informe a senha do certificado
-          </DialogDescription>
-        </DialogHeader>
+          </p>
+        </div>
 
         <div className="flex flex-col gap-4 py-4">
           {/* Upload de arquivo */}
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 px-8">
             <label className="text-sm font-medium text-primary">
               Arquivo do Certificado
             </label>
             <div className="flex flex-col gap-2">
               <label 
                 htmlFor="certificado-file" 
-                className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-primary/30 bg-primary/5 px-4 py-6 cursor-pointer hover:border-primary/50 hover:bg-primary/10 transition-colors"
+                className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-primary/30 bg-primary/5 px-4 py-8 cursor-pointer hover:border-primary/50 hover:bg-primary/10 transition-colors"
               >
                 <MdUploadFile className="text-primary" size={24} />
                 <span className="text-sm font-medium text-primary">
@@ -196,32 +176,13 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
             </div>
           </div>
 
-          {/* Ambiente */}
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-primary">
-              Ambiente
-            </label>
-            <select
-              value={ambiente}
-              onChange={(e) => setAmbiente(e.target.value as 'HOMOLOGACAO' | 'PRODUCAO')}
-              disabled={isUploading}
-              className="h-10 rounded-lg border border-input bg-background px-3 text-sm"
-            >
-              <option value="HOMOLOGACAO">Homologação</option>
-              <option value="PRODUCAO">Produção</option>
-            </select>
-            <p className="text-xs text-secondary-text">
-              Use Homologação para testes e Produção para emissões reais
-            </p>
-          </div>
-
           {/* Campo de senha */}
           <div className="flex flex-col gap-2">
             <label htmlFor="senha-cert" className="text-sm font-medium text-primary">
               Senha do Certificado
             </label>
             <div className="relative">
-              <MdLock className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
+              <MdLock className="absolute left-2 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
               <Input
                 id="senha-cert"
                 type="password"
@@ -229,7 +190,12 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
                 disabled={isUploading}
-                className="pl-10"
+                size="small"
+                sx={{
+                  '& .MuiOutlinedInput-input': {
+                    paddingLeft: '2rem', // 56px (equivalente ao pl-14 do Tailwind)
+                  },
+                }}
               />
             </div>
           </div>
@@ -239,7 +205,7 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
             <Button
               onClick={handleClose}
               disabled={isUploading}
-              variant="outline"
+              variant="outlined"
               className="flex-1"
             >
               Cancelar
@@ -257,7 +223,7 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
             </Button>
           </div>
         </div>
-      </DialogContent>
+      </div>
     </Dialog>
   )
 }

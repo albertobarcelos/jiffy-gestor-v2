@@ -152,11 +152,24 @@ export class ClienteRepository implements IClienteRepository {
       if (data.nome) requestBody.nome = data.nome
       if (data.razaoSocial !== undefined) requestBody.razaoSocial = data.razaoSocial || ''
       
-      // CPF e CNPJ: sempre envia (mesmo que vazio) para garantir atualização
-      // IMPORTANTE: Envia da mesma forma que criarCliente para manter consistência
-      // Se estiver presente no DTO, envia o valor; se não, envia string vazia
-      requestBody.cpf = data.cpf !== undefined && data.cpf !== null ? data.cpf : ''
-      requestBody.cnpj = data.cnpj !== undefined && data.cnpj !== null ? data.cnpj : ''
+      // CPF e CNPJ: 
+      // - Se o campo estiver presente no DTO e for string vazia, envia null (para limpar/apagar)
+      // - Se o campo estiver presente e tiver valor, envia o valor
+      // - Se o campo não estiver presente, não envia (omitir - não atualiza)
+      if ('cpf' in data) {
+        if (data.cpf === null || (typeof data.cpf === 'string' && data.cpf.trim() === '')) {
+          requestBody.cpf = null
+        } else if (data.cpf) {
+          requestBody.cpf = data.cpf
+        }
+      }
+      if ('cnpj' in data) {
+        if (data.cnpj === null || (typeof data.cnpj === 'string' && data.cnpj.trim() === '')) {
+          requestBody.cnpj = null
+        } else if (data.cnpj) {
+          requestBody.cnpj = data.cnpj
+        }
+      }
       
       if (data.telefone !== undefined) requestBody.telefone = data.telefone || ''
       if (data.email !== undefined) requestBody.email = data.email || ''

@@ -46,6 +46,7 @@ interface VendaDetalhes {
   solicitarEmissaoFiscal?: boolean | null
   statusFiscal?: string | null
   documentoFiscalId?: string | null
+  retornoSefaz?: string | null
 }
 
 interface ProdutoLancado {
@@ -167,7 +168,12 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
       if (!token) return null
 
       try {
-        const response = await fetch(`/api/usuarios/${usuarioId}`, {
+        // Usa endpoint diferente dependendo da origem da venda
+        const endpoint = tabelaOrigem === 'venda_gestor'
+          ? `/api/pessoas/usuarios-gestor/${usuarioId}`
+          : `/api/usuarios/${usuarioId}`
+        
+        const response = await fetch(endpoint, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -183,7 +189,7 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
         return null
       }
     },
-    [auth]
+    [auth, tabelaOrigem]
   )
 
   /**
@@ -324,22 +330,54 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
       }
 
       const dataRaw = await response.json()
+
+      // Busca status fiscal atualizado para exibir motivo de rejeição no modal
+      let statusFiscal = dataRaw.statusFiscal ?? null
+      let documentoFiscalId = dataRaw.documentoFiscalId ?? null
+      let retornoSefaz = dataRaw.retornoSefaz ?? null
+
+      try {
+        const statusEndpoint = tabelaOrigem === 'venda_gestor'
+          ? `/api/vendas/gestor/${vendaId}/status-emissao`
+          : `/api/vendas/${vendaId}/status-emissao`
+
+        const statusResponse = await fetch(statusEndpoint, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (statusResponse.ok) {
+          const statusData = await statusResponse.json()
+          statusFiscal = statusData.status ?? statusFiscal
+          documentoFiscalId = statusData.documentoFiscalId ?? documentoFiscalId
+          retornoSefaz = statusData.retornoSefaz ?? retornoSefaz
+        }
+      } catch {
+        // Mantém dados já retornados pela API principal em caso de falha no endpoint de status.
+      }
       
-      // Mapeia os dados da API para o formato esperado, garantindo que campos sejam capturados corretamente
-      // Verifica diferentes possíveis estruturas do codigoTerminal na resposta da API
-      let codigoTerminal = dataRaw.codigoTerminal || 
-                          dataRaw.terminal?.codigo || 
-                          dataRaw.terminal?.codigoInterno ||
-                          dataRaw.terminal?.codigoTerminal ||
-                          dataRaw.terminal?.code ||
-                          dataRaw.terminalCodigo || 
-                          dataRaw.codigoInterno ||
-                          dataRaw.codigo ||
-                          dataRaw.code ||
-                          ''
+      // Venda do gestor não possui terminal no modelo atual.
+      // Evita warning falso-positivo e tentativa de lookup desnecessária.
+      let codigoTerminal = ''
+      if (tabelaOrigem === 'venda') {
+        // Mapeia os dados da API para o formato esperado, garantindo que campos sejam capturados corretamente
+        // Verifica diferentes possíveis estruturas do codigoTerminal na resposta da API
+        codigoTerminal = dataRaw.codigoTerminal || 
+                        dataRaw.terminal?.codigo || 
+                        dataRaw.terminal?.codigoInterno ||
+                        dataRaw.terminal?.codigoTerminal ||
+                        dataRaw.terminal?.code ||
+                        dataRaw.terminalCodigo || 
+                        dataRaw.codigoInterno ||
+                        dataRaw.codigo ||
+                        dataRaw.code ||
+                        ''
+      }
       
       // Se não encontrou o codigoTerminal e temos terminalId, busca os detalhes do terminal
-      if (!codigoTerminal && dataRaw.terminalId) {
+      if (tabelaOrigem === 'venda' && !codigoTerminal && dataRaw.terminalId) {
         try {
           const terminalResponse = await fetch(`/api/terminais/${dataRaw.terminalId}/detalhes`, {
             headers: {
@@ -365,17 +403,54 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
       }
       
       // Se ainda não tem código, usa terminalId como fallback
-      if (!codigoTerminal && dataRaw.terminalId) {
+      if (tabelaOrigem === 'venda' && !codigoTerminal && dataRaw.terminalId) {
         codigoTerminal = String(dataRaw.terminalId)
       }
+      
+      // Mapear produtos lançados garantindo que os complementos sejam preservados
+      const produtosLancadosMapeados = dataRaw.produtosLancados?.map((produto: any) => {
+        // Mapear complementos garantindo que todos os campos estejam presentes
+        const complementosMapeados = Array.isArray(produto.complementos) 
+          ? produto.complementos.map((comp: any) => {
+              // Normalizar tipoImpactoPreco (pode vir como string ou já no formato correto)
+              let tipoImpactoPreco: 'aumenta' | 'diminui' | 'nenhum' = 'nenhum'
+              if (comp.tipoImpactoPreco) {
+                const tipo = String(comp.tipoImpactoPreco).toLowerCase()
+                if (tipo === 'aumenta' || tipo === 'increase') {
+                  tipoImpactoPreco = 'aumenta'
+                } else if (tipo === 'diminui' || tipo === 'decrease' || tipo === 'diminui') {
+                  tipoImpactoPreco = 'diminui'
+                } else {
+                  tipoImpactoPreco = 'nenhum'
+                }
+              }
+              
+              return {
+                nomeComplemento: comp.nomeComplemento || comp.nome || comp.nomeComplemento || '',
+                quantidade: Number(comp.quantidade) || 0,
+                valorUnitario: Number(comp.valorUnitario) || 0,
+                tipoImpactoPreco,
+              }
+            })
+          : []
+        
+        return {
+          ...produto,
+          complementos: complementosMapeados,
+        }
+      }) || []
       
       const data: VendaDetalhes = {
         ...dataRaw,
         codigoTerminal: codigoTerminal,
+        statusFiscal,
+        documentoFiscalId,
+        retornoSefaz,
+        produtosLancados: produtosLancadosMapeados,
       }
       
       // Debug: log para verificar se o campo está sendo capturado
-      if (typeof window !== 'undefined' && !codigoTerminal) {
+      if (typeof window !== 'undefined' && tabelaOrigem === 'venda' && !codigoTerminal) {
         console.warn('DetalhesVendas: codigoTerminal não encontrado na resposta da API', {
           vendaId,
           dataRaw,
@@ -769,6 +844,20 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
                       <span className="font-mono text-xs">{venda.documentoFiscalId}</span>
                     </div>
                   )}
+
+                  {/* Retorno SEFAZ (motivo da rejeição/autorização) */}
+                  {venda.retornoSefaz && (
+                    <div
+                      className={`text-sm font-nunito px-3 py-2 rounded-lg ${
+                        venda.statusFiscal === 'REJEITADA'
+                          ? 'bg-red-50 text-red-700'
+                          : 'bg-blue-50 text-primary-text'
+                      }`}
+                    >
+                      <span className="font-semibold">Retorno SEFAZ: </span>
+                      <span>{venda.retornoSefaz}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -844,14 +933,19 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
                           </div>
 
                           {/* Linhas dos complementos */}
-                          {produto.complementos && produto.complementos.length > 0 && (
+                          {produto.complementos && produto.complementos.length > 0 ? (
                             <div className="space-y-1 md:ml-7 ml-2">
                               {produto.complementos.map((complemento, compIndex) => {
+                                console.log(`  🎨 Renderizando complemento ${compIndex}:`, complemento)
+                                
                                 const valorTotalComplemento = calcularValorComplemento(complemento)
                                 const temImpactoPreco = complemento.tipoImpactoPreco !== 'nenhum'
-                                const prefix = temImpactoPreco
-                                  ? (complemento.tipoImpactoPreco === 'aumenta' ? '+ ' : '- ')
-                                  : ''
+                                
+                                // Determina o prefixo baseado no tipo de impacto
+                                let prefix = ''
+                                if (temImpactoPreco) {
+                                  prefix = complemento.tipoImpactoPreco === 'aumenta' ? '+ ' : '- '
+                                }
                                 
                                 return (
                                   <div key={compIndex} className="flex items-center justify-between gap-2">
@@ -859,14 +953,16 @@ export function DetalhesVendas({ vendaId, open, onClose, tabelaOrigem = 'venda' 
                                       {complemento.quantidade}x {complemento.nomeComplemento}
                                       {temImpactoPreco && ` (${formatNumber(complemento.valorUnitario)})`}
                                     </span>
-                                    <div className="text-xs font-semibold text-secondary-text font-nunito">
-                                      {temImpactoPreco ? `${prefix}${formatCurrency(valorTotalComplemento)}` : '-'}
-                                    </div>
+                                    {temImpactoPreco && (
+                                      <div className="text-xs font-semibold text-secondary-text font-nunito">
+                                        {prefix}{formatCurrency(valorTotalComplemento)}
+                                      </div>
+                                    )}
                                   </div>
                                 )
                               })}
                             </div>
-                          )}
+                          ) : null}
 
                           {/* Informações de lançamento */}
                           <div className="flex flex-col md:flex-row text-xs text-secondary-text mt-1 md:ml-7">

@@ -4,6 +4,8 @@
 interface ProdutoComplementoResumo {
   id: string
   nome: string
+  valor?: number
+  tipoImpactoPreco?: 'aumenta' | 'diminui' | 'nenhum'
 }
 
 interface ProdutoGrupoComplementoResumo {
@@ -106,6 +108,8 @@ export class Produto {
               ? grupo.complementos.map((comp: any) => ({
                   id: comp.id?.toString() || '',
                   nome: comp.nome?.toString() || '',
+                  valor: typeof comp.valor === 'number' ? comp.valor : (comp.valor ? parseFloat(comp.valor) : 0),
+                  tipoImpactoPreco: comp.tipoImpactoPreco || 'nenhum',
                 }))
               : [],
           }))
