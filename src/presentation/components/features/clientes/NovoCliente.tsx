@@ -89,6 +89,8 @@ export function NovoCliente({
   const [cep, setCep] = useState('')
   const [complemento, setComplemento] = useState('')
   const [cidadeValida, setCidadeValida] = useState<boolean | null>(null)
+  const [codigoCidadeIbge, setCodigoCidadeIbge] = useState<string>('')
+  const [codigoEstadoIbge, setCodigoEstadoIbge] = useState<string>('')
 
   // Estados de loading
   const [isLoading, setIsLoading] = useState(false)
@@ -167,10 +169,22 @@ export function NovoCliente({
             setNumero(endereco.numero || '')
             setBairro(endereco.bairro || '')
             setCidade(endereco.cidade || '')
-            setEstado(endereco.estado || '')
+            const estadoValue = endereco.estado || ''
+            setEstado(estadoValue)
             const cepValue = endereco.cep || ''
             setCep(cepValue ? formatCEP(cepValue) : '')
             setComplemento(endereco.complemento || '')
+            
+            // Carrega códigos IBGE se disponíveis
+            if (endereco.codigoCidadeIbge) {
+              setCodigoCidadeIbge(endereco.codigoCidadeIbge)
+            }
+            if (endereco.codigoEstadoIbge) {
+              setCodigoEstadoIbge(endereco.codigoEstadoIbge)
+            } else if (estadoValue) {
+              // Se não tiver código do estado, busca pelo mapeamento
+              setCodigoEstadoIbge(getCodigoEstadoIbge(estadoValue))
+            }
             
             // Verifica se há algum campo de endereço preenchido
             const temEnderecoPreenchido = !!(
@@ -238,6 +252,36 @@ export function NovoCliente({
       return numbers.replace(/(\d{5})(\d{3})/, '$1-$2')
     }
     return value
+  }
+
+  /**
+   * Mapeamento de siglas de estados para códigos IBGE
+   * Fonte: https://www.ibge.gov.br/explica/codigos-dos-municipios.php
+   */
+  const getCodigoEstadoIbge = (uf: string): string => {
+    const codigos: Record<string, string> = {
+      'AC': '12', 'AL': '27', 'AP': '16', 'AM': '13', 'BA': '29',
+      'CE': '23', 'DF': '53', 'ES': '32', 'GO': '52', 'MA': '21',
+      'MT': '51', 'MS': '50', 'MG': '31', 'PA': '15', 'PB': '25',
+      'PR': '41', 'PE': '26', 'PI': '22', 'RJ': '33', 'RN': '24',
+      'RS': '43', 'RO': '11', 'RR': '14', 'SC': '42', 'SP': '35',
+      'SE': '28', 'TO': '17'
+    }
+    return codigos[uf] || ''
+  }
+
+  /**
+   * Handler para mudança de estado - busca código IBGE do estado
+   */
+  const handleEstadoChange = (newEstado: string) => {
+    setEstado(newEstado)
+    if (newEstado) {
+      setCodigoEstadoIbge(getCodigoEstadoIbge(newEstado))
+    } else {
+      setCodigoEstadoIbge('')
+    }
+    // Limpa código da cidade quando muda o estado
+    setCodigoCidadeIbge('')
   }
 
   /**
@@ -326,6 +370,8 @@ export function NovoCliente({
     setComplemento('')
     setCidade('')
     setEstado('')
+    setCodigoCidadeIbge('')
+    setCodigoEstadoIbge('')
 
     try {
       // API ViaCEP - gratuita e pública
@@ -367,7 +413,9 @@ export function NovoCliente({
         setCidade(data.localidade)
       }
       if (data.uf) {
-        setEstado(data.uf.toUpperCase())
+        const ufUpper = data.uf.toUpperCase()
+        setEstado(ufUpper)
+        setCodigoEstadoIbge(getCodigoEstadoIbge(ufUpper))
       }
 
       // Garante que o endereço está incluído
@@ -389,6 +437,34 @@ export function NovoCliente({
    */
   const handleClearCEP = () => {
     setCep('')
+  }
+
+  /**
+   * Limpa todos os campos de endereço
+   */
+  const handleLimparEndereco = () => {
+    setRua('')
+    setNumero('')
+    setBairro('')
+    setCidade('')
+    setEstado('')
+    setCep('')
+    setComplemento('')
+    setCidadeValida(null)
+    setCodigoCidadeIbge('')
+    setCodigoEstadoIbge('')
+  }
+
+  /**
+   * Handler para mudança do switch "Incluir Endereço"
+   * Limpa os campos quando o switch é desativado
+   */
+  const handleToggleEndereco = (checked: boolean) => {
+    setIncluirEndereco(checked)
+    if (!checked) {
+      // Limpa os campos quando desativar o switch
+      handleLimparEndereco()
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -442,25 +518,44 @@ export function NovoCliente({
       const body: any = {
         nome,
         razaoSocial: razaoSocial || undefined,
-        telefone: telefoneLimpo || undefined,
         email: email || undefined,
         nomeFantasia: nomeFantasia || undefined,
         ativo,
       }
 
-      // CPF e CNPJ: sempre envia se tiver valor, ou string vazia se estiver editando
-      // Isso garante que o campo seja atualizado mesmo que vazio
+      // CPF e CNPJ: lógica diferente para criação e edição
       if (isEditing) {
         // Em edição, sempre envia CPF e CNPJ (mesmo vazios) para garantir atualização
-        // IMPORTANTE: Envia string vazia explicitamente, não undefined
-        // Garante que o campo sempre exista no body, mesmo que vazio
+        // String vazia será convertida para null no repositório para limpar o valor na API externa
         body.cpf = cpfLimpo || ''
         body.cnpj = cnpjLimpo || ''
+        
+        // Telefone: se estiver editando e quiser remover, envia null
+        // Se tiver valor, envia a string limpa
+        body.telefone = telefoneLimpo ? telefoneLimpo : null
       } else {
         // Em criação, envia apenas se tiver valor
         if (cpfLimpo) body.cpf = cpfLimpo
         if (cnpjLimpo) body.cnpj = cnpjLimpo
+        if (telefoneLimpo) body.telefone = telefoneLimpo
       }
+
+      // Tratamento do endereço
+      if (incluirEndereco) {
+        // Se o switch estiver ativado, envia os dados do endereço
+        body.endereco = {
+          rua: rua || undefined,
+          numero: numero || undefined,
+          bairro: bairro || undefined,
+          cidade: cidade || undefined,
+          estado: estado || undefined,
+          cep: cepLimpo || undefined,
+          complemento: complemento || undefined,
+          codigoCidadeIbge: codigoCidadeIbge || undefined,
+          codigoEstadoIbge: codigoEstadoIbge || undefined,
+        }
+      }
+      // Se o switch estiver desativado, não envia o campo endereco
 
       console.log('📤 Dados sendo enviados do componente:', {
         modo: isEditing ? 'edição' : 'criação',
@@ -474,20 +569,10 @@ export function NovoCliente({
         cnpjOriginal: cnpj,
         cnpjLimpo: cnpjLimpo,
         cnpjEnviado: body.cnpj,
+        incluirEndereco,
+        enderecoEnviado: body.endereco,
         bodyCompleto: JSON.stringify(body, null, 2),
       })
-
-      if (incluirEndereco) {
-        body.endereco = {
-          rua: rua || undefined,
-          numero: numero || undefined,
-          bairro: bairro || undefined,
-          cidade: cidade || undefined,
-          estado: estado || undefined,
-          cep: cepLimpo || undefined,
-          complemento: complemento || undefined,
-        }
-      }
 
       const url = isEditing
         ? `/api/clientes/${clienteId}`
@@ -798,7 +883,7 @@ export function NovoCliente({
               <input
                 type="checkbox"
                 checked={incluirEndereco}
-                onChange={(e) => setIncluirEndereco(e.target.checked)}
+                onChange={(e) => handleToggleEndereco(e.target.checked)}
                 className="sr-only peer"
               />
               <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[28px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
@@ -883,7 +968,7 @@ export function NovoCliente({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 <Input
                   label="Número"
                   value={numero}
@@ -908,6 +993,7 @@ export function NovoCliente({
                   onChange={(e) => setBairro(e.target.value)}
                   placeholder="Bairro"
                   size="small"
+                  className="col-span-2"
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -920,42 +1006,6 @@ export function NovoCliente({
                   },
                 }}
                 />
-              </div>
-
-              <div className="grid md:grid-cols-3 grid-cols-1 gap-3">
-                <div className="flex flex-col">
-                  <CidadeAutocomplete
-                    value={cidade}
-                    onChange={setCidade}
-                    estado={estado}
-                    label="Cidade"
-                    placeholder="Digite o nome da cidade"
-                    required={false}
-                    disabled={!estado}
-                    onValidationChange={setCidadeValida}
-                    className="w-full"
-                  />
-                </div>
-                <div className="flex flex-col">
-                  <label className="text-sm font-medium text-primary-text mb-1">
-                    Estado
-                  </label>
-                  <Select
-                    value={estado}
-                    onValueChange={setEstado}
-                  >
-                    <SelectTrigger className="h-[38px] bg-primary-bg">
-                      <SelectValue placeholder="Selecione o estado" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ESTADOS_BRASILEIROS.map((estadoOption) => (
-                        <SelectItem key={estadoOption.sigla} value={estadoOption.sigla}>
-                          {estadoOption.sigla} - {estadoOption.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
                 <Input
                   label="Complemento"
                   value={complemento}
@@ -974,6 +1024,55 @@ export function NovoCliente({
                   },
                 }}
                 />
+              </div>
+
+              <div className="grid md:grid-cols-2 grid-cols-1 gap-3">
+                <div className="flex flex-col">
+                  <label className="text-sm font-medium text-primary-text mb-2">
+                    Estado
+                  </label>
+                  <Select
+                    value={estado}
+                    onValueChange={handleEstadoChange}
+                  >
+                    <SelectTrigger className="h-[38px] bg-primary-bg">
+                      <SelectValue placeholder="Selecione o estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ESTADOS_BRASILEIROS.map((estadoOption) => (
+                        <SelectItem key={estadoOption.sigla} value={estadoOption.sigla}>
+                          {estadoOption.sigla} - {estadoOption.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col">
+                  <CidadeAutocomplete
+                    value={cidade}
+                    onChange={setCidade}
+                    estado={estado}
+                    label="Cidade"
+                    placeholder="Digite o nome da cidade"
+                    required={false}
+                    disabled={!estado}
+                    onValidationChange={setCidadeValida}
+                    onCidadeSelecionada={setCodigoCidadeIbge}
+                    className="w-full"
+                    size="small"
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        height: '38px',
+                        backgroundColor: 'var(--color-primary-bg)',
+                        borderRadius: '8px',
+                      },
+                      '& .MuiInputBase-input': {
+                        padding: '8px 14px',
+                        fontSize: '14px',
+                      },
+                    }}
+                  />
+                </div>
               </div>
             </div>
           )}

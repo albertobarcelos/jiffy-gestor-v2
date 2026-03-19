@@ -5,6 +5,7 @@ import { MdSchedule, MdCheckCircle, MdError, MdCancel, MdWarning } from 'react-i
 import { CircularProgress } from '@mui/material'
 
 type StatusFiscal = 
+  | 'PENDENTE'
   | 'PENDENTE_EMISSAO' 
   | 'EMITINDO' 
   | 'PENDENTE_AUTORIZACAO' 
@@ -28,6 +29,13 @@ export function StatusFiscalBadge({ status, className }: StatusFiscalBadgeProps)
 
   const getStatusConfig = (status: StatusFiscal) => {
     switch (status) {
+      case 'PENDENTE':
+        return {
+          label: 'Aguardando SEFAZ...',
+          color: '#3B82F6', // Azul
+          bgColor: '#DBEAFE',
+          icon: <CircularProgress size={12} sx={{ color: '#3B82F6' }} />,
+        }
       case 'PENDENTE_EMISSAO':
         return {
           label: 'Pendente Emissão',

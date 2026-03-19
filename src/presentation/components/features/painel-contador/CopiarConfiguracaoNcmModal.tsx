@@ -134,7 +134,7 @@ export function CopiarConfiguracaoNcmModal({
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Copiar Configuração de Impostos</DialogTitle>
+          <h1 className="text-alternate font-exo font-bold text-lg sm:text-xl">Copiar Configuração de Impostos</h1>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
@@ -176,7 +176,7 @@ export function CopiarConfiguracaoNcmModal({
                         setNcmsDestino([...atual, ncm].join(', '))
                       }
                     }}
-                    className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors font-mono"
+                    className="px-2 py-1 text-xs bg-alternate/10 text-alternate rounded hover:bg-alternate/20 transition-colors font-mono"
                   >
                     {ncm}
                   </button>
@@ -199,10 +199,36 @@ export function CopiarConfiguracaoNcmModal({
         </div>
 
         <DialogFooter>
-          <Button onClick={onClose} variant="outlined" disabled={isLoading}>
+          <Button 
+            onClick={onClose} 
+            variant="outlined" 
+            disabled={isLoading}
+            sx={{
+              backgroundColor: 'rgba(131, 56, 236, 0.1)',
+              color: 'var(--color-alternate)',
+              borderColor: 'var(--color-alternate)',
+              '&:hover': { 
+                backgroundColor: 'rgba(131, 56, 236, 0.2)' 
+              },
+            }}
+          >
             Cancelar
           </Button>
-          <Button onClick={handleCopiar} disabled={isLoading}>
+          <Button 
+            onClick={handleCopiar} 
+            disabled={isLoading}
+            sx={{
+              backgroundColor: 'var(--color-alternate)',
+              color: '#ffffff',
+              '&:hover': { 
+                backgroundColor: 'rgba(131, 56, 236, 0.8)' 
+              },
+              '&:disabled': { 
+                backgroundColor: '#cbd5e1', 
+                cursor: 'not-allowed' 
+              },
+            }}
+          >
             {isLoading ? 'Copiando...' : 'Copiar Configuração'}
           </Button>
         </DialogFooter>

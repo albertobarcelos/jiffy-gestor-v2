@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/presentation/components/ui/dialog'
 import { Button } from '@/src/presentation/components/ui/button'
 import { useEmitirNfe, useEmitirNfeGestor } from '@/src/presentation/hooks/useVendas'
@@ -12,23 +12,36 @@ interface EmitirNfeModalProps {
   vendaId: string
   vendaNumero?: string
   tabelaOrigem?: 'venda' | 'venda_gestor' // Indica de qual tabela é a venda
+  modeloInicial?: 55 | 65
 }
 
-export function EmitirNfeModal({ open, onClose, vendaId, vendaNumero, tabelaOrigem = 'venda' }: EmitirNfeModalProps) {
+export function EmitirNfeModal({
+  open,
+  onClose,
+  vendaId,
+  vendaNumero,
+  tabelaOrigem = 'venda',
+  modeloInicial = 65,
+}: EmitirNfeModalProps) {
   const emitirNfePdv = useEmitirNfe()
   const emitirNfeGestor = useEmitirNfeGestor()
   
   // Usar o hook correto baseado na tabela de origem
   const emitirNfe = tabelaOrigem === 'venda_gestor' ? emitirNfeGestor : emitirNfePdv
-  const [formData, setFormData] = useState({
-    modelo: 65 as 55 | 65, // 55 = NF-e, 65 = NFC-e
-    serie: 1,
-    ambiente: 'PRODUCAO' as 'HOMOLOGACAO' | 'PRODUCAO',
-    crt: 1 as 1 | 2 | 3, // 1=Simples Nacional, 2=Simples Excesso, 3=Regime Normal
-  })
+  const [formData, setFormData] = useState(() => ({
+    modelo: modeloInicial, // 55 = NF-e, 65 = NFC-e
+  }))
   
   // Estado para controlar se está processando (desabilita botão imediatamente)
   const [emissaoEmProcessamento, setEmissaoEmProcessamento] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+
+    setFormData({
+      modelo: modeloInicial,
+    })
+  }, [open, modeloInicial])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -39,18 +52,13 @@ export function EmitirNfeModal({ open, onClose, vendaId, vendaNumero, tabelaOrig
     setEmissaoEmProcessamento(true)
 
     try {
-      const result = await emitirNfe.mutateAsync({
+      await emitirNfe.mutateAsync({
         id: vendaId,
         modelo: formData.modelo,
-        serie: formData.serie,
-        ambiente: formData.ambiente,
-        crt: formData.crt,
       })
 
-      // Só fecha o modal se emitida com sucesso; rejeitada mantém aberto para o usuário ver o toast
-      if (result?.status === 'EMITIDA') {
-        onClose()
-      }
+      // Fluxo assíncrono: fecha após enviar e acompanha status no kanban.
+      onClose()
     } catch (error) {
       // Erro de rede/servidor já é tratado pelo hook com toast
       console.error('Erro ao emitir NFe:', error)
@@ -63,7 +71,7 @@ export function EmitirNfeModal({ open, onClose, vendaId, vendaNumero, tabelaOrig
     <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
       <DialogContent sx={{ maxWidth: 500 }}>
         <DialogHeader>
-          <DialogTitle>Emitir Nota Fiscal</DialogTitle>
+          <DialogTitle>Emitir {formData.modelo === 55 ? 'NFe' : 'NFCe'}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
@@ -92,50 +100,6 @@ export function EmitirNfeModal({ open, onClose, vendaId, vendaNumero, tabelaOrig
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Série *
-              </label>
-              <input
-                type="number"
-                min="1"
-                value={formData.serie}
-                onChange={(e) => setFormData({ ...formData, serie: Number(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Ambiente *
-              </label>
-              <select
-                value={formData.ambiente}
-                onChange={(e) => setFormData({ ...formData, ambiente: e.target.value as 'HOMOLOGACAO' | 'PRODUCAO' })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              >
-                <option value="HOMOLOGACAO">Homologação</option>
-                <option value="PRODUCAO">Produção</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                CRT (Código de Regime Tributário) *
-              </label>
-              <select
-                value={formData.crt}
-                onChange={(e) => setFormData({ ...formData, crt: Number(e.target.value) as 1 | 2 | 3 })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              >
-                <option value={1}>1 - Simples Nacional</option>
-                <option value={2}>2 - Simples Nacional - Excesso de Sublimite</option>
-                <option value={3}>3 - Regime Normal</option>
-              </select>
-            </div>
           </div>
 
           <DialogFooter sx={{ mt: 3 }}>
@@ -153,7 +117,9 @@ export function EmitirNfeModal({ open, onClose, vendaId, vendaNumero, tabelaOrig
               isLoading={emissaoEmProcessamento || emitirNfe.isPending}
               disabled={emissaoEmProcessamento || emitirNfe.isPending}
             >
-              {emissaoEmProcessamento || emitirNfe.isPending ? 'Emitindo...' : 'Emitir NFe'}
+              {emissaoEmProcessamento || emitirNfe.isPending
+                ? 'Emitindo...'
+                : `Emitir ${formData.modelo === 55 ? 'NFe' : 'NFCe'}`}
             </Button>
           </DialogFooter>
         </form>

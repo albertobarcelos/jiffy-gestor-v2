@@ -9,6 +9,8 @@ export interface Endereco {
   estado?: string
   cep?: string
   complemento?: string
+  codigoCidadeIbge?: string
+  codigoEstadoIbge?: string
 }
 
 export class Cliente {
@@ -98,6 +100,8 @@ export class Cliente {
             estado: (data.endereco?.estado || data.endereco_data?.estado)?.toString(),
             cep: (data.endereco?.cep || data.endereco_data?.cep)?.toString(),
             complemento: (data.endereco?.complemento || data.endereco_data?.complemento)?.toString(),
+            codigoCidadeIbge: (data.endereco?.codigoCidadeIbge || data.endereco_data?.codigoCidadeIbge)?.toString(),
+            codigoEstadoIbge: (data.endereco?.codigoEstadoIbge || data.endereco_data?.codigoEstadoIbge)?.toString(),
           }
         : undefined
     )

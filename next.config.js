@@ -57,9 +57,6 @@ const nextConfig = {
       '@radix-ui/react-slot': radixSlotPath,
     }
     
-    // Configurar condições de exportação para priorizar módulos ESM
-    config.resolve.conditionNames = ['import', 'require', 'default']
-    
     return config
   },
 }

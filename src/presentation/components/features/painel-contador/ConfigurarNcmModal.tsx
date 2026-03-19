@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
   DialogFooter,
 } from '@/src/presentation/components/ui/dialog'
@@ -20,7 +19,6 @@ import {
 } from '@/src/presentation/components/ui/select'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
-import { extractTokenInfo } from '@/src/shared/utils/validateToken'
 
 interface ConfiguracaoImpostoNcm {
   ncm?: {
@@ -85,49 +83,29 @@ export function ConfigurarNcmModal({
       }
 
       try {
-        const tokenInfo = extractTokenInfo(token)
-        const empresaId = tokenInfo?.empresaId
-        if (!empresaId) {
-          setIsLoadingRegime(false)
-          setRegimeTributario(1) // Default: Simples Nacional
-          return
-        }
-
-        // Segurança: empresaId é extraído do JWT pelo backend
-        const response = await fetch(`/api/v1/fiscal/empresas-fiscais/me/todas`, {
+        const response = await fetch('/api/v1/fiscal/empresas-fiscais/me', {
           headers: { Authorization: `Bearer ${token}` },
         })
 
         if (response.ok) {
-          const configs = await response.json()
-          console.log('[ConfigurarNcmModal] Configurações fiscais recebidas:', configs)
-          if (configs && configs.length > 0) {
-            const codigoRegime = configs[0].codigoRegimeTributario
-            console.log('[ConfigurarNcmModal] Código regime tributário (raw):', codigoRegime, 'tipo:', typeof codigoRegime)
-            // Garantir que seja número (pode vir como string da API)
-            const regimeNumero = typeof codigoRegime === 'string' 
-              ? parseInt(codigoRegime, 10) 
+          const config = await response.json()
+          const codigoRegime = config?.codigoRegimeTributario
+          const regimeNumero =
+            typeof codigoRegime === 'string'
+              ? parseInt(codigoRegime, 10)
               : (typeof codigoRegime === 'number' ? codigoRegime : null)
-            console.log('[ConfigurarNcmModal] Código regime tributário (convertido):', regimeNumero)
-            // Validar se é um número válido (1, 2 ou 3)
-            if (regimeNumero === 1 || regimeNumero === 2 || regimeNumero === 3) {
-              console.log('[ConfigurarNcmModal] Regime tributário carregado:', regimeNumero, 'isSimplesNacional:', regimeNumero === 1 || regimeNumero === 2)
-              setRegimeTributario(regimeNumero)
-            } else {
-              console.warn('[ConfigurarNcmModal] Regime tributário inválido:', codigoRegime, 'usando default: 1')
-              setRegimeTributario(1) // Default: Simples Nacional
-            }
+
+          if (regimeNumero === 1 || regimeNumero === 2 || regimeNumero === 3) {
+            setRegimeTributario(regimeNumero)
           } else {
-            console.warn('[ConfigurarNcmModal] Nenhuma configuração encontrada, usando default: 1')
             setRegimeTributario(1) // Default: Simples Nacional
           }
         } else {
-          const errorText = await response.text()
-          console.warn('[ConfigurarNcmModal] Erro ao buscar regime tributário:', response.status, errorText, 'usando default: 1')
+          await response.text()
           setRegimeTributario(1) // Default: Simples Nacional
         }
       } catch (error) {
-        console.error('[ConfigurarNcmModal] Erro ao buscar regime tributário:', error)
+        console.error('Erro ao buscar regime tributário:', error)
         setRegimeTributario(1) // Default: Simples Nacional
       } finally {
         setIsLoadingRegime(false)
@@ -362,11 +340,11 @@ export function ConfigurarNcmModal({
           flexDirection: 'column',
         }}
       >
-        <DialogHeader sx={{ padding: '24px 24px 16px 24px', flexShrink: 0 }}>
-          <DialogTitle>
+        <div style={{ padding: '24px 24px 16px 24px', flexShrink: 0 }}>
+          <h1 className="text-alternate font-exo font-bold text-lg sm:text-xl">
             {configuracaoImposto ? 'Editar Configuração de Impostos por NCM' : 'Nova Configuração de Impostos por NCM'}
-          </DialogTitle>
-        </DialogHeader>
+          </h1>
+        </div>
 
         <div 
           style={{
@@ -389,9 +367,10 @@ export function ConfigurarNcmModal({
                 setFormData({ ...formData, ncm: value })
               }}
               placeholder="12345678"
-              maxLength={8}
+              inputProps={{ maxLength: 8 }}
               required
               disabled={!!configuracaoImposto}
+              size="small"
             />
             <p className="text-xs text-secondary-text/70">8 dígitos</p>
           </div>
@@ -407,7 +386,8 @@ export function ConfigurarNcmModal({
                   setFormData({ ...formData, cfop: value })
                 }}
                 placeholder="5102"
-                maxLength={4}
+                inputProps={{ maxLength: 4 }}
+                size="small"
               />
               <p className="text-xs text-secondary-text/70">4 dígitos</p>
             </div>
@@ -429,7 +409,7 @@ export function ConfigurarNcmModal({
                     setFormData({ ...formData, csosn: value, icmsCst: '' })
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10">
                     <SelectValue placeholder="Selecione o CSOSN" />
                   </SelectTrigger>
                   <SelectContent>
@@ -453,7 +433,7 @@ export function ConfigurarNcmModal({
                     setFormData({ ...formData, icmsCst: value, csosn: '' })
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10">
                     <SelectValue placeholder="Selecione o CST" />
                   </SelectTrigger>
                   <SelectContent>
@@ -477,14 +457,13 @@ export function ConfigurarNcmModal({
               <Input
                 id="icmsAliquota"
                 type="number"
-                step="0.01"
-                min="0"
-                max="100"
+                inputProps={{ step: 0.01, min: 0, max: 100 }}
                 value={formData.icmsAliquota}
                 onChange={(e) =>
                   setFormData({ ...formData, icmsAliquota: e.target.value })
                 }
                 placeholder="18.00"
+                size="small"
               />
             </div>
             <div className="space-y-2">
@@ -501,7 +480,7 @@ export function ConfigurarNcmModal({
                   setFormData({ ...formData, pisCst: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-10">
                   <SelectValue placeholder="Selecione o CST PIS" />
                 </SelectTrigger>
                 <SelectContent>
@@ -519,14 +498,13 @@ export function ConfigurarNcmModal({
               <Input
                 id="pisAliquota"
                 type="number"
-                step="0.01"
-                min="0"
-                max="100"
+                inputProps={{ step: 0.01, min: 0, max: 100 }}
                 value={formData.pisAliquota}
                 onChange={(e) =>
                   setFormData({ ...formData, pisAliquota: e.target.value })
                 }
                 placeholder="1.65"
+                size="small"
               />
             </div>
           </div>
@@ -540,7 +518,7 @@ export function ConfigurarNcmModal({
                   setFormData({ ...formData, cofinsCst: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-10">
                   <SelectValue placeholder="Selecione o CST COFINS" />
                 </SelectTrigger>
                 <SelectContent>
@@ -558,14 +536,13 @@ export function ConfigurarNcmModal({
               <Input
                 id="cofinsAliquota"
                 type="number"
-                step="0.01"
-                min="0"
-                max="100"
+                inputProps={{ step: 0.01, min: 0, max: 100 }}
                 value={formData.cofinsAliquota}
                 onChange={(e) =>
                   setFormData({ ...formData, cofinsAliquota: e.target.value })
                 }
                 placeholder="7.60"
+                size="small"
               />
             </div>
           </div>
@@ -579,6 +556,14 @@ export function ConfigurarNcmModal({
             variant="outlined"
             onClick={onClose}
             disabled={isLoading}
+            sx={{
+              backgroundColor: 'rgba(131, 56, 236, 0.1)',
+              color: 'var(--color-alternate)',
+              borderColor: 'var(--color-alternate)',
+              '&:hover': { 
+                backgroundColor: 'rgba(131, 56, 236, 0.2)' 
+              },
+            }}
           >
             Cancelar
           </Button>
@@ -592,6 +577,13 @@ export function ConfigurarNcmModal({
               }
             }}
             disabled={isLoading}
+            sx={{
+              backgroundColor: 'var(--color-alternate)',
+              color: '#ffffff',
+              '&:hover': { 
+                backgroundColor: 'rgba(131, 56, 236, 0.8)' 
+              },
+            }}
           >
             {isLoading ? 'Salvando...' : 'Salvar'}
           </Button>

@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 
+type ApiErrorData = {
+  message?: string
+  error?: string
+  motivo?: string
+  cStat?: string
+  categoria?: string
+  acaoSugerida?: string
+  detalhes?: string
+}
+
 /**
  * POST /api/vendas/gestor/[id]/cancelar
  * Cancela uma venda do gestor (com ou sem NFe)
@@ -49,8 +59,20 @@ export async function POST(
   } catch (error) {
     console.error('Erro ao cancelar venda gestor:', error)
     if (error instanceof ApiError) {
+      const errorData =
+        error.data && typeof error.data === 'object'
+          ? (error.data as ApiErrorData)
+          : {}
+
       return NextResponse.json(
-        { error: error.message || 'Erro ao cancelar venda' },
+        {
+          error: error.message || errorData.message || errorData.error || 'Erro ao cancelar venda',
+          motivo: errorData.motivo ?? null,
+          cStat: errorData.cStat ?? null,
+          categoria: errorData.categoria ?? null,
+          acaoSugerida: errorData.acaoSugerida ?? null,
+          detalhes: errorData.detalhes ?? null,
+        },
         { status: error.status }
       )
     }

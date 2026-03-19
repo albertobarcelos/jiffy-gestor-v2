@@ -7,6 +7,7 @@ import { MdSearch, MdAttachMoney, MdCalendarToday, MdFilterAltOff, MdRestaurant,
 import { showToast } from '@/src/shared/utils/toast'
 import { DetalhesVendas } from './DetalhesVendas'
 import { EscolheDatasModal } from './EscolheDatasModal'
+import { GraficoVendasPorUsuarioModal } from './GraficoVendasPorUsuarioModal'
 import {
   FormControl,
   InputLabel,
@@ -25,6 +26,7 @@ interface Venda {
   valorFinal: number
   tipoVenda: 'balcao' | 'mesa'
   abertoPorId: string
+  canceladoPorId?: string
   codigoTerminal: string
   terminalId: string
   dataCriacao: string
@@ -34,6 +36,7 @@ interface Venda {
   dataFinalizacao?: string
   metodoPagamento?: string
   status?: string
+  totalValorProdutosRemovidos?: number
 }
 
 interface MetricasVendas {
@@ -110,6 +113,8 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   const [isDatasModalOpen, setIsDatasModalOpen] = useState(false)
   const [filtrosVisiveisMobile, setFiltrosVisiveisMobile] = useState(false)
   const [isMobileViewport, setIsMobileViewport] = useState(false)
+  const [isGraficoVendasPorUsuarioOpen, setIsGraficoVendasPorUsuarioOpen] = useState(false)
+  const [isGraficoVendasCanceladasOpen, setIsGraficoVendasCanceladasOpen] = useState(false)
 
   const pageSize = 100 // Aumentado para buscar mais itens por página
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -453,6 +458,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       }
 
       // Só envia parâmetros de período se o período não for "Todos" e as datas estiverem definidas
+      // A API externa usa dataFinalizacao quando periodoInicial/periodoFinal são enviados
       if (filters.periodo !== 'Todos' && filters.periodo !== 'Datas Personalizadas') {
         if (filters.periodoInicial) {
           baseParams.append('periodoInicial', filters.periodoInicial.toISOString())
@@ -508,8 +514,18 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           }
         }
 
+        // Mapeia os itens garantindo que totalValorProdutosRemovidos seja capturado corretamente
+        const mappedItems = (data.items || []).map((item: any) => ({
+          ...item,
+          totalValorProdutosRemovidos: item.totalValorProdutosRemovidos || 
+                                      item.totalValorProdutosRemovido || 
+                                      item.valorProdutosRemovidos ||
+                                      item.valorProdutosRemovido ||
+                                      0
+        }))
+
         // Filtra os itens respeitando o status selecionado
-        const filteredItems = (data.items || []).filter((v: Venda) => {
+        const filteredItems = mappedItems.filter((v: Venda) => {
           const normalizedStatus = filters.statusFilter?.toUpperCase()
           
           // Se não há filtro de status ou é "Aberta", mostra todas (finalizadas e canceladas)
@@ -1006,7 +1022,11 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         {/* Cards de Métricas */}
         <div className="flex gap-2 m-1 overflow-x-auto pb-2 scrollbar-thin">
           {/* Vendas Finalizadas/Em Aberto */}
-          <div className="flex-1 border-2 rounded-lg p-1 flex items-center gap-3">
+          <div 
+            className="flex-1 border-2 rounded-lg p-1 flex items-center gap-3 cursor-pointer hover:bg-primary/5 transition-colors"
+            onClick={() => setIsGraficoVendasPorUsuarioOpen(true)}
+            title="Clique para ver gráfico de vendas por usuário"
+          >
             <div className="w-10 h-10 rounded-full bg-alternate flex items-center justify-center flex-shrink-0">
               <span className="text-info text-xl">🛒</span>
             </div>
@@ -1021,7 +1041,11 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           </div>
 
           {/* Vendas Canceladas */}
-          <div className="flex-1 rounded-lg border-2 p-1 flex items-center gap-3">
+          <div 
+            className="flex-1 rounded-lg border-2 p-1 flex items-center gap-3 cursor-pointer hover:bg-primary/5 transition-colors"
+            onClick={() => setIsGraficoVendasCanceladasOpen(true)}
+            title="Clique para ver gráfico de vendas canceladas por usuário"
+          >
             <div className="w-10 h-10 rounded-full bg-error flex items-center justify-center flex-shrink-0">
               <span className="text-info text-xl">✕</span>
             </div>
@@ -1055,9 +1079,23 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               <span className="text-xs text-secondary-text font-nunito">Total Cancelado</span>
               <span className="text-[22px] text-primary font-exo">
                 {formatCurrency(
-                  vendas
-                    .filter((v) => v.dataCancelamento)
-                    .reduce((total, v) => total + (v.valorFinal || 0), 0)
+                  vendas.reduce((total, v) => {
+                    const totalRemovidos = Number(v.totalValorProdutosRemovidos) || 0
+                    const valorFinal = Number(v.valorFinal) || 0
+                    
+                    // Se venda está CANCELADA: soma totalValorProdutosRemovidos + valorFinal
+                    if (v.dataCancelamento) {
+                      return total + totalRemovidos + valorFinal
+                    }
+                    
+                    // Se venda está FINALIZADA com produtos removidos: soma apenas totalValorProdutosRemovidos
+                    if (v.dataFinalizacao && !v.dataCancelamento && totalRemovidos > 0) {
+                      return total + totalRemovidos
+                    }
+                    
+                    // Caso contrário: não adiciona nada ao total
+                    return total
+                  }, 0)
                 )}
               </span>
             </div>
@@ -1085,7 +1123,10 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               Código Venda
             </div>
             <div className="flex-1 text-xs md:text-sm text-center uppercase">
-              Data/ Hora
+              Data Abertura
+            </div>
+            <div className="flex-1 text-xs md:text-sm text-center uppercase hidden md:flex">
+              Data Finalização
             </div>
             <div className="flex-1 text-xs md:text-sm text-center uppercase">
               Tipo Venda
@@ -1096,11 +1137,11 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             <div className="flex-[2] text-xs md:text-sm text-center uppercase">
               Usuário PDV
             </div>
-            <div className="flex-1 text-xs md:text-sm text-right uppercase">
-              VL. Faturado
-            </div>
             <div className="flex-1 text-xs md:text-sm justify-end uppercase hidden md:flex">
               VL. Cancelado
+            </div>
+            <div className="flex-1 text-xs md:text-sm text-right uppercase">
+              VL. Faturado
             </div>
             <div className="flex-1 justify-end  uppercase hidden md:flex">
               Cupom
@@ -1130,7 +1171,10 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             )}
 
             {vendas.map((venda, index) => {
-              const { date, time } = formatDateList(venda.dataCriacao)
+              const { date: dateAbertura, time: timeAbertura } = formatDateList(venda.dataCriacao)
+              const { date: dateFinalizacao, time: timeFinalizacao } = formatDateList(
+                venda.dataFinalizacao || venda.dataCriacao
+              )
               const usuarioNome =
                 usuariosPDV.find((u) => u.id === venda.abertoPorId)?.nome || venda.abertoPorId
               const isZebraEven = index % 2 === 0
@@ -1143,6 +1187,9 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                     let baseClasses = ''
                     if (venda.dataCancelamento) {
                       baseClasses = 'bg-red-100 hover:bg-red-200'
+                    } else if (venda.dataFinalizacao && !venda.dataCancelamento && (venda.totalValorProdutosRemovidos || 0) > 0) {
+                      // Venda FINALIZADA com produtos removidos: mesma cor vermelha de cancelada
+                      baseClasses = 'bg-red-50 hover:bg-red-200'
                     } else if (!venda.dataCancelamento && !venda.dataFinalizacao) {
                       baseClasses = 'bg-yellow-100 hover:bg-yellow-200'
                     } else {
@@ -1159,8 +1206,12 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                     </span>
                   </div>
                   <div className="flex-1 flex flex-col items-center">
-                    <span className="text-xs md:text-sm text-primary-text font-nunito">{date}</span>
-                    <span className="text-xs md:text-sm text-primary-text font-nunito">{time}</span>
+                    <span className="text-xs md:text-sm text-primary-text font-nunito">{dateAbertura}</span>
+                    <span className="text-xs md:text-sm text-primary-text font-nunito">{timeAbertura}</span>
+                  </div>
+                  <div className="flex-1 hidden md:flex flex-col items-center justify-center">
+                    <span className="text-xs md:text-sm text-primary-text font-nunito">{dateFinalizacao}</span>
+                    <span className="text-xs md:text-sm text-primary-text font-nunito">{timeFinalizacao}</span>
                   </div>
                   <div className="flex-1 flex flex-col items-center justify-center">
                   <TipoVendaIcon
@@ -1168,7 +1219,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                     numeroMesa={venda.numeroMesa}
                     corTexto="var(--color-info)" // Garante que o número da mesa seja visível
                     containerScale={0.90}
-                    size={isMobileViewport ? 45 : 60}
+                    size={isMobileViewport ? 45 : 55}
                   />
                   </div>
                   <div className="flex-1 text-center hidden md:block">
@@ -1179,14 +1230,27 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                   <div className="flex-[2] text-center">
                     <span className="text-xs md:text-sm text-primary-text font-nunito">{usuarioNome}</span>
                   </div>
+                  <div className="flex-1 hidden md:block text-right">
+                    <span className="text-xs md:text-sm text-primary-text font-nunito">
+                      {(() => {
+                        // Se venda está CANCELADA: soma totalValorProdutosRemovidos + valorFinal
+                        if (venda.dataCancelamento) {
+                          const totalRemovidos = venda.totalValorProdutosRemovidos || 0
+                          return formatCurrency(totalRemovidos + (venda.valorFinal || 0))
+                        }
+                        // Se venda está FINALIZADA: exibe apenas totalValorProdutosRemovidos
+                        if (venda.dataFinalizacao && !venda.dataCancelamento) {
+                          const totalRemovidos = venda.totalValorProdutosRemovidos || 0
+                          return totalRemovidos > 0 ? formatCurrency(totalRemovidos) : '-'
+                        }
+                        // Caso contrário (venda aberta): não exibe nada
+                        return '-'
+                      })()}
+                    </span>
+                  </div>
                   <div className="flex-1 text-end">
                     <span className="text-xs md:text-sm text-primary-text font-nunito">
                       {venda.dataCancelamento ? '-' : formatCurrency(venda.valorFinal)}
-                    </span>
-                  </div>
-                  <div className="flex-1 hidden md:block text-right">
-                    <span className="text-xs md:text-sm text-primary-text font-nunito">
-                      {venda.dataCancelamento ? formatCurrency(venda.valorFinal) : '-'}
                     </span>
                   </div>
                   <div className="flex-1 justify-end hidden md:flex">
@@ -1225,6 +1289,24 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         onConfirm={handleConfirmDatas}
         dataInicial={periodoInicial}
         dataFinal={periodoFinal}
+      />
+
+      {/* Modal de Gráfico de Vendas por Usuário */}
+      <GraficoVendasPorUsuarioModal
+        open={isGraficoVendasPorUsuarioOpen}
+        onClose={() => setIsGraficoVendasPorUsuarioOpen(false)}
+        vendas={vendas}
+        usuariosPDV={usuariosPDV}
+        tipo="finalizadas"
+      />
+
+      {/* Modal de Gráfico de Vendas Canceladas por Usuário */}
+      <GraficoVendasPorUsuarioModal
+        open={isGraficoVendasCanceladasOpen}
+        onClose={() => setIsGraficoVendasCanceladasOpen(false)}
+        vendas={vendas}
+        usuariosPDV={usuariosPDV}
+        tipo="canceladas"
       />
     </div>
   )

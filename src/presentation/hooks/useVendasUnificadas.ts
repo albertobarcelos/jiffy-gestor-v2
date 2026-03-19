@@ -19,13 +19,14 @@ export class VendaUnificadaDTO {
         public readonly totalAcrescimo: number,
         public readonly dataCriacao: string,
         public readonly dataFinalizacao: string | null,
-        public readonly cliente?: {
+        public readonly dataCancelamento: string | null,
+        public readonly cliente: {
             id: string;
             nome: string;
             cpfCnpj?: string;
-        },
+        } | null,
         public readonly solicitarEmissaoFiscal: boolean,
-        public readonly statusFiscal: 'PENDENTE_EMISSAO' | 'EMITINDO' | 'PENDENTE_AUTORIZACAO' | 'CONTINGENCIA' | 'EMITIDA' | 'REJEITADA' | 'CANCELADA' | null,
+        public readonly statusFiscal: 'PENDENTE' | 'PENDENTE_EMISSAO' | 'EMITINDO' | 'PENDENTE_AUTORIZACAO' | 'CONTINGENCIA' | 'EMITIDA' | 'REJEITADA' | 'CANCELADA' | null,
         public readonly documentoFiscalId: string | null,
         public readonly abertoPor: {
             id: string;
@@ -34,20 +35,31 @@ export class VendaUnificadaDTO {
         public readonly numeroFiscal?: number | null,
         public readonly serieFiscal?: string | null,
         public readonly dataEmissaoFiscal?: string | null,
-        public readonly tipoDocFiscal?: 'NFE' | 'NFCE' | null
+        public readonly tipoDocFiscal?: 'NFE' | 'NFCE' | null,
+        public readonly retornoSefaz?: string | null
     ) {}
 
+    private possuiDocumentoFiscal(): boolean {
+        return !!this.documentoFiscalId || !!this.numeroFiscal
+    }
+
     isPendenteEmissao(): boolean {
-        // Vendas GESTOR: sempre pendentes de emissão quando finalizadas (exceto se já emitida)
+        // Vendas GESTOR: pendentes apenas quando foram marcadas para emissão (solicitarEmissaoFiscal), igual ao PDV
         // Vendas PDV: pendentes apenas se foram marcadas para emissão
+        if (this.isCancelada()) return false
+
         if (this.isVendaGestor()) {
-            return !!this.dataFinalizacao && this.statusFiscal !== 'EMITIDA';
+            return !!this.solicitarEmissaoFiscal && this.statusFiscal !== 'EMITIDA';
         }
+
         return this.solicitarEmissaoFiscal && this.statusFiscal !== 'EMITIDA';
     }
 
     temNFeEmitida(): boolean {
-        return this.statusFiscal === 'EMITIDA' && !!this.documentoFiscalId;
+        const statusComDocumentoValido =
+            this.statusFiscal === 'EMITIDA' || this.statusFiscal === 'CANCELADA'
+
+        return statusComDocumentoValido && this.possuiDocumentoFiscal()
     }
 
     isVendaPdv(): boolean {
@@ -62,6 +74,11 @@ export class VendaUnificadaDTO {
         return this.origem === 'DELIVERY_IFOOD' || this.origem === 'DELIVERY_UBER';
     }
 
+    /** Venda cancelada: por dataCancelamento ou por statusFiscal CANCELADA (API pode não enviar dataCancelamento) */
+    isCancelada(): boolean {
+        return !!this.dataCancelamento || this.statusFiscal === 'CANCELADA';
+    }
+
     getEtapaKanban(): string {
         if (this.temNFeEmitida()) return 'COM_NFE';
         if (this.isPendenteEmissao()) return 'PENDENTE_EMISSAO';
@@ -71,16 +88,19 @@ export class VendaUnificadaDTO {
 }
 
 /**
- * Parâmetros alinhados ao contrato do backend:
- * - Filtros: origem, statusFiscal, periodoInicial, periodoFinal
- * - Paginação: offset, limit
- * - empresaId vem do JWT (backend extrai de req.user)
+ * Parâmetros alinhados ao contrato do backend GET /vendas/unificado:
+ * - origem, statusFiscal, periodoInicial, periodoFinal (dataCriacao)
+ * - dataFinalizacaoInicio, dataFinalizacaoFim
+ * - q (busca), offset, limit
  */
 interface VendasUnificadasQueryParams {
     origem?: 'PDV' | 'GESTOR' | 'DELIVERY'
     statusFiscal?: string
-    periodoInicial?: string // ISO date string
-    periodoFinal?: string   // ISO date string
+    periodoInicial?: string // ISO date string (dataCriacao)
+    periodoFinal?: string   // ISO date string (dataCriacao)
+    dataFinalizacaoInicio?: string // ISO date string
+    dataFinalizacaoFim?: string    // ISO date string
+    q?: string                     // termo de busca
     offset?: number
     limit?: number
 }
@@ -118,6 +138,9 @@ export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
             if (params.statusFiscal) searchParams.append('statusFiscal', params.statusFiscal)
             if (params.periodoInicial) searchParams.append('periodoInicial', params.periodoInicial)
             if (params.periodoFinal) searchParams.append('periodoFinal', params.periodoFinal)
+            if (params.dataFinalizacaoInicio) searchParams.append('dataFinalizacaoInicio', params.dataFinalizacaoInicio)
+            if (params.dataFinalizacaoFim) searchParams.append('dataFinalizacaoFim', params.dataFinalizacaoFim)
+            if (params.q?.trim()) searchParams.append('q', params.q.trim())
             if (params.offset != null) searchParams.append('offset', params.offset.toString())
             if (params.limit) searchParams.append('limit', params.limit.toString())
 
@@ -150,6 +173,7 @@ export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
                 v.totalAcrescimo,
                 v.dataCriacao,
                 v.dataFinalizacao,
+                v.dataCancelamento ?? null, // API pode não retornar; considerar cancelada por statusFiscal
                 v.cliente,
                 v.solicitarEmissaoFiscal,
                 v.statusFiscal,
@@ -158,7 +182,8 @@ export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
                 v.numeroFiscal,
                 v.serieFiscal,
                 v.dataEmissaoFiscal,
-                v.tipoDocFiscal
+                v.tipoDocFiscal,
+                v.retornoSefaz
             ))
 
             return {
@@ -175,5 +200,22 @@ export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
         staleTime: 1000 * 30, // 30 segundos
         refetchOnWindowFocus: true,
         refetchOnReconnect: true,
+        refetchInterval: query => {
+            const data = query.state.data
+            if (!data?.items?.length) return false
+
+            const temEmissaoEmAndamento = data.items.some(venda => {
+                const status = venda.statusFiscal?.toUpperCase()
+                return (
+                    status === 'PENDENTE' ||
+                    status === 'PENDENTE_EMISSAO' ||
+                    status === 'EMITINDO' ||
+                    status === 'PENDENTE_AUTORIZACAO' ||
+                    status === 'CONTINGENCIA'
+                )
+            })
+
+            return temEmissaoEmAndamento ? 5000 : false
+        },
     })
 }

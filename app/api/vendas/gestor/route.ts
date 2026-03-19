@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+import { validateRequest } from '@/src/shared/utils/validateRequest'
+import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 
 /**
  * POST /api/vendas/gestor
@@ -8,48 +8,38 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
  */
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Token não fornecido' }, { status: 401 })
+    const validation = validateRequest(request)
+    if (!validation.valid || !validation.tokenInfo) {
+      return validation.error!
     }
+    const { tokenInfo } = validation
 
     const body = await request.json()
-    
-    console.log('📤 [API Route] Criando venda gestor:', {
-      url: `${BACKEND_URL}/api/v1/gestor/vendas`,
-      body: JSON.stringify(body, null, 2),
-    })
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/gestor/vendas`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: authHeader,
-      },
-      body: JSON.stringify(body),
-    })
+    const apiClient = new ApiClient()
+    const response = await apiClient.request<any>(
+      `/api/v1/gestor/vendas`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenInfo.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      }
+    )
 
-    const data = await response.json()
-
-    console.log('📥 [API Route] Resposta do backend:', {
-      status: response.status,
-      ok: response.ok,
-      data: JSON.stringify(data, null, 2),
-    })
-
-    if (!response.ok) {
-      console.error('❌ [API Route] Erro na resposta do backend:', {
-        status: response.status,
-        data,
-      })
-      return NextResponse.json(data, { status: response.status })
+    return NextResponse.json(response.data || {}, { status: 201 })
+  } catch (error) {
+    console.error('Erro ao criar venda gestor:', error)
+    if (error instanceof ApiError) {
+      return NextResponse.json(
+        { error: error.message || 'Erro ao criar venda', details: error.data },
+        { status: error.status }
+      )
     }
-
-    return NextResponse.json(data, { status: 201 })
-  } catch (error: any) {
-    console.error('❌ [API Route] Erro ao criar venda gestor:', error)
     return NextResponse.json(
-      { error: 'Erro interno ao criar venda', details: error.message },
+      { error: 'Erro interno do servidor' },
       { status: 500 }
     )
   }

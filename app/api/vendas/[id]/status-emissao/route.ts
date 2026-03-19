@@ -3,10 +3,10 @@ import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 
 /**
- * POST /api/vendas/[id]/emitir-nfe
- * Emite nota fiscal (NFC-e ou NF-e) para uma venda
+ * GET /api/vendas/[id]/status-emissao
+ * Consulta o status de emissão fiscal de uma venda PDV
  */
-export async function POST(
+export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -22,35 +22,23 @@ export async function POST(
       return NextResponse.json({ error: 'ID da venda é obrigatório' }, { status: 400 })
     }
 
-    const body = await request.json()
-
-    // Validação básica dos campos obrigatórios
-    if (!body.modelo || !body.serie || !body.ambiente || !body.crt) {
-      return NextResponse.json(
-        { error: 'Campos obrigatórios: modelo, serie, ambiente, crt' },
-        { status: 400 }
-      )
-    }
-
     const apiClient = new ApiClient()
     const response = await apiClient.request<any>(
-      `/api/v1/operacao-pdv/vendas/${id}/emitir-nfe`,
+      `/api/v1/operacao-pdv/vendas/${id}/status-emissao`,
       {
-        method: 'POST',
+        method: 'GET',
         headers: {
           Authorization: `Bearer ${tokenInfo.token}`,
-          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(body),
       }
     )
 
-    return NextResponse.json(response.data || {})
+    return NextResponse.json(response.data || {}, { status: response.status })
   } catch (error) {
-    console.error('Erro ao emitir NFe:', error)
+    console.error('Erro ao consultar status de emissão:', error)
     if (error instanceof ApiError) {
       return NextResponse.json(
-        { error: error.message || 'Erro ao emitir NFe' },
+        { error: error.message || 'Erro ao consultar status de emissão' },
         { status: error.status }
       )
     }
