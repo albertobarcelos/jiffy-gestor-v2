@@ -1,18 +1,31 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/presentation/components/ui/dialog'
+import { useCallback, useMemo, useState } from 'react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/src/presentation/components/ui/dialog'
 import { Button } from '@/src/presentation/components/ui/button'
 import { useEmitirNfe, useEmitirNfeGestor } from '@/src/presentation/hooks/useVendas'
 import { showToast } from '@/src/shared/utils/toast'
+import { MdClose } from 'react-icons/md'
 
 interface EmitirNfeModalProps {
   open: boolean
   onClose: () => void
   vendaId: string
   vendaNumero?: string
-  tabelaOrigem?: 'venda' | 'venda_gestor' // Indica de qual tabela é a venda
-  modeloInicial?: 55 | 65
+  /** Origem comercial da venda (ex.: PDV, GESTOR) — exibida antes do código */
+  origemVenda?: string | null
+  codigoVenda?: string
+  /** Nome do cliente para exibição */
+  clienteNome?: string | null
+  /** ID do cliente vinculado — NFC-e exige cliente cadastrado */
+  clienteId?: string | null
+  tabelaOrigem?: 'venda' | 'venda_gestor'
 }
 
 export function EmitirNfeModal({
@@ -20,109 +33,165 @@ export function EmitirNfeModal({
   onClose,
   vendaId,
   vendaNumero,
+  origemVenda,
+  codigoVenda,
+  clienteNome,
+  clienteId,
   tabelaOrigem = 'venda',
-  modeloInicial = 65,
 }: EmitirNfeModalProps) {
   const emitirNfePdv = useEmitirNfe()
   const emitirNfeGestor = useEmitirNfeGestor()
-  
-  // Usar o hook correto baseado na tabela de origem
+
   const emitirNfe = tabelaOrigem === 'venda_gestor' ? emitirNfeGestor : emitirNfePdv
-  const [formData, setFormData] = useState(() => ({
-    modelo: modeloInicial, // 55 = NF-e, 65 = NFC-e
-  }))
-  
-  // Estado para controlar se está processando (desabilita botão imediatamente)
   const [emissaoEmProcessamento, setEmissaoEmProcessamento] = useState(false)
+  const [modeloEmitindo, setModeloEmitindo] = useState<55 | 65 | null>(null)
 
-  useEffect(() => {
-    if (!open) return
+  const temClienteCadastrado = useMemo(
+    () => Boolean(clienteId && String(clienteId).trim() !== ''),
+    [clienteId]
+  )
 
-    setFormData({
-      modelo: modeloInicial,
-    })
-  }, [open, modeloInicial])
+  const nomeClienteExibicao = clienteNome?.trim() || 'Sem cliente'
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const emitirPorModelo = useCallback(
+    async (modelo: 55 | 65) => {
+      if (emissaoEmProcessamento || emitirNfe.isPending) return
 
-    // Desabilitar botão imediatamente
-    if (emissaoEmProcessamento) return
-    
-    setEmissaoEmProcessamento(true)
+      if (modelo === 65 && !temClienteCadastrado) {
+        showToast.error(
+          'Para emitir NFC-e é obrigatório que a venda tenha um cliente cadastrado. Associe um cliente à venda e tente novamente.'
+        )
+        return
+      }
 
-    try {
-      await emitirNfe.mutateAsync({
-        id: vendaId,
-        modelo: formData.modelo,
-      })
+      setEmissaoEmProcessamento(true)
+      setModeloEmitindo(modelo)
 
-      // Fluxo assíncrono: fecha após enviar e acompanha status no kanban.
-      onClose()
-    } catch (error) {
-      // Erro de rede/servidor já é tratado pelo hook com toast
-      console.error('Erro ao emitir NFe:', error)
-    } finally {
-      setEmissaoEmProcessamento(false)
-    }
-  }
+      try {
+        await emitirNfe.mutateAsync({
+          id: vendaId,
+          modelo,
+        })
+        onClose()
+      } catch (error) {
+        console.error('Erro ao emitir NFe:', error)
+      } finally {
+        setEmissaoEmProcessamento(false)
+        setModeloEmitindo(null)
+      }
+    },
+    [emissaoEmProcessamento, emitirNfe, onClose, temClienteCadastrado, vendaId]
+  )
+
+  const bloqueado = emissaoEmProcessamento || emitirNfe.isPending
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent sx={{ maxWidth: 500 }}>
-        <DialogHeader>
-          <DialogTitle>Emitir {formData.modelo === 55 ? 'NFe' : 'NFCe'}</DialogTitle>
-        </DialogHeader>
+    <Dialog open={open} onOpenChange={isOpen => !isOpen && onClose()}>
+      <DialogContent sx={{ maxWidth: 520, padding: '0px 24px 24px 24px' }}>
+        <div className="flex items-center justify-between">
+          <h1 className="text-primary font-exo font-bold text-lg sm:text-2xl py-4">Emitir Nota</h1>
+            <button
+              onClick={onClose}
+              style={{
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                borderRadius: '50%',
+                border: 'none',
+                background: 'transparent',
+              }}
+            >
+              <MdClose size={20} />
+            </button>
+        </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-4">
-            {vendaNumero && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Venda
-                </label>
-                <p className="text-sm text-gray-600">#{vendaNumero}</p>
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Modelo *
-              </label>
-              <select
-                value={formData.modelo}
-                onChange={(e) => setFormData({ ...formData, modelo: Number(e.target.value) as 55 | 65 })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              >
-                <option value={55}>55 - NF-e (Nota Fiscal Eletrônica)</option>
-                <option value={65}>65 - NFC-e (Nota Fiscal de Consumidor Eletrônica)</option>
-              </select>
+        <div className="space-y-4">
+          <div className="rounded-lg border border-gray-200 bg-gray-50/80 px-4 py-3 text-sm">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-gray-800">
+              {vendaNumero != null && vendaNumero !== '' && (
+                <span>
+                  <span className="font-medium text-gray-600">Nº da venda:</span> {vendaNumero}
+                </span>
+              )}
+              {origemVenda != null && String(origemVenda).trim() !== '' && (
+                <span>
+                  <span className="font-medium text-gray-600">Origem:</span> {origemVenda}
+                </span>
+              )}
+              {codigoVenda != null && codigoVenda !== '' && (
+                <span>
+                  <span className="font-medium text-gray-600">Código:</span> #{codigoVenda}
+                </span>
+              )}
             </div>
-
+            <p className="mt-2 text-gray-800">
+              <span className="font-medium text-gray-600">Cliente:</span> {nomeClienteExibicao}
+            </p>
           </div>
 
-          <DialogFooter sx={{ mt: 3 }}>
-            <Button 
-              type="button" 
-              variant="outlined" 
-              onClick={onClose}
-              disabled={emissaoEmProcessamento || emitirNfe.isPending}
+          {!temClienteCadastrado && (
+            <div
+              className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+              role="alert"
             >
-              Cancelar
-            </Button>
-            <Button 
-              type="submit" 
-              variant="contained" 
-              isLoading={emissaoEmProcessamento || emitirNfe.isPending}
-              disabled={emissaoEmProcessamento || emitirNfe.isPending}
+              <p className="font-semibold text-amber-900">NFC-e e cliente obrigatório</p>
+              <p className="mt-1 leading-relaxed">
+                O modelo <strong>NFC-e</strong> (Nota Fiscal de Consumidor Eletrônica) exige que a
+                venda possua um <strong>cliente vinculado</strong>.
+              </p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <button
+              type="button"
+              disabled={bloqueado}
+              onClick={() => void emitirPorModelo(55)}
+              className="flex min-h-[160px] flex-col items-center justify-center rounded-xl border-2 border-primary bg-primary p-6 text-center shadow-sm transition-all hover:bg-primary/95 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {emissaoEmProcessamento || emitirNfe.isPending
-                ? 'Emitindo...'
-                : `Emitir ${formData.modelo === 55 ? 'NFe' : 'NFCe'}`}
-            </Button>
-          </DialogFooter>
-        </form>
+              <span className="text-3xl font-extrabold tracking-tight text-info sm:text-4xl">
+                NF-e
+              </span>
+              <span className="mt-2 max-w-[12rem] text-xs font-medium leading-snug text-gray-200 sm:text-sm">
+                Nota Fiscal eletrônica
+              </span>
+              {bloqueado && modeloEmitindo === 55 && (
+                <span className="mt-2 text-xs font-medium text-primary">Emitindo...</span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              disabled={bloqueado || !temClienteCadastrado}
+              onClick={() => void emitirPorModelo(65)}
+              title={
+                !temClienteCadastrado
+                  ? 'Cadastre um cliente na venda para emitir NFC-e'
+                  : 'Emitir NFC-e'
+              }
+              className="flex min-h-[160px] flex-col items-center justify-center rounded-xl border-2 border-primary bg-white p-6 text-center shadow-sm transition-all hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <span className="text-3xl font-extrabold tracking-tight text-primary sm:text-4xl">
+                NFC-e
+              </span>
+              <span className="mt-2 max-w-[14rem] text-xs font-medium leading-snug text-gray-600 sm:text-sm">
+                Nota Fiscal de Consumidor Eletrônica
+              </span>
+              {bloqueado && modeloEmitindo === 65 && (
+                <span className="mt-2 text-xs font-medium text-primary">Emitindo...</span>
+              )}
+            </button>
+          </div>
+        </div>
+
+        <DialogFooter sx={{ mt: 2, justifyContent: 'flex-end' }}>
+          <Button type="button" variant="outlined" onClick={onClose} disabled={bloqueado}>
+            Cancelar
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

@@ -13,12 +13,37 @@ import {
   useDraggable,
   useDroppable,
 } from '@dnd-kit/core'
-import { useMarcarEmissaoFiscal, useDesmarcarEmissaoFiscal, useEmitirNfe, useEmitirNfeGestor, useReemitirNfe, useReemitirNfeGestor } from '@/src/presentation/hooks/useVendas'
-import { useVendasUnificadas, VendaUnificadaDTO } from '@/src/presentation/hooks/useVendasUnificadas'
+import {
+  useMarcarEmissaoFiscal,
+  useDesmarcarEmissaoFiscal,
+  useEmitirNfe,
+  useEmitirNfeGestor,
+  useReemitirNfe,
+  useReemitirNfeGestor,
+} from '@/src/presentation/hooks/useVendas'
+import {
+  useVendasUnificadas,
+  VendaUnificadaDTO,
+} from '@/src/presentation/hooks/useVendasUnificadas'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { calculatePeriodo } from '@/src/shared/utils/dateFilters'
-import { MdReceipt, MdAdd, MdVisibility, MdSchedule, MdRefresh, MdCheckCircle, MdFilterList, MdFilterAltOff, MdSearch, MdCalendarToday, MdMoreVert } from 'react-icons/md'
+import {
+  MdReceipt,
+  MdAdd,
+  MdVisibility,
+  MdSchedule,
+  MdRefresh,
+  MdCheckCircle,
+  MdFilterList,
+  MdFilterAltOff,
+  MdSearch,
+  MdCalendarToday,
+  MdMoreVert,
+  MdEdit,
+} from 'react-icons/md'
 import { EmitirNfeModal } from './EmitirNfeModal'
+import { SeletorClienteModal } from './SeletorClienteModal'
+import { Cliente } from '@/src/domain/entities/Cliente'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Badge } from '@/src/presentation/components/ui/badge'
 import { StatusFiscalBadge } from './StatusFiscalBadge'
@@ -46,13 +71,30 @@ interface KanbanColumn {
 // Usar VendaUnificadaDTO do hook
 type Venda = VendaUnificadaDTO
 
+/** Exibido quando o nome do cliente está vazio (Kanban e arraste) */
+const LABEL_SEM_CLIENTE = 'SEM CLIENTE'
+
+/** Venda sem nome de cliente preenchido (nome vazio ou só espaços) */
+function vendaSemNomeCliente(v: Venda): boolean {
+  return !v.cliente?.nome?.trim()
+}
+
 /**
  * Componente Kanban para gerenciamento de pedidos e emissão fiscal
  * Baseado no modelo de Kanban moderno e limpo
  */
-type StatusVendaFiltro = 'TODAS' | 'ATIVAS' | 'CANCELADAS'
 type OrigemFiltro = '' | 'PDV' | 'GESTOR' | 'DELIVERY'
-type PeriodoOpcao = 'Todos' | 'Hoje' | 'Ontem' | 'Últimos 7 Dias' | 'Mês Atual' | 'Mês Passado' | 'Últimos 30 Dias' | 'Últimos 60 Dias' | 'Últimos 90 Dias' | 'Datas Personalizadas'
+type PeriodoOpcao =
+  | 'Todos'
+  | 'Hoje'
+  | 'Ontem'
+  | 'Últimos 7 Dias'
+  | 'Mês Atual'
+  | 'Mês Passado'
+  | 'Últimos 30 Dias'
+  | 'Últimos 60 Dias'
+  | 'Últimos 90 Dias'
+  | 'Datas Personalizadas'
 
 const KANBAN_ORDEM_STORAGE_KEY = 'kanban-ordem-colunas'
 
@@ -121,21 +163,20 @@ function DroppableColumnContent({
   const { setNodeRef, isOver } = useDroppable({ id: columnId })
   const showDropSlotPendente = columnId === 'PENDENTE_EMISSAO' && isOver
   const showDropSlotFinalizadas = columnId === 'FINALIZADAS' && isOver
-  const isOverClass =
-    showDropSlotPendente
-      ? 'ring-2 ring-yellow-400 ring-inset bg-yellow-50/50'
-      : showDropSlotFinalizadas
-        ? 'ring-2 ring-blue-400 ring-inset bg-blue-50/50'
-        : ''
+  const isOverClass = showDropSlotPendente
+    ? 'ring-2 ring-yellow-400 ring-inset bg-yellow-50/50'
+    : showDropSlotFinalizadas
+      ? 'ring-2 ring-blue-400 ring-inset bg-blue-50/50'
+      : ''
   return (
     <div ref={setNodeRef} className={`${className ?? ''} ${isOverClass}`}>
       {showDropSlotPendente && (
-        <div className="min-h-[72px] border-2 border-dashed border-yellow-400 rounded-lg flex items-center justify-center bg-yellow-50/90 text-yellow-700 text-sm font-medium mb-2 transition-all">
+        <div className="mb-2 flex min-h-[72px] items-center justify-center rounded-lg border-2 border-dashed border-yellow-400 bg-yellow-50/90 text-sm font-medium text-yellow-700 transition-all">
           Solte aqui para marcar para emissão
         </div>
       )}
       {showDropSlotFinalizadas && (
-        <div className="min-h-[72px] border-2 border-dashed border-blue-400 rounded-lg flex items-center justify-center bg-blue-50/90 text-blue-700 text-sm font-medium mb-2 transition-all">
+        <div className="mb-2 flex min-h-[72px] items-center justify-center rounded-lg border-2 border-dashed border-blue-400 bg-blue-50/90 text-sm font-medium text-blue-700 transition-all">
           Solte aqui para voltar à coluna Finalizadas
         </div>
       )}
@@ -147,22 +188,20 @@ function DroppableColumnContent({
 /** Preview do card durante o arraste: inclinado e com leve tremor (efeito de “arrastando na tela”) */
 function VendaCardDragPreview({ venda }: { venda: VendaUnificadaDTO }) {
   const valorFormatado = transformarParaReal(venda.valorFinal)
-  const clienteNome = venda.cliente?.nome || 'Sem cliente'
+  const clienteNome = venda.cliente?.nome?.trim() ? venda.cliente.nome : LABEL_SEM_CLIENTE
   return (
-    <div className="drag-preview-card bg-white rounded-lg border-2 border-gray-300 p-2.5 cursor-grabbing w-64 opacity-95 shadow-lg">
-      <p className="text-xs text-gray-500 mb-0.5">
+    <div className="drag-preview-card w-64 cursor-grabbing rounded-lg border-2 border-gray-300 bg-white p-2.5 opacity-95 shadow-lg">
+      <p className="mb-0.5 text-xs text-gray-500">
         Venda {venda.numeroVenda}
         {venda.codigoVenda ? ` - #${venda.codigoVenda}` : ''}
       </p>
-      <p className="text-sm font-semibold text-primary mb-0.5 uppercase truncate">{clienteNome}</p>
-      <div className="mb-1.5 pb-1.5 border-b border-gray-200">
+      <p className="mb-0.5 truncate text-sm font-semibold uppercase text-primary">{clienteNome}</p>
+      <div className="mb-1.5 border-b border-gray-200 pb-1.5">
         <p className="text-xs text-gray-600">
           <span className="text-sm font-semibold text-gray-900">{valorFormatado}</span>
         </p>
       </div>
-      {venda.origem && (
-        <p className="text-xs text-gray-500">Origem: {venda.origem}</p>
-      )}
+      {venda.origem && <p className="text-xs text-gray-500">Origem: {venda.origem}</p>}
     </div>
   )
 }
@@ -194,7 +233,7 @@ function DraggableVendaCard({
       className="cursor-grab active:cursor-grabbing"
     >
       {isDragging ? (
-        <div className="min-h-[100px] rounded border-2 border-dashed border-gray-300 bg-gray-50/80 flex items-center justify-center">
+        <div className="flex min-h-[100px] items-center justify-center rounded border-2 border-dashed border-gray-300 bg-gray-50/80">
           <span className="text-xs text-gray-400">Arrastando...</span>
         </div>
       ) : (
@@ -210,7 +249,10 @@ export function FiscalFlowKanban() {
     id: string
     tabelaOrigem: 'venda' | 'venda_gestor'
     numeroVenda?: number
-    modeloInicial?: 55 | 65
+    codigoVenda?: string
+    origemVenda?: string
+    clienteId?: string | null
+    clienteNome?: string | null
   } | null>(null)
   const [emitirNfeModalOpen, setEmitirNfeModalOpen] = useState(false)
   const [detalhesVendaModalOpen, setDetalhesVendaModalOpen] = useState(false)
@@ -229,19 +271,30 @@ export function FiscalFlowKanban() {
   const [dataFinalizacaoFim, setDataFinalizacaoFim] = useState<Date | null>(null)
   const [origemFilter, setOrigemFilter] = useState<OrigemFiltro>('')
   const [statusFiscalFilter, setStatusFiscalFilter] = useState<string>('')
-  const [statusVendaFiltro, setStatusVendaFiltro] = useState<StatusVendaFiltro>('TODAS')
   const [filtrosVisiveisMobile, setFiltrosVisiveisMobile] = useState(false)
   const [isDatasModalOpen, setIsDatasModalOpen] = useState(false)
   const debounceSearchRef = useRef<NodeJS.Timeout | undefined>(undefined)
+  const [seletorClienteVendaOpen, setSeletorClienteVendaOpen] = useState(false)
+  /** Contexto da venda ao abrir o seletor (para futuro PATCH de cliente na venda) */
+  const vendaParaVincularClienteRef = useRef<{
+    id: string
+    tabelaOrigem: 'venda' | 'venda_gestor'
+  } | null>(null)
 
   const [novoPedidoModalOpen, setNovoPedidoModalOpen] = useState(false)
   const [novoPedidoModalVisualizacaoOpen, setNovoPedidoModalVisualizacaoOpen] = useState(false)
   const [vendaIdParaVisualizacao, setVendaIdParaVisualizacao] = useState<string | null>(null)
   const [menuAcoesVendaIdAberto, setMenuAcoesVendaIdAberto] = useState<string | null>(null)
-  const [acaoFiscalEmAndamentoPorVenda, setAcaoFiscalEmAndamentoPorVenda] = useState<Record<string, 'emitindo' | 'reemitindo'>>({})
+  const [acaoFiscalEmAndamentoPorVenda, setAcaoFiscalEmAndamentoPorVenda] = useState<
+    Record<string, 'emitindo' | 'reemitindo'>
+  >({})
   const [draggingVenda, setDraggingVenda] = useState<Venda | null>(null)
-  const [vendaRecemMovidaParaPendenteId, setVendaRecemMovidaParaPendenteId] = useState<string | null>(null)
-  const [vendaRecemMovidaParaFinalizadasId, setVendaRecemMovidaParaFinalizadasId] = useState<string | null>(null)
+  const [vendaRecemMovidaParaPendenteId, setVendaRecemMovidaParaPendenteId] = useState<
+    string | null
+  >(null)
+  const [vendaRecemMovidaParaFinalizadasId, setVendaRecemMovidaParaFinalizadasId] = useState<
+    string | null
+  >(null)
 
   // Debounce da busca (q)
   useEffect(() => {
@@ -281,9 +334,29 @@ export function FiscalFlowKanban() {
 
   // Converter datas para ISO para a API
   const periodoInicialISO = periodoInicial?.toISOString() ?? undefined
-  const periodoFinalISO = periodoFinal ? new Date(periodoFinal.getFullYear(), periodoFinal.getMonth(), periodoFinal.getDate(), 23, 59, 59, 999).toISOString() : undefined
+  const periodoFinalISO = periodoFinal
+    ? new Date(
+        periodoFinal.getFullYear(),
+        periodoFinal.getMonth(),
+        periodoFinal.getDate(),
+        23,
+        59,
+        59,
+        999
+      ).toISOString()
+    : undefined
   const dataFinalizacaoInicioISO = dataFinalizacaoInicio?.toISOString() ?? undefined
-  const dataFinalizacaoFimISO = dataFinalizacaoFim ? new Date(dataFinalizacaoFim.getFullYear(), dataFinalizacaoFim.getMonth(), dataFinalizacaoFim.getDate(), 23, 59, 59, 999).toISOString() : undefined
+  const dataFinalizacaoFimISO = dataFinalizacaoFim
+    ? new Date(
+        dataFinalizacaoFim.getFullYear(),
+        dataFinalizacaoFim.getMonth(),
+        dataFinalizacaoFim.getDate(),
+        23,
+        59,
+        59,
+        999
+      ).toISOString()
+    : undefined
 
   // Parâmetros estáveis para o React Query (evita churn desnecessário na queryKey)
   const vendasUnificadasQueryParams = useMemo(
@@ -310,8 +383,12 @@ export function FiscalFlowKanban() {
   )
 
   // Buscar vendas unificadas (PDV + Gestor) com filtros da API
-  const { data: vendasUnificadasData, isLoading, refetch } = useVendasUnificadas(vendasUnificadasQueryParams)
-  
+  const {
+    data: vendasUnificadasData,
+    isLoading,
+    refetch,
+  } = useVendasUnificadas(vendasUnificadasQueryParams)
+
   const marcarEmissaoFiscal = useMarcarEmissaoFiscal()
   const desmarcarEmissaoFiscal = useDesmarcarEmissaoFiscal()
   const emitirNfePdv = useEmitirNfe()
@@ -325,13 +402,10 @@ export function FiscalFlowKanban() {
     useSensor(TouchSensor, { activationConstraint: { delay: 100, tolerance: 8 } })
   )
 
-  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+  const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
-  const setAcaoFiscalEmAndamento = (
-    vendaId: string,
-    acao: 'emitindo' | 'reemitindo' | null
-  ) => {
-    setAcaoFiscalEmAndamentoPorVenda((prev) => {
+  const setAcaoFiscalEmAndamento = (vendaId: string, acao: 'emitindo' | 'reemitindo' | null) => {
+    setAcaoFiscalEmAndamentoPorVenda(prev => {
       if (!acao) {
         const { [vendaId]: _, ...rest } = prev
         return rest
@@ -358,22 +432,15 @@ export function FiscalFlowKanban() {
       await sleep(intervaloMs)
     }
   }
-  
+
   // Todas as vendas unificadas retornadas pela API (já filtradas por q, período, origem, statusFiscal no backend)
   const todasVendas: Venda[] = vendasUnificadasData?.items || []
-
-  // Filtro client-side: Todas / Ativas / Canceladas (usa isCancelada = dataCancelamento ou statusFiscal CANCELADA)
-  const filtrarPorStatusVenda = (vendas: Venda[]): Venda[] => {
-    if (statusVendaFiltro === 'TODAS') return vendas
-    if (statusVendaFiltro === 'ATIVAS') return vendas.filter((v) => !v.isCancelada())
-    return vendas.filter((v) => v.isCancelada())
-  }
 
   // Filtro client-side por termo de busca: codigoVenda, numeroVenda, cliente.nome, id
   const filtrarPorBusca = (vendas: Venda[], termo: string): Venda[] => {
     const t = termo.trim().toLowerCase()
     if (!t) return vendas
-    return vendas.filter((v) => {
+    return vendas.filter(v => {
       if (v.codigoVenda?.toLowerCase().includes(t)) return true
       if (String(v.numeroVenda).includes(t)) return true
       if (v.cliente?.nome?.toLowerCase().includes(t)) return true
@@ -382,10 +449,7 @@ export function FiscalFlowKanban() {
     })
   }
 
-  const vendasFiltradasPorTipo: Venda[] = filtrarPorBusca(
-    filtrarPorStatusVenda(todasVendas),
-    searchQuery
-  )
+  const vendasFiltradasPorTipo: Venda[] = filtrarPorBusca(todasVendas, searchQuery)
 
   // Colunas fixas do Kanban (Finalizadas, Pendente Emissão, Com NFe)
   const getColumns = (): KanbanColumn[] => [
@@ -396,7 +460,7 @@ export function FiscalFlowKanban() {
       borderColor: 'border-gray-400',
       borderColorClass: 'border-l-primary',
       cardBackgroundClass: 'bg-primary/10',
-      icon: <MdReceipt className="w-4 h-4 text-gray-600" />,
+      icon: <MdReceipt className="h-4 w-4 text-gray-600" />,
       placeholder: 'Vendas finalizadas aguardando ação',
     },
     {
@@ -406,7 +470,7 @@ export function FiscalFlowKanban() {
       borderColor: 'border-yellow-400',
       borderColorClass: 'border-l-yellow-400',
       cardBackgroundClass: 'bg-yellow-400/10',
-      icon: <MdSchedule className="w-4 h-4 text-yellow-600" />,
+      icon: <MdSchedule className="h-4 w-4 text-yellow-600" />,
       placeholder: 'Vendas aguardando emissão de NFe',
     },
     {
@@ -416,7 +480,7 @@ export function FiscalFlowKanban() {
       borderColor: 'border-green-400',
       borderColorClass: 'border-l-green-400',
       cardBackgroundClass: 'bg-green-400/10',
-      icon: <MdCheckCircle className="w-4 h-4 text-green-600" />,
+      icon: <MdCheckCircle className="h-4 w-4 text-green-600" />,
       placeholder: 'Vendas com nota fiscal emitida',
     },
   ]
@@ -463,7 +527,7 @@ export function FiscalFlowKanban() {
     const now = new Date()
     const diff = now.getTime() - date.getTime()
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-    
+
     if (days === 0) return 'Hoje'
     if (days === 1) return '1d'
     if (days < 30) return `${days}d`
@@ -498,9 +562,10 @@ export function FiscalFlowKanban() {
     return tipo.charAt(0).toUpperCase() + tipo.slice(1).toLowerCase()
   }
 
-
-
-  const handleMarcarEmissaoFiscal = async (vendaId: string, tabelaOrigem: 'venda' | 'venda_gestor') => {
+  const handleMarcarEmissaoFiscal = async (
+    vendaId: string,
+    tabelaOrigem: 'venda' | 'venda_gestor'
+  ) => {
     try {
       await marcarEmissaoFiscal.mutateAsync({ id: vendaId, tabelaOrigem })
     } catch (error) {
@@ -530,7 +595,10 @@ export function FiscalFlowKanban() {
     }
   }
 
-  const handleDesmarcarEmissaoFiscal = async (vendaId: string, tabelaOrigem: 'venda' | 'venda_gestor') => {
+  const handleDesmarcarEmissaoFiscal = async (
+    vendaId: string,
+    tabelaOrigem: 'venda' | 'venda_gestor'
+  ) => {
     try {
       await desmarcarEmissaoFiscal.mutateAsync({ id: vendaId, tabelaOrigem })
     } catch (error) {
@@ -551,15 +619,14 @@ export function FiscalFlowKanban() {
     const modeloInicial: 55 | 65 = venda.tipoDocFiscal === 'NFE' ? 55 : 65
 
     // Reemissão: rota explícita dedicada.
-    if (
-      venda.statusFiscal === 'REJEITADA' &&
-      venda.tipoDocFiscal
-    ) {
+    if (venda.statusFiscal === 'REJEITADA' && venda.tipoDocFiscal) {
       setAcaoFiscalEmAndamento(venda.id, 'reemitindo')
       try {
         const serieReemissao = Number(venda.serieFiscal)
         if (!Number.isFinite(serieReemissao) || serieReemissao <= 0) {
-          showToast.error('Série fiscal da rejeição não encontrada. Não foi possível reemitir automaticamente.')
+          showToast.error(
+            'Série fiscal da rejeição não encontrada. Não foi possível reemitir automaticamente.'
+          )
           return
         }
 
@@ -590,7 +657,10 @@ export function FiscalFlowKanban() {
       id: venda.id,
       tabelaOrigem: venda.tabelaOrigem,
       numeroVenda: venda.numeroVenda,
-      modeloInicial,
+      codigoVenda: venda.codigoVenda,
+      origemVenda: venda.origem,
+      clienteId: venda.cliente?.id ?? null,
+      clienteNome: venda.cliente?.nome ?? null,
     })
     setSelectedVendaId(venda.id) // Mantém para compatibilidade
     setEmitirNfeModalOpen(true)
@@ -598,7 +668,7 @@ export function FiscalFlowKanban() {
 
   const handleViewDetails = (venda: Venda) => {
     setMenuAcoesVendaIdAberto(null)
-    
+
     // Se for venda_gestor, abrir NovoPedidoModal na step 4
     if (venda.tabelaOrigem === 'venda_gestor') {
       setVendaIdParaVisualizacao(venda.id)
@@ -614,7 +684,7 @@ export function FiscalFlowKanban() {
   }
 
   const toggleMenuAcoes = (vendaId: string) => {
-    setMenuAcoesVendaIdAberto((prev) => (prev === vendaId ? null : vendaId))
+    setMenuAcoesVendaIdAberto(prev => (prev === vendaId ? null : vendaId))
   }
 
   const handleClearFilters = useCallback(() => {
@@ -628,13 +698,30 @@ export function FiscalFlowKanban() {
     setDataFinalizacaoFim(null)
     setOrigemFilter('')
     setStatusFiscalFilter('')
-    setStatusVendaFiltro('TODAS')
+  }, [])
+
+  const handleAbrirSeletorClienteVenda = useCallback((venda: Venda) => {
+    vendaParaVincularClienteRef.current = { id: venda.id, tabelaOrigem: venda.tabelaOrigem }
+    setSeletorClienteVendaOpen(true)
+  }, [])
+
+  const handleFecharSeletorClienteVenda = useCallback(() => {
+    setSeletorClienteVendaOpen(false)
+    vendaParaVincularClienteRef.current = null
+  }, [])
+
+  /** Seleção confirmada; vinculação na API quando o endpoint existir (ref ainda válido até o onClose do modal) */
+  const handleClienteSelecionadoParaVenda = useCallback((cliente: Cliente) => {
+    showToast.info(
+      `Cliente "${cliente.getNome()}" vinculado à venda.`
+    )
+    // Futuro: PATCH com vendaParaVincularClienteRef.current e cliente.getId()
   }, [])
 
   const handleConfirmDatas = useCallback((dataInicial: Date | null, dataFinal: Date | null) => {
     setPeriodoInicial(dataInicial)
     setPeriodoFinal(dataFinal)
-    setPeriodo((dataInicial || dataFinal) ? 'Datas Personalizadas' : 'Todos')
+    setPeriodo(dataInicial || dataFinal ? 'Datas Personalizadas' : 'Todos')
     setIsDatasModalOpen(false)
   }, [])
 
@@ -667,7 +754,10 @@ export function FiscalFlowKanban() {
           const idx = vendas.findIndex((v: Venda) => v.id === vendaRecemMovidaParaFinalizadasId)
           if (idx > 0) {
             const recemMovida = vendas[idx]
-            vendas = [recemMovida, ...vendas.filter((v: Venda) => v.id !== vendaRecemMovidaParaFinalizadasId)]
+            vendas = [
+              recemMovida,
+              ...vendas.filter((v: Venda) => v.id !== vendaRecemMovidaParaFinalizadasId),
+            ]
           }
         }
         break
@@ -685,7 +775,10 @@ export function FiscalFlowKanban() {
           const idx = vendas.findIndex((v: Venda) => v.id === vendaRecemMovidaParaPendenteId)
           if (idx > 0) {
             const recemMovida = vendas[idx]
-            vendas = [recemMovida, ...vendas.filter((v: Venda) => v.id !== vendaRecemMovidaParaPendenteId)]
+            vendas = [
+              recemMovida,
+              ...vendas.filter((v: Venda) => v.id !== vendaRecemMovidaParaPendenteId),
+            ]
           }
         }
         break
@@ -699,7 +792,7 @@ export function FiscalFlowKanban() {
       default:
         return []
     }
-    
+
     // Garantir que não há duplicação por ID (usando Map para manter ordem)
     const vendasUnicas = new Map<string, Venda>()
     vendas.forEach(venda => {
@@ -707,28 +800,28 @@ export function FiscalFlowKanban() {
         vendasUnicas.set(venda.id, venda)
       }
     })
-    
+
     return Array.from(vendasUnicas.values())
   }
 
   if (isLoading) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex h-full items-center justify-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600"></div>
       </div>
     )
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden bg-gray-50">
       {/* Container de filtros (estilo VendasList) */}
-      <div className="bg-primary-background rounded-t-lg rounded-b-lg md:px-2 flex-shrink-0">
+      <div className="bg-primary-background flex-shrink-0 rounded-b-lg rounded-t-lg md:px-2">
         {/* Toggle filtros no mobile */}
-        <div className="sm:hidden flex justify-end py-2">
+        <div className="flex justify-end py-2 sm:hidden">
           <button
             type="button"
-            onClick={() => setFiltrosVisiveisMobile((prev) => !prev)}
-            className="flex items-center gap-2 px-3 py-1 rounded-md bg-primary text-white text-sm font-nunito shadow-sm"
+            onClick={() => setFiltrosVisiveisMobile(prev => !prev)}
+            className="font-nunito flex items-center gap-2 rounded-md bg-primary px-3 py-1 text-sm text-white shadow-sm"
             aria-expanded={filtrosVisiveisMobile}
           >
             {filtrosVisiveisMobile ? <MdFilterAltOff size={18} /> : <MdFilterList size={18} />}
@@ -737,44 +830,51 @@ export function FiscalFlowKanban() {
         </div>
 
         {/* Filtros superiores: Busca, Período, Origem, Ações */}
-        <div className={`flex flex-col sm:flex-row items-center gap-3 py-2 ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}>
-          <div className="flex-[2] w-full max-w-full lg:max-w-[550px] px-4 relative">
-            <MdSearch className="absolute left-8 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
+        <div
+          className={`flex flex-col items-center gap-3 py-2 sm:flex-row ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
+        >
+          <div className="relative w-full max-w-full flex-[2] px-4 lg:max-w-[550px]">
+            <MdSearch
+              className="absolute left-8 top-1/2 -translate-y-1/2 text-secondary-text"
+              size={20}
+            />
             <input
               type="text"
               placeholder="Pesquisar por código da venda ou cliente"
               value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && refetch()}
-              className="w-full h-8 pl-10 pr-4 rounded-lg bg-info border shadow-sm text-sm font-nunito"
+              onChange={e => setSearchInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && refetch()}
+              className="font-nunito h-8 w-full rounded-lg border bg-info pl-10 pr-4 text-sm shadow-sm"
             />
           </div>
-          <div className="flex items-center gap-2 ml-auto">
+          <div className="ml-auto flex items-center gap-2">
             <button
               onClick={() => refetch()}
-              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
               title="Atualizar"
             >
-              <MdRefresh className="w-5 h-5" />
+              <MdRefresh className="h-5 w-5" />
             </button>
             <button
               onClick={() => setNovoPedidoModalOpen(true)}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1.5"
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary/90"
             >
-              <MdAdd className="w-4 h-4" />
+              <MdAdd className="h-4 w-4" />
               Novo Pedido
             </button>
           </div>
         </div>
 
-        {/* Filtros avançados: Origem, Data finalização, Data Criação, Status fiscal, Exibir, Limpar */}
-        <div className={`bg-custom-2 rounded-t-lg px-2 pt-1.5 pb-2 justify-center md:justify-start flex flex-wrap items-end gap-x-2 gap-y-4 ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}>
+        {/* Filtros avançados: Origem, Data finalização, Data Criação, Status fiscal, Limpar */}
+        <div
+          className={`flex flex-wrap items-end justify-center gap-x-2 gap-y-4 rounded-t-lg bg-custom-2 px-2 pb-2 pt-1.5 md:justify-start ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
+        >
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-secondary-text font-nunito">Origem</label>
+            <label className="font-nunito text-xs text-secondary-text">Origem</label>
             <FormControl size="small" sx={{ minWidth: 140 }}>
               <Select
                 value={origemFilter}
-                onChange={(e) => setOrigemFilter(e.target.value as OrigemFiltro)}
+                onChange={e => setOrigemFilter(e.target.value as OrigemFiltro)}
                 displayEmpty
                 sx={{
                   height: '32px',
@@ -791,11 +891,11 @@ export function FiscalFlowKanban() {
             </FormControl>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-secondary-text font-nunito">Data finalização</label>
+            <label className="font-nunito text-xs text-secondary-text">Data finalização</label>
             <FormControl size="small" sx={{ minWidth: 150 }}>
               <Select
                 value={dataFinalizacaoPeriodo}
-                onChange={(e) => setDataFinalizacaoPeriodo(e.target.value as PeriodoOpcao)}
+                onChange={e => setDataFinalizacaoPeriodo(e.target.value as PeriodoOpcao)}
                 sx={{
                   height: '32px',
                   backgroundColor: '#FFFFFF',
@@ -815,11 +915,11 @@ export function FiscalFlowKanban() {
             </FormControl>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-secondary-text font-nunito">Data criação</label>
+            <label className="font-nunito text-xs text-secondary-text">Data criação</label>
             <FormControl size="small" sx={{ minWidth: 150 }}>
               <Select
                 value={periodo}
-                onChange={(e) => setPeriodo(e.target.value as PeriodoOpcao)}
+                onChange={e => setPeriodo(e.target.value as PeriodoOpcao)}
                 sx={{
                   height: '32px',
                   backgroundColor: '#FFFFFF',
@@ -840,11 +940,11 @@ export function FiscalFlowKanban() {
             </FormControl>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-secondary-text font-nunito">Status fiscal</label>
+            <label className="font-nunito text-xs text-secondary-text">Status fiscal</label>
             <FormControl size="small" sx={{ minWidth: 160 }}>
               <Select
                 value={statusFiscalFilter}
-                onChange={(e) => setStatusFiscalFilter(e.target.value)}
+                onChange={e => setStatusFiscalFilter(e.target.value)}
                 displayEmpty
                 sx={{
                   height: '32px',
@@ -863,29 +963,11 @@ export function FiscalFlowKanban() {
             </FormControl>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-secondary-text font-nunito">Exibir</label>
-            <FormControl size="small" sx={{ minWidth: 130 }}>
-              <Select
-                value={statusVendaFiltro}
-                onChange={(e) => setStatusVendaFiltro(e.target.value as StatusVendaFiltro)}
-                sx={{
-                  height: '32px',
-                  backgroundColor: '#FFFFFF',
-                  '& .MuiOutlinedInput-notchedOutline': { borderColor: 'transparent' },
-                }}
-              >
-                <MenuItem value="TODAS">Todas</MenuItem>
-                <MenuItem value="ATIVAS">Ativas</MenuItem>
-                <MenuItem value="CANCELADAS">Canceladas</MenuItem>
-              </Select>
-            </FormControl>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-secondary-text font-nunito">Período (criação)</label>
+            <label className="font-nunito text-xs text-secondary-text">Período (criação)</label>
             <button
               type="button"
               onClick={() => setIsDatasModalOpen(true)}
-              className="h-8 px-4 bg-primary text-white rounded-lg flex items-center gap-2 text-sm font-nunito hover:bg-primary/90 transition-colors"
+              className="font-nunito flex h-8 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
             >
               <MdCalendarToday size={18} />
               Por datas
@@ -893,7 +975,7 @@ export function FiscalFlowKanban() {
           </div>
           <button
             onClick={handleClearFilters}
-            className="h-8 px-4 bg-primary text-white rounded-lg flex items-center justify-center gap-2 text-sm font-nunito hover:bg-primary/90 transition-colors"
+            className="font-nunito flex h-8 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
           >
             <MdFilterAltOff size={18} />
             Limpar filtros
@@ -902,376 +984,445 @@ export function FiscalFlowKanban() {
       </div>
 
       {/* Kanban Board */}
-        <div className="flex-1 overflow-x-auto p-4 pb-4 mb-[10px] min-h-0 scrollbar-thin">
+      <div className="scrollbar-thin mb-[10px] min-h-0 flex-1 overflow-x-auto p-4 pb-4">
         <DndContext
           sensors={sensors}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
-        <div className="flex gap-3 min-w-max h-full">
-          {columns.map((column) => {
-            const columnVendas = getVendasByColumn(column.id)
-            const count = columnVendas.length
+          <div className="flex h-full min-w-max gap-3">
+            {columns.map(column => {
+              const columnVendas = getVendasByColumn(column.id)
+              const count = columnVendas.length
 
-            return (
-              <div
-                key={column.id}
-                className="flex-shrink-0 w-64 sm:w-60 md:w-64 lg:w-80 bg-white border border-gray-200 rounded-lg overflow-hidden flex flex-col"
-                style={{ height: 'calc(100vh - 180px)' }}
-              >
-                {/* Column Header - Apenas o header tem cor */}
-                <div className={`px-3 py-2 ${column.color} border-b ${column.borderColor} flex items-center justify-between flex-shrink-0`}>
-                  <div className="flex items-center gap-1.5">
-                    {column.icon}
-                    <h3 className="font-medium text-gray-900 text-xs">
-                      {column.title} ({count})
-                    </h3>
-                  </div>
-                </div>
-
-                {/* Column Content - Área droppable (Pendente Emissão aceita cards arrastados) */}
-                <DroppableColumnContent
-                  columnId={column.id}
-                  className="flex-1 overflow-y-auto p-2.5 space-y-2 bg-white min-h-0 scrollbar-thin"
+              return (
+                <div
+                  key={column.id}
+                  className="flex w-64 flex-shrink-0 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white sm:w-60 md:w-64 lg:w-80"
+                  style={{ height: 'calc(100vh - 180px)' }}
                 >
-                  {columnVendas.length === 0 ? (
-                    <div className="text-center py-6">
-                      <p className="text-xs text-gray-500">{column.placeholder}</p>
+                  {/* Column Header - Apenas o header tem cor */}
+                  <div
+                    className={`px-3 py-2 ${column.color} border-b ${column.borderColor} flex flex-shrink-0 items-center justify-between`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      {column.icon}
+                      <h3 className="text-xs font-medium text-gray-900">
+                        {column.title} ({count})
+                      </h3>
                     </div>
-                  ) : (
-                    columnVendas.map((venda: Venda) => {
-                      const valorFormatado = transformarParaReal(venda.valorFinal)
-                      const clienteNome = venda.cliente?.nome || 'Sem cliente'
-                      // Vendas do Gestor são sempre balcão; exibir "Balcão" quando a API não retorna tipoVenda
-                      const tipoVendaExibicao =
-                        venda.tabelaOrigem === 'venda_gestor'
-                          ? (venda.tipoVenda || 'balcao')
-                          : venda.tipoVenda
+                  </div>
 
-                      return (
-                        <DraggableVendaCard key={venda.id} venda={venda} column={column}>
-                        <div
-                          className={`rounded-lg border-l-4 ${column.borderColorClass} ${column.cardBackgroundClass} border border-gray-200/80 p-3 hover:shadow-md transition-all relative cursor-pointer`}
-                          onClick={() => handleViewDetails(venda)}
-                        >
-                          {/* Menu de três pontos no canto superior direito */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              toggleMenuAcoes(venda.id)
-                            }}
-                            className="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
-                            title="Mais opções"
-                          >
-                            <MdMoreVert className="w-4 h-4" />
-                          </button>
+                  {/* Column Content - Área droppable (Pendente Emissão aceita cards arrastados) */}
+                  <DroppableColumnContent
+                    columnId={column.id}
+                    className="scrollbar-thin min-h-0 flex-1 space-y-2 overflow-y-auto bg-white p-2.5"
+                  >
+                    {columnVendas.length === 0 ? (
+                      <div className="py-6 text-center">
+                        <p className="text-xs text-gray-500">{column.placeholder}</p>
+                      </div>
+                    ) : (
+                      columnVendas.map((venda: Venda) => {
+                        const valorFormatado = transformarParaReal(venda.valorFinal)
+                        const clienteNome = venda.cliente?.nome?.trim()
+                          ? venda.cliente.nome
+                          : LABEL_SEM_CLIENTE
+                        const semNomeCliente = vendaSemNomeCliente(venda)
+                        const podeEditarClienteNaVenda =
+                          semNomeCliente &&
+                          (column.id === 'FINALIZADAS' || column.id === 'PENDENTE_EMISSAO')
+                        // Vendas do Gestor são sempre balcão; exibir "Balcão" quando a API não retorna tipoVenda
+                        const tipoVendaExibicao =
+                          venda.tabelaOrigem === 'venda_gestor'
+                            ? venda.tipoVenda || 'balcao'
+                            : venda.tipoVenda
 
-                          {menuAcoesVendaIdAberto === venda.id && (
+                        return (
+                          <DraggableVendaCard key={venda.id} venda={venda} column={column}>
                             <div
-                              className="absolute top-9 right-2 z-20 w-36 bg-white border border-gray-200 rounded-lg shadow-lg py-1"
-                              onClick={(e) => e.stopPropagation()}
+                              className={`rounded-lg border-l-4 ${column.borderColorClass} ${column.cardBackgroundClass} relative cursor-pointer border border-gray-200/80 p-3 transition-all hover:shadow-md`}
+                              onClick={() => handleViewDetails(venda)}
                             >
-                              <button
-                                type="button"
-                                onClick={() => setMenuAcoesVendaIdAberto(null)}
-                                className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                              >
-                                Incluir cliente
-                              </button>
-                            </div>
-                          )}
+                              {/* Menu de três pontos: apenas quando pode incluir cliente (mesmas colunas do lápis) */}
+                              {podeEditarClienteNaVenda && (
+                                <>
+                                  <button
+                                    onClick={e => {
+                                      e.stopPropagation()
+                                      toggleMenuAcoes(venda.id)
+                                    }}
+                                    className="absolute right-2 top-2 rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                                    title="Mais opções"
+                                  >
+                                    <MdMoreVert className="h-4 w-4" />
+                                  </button>
 
-                          {/* Bloco número da venda até valor, com ícone ao lado */}
-                          <div className="flex gap-3 mb-2 pr-6">
-                            <div className="flex-1 min-w-0 border-b border-gray-100 pb-1.5">
-                              <p className="text-xs text-gray-500 mb-0.5">
-                                Venda {venda.numeroVenda}
-                                {venda.codigoVenda ? ` - #${venda.codigoVenda}` : ''}
-                              </p>
-                              <p className="text-sm font-semibold text-primary mb-1 uppercase truncate">
-                                {clienteNome}
-                              </p>
-                              {venda.statusFiscal && (
-                                <div className="mb-1">
-                                  <StatusFiscalBadge status={venda.statusFiscal} />
-                                  {venda.numeroFiscal && venda.statusFiscal === 'EMITIDA' && (
-                                    <div className="mt-1 inline-flex items-center gap-1 bg-green-100 text-green-800 px-2 py-0.5 rounded-md">
-                                      <MdCheckCircle className="w-3.5 h-3.5" />
-                                      <span className="text-xs font-semibold">
-                                        {venda.tipoDocFiscal || 'NFe'} Nº {venda.numeroFiscal}
-                                        {venda.serieFiscal && ` / Série ${venda.serieFiscal}`}
-                                      </span>
+                                  {menuAcoesVendaIdAberto === venda.id && (
+                                    <div
+                                      className="absolute right-2 top-9 z-20 w-36 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+                                      onClick={e => e.stopPropagation()}
+                                    >
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setMenuAcoesVendaIdAberto(null)
+                                          handleAbrirSeletorClienteVenda(venda)
+                                        }}
+                                        className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                      >
+                                        Incluir cliente
+                                      </button>
                                     </div>
                                   )}
-                                </div>
+                                </>
                               )}
-                              <p className="text-xs text-gray-600">
-                                <span className="text-sm font-semibold text-gray-900">
-                                  {valorFormatado}
-                                </span>
-                              </p>
-                            </div>
-                            {tipoVendaExibicao && (tipoVendaExibicao === 'balcao' || tipoVendaExibicao === 'mesa') && (
-                              <div className="flex-shrink-0 flex items-center justify-center">
-                                <TipoVendaIcon
-                                  tipoVenda={tipoVendaExibicao as 'balcao' | 'mesa'}
-                                  numeroMesa="M"
-                                  size={64}
-                                  containerScale={0.9}
-                                  corPrincipal="var(--color-primary)"
-                                  corTexto="var(--color-info)"
-                                  corBalcao="var(--color-primary)"
-                                  corBorda="var(--color-primary)"
-                                />
+
+                              {/* Bloco número da venda até valor, com ícone ao lado */}
+                              <div className="mb-2 flex gap-3 pr-6">
+                                <div className="min-w-0 flex-1 border-b border-gray-100 pb-1.5">
+                                  <p className="mb-0.5 text-xs text-gray-500">
+                                    Venda {venda.numeroVenda}
+                                    {venda.codigoVenda ? ` - #${venda.codigoVenda}` : ''}
+                                  </p>
+                                  <div className="mb-1 flex min-w-0 items-start gap-1">
+                                    <p className="mb-0 min-w-0 flex-1 truncate text-sm font-semibold uppercase text-primary">
+                                      {clienteNome}
+                                    </p>
+                                    {podeEditarClienteNaVenda && (
+                                      <button
+                                        type="button"
+                                        onClick={e => {
+                                          e.stopPropagation()
+                                          handleAbrirSeletorClienteVenda(venda)
+                                        }}
+                                        className="flex-shrink-0 rounded p-0.5 text-primary transition-colors hover:bg-primary/10"
+                                        title="Incluir cliente na venda"
+                                      >
+                                        <MdEdit className="h-4 w-4" />
+                                      </button>
+                                    )}
+                                  </div>
+                                  {venda.statusFiscal && (
+                                    <div className="mb-1">
+                                      <StatusFiscalBadge status={venda.statusFiscal} />
+                                      {venda.numeroFiscal && venda.statusFiscal === 'EMITIDA' && (
+                                        <div className="mt-1 inline-flex items-center gap-1 rounded-md bg-green-100 px-2 py-0.5 text-green-800">
+                                          <MdCheckCircle className="h-3.5 w-3.5" />
+                                          <span className="text-xs font-semibold">
+                                            {venda.tipoDocFiscal || 'NFe'} Nº {venda.numeroFiscal}
+                                            {venda.serieFiscal && ` / Série ${venda.serieFiscal}`}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                  <p className="text-xs text-gray-600">
+                                    <span className="text-sm font-semibold text-gray-900">
+                                      {valorFormatado}
+                                    </span>
+                                  </p>
+                                </div>
+                                {tipoVendaExibicao &&
+                                  (tipoVendaExibicao === 'balcao' ||
+                                    tipoVendaExibicao === 'mesa') && (
+                                    <div className="flex flex-shrink-0 items-center justify-center">
+                                      <TipoVendaIcon
+                                        tipoVenda={tipoVendaExibicao as 'balcao' | 'mesa'}
+                                        numeroMesa="M"
+                                        size={64}
+                                        containerScale={0.9}
+                                        corPrincipal="var(--color-primary)"
+                                        corTexto="var(--color-info)"
+                                        corBalcao="var(--color-primary)"
+                                        corBorda="var(--color-primary)"
+                                      />
+                                    </div>
+                                  )}
                               </div>
-                            )}
-                          </div>
 
-                          {/* Novos campos: Data finalização, Aberto por; Origem */}
-                          <div className="space-y-0.5 mb-2">
-                            {venda.dataFinalizacao && (
-                              <p className="text-xs text-gray-500">
-                                Finalizada: {formatarDataCard(venda.dataFinalizacao)}
-                              </p>
-                            )}
-                            {venda.abertoPor?.nome && (
-                              <p className="text-xs text-gray-500">
-                                Aberto por: {venda.abertoPor.nome}
-                              </p>
-                            )}
-                            {venda.origem && (
-                              <p className="text-xs text-gray-500">Origem: {venda.origem}</p>
-                            )}
-                          </div>
+                              {/* Novos campos: Data finalização, Aberto por; Origem */}
+                              <div className="mb-2 space-y-0.5">
+                                {venda.dataFinalizacao && (
+                                  <p className="text-xs text-gray-500">
+                                    Finalizada: {formatarDataCard(venda.dataFinalizacao)}
+                                  </p>
+                                )}
+                                {venda.abertoPor?.nome && (
+                                  <p className="text-xs text-gray-500">
+                                    Aberto por: {venda.abertoPor.nome}
+                                  </p>
+                                )}
+                                {venda.origem && (
+                                  <p className="text-xs text-gray-500">Origem: {venda.origem}</p>
+                                )}
+                              </div>
 
-                          {/* Ações baseadas na coluna */}
-                          <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
-                            {/* Ações para colunas de delivery — COMENTADO: colunas não utilizadas por enquanto */}
-                            {/* {['EM_ANALISE', 'EM_PRODUCAO', 'PRONTOS_ENTREGA', 'COM_ENTREGADOR'].includes(column.id) && (
+                              {/* Ações baseadas na coluna */}
+                              <div className="mt-2 flex gap-2" onClick={e => e.stopPropagation()}>
+                                {/* Ações para colunas de delivery — COMENTADO: colunas não utilizadas por enquanto */}
+                                {/* {['EM_ANALISE', 'EM_PRODUCAO', 'PRONTOS_ENTREGA', 'COM_ENTREGADOR'].includes(column.id) && (
                               <div className="text-xs text-gray-500 italic w-full text-center py-1">
                                 Em andamento
                               </div>
                             )} */}
 
-                            {/* Botão "Marcar para Emissão" (primary) */}
-                            {column.id === 'FINALIZADAS' && (venda.tabelaOrigem === 'venda' || venda.tabelaOrigem === 'venda_gestor') && (
-                              <Button
-                                size="sm"
-                                variant="outlined"
-                                className="flex-1 !border-primary !text-primary hover:!bg-primary/5"
-                                sx={{ py: 0.375, px: 1, minHeight: 'auto' }}
-                                onClick={() => handleMarcarEmissaoFiscal(venda.id, venda.tabelaOrigem)}
-                                isLoading={marcarEmissaoFiscal.isPending}
-                              >
-                                Marcar para Emissão
-                              </Button>
-                            )}
-
-                            {column.id === 'PENDENTE_EMISSAO' && (
-                              <Button
-                                size="sm"
-                                variant="contained"
-                                className="flex-1 !bg-primary hover:!bg-primary/90"
-                                sx={{ py: 0.375, px: 1, minHeight: 'auto' }}
-                                onClick={() => handleEmitirNfe(venda)}
-                                disabled={
-                                  !!acaoFiscalEmAndamentoPorVenda[venda.id] ||
-                                  emitirNfePdv.isPending ||
-                                  emitirNfeGestor.isPending ||
-                                  reemitirNfePdv.isPending ||
-                                  reemitirNfeGestor.isPending ||
-                                  venda.statusFiscal === 'PENDENTE' ||
-                                  venda.statusFiscal === 'PENDENTE_EMISSAO' ||
-                                  venda.statusFiscal === 'EMITINDO' || 
-                                  venda.statusFiscal === 'PENDENTE_AUTORIZACAO' ||
-                                  venda.statusFiscal === 'CONTINGENCIA' ||
-                                  venda.statusFiscal === 'EMITIDA'
-                                }
-                              >
-                                {(() => {
-                                  const acaoEmAndamento = acaoFiscalEmAndamentoPorVenda[venda.id]
-                                  if (acaoEmAndamento === 'reemitindo') return 'Reemitindo...'
-                                  if (acaoEmAndamento === 'emitindo') return 'Emitindo...'
-                                  const documentoLabel = venda.tipoDocFiscal === 'NFE' ? 'NFe' : 'NFCe'
-                                  if (venda.statusFiscal === 'REJEITADA') return `Reemitir ${documentoLabel}`
-                                  if (
-                                    venda.statusFiscal === 'PENDENTE' ||
-                                    venda.statusFiscal === 'PENDENTE_EMISSAO' ||
-                                    venda.statusFiscal === 'EMITINDO' ||
-                                    venda.statusFiscal === 'PENDENTE_AUTORIZACAO' ||
-                                    venda.statusFiscal === 'CONTINGENCIA'
-                                  ) {
-                                    return 'Aguardando...'
-                                  }
-                                  return `Emitir Nota`
-                                })()}
-                              </Button>
-                            )}
-
-                            {column.id === 'COM_NFE' && venda.documentoFiscalId && (
-                              <Button
-                                size="sm"
-                                variant="outlined"
-                                className="flex-1 !border-primary !text-primary hover:!bg-primary/5"
-                                onClick={async () => {
-                                  const url = `/api/nfe/${venda.documentoFiscalId}`
-                                  const documentoLabel = venda.tipoDocFiscal === 'NFE' ? 'DANFE' : 'DANFCE'
-                                  
-                                  // Verificar se o PDF fiscal está disponível antes de abrir
-                                  try {
-                                    const response = await fetch(url)
-                                    
-                                    if (response.ok) {
-                                      // Verificar se é realmente um PDF
-                                      const contentType = response.headers.get('content-type')
-                                      if (contentType?.includes('application/pdf')) {
-                                        // PDF fiscal disponível, abrir normalmente
-                                        window.open(url, '_blank')
-                                      } else {
-                                        // Resposta inesperada
-                                        const errorData = await response.json().catch(() => ({}))
-                                        alert(errorData.error || `Erro ao buscar ${documentoLabel}. Tente novamente mais tarde.`)
+                                {/* Botão "Marcar para Emissão" (primary) */}
+                                {column.id === 'FINALIZADAS' &&
+                                  (venda.tabelaOrigem === 'venda' ||
+                                    venda.tabelaOrigem === 'venda_gestor') && (
+                                    <Button
+                                      size="sm"
+                                      variant="outlined"
+                                      className="flex-1 !border-primary !text-primary hover:!bg-primary/5"
+                                      sx={{ py: 0.375, px: 1, minHeight: 'auto' }}
+                                      onClick={() =>
+                                        handleMarcarEmissaoFiscal(venda.id, venda.tabelaOrigem)
                                       }
-                                    } else if (response.status === 404) {
-                                      // PDF fiscal ainda não foi gerado
-                                      const errorData = await response.json().catch(() => ({}))
-                                      const errorMessage = errorData.error || `O ${documentoLabel} ainda não foi gerado.`
-                                      
-                                      // Oferecer opção de regenerar ou aguardar
-                                      const opcao = confirm(
-                                        `${errorMessage}\n\n` +
-                                        `Escolha uma opção:\n` +
-                                        `OK = Regenerar ${documentoLabel} agora\n` +
-                                        `Cancelar = Aguardar e tentar novamente automaticamente`
-                                      )
-                                      
-                                      if (opcao) {
-                                        // Regenerar PDF fiscal via Next.js API route (proxy)
-                                        try {
-                                          const regenerarUrl = `/api/nfe/${venda.documentoFiscalId}/regenerar`
-                                          
-                                          const regenerarResponse = await fetch(regenerarUrl, {
-                                            method: 'POST',
-                                            headers: {
-                                              'Content-Type': 'application/json',
-                                            },
-                                          })
-                                          
-                                          if (regenerarResponse.ok) {
-                                            const regenerarData = await regenerarResponse.json()
-                                            alert(`✅ ${regenerarData.mensagem || `Geração de ${documentoLabel} iniciada. Aguarde alguns segundos e tente novamente.`}`)
-                                            
-                                            // Aguardar 5 segundos e tentar abrir
-                                            setTimeout(async () => {
-                                              let tentativas = 0
-                                              const maxTentativas = 6 // 30 segundos no total (6 x 5s)
-                                              
-                                              const verificarPdfFiscal = async () => {
-                                                tentativas++
-                                                try {
-                                                  const retryResponse = await fetch(url)
-                                                  if (retryResponse.ok) {
-                                                    const contentType = retryResponse.headers.get('content-type')
-                                                    if (contentType?.includes('application/pdf')) {
-                                                      window.open(url, '_blank')
-                                                      return
+                                      isLoading={marcarEmissaoFiscal.isPending}
+                                    >
+                                      Marcar para Emissão
+                                    </Button>
+                                  )}
+
+                                {column.id === 'PENDENTE_EMISSAO' && (
+                                  <Button
+                                    size="sm"
+                                    variant="contained"
+                                    className="flex-1 !bg-primary hover:!bg-primary/90"
+                                    sx={{ py: 0.375, px: 1, minHeight: 'auto' }}
+                                    onClick={() => handleEmitirNfe(venda)}
+                                    disabled={
+                                      !!acaoFiscalEmAndamentoPorVenda[venda.id] ||
+                                      emitirNfePdv.isPending ||
+                                      emitirNfeGestor.isPending ||
+                                      reemitirNfePdv.isPending ||
+                                      reemitirNfeGestor.isPending ||
+                                      venda.statusFiscal === 'PENDENTE' ||
+                                      venda.statusFiscal === 'PENDENTE_EMISSAO' ||
+                                      venda.statusFiscal === 'EMITINDO' ||
+                                      venda.statusFiscal === 'PENDENTE_AUTORIZACAO' ||
+                                      venda.statusFiscal === 'CONTINGENCIA' ||
+                                      venda.statusFiscal === 'EMITIDA'
+                                    }
+                                  >
+                                    {(() => {
+                                      const acaoEmAndamento =
+                                        acaoFiscalEmAndamentoPorVenda[venda.id]
+                                      if (acaoEmAndamento === 'reemitindo') return 'Reemitindo...'
+                                      if (acaoEmAndamento === 'emitindo') return 'Emitindo...'
+                                      const documentoLabel =
+                                        venda.tipoDocFiscal === 'NFE' ? 'NFe' : 'NFCe'
+                                      if (venda.statusFiscal === 'REJEITADA')
+                                        return `Reemitir ${documentoLabel}`
+                                      if (
+                                        venda.statusFiscal === 'PENDENTE' ||
+                                        venda.statusFiscal === 'PENDENTE_EMISSAO' ||
+                                        venda.statusFiscal === 'EMITINDO' ||
+                                        venda.statusFiscal === 'PENDENTE_AUTORIZACAO' ||
+                                        venda.statusFiscal === 'CONTINGENCIA'
+                                      ) {
+                                        return 'Aguardando...'
+                                      }
+                                      return `Emitir Nota`
+                                    })()}
+                                  </Button>
+                                )}
+
+                                {column.id === 'COM_NFE' && venda.documentoFiscalId && (
+                                  <Button
+                                    size="sm"
+                                    variant="outlined"
+                                    className="flex-1 !border-primary !text-primary hover:!bg-primary/5"
+                                    onClick={async () => {
+                                      const url = `/api/nfe/${venda.documentoFiscalId}`
+                                      const documentoLabel =
+                                        venda.tipoDocFiscal === 'NFE' ? 'DANFE' : 'DANFCE'
+
+                                      // Verificar se o PDF fiscal está disponível antes de abrir
+                                      try {
+                                        const response = await fetch(url)
+
+                                        if (response.ok) {
+                                          // Verificar se é realmente um PDF
+                                          const contentType = response.headers.get('content-type')
+                                          if (contentType?.includes('application/pdf')) {
+                                            // PDF fiscal disponível, abrir normalmente
+                                            window.open(url, '_blank')
+                                          } else {
+                                            // Resposta inesperada
+                                            const errorData = await response
+                                              .json()
+                                              .catch(() => ({}))
+                                            alert(
+                                              errorData.error ||
+                                                `Erro ao buscar ${documentoLabel}. Tente novamente mais tarde.`
+                                            )
+                                          }
+                                        } else if (response.status === 404) {
+                                          // PDF fiscal ainda não foi gerado
+                                          const errorData = await response.json().catch(() => ({}))
+                                          const errorMessage =
+                                            errorData.error ||
+                                            `O ${documentoLabel} ainda não foi gerado.`
+
+                                          // Oferecer opção de regenerar ou aguardar
+                                          const opcao = confirm(
+                                            `${errorMessage}\n\n` +
+                                              `Escolha uma opção:\n` +
+                                              `OK = Regenerar ${documentoLabel} agora\n` +
+                                              `Cancelar = Aguardar e tentar novamente automaticamente`
+                                          )
+
+                                          if (opcao) {
+                                            // Regenerar PDF fiscal via Next.js API route (proxy)
+                                            try {
+                                              const regenerarUrl = `/api/nfe/${venda.documentoFiscalId}/regenerar`
+
+                                              const regenerarResponse = await fetch(regenerarUrl, {
+                                                method: 'POST',
+                                                headers: {
+                                                  'Content-Type': 'application/json',
+                                                },
+                                              })
+
+                                              if (regenerarResponse.ok) {
+                                                const regenerarData = await regenerarResponse.json()
+                                                alert(
+                                                  `✅ ${regenerarData.mensagem || `Geração de ${documentoLabel} iniciada. Aguarde alguns segundos e tente novamente.`}`
+                                                )
+
+                                                // Aguardar 5 segundos e tentar abrir
+                                                setTimeout(async () => {
+                                                  let tentativas = 0
+                                                  const maxTentativas = 6 // 30 segundos no total (6 x 5s)
+
+                                                  const verificarPdfFiscal = async () => {
+                                                    tentativas++
+                                                    try {
+                                                      const retryResponse = await fetch(url)
+                                                      if (retryResponse.ok) {
+                                                        const contentType =
+                                                          retryResponse.headers.get('content-type')
+                                                        if (
+                                                          contentType?.includes('application/pdf')
+                                                        ) {
+                                                          window.open(url, '_blank')
+                                                          return
+                                                        }
+                                                      }
+
+                                                      if (tentativas < maxTentativas) {
+                                                        setTimeout(verificarPdfFiscal, 5000) // Tentar novamente em 5 segundos
+                                                      } else {
+                                                        alert(
+                                                          `O ${documentoLabel} ainda não foi gerado após 30 segundos. Por favor, tente novamente mais tarde.`
+                                                        )
+                                                      }
+                                                    } catch {
+                                                      if (tentativas < maxTentativas) {
+                                                        setTimeout(verificarPdfFiscal, 5000)
+                                                      }
                                                     }
                                                   }
-                                                  
-                                                  if (tentativas < maxTentativas) {
-                                                    setTimeout(verificarPdfFiscal, 5000) // Tentar novamente em 5 segundos
-                                                  } else {
-                                                    alert(`O ${documentoLabel} ainda não foi gerado após 30 segundos. Por favor, tente novamente mais tarde.`)
-                                                  }
-                                                } catch {
-                                                  if (tentativas < maxTentativas) {
-                                                    setTimeout(verificarPdfFiscal, 5000)
+
+                                                  setTimeout(verificarPdfFiscal, 5000)
+                                                }, 5000)
+                                              } else {
+                                                const errorRegenerar = await regenerarResponse
+                                                  .json()
+                                                  .catch(() => ({}))
+                                                alert(
+                                                  `Erro ao regenerar ${documentoLabel}: ${errorRegenerar.error || errorRegenerar.message || 'Erro desconhecido'}`
+                                                )
+                                              }
+                                            } catch (error) {
+                                              console.error(
+                                                `Erro ao regenerar ${documentoLabel}:`,
+                                                error
+                                              )
+                                              alert(
+                                                `Erro ao regenerar ${documentoLabel}. Tente novamente mais tarde.`
+                                              )
+                                            }
+                                          } else {
+                                            // Aguardar e tentar novamente automaticamente
+                                            let tentativas = 0
+                                            const maxTentativas = 6 // 30 segundos no total (6 x 5s)
+
+                                            const verificarPdfFiscal = async () => {
+                                              tentativas++
+                                              try {
+                                                const retryResponse = await fetch(url)
+                                                if (retryResponse.ok) {
+                                                  const contentType =
+                                                    retryResponse.headers.get('content-type')
+                                                  if (contentType?.includes('application/pdf')) {
+                                                    window.open(url, '_blank')
+                                                    return
                                                   }
                                                 }
-                                              }
-                                              
-                                              setTimeout(verificarPdfFiscal, 5000)
-                                            }, 5000)
-                                          } else {
-                                            const errorRegenerar = await regenerarResponse.json().catch(() => ({}))
-                                            alert(`Erro ao regenerar ${documentoLabel}: ${errorRegenerar.error || errorRegenerar.message || 'Erro desconhecido'}`)
-                                          }
-                                        } catch (error) {
-                                          console.error(`Erro ao regenerar ${documentoLabel}:`, error)
-                                          alert(`Erro ao regenerar ${documentoLabel}. Tente novamente mais tarde.`)
-                                        }
-                                      } else {
-                                        // Aguardar e tentar novamente automaticamente
-                                        let tentativas = 0
-                                        const maxTentativas = 6 // 30 segundos no total (6 x 5s)
-                                        
-                                        const verificarPdfFiscal = async () => {
-                                          tentativas++
-                                          try {
-                                            const retryResponse = await fetch(url)
-                                            if (retryResponse.ok) {
-                                              const contentType = retryResponse.headers.get('content-type')
-                                              if (contentType?.includes('application/pdf')) {
-                                                window.open(url, '_blank')
-                                                return
+
+                                                if (tentativas < maxTentativas) {
+                                                  setTimeout(verificarPdfFiscal, 5000) // Tentar novamente em 5 segundos
+                                                } else {
+                                                  alert(
+                                                    `O ${documentoLabel} ainda não foi gerado após 30 segundos. Por favor, tente novamente mais tarde.`
+                                                  )
+                                                }
+                                              } catch {
+                                                if (tentativas < maxTentativas) {
+                                                  setTimeout(verificarPdfFiscal, 5000)
+                                                }
                                               }
                                             }
-                                            
-                                            if (tentativas < maxTentativas) {
-                                              setTimeout(verificarPdfFiscal, 5000) // Tentar novamente em 5 segundos
-                                            } else {
-                                              alert(`O ${documentoLabel} ainda não foi gerado após 30 segundos. Por favor, tente novamente mais tarde.`)
-                                            }
-                                          } catch {
-                                            if (tentativas < maxTentativas) {
-                                              setTimeout(verificarPdfFiscal, 5000)
-                                            }
+
+                                            setTimeout(verificarPdfFiscal, 5000)
                                           }
+                                        } else {
+                                          // Outro erro
+                                          const errorData = await response.json().catch(() => ({}))
+                                          alert(
+                                            errorData.error ||
+                                              `Erro ao buscar ${documentoLabel}. Tente novamente mais tarde.`
+                                          )
                                         }
-                                        
-                                        setTimeout(verificarPdfFiscal, 5000)
+                                      } catch (error) {
+                                        // Erro de rede, tentar abrir mesmo assim
+                                        console.error(`Erro ao verificar ${documentoLabel}:`, error)
+                                        window.open(url, '_blank')
                                       }
-                                    } else {
-                                      // Outro erro
-                                      const errorData = await response.json().catch(() => ({}))
-                                      alert(errorData.error || `Erro ao buscar ${documentoLabel}. Tente novamente mais tarde.`)
-                                    }
-                                  } catch (error) {
-                                    // Erro de rede, tentar abrir mesmo assim
-                                    console.error(`Erro ao verificar ${documentoLabel}:`, error)
-                                    window.open(url, '_blank')
-                                  }
-                                }}
-                              >
-                                Ver {venda.tipoDocFiscal === 'NFE' ? 'NFe' : 'NFCe'}
-                              </Button>
-                            )}
-                            
-                            {/* Botão de visualizar detalhes (primary) */}
-                            <Button
-                              size="sm"
-                              variant="text"
-                              onClick={() => handleViewDetails(venda)}
-                              className="px-2 !text-primary hover:!bg-primary/10 min-w-0"
-                              title="Ver detalhes"
-                            >
-                              <MdVisibility className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                        </DraggableVendaCard>
-                      )
-                    })
-                  )}
-                </DroppableColumnContent>
-              </div>
-            )
-          })}
-        </div>
-        <DragOverlay dropAnimation={null}>
-          {draggingVenda ? <VendaCardDragPreview venda={draggingVenda} /> : null}
-        </DragOverlay>
+                                    }}
+                                  >
+                                    Ver {venda.tipoDocFiscal === 'NFE' ? 'NFe' : 'NFCe'}
+                                  </Button>
+                                )}
+
+                                {/* Botão de visualizar detalhes (primary) */}
+                                <Button
+                                  size="sm"
+                                  variant="text"
+                                  onClick={() => handleViewDetails(venda)}
+                                  className="min-w-0 px-2 !text-primary hover:!bg-primary/10"
+                                  title="Ver detalhes"
+                                >
+                                  <MdVisibility className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </DraggableVendaCard>
+                        )
+                      })
+                    )}
+                  </DroppableColumnContent>
+                </div>
+              )
+            })}
+          </div>
+          <DragOverlay dropAnimation={null}>
+            {draggingVenda ? <VendaCardDragPreview venda={draggingVenda} /> : null}
+          </DragOverlay>
         </DndContext>
       </div>
 
@@ -1286,8 +1437,11 @@ export function FiscalFlowKanban() {
           }}
           vendaId={vendaSelecionadaParaEmissao.id}
           vendaNumero={vendaSelecionadaParaEmissao.numeroVenda?.toString()}
+          origemVenda={vendaSelecionadaParaEmissao.origemVenda}
+          codigoVenda={vendaSelecionadaParaEmissao.codigoVenda}
+          clienteId={vendaSelecionadaParaEmissao.clienteId}
+          clienteNome={vendaSelecionadaParaEmissao.clienteNome}
           tabelaOrigem={vendaSelecionadaParaEmissao.tabelaOrigem}
-          modeloInicial={vendaSelecionadaParaEmissao.modeloInicial ?? 65}
         />
       )}
 
@@ -1342,7 +1496,13 @@ export function FiscalFlowKanban() {
         dataInicial={periodoInicial}
         dataFinal={periodoFinal}
       />
+
+      <SeletorClienteModal
+        open={seletorClienteVendaOpen}
+        onClose={handleFecharSeletorClienteVenda}
+        onSelect={handleClienteSelecionadoParaVenda}
+        title="Vincular cliente à venda"
+      />
     </div>
   )
 }
-
