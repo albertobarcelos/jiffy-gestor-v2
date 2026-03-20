@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   DndContext,
   DragEndEvent,
@@ -37,6 +37,8 @@ interface KanbanColumn {
   color: string
   borderColor: string
   borderColorClass: string // Classe Tailwind para a cor da borda
+  /** Fundo do card: mesma família de cor da coluna, mais suave que o header */
+  cardBackgroundClass: string
   icon: React.ReactNode
   placeholder: string
 }
@@ -283,18 +285,32 @@ export function FiscalFlowKanban() {
   const dataFinalizacaoInicioISO = dataFinalizacaoInicio?.toISOString() ?? undefined
   const dataFinalizacaoFimISO = dataFinalizacaoFim ? new Date(dataFinalizacaoFim.getFullYear(), dataFinalizacaoFim.getMonth(), dataFinalizacaoFim.getDate(), 23, 59, 59, 999).toISOString() : undefined
 
+  // Parâmetros estáveis para o React Query (evita churn desnecessário na queryKey)
+  const vendasUnificadasQueryParams = useMemo(
+    () => ({
+      q: searchQuery || undefined,
+      origem: origemFilter || undefined,
+      statusFiscal: statusFiscalFilter || undefined,
+      periodoInicial: periodoInicialISO,
+      periodoFinal: periodoFinalISO,
+      dataFinalizacaoInicio: dataFinalizacaoInicioISO,
+      dataFinalizacaoFim: dataFinalizacaoFimISO,
+      offset: 0,
+      limit: 100,
+    }),
+    [
+      searchQuery,
+      origemFilter,
+      statusFiscalFilter,
+      periodoInicialISO,
+      periodoFinalISO,
+      dataFinalizacaoInicioISO,
+      dataFinalizacaoFimISO,
+    ]
+  )
+
   // Buscar vendas unificadas (PDV + Gestor) com filtros da API
-  const { data: vendasUnificadasData, isLoading, refetch } = useVendasUnificadas({
-    q: searchQuery || undefined,
-    origem: origemFilter || undefined,
-    statusFiscal: statusFiscalFilter || undefined,
-    periodoInicial: periodoInicialISO,
-    periodoFinal: periodoFinalISO,
-    dataFinalizacaoInicio: dataFinalizacaoInicioISO,
-    dataFinalizacaoFim: dataFinalizacaoFimISO,
-    offset: 0,
-    limit: 100,
-  })
+  const { data: vendasUnificadasData, isLoading, refetch } = useVendasUnificadas(vendasUnificadasQueryParams)
   
   const marcarEmissaoFiscal = useMarcarEmissaoFiscal()
   const desmarcarEmissaoFiscal = useDesmarcarEmissaoFiscal()
@@ -379,6 +395,7 @@ export function FiscalFlowKanban() {
       color: 'bg-primary/15',
       borderColor: 'border-gray-400',
       borderColorClass: 'border-l-primary',
+      cardBackgroundClass: 'bg-primary/10',
       icon: <MdReceipt className="w-4 h-4 text-gray-600" />,
       placeholder: 'Vendas finalizadas aguardando ação',
     },
@@ -388,15 +405,17 @@ export function FiscalFlowKanban() {
       color: 'bg-yellow-50',
       borderColor: 'border-yellow-400',
       borderColorClass: 'border-l-yellow-400',
+      cardBackgroundClass: 'bg-yellow-400/10',
       icon: <MdSchedule className="w-4 h-4 text-yellow-600" />,
       placeholder: 'Vendas aguardando emissão de NFe',
     },
     {
       id: 'COM_NFE',
-      title: 'Com NFe Emitida',
+      title: 'Com Nota Emitida',
       color: 'bg-green-50',
       borderColor: 'border-green-400',
       borderColorClass: 'border-l-green-400',
+      cardBackgroundClass: 'bg-green-400/10',
       icon: <MdCheckCircle className="w-4 h-4 text-green-600" />,
       placeholder: 'Vendas com nota fiscal emitida',
     },
@@ -489,9 +508,9 @@ export function FiscalFlowKanban() {
     }
   }
 
-  // Ao soltar: Finalizadas → Pendente Emissão = marcar para emissão; Pendente Emissão → Finalizadas = desmarcar
-  // Só chama desmarcar se a venda estava marcada para emissão (solicitarEmissaoFiscal === true), evitando
-  // chamar o endpoint quando o usuário apenas solta de volta na coluna Finalizadas sem ter mudado de coluna.
+  // Ao soltar: Finalizadas → Pendente Emissão = marcar; Pendente Emissão → Finalizadas = desmarcar
+  // - Só chama marcar se solicitarEmissaoFiscal ainda não é true (evita requisição ao reordenar em Pendente ou soltar de volta sem sair da coluna).
+  // - Só chama desmarcar se solicitarEmissaoFiscal é true (evita requisição ao soltar em Finalizadas sem ter vindo de Pendente).
   const handleDragEnd = (event: DragEndEvent) => {
     setDraggingVenda(null)
     const { active, over } = event
@@ -501,7 +520,9 @@ export function FiscalFlowKanban() {
     if (over.id === 'PENDENTE_EMISSAO') {
       setVendaRecemMovidaParaPendenteId(venda.id)
       persistirOrdemAoMover(venda.id, 'PENDENTE_EMISSAO')
-      handleMarcarEmissaoFiscal(venda.id, venda.tabelaOrigem)
+      if (venda.solicitarEmissaoFiscal !== true) {
+        handleMarcarEmissaoFiscal(venda.id, venda.tabelaOrigem)
+      }
     } else if (over.id === 'FINALIZADAS' && venda.solicitarEmissaoFiscal === true) {
       setVendaRecemMovidaParaFinalizadasId(venda.id)
       persistirOrdemAoMover(venda.id, 'FINALIZADAS')
@@ -738,7 +759,7 @@ export function FiscalFlowKanban() {
             </button>
             <button
               onClick={() => setNovoPedidoModalOpen(true)}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-primary rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1.5"
             >
               <MdAdd className="w-4 h-4" />
               Novo Pedido
@@ -765,7 +786,7 @@ export function FiscalFlowKanban() {
                 <MenuItem value="">Todos</MenuItem>
                 <MenuItem value="PDV">PDV</MenuItem>
                 <MenuItem value="GESTOR">Gestor</MenuItem>
-                <MenuItem value="DELIVERY">Delivery</MenuItem>
+                {/* <MenuItem value="DELIVERY">Delivery</MenuItem> */}
               </Select>
             </FormControl>
           </div>
@@ -931,7 +952,7 @@ export function FiscalFlowKanban() {
                       return (
                         <DraggableVendaCard key={venda.id} venda={venda} column={column}>
                         <div
-                          className={`bg-white rounded-lg border-l-4 ${column.borderColorClass} border border-gray-200 p-3 hover:shadow-md transition-all relative cursor-pointer`}
+                          className={`rounded-lg border-l-4 ${column.borderColorClass} ${column.cardBackgroundClass} border border-gray-200/80 p-3 hover:shadow-md transition-all relative cursor-pointer`}
                           onClick={() => handleViewDetails(venda)}
                         >
                           {/* Menu de três pontos no canto superior direito */}
@@ -995,12 +1016,11 @@ export function FiscalFlowKanban() {
                               <div className="flex-shrink-0 flex items-center justify-center">
                                 <TipoVendaIcon
                                   tipoVenda={tipoVendaExibicao as 'balcao' | 'mesa'}
-                                  numeroMesa={undefined}
+                                  numeroMesa="M"
                                   size={64}
                                   containerScale={0.9}
-                                  title={formatarTipoVenda(tipoVendaExibicao)}
                                   corPrincipal="var(--color-primary)"
-                                  corTexto="var(--color-primary)"
+                                  corTexto="var(--color-info)"
                                   corBalcao="var(--color-primary)"
                                   corBorda="var(--color-primary)"
                                 />
@@ -1040,6 +1060,7 @@ export function FiscalFlowKanban() {
                                 size="sm"
                                 variant="outlined"
                                 className="flex-1 !border-primary !text-primary hover:!bg-primary/5"
+                                sx={{ py: 0.375, px: 1, minHeight: 'auto' }}
                                 onClick={() => handleMarcarEmissaoFiscal(venda.id, venda.tabelaOrigem)}
                                 isLoading={marcarEmissaoFiscal.isPending}
                               >
@@ -1052,6 +1073,7 @@ export function FiscalFlowKanban() {
                                 size="sm"
                                 variant="contained"
                                 className="flex-1 !bg-primary hover:!bg-primary/90"
+                                sx={{ py: 0.375, px: 1, minHeight: 'auto' }}
                                 onClick={() => handleEmitirNfe(venda)}
                                 disabled={
                                   !!acaoFiscalEmAndamentoPorVenda[venda.id] ||
@@ -1082,7 +1104,7 @@ export function FiscalFlowKanban() {
                                   ) {
                                     return 'Aguardando...'
                                   }
-                                  return `Emitir ${documentoLabel}`
+                                  return `Emitir Nota`
                                 })()}
                               </Button>
                             )}

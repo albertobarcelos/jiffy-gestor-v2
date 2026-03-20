@@ -200,22 +200,23 @@ export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
         staleTime: 1000 * 30, // 30 segundos
         refetchOnWindowFocus: true,
         refetchOnReconnect: true,
+        // Polling só enquanto houver nota em processamento na SEFAZ. Não incluir PENDENTE / PENDENTE_EMISSAO:
+        // esses estados podem ficar dias até o usuário emitir e geravam GET a cada 5s indefinidamente.
         refetchInterval: query => {
             const data = query.state.data
             if (!data?.items?.length) return false
 
-            const temEmissaoEmAndamento = data.items.some(venda => {
+            const temProcessamentoSefazEmAndamento = data.items.some(venda => {
                 const status = venda.statusFiscal?.toUpperCase()
                 return (
-                    status === 'PENDENTE' ||
-                    status === 'PENDENTE_EMISSAO' ||
                     status === 'EMITINDO' ||
                     status === 'PENDENTE_AUTORIZACAO' ||
                     status === 'CONTINGENCIA'
                 )
             })
 
-            return temEmissaoEmAndamento ? 5000 : false
+            return temProcessamentoSefazEmAndamento ? 5000 : false
         },
+        refetchIntervalInBackground: false,
     })
 }

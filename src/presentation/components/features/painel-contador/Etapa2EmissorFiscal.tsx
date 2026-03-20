@@ -667,7 +667,6 @@ export function Etapa3EmissorFiscal() {
                   onChange={e => handleChangeNfeAmbiente(e.target.value as AmbienteFiscal | '')}
                   className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 >
-                  <option value="">Selecione</option>
                   <option value="HOMOLOGACAO">Homologacao</option>
                   <option value="PRODUCAO">Producao</option>
                 </select>
@@ -763,7 +762,6 @@ export function Etapa3EmissorFiscal() {
                   onChange={e => handleChangeNfceAmbiente(e.target.value as AmbienteFiscal | '')}
                   className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 >
-                  <option value="">Selecione</option>
                   <option value="HOMOLOGACAO">Homologacao</option>
                   <option value="PRODUCAO">Producao</option>
                 </select>
