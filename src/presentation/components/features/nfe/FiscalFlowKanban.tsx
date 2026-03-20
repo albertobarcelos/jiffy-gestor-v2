@@ -47,7 +47,6 @@ import { Cliente } from '@/src/domain/entities/Cliente'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Badge } from '@/src/presentation/components/ui/badge'
 import { StatusFiscalBadge } from './StatusFiscalBadge'
-import { DetalhesVendas } from '@/src/presentation/components/features/vendas/DetalhesVendas'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 import { NovoPedidoModal } from './NovoPedidoModal'
 import { EscolheDatasModal } from '@/src/presentation/components/features/vendas/EscolheDatasModal'
@@ -255,11 +254,6 @@ export function FiscalFlowKanban() {
     clienteNome?: string | null
   } | null>(null)
   const [emitirNfeModalOpen, setEmitirNfeModalOpen] = useState(false)
-  const [detalhesVendaModalOpen, setDetalhesVendaModalOpen] = useState(false)
-  const [vendaSelecionadaParaDetalhes, setVendaSelecionadaParaDetalhes] = useState<{
-    id: string
-    tabelaOrigem: 'venda' | 'venda_gestor'
-  } | null>(null)
   // Estados dos filtros (alinhados à API GET /vendas/unificado)
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -283,7 +277,12 @@ export function FiscalFlowKanban() {
 
   const [novoPedidoModalOpen, setNovoPedidoModalOpen] = useState(false)
   const [novoPedidoModalVisualizacaoOpen, setNovoPedidoModalVisualizacaoOpen] = useState(false)
-  const [vendaIdParaVisualizacao, setVendaIdParaVisualizacao] = useState<string | null>(null)
+  /** Venda aberta no modal de detalhes (step 4): id, tabela e statusFiscal do unificado (PDV não repete no GET detalhe) */
+  const [pedidoVisualizacaoContext, setPedidoVisualizacaoContext] = useState<{
+    id: string
+    tabelaOrigem: 'venda' | 'venda_gestor'
+    statusFiscal: Venda['statusFiscal']
+  } | null>(null)
   const [menuAcoesVendaIdAberto, setMenuAcoesVendaIdAberto] = useState<string | null>(null)
   const [acaoFiscalEmAndamentoPorVenda, setAcaoFiscalEmAndamentoPorVenda] = useState<
     Record<string, 'emitindo' | 'reemitindo'>
@@ -669,18 +668,12 @@ export function FiscalFlowKanban() {
   const handleViewDetails = (venda: Venda) => {
     setMenuAcoesVendaIdAberto(null)
 
-    // Se for venda_gestor, abrir NovoPedidoModal na step 4
-    if (venda.tabelaOrigem === 'venda_gestor') {
-      setVendaIdParaVisualizacao(venda.id)
-      setNovoPedidoModalVisualizacaoOpen(true)
-    } else {
-      // Para vendas do PDV, manter DetalhesVendas
-      setVendaSelecionadaParaDetalhes({
-        id: venda.id,
-        tabelaOrigem: venda.tabelaOrigem,
-      })
-      setDetalhesVendaModalOpen(true)
-    }
+    setPedidoVisualizacaoContext({
+      id: venda.id,
+      tabelaOrigem: venda.tabelaOrigem,
+      statusFiscal: venda.statusFiscal,
+    })
+    setNovoPedidoModalVisualizacaoOpen(true)
   }
 
   const toggleMenuAcoes = (vendaId: string) => {
@@ -1445,19 +1438,6 @@ export function FiscalFlowKanban() {
         />
       )}
 
-      {/* Modal de Detalhes da Venda */}
-      {vendaSelecionadaParaDetalhes && (
-        <DetalhesVendas
-          vendaId={vendaSelecionadaParaDetalhes.id}
-          tabelaOrigem={vendaSelecionadaParaDetalhes.tabelaOrigem}
-          open={detalhesVendaModalOpen}
-          onClose={() => {
-            setDetalhesVendaModalOpen(false)
-            setVendaSelecionadaParaDetalhes(null)
-          }}
-        />
-      )}
-
       {/* Modal de Novo Pedido */}
       <NovoPedidoModal
         open={novoPedidoModalOpen}
@@ -1471,19 +1451,21 @@ export function FiscalFlowKanban() {
       />
 
       {/* Modal de Novo Pedido em Modo Visualização (Step 4) */}
-      {vendaIdParaVisualizacao && (
+      {pedidoVisualizacaoContext && (
         <NovoPedidoModal
           open={novoPedidoModalVisualizacaoOpen}
           onClose={() => {
             setNovoPedidoModalVisualizacaoOpen(false)
-            setVendaIdParaVisualizacao(null)
+            setPedidoVisualizacaoContext(null)
           }}
           onSuccess={() => {
             setNovoPedidoModalVisualizacaoOpen(false)
-            setVendaIdParaVisualizacao(null)
+            setPedidoVisualizacaoContext(null)
             refetch()
           }}
-          vendaId={vendaIdParaVisualizacao}
+          vendaId={pedidoVisualizacaoContext.id}
+          tabelaOrigemVenda={pedidoVisualizacaoContext.tabelaOrigem}
+          statusFiscalUnificado={pedidoVisualizacaoContext.statusFiscal}
           modoVisualizacao={true}
         />
       )}

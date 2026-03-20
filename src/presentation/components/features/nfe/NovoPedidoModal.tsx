@@ -61,8 +61,28 @@ interface NovoPedidoModalProps {
   onClose: () => void
   onSuccess: () => void
   // Props opcionais para visualizar venda existente
-  vendaId?: string // ID da venda_gestor para carregar e visualizar
+  vendaId?: string // ID da venda para carregar e visualizar
   modoVisualizacao?: boolean // Se true, abre direto na step 4 em modo apenas visualização
+  /** GET gestor vs PDV (`/api/vendas/gestor/:id` vs `/api/vendas/:id`); com `incluirFiscal=true` no carregamento */
+  tabelaOrigemVenda?: 'venda' | 'venda_gestor'
+  /**
+   * `statusFiscal` do GET vendas unificado (Kanban). No PDV o GET de detalhe não repete esse campo;
+   * use-o para saber se a nota está EMITIDA antes/sem depender só do `resumoFiscal`.
+   */
+  statusFiscalUnificado?: string | null
+}
+
+/** Trecho retornado pela API quando `incluirFiscal=true` */
+interface ResumoFiscalVenda {
+  status?: string | null
+  numero?: number | null
+  retornoSefaz?: string | null
+  serie?: string | null
+  dataEmissao?: string | null
+  modelo?: number | null
+  chaveFiscal?: string | null
+  dataCriacao?: string | null
+  dataUltimaModificacao?: string | null
 }
 
 interface ComplementoSelecionado {
@@ -95,12 +115,34 @@ interface PagamentoSelecionado {
 type OrigemVenda = 'GESTOR' | 'IFOOD' | 'RAPPI' | 'OUTROS'
 type StatusVenda = 'ABERTA' | 'FINALIZADA' | 'PENDENTE_EMISSAO'
 
+/** Abas em Detalhes do Pedido (modo visualização — venda finalizada) */
+type AbaDetalhesPedido = 'dadosPedido' | 'notaFiscal'
+
+/**
+ * Texto do campo Origem no painel de detalhes (abas Dados / contexto visualização).
+ * O GET de detalhe do PDV não retorna `origem`; nesse caso a venda é tratada como PDV.
+ */
+function rotuloOrigemParaExibicao(origemBrutaApi: string | null): string {
+  if (origemBrutaApi == null || String(origemBrutaApi).trim() === '') {
+    return 'PDV'
+  }
+  const o = String(origemBrutaApi).trim().toUpperCase()
+  if (o === 'GESTOR') return 'Gestor'
+  if (o === 'PDV') return 'PDV'
+  if (o === 'IFOOD' || o === 'DELIVERY_IFOOD') return 'iFood'
+  if (o === 'RAPPI' || o === 'DELIVERY_UBER') return 'Rappi'
+  if (o === 'OUTROS') return 'Outros'
+  return String(origemBrutaApi).trim()
+}
+
 export function NovoPedidoModal({
   open,
   onClose,
   onSuccess,
   vendaId,
   modoVisualizacao,
+  tabelaOrigemVenda = 'venda_gestor',
+  statusFiscalUnificado = null,
 }: NovoPedidoModalProps) {
   const { auth } = useAuthStore()
   const createVendaGestor = useCreateVendaGestor()
@@ -133,6 +175,50 @@ export function NovoPedidoModal({
   const [vendaGestorJaCancelada, setVendaGestorJaCancelada] = useState(false)
   const [modalCancelarVendaOpen, setModalCancelarVendaOpen] = useState(false)
   const [justificativaCancelamento, setJustificativaCancelamento] = useState('')
+  const [abaDetalhesPedido, setAbaDetalhesPedido] = useState<AbaDetalhesPedido>('dadosPedido')
+  const [resumoFiscal, setResumoFiscal] = useState<ResumoFiscalVenda | null>(null)
+  /** Texto bruto de `origem` no GET de detalhe (GESTOR/PDV/…); PDV muitas vezes omite o campo */
+  const [origemTextoApiDetalhe, setOrigemTextoApiDetalhe] = useState<string | null>(null)
+  /** Texto bruto de `statusVenda` no GET de detalhe (Gestor pode vir null) */
+  const [statusVendaTextoApiDetalhe, setStatusVendaTextoApiDetalhe] = useState<string | null>(null)
+
+  /**
+   * Aba Nota Fiscal só para nota emitida e origem coerente:
+   * - PDV (`tabelaOrigem`): lista unificada traz `statusFiscal`; detalhe não traz `origem`.
+   * - Gestor: detalhe traz `origem: GESTOR`; `statusVenda` pode ser null — usar `resumoFiscal.status` ou `statusFiscal` unificado.
+   */
+  const podeExibirAbaNotaFiscal = useMemo(() => {
+    if (!modoVisualizacao) return false
+
+    const notaEmitida =
+      statusFiscalUnificado === 'EMITIDA' ||
+      resumoFiscal?.status === 'EMITIDA' ||
+      statusVendaTextoApiDetalhe === 'EMITIDA'
+
+    if (!notaEmitida) return false
+
+    if (tabelaOrigemVenda === 'venda') {
+      return true
+    }
+
+    if (origemTextoApiDetalhe === 'GESTOR') return true
+    if (origemTextoApiDetalhe === 'PDV') return false
+    if (origemTextoApiDetalhe != null && origemTextoApiDetalhe !== 'GESTOR') return false
+    return statusFiscalUnificado === 'EMITIDA' || resumoFiscal?.status === 'EMITIDA'
+  }, [
+    modoVisualizacao,
+    tabelaOrigemVenda,
+    statusFiscalUnificado,
+    resumoFiscal?.status,
+    statusVendaTextoApiDetalhe,
+    origemTextoApiDetalhe,
+  ])
+
+  useEffect(() => {
+    if (modoVisualizacao && abaDetalhesPedido === 'notaFiscal' && !podeExibirAbaNotaFiscal) {
+      setAbaDetalhesPedido('dadosPedido')
+    }
+  }, [modoVisualizacao, abaDetalhesPedido, podeExibirAbaNotaFiscal])
 
   // Estado para controlar valores em edição (índice do produto ou chave do complemento -> valor string)
   const [valoresEmEdicao, setValoresEmEdicao] = useState<Record<string | number, string>>({})
@@ -611,12 +697,38 @@ export function NovoPedidoModal({
   // Passo 4: exibir cancelamento só para venda gestor carregada, finalizada e não cancelada
   const podeExibirCancelarVendaGestor = useMemo(
     () =>
+      tabelaOrigemVenda === 'venda_gestor' &&
       Boolean(vendaId) &&
       Boolean(dataFinalizacaoCarregada) &&
       !vendaGestorJaCancelada &&
       currentStep === 4,
-    [vendaId, dataFinalizacaoCarregada, vendaGestorJaCancelada, currentStep]
+    [tabelaOrigemVenda, vendaId, dataFinalizacaoCarregada, vendaGestorJaCancelada, currentStep]
   )
+
+  /** Datas do resumo fiscal (API ISO) */
+  const formatarDataHoraResumoFiscal = (valor: string | null | undefined): string => {
+    if (valor == null || String(valor).trim() === '') return '—'
+    try {
+      const d = new Date(valor)
+      if (Number.isNaN(d.getTime())) return String(valor)
+      return d.toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    } catch {
+      return String(valor)
+    }
+  }
+
+  const rotuloModeloNfe = (modelo: number | null | undefined): string => {
+    if (modelo === 55) return '55 (NF-e)'
+    if (modelo === 65) return '65 (NFC-e)'
+    if (modelo == null || modelo === undefined) return '—'
+    return String(modelo)
+  }
 
   // Função para obter ícone do meio de pagamento
   const obterIconeMeioPagamento = (nome: string) => {
@@ -1204,6 +1316,10 @@ export function NovoPedidoModal({
     setVendaGestorJaCancelada(false)
     setModalCancelarVendaOpen(false)
     setJustificativaCancelamento('')
+    setAbaDetalhesPedido('dadosPedido')
+    setResumoFiscal(null)
+    setOrigemTextoApiDetalhe(null)
+    setStatusVendaTextoApiDetalhe(null)
 
     // Limpar timeouts de long press de complementos
     if (longPressComplementoTimeoutRef.current) {
@@ -1297,10 +1413,16 @@ export function NovoPedidoModal({
     }
 
     setIsLoadingVenda(true)
+    setOrigemTextoApiDetalhe(null)
+    setStatusVendaTextoApiDetalhe(null)
 
     try {
-      // Buscar dados da venda_gestor
-      const response = await fetch(`/api/vendas/gestor/${vendaId}`, {
+      const urlVenda =
+        tabelaOrigemVenda === 'venda'
+          ? `/api/vendas/${vendaId}?incluirFiscal=true`
+          : `/api/vendas/gestor/${vendaId}?incluirFiscal=true`
+
+      const response = await fetch(urlVenda, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -1314,13 +1436,22 @@ export function NovoPedidoModal({
 
       const vendaData = await response.json()
 
-      // Debug: verificar estrutura dos dados retornados
-      console.log('📦 Dados da venda carregados:', {
-        produtosLancados: vendaData.produtosLancados,
-        produtos: vendaData.produtos,
-        produtosLancadosLength: vendaData.produtosLancados?.length,
-        produtosLength: vendaData.produtos?.length,
-      })
+      if (vendaData.resumoFiscal && typeof vendaData.resumoFiscal === 'object') {
+        setResumoFiscal(vendaData.resumoFiscal as ResumoFiscalVenda)
+      } else {
+        setResumoFiscal(null)
+      }
+
+      setOrigemTextoApiDetalhe(
+        vendaData.origem !== undefined && vendaData.origem !== null
+          ? String(vendaData.origem)
+          : null
+      )
+      setStatusVendaTextoApiDetalhe(
+        vendaData.statusVenda !== undefined && vendaData.statusVenda !== null
+          ? String(vendaData.statusVenda)
+          : null
+      )
 
       // Mapear dados da venda para os estados do componente
       // Origem
@@ -1557,7 +1688,7 @@ export function NovoPedidoModal({
     } finally {
       setIsLoadingVenda(false)
     }
-  }, [vendaId, open, auth, modoVisualizacao, onClose])
+  }, [vendaId, open, auth, modoVisualizacao, onClose, tabelaOrigemVenda])
 
   // Sincroniza o estado interno com o prop open
   useEffect(() => {
@@ -1587,6 +1718,10 @@ export function NovoPedidoModal({
       if (!modoVisualizacao) {
         setCurrentStep(1)
       }
+      setAbaDetalhesPedido('dadosPedido')
+      setResumoFiscal(null)
+      setOrigemTextoApiDetalhe(null)
+      setStatusVendaTextoApiDetalhe(null)
     }
   }, [open, vendaId, modoVisualizacao, carregarVendaExistente])
 
@@ -1812,6 +1947,46 @@ export function NovoPedidoModal({
                 </div>
               )}
             </div>
+
+            {/* Abas: Detalhes do Pedido (modo visualização, após carregar venda) */}
+            {modoVisualizacao && currentStep === 4 && !isLoadingVenda && (
+              <div
+                className="mt-3 flex gap-1 border-b border-gray-200"
+                role="tablist"
+                aria-label="Seções dos detalhes do pedido"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={abaDetalhesPedido === 'dadosPedido'}
+                  id="tab-detalhes-dados-pedido"
+                  onClick={() => setAbaDetalhesPedido('dadosPedido')}
+                  className={`font-nunito -mb-px border-b-2 px-4 py-2 text-sm font-semibold transition-colors ${
+                    abaDetalhesPedido === 'dadosPedido'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-gray-500 hover:text-gray-800'
+                  }`}
+                >
+                  Dados do Pedido
+                </button>
+                {podeExibirAbaNotaFiscal && (
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={abaDetalhesPedido === 'notaFiscal'}
+                    id="tab-detalhes-nota-fiscal"
+                    onClick={() => setAbaDetalhesPedido('notaFiscal')}
+                    className={`font-nunito -mb-px border-b-2 px-4 py-2 text-sm font-semibold transition-colors ${
+                      abaDetalhesPedido === 'notaFiscal'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-gray-500 hover:text-gray-800'
+                    }`}
+                  >
+                    Nota Fiscal
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Detalhes do Pedido (venda existente): sem stepper no passo 4. Novo pedido: mantém stepper em todos os passos */}
             {!(modoVisualizacao && currentStep === 4) && (
@@ -2839,10 +3014,112 @@ export function NovoPedidoModal({
               </div>
             )}
 
-            {/* STEP 4: Detalhes da Venda (Apenas Visualização) */}
+            {/* STEP 4: Detalhes da Venda (visualização ou após criar pedido) */}
             {currentStep === 4 && !isLoadingVenda && (
               <div className="space-y-4 py-2">
-                <>
+                {modoVisualizacao &&
+                abaDetalhesPedido === 'notaFiscal' &&
+                podeExibirAbaNotaFiscal ? (
+                  <div
+                    className="space-y-3"
+                    role="tabpanel"
+                    aria-labelledby="tab-detalhes-nota-fiscal"
+                  >
+                    <div className="rounded-lg border-2 border-primary/20 bg-gray-50/90 px-4 py-3">
+                      <h3 className="font-nunito text-lg font-semibold text-primary">
+                        Resumo da nota fiscal
+                      </h3>
+                      <p className="font-nunito mt-1 text-xs text-gray-500">
+                        Dados retornados pela API com{' '}
+                        <code className="rounded bg-gray-200 px-1 py-0.5 text-[11px]">
+                          incluirFiscal=true
+                        </code>
+                        .
+                      </p>
+                    </div>
+
+                    {!resumoFiscal ? (
+                      <div className="rounded-lg border border-dashed border-amber-300/80 bg-amber-50/90 px-6 py-10 text-center">
+                        <p className="font-nunito text-sm leading-relaxed text-amber-950/90">
+                          Nenhum resumo fiscal disponível para esta venda. Isso pode ocorrer se ainda
+                          não houver nota emitida ou se o backend não retornou o objeto{' '}
+                          <span className="font-semibold">resumoFiscal</span>.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+                        <div className="divide-y divide-gray-100">
+                          {(
+                            [
+                              {
+                                label: 'Status',
+                                value: resumoFiscal.status ?? '—',
+                              },
+                              {
+                                label: 'Número',
+                                value:
+                                  resumoFiscal.numero != null ? String(resumoFiscal.numero) : '—',
+                              },
+                              {
+                                label: 'Retorno SEFAZ',
+                                value: resumoFiscal.retornoSefaz ?? '—',
+                                multiline: true,
+                              },
+                              {
+                                label: 'Série',
+                                value: resumoFiscal.serie ?? '—',
+                              },
+                              {
+                                label: 'Data de emissão',
+                                value: formatarDataHoraResumoFiscal(resumoFiscal.dataEmissao),
+                              },
+                              {
+                                label: 'Modelo',
+                                value: rotuloModeloNfe(resumoFiscal.modelo ?? null),
+                              },
+                              {
+                                label: 'Chave fiscal',
+                                value: resumoFiscal.chaveFiscal ?? '—',
+                                monospace: true,
+                              },
+                              {
+                                label: 'Data de criação',
+                                value: formatarDataHoraResumoFiscal(resumoFiscal.dataCriacao),
+                              },
+                              {
+                                label: 'Última modificação',
+                                value: formatarDataHoraResumoFiscal(
+                                  resumoFiscal.dataUltimaModificacao
+                                ),
+                              },
+                            ] as const
+                          ).map((row, idx) => (
+                            <div
+                              key={row.label}
+                              className={`flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 ${
+                                idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/80'
+                              }`}
+                            >
+                              <span className="shrink-0 text-xs font-semibold text-gray-600 sm:text-sm">
+                                {row.label}
+                              </span>
+                              <span
+                                className={`font-nunito break-words text-right text-sm text-gray-900 sm:max-w-[min(100%,28rem)] sm:text-left ${
+                                  'monospace' in row && row.monospace ? 'font-mono text-xs' : ''
+                                } ${
+                                  'multiline' in row && row.multiline ? 'whitespace-pre-wrap' : ''
+                                }`}
+                              >
+                                {row.value}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <>
                   {/* Informações do Pedido */}
                   <div className="rounded-lg border bg-gray-50 px-4">
                     <h3 className="text-lg font-semibold">Informações do Pedido</h3>
@@ -2861,7 +3138,9 @@ export function NovoPedidoModal({
                       </div>
                       <div className="flex justify-between px-1">
                         <span className="text-gray-600">Origem:</span>
-                        <span className="font-medium">{origem}</span>
+                        <span className="font-medium">
+                          {rotuloOrigemParaExibicao(origemTextoApiDetalhe)}
+                        </span>
                       </div>
                       <div className="flex justify-between rounded-lg bg-white px-1">
                         <span className="text-gray-600">Status:</span>
@@ -3084,7 +3363,8 @@ export function NovoPedidoModal({
                         </div>
                       </div>
                     )}
-                </>
+                  </>
+                )}
               </div>
             )}
           </div>

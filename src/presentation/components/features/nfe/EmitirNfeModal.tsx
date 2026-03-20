@@ -23,7 +23,7 @@ interface EmitirNfeModalProps {
   codigoVenda?: string
   /** Nome do cliente para exibição */
   clienteNome?: string | null
-  /** ID do cliente vinculado — NFC-e exige cliente cadastrado */
+  /** ID do cliente vinculado — NF-e (modelo 55) exige cliente cadastrado */
   clienteId?: string | null
   tabelaOrigem?: 'venda' | 'venda_gestor'
 }
@@ -57,9 +57,9 @@ export function EmitirNfeModal({
     async (modelo: 55 | 65) => {
       if (emissaoEmProcessamento || emitirNfe.isPending) return
 
-      if (modelo === 65 && !temClienteCadastrado) {
+      if (modelo === 55 && !temClienteCadastrado) {
         showToast.error(
-          'Para emitir NFC-e é obrigatório que a venda tenha um cliente cadastrado. Associe um cliente à venda e tente novamente.'
+          'Para emitir NF-e (modelo 55) é obrigatório que a venda tenha um cliente cadastrado. Associe um cliente à venda e tente novamente.'
         )
         return
       }
@@ -108,8 +108,8 @@ export function EmitirNfeModal({
             </button>
         </div>
 
-        <div className="space-y-4">
-          <div className="rounded-lg border border-gray-200 bg-gray-50/80 px-4 py-3 text-sm">
+        <div className="space-y-2">
+          <div className="rounded-lg border border-gray-200 bg-gray-50/80 px-4 py-2 text-sm">
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-gray-800">
               {vendaNumero != null && vendaNumero !== '' && (
                 <span>
@@ -134,13 +134,13 @@ export function EmitirNfeModal({
 
           {!temClienteCadastrado && (
             <div
-              className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+              className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-950"
               role="alert"
             >
-              <p className="font-semibold text-amber-900">NFC-e e cliente obrigatório</p>
+              <p className="font-semibold text-amber-900">NF-e não pode ser emitida.</p>
               <p className="mt-1 leading-relaxed">
-                O modelo <strong>NFC-e</strong> (Nota Fiscal de Consumidor Eletrônica) exige que a
-                venda possua um <strong>cliente vinculado</strong>.
+                O modelo <strong>NF-e</strong> exige que a venda
+                possua um <strong>cliente vinculado à venda</strong>. 
               </p>
             </div>
           )}
@@ -148,8 +148,13 @@ export function EmitirNfeModal({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <button
               type="button"
-              disabled={bloqueado}
+              disabled={bloqueado || !temClienteCadastrado}
               onClick={() => void emitirPorModelo(55)}
+              title={
+                !temClienteCadastrado
+                  ? 'Cadastre um cliente na venda para emitir NF-e'
+                  : 'Emitir NF-e'
+              }
               className="flex min-h-[160px] flex-col items-center justify-center rounded-xl border-2 border-primary bg-primary p-6 text-center shadow-sm transition-all hover:bg-primary/95 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <span className="text-3xl font-extrabold tracking-tight text-info sm:text-4xl">
@@ -165,13 +170,9 @@ export function EmitirNfeModal({
 
             <button
               type="button"
-              disabled={bloqueado || !temClienteCadastrado}
+              disabled={bloqueado}
               onClick={() => void emitirPorModelo(65)}
-              title={
-                !temClienteCadastrado
-                  ? 'Cadastre um cliente na venda para emitir NFC-e'
-                  : 'Emitir NFC-e'
-              }
+              title="Emitir NFC-e"
               className="flex min-h-[160px] flex-col items-center justify-center rounded-xl border-2 border-primary bg-white p-6 text-center shadow-sm transition-all hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <span className="text-3xl font-extrabold tracking-tight text-primary sm:text-4xl">
