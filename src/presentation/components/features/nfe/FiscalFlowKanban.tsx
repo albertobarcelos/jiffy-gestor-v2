@@ -1225,8 +1225,15 @@ export function FiscalFlowKanban() {
                                   <Button
                                     size="sm"
                                     variant="outlined"
-                                    className="flex-1 !border-primary !text-primary hover:!bg-primary/5"
+                                    disabled={venda.statusFiscal !== 'EMITIDA'}
+                                    title={
+                                      venda.statusFiscal !== 'EMITIDA'
+                                        ? 'PDF disponível apenas com nota emitida (autorizada pela SEFAZ)'
+                                        : undefined
+                                    }
+                                    className="flex-1 !border-primary !text-primary hover:!bg-primary/5 disabled:!cursor-not-allowed disabled:!border-gray-300 disabled:!text-gray-400 disabled:hover:!bg-transparent"
                                     onClick={() => {
+                                      if (venda.statusFiscal !== 'EMITIDA') return
                                       void abrirDocumentoFiscalPdf(
                                         venda.documentoFiscalId!,
                                         venda.tipoDocFiscal

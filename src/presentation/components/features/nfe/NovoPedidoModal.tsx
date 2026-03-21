@@ -157,6 +157,17 @@ function statusFiscalPermiteAbaNotaFiscal(s: string | null | undefined): boolean
   return STATUS_FISCAL_ABA_NOTA_FISCAL.has(String(s).trim().toUpperCase())
 }
 
+/** PDF DANFE/DANFCE só existe após autorização — mesmo critério do Kanban */
+function statusFiscalEhEmitida(
+  resumoStatus: string | null | undefined,
+  statusUnificado: string | null | undefined
+): boolean {
+  const r = resumoStatus != null ? String(resumoStatus).trim() : ''
+  const u = statusUnificado != null ? String(statusUnificado).trim() : ''
+  const s = (r !== '' ? r : u).toUpperCase()
+  return s === 'EMITIDA'
+}
+
 export function NovoPedidoModal({
   open,
   onClose,
@@ -3054,24 +3065,25 @@ export function NovoPedidoModal({
                       <h3 className="font-nunito text-lg font-semibold text-primary">
                         Resumo da Nota Fiscal modelo: {rotuloModeloNfe(resumoFiscal?.modelo)}
                       </h3>
-                      {resumoFiscal?.documentoFiscalId && (
-                        <Button
-                          type="button"
-                          variant="outlined"
-                          className="shrink-0 !border-primary !text-primary hover:!bg-primary/5"
-                          onClick={() => {
-                            void abrirDocumentoFiscalPdf(
-                              resumoFiscal.documentoFiscalId!,
-                              tipoDocFiscalFromModelo(resumoFiscal.modelo)
-                            )
-                          }}
-                        >
-                          Ver{' '}
-                          {tipoDocFiscalFromModelo(resumoFiscal.modelo) === 'NFE'
-                            ? 'NFe'
-                            : 'NFCe'}
-                        </Button>
-                      )}
+                      {resumoFiscal?.documentoFiscalId &&
+                        statusFiscalEhEmitida(resumoFiscal.status, statusFiscalUnificado) && (
+                          <Button
+                            type="button"
+                            variant="outlined"
+                            className="shrink-0 !border-primary !text-primary hover:!bg-primary/5"
+                            onClick={() => {
+                              void abrirDocumentoFiscalPdf(
+                                resumoFiscal.documentoFiscalId!,
+                                tipoDocFiscalFromModelo(resumoFiscal.modelo)
+                              )
+                            }}
+                          >
+                            Ver{' '}
+                            {tipoDocFiscalFromModelo(resumoFiscal.modelo) === 'NFE'
+                              ? 'NFe'
+                              : 'NFCe'}
+                          </Button>
+                        )}
                     </div>
 
                     {!resumoFiscal ? (

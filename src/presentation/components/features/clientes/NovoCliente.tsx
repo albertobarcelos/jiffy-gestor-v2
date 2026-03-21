@@ -475,6 +475,26 @@ export function NovoCliente({
       return
     }
 
+    const cpfLimpo = cpf.replace(/\D/g, '')
+    const cnpjLimpo = cnpj.replace(/\D/g, '')
+
+    // Pessoa física ou jurídica: não permite CPF e CNPJ preenchidos ao mesmo tempo
+    if (cpfLimpo.length > 0 && cnpjLimpo.length > 0) {
+      showToast.error(
+        'Informe apenas CPF ou CNPJ, não os dois. Remova um dos documentos para salvar.'
+      )
+      return
+    }
+
+    const telefoneLimpo = telefone.replace(/\D/g, '')
+    // API externa exige DDD + número completo (10 fixo ou 11 celular no Brasil)
+    if (telefoneLimpo.length > 0 && telefoneLimpo.length !== 10 && telefoneLimpo.length !== 11) {
+      showToast.error(
+        'Telefone com DDD deve ter 10 dígitos (fixo) ou 11 (celular). Verifique o número digitado.'
+      )
+      return
+    }
+
     // Validar cidade antes de salvar
     if (cidade && estado) {
       if (cidadeValida === false) {
@@ -509,10 +529,6 @@ export function NovoCliente({
     setIsLoading(true)
 
     try {
-      // Remove formatação dos campos antes de enviar
-      const cpfLimpo = cpf.replace(/\D/g, '')
-      const cnpjLimpo = cnpj.replace(/\D/g, '')
-      const telefoneLimpo = telefone.replace(/\D/g, '')
       const cepLimpo = cep.replace(/\D/g, '')
 
       const body: any = {
@@ -523,18 +539,22 @@ export function NovoCliente({
         ativo,
       }
 
-      // CPF e CNPJ: lógica diferente para criação e edição
+      // CPF e CNPJ: exclusivos (validação acima); envia só um — o outro vazio para limpar na edição
       if (isEditing) {
-        // Em edição, sempre envia CPF e CNPJ (mesmo vazios) para garantir atualização
-        // String vazia será convertida para null no repositório para limpar o valor na API externa
-        body.cpf = cpfLimpo || ''
-        body.cnpj = cnpjLimpo || ''
-        
-        // Telefone: se estiver editando e quiser remover, envia null
-        // Se tiver valor, envia a string limpa
+        if (cpfLimpo) {
+          body.cpf = cpfLimpo
+          body.cnpj = ''
+        } else if (cnpjLimpo) {
+          body.cnpj = cnpjLimpo
+          body.cpf = ''
+        } else {
+          body.cpf = ''
+          body.cnpj = ''
+        }
+
+        // Telefone: null limpa na API externa (string vazia aciona validação de 11 dígitos)
         body.telefone = telefoneLimpo ? telefoneLimpo : null
       } else {
-        // Em criação, envia apenas se tiver valor
         if (cpfLimpo) body.cpf = cpfLimpo
         if (cnpjLimpo) body.cnpj = cnpjLimpo
         if (telefoneLimpo) body.telefone = telefoneLimpo

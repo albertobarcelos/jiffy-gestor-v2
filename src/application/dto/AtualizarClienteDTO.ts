@@ -11,7 +11,8 @@ export const AtualizarClienteSchema = z.object({
   // string vazia também será convertida para null no repositório
   cpf: z.string().nullable().optional(),
   cnpj: z.string().nullable().optional(),
-  telefone: z.string().optional(),
+  // null ou '' limpam o valor na API (mesmo padrão de cpf/cnpj no repositório)
+  telefone: z.string().nullable().optional(),
   email: z.string().email('Email inválido').optional().or(z.literal('')),
   nomeFantasia: z.string().optional(),
   ativo: z.boolean().optional(),

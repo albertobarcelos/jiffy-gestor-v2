@@ -95,12 +95,13 @@ export class ClienteRepository implements IClienteRepository {
 
   async criarCliente(data: CriarClienteDTO): Promise<Cliente> {
     try {
+      const telDigits = (data.telefone || '').replace(/\D/g, '')
       const bodyMap: any = {
         nome: data.nome,
         razaoSocial: data.razaoSocial || '',
         cpf: data.cpf || '',
         cnpj: data.cnpj || '',
-        telefone: data.telefone || '',
+        telefone: telDigits.length > 0 ? telDigits : null,
         email: data.email || '',
         nomeFantasia: data.nomeFantasia || '',
         ativo: data.ativo !== undefined ? data.ativo : true,
@@ -171,7 +172,15 @@ export class ClienteRepository implements IClienteRepository {
         }
       }
       
-      if (data.telefone !== undefined) requestBody.telefone = data.telefone || ''
+      // String vazia na API externa dispara validação "11 dígitos"; usar null para limpar (como cpf/cnpj)
+      if (data.telefone !== undefined) {
+        const t = data.telefone
+        if (t === null || (typeof t === 'string' && t.replace(/\D/g, '').length === 0)) {
+          requestBody.telefone = null
+        } else if (typeof t === 'string') {
+          requestBody.telefone = t.replace(/\D/g, '')
+        }
+      }
       if (data.email !== undefined) requestBody.email = data.email || ''
       if (data.nomeFantasia !== undefined) requestBody.nomeFantasia = data.nomeFantasia || ''
       if (data.ativo !== undefined) requestBody.ativo = data.ativo

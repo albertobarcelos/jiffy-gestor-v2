@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
-import { Input } from './input'
+import { Input, type InputProps } from './input'
 import { Label } from './label'
 
 interface Municipio {
@@ -26,6 +26,9 @@ interface CidadeAutocompleteProps {
   useNativeInput?: boolean
   // Classes customizadas para o input nativo
   inputClassName?: string
+  /** Repassados ao `Input` interno (MUI TextField), quando não é `useNativeInput` */
+  size?: InputProps['size']
+  sx?: InputProps['sx']
 }
 
 // Limite de itens exibidos no dropdown quando não há filtro ativo (Infinity = sem limite)
@@ -60,6 +63,8 @@ export function CidadeAutocomplete({
   className = '',
   useNativeInput = false,
   inputClassName = '',
+  size = 'small',
+  sx,
 }: CidadeAutocompleteProps) {
   const [isValidating, setIsValidating] = useState(false)
   const [isValid, setIsValid] = useState<boolean | null>(null)
@@ -573,7 +578,8 @@ export function CidadeAutocomplete({
             required={required}
             disabled={disabled || !estado || isLoadingMunicipios}
             autoComplete="off"
-            size="small"
+            size={size}
+            sx={sx}
             className={
               isValid === false
                 ? 'border-red-500 focus:border-red-500'
