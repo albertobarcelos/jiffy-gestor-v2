@@ -1,7 +1,7 @@
 'use client'
 
 import { Badge } from '@/src/presentation/components/ui/badge'
-import { MdSchedule, MdCheckCircle, MdError, MdCancel, MdWarning } from 'react-icons/md'
+import { MdSchedule, MdCheckCircle, MdError, MdWarning, MdCancel } from 'react-icons/md'
 import { CircularProgress } from '@mui/material'
 
 type StatusFiscal = 
@@ -79,10 +79,11 @@ export function StatusFiscalBadge({ status, className }: StatusFiscalBadgeProps)
           icon: <MdError className="w-3.5 h-3.5" />,
         }
       case 'CANCELADA':
+        // Mesma paleta de rejeição: destaque vermelho no card (Kanban col. Com Nota Solicitada)
         return {
           label: 'Cancelada',
-          color: '#6B7280', // Cinza
-          bgColor: '#F3F4F6',
+          color: '#EF4444',
+          bgColor: '#FEE2E2',
           icon: <MdCancel className="w-3.5 h-3.5" />,
         }
       default:

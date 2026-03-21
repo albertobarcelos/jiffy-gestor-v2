@@ -53,6 +53,10 @@ import {
   MdCancel,
 } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
+import {
+  abrirDocumentoFiscalPdf,
+  tipoDocFiscalFromModelo,
+} from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { SeletorClienteModal } from './SeletorClienteModal'
 
@@ -83,6 +87,8 @@ interface ResumoFiscalVenda {
   chaveFiscal?: string | null
   dataCriacao?: string | null
   dataUltimaModificacao?: string | null
+  /** Id do documento fiscal — mesmo usado em GET `/api/nfe/[id]` (Kanban “Ver NFCe/NFe”) */
+  documentoFiscalId?: string | null
 }
 
 interface ComplementoSelecionado {
@@ -135,6 +141,22 @@ function rotuloOrigemParaExibicao(origemBrutaApi: string | null): string {
   return String(origemBrutaApi).trim()
 }
 
+/**
+ * Status em que a aba Nota Fiscal e o resumo fazem sentido (incl. aguardando SEFAZ).
+ * Alinhado ao Kanban e ao `StatusFiscalBadge` ("Aguardando SEFAZ..." para PENDENTE / PENDENTE_AUTORIZACAO).
+ */
+const STATUS_FISCAL_ABA_NOTA_FISCAL = new Set([
+  'EMITIDA',
+  'REJEITADA',
+  'PENDENTE',
+  'PENDENTE_AUTORIZACAO',
+])
+
+function statusFiscalPermiteAbaNotaFiscal(s: string | null | undefined): boolean {
+  if (s == null || String(s).trim() === '') return false
+  return STATUS_FISCAL_ABA_NOTA_FISCAL.has(String(s).trim().toUpperCase())
+}
+
 export function NovoPedidoModal({
   open,
   onClose,
@@ -183,19 +205,19 @@ export function NovoPedidoModal({
   const [statusVendaTextoApiDetalhe, setStatusVendaTextoApiDetalhe] = useState<string | null>(null)
 
   /**
-   * Aba Nota Fiscal só para nota emitida e origem coerente:
+   * Aba Nota Fiscal quando o status fiscal indica nota (emitida, rejeitada, aguardando SEFAZ, etc.) e origem coerente:
    * - PDV (`tabelaOrigem`): lista unificada traz `statusFiscal`; detalhe não traz `origem`.
    * - Gestor: detalhe traz `origem: GESTOR`; `statusVenda` pode ser null — usar `resumoFiscal.status` ou `statusFiscal` unificado.
    */
   const podeExibirAbaNotaFiscal = useMemo(() => {
     if (!modoVisualizacao) return false
 
-    const notaEmitida =
-      statusFiscalUnificado === 'EMITIDA' ||
-      resumoFiscal?.status === 'EMITIDA' ||
-      statusVendaTextoApiDetalhe === 'EMITIDA'
+    const temFiscalParaExibir =
+      statusFiscalPermiteAbaNotaFiscal(statusFiscalUnificado) ||
+      statusFiscalPermiteAbaNotaFiscal(resumoFiscal?.status) ||
+      statusFiscalPermiteAbaNotaFiscal(statusVendaTextoApiDetalhe)
 
-    if (!notaEmitida) return false
+    if (!temFiscalParaExibir) return false
 
     if (tabelaOrigemVenda === 'venda') {
       return true
@@ -204,7 +226,10 @@ export function NovoPedidoModal({
     if (origemTextoApiDetalhe === 'GESTOR') return true
     if (origemTextoApiDetalhe === 'PDV') return false
     if (origemTextoApiDetalhe != null && origemTextoApiDetalhe !== 'GESTOR') return false
-    return statusFiscalUnificado === 'EMITIDA' || resumoFiscal?.status === 'EMITIDA'
+    return (
+      statusFiscalPermiteAbaNotaFiscal(statusFiscalUnificado) ||
+      statusFiscalPermiteAbaNotaFiscal(resumoFiscal?.status)
+    )
   }, [
     modoVisualizacao,
     tabelaOrigemVenda,
@@ -724,8 +749,8 @@ export function NovoPedidoModal({
   }
 
   const rotuloModeloNfe = (modelo: number | null | undefined): string => {
-    if (modelo === 55) return '55 (NF-e)'
-    if (modelo === 65) return '65 (NFC-e)'
+    if (modelo === 55) return 'NF-e'
+    if (modelo === 65) return 'NFC-e'
     if (modelo == null || modelo === undefined) return '—'
     return String(modelo)
   }
@@ -3025,17 +3050,28 @@ export function NovoPedidoModal({
                     role="tabpanel"
                     aria-labelledby="tab-detalhes-nota-fiscal"
                   >
-                    <div className="rounded-lg border-2 border-primary/20 bg-gray-50/90 px-4 py-3">
+                    <div className="flex flex-col gap-3 rounded-lg border-2 border-primary/20 bg-gray-50/90 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                       <h3 className="font-nunito text-lg font-semibold text-primary">
-                        Resumo da nota fiscal
+                        Resumo da Nota Fiscal modelo: {rotuloModeloNfe(resumoFiscal?.modelo)}
                       </h3>
-                      <p className="font-nunito mt-1 text-xs text-gray-500">
-                        Dados retornados pela API com{' '}
-                        <code className="rounded bg-gray-200 px-1 py-0.5 text-[11px]">
-                          incluirFiscal=true
-                        </code>
-                        .
-                      </p>
+                      {resumoFiscal?.documentoFiscalId && (
+                        <Button
+                          type="button"
+                          variant="outlined"
+                          className="shrink-0 !border-primary !text-primary hover:!bg-primary/5"
+                          onClick={() => {
+                            void abrirDocumentoFiscalPdf(
+                              resumoFiscal.documentoFiscalId!,
+                              tipoDocFiscalFromModelo(resumoFiscal.modelo)
+                            )
+                          }}
+                        >
+                          Ver{' '}
+                          {tipoDocFiscalFromModelo(resumoFiscal.modelo) === 'NFE'
+                            ? 'NFe'
+                            : 'NFCe'}
+                        </Button>
+                      )}
                     </div>
 
                     {!resumoFiscal ? (
@@ -3056,14 +3092,14 @@ export function NovoPedidoModal({
                                 value: resumoFiscal.status ?? '—',
                               },
                               {
-                                label: 'Número',
-                                value:
-                                  resumoFiscal.numero != null ? String(resumoFiscal.numero) : '—',
-                              },
-                              {
                                 label: 'Retorno SEFAZ',
                                 value: resumoFiscal.retornoSefaz ?? '—',
                                 multiline: true,
+                              },
+                              {
+                                label: 'Número ' + rotuloModeloNfe(resumoFiscal.modelo ?? null),
+                                value:
+                                  resumoFiscal.numero != null ? String(resumoFiscal.numero) : '—',
                               },
                               {
                                 label: 'Série',
@@ -3105,7 +3141,7 @@ export function NovoPedidoModal({
                               </span>
                               <span
                                 className={`font-nunito break-words text-right text-sm text-gray-900 sm:max-w-[min(100%,28rem)] sm:text-left ${
-                                  'monospace' in row && row.monospace ? 'font-mono text-xs' : ''
+                                  'monospace' in row && row.monospace ? 'font-mono text-sm' : ''
                                 } ${
                                   'multiline' in row && row.multiline ? 'whitespace-pre-wrap' : ''
                                 }`}

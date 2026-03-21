@@ -51,6 +51,7 @@ import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/Tip
 import { NovoPedidoModal } from './NovoPedidoModal'
 import { EscolheDatasModal } from '@/src/presentation/components/features/vendas/EscolheDatasModal'
 import { showToast } from '@/src/shared/utils/toast'
+import { abrirDocumentoFiscalPdf } from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
 import { FormControl, Select, MenuItem } from '@mui/material'
 
 type Priority = 'high' | 'medium' | 'low'
@@ -474,13 +475,13 @@ export function FiscalFlowKanban() {
     },
     {
       id: 'COM_NFE',
-      title: 'Com Nota Emitida',
+      title: 'Com Nota Solicitada',
       color: 'bg-green-50',
       borderColor: 'border-green-400',
       borderColorClass: 'border-l-green-400',
       cardBackgroundClass: 'bg-green-400/10',
       icon: <MdCheckCircle className="h-4 w-4 text-green-600" />,
-      placeholder: 'Vendas com nota fiscal emitida',
+      placeholder: 'Vendas com nota fiscal solicitada',
     },
   ]
 
@@ -777,10 +778,7 @@ export function FiscalFlowKanban() {
         break
       }
       case 'COM_NFE':
-        vendas = vendasParaFiltrar.filter((v: Venda) => {
-          const etapa = v.getEtapaKanban()
-          return etapa === 'COM_NFE'
-        })
+        vendas = vendasParaFiltrar.filter((v: Venda) => v.getEtapaKanban() === 'COM_NFE')
         break
       default:
         return []
@@ -1228,164 +1226,11 @@ export function FiscalFlowKanban() {
                                     size="sm"
                                     variant="outlined"
                                     className="flex-1 !border-primary !text-primary hover:!bg-primary/5"
-                                    onClick={async () => {
-                                      const url = `/api/nfe/${venda.documentoFiscalId}`
-                                      const documentoLabel =
-                                        venda.tipoDocFiscal === 'NFE' ? 'DANFE' : 'DANFCE'
-
-                                      // Verificar se o PDF fiscal está disponível antes de abrir
-                                      try {
-                                        const response = await fetch(url)
-
-                                        if (response.ok) {
-                                          // Verificar se é realmente um PDF
-                                          const contentType = response.headers.get('content-type')
-                                          if (contentType?.includes('application/pdf')) {
-                                            // PDF fiscal disponível, abrir normalmente
-                                            window.open(url, '_blank')
-                                          } else {
-                                            // Resposta inesperada
-                                            const errorData = await response
-                                              .json()
-                                              .catch(() => ({}))
-                                            alert(
-                                              errorData.error ||
-                                                `Erro ao buscar ${documentoLabel}. Tente novamente mais tarde.`
-                                            )
-                                          }
-                                        } else if (response.status === 404) {
-                                          // PDF fiscal ainda não foi gerado
-                                          const errorData = await response.json().catch(() => ({}))
-                                          const errorMessage =
-                                            errorData.error ||
-                                            `O ${documentoLabel} ainda não foi gerado.`
-
-                                          // Oferecer opção de regenerar ou aguardar
-                                          const opcao = confirm(
-                                            `${errorMessage}\n\n` +
-                                              `Escolha uma opção:\n` +
-                                              `OK = Regenerar ${documentoLabel} agora\n` +
-                                              `Cancelar = Aguardar e tentar novamente automaticamente`
-                                          )
-
-                                          if (opcao) {
-                                            // Regenerar PDF fiscal via Next.js API route (proxy)
-                                            try {
-                                              const regenerarUrl = `/api/nfe/${venda.documentoFiscalId}/regenerar`
-
-                                              const regenerarResponse = await fetch(regenerarUrl, {
-                                                method: 'POST',
-                                                headers: {
-                                                  'Content-Type': 'application/json',
-                                                },
-                                              })
-
-                                              if (regenerarResponse.ok) {
-                                                const regenerarData = await regenerarResponse.json()
-                                                alert(
-                                                  `✅ ${regenerarData.mensagem || `Geração de ${documentoLabel} iniciada. Aguarde alguns segundos e tente novamente.`}`
-                                                )
-
-                                                // Aguardar 5 segundos e tentar abrir
-                                                setTimeout(async () => {
-                                                  let tentativas = 0
-                                                  const maxTentativas = 6 // 30 segundos no total (6 x 5s)
-
-                                                  const verificarPdfFiscal = async () => {
-                                                    tentativas++
-                                                    try {
-                                                      const retryResponse = await fetch(url)
-                                                      if (retryResponse.ok) {
-                                                        const contentType =
-                                                          retryResponse.headers.get('content-type')
-                                                        if (
-                                                          contentType?.includes('application/pdf')
-                                                        ) {
-                                                          window.open(url, '_blank')
-                                                          return
-                                                        }
-                                                      }
-
-                                                      if (tentativas < maxTentativas) {
-                                                        setTimeout(verificarPdfFiscal, 5000) // Tentar novamente em 5 segundos
-                                                      } else {
-                                                        alert(
-                                                          `O ${documentoLabel} ainda não foi gerado após 30 segundos. Por favor, tente novamente mais tarde.`
-                                                        )
-                                                      }
-                                                    } catch {
-                                                      if (tentativas < maxTentativas) {
-                                                        setTimeout(verificarPdfFiscal, 5000)
-                                                      }
-                                                    }
-                                                  }
-
-                                                  setTimeout(verificarPdfFiscal, 5000)
-                                                }, 5000)
-                                              } else {
-                                                const errorRegenerar = await regenerarResponse
-                                                  .json()
-                                                  .catch(() => ({}))
-                                                alert(
-                                                  `Erro ao regenerar ${documentoLabel}: ${errorRegenerar.error || errorRegenerar.message || 'Erro desconhecido'}`
-                                                )
-                                              }
-                                            } catch (error) {
-                                              console.error(
-                                                `Erro ao regenerar ${documentoLabel}:`,
-                                                error
-                                              )
-                                              alert(
-                                                `Erro ao regenerar ${documentoLabel}. Tente novamente mais tarde.`
-                                              )
-                                            }
-                                          } else {
-                                            // Aguardar e tentar novamente automaticamente
-                                            let tentativas = 0
-                                            const maxTentativas = 6 // 30 segundos no total (6 x 5s)
-
-                                            const verificarPdfFiscal = async () => {
-                                              tentativas++
-                                              try {
-                                                const retryResponse = await fetch(url)
-                                                if (retryResponse.ok) {
-                                                  const contentType =
-                                                    retryResponse.headers.get('content-type')
-                                                  if (contentType?.includes('application/pdf')) {
-                                                    window.open(url, '_blank')
-                                                    return
-                                                  }
-                                                }
-
-                                                if (tentativas < maxTentativas) {
-                                                  setTimeout(verificarPdfFiscal, 5000) // Tentar novamente em 5 segundos
-                                                } else {
-                                                  alert(
-                                                    `O ${documentoLabel} ainda não foi gerado após 30 segundos. Por favor, tente novamente mais tarde.`
-                                                  )
-                                                }
-                                              } catch {
-                                                if (tentativas < maxTentativas) {
-                                                  setTimeout(verificarPdfFiscal, 5000)
-                                                }
-                                              }
-                                            }
-
-                                            setTimeout(verificarPdfFiscal, 5000)
-                                          }
-                                        } else {
-                                          // Outro erro
-                                          const errorData = await response.json().catch(() => ({}))
-                                          alert(
-                                            errorData.error ||
-                                              `Erro ao buscar ${documentoLabel}. Tente novamente mais tarde.`
-                                          )
-                                        }
-                                      } catch (error) {
-                                        // Erro de rede, tentar abrir mesmo assim
-                                        console.error(`Erro ao verificar ${documentoLabel}:`, error)
-                                        window.open(url, '_blank')
-                                      }
+                                    onClick={() => {
+                                      void abrirDocumentoFiscalPdf(
+                                        venda.documentoFiscalId!,
+                                        venda.tipoDocFiscal
+                                      )
                                     }}
                                   >
                                     Ver {venda.tipoDocFiscal === 'NFE' ? 'NFe' : 'NFCe'}
