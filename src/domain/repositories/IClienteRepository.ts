@@ -30,9 +30,10 @@ export interface CriarClienteDTO {
 export interface AtualizarClienteDTO {
   nome?: string
   razaoSocial?: string
-  cpf?: string
-  cnpj?: string
-  telefone?: string
+  /** null limpa o valor na API (alinhado ao schema Zod e ao repositório) */
+  cpf?: string | null
+  cnpj?: string | null
+  telefone?: string | null
   email?: string
   nomeFantasia?: string
   ativo?: boolean
