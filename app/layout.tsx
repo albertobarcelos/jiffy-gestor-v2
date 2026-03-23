@@ -3,6 +3,7 @@ import { Exo_2, Manrope } from 'next/font/google'
 import { Toaster } from 'react-hot-toast'
 import { ThemeProvider } from '@/src/presentation/providers/ThemeProvider'
 import { QueryProvider } from '@/src/presentation/providers/QueryProvider'
+import { DocumentoFiscalPdfRetryModal } from '@/src/presentation/components/features/nfe/DocumentoFiscalPdfRetryModal'
 import './globals.css'
 
 // Exo 2 - Fonte para textos normais (corpo do texto)
@@ -37,6 +38,7 @@ export default function RootLayout({
         <QueryProvider>
           <ThemeProvider>
             {children}
+            <DocumentoFiscalPdfRetryModal />
             <Toaster
             position="top-right"
             toastOptions={{

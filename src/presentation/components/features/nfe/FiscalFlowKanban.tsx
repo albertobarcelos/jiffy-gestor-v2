@@ -819,47 +819,28 @@ export function FiscalFlowKanban() {
             <span>{filtrosVisiveisMobile ? 'Ocultar filtros' : 'Mostrar filtros'}</span>
           </button>
         </div>
-
-        {/* Filtros superiores: Busca, Período, Origem, Ações */}
+        {/* Filtros avançados: Origem, Data finalização, Data Criação, Status fiscal, Limpar */}
         <div
-          className={`flex flex-col items-center gap-3 py-2 sm:flex-row ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
+          className={`flex flex-wrap items-end justify-center gap-x-1 gap-y-4 rounded-t-lg bg-custom-2 px-1 pb-2 pt-1.5 md:justify-start ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
         >
-          <div className="relative w-full max-w-full flex-[2] px-4 lg:max-w-[550px]">
+          <div className="flex flex-col gap-1">
+            <label className="font-nunito text-xs text-secondary-text pl-2">Pesquisar</label>
+          
+          <div className="relative w-full max-w-full px-1 lg:max-w-[250px]">
             <MdSearch
-              className="absolute left-8 top-1/2 -translate-y-1/2 text-secondary-text"
+              className="absolute left-2 top-1/2 -translate-y-1/2 text-secondary-text"
               size={20}
             />
             <input
               type="text"
-              placeholder="Pesquisar por código da venda ou cliente"
+              placeholder="Digite o código ou cliente"
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && refetch()}
-              className="font-nunito h-8 w-full rounded-lg border bg-info pl-10 pr-4 text-sm shadow-sm"
+              className="font-nunito h-8 w-full rounded-lg border bg-info pl-6 pr-4 text-sm shadow-sm"
             />
           </div>
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              onClick={() => refetch()}
-              className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
-              title="Atualizar"
-            >
-              <MdRefresh className="h-5 w-5" />
-            </button>
-            <button
-              onClick={() => setNovoPedidoModalOpen(true)}
-              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary/90"
-            >
-              <MdAdd className="h-4 w-4" />
-              Novo Pedido
-            </button>
           </div>
-        </div>
-
-        {/* Filtros avançados: Origem, Data finalização, Data Criação, Status fiscal, Limpar */}
-        <div
-          className={`flex flex-wrap items-end justify-center gap-x-2 gap-y-4 rounded-t-lg bg-custom-2 px-2 pb-2 pt-1.5 md:justify-start ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
-        >
           <div className="flex flex-col gap-1">
             <label className="font-nunito text-xs text-secondary-text">Origem</label>
             <FormControl size="small" sx={{ minWidth: 140 }}>
@@ -966,16 +947,32 @@ export function FiscalFlowKanban() {
           </div>
           <button
             onClick={handleClearFilters}
-            className="font-nunito flex h-8 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
+            className="font-nunito flex h-8 items-center justify-center gap-2 rounded-lg border border-primary px-4 text-sm text-primary transition-colors hover:bg-primary/10"
           >
             <MdFilterAltOff size={18} />
             Limpar filtros
           </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => refetch()}
+              className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
+              title="Atualizar"
+            >
+              <MdRefresh className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => setNovoPedidoModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary/90"
+            >
+              <MdAdd className="h-4 w-4" />
+              Novo Pedido
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Kanban Board */}
-      <div className="scrollbar-thin mb-[10px] min-h-0 flex-1 overflow-x-auto p-4 pb-4">
+      <div className="scrollbar-thin mb-[10px] min-h-0 flex-1 overflow-x-auto p-2 pb-4">
         <DndContext
           sensors={sensors}
           onDragStart={handleDragStart}
@@ -990,7 +987,7 @@ export function FiscalFlowKanban() {
               return (
                 <div
                   key={column.id}
-                  className="flex w-64 flex-shrink-0 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white sm:w-60 md:w-64 lg:w-80"
+                  className="flex w-64 flex-shrink-0 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white sm:w-60 md:w-64 lg:w-96"
                   style={{ height: 'calc(100vh - 180px)' }}
                 >
                   {/* Column Header - Apenas o header tem cor */}
@@ -1008,7 +1005,7 @@ export function FiscalFlowKanban() {
                   {/* Column Content - Área droppable (Pendente Emissão aceita cards arrastados) */}
                   <DroppableColumnContent
                     columnId={column.id}
-                    className="scrollbar-thin min-h-0 flex-1 space-y-2 overflow-y-auto bg-white p-2.5"
+                    className={`scrollbar-thin min-h-0 flex-1 space-y-2 overflow-y-auto ${column.cardBackgroundClass} p-2.5`}
                   >
                     {columnVendas.length === 0 ? (
                       <div className="py-6 text-center">
@@ -1033,7 +1030,7 @@ export function FiscalFlowKanban() {
                         return (
                           <DraggableVendaCard key={venda.id} venda={venda} column={column}>
                             <div
-                              className={`rounded-lg border-l-4 ${column.borderColorClass} ${column.cardBackgroundClass} relative cursor-pointer border border-gray-200/80 p-3 transition-all hover:shadow-md`}
+                              className={`rounded-lg border-l-4 ${column.borderColorClass} bg-white cursor-pointer border border-gray-200/80 p-3 transition-all hover:shadow-md`}
                               onClick={() => handleViewDetails(venda)}
                             >
                               {/* Menu de três pontos: apenas quando pode incluir cliente (mesmas colunas do lápis) */}
@@ -1071,14 +1068,15 @@ export function FiscalFlowKanban() {
                               )}
 
                               {/* Bloco número da venda até valor, com ícone ao lado */}
-                              <div className="mb-2 flex gap-3 pr-6">
+                              <div className="mb-2 flex gap-2 pr-6">
                                 <div className="min-w-0 flex-1 border-b border-gray-100 pb-1.5">
                                   <p className="mb-0.5 text-xs text-gray-500">
+                                    {venda.origem} | 
                                     Venda {venda.numeroVenda}
                                     {venda.codigoVenda ? ` - #${venda.codigoVenda}` : ''}
                                   </p>
-                                  <div className="mb-1 flex min-w-0 items-start gap-1">
-                                    <p className="mb-0 min-w-0 flex-1 truncate text-sm font-semibold uppercase text-primary">
+                                  <div className="flex min-w-0 items-start gap-1">
+                                    <p className="mb-0 min-w-0 flex-1 truncate text-sm font-semibold uppercase text-primary-text">
                                       {clienteNome}
                                     </p>
                                     {podeEditarClienteNaVenda && (
@@ -1095,25 +1093,24 @@ export function FiscalFlowKanban() {
                                       </button>
                                     )}
                                   </div>
+                                  <p className="text-xs text-gray-600">
+                                    <span className="text-sm font-semibold text-gray-900">
+                                      {valorFormatado}
+                                    </span>
+                                  </p>
                                   {venda.statusFiscal && (
-                                    <div className="mb-1">
-                                      <StatusFiscalBadge status={venda.statusFiscal} />
+                                    <div className="flex flex-row gap-1 items-center justify-between">
                                       {venda.numeroFiscal && venda.statusFiscal === 'EMITIDA' && (
-                                        <div className="mt-1 inline-flex items-center gap-1 rounded-md bg-green-100 px-2 py-0.5 text-green-800">
-                                          <MdCheckCircle className="h-3.5 w-3.5" />
+                                        <div className="mt-1 inline-flex items-center gap-1 text-primary-text">
                                           <span className="text-xs font-semibold">
                                             {venda.tipoDocFiscal || 'NFe'} Nº {venda.numeroFiscal}
                                             {venda.serieFiscal && ` / Série ${venda.serieFiscal}`}
                                           </span>
                                         </div>
                                       )}
+                                      <StatusFiscalBadge status={venda.statusFiscal} />
                                     </div>
                                   )}
-                                  <p className="text-xs text-gray-600">
-                                    <span className="text-sm font-semibold text-gray-900">
-                                      {valorFormatado}
-                                    </span>
-                                  </p>
                                 </div>
                                 {tipoVendaExibicao &&
                                   (tipoVendaExibicao === 'balcao' ||
@@ -1122,7 +1119,7 @@ export function FiscalFlowKanban() {
                                       <TipoVendaIcon
                                         tipoVenda={tipoVendaExibicao as 'balcao' | 'mesa'}
                                         numeroMesa="M"
-                                        size={64}
+                                        size={56}
                                         containerScale={0.9}
                                         corPrincipal="var(--color-primary)"
                                         corTexto="var(--color-info)"
@@ -1134,24 +1131,16 @@ export function FiscalFlowKanban() {
                               </div>
 
                               {/* Novos campos: Data finalização, Aberto por; Origem */}
-                              <div className="mb-2 space-y-0.5">
+                              <div className="space-y-0.5">
                                 {venda.dataFinalizacao && (
                                   <p className="text-xs text-gray-500">
                                     Finalizada: {formatarDataCard(venda.dataFinalizacao)}
                                   </p>
                                 )}
-                                {venda.abertoPor?.nome && (
-                                  <p className="text-xs text-gray-500">
-                                    Aberto por: {venda.abertoPor.nome}
-                                  </p>
-                                )}
-                                {venda.origem && (
-                                  <p className="text-xs text-gray-500">Origem: {venda.origem}</p>
-                                )}
                               </div>
 
                               {/* Ações baseadas na coluna */}
-                              <div className="mt-2 flex gap-2" onClick={e => e.stopPropagation()}>
+                              <div className="mt-0.5 flex gap-2" onClick={e => e.stopPropagation()}>
                                 {/* Ações para colunas de delivery — COMENTADO: colunas não utilizadas por enquanto */}
                                 {/* {['EM_ANALISE', 'EM_PRODUCAO', 'PRONTOS_ENTREGA', 'COM_ENTREGADOR'].includes(column.id) && (
                               <div className="text-xs text-gray-500 italic w-full text-center py-1">
@@ -1160,23 +1149,6 @@ export function FiscalFlowKanban() {
                             )} */}
 
                                 {/* Botão "Marcar para Emissão" (primary) */}
-                                {column.id === 'FINALIZADAS' &&
-                                  (venda.tabelaOrigem === 'venda' ||
-                                    venda.tabelaOrigem === 'venda_gestor') && (
-                                    <Button
-                                      size="sm"
-                                      variant="outlined"
-                                      className="flex-1 !border-primary !text-primary hover:!bg-primary/5"
-                                      sx={{ py: 0.375, px: 1, minHeight: 'auto' }}
-                                      onClick={() =>
-                                        handleMarcarEmissaoFiscal(venda.id, venda.tabelaOrigem)
-                                      }
-                                      isLoading={marcarEmissaoFiscal.isPending}
-                                    >
-                                      Marcar para Emissão
-                                    </Button>
-                                  )}
-
                                 {column.id === 'PENDENTE_EMISSAO' && (
                                   <Button
                                     size="sm"
@@ -1221,39 +1193,31 @@ export function FiscalFlowKanban() {
                                   </Button>
                                 )}
 
-                                {column.id === 'COM_NFE' && venda.documentoFiscalId && (
-                                  <Button
-                                    size="sm"
-                                    variant="outlined"
-                                    disabled={venda.statusFiscal !== 'EMITIDA'}
-                                    title={
-                                      venda.statusFiscal !== 'EMITIDA'
-                                        ? 'PDF disponível apenas com nota emitida (autorizada pela SEFAZ)'
-                                        : undefined
-                                    }
-                                    className="flex-1 !border-primary !text-primary hover:!bg-primary/5 disabled:!cursor-not-allowed disabled:!border-gray-300 disabled:!text-gray-400 disabled:hover:!bg-transparent"
-                                    onClick={() => {
-                                      if (venda.statusFiscal !== 'EMITIDA') return
-                                      void abrirDocumentoFiscalPdf(
-                                        venda.documentoFiscalId!,
-                                        venda.tipoDocFiscal
-                                      )
-                                    }}
-                                  >
-                                    Ver {venda.tipoDocFiscal === 'NFE' ? 'NFe' : 'NFCe'}
-                                  </Button>
-                                )}
-
-                                {/* Botão de visualizar detalhes (primary) */}
-                                <Button
-                                  size="sm"
-                                  variant="text"
-                                  onClick={() => handleViewDetails(venda)}
-                                  className="min-w-0 px-2 !text-primary hover:!bg-primary/10"
-                                  title="Ver detalhes"
-                                >
-                                  <MdVisibility className="h-4 w-4" />
-                                </Button>
+                                {/* PDF só existe após autorização ou após cancelamento de nota já emitida; demais status ficam sem botão */}
+                                {column.id === 'COM_NFE' &&
+                                  venda.documentoFiscalId &&
+                                  (venda.statusFiscal === 'EMITIDA' ||
+                                    venda.statusFiscal === 'CANCELADA') && (
+                                    <Button
+                                      size="sm"
+                                      sx={{ py: 0.375, px: 1, minHeight: 'auto' }}
+                                      variant="outlined"
+                                      title={
+                                        venda.statusFiscal === 'CANCELADA'
+                                          ? 'Abrir PDF da nota (cancelada na SEFAZ)'
+                                          : undefined
+                                      }
+                                      className="flex-1 !border-primary !text-primary hover:!bg-primary/5"
+                                      onClick={() => {
+                                        void abrirDocumentoFiscalPdf(
+                                          venda.documentoFiscalId!,
+                                          venda.tipoDocFiscal
+                                        )
+                                      }}
+                                    >
+                                      Ver {venda.tipoDocFiscal === 'NFE' ? 'NFe' : 'NFCe'}
+                                    </Button>
+                                  )}
                               </div>
                             </div>
                           </DraggableVendaCard>

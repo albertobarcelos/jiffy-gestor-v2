@@ -81,8 +81,8 @@ export class VendaUnificadaDTO {
 
     getEtapaKanban(): string {
         if (this.temNFeEmitida()) return 'COM_NFE';
-        // Rejeitada com documento fiscal: só na coluna "Com Nota Solicitada" (reemissão), não em Finalizadas
-        if (this.statusFiscal === 'REJEITADA' && this.documentoFiscalId) return 'COM_NFE';
+        // Rejeitada: coluna "Pendente Emissão Fiscal" para reenvio/reemissão (botão vira "Reemitir NFe/NFCe")
+        if (this.statusFiscal === 'REJEITADA') return 'PENDENTE_EMISSAO';
         // Aguardando retorno da SEFAZ (badge "Aguardando SEFAZ...") — só em "Com Nota Solicitada"
         if (this.statusFiscal === 'PENDENTE' || this.statusFiscal === 'PENDENTE_AUTORIZACAO') {
             return 'COM_NFE';

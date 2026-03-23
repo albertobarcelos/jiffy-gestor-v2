@@ -2,6 +2,9 @@
  * Abre o PDF do documento fiscal (DANFE/DANFCE) na mesma rota usada pelo Kanban:
  * GET `/api/nfe/[documentoFiscalId]`.
  */
+import { showToast } from '@/src/shared/utils/toast'
+import { requestDocumentoFiscalPdfRetryChoice } from '@/src/presentation/utils/documentoFiscalPdfRetryModalStore'
+
 export async function abrirDocumentoFiscalPdf(
   documentoFiscalId: string,
   tipoDocFiscal: 'NFE' | 'NFCE' | null | undefined
@@ -18,24 +21,38 @@ export async function abrirDocumentoFiscalPdf(
         window.open(url, '_blank')
       } else {
         const errorData = await response.json().catch(() => ({}))
-        alert(
-          errorData.error ||
-            `Erro ao buscar ${documentoLabel}. Tente novamente mais tarde.`
+        showToast.error(
+          errorData.error || `Erro ao buscar ${documentoLabel}. Tente novamente mais tarde.`
         )
       }
     } else if (response.status === 404) {
       const errorData = await response.json().catch(() => ({}))
       const errorMessage =
         errorData.error || `O ${documentoLabel} ainda não foi gerado.`
+      const normalizedError = String(errorMessage).toUpperCase()
+      const nonRetryableByMessage =
+        normalizedError.includes('CANCELADA') ||
+        normalizedError.includes('CANCELADO') ||
+        normalizedError.includes('NÃO PODE SER GERADO') ||
+        normalizedError.includes('NAO PODE SER GERADO')
+      const nonRetryable = Boolean(errorData?.nonRetryable) || nonRetryableByMessage
 
-      const opcao = confirm(
-        `${errorMessage}\n\n` +
-          `Escolha uma opção:\n` +
-          `OK = Regenerar ${documentoLabel} agora\n` +
-          `Cancelar = Aguardar e tentar novamente automaticamente`
-      )
+      // Erro definitivo (ex.: documento cancelado): apenas aviso, sem modal de regenerar/retry.
+      if (nonRetryable) {
+        showToast.warning(errorMessage)
+        return
+      }
 
-      if (opcao) {
+      const escolha = await requestDocumentoFiscalPdfRetryChoice({
+        errorMessage,
+        documentoLabel,
+      })
+
+      if (escolha === null) {
+        return
+      }
+
+      if (escolha === 'regenerar') {
         try {
           const regenerarUrl = `/api/nfe/${documentoFiscalId}/regenerar`
 
@@ -48,8 +65,9 @@ export async function abrirDocumentoFiscalPdf(
 
           if (regenerarResponse.ok) {
             const regenerarData = await regenerarResponse.json()
-            alert(
-              `✅ ${regenerarData.mensagem || `Geração de ${documentoLabel} iniciada. Aguarde alguns segundos e tente novamente.`}`
+            showToast.success(
+              regenerarData.mensagem ||
+                `Geração de ${documentoLabel} iniciada. Aguarde alguns segundos; tentaremos abrir o PDF.`
             )
 
             setTimeout(async () => {
@@ -71,8 +89,8 @@ export async function abrirDocumentoFiscalPdf(
                   if (tentativas < maxTentativas) {
                     setTimeout(verificarPdfFiscal, 5000)
                   } else {
-                    alert(
-                      `O ${documentoLabel} ainda não foi gerado após 30 segundos. Por favor, tente novamente mais tarde.`
+                    showToast.warning(
+                      `O ${documentoLabel} ainda não ficou pronto após algumas tentativas. Tente abrir de novo em instantes.`
                     )
                   }
                 } catch {
@@ -86,17 +104,19 @@ export async function abrirDocumentoFiscalPdf(
             }, 5000)
           } else {
             const errorRegenerar = await regenerarResponse.json().catch(() => ({}))
-            alert(
+            showToast.error(
               `Erro ao regenerar ${documentoLabel}: ${errorRegenerar.error || errorRegenerar.message || 'Erro desconhecido'}`
             )
           }
         } catch (error) {
           console.error(`Erro ao regenerar ${documentoLabel}:`, error)
-          alert(`Erro ao regenerar ${documentoLabel}. Tente novamente mais tarde.`)
+          showToast.error(`Erro ao regenerar ${documentoLabel}. Tente novamente mais tarde.`)
         }
       } else {
         let tentativas = 0
         const maxTentativas = 6
+
+        showToast.info(`Consultando ${documentoLabel} automaticamente em alguns segundos…`)
 
         const verificarPdfFiscal = async () => {
           tentativas++
@@ -113,8 +133,8 @@ export async function abrirDocumentoFiscalPdf(
             if (tentativas < maxTentativas) {
               setTimeout(verificarPdfFiscal, 5000)
             } else {
-              alert(
-                `O ${documentoLabel} ainda não foi gerado após 30 segundos. Por favor, tente novamente mais tarde.`
+              showToast.warning(
+                `O ${documentoLabel} ainda não ficou pronto após algumas tentativas. Tente novamente mais tarde.`
               )
             }
           } catch {
@@ -128,13 +148,13 @@ export async function abrirDocumentoFiscalPdf(
       }
     } else {
       const errorData = await response.json().catch(() => ({}))
-      alert(
-        errorData.error ||
-          `Erro ao buscar ${documentoLabel}. Tente novamente mais tarde.`
+      showToast.error(
+        errorData.error || `Erro ao buscar ${documentoLabel}. Tente novamente mais tarde.`
       )
     }
   } catch (error) {
     console.error(`Erro ao verificar ${documentoLabel}:`, error)
+    showToast.error(`Não foi possível verificar o ${documentoLabel}. Tente abrir o link manualmente.`)
     window.open(url, '_blank')
   }
 }
