@@ -306,6 +306,8 @@ export function NovoPedidoModal({
   const longPressComplementoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressComplementoIndexRef = useRef<number | null>(null)
   const hasMovedMeiosPagamentoRef = useRef(false)
+  // Evita POST duplicado quando o usuário clica duas vezes rápido em "Criar Pedido" (isPending não bloqueia a tempo)
+  const criacaoVendaGestorEmAndamentoRef = useRef(false)
 
   // Buscar grupos de produtos
   const {
@@ -1190,6 +1192,10 @@ export function NovoPedidoModal({
   }
 
   const handleSubmit = async () => {
+    if (criacaoVendaGestorEmAndamentoRef.current || createVendaGestor.isPending) {
+      return
+    }
+
     if (produtos.length === 0) {
       showToast.error('Adicione pelo menos um produto')
       return
@@ -1218,6 +1224,7 @@ export function NovoPedidoModal({
       }
     }
 
+    criacaoVendaGestorEmAndamentoRef.current = true
     try {
       // Mapear produtos para o payload (valorFinal por produto = total já calculado da linha)
       const produtosLancados = produtos.map(p => {
@@ -1310,6 +1317,8 @@ export function NovoPedidoModal({
         error?.message ||
         'Erro ao criar pedido'
       showToast.error(errorMessage)
+    } finally {
+      criacaoVendaGestorEmAndamentoRef.current = false
     }
   }
 
@@ -3486,6 +3495,7 @@ export function NovoPedidoModal({
                   </Button>
                 ) : (
                   <Button
+                    type="button"
                     onClick={handleSubmit}
                     disabled={createVendaGestor.isPending || !canSubmit()}
                     className="flex items-center gap-2"

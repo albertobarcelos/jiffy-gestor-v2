@@ -16,6 +16,7 @@ import {
 import {
   useMarcarEmissaoFiscal,
   useDesmarcarEmissaoFiscal,
+  useVincularClienteNaVenda,
   useEmitirNfe,
   useEmitirNfeGestor,
   useReemitirNfe,
@@ -53,6 +54,8 @@ import { EscolheDatasModal } from '@/src/presentation/components/features/vendas
 import { showToast } from '@/src/shared/utils/toast'
 import { abrirDocumentoFiscalPdf } from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
 import { FormControl, Select, MenuItem } from '@mui/material'
+import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
+import { NovoCliente } from '@/src/presentation/components/features/clientes/NovoCliente'
 
 type Priority = 'high' | 'medium' | 'low'
 
@@ -270,7 +273,9 @@ export function FiscalFlowKanban() {
   const [isDatasModalOpen, setIsDatasModalOpen] = useState(false)
   const debounceSearchRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const [seletorClienteVendaOpen, setSeletorClienteVendaOpen] = useState(false)
-  /** Contexto da venda ao abrir o seletor (para futuro PATCH de cliente na venda) */
+  const [editarClienteModalOpen, setEditarClienteModalOpen] = useState(false)
+  const [editarClienteId, setEditarClienteId] = useState<string | null>(null)
+  /** Contexto da venda ao abrir o seletor (PATCH clienteId só em /api/vendas/gestor/:id) */
   const vendaParaVincularClienteRef = useRef<{
     id: string
     tabelaOrigem: 'venda' | 'venda_gestor'
@@ -391,6 +396,7 @@ export function FiscalFlowKanban() {
 
   const marcarEmissaoFiscal = useMarcarEmissaoFiscal()
   const desmarcarEmissaoFiscal = useDesmarcarEmissaoFiscal()
+  const vincularClienteNaVenda = useVincularClienteNaVenda()
   const emitirNfePdv = useEmitirNfe()
   const emitirNfeGestor = useEmitirNfeGestor()
   const reemitirNfePdv = useReemitirNfe()
@@ -704,13 +710,40 @@ export function FiscalFlowKanban() {
     vendaParaVincularClienteRef.current = null
   }, [])
 
-  /** Seleção confirmada; vinculação na API quando o endpoint existir (ref ainda válido até o onClose do modal) */
-  const handleClienteSelecionadoParaVenda = useCallback((cliente: Cliente) => {
-    showToast.info(
-      `Cliente "${cliente.getNome()}" vinculado à venda.`
-    )
-    // Futuro: PATCH com vendaParaVincularClienteRef.current e cliente.getId()
+  const handleAbrirEdicaoCliente = useCallback((clienteId: string) => {
+    setMenuAcoesVendaIdAberto(null)
+    setEditarClienteId(clienteId)
+    setEditarClienteModalOpen(true)
   }, [])
+
+  const handleFecharEdicaoCliente = useCallback(() => {
+    setEditarClienteModalOpen(false)
+    setEditarClienteId(null)
+  }, [])
+
+  /** Seleção confirmada: PATCH clienteId só na venda Gestor. O ref deve ser lido no início — o modal chama onClose em seguida. */
+  const handleClienteSelecionadoParaVenda = useCallback(
+    async (cliente: Cliente) => {
+      const ctx = vendaParaVincularClienteRef.current
+      if (!ctx) {
+        showToast.error('Não foi possível identificar a venda. Tente novamente.')
+        return
+      }
+      if (ctx.tabelaOrigem !== 'venda_gestor') {
+        showToast.error('Vincular cliente só está disponível para vendas do Gestor.')
+        return
+      }
+      try {
+        await vincularClienteNaVenda.mutateAsync({
+          vendaId: ctx.id,
+          clienteId: cliente.getId(),
+        })
+      } catch {
+        // Mensagem de erro exibida pelo hook
+      }
+    },
+    [vincularClienteNaVenda]
+  )
 
   const handleConfirmDatas = useCallback((dataInicial: Date | null, dataFinal: Date | null) => {
     setPeriodoInicial(dataInicial)
@@ -1018,9 +1051,15 @@ export function FiscalFlowKanban() {
                           ? venda.cliente.nome
                           : LABEL_SEM_CLIENTE
                         const semNomeCliente = vendaSemNomeCliente(venda)
-                        const podeEditarClienteNaVenda =
-                          semNomeCliente &&
-                          (column.id === 'FINALIZADAS' || column.id === 'PENDENTE_EMISSAO')
+                        const colunaPermiteClienteGestor =
+                          column.id === 'FINALIZADAS' || column.id === 'PENDENTE_EMISSAO'
+                        // Vincular/editar cliente: só venda Gestor nas colunas Finalizadas e Pendente emissão
+                        const podeGerenciarClienteVendaGestor =
+                          venda.tabelaOrigem === 'venda_gestor' && colunaPermiteClienteGestor
+                        const temClienteComIdParaEditar =
+                          podeGerenciarClienteVendaGestor &&
+                          !semNomeCliente &&
+                          Boolean(venda.cliente?.id?.trim())
                         // Vendas do Gestor são sempre balcão; exibir "Balcão" quando a API não retorna tipoVenda
                         const tipoVendaExibicao =
                           venda.tabelaOrigem === 'venda_gestor'
@@ -1030,11 +1069,11 @@ export function FiscalFlowKanban() {
                         return (
                           <DraggableVendaCard key={venda.id} venda={venda} column={column}>
                             <div
-                              className={`rounded-lg border-l-4 ${column.borderColorClass} bg-white cursor-pointer border border-gray-200/80 p-3 transition-all hover:shadow-md`}
+                              className={`relative rounded-lg border-l-4 ${column.borderColorClass} bg-white cursor-pointer border border-gray-200/80 p-3 transition-all hover:shadow-md`}
                               onClick={() => handleViewDetails(venda)}
                             >
-                              {/* Menu de três pontos: apenas quando pode incluir cliente (mesmas colunas do lápis) */}
-                              {podeEditarClienteNaVenda && (
+                              {/* Menu de três pontos: apenas quando ainda não há cliente (abre seletor) */}
+                              {podeGerenciarClienteVendaGestor && semNomeCliente && (
                                 <>
                                   <button
                                     onClick={e => {
@@ -1068,7 +1107,9 @@ export function FiscalFlowKanban() {
                               )}
 
                               {/* Bloco número da venda até valor, com ícone ao lado */}
-                              <div className="mb-2 flex gap-2 pr-6">
+                              <div
+                                className={`mb-2 flex gap-2 ${podeGerenciarClienteVendaGestor && semNomeCliente ? 'pr-6' : temClienteComIdParaEditar ? 'pr-1' : ''}`}
+                              >
                                 <div className="min-w-0 flex-1 border-b border-gray-100 pb-1.5">
                                   <p className="mb-0.5 text-xs text-gray-500">
                                     {venda.origem} | 
@@ -1079,7 +1120,7 @@ export function FiscalFlowKanban() {
                                     <p className="mb-0 min-w-0 flex-1 truncate text-sm font-semibold uppercase text-primary-text">
                                       {clienteNome}
                                     </p>
-                                    {podeEditarClienteNaVenda && (
+                                    {podeGerenciarClienteVendaGestor && semNomeCliente && (
                                       <button
                                         type="button"
                                         onClick={e => {
@@ -1087,7 +1128,22 @@ export function FiscalFlowKanban() {
                                           handleAbrirSeletorClienteVenda(venda)
                                         }}
                                         className="flex-shrink-0 rounded p-0.5 text-primary transition-colors hover:bg-primary/10"
-                                        title="Incluir cliente na venda"
+                                        title="Vincular cliente à venda"
+                                        aria-label="Vincular cliente à venda"
+                                      >
+                                        <MdAdd className="h-4 w-4" />
+                                      </button>
+                                    )}
+                                    {temClienteComIdParaEditar && venda.cliente?.id && (
+                                      <button
+                                        type="button"
+                                        onClick={e => {
+                                          e.stopPropagation()
+                                          handleAbrirEdicaoCliente(venda.cliente!.id)
+                                        }}
+                                        className="flex-shrink-0 rounded p-0.5 text-primary transition-colors hover:bg-primary/10"
+                                        title="Editar dados do cliente"
+                                        aria-label="Editar dados do cliente"
                                       >
                                         <MdEdit className="h-4 w-4" />
                                       </button>
@@ -1301,6 +1357,53 @@ export function FiscalFlowKanban() {
         onSelect={handleClienteSelecionadoParaVenda}
         title="Vincular cliente à venda"
       />
+
+      <Dialog
+        open={editarClienteModalOpen && Boolean(editarClienteId)}
+        onOpenChange={open => {
+          if (!open) handleFecharEdicaoCliente()
+        }}
+        fullWidth
+        maxWidth="xl"
+        sx={{
+          '& .MuiDialog-container': {
+            zIndex: 1500,
+            justifyContent: { xs: 'center', md: 'flex-end' },
+            alignItems: 'stretch',
+            margin: 0,
+          },
+          '& .MuiBackdrop-root': { zIndex: 1500 },
+          '& .MuiDialog-paper': { zIndex: 1500 },
+        }}
+        PaperProps={{
+          sx: {
+            height: '100vh',
+            maxHeight: '100vh',
+            width: { xs: '95vw', sm: '90vw', md: 'min(900px, 60vw)' },
+            margin: { xs: 'auto', md: 0 },
+            borderRadius: 0,
+            display: 'flex',
+            flexDirection: 'column',
+          },
+        }}
+      >
+        <DialogContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
+          {editarClienteId && (
+            <div className="h-full overflow-y-auto">
+              <NovoCliente
+                key={editarClienteId}
+                clienteId={editarClienteId}
+                isEmbedded
+                onClose={handleFecharEdicaoCliente}
+                onSaved={() => {
+                  refetch()
+                  handleFecharEdicaoCliente()
+                }}
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

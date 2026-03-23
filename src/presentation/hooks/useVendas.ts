@@ -697,6 +697,54 @@ export function useDesmarcarEmissaoFiscal() {
 }
 
 /**
+ * Vincula um cliente à venda do Gestor (PATCH com clienteId).
+ * Apenas: PATCH /api/vendas/gestor/:id → /api/v1/gestor/vendas/:id
+ * (O PATCH da venda PDV exige outros campos e não suporta este fluxo.)
+ */
+export function useVincularClienteNaVenda() {
+  const { auth } = useAuthStore()
+  const queryClient = useQueryClient()
+  const token = auth?.getAccessToken()
+
+  return useMutation({
+    mutationFn: async (params: { vendaId: string; clienteId: string }) => {
+      if (!token) {
+        throw new Error('Token não encontrado')
+      }
+
+      const response = await fetch(`/api/vendas/gestor/${params.vendaId}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ clienteId: params.clienteId }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = resolveDomainErrorMessage(
+          errorData,
+          `Erro ${response.status}: ${response.statusText}`
+        )
+        throw new Error(errorMessage)
+      }
+
+      return await response.json()
+    },
+    onSuccess: (_, params) => {
+      queryClient.invalidateQueries({ queryKey: ['vendas'] })
+      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      queryClient.invalidateQueries({ queryKey: ['venda', params.vendaId] })
+      showToast.success('Cliente vinculado à venda.')
+    },
+    onError: (error: Error) => {
+      showToast.error(error.message || 'Erro ao vincular cliente à venda')
+    },
+  })
+}
+
+/**
  * Hook para emitir NFe (NFC-e ou NF-e) para uma venda PDV.
  * Fluxo assíncrono real: retorna após enfileirar/processar no backend.
  * A atualização final de status vem por webhook + refetch.
