@@ -25,7 +25,9 @@ export class Cliente {
     private readonly nomeFantasia?: string,
     private readonly ativo: boolean = true,
     private readonly empresaId?: string,
-    private readonly endereco?: Endereco
+    private readonly endereco?: Endereco,
+    /** Texto informativo retornado pela API (ex.: CPF/CNPJ prioritário) */
+    private readonly mensagemApi?: string
   ) {}
 
   static create(
@@ -39,7 +41,8 @@ export class Cliente {
     nomeFantasia?: string,
     ativo: boolean = true,
     empresaId?: string,
-    endereco?: Endereco
+    endereco?: Endereco,
+    mensagemApi?: string
   ): Cliente {
     // Validação mais flexível - permite valores padrão
     const validId = id || `temp-${Date.now()}-${Math.random()}`
@@ -56,7 +59,8 @@ export class Cliente {
       nomeFantasia,
       ativo,
       empresaId,
-      endereco
+      endereco,
+      mensagemApi
     )
   }
 
@@ -79,7 +83,13 @@ export class Cliente {
     // CPF e CNPJ: preserva string vazia se existir, undefined se não existir
     const cpf = data.cpf !== undefined && data.cpf !== null ? String(data.cpf) : undefined
     const cnpj = data.cnpj !== undefined && data.cnpj !== null ? String(data.cnpj) : undefined
-    
+
+    const mensagemRaw = data.message ?? data.mensagem
+    const mensagemApi =
+      typeof mensagemRaw === 'string' && mensagemRaw.trim() !== ''
+        ? mensagemRaw.trim()
+        : undefined
+
     return Cliente.create(
       id,
       nome,
@@ -103,7 +113,8 @@ export class Cliente {
             codigoCidadeIbge: (data.endereco?.codigoCidadeIbge || data.endereco_data?.codigoCidadeIbge)?.toString(),
             codigoEstadoIbge: (data.endereco?.codigoEstadoIbge || data.endereco_data?.codigoEstadoIbge)?.toString(),
           }
-        : undefined
+        : undefined,
+      mensagemApi
     )
   }
 
@@ -151,8 +162,13 @@ export class Cliente {
     return this.endereco
   }
 
+  /** Mensagem informativa da API (quando existir), ex.: prioridade CPF sobre CNPJ */
+  getMensagemApi(): string | undefined {
+    return this.mensagemApi
+  }
+
   toJSON() {
-    return {
+    const base = {
       id: this.id,
       nome: this.nome,
       razaoSocial: this.razaoSocial,
@@ -165,6 +181,10 @@ export class Cliente {
       empresaId: this.empresaId,
       endereco: this.endereco,
     }
+    if (this.mensagemApi) {
+      return { ...base, message: this.mensagemApi }
+    }
+    return base
   }
 }
 

@@ -471,20 +471,12 @@ export function NovoCliente({
     e.preventDefault()
     const token = auth?.getAccessToken()
     if (!token) {
-      alert('Token não encontrado')
+      showToast.error('Token não encontrado')
       return
     }
 
     const cpfLimpo = cpf.replace(/\D/g, '')
     const cnpjLimpo = cnpj.replace(/\D/g, '')
-
-    // Pessoa física ou jurídica: não permite CPF e CNPJ preenchidos ao mesmo tempo
-    if (cpfLimpo.length > 0 && cnpjLimpo.length > 0) {
-      showToast.error(
-        'Informe apenas CPF ou CNPJ, não os dois. Remova um dos documentos para salvar.'
-      )
-      return
-    }
 
     const telefoneLimpo = telefone.replace(/\D/g, '')
     // API externa exige DDD + número completo (10 fixo ou 11 celular no Brasil)
@@ -539,18 +531,10 @@ export function NovoCliente({
         ativo,
       }
 
-      // CPF e CNPJ: exclusivos (validação acima); envia só um — o outro vazio para limpar na edição
+      // CPF e CNPJ: na edição envia o que estiver no formulário (ambos se preenchidos); string vazia limpa no backend
       if (isEditing) {
-        if (cpfLimpo) {
-          body.cpf = cpfLimpo
-          body.cnpj = ''
-        } else if (cnpjLimpo) {
-          body.cnpj = cnpjLimpo
-          body.cpf = ''
-        } else {
-          body.cpf = ''
-          body.cnpj = ''
-        }
+        body.cpf = cpfLimpo || ''
+        body.cnpj = cnpjLimpo || ''
 
         // Telefone: null limpa na API externa (string vazia aciona validação de 11 dígitos)
         body.telefone = telefoneLimpo ? telefoneLimpo : null
@@ -608,12 +592,34 @@ export function NovoCliente({
         body: JSON.stringify(body),
       })
 
+      const result: { error?: string; message?: string } = await response
+        .json()
+        .catch(() => ({}))
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Erro ao salvar cliente')
+        const msgErro =
+          (typeof result.error === 'string' && result.error.trim()) ||
+          (typeof result.message === 'string' && result.message.trim()) ||
+          'Erro ao salvar cliente'
+        throw new Error(msgErro)
       }
 
       showToast.success(isEditing ? 'Cliente atualizado com sucesso!' : 'Cliente criado com sucesso!')
+
+      // API pode retornar aviso informativo no corpo (ex.: prioridade CPF ao enviar CPF + CNPJ)
+      const mensagemApi =
+        typeof result.message === 'string' ? result.message.trim() : ''
+
+      // Debug: conferir se `message` veio na resposta (toasts podem sobrepor no tempo)
+      console.debug('[NovoCliente] salvar cliente — campo message da API', {
+        'result.message': result.message,
+        mensagemApiAposTrim: mensagemApi || '(vazia — sem toast info)',
+        chavesNoBody: Object.keys(result),
+      })
+
+      if (mensagemApi) {
+        showToast.info(mensagemApi)
+      }
       
       if (onSaved) {
         onSaved()
@@ -622,7 +628,17 @@ export function NovoCliente({
       }
     } catch (error) {
       console.error('Erro ao salvar cliente:', error)
-      alert(error instanceof Error ? error.message : 'Erro ao salvar cliente')
+      const mensagem =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'string'
+            ? error
+            : 'Erro ao salvar cliente'
+      // Remove prefixo do repositório para o toast mostrar só o texto da API quando existir
+      const textoToast = mensagem
+        .replace(/^Erro ao (atualizar|criar) cliente:\s*/i, '')
+        .trim()
+      showToast.error(textoToast || mensagem)
     } finally {
       setIsLoading(false)
     }
@@ -650,6 +666,12 @@ export function NovoCliente({
       </div>
     )
   }
+
+  // Aviso de UX: CPF e CNPJ não devem ser preenchidos juntos (validação definitiva no backend)
+  const cpfSoDigitos = cpf.replace(/\D/g, '')
+  const cnpjSoDigitos = cnpj.replace(/\D/g, '')
+  const exibeAvisoCpfECnpjPreenchidos =
+    cpfSoDigitos.length > 0 && cnpjSoDigitos.length > 0
 
   return (
     <div className="flex flex-col h-full">
@@ -829,6 +851,16 @@ export function NovoCliente({
                 />
               </div>
             </div>
+
+            {exibeAvisoCpfECnpjPreenchidos && (
+              <p
+                role="alert"
+                className="text-sm font-nunito rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-950"
+              >
+                Informe apenas CPF ou CNPJ — não é possível preencher os dois ao mesmo tempo.
+                Remova um dos campos.
+              </p>
+            )}
 
             <div className="grid md:grid-cols-2 grid-cols-1 gap-3">
               <Input
