@@ -25,7 +25,12 @@ import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
 import { Produto } from '@/src/domain/entities/Produto'
 import { Cliente } from '@/src/domain/entities/Cliente'
-import { useCreateVendaGestor, useCancelarVendaGestor } from '@/src/presentation/hooks/useVendas'
+import {
+  useCreateVendaGestor,
+  useCancelarVendaGestor,
+  useCancelarNotaFiscalVendaPdv,
+  useCancelarNotaFiscalVendaGestor,
+} from '@/src/presentation/hooks/useVendas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { extractTokenInfo } from '@/src/shared/utils/validateToken'
@@ -59,6 +64,10 @@ import {
 } from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { SeletorClienteModal } from './SeletorClienteModal'
+import {
+  ProdutosTabsModal,
+  ProdutosTabsModalState,
+} from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
 
 interface NovoPedidoModalProps {
   open: boolean
@@ -168,6 +177,19 @@ function statusFiscalEhEmitida(
   return s === 'EMITIDA'
 }
 
+function statusFiscalPermiteCancelarNota(
+  resumoStatus: string | null | undefined,
+  statusUnificado: string | null | undefined,
+  statusDetalhe: string | null | undefined
+): boolean {
+  const r = resumoStatus != null ? String(resumoStatus).trim() : ''
+  const u = statusUnificado != null ? String(statusUnificado).trim() : ''
+  const d = statusDetalhe != null ? String(statusDetalhe).trim() : ''
+  const s = (r !== '' ? r : u !== '' ? u : d).toUpperCase()
+  // Só é possível cancelar nota já emitida
+  return s === 'EMITIDA'
+}
+
 export function NovoPedidoModal({
   open,
   onClose,
@@ -180,6 +202,8 @@ export function NovoPedidoModal({
   const { auth } = useAuthStore()
   const createVendaGestor = useCreateVendaGestor()
   const cancelarVendaGestor = useCancelarVendaGestor()
+  const cancelarNotaFiscalVendaPdv = useCancelarNotaFiscalVendaPdv()
+  const cancelarNotaFiscalVendaGestor = useCancelarNotaFiscalVendaGestor()
 
   const [origem, setOrigem] = useState<OrigemVenda>('GESTOR')
   const [status, setStatus] = useState<StatusVenda>('FINALIZADA')
@@ -207,7 +231,17 @@ export function NovoPedidoModal({
   const [dataFinalizacaoCarregada, setDataFinalizacaoCarregada] = useState<string | null>(null)
   const [vendaGestorJaCancelada, setVendaGestorJaCancelada] = useState(false)
   const [modalCancelarVendaOpen, setModalCancelarVendaOpen] = useState(false)
+  const [tipoCancelamentoSelecionado, setTipoCancelamentoSelecionado] = useState<'venda' | 'nota'>(
+    'venda'
+  )
   const [justificativaCancelamento, setJustificativaCancelamento] = useState('')
+  const [produtoTabsModalState, setProdutoTabsModalState] = useState<ProdutosTabsModalState>({
+    open: false,
+    tab: 'produto',
+    mode: 'edit',
+    produto: undefined,
+    initialStepProduto: 0,
+  })
   const [abaDetalhesPedido, setAbaDetalhesPedido] = useState<AbaDetalhesPedido>('dadosPedido')
   const [resumoFiscal, setResumoFiscal] = useState<ResumoFiscalVenda | null>(null)
   /** Texto bruto de `origem` no GET de detalhe (GESTOR/PDV/…); PDV muitas vezes omite o campo */
@@ -741,6 +775,27 @@ export function NovoPedidoModal({
       !vendaGestorJaCancelada &&
       currentStep === 4,
     [tabelaOrigemVenda, vendaId, dataFinalizacaoCarregada, vendaGestorJaCancelada, currentStep]
+  )
+
+  // Passo 4: exibir cancelamento de nota para PDV e Gestor quando status permitir
+  const podeExibirCancelarNotaFiscal = useMemo(
+    () =>
+      (tabelaOrigemVenda === 'venda' || tabelaOrigemVenda === 'venda_gestor') &&
+      Boolean(vendaId) &&
+      currentStep === 4 &&
+      statusFiscalPermiteCancelarNota(
+        resumoFiscal?.status,
+        statusFiscalUnificado,
+        statusVendaTextoApiDetalhe
+      ),
+    [
+      tabelaOrigemVenda,
+      vendaId,
+      currentStep,
+      resumoFiscal?.status,
+      statusFiscalUnificado,
+      statusVendaTextoApiDetalhe,
+    ]
   )
 
   /** Datas do resumo fiscal (API ISO) */
@@ -1422,7 +1477,39 @@ export function NovoPedidoModal({
     setModalConfirmacaoSaidaOpen(false)
   }
 
-  /** Confirma cancelamento da venda gestor (POST /api/vendas/gestor/:id/cancelar) */
+  const handleAbrirEdicaoProdutoDetalhes = useCallback((produtoId: string | null | undefined) => {
+    const id = String(produtoId || '').trim()
+    if (!id) {
+      showToast.error('Não foi possível abrir a edição: produto sem ID.')
+      return
+    }
+    const produtoPedido = produtos.find(p => p.produtoId === id)
+    const produtoParaEditar = Produto.create(
+      id,
+      '',
+      produtoPedido?.nome || 'Produto',
+      produtoPedido?.valorUnitario || 0,
+      true
+    )
+    setProdutoTabsModalState({
+      open: true,
+      tab: 'produto',
+      mode: 'edit',
+      produto: produtoParaEditar,
+      // Abrir direto na etapa fiscal para ajuste rápido da tributação
+      initialStepProduto: 2,
+    })
+  }, [produtos])
+
+  const handleFecharProdutoTabsModal = useCallback(() => {
+    setProdutoTabsModalState(prev => ({ ...prev, open: false }))
+  }, [])
+
+  const handleTabChangeProdutoModal = useCallback((tab: 'produto' | 'complementos' | 'impressoras' | 'grupo') => {
+    setProdutoTabsModalState(prev => ({ ...prev, tab }))
+  }, [])
+
+  /** Confirma cancelamento (venda gestor OU nota fiscal por origem) */
   const handleConfirmarCancelamentoVenda = async () => {
     if (!vendaId) return
 
@@ -1432,12 +1519,27 @@ export function NovoPedidoModal({
     }
 
     try {
-      await cancelarVendaGestor.mutateAsync({
-        id: vendaId,
-        motivo: justificativaCancelamento.trim(),
-      })
+      if (tipoCancelamentoSelecionado === 'venda') {
+        await cancelarVendaGestor.mutateAsync({
+          id: vendaId,
+          motivo: justificativaCancelamento.trim(),
+        })
+      } else {
+        if (tabelaOrigemVenda === 'venda_gestor') {
+          await cancelarNotaFiscalVendaGestor.mutateAsync({
+            id: vendaId,
+            justificativa: justificativaCancelamento.trim(),
+          })
+        } else {
+          await cancelarNotaFiscalVendaPdv.mutateAsync({
+            id: vendaId,
+            justificativa: justificativaCancelamento.trim(),
+          })
+        }
+      }
       setModalCancelarVendaOpen(false)
       setJustificativaCancelamento('')
+      setTipoCancelamentoSelecionado('venda')
       resetForm()
       setInternalDialogOpen(false)
       onSuccess()
@@ -3268,7 +3370,11 @@ export function NovoPedidoModal({
                                   <div
                                     className={`flex items-center gap-1 rounded ${
                                       index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                                    }`}
+                                    } cursor-pointer`}
+                                    onDoubleClick={() =>
+                                      handleAbrirEdicaoProdutoDetalhes(produto.produtoId)
+                                    }
+                                    title="Duplo clique para editar este produto"
                                   >
                                     {/* Quantidade */}
                                     <div className="w-[60px] flex-shrink-0">
@@ -3443,11 +3549,30 @@ export function NovoPedidoModal({
                     variant="contained"
                     color="error"
                     size="large"
-                    onClick={() => setModalCancelarVendaOpen(true)}
+                    onClick={() => {
+                      setTipoCancelamentoSelecionado('venda')
+                      setModalCancelarVendaOpen(true)
+                    }}
                     className="flex items-center gap-2"
                   >
                     <MdCancel className="h-5 w-5" />
                     Cancelar Venda
+                  </Button>
+                )}
+                {podeExibirCancelarNotaFiscal && (
+                  <Button
+                    type="button"
+                    variant="contained"
+                    color="error"
+                    size="large"
+                    onClick={() => {
+                      setTipoCancelamentoSelecionado('nota')
+                      setModalCancelarVendaOpen(true)
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <MdCancel className="h-5 w-5" />
+                    Cancelar Nota
                   </Button>
                 )}
                 <Button
@@ -3931,12 +4056,15 @@ export function NovoPedidoModal({
           </DialogContent>
         </Dialog>
 
-        {/* Modal de justificativa: cancelar venda gestor (ver docs/CANCELAR_VENDA_GESTOR.md) */}
+        {/* Modal de justificativa: cancelamento por origem (Gestor: venda | PDV: nota fiscal) */}
         <Dialog
           open={modalCancelarVendaOpen}
           onOpenChange={isOpen => {
             setModalCancelarVendaOpen(isOpen)
-            if (!isOpen) setJustificativaCancelamento('')
+            if (!isOpen) {
+              setJustificativaCancelamento('')
+              setTipoCancelamentoSelecionado('venda')
+            }
           }}
           maxWidth="sm"
           sx={{
@@ -3957,12 +4085,15 @@ export function NovoPedidoModal({
                 py: 2,
               }}
             >
-              Cancelar Venda
+              {tipoCancelamentoSelecionado === 'venda' ? 'Cancelar Venda' : 'Cancelar Nota Fiscal'}
             </DialogTitle>
             <div className="space-y-4 pt-2">
               <p className="text-sm text-gray-600">
-                Esta ação cancelará a venda e, se houver nota fiscal emitida, também a cancelará na
-                SEFAZ.
+                {tipoCancelamentoSelecionado === 'venda'
+                  ? 'Esta ação cancelará a venda e, se houver nota fiscal emitida, também a cancelará na SEFAZ.'
+                  : tabelaOrigemVenda === 'venda_gestor'
+                    ? 'Esta ação cancelará a nota fiscal vinculada à venda do Gestor na SEFAZ.'
+                    : 'Esta ação cancelará a nota fiscal vinculada à venda PDV na SEFAZ.'}
               </p>
               <p className="text-sm font-bold text-red-600">Esta ação não pode ser desfeita!</p>
               <Textarea
@@ -3984,8 +4115,13 @@ export function NovoPedidoModal({
                 onClick={() => {
                   setModalCancelarVendaOpen(false)
                   setJustificativaCancelamento('')
+                  setTipoCancelamentoSelecionado('venda')
                 }}
-                disabled={cancelarVendaGestor.isPending}
+                disabled={
+                  cancelarVendaGestor.isPending ||
+                  cancelarNotaFiscalVendaPdv.isPending ||
+                  cancelarNotaFiscalVendaGestor.isPending
+                }
               >
                 Voltar
               </Button>
@@ -3994,9 +4130,16 @@ export function NovoPedidoModal({
                 color="error"
                 onClick={handleConfirmarCancelamentoVenda}
                 disabled={
-                  cancelarVendaGestor.isPending || justificativaCancelamento.trim().length < 15
+                  cancelarVendaGestor.isPending ||
+                  cancelarNotaFiscalVendaPdv.isPending ||
+                  cancelarNotaFiscalVendaGestor.isPending ||
+                  justificativaCancelamento.trim().length < 15
                 }
-                isLoading={cancelarVendaGestor.isPending}
+                isLoading={
+                  cancelarVendaGestor.isPending ||
+                  cancelarNotaFiscalVendaPdv.isPending ||
+                  cancelarNotaFiscalVendaGestor.isPending
+                }
               >
                 Confirmar Cancelamento
               </Button>
@@ -4004,6 +4147,11 @@ export function NovoPedidoModal({
           </DialogContent>
         </Dialog>
       </Dialog>
+      <ProdutosTabsModal
+        state={produtoTabsModalState}
+        onClose={handleFecharProdutoTabsModal}
+        onTabChange={handleTabChangeProdutoModal}
+      />
     </>
   )
 }

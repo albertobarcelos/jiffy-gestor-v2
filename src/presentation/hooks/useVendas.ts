@@ -1150,6 +1150,118 @@ export function useCancelarVendaGestor() {
 }
 
 /**
+ * Hook para cancelar nota fiscal de uma venda PDV
+ */
+export function useCancelarNotaFiscalVendaPdv() {
+  const { auth } = useAuthStore()
+  const queryClient = useQueryClient()
+  const token = auth?.getAccessToken()
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      justificativa,
+    }: {
+      id: string
+      justificativa: string
+    }) => {
+      if (!token) {
+        throw new Error('Token não encontrado')
+      }
+
+      if (justificativa.trim().length < 15) {
+        throw new Error('Justificativa deve ter no mínimo 15 caracteres')
+      }
+
+      const response = await fetch(`/api/vendas/${id}/cancelar-nota`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ justificativa: justificativa.trim() }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = resolveDomainErrorMessage(
+          errorData,
+          `Erro ${response.status}: ${response.statusText}`
+        )
+        throw new Error(errorMessage)
+      }
+
+      return await response.json()
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['vendas'] })
+      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      queryClient.invalidateQueries({ queryKey: ['venda', variables.id] })
+      showToast.success('Nota fiscal cancelada com sucesso!')
+    },
+    onError: (error: Error) => {
+      showToast.error(error.message || 'Erro ao cancelar nota fiscal')
+    },
+  })
+}
+
+/**
+ * Hook para cancelar nota fiscal de uma venda do Gestor
+ */
+export function useCancelarNotaFiscalVendaGestor() {
+  const { auth } = useAuthStore()
+  const queryClient = useQueryClient()
+  const token = auth?.getAccessToken()
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      justificativa,
+    }: {
+      id: string
+      justificativa: string
+    }) => {
+      if (!token) {
+        throw new Error('Token não encontrado')
+      }
+
+      if (justificativa.trim().length < 15) {
+        throw new Error('Justificativa deve ter no mínimo 15 caracteres')
+      }
+
+      const response = await fetch(`/api/vendas/gestor/${id}/cancelar-nota`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ justificativa: justificativa.trim() }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = resolveDomainErrorMessage(
+          errorData,
+          `Erro ${response.status}: ${response.statusText}`
+        )
+        throw new Error(errorMessage)
+      }
+
+      return await response.json()
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['vendas'] })
+      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id] })
+      showToast.success('Nota fiscal cancelada com sucesso!')
+    },
+    onError: (error: Error) => {
+      showToast.error(error.message || 'Erro ao cancelar nota fiscal')
+    },
+  })
+}
+
+/**
  * Hook para excluir definitivamente uma venda do gestor.
  * Regra de negócio: permitido apenas quando não há documento fiscal autorizado/cancelado.
  */

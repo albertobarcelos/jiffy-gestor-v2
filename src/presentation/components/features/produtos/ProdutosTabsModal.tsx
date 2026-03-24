@@ -17,6 +17,7 @@ export interface ProdutosTabsModalState {
   produto?: Produto
   prefillGrupoProdutoId?: string
   grupoId?: string
+  initialStepProduto?: 0 | 1 | 2
 }
 
 interface ProdutosTabsModalProps {
@@ -124,6 +125,7 @@ export function ProdutosTabsModal({ state, onClose, onReload, onTabChange }: Pro
                 produtoId={state.mode === 'create' ? undefined : produtoId}
                 isCopyMode={state.mode === 'copy'}
                 defaultGrupoProdutoId={state.mode === 'create' ? state.prefillGrupoProdutoId : undefined}
+                initialStep={state.initialStepProduto ?? 0}
                 onClose={onClose}
                 onSuccess={(produtoData) => {
                   // Passar dados do produto para atualização otimista do cache

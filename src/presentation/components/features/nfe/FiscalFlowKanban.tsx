@@ -41,6 +41,7 @@ import {
   MdCalendarToday,
   MdMoreVert,
   MdEdit,
+  MdAddBox,
 } from 'react-icons/md'
 import { EmitirNfeModal } from './EmitirNfeModal'
 import { SeletorClienteModal } from './SeletorClienteModal'
@@ -1131,7 +1132,7 @@ export function FiscalFlowKanban() {
                                         title="Vincular cliente à venda"
                                         aria-label="Vincular cliente à venda"
                                       >
-                                        <MdAdd className="h-4 w-4" />
+                                        <MdAddBox className="h-4 w-4" />
                                       </button>
                                     )}
                                     {temClienteComIdParaEditar && venda.cliente?.id && (
