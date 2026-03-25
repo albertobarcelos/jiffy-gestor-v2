@@ -31,8 +31,11 @@ export function getDocumentoFiscalPdfRetryModalSnapshot(): DocumentoFiscalPdfRet
   return state
 }
 
+/** Referência estável — useSyncExternalStore exige que getServerSnapshot não aloque objeto novo a cada render. */
+const serverSnapshotFechado: DocumentoFiscalPdfRetryModalState = { open: false }
+
 export function getDocumentoFiscalPdfRetryModalServerSnapshot(): DocumentoFiscalPdfRetryModalState {
-  return { open: false }
+  return serverSnapshotFechado
 }
 
 /** Abre o modal e retorna a escolha do usuário (null = fechou sem escolher). */

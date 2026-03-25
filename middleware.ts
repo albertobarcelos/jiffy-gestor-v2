@@ -8,13 +8,15 @@ import type { NextRequest } from 'next/server'
  */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
-  
+
   // Rotas públicas - bypass rápido
   if (
-    pathname === '/login' || 
+    pathname === '/login' ||
     pathname.startsWith('/api/auth/login') ||
     pathname.startsWith('/api/consulta-cnpj') ||
-    pathname.startsWith('/api/consulta-cep')
+    pathname.startsWith('/api/consulta-cep') ||
+    pathname.startsWith('/notas-fiscais') ||
+    pathname.startsWith('/api/public/notas-fiscais-consumidor')
   ) {
     return NextResponse.next()
   }
