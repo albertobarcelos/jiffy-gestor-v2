@@ -824,7 +824,7 @@ export function Etapa3EmissorFiscal() {
                   size="small"
                 />
                 <p className="text-xs text-secondary-text/70">
-                  Código de 8 dígitos obtido na SEFAZ
+                  Obtido na SEFAZ da sua UF
                 </p>
               </div>
             </div>
