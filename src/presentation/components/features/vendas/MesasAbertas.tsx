@@ -228,7 +228,6 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
       const limit = 100
 
       while (hasMore) {
-        // Sem `ativo`: a API lista todos os usuários (ativos e inativos) para resolver nome do "Aberto por"
         const params = new URLSearchParams({
           limit: limit.toString(),
           offset: currentOffset.toString(),
@@ -749,7 +748,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
                   </div>
 
                   <div className="w-full flex flex-col items-start px-2 mb-4">
-                    <div className="flex flex-col md:flex-row items-start md:items-center"><span className="text-xs text-primary-text font-nunito font-semibold">Usuário:</span> <span className="font-normal text-xs">{usuarioNome}</span></div>
+                    <div className="flex flex-col md:flex-row items-start md:items-center"><span className="text-xs text-primary-text font-nunito font-semibold">Usuário</span> <span className="font-normal text-xs">: {usuarioNome}</span></div>
                     <div className="flex justify-between w-full text-xs text-primary-text font-nunito mt-1">
                       <div className="flex flex-col items-start"><span className="font-semibold">Valor atual</span><span>{formatCurrency(venda.valorFinal)}</span></div>
                       <div className="flex flex-col items-start"><span className="font-semibold">Aberta há</span><span>{elapsedTime}</span></div>

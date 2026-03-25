@@ -7,7 +7,6 @@ import {
   DragStartEvent,
   DragOverlay,
   PointerSensor,
-  TouchSensor,
   useSensor,
   useSensors,
   useDraggable,
@@ -176,7 +175,12 @@ function VendaCardDragPreview({ venda }: { venda: VendaUnificadaDTO }) {
   )
 }
 
-/** Card draggable em Finalizadas (→ Pendente Emissão) e em Pendente Emissão (→ Finalizadas); PDV e Gestor */
+/**
+ * Card draggable em Finalizadas (→ Pendente Emissão) e em Pendente Emissão (→ Finalizadas); PDV e Gestor.
+ * Em mobile: não trocar o conteúdo do card por outro nó ao arrastar — isso quebrava a sequência touch
+ * (o preview somecia no meio do gesto). Mantemos o mesmo DOM e só reduzimos opacidade; o DragOverlay mostra o preview.
+ * touch-action: none evita o scroll da coluna competir com o arraste.
+ */
 function DraggableVendaCard({
   venda,
   column,
@@ -200,15 +204,10 @@ function DraggableVendaCard({
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      className="cursor-grab active:cursor-grabbing"
+      className={`touch-none cursor-grab select-none active:cursor-grabbing ${isDragging ? 'opacity-40' : ''}`}
+      style={{ touchAction: 'none' }}
     >
-      {isDragging ? (
-        <div className="flex min-h-[100px] items-center justify-center rounded border-2 border-dashed border-gray-300 bg-gray-50/80">
-          <span className="text-xs text-gray-400">Arrastando...</span>
-        </div>
-      ) : (
-        children
-      )}
+      {children}
     </div>
   )
 }
@@ -408,10 +407,10 @@ export function FiscalFlowKanban() {
     }
   }, [dataUpdatedAt, isLoading, vendasUnificadasData, marcarEmissaoFiscal])
 
-  // Sensores para drag-and-drop: evita conflito com clique (abrir detalhes)
+  // Só PointerSensor: em touch, pointermove fica no document (melhor que TouchSensor no alvo + scroll).
+  // TouchSensor junto com PointerSensor gerava gesto “travado” no mobile; distance evita arraste ao rolar.
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 100, tolerance: 8 } })
+    useSensor(PointerSensor, { activationConstraint: { distance: 10 } })
   )
 
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
