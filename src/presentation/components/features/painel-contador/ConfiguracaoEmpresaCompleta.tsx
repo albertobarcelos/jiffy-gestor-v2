@@ -494,7 +494,7 @@ export function ConfiguracaoEmpresaCompleta() {
   }
 
   return (
-    <div className="w-full px-6 pt-6 pb-4">
+    <div className="w-full md:p-6 p-2">
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 px-6 pt-6 pb-4">
         <h2 className="text-2xl font-bold text-alternate mb-6">Configuração Completa da Empresa</h2>
         

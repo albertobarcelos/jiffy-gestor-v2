@@ -112,7 +112,7 @@ export function Etapa5TabelaIbpt() {
   }
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4 md:p-4 p-2">
       <div className="rounded-lg border border-primary/20 bg-white p-4">
         <h1 className="font-exo font-semibold text-alternate text-base mb-2">
           Tabela IBPT (Impostos Básicos sobre Produtos e Serviços)

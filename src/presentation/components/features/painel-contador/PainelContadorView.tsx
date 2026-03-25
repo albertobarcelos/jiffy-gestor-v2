@@ -620,7 +620,7 @@ export function PainelContadorView() {
   return (
     <div className="pb-2 flex w-full flex-col items-stretch bg-info lg:flex-row lg:h-full">
       {/* Painel Esquerdo - Roxo */}
-      <div className="flex min-h-[350px] flex-1 md:w-[70%] lg:w-[72%] w-full flex-col overflow-hidden rounded-tr-none rounded-br-none bg-secondary lg:h-full lg:rounded-tr-[48px] lg:rounded-br-[48px]">
+      <div className="flex min-h-[300px] flex-1 md:w-[70%] lg:w-[72%] w-full flex-col overflow-hidden rounded-tr-none rounded-br-none bg-secondary lg:h-full lg:rounded-tr-[48px] lg:rounded-br-[48px]">
         {/* Seção Superior com Título e Ilustração */}
         <div className="flex flex-col gap-3 sm:gap-4 lg:gap-6 border-b border-[#330468] bg-[rgba(131,56,236,0.4)] sm:rounded-tr-[24px] md:rounded-tr-[32px] lg:rounded-tr-[48px] p-3 sm:p-4">
           <div className="flex flex-row items-center justify-center gap-4 sm:gap-16">
@@ -629,7 +629,7 @@ export function PainelContadorView() {
               <img
                 src="/images/jiffy-contador.png"
                 alt="Jiffy Contador"
-                className="w-64 h-64 p-2 object-contain object-left-top"
+                className="md:w-64 md:h-64 w-28 h-28 p-2 object-contain object-left-top"
               />
             </div>
 

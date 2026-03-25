@@ -326,13 +326,24 @@ export function ConfigurarNcmModal({
           zIndex: 1300,
           backgroundColor: '#ffffff', // Fundo branco sólido
           opacity: 1, // Garante opacidade total
+          // Mobile: modal ocupa ~95% da viewport (largura e altura)
+          width: { xs: '95vw', sm: 'auto' },
+          maxWidth: { xs: '95vw !important', sm: undefined },
+          height: { xs: '95vh', sm: 'auto' },
+          maxHeight: { xs: '95vh', sm: undefined },
+          margin: { xs: 'auto', sm: undefined },
+          display: { xs: 'flex', sm: 'block' },
+          flexDirection: { xs: 'column', sm: 'initial' },
         },
       }}
     >
       <DialogContent 
         sx={{ 
-          maxWidth: '56rem', 
-          maxHeight: '90vh', 
+          maxWidth: { xs: '100%', sm: '56rem' },
+          width: { xs: '100%', sm: 'auto' },
+          maxHeight: { xs: '100%', sm: '90vh' },
+          minHeight: { xs: 0, sm: 'auto' },
+          flex: { xs: 1, sm: 'none' },
           overflow: 'hidden', // Remove overflow do container principal
           backgroundColor: '#ffffff', // Fundo branco sólido
           padding: 0,
@@ -351,10 +362,9 @@ export function ConfigurarNcmModal({
             flex: 1,
             overflowY: 'auto',
             overflowX: 'hidden',
-            padding: '0 24px',
             minHeight: 0, // Permite que o flex funcione corretamente
           }}
-          className="scrollbar-thin"
+          className="scrollbar-thin md:px-24 px-2"
         >
           <form id="configurar-ncm-form" onSubmit={handleSubmit} className="space-y-4" style={{ paddingTop: '8px', paddingBottom: '24px' }}>
           <div className="space-y-2">
@@ -375,7 +385,7 @@ export function ConfigurarNcmModal({
             <p className="text-xs text-secondary-text/70">8 dígitos</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
             <div className="space-y-2">
               <Label htmlFor="cfop">CFOP</Label>
               <Input
@@ -451,7 +461,7 @@ export function ConfigurarNcmModal({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
             <div className="space-y-2">
               <Label htmlFor="icmsAliquota">Alíquota ICMS (%)</Label>
               <Input
@@ -471,7 +481,7 @@ export function ConfigurarNcmModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
             <div className="space-y-2">
               <Label htmlFor="pisCst">CST PIS</Label>
               <Select
@@ -509,7 +519,7 @@ export function ConfigurarNcmModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
             <div className="space-y-2">
               <Label htmlFor="cofinsCst">CST COFINS</Label>
               <Select
