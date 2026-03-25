@@ -1,17 +1,23 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/src/presentation/components/ui/dialog'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Dialog, DialogContent, DialogFooter } from '@/src/presentation/components/ui/dialog'
 import { Button } from '@/src/presentation/components/ui/button'
+import { Input } from '@/src/presentation/components/ui/input'
 import { useEmitirNfe, useEmitirNfeGestor } from '@/src/presentation/hooks/useVendas'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdClose } from 'react-icons/md'
+
+/** Aplica máscara de CPF (000.000.000-00) durante a digitação — apenas UI. */
+function formatarCpfMascara(valor: string): string {
+  const digitos = valor.replace(/\D/g, '').slice(0, 11)
+  if (digitos.length <= 3) return digitos
+  if (digitos.length <= 6) return `${digitos.slice(0, 3)}.${digitos.slice(3)}`
+  if (digitos.length <= 9) {
+    return `${digitos.slice(0, 3)}.${digitos.slice(3, 6)}.${digitos.slice(6)}`
+  }
+  return `${digitos.slice(0, 3)}.${digitos.slice(3, 6)}.${digitos.slice(6, 9)}-${digitos.slice(9)}`
+}
 
 interface EmitirNfeModalProps {
   open: boolean
@@ -45,6 +51,12 @@ export function EmitirNfeModal({
   const emitirNfe = tabelaOrigem === 'venda_gestor' ? emitirNfeGestor : emitirNfePdv
   const [emissaoEmProcessamento, setEmissaoEmProcessamento] = useState(false)
   const [modeloEmitindo, setModeloEmitindo] = useState<55 | 65 | null>(null)
+  /** CPF do consumidor para NFC-e (UI preparada; envio ao backend pendente). */
+  const [cpfNfce, setCpfNfce] = useState('')
+
+  useEffect(() => {
+    if (!open) setCpfNfce('')
+  }, [open])
 
   const temClienteCadastrado = useMemo(
     () => Boolean(clienteId && String(clienteId).trim() !== ''),
@@ -168,23 +180,36 @@ export function EmitirNfeModal({
               )}
             </button>
 
-            <button
-              type="button"
-              disabled={bloqueado}
-              onClick={() => void emitirPorModelo(65)}
-              title="Emitir NFC-e"
-              className="flex min-h-[160px] flex-col items-center justify-center rounded-xl border-2 border-primary bg-white p-6 text-center shadow-sm transition-all hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <span className="text-3xl font-extrabold tracking-tight text-primary sm:text-4xl">
-                NFC-e
-              </span>
-              <span className="mt-2 max-w-[14rem] text-xs font-medium leading-snug text-gray-600 sm:text-sm">
-                Nota Fiscal de Consumidor Eletrônica
-              </span>
-              {bloqueado && modeloEmitindo === 65 && (
-                <span className="mt-2 text-xs font-medium text-primary">Emitindo...</span>
-              )}
-            </button>
+            <div className="flex min-h-[160px] flex-col rounded-xl border-2 border-primary bg-white p-4 text-center shadow-sm sm:p-5">
+              <div className="flex flex-1 flex-col items-center justify-center">
+                <span className="text-3xl font-extrabold tracking-tight text-primary sm:text-4xl">
+                  NFC-e
+                </span>
+                <span className="mt-2 max-w-[14rem] text-xs font-medium leading-snug text-gray-600 sm:text-sm">
+                  Nota Fiscal de Consumidor Eletrônica
+                </span>
+              </div>
+              <div className="mt-4 w-full text-left">
+                <Input
+                  label="CPF do consumidor"
+                  placeholder="000.000.000-00"
+                  size="small"
+                  value={cpfNfce}
+                  onChange={e => setCpfNfce(formatarCpfMascara(e.target.value))}
+                  inputProps={{ inputMode: 'numeric', autoComplete: 'off' }}
+                  disabled={bloqueado}
+                />
+              </div>
+              <button
+                type="button"
+                disabled={bloqueado}
+                onClick={() => void emitirPorModelo(65)}
+                title="Emitir NFC-e"
+                className="mt-4 w-full rounded-lg border-2 border-primary bg-primary py-2.5 text-sm font-semibold text-info shadow-sm transition-all hover:bg-primary/95 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {bloqueado && modeloEmitindo === 65 ? 'Emitindo...' : 'Emitir NFC-e'}
+              </button>
+            </div>
           </div>
         </div>
 

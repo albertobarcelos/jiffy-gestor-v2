@@ -13,7 +13,7 @@ type ApiErrorData = {
 
 /**
  * POST /api/vendas/gestor/[id]/reemitir
- * Reemite nota fiscal para uma venda do gestor rejeitada
+ * Proxy para o backend: POST /api/v1/gestor/vendas/{id}/reemitir-nota (Swagger)
  */
 export async function POST(
   request: NextRequest,
@@ -35,7 +35,7 @@ export async function POST(
     const apiClient = new ApiClient()
 
     const response = await apiClient.request<any>(
-      `/api/v1/gestor/vendas/${id}/reemitir`,
+      `/api/v1/gestor/vendas/${id}/reemitir-nota`,
       {
         method: 'POST',
         headers: {

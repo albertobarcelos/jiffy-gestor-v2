@@ -600,7 +600,12 @@ export function useMarcarEmissaoFiscal() {
   const token = auth?.getAccessToken()
 
   return useMutation({
-    mutationFn: async (params: { id: string; tabelaOrigem?: 'venda' | 'venda_gestor' }) => {
+    mutationFn: async (params: {
+      id: string
+      tabelaOrigem?: 'venda' | 'venda_gestor'
+      /** Não exibir toast de sucesso (ex.: correção automática no Kanban) */
+      silent?: boolean
+    }) => {
       if (!token) {
         throw new Error('Token não encontrado')
       }
@@ -634,7 +639,9 @@ export function useMarcarEmissaoFiscal() {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
       queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
       queryClient.invalidateQueries({ queryKey: ['venda', params.id] })
-      showToast.success('Venda marcada para emissão fiscal!')
+      if (!params.silent) {
+        showToast.success('Venda marcada para emissão fiscal!')
+      }
     },
     onError: (error: Error) => {
       showToast.error(error.message || 'Erro ao marcar emissão fiscal')
@@ -1026,11 +1033,14 @@ export function useReemitirNfeGestor() {
       modelo,
       tipoDocumento,
       serie,
+      numero,
     }: {
       id: string
       modelo: 55 | 65
       tipoDocumento: 'NFE' | 'NFCE'
       serie: number
+      /** Número da nota rejeitada (Swagger: body opcional reemitir-nota) */
+      numero?: number
     }) => {
       if (!token) {
         throw new Error('Token não encontrado')
@@ -1053,6 +1063,7 @@ export function useReemitirNfeGestor() {
           serie,
           ambiente: fiscalConfig.ambiente,
           crt: fiscalConfig.crt,
+          ...(numero != null && Number.isFinite(numero) ? { numero } : {}),
         }),
       })
 

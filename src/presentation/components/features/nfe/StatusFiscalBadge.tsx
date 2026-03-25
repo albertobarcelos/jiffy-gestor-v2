@@ -23,9 +23,9 @@ interface StatusFiscalBadgeProps {
  * Componente Badge para exibir status fiscal com cores e ícones
  */
 export function StatusFiscalBadge({ status, className }: StatusFiscalBadgeProps) {
-  if (!status) return null
+  if (status == null || status === '') return null
 
-  const statusUpper = status.toUpperCase() as StatusFiscal
+  const statusUpper = String(status).trim().toUpperCase() as StatusFiscal
 
   const getStatusConfig = (status: StatusFiscal) => {
     switch (status) {

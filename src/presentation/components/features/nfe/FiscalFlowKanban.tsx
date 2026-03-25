@@ -17,8 +17,6 @@ import {
   useMarcarEmissaoFiscal,
   useDesmarcarEmissaoFiscal,
   useVincularClienteNaVenda,
-  useEmitirNfe,
-  useEmitirNfeGestor,
   useReemitirNfe,
   useReemitirNfeGestor,
 } from '@/src/presentation/hooks/useVendas'
@@ -295,6 +293,8 @@ export function FiscalFlowKanban() {
     Record<string, 'emitindo' | 'reemitindo'>
   >({})
   const [draggingVenda, setDraggingVenda] = useState<Venda | null>(null)
+  /** Evita PATCH duplicado ao reativar solicitarEmissaoFiscal para REJEITADA (Strict Mode / re-renders) */
+  const rejeitadaReativacaoEmAndamentoRef = useRef(false)
   const [vendaRecemMovidaParaPendenteId, setVendaRecemMovidaParaPendenteId] = useState<
     string | null
   >(null)
@@ -393,15 +393,55 @@ export function FiscalFlowKanban() {
     data: vendasUnificadasData,
     isLoading,
     refetch,
+    dataUpdatedAt,
   } = useVendasUnificadas(vendasUnificadasQueryParams)
 
   const marcarEmissaoFiscal = useMarcarEmissaoFiscal()
   const desmarcarEmissaoFiscal = useDesmarcarEmissaoFiscal()
   const vincularClienteNaVenda = useVincularClienteNaVenda()
-  const emitirNfePdv = useEmitirNfe()
-  const emitirNfeGestor = useEmitirNfeGestor()
   const reemitirNfePdv = useReemitirNfe()
   const reemitirNfeGestor = useReemitirNfeGestor()
+
+  // REJEITADA com solicitarEmissaoFiscal false: reativa com o mesmo PATCH de "marcar emissão" (useMarcarEmissaoFiscal)
+  useEffect(() => {
+    if (isLoading || !vendasUnificadasData?.items?.length || rejeitadaReativacaoEmAndamentoRef.current) return
+
+    const pendentes = vendasUnificadasData.items.filter(v => {
+      const rejeitada = String(v.statusFiscal ?? '').trim().toUpperCase() === 'REJEITADA'
+      return rejeitada && !v.solicitarEmissaoFiscal
+    })
+    if (pendentes.length === 0) return
+
+    rejeitadaReativacaoEmAndamentoRef.current = true
+    let cancelled = false
+    void (async () => {
+      try {
+        for (const v of pendentes) {
+          if (cancelled) break
+          await marcarEmissaoFiscal.mutateAsync({
+            id: v.id,
+            tabelaOrigem: v.tabelaOrigem,
+            silent: true,
+          })
+        }
+        if (!cancelled && pendentes.length > 0) {
+          showToast.info(
+            pendentes.length === 1
+              ? 'Solicitação de emissão reativada para a venda com nota rejeitada.'
+              : `Solicitação de emissão reativada para ${pendentes.length} vendas com nota rejeitada.`
+          )
+        }
+      } catch {
+        // onError do hook já exibe toast de erro
+      } finally {
+        rejeitadaReativacaoEmAndamentoRef.current = false
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [dataUpdatedAt, isLoading, vendasUnificadasData, marcarEmissaoFiscal])
 
   // Sensores para drag-and-drop: evita conflito com clique (abrir detalhes)
   const sensors = useSensors(
@@ -583,6 +623,7 @@ export function FiscalFlowKanban() {
   // Ao soltar: Finalizadas → Pendente Emissão = marcar; Pendente Emissão → Finalizadas = desmarcar
   // - Só chama marcar se solicitarEmissaoFiscal ainda não é true (evita requisição ao reordenar em Pendente ou soltar de volta sem sair da coluna).
   // - Só chama desmarcar se solicitarEmissaoFiscal é true (evita requisição ao soltar em Finalizadas sem ter vindo de Pendente).
+  // - statusFiscal REJEITADA: não permite soltar em Finalizadas (toast sempre, mesmo com solicitarEmissaoFiscal false).
   const handleDragEnd = (event: DragEndEvent) => {
     setDraggingVenda(null)
     const { active, over } = event
@@ -595,10 +636,21 @@ export function FiscalFlowKanban() {
       if (venda.solicitarEmissaoFiscal !== true) {
         handleMarcarEmissaoFiscal(venda.id, venda.tabelaOrigem)
       }
-    } else if (over.id === 'FINALIZADAS' && venda.solicitarEmissaoFiscal === true) {
-      setVendaRecemMovidaParaFinalizadasId(venda.id)
-      persistirOrdemAoMover(venda.id, 'FINALIZADAS')
-      handleDesmarcarEmissaoFiscal(venda.id, venda.tabelaOrigem)
+    } else if (over.id === 'FINALIZADAS') {
+      // Rejeitada pode estar com solicitarEmissaoFiscal false — o bloqueio não pode depender só desse flag
+      const fiscalRejeitada =
+        String(venda.statusFiscal ?? '').trim().toUpperCase() === 'REJEITADA'
+      if (fiscalRejeitada) {
+        showToast.warning(
+          'Vendas com nota rejeitada não podem ser movidas para Finalizadas. Use Reemitir na coluna Pendente Emissão.'
+        )
+        return
+      }
+      if (venda.solicitarEmissaoFiscal === true) {
+        setVendaRecemMovidaParaFinalizadasId(venda.id)
+        persistirOrdemAoMover(venda.id, 'FINALIZADAS')
+        handleDesmarcarEmissaoFiscal(venda.id, venda.tabelaOrigem)
+      }
     }
   }
 
@@ -637,7 +689,7 @@ export function FiscalFlowKanban() {
           return
         }
 
-        const payload = {
+        const basePayload = {
           id: venda.id,
           modelo: modeloInicial,
           tipoDocumento: venda.tipoDocFiscal,
@@ -645,9 +697,15 @@ export function FiscalFlowKanban() {
         }
 
         if (venda.tabelaOrigem === 'venda_gestor') {
-          await reemitirNfeGestor.mutateAsync(payload)
+          await reemitirNfeGestor.mutateAsync({
+            ...basePayload,
+            ...(venda.numeroFiscal != null &&
+            Number.isFinite(Number(venda.numeroFiscal))
+              ? { numero: Number(venda.numeroFiscal) }
+              : {}),
+          })
         } else {
-          await reemitirNfePdv.mutateAsync(payload)
+          await reemitirNfePdv.mutateAsync(basePayload)
         }
         await refetch()
         await refetchAteMudarStatusFiscal(venda.id, 'REJEITADA')
@@ -1211,14 +1269,19 @@ export function FiscalFlowKanban() {
                                     size="sm"
                                     variant="contained"
                                     className="flex-1 !bg-primary hover:!bg-primary/90"
-                                    sx={{ py: 0.375, px: 1, minHeight: 'auto' }}
+                                    sx={{
+                                      py: 0.375,
+                                      px: 1,
+                                      minHeight: 'auto',
+                                      // Só esta venda usa acaoFiscalEmAndamentoPorVenda; não usar isPending global dos hooks (afetava todos os cards)
+                                      '&.MuiButton-contained.Mui-disabled': {
+                                        color: 'rgba(255,255,255,0.96)',
+                                        WebkitTextFillColor: 'rgba(255,255,255,0.96)',
+                                      },
+                                    }}
                                     onClick={() => handleEmitirNfe(venda)}
                                     disabled={
                                       !!acaoFiscalEmAndamentoPorVenda[venda.id] ||
-                                      emitirNfePdv.isPending ||
-                                      emitirNfeGestor.isPending ||
-                                      reemitirNfePdv.isPending ||
-                                      reemitirNfeGestor.isPending ||
                                       venda.statusFiscal === 'PENDENTE' ||
                                       venda.statusFiscal === 'PENDENTE_EMISSAO' ||
                                       venda.statusFiscal === 'EMITINDO' ||

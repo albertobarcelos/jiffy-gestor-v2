@@ -3,6 +3,56 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 
 /**
+ * Primeiro texto não vazio entre candidatos (null, undefined e string só com espaços ignorados).
+ * Importante: `"" ?? resumoFiscal.status` em JS mantém ""; por isso não usamos ?? em cadeia para status.
+ */
+function primeiroStatusTextoNaoVazio(...candidatos: unknown[]): string | undefined {
+    for (const c of candidatos) {
+        if (c == null) continue
+        const s = String(c).trim()
+        if (s) return s
+    }
+    return undefined
+}
+
+/**
+ * Status fiscal exibido no Kanban / DTO unificado.
+ *
+ * Alinhamento com o detalhe da venda (NovoPedidoModal): lá o fiscal costuma vir em `resumoFiscal.status`.
+ * No GET /vendas/unificado o backend costuma expor `statusFiscal` na raiz; em alguns casos só um dos dois vem
+ * preenchido (ou a raiz vem string vazia). Ordem de prioridade:
+ * 1) `statusFiscal` (raiz)  2) `status_fiscal` (raiz)  3) `resumoFiscal.status`  4) `resumoFiscal.statusFiscal`
+ *
+ * Depois: trim + UPPER para bater com === 'REJEITADA' no FiscalFlowKanban e StatusFiscalBadge.
+ */
+function normalizarStatusFiscalUnificado(item: Record<string, unknown>): VendaUnificadaDTO['statusFiscal'] {
+    const rf =
+        item.resumoFiscal && typeof item.resumoFiscal === 'object'
+            ? (item.resumoFiscal as Record<string, unknown>)
+            : null
+
+    const raw = primeiroStatusTextoNaoVazio(
+        item.statusFiscal,
+        item.status_fiscal,
+        rf?.status,
+        rf?.statusFiscal
+    )
+    if (!raw) return null
+    return raw.toUpperCase() as VendaUnificadaDTO['statusFiscal']
+}
+
+/** Evita Boolean("false") === true se a API enviar string */
+function parseSolicitarEmissaoFiscal(raw: unknown): boolean {
+    if (typeof raw === 'boolean') return raw
+    if (typeof raw === 'string') {
+        const t = raw.trim().toLowerCase()
+        if (t === 'true' || t === '1') return true
+        if (t === 'false' || t === '0' || t === '') return false
+    }
+    return Boolean(raw)
+}
+
+/**
  * DTO unificado para vendas do PDV e do Gestor (TypeScript)
  * Deve corresponder à classe VendaUnificadaDTO do backend
  */
@@ -167,30 +217,32 @@ export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
             const data = await response.json()
 
             // Converter objetos JSON para instâncias de VendaUnificadaDTO
-            const items = (data.items || []).map((v: any) => new VendaUnificadaDTO(
-                v.id,
-                v.numeroVenda,
-                v.codigoVenda,
-                v.tipoVenda,
-                v.origem,
-                v.tabelaOrigem,
-                v.valorFinal,
-                v.totalDesconto,
-                v.totalAcrescimo,
-                v.dataCriacao,
-                v.dataFinalizacao,
-                v.dataCancelamento ?? null, // API pode não retornar; considerar cancelada por statusFiscal
-                v.cliente,
-                v.solicitarEmissaoFiscal,
-                v.statusFiscal,
-                v.documentoFiscalId,
-                v.abertoPor,
-                v.numeroFiscal,
-                v.serieFiscal,
-                v.dataEmissaoFiscal,
-                v.tipoDocFiscal,
-                v.retornoSefaz
-            ))
+            const items = (data.items || []).map((v: Record<string, unknown>) =>
+                new VendaUnificadaDTO(
+                    v.id as string,
+                    v.numeroVenda as number,
+                    v.codigoVenda as string,
+                    v.tipoVenda as string | null,
+                    v.origem as VendaUnificadaDTO['origem'],
+                    v.tabelaOrigem as VendaUnificadaDTO['tabelaOrigem'],
+                    v.valorFinal as number,
+                    v.totalDesconto as number,
+                    v.totalAcrescimo as number,
+                    v.dataCriacao as string,
+                    v.dataFinalizacao as string | null,
+                    (v.dataCancelamento ?? null) as string | null,
+                    v.cliente as VendaUnificadaDTO['cliente'],
+                    parseSolicitarEmissaoFiscal(v.solicitarEmissaoFiscal),
+                    normalizarStatusFiscalUnificado(v),
+                    (v.documentoFiscalId ?? null) as string | null,
+                    v.abertoPor as VendaUnificadaDTO['abertoPor'],
+                    v.numeroFiscal as number | null | undefined,
+                    v.serieFiscal as string | null | undefined,
+                    v.dataEmissaoFiscal as string | null | undefined,
+                    v.tipoDocFiscal as VendaUnificadaDTO['tipoDocFiscal'],
+                    v.retornoSefaz as string | null | undefined
+                )
+            )
 
             return {
                 items,
@@ -206,23 +258,8 @@ export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
         staleTime: 1000 * 30, // 30 segundos
         refetchOnWindowFocus: true,
         refetchOnReconnect: true,
-        // Polling só enquanto houver nota em processamento na SEFAZ. Não incluir PENDENTE / PENDENTE_EMISSAO:
-        // esses estados podem ficar dias até o usuário emitir e geravam GET a cada 5s indefinidamente.
-        refetchInterval: query => {
-            const data = query.state.data
-            if (!data?.items?.length) return false
-
-            const temProcessamentoSefazEmAndamento = data.items.some(venda => {
-                const status = venda.statusFiscal?.toUpperCase()
-                return (
-                    status === 'EMITINDO' ||
-                    status === 'PENDENTE_AUTORIZACAO' ||
-                    status === 'CONTINGENCIA'
-                )
-            })
-
-            return temProcessamentoSefazEmAndamento ? 5000 : false
-        },
-        refetchIntervalInBackground: false,
+        // Polling por status fiscal (PENDENTE / EMITINDO / etc.) desativado temporariamente: vendas presas em
+        // PENDENTE geravam refetch contínuo. Atualizar manualmente (botão) ou ao focar a janela até nova estratégia.
+        refetchInterval: false,
     })
 }
