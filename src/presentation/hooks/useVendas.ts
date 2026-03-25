@@ -704,9 +704,10 @@ export function useDesmarcarEmissaoFiscal() {
 }
 
 /**
- * Vincula um cliente à venda do Gestor (PATCH com clienteId).
- * Apenas: PATCH /api/vendas/gestor/:id → /api/v1/gestor/vendas/:id
- * (O PATCH da venda PDV exige outros campos e não suporta este fluxo.)
+ * Vincula um cliente à venda (PATCH com clienteId).
+ * - Gestor: PATCH /api/vendas/gestor/:id
+ * - PDV: PATCH /api/vendas/:id
+ * O backend exige `solicitarEmissaoFiscal` no PATCH; por padrão envia `true` (fluxo fiscal / Kanban).
  */
 export function useVincularClienteNaVenda() {
   const { auth } = useAuthStore()
@@ -714,18 +715,35 @@ export function useVincularClienteNaVenda() {
   const token = auth?.getAccessToken()
 
   return useMutation({
-    mutationFn: async (params: { vendaId: string; clienteId: string }) => {
+    mutationFn: async (params: {
+      vendaId: string
+      clienteId: string
+      tabelaOrigem?: 'venda' | 'venda_gestor'
+      /** Padrão true — obrigatório na API ao atualizar venda no contexto de emissão. */
+      solicitarEmissaoFiscal?: boolean
+    }) => {
       if (!token) {
         throw new Error('Token não encontrado')
       }
 
-      const response = await fetch(`/api/vendas/gestor/${params.vendaId}`, {
+      const origem = params.tabelaOrigem ?? 'venda_gestor'
+      const url =
+        origem === 'venda_gestor'
+          ? `/api/vendas/gestor/${params.vendaId}`
+          : `/api/vendas/${params.vendaId}`
+
+      const solicitarEmissaoFiscal = params.solicitarEmissaoFiscal !== false
+
+      const response = await fetch(url, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ clienteId: params.clienteId }),
+        body: JSON.stringify({
+          clienteId: params.clienteId,
+          solicitarEmissaoFiscal,
+        }),
       })
 
       if (!response.ok) {

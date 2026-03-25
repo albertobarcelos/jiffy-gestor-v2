@@ -228,10 +228,10 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
       const limit = 100
 
       while (hasMore) {
+        // Sem `ativo`: a API lista todos os usuários (ativos e inativos) para resolver nome do "Aberto por"
         const params = new URLSearchParams({
           limit: limit.toString(),
           offset: currentOffset.toString(),
-          ativo: 'true',
         })
 
         const response = await fetch(`/api/usuarios?${params.toString()}`, {

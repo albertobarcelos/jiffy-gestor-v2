@@ -4,9 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Dialog, DialogContent, DialogFooter } from '@/src/presentation/components/ui/dialog'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
-import { useEmitirNfe, useEmitirNfeGestor } from '@/src/presentation/hooks/useVendas'
+import { useEmitirNfe, useEmitirNfeGestor, useVincularClienteNaVenda } from '@/src/presentation/hooks/useVendas'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdClose } from 'react-icons/md'
+import { SeletorClienteModal } from '@/src/presentation/components/features/nfe/SeletorClienteModal'
+import { Cliente } from '@/src/domain/entities/Cliente'
 
 /** Aplica máscara de CPF (000.000.000-00) durante a digitação — apenas UI. */
 function formatarCpfMascara(valor: string): string {
@@ -49,21 +51,49 @@ export function EmitirNfeModal({
   const emitirNfeGestor = useEmitirNfeGestor()
 
   const emitirNfe = tabelaOrigem === 'venda_gestor' ? emitirNfeGestor : emitirNfePdv
+  const vincularCliente = useVincularClienteNaVenda()
   const [emissaoEmProcessamento, setEmissaoEmProcessamento] = useState(false)
   const [modeloEmitindo, setModeloEmitindo] = useState<55 | 65 | null>(null)
   /** CPF do consumidor para NFC-e (UI preparada; envio ao backend pendente). */
   const [cpfNfce, setCpfNfce] = useState('')
+  const [seletorClienteOpen, setSeletorClienteOpen] = useState(false)
+  /** Após vincular no modal, atualiza exibição até o pai refetch (props). */
+  const [clienteVinculadoLocal, setClienteVinculadoLocal] = useState<{
+    id: string
+    nome: string
+  } | null>(null)
 
   useEffect(() => {
-    if (!open) setCpfNfce('')
+    if (!open) {
+      setCpfNfce('')
+      setClienteVinculadoLocal(null)
+    }
   }, [open])
 
-  const temClienteCadastrado = useMemo(
-    () => Boolean(clienteId && String(clienteId).trim() !== ''),
-    [clienteId]
-  )
+  const temClienteCadastrado = useMemo(() => {
+    const id = clienteVinculadoLocal?.id ?? clienteId
+    return Boolean(id && String(id).trim() !== '')
+  }, [clienteId, clienteVinculadoLocal])
 
-  const nomeClienteExibicao = clienteNome?.trim() || 'Sem cliente'
+  const nomeClienteExibicao =
+    clienteVinculadoLocal?.nome?.trim() || clienteNome?.trim() || 'Sem cliente'
+
+  const handleClienteSelecionado = async (cliente: Cliente) => {
+    try {
+      await vincularCliente.mutateAsync({
+        vendaId,
+        clienteId: cliente.getId(),
+        tabelaOrigem,
+      })
+      setClienteVinculadoLocal({
+        id: cliente.getId(),
+        nome: cliente.getNome(),
+      })
+      setSeletorClienteOpen(false)
+    } catch {
+      // Toast de erro vem do hook
+    }
+  }
 
   const emitirPorModelo = useCallback(
     async (modelo: 55 | 65) => {
@@ -95,11 +125,19 @@ export function EmitirNfeModal({
     [emissaoEmProcessamento, emitirNfe, onClose, temClienteCadastrado, vendaId]
   )
 
-  const bloqueado = emissaoEmProcessamento || emitirNfe.isPending
+  const bloqueado =
+    emissaoEmProcessamento || emitirNfe.isPending || vincularCliente.isPending
 
   return (
-    <Dialog open={open} onOpenChange={isOpen => !isOpen && onClose()}>
-      <DialogContent sx={{ maxWidth: 520, padding: '0px 24px 24px 24px' }}>
+    <>
+      <SeletorClienteModal
+        open={seletorClienteOpen}
+        onClose={() => setSeletorClienteOpen(false)}
+        onSelect={c => void handleClienteSelecionado(c)}
+        title="Vincular cliente à venda"
+      />
+      <Dialog open={open} onOpenChange={isOpen => !isOpen && onClose()}>
+        <DialogContent sx={{ maxWidth: 520, padding: '0px 24px 24px 24px' }}>
         <div className="flex items-center justify-between">
           <h1 className="text-primary font-exo font-bold text-lg sm:text-2xl py-4">Emitir Nota</h1>
             <button
@@ -144,42 +182,50 @@ export function EmitirNfeModal({
             </p>
           </div>
 
-          {!temClienteCadastrado && (
-            <div
-              className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-950"
-              role="alert"
-            >
-              <p className="font-semibold text-amber-900">NF-e não pode ser emitida.</p>
-              <p className="mt-1 leading-relaxed">
-                O modelo <strong>NF-e</strong> exige que a venda
-                possua um <strong>cliente vinculado à venda</strong>. 
-              </p>
-            </div>
-          )}
-
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <button
-              type="button"
-              disabled={bloqueado || !temClienteCadastrado}
-              onClick={() => void emitirPorModelo(55)}
-              title={
-                !temClienteCadastrado
-                  ? 'Cadastre um cliente na venda para emitir NF-e'
-                  : 'Emitir NF-e'
-              }
-              className="flex min-h-[160px] flex-col items-center justify-center rounded-xl border-2 border-primary bg-primary p-6 text-center shadow-sm transition-all hover:bg-primary/95 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <span className="text-3xl font-extrabold tracking-tight text-info sm:text-4xl">
-                NF-e
-              </span>
-              <span className="mt-2 max-w-[12rem] text-xs font-medium leading-snug text-gray-200 sm:text-sm">
-                Nota Fiscal eletrônica
-              </span>
-              {bloqueado && modeloEmitindo === 55 && (
-                <span className="mt-2 text-xs font-medium text-primary">Emitindo...</span>
+            <div className="flex min-h-[160px] flex-col rounded-xl border-2 border-primary bg-primary p-4 text-center shadow-sm sm:p-5">
+              <div className="flex flex-1 flex-col items-center justify-center">
+                <span className="text-3xl font-extrabold tracking-tight text-info sm:text-4xl">
+                  NF-e
+                </span>
+                <span className="mt-2 max-w-[12rem] text-xs font-medium leading-snug text-gray-200 sm:text-sm">
+                  Nota Fiscal eletrônica
+                </span>
+              </div>
+              {!temClienteCadastrado && (
+                <div className="mt-4 w-full text-left">
+                  <p className="mb-2 text-xs leading-relaxed text-gray-200 text-center">
+                    A NF-e exige um <strong className="text-gray-100">cliente vinculado</strong> à venda.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outlined"
+                    disabled={bloqueado}
+                    onClick={() => setSeletorClienteOpen(true)}
+                    className="w-full border-white/80 text-info hover:bg-white/10"
+                    sx={{
+                      borderColor: 'rgba(255,255,255,0.7)',
+                      color: '#fff',
+                    }}
+                  >
+                    {vincularCliente.isPending ? 'Vinculando...' : 'Vincular cliente'}
+                  </Button>
+                </div>
               )}
-            </button>
-
+              <button
+                type="button"
+                disabled={bloqueado || !temClienteCadastrado}
+                onClick={() => void emitirPorModelo(55)}
+                title={
+                  !temClienteCadastrado
+                    ? 'Vincule um cliente à venda para emitir NF-e'
+                    : 'Emitir NF-e'
+                }
+                className="mt-4 w-full rounded-lg border-2 border-white/50 bg-white/10 py-2.5 text-sm font-semibold text-info shadow-sm transition-all hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {bloqueado && modeloEmitindo === 55 ? 'Emitindo...' : 'Emitir NF-e'}
+              </button>
+            </div>
             <div className="flex min-h-[160px] flex-col rounded-xl border-2 border-primary bg-white p-4 text-center shadow-sm sm:p-5">
               <div className="flex flex-1 flex-col items-center justify-center">
                 <span className="text-3xl font-extrabold tracking-tight text-primary sm:text-4xl">
@@ -218,7 +264,8 @@ export function EmitirNfeModal({
             Cancelar
           </Button>
         </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
