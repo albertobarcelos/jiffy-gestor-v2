@@ -1060,7 +1060,8 @@ export function FiscalFlowKanban() {
                           <DraggableVendaCard key={venda.id} venda={venda} column={column}>
                             <div
                               className={`relative rounded-lg border-l-4 ${column.borderColorClass} bg-white cursor-pointer border border-gray-200/80 p-3 transition-all hover:shadow-md`}
-                              onClick={() => handleViewDetails(venda)}
+                              title="Duplo clique para ver os detalhes do pedido"
+                              onDoubleClick={() => handleViewDetails(venda)}
                             >
                               {/* Menu de três pontos: apenas quando ainda não há cliente (abre seletor) */}
                               {podeGerenciarClienteVendaGestor && semNomeCliente && (
@@ -1070,6 +1071,7 @@ export function FiscalFlowKanban() {
                                       e.stopPropagation()
                                       toggleMenuAcoes(venda.id)
                                     }}
+                                    onDoubleClick={e => e.stopPropagation()}
                                     className="absolute right-2 top-2 rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
                                     title="Mais opções"
                                   >
@@ -1080,6 +1082,7 @@ export function FiscalFlowKanban() {
                                     <div
                                       className="absolute right-2 top-9 z-20 w-36 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
                                       onClick={e => e.stopPropagation()}
+                                      onDoubleClick={e => e.stopPropagation()}
                                     >
                                       <button
                                         type="button"
@@ -1087,6 +1090,7 @@ export function FiscalFlowKanban() {
                                           setMenuAcoesVendaIdAberto(null)
                                           handleAbrirSeletorClienteVenda(venda, 'incluir')
                                         }}
+                                        onDoubleClick={e => e.stopPropagation()}
                                         className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
                                       >
                                         Incluir cliente
@@ -1117,6 +1121,7 @@ export function FiscalFlowKanban() {
                                           e.stopPropagation()
                                           handleAbrirSeletorClienteVenda(venda, 'incluir')
                                         }}
+                                        onDoubleClick={e => e.stopPropagation()}
                                         className="flex-shrink-0 rounded p-0.5 text-primary transition-colors hover:bg-primary/10"
                                         title="Adicionar cliente à venda"
                                         aria-label="Adicionar cliente à venda"
@@ -1132,6 +1137,7 @@ export function FiscalFlowKanban() {
                                             e.stopPropagation()
                                             handleAbrirEdicaoCliente(venda.cliente!.id)
                                           }}
+                                          onDoubleClick={e => e.stopPropagation()}
                                           className="flex-shrink-0 rounded p-0.5 text-primary transition-colors hover:bg-primary/10"
                                           title="Editar dados do cliente"
                                           aria-label="Editar dados do cliente"
@@ -1144,6 +1150,7 @@ export function FiscalFlowKanban() {
                                             e.stopPropagation()
                                             handleAbrirSeletorClienteVenda(venda, 'trocar')
                                           }}
+                                          onDoubleClick={e => e.stopPropagation()}
                                           className="flex-shrink-0 rounded p-0.5 text-primary transition-colors hover:bg-primary/10"
                                           title="Trocar cliente da venda"
                                           aria-label="Trocar cliente da venda"
@@ -1200,7 +1207,11 @@ export function FiscalFlowKanban() {
                               </div>
 
                               {/* Ações baseadas na coluna */}
-                              <div className="mt-0.5 flex gap-2" onClick={e => e.stopPropagation()}>
+                              <div
+                                className="mt-0.5 flex gap-2"
+                                onClick={e => e.stopPropagation()}
+                                onDoubleClick={e => e.stopPropagation()}
+                              >
                                 {/* Ações para colunas de delivery — COMENTADO: colunas não utilizadas por enquanto */}
                                 {/* {['EM_ANALISE', 'EM_PRODUCAO', 'PRONTOS_ENTREGA', 'COM_ENTREGADOR'].includes(column.id) && (
                               <div className="text-xs text-gray-500 italic w-full text-center py-1">
