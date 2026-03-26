@@ -120,18 +120,65 @@ interface ProdutoSelecionado {
   tipoAcrescimo?: 'fixo' | 'porcentagem' | null
   valorAcrescimo?: number | null
   valorFinal?: number | null // Valor final do produto quando carregado do backend (já calculado)
+  lancadoPorId?: string
+  removido?: boolean
+  removidoPorId?: string
+  dataLancamento?: string
+  dataRemocao?: string
+  ncm?: string
 }
 
 interface PagamentoSelecionado {
   meioPagamentoId: string
   valor: number
+  realizadoPorId?: string
+  cancelado?: boolean
+  canceladoPorId?: string
+  dataCriacao?: string
+  dataCancelamento?: string
+  isTefUsed?: boolean
+  isTefConfirmed?: boolean
+  tefIdentifier?: string
+  tefAdquirente?: string
+  cnpjAdquirente?: string
+  codigoAutorizacao?: string
+  tipoIntegracao?: string
+  bandeiraCartao?: string
 }
 
 type OrigemVenda = 'GESTOR' | 'IFOOD' | 'RAPPI' | 'OUTROS'
 type StatusVenda = 'ABERTA' | 'FINALIZADA' | 'PENDENTE_EMISSAO'
 
-/** Abas em Detalhes do Pedido (modo visualização — venda finalizada) */
-type AbaDetalhesPedido = 'dadosPedido' | 'notaFiscal'
+/** Abas em Detalhes do Pedido (passo 4) */
+type AbaDetalhesPedido = 'infoPedido' | 'listaProdutos' | 'pagamentos' | 'notaFiscal'
+
+interface DetalhesPedidoMeta {
+  numeroVenda?: number | null
+  codigoVenda?: string | null
+  tipoVenda?: string | null
+  numeroMesa?: string | number | null
+  statusMesa?: string | null
+  abertoPorId?: string | null
+  ultimoResponsavelId?: string | null
+  canceladoPorId?: string | null
+  codigoTerminal?: string | null
+  terminalId?: string | null
+  identificacao?: string | null
+  solicitarEmissaoFiscal?: boolean | null
+  dataCriacao?: string | null
+  dataFinalizacao?: string | null
+  dataCancelamento?: string | null
+  dataUltimaModificacao?: string | null
+  dataUltimoProdutoLancado?: string | null
+}
+
+interface ResumoFinanceiroDetalhes {
+  totalItensLancados: number
+  totalItensCancelados: number
+  totalDosItens: number
+  totalDescontosConta: number
+  totalAcrescimosConta: number
+}
 
 /**
  * Texto do campo Origem no painel de detalhes (abas Dados / contexto visualização).
@@ -242,7 +289,15 @@ export function NovoPedidoModal({
     produto: undefined,
     initialStepProduto: 0,
   })
-  const [abaDetalhesPedido, setAbaDetalhesPedido] = useState<AbaDetalhesPedido>('dadosPedido')
+  const [abaDetalhesPedido, setAbaDetalhesPedido] = useState<AbaDetalhesPedido>('infoPedido')
+  const [detalhesPedidoMeta, setDetalhesPedidoMeta] = useState<DetalhesPedidoMeta | null>(null)
+  const [nomesUsuariosPedido, setNomesUsuariosPedido] = useState<Record<string, string>>({})
+  const [nomesMeiosPagamentoPedido, setNomesMeiosPagamentoPedido] = useState<Record<string, string>>(
+    {}
+  )
+  const [resumoFinanceiroDetalhes, setResumoFinanceiroDetalhes] =
+    useState<ResumoFinanceiroDetalhes | null>(null)
+  const [vendaIdCriada, setVendaIdCriada] = useState<string | null>(null)
   const [resumoFiscal, setResumoFiscal] = useState<ResumoFiscalVenda | null>(null)
   /** Texto bruto de `origem` no GET de detalhe (GESTOR/PDV/…); PDV muitas vezes omite o campo */
   const [origemTextoApiDetalhe, setOrigemTextoApiDetalhe] = useState<string | null>(null)
@@ -285,10 +340,10 @@ export function NovoPedidoModal({
   ])
 
   useEffect(() => {
-    if (modoVisualizacao && abaDetalhesPedido === 'notaFiscal' && !podeExibirAbaNotaFiscal) {
-      setAbaDetalhesPedido('dadosPedido')
+    if (currentStep === 4 && abaDetalhesPedido === 'notaFiscal' && !podeExibirAbaNotaFiscal) {
+      setAbaDetalhesPedido('infoPedido')
     }
-  }, [modoVisualizacao, abaDetalhesPedido, podeExibirAbaNotaFiscal])
+  }, [currentStep, abaDetalhesPedido, podeExibirAbaNotaFiscal])
 
   // Estado para controlar valores em edição (índice do produto ou chave do complemento -> valor string)
   const [valoresEmEdicao, setValoresEmEdicao] = useState<Record<string | number, string>>({})
@@ -814,6 +869,29 @@ export function NovoPedidoModal({
     } catch {
       return String(valor)
     }
+  }
+
+  const formatarDataDetalhePedido = (valor: string | null | undefined): string => {
+    if (!valor || String(valor).trim() === '') return '—'
+    try {
+      const d = new Date(valor)
+      if (Number.isNaN(d.getTime())) return '—'
+      return d.toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    } catch {
+      return '—'
+    }
+  }
+
+  const formatarUsuarioPorId = (usuarioId: string | null | undefined): string => {
+    const id = String(usuarioId || '').trim()
+    if (!id) return '—'
+    return nomesUsuariosPedido[id] || 'Usuário não identificado'
   }
 
   const rotuloModeloNfe = (modelo: number | null | undefined): string => {
@@ -1358,6 +1436,21 @@ export function NovoPedidoModal({
       showToast.success('Pedido criado com sucesso!')
       // Ir para step 4 (Detalhes da Venda) após criar o pedido
       setCurrentStep(4)
+
+      // Após criar, buscar o detalhe completo para preencher campos que dependem de lookup por ID
+      const idCriado =
+        String(
+          (resultado as any)?.id ||
+            (resultado as any)?.vendaId ||
+            (resultado as any)?.data?.id ||
+            (resultado as any)?.data?.vendaId ||
+            ''
+        ).trim() || null
+
+      if (idCriado) {
+        setVendaIdCriada(idCriado)
+        await carregarVendaExistente(idCriado)
+      }
     } catch (error: any) {
       console.error('❌ Erro ao criar pedido:', error)
       console.error('❌ Detalhes do erro:', {
@@ -1416,10 +1509,15 @@ export function NovoPedidoModal({
     setVendaGestorJaCancelada(false)
     setModalCancelarVendaOpen(false)
     setJustificativaCancelamento('')
-    setAbaDetalhesPedido('dadosPedido')
+    setAbaDetalhesPedido('infoPedido')
     setResumoFiscal(null)
     setOrigemTextoApiDetalhe(null)
     setStatusVendaTextoApiDetalhe(null)
+    setDetalhesPedidoMeta(null)
+    setNomesUsuariosPedido({})
+    setNomesMeiosPagamentoPedido({})
+    setResumoFinanceiroDetalhes(null)
+    setVendaIdCriada(null)
 
     // Limpar timeouts de long press de complementos
     if (longPressComplementoTimeoutRef.current) {
@@ -1550,8 +1648,9 @@ export function NovoPedidoModal({
   }
 
   // Função para carregar dados de uma venda existente
-  const carregarVendaExistente = useCallback(async () => {
-    if (!vendaId || !open || !auth) return
+  const carregarVendaExistente = useCallback(async (vendaIdOverride?: string | null) => {
+    const vendaIdParaCarregar = vendaIdOverride || vendaId || vendaIdCriada
+    if (!vendaIdParaCarregar || !open || !auth) return
 
     const token = auth.getAccessToken()
     if (!token) {
@@ -1566,8 +1665,8 @@ export function NovoPedidoModal({
     try {
       const urlVenda =
         tabelaOrigemVenda === 'venda'
-          ? `/api/vendas/${vendaId}?incluirFiscal=true`
-          : `/api/vendas/gestor/${vendaId}?incluirFiscal=true`
+          ? `/api/vendas/${vendaIdParaCarregar}?incluirFiscal=true`
+          : `/api/vendas/gestor/${vendaIdParaCarregar}?incluirFiscal=true`
 
       const response = await fetch(urlVenda, {
         headers: {
@@ -1582,6 +1681,26 @@ export function NovoPedidoModal({
       }
 
       const vendaData = await response.json()
+
+      setDetalhesPedidoMeta({
+        numeroVenda: vendaData.numeroVenda ?? null,
+        codigoVenda: vendaData.codigoVenda ?? null,
+        tipoVenda: vendaData.tipoVenda ?? null,
+        numeroMesa: vendaData.numeroMesa ?? null,
+        statusMesa: vendaData.statusMesa ?? null,
+        abertoPorId: vendaData.abertoPorId ?? null,
+        ultimoResponsavelId: vendaData.ultimoResponsavelId ?? null,
+        canceladoPorId: vendaData.canceladoPorId ?? null,
+        codigoTerminal: vendaData.codigoTerminal ?? null,
+        terminalId: vendaData.terminalId ?? null,
+        identificacao: vendaData.identificacao ?? null,
+        solicitarEmissaoFiscal: vendaData.solicitarEmissaoFiscal ?? null,
+        dataCriacao: vendaData.dataCriacao ?? null,
+        dataFinalizacao: vendaData.dataFinalizacao ?? null,
+        dataCancelamento: vendaData.dataCancelamento ?? null,
+        dataUltimaModificacao: vendaData.dataUltimaModificacao ?? null,
+        dataUltimoProdutoLancado: vendaData.dataUltimoProdutoLancado ?? null,
+      })
 
       if (vendaData.resumoFiscal && typeof vendaData.resumoFiscal === 'object') {
         setResumoFiscal(vendaData.resumoFiscal as ResumoFiscalVenda)
@@ -1659,9 +1778,7 @@ export function NovoPedidoModal({
       const produtosRaw = vendaData.produtosLancados || vendaData.produtos
 
       if (produtosRaw && Array.isArray(produtosRaw)) {
-        const produtosMapeados: ProdutoSelecionado[] = produtosRaw
-          .filter((prod: any) => !prod.removido) // Filtrar produtos removidos
-          .map((prod: any) => {
+        const produtosMapeadosTodos: ProdutoSelecionado[] = produtosRaw.map((prod: any) => {
             // Buscar nome do produto
             let nomeProduto = prod.nomeProduto || prod.nome || 'Produto sem nome'
 
@@ -1800,29 +1917,184 @@ export function NovoPedidoModal({
               tipoAcrescimo: tipoAcrescimoFinal,
               valorAcrescimo: valorAcrescimoFinal,
               valorFinal: valorFinalProduto,
+              lancadoPorId: prod.lancadoPorId || null,
+              removido: Boolean(prod.removido),
+              removidoPorId: prod.removidoPorId || null,
+              dataLancamento: prod.dataLancamento || null,
+              dataRemocao: prod.dataRemocao || null,
+              ncm: prod.ncm || null,
             }
           })
 
+        const produtosMapeados = produtosMapeadosTodos.filter(prod => !prod.removido)
         console.log('✅ Produtos mapeados:', produtosMapeados)
         setProdutos(produtosMapeados)
+
+        // Resumo financeiro alinhado ao DetalhesVendas.tsx:
+        // A) total itens lançados (inclui removidos), B) itens cancelados, C) A-B, descontos e acréscimos
+        const vendaCancelada = Boolean(vendaData.dataCancelamento || vendaData.canceladoPorId)
+        let totalItensLancados = 0
+        let totalItensCancelados = 0
+        let totalDescontosConta = 0
+        let totalAcrescimosConta = 0
+
+        produtosMapeadosTodos.forEach(produto => {
+          const valorBaseProduto = produto.valorUnitario * produto.quantidade
+          const valorComplementos = (produto.complementos || []).reduce((sum, comp) => {
+            const tipo = comp.tipoImpactoPreco || 'nenhum'
+            const valorTotal = comp.valor * comp.quantidade * produto.quantidade
+            if (tipo === 'aumenta') return sum + valorTotal
+            if (tipo === 'diminui') return sum - valorTotal
+            return sum
+          }, 0)
+          const subtotal = valorBaseProduto + valorComplementos
+
+          let valorDesconto = 0
+          if (produto.tipoDesconto && produto.valorDesconto) {
+            if (produto.tipoDesconto === 'porcentagem') {
+              valorDesconto = subtotal * (produto.valorDesconto / 100)
+            } else {
+              valorDesconto = produto.valorDesconto
+            }
+          }
+          let valorAcrescimo = 0
+          if (produto.tipoAcrescimo && produto.valorAcrescimo) {
+            if (produto.tipoAcrescimo === 'porcentagem') {
+              valorAcrescimo = subtotal * (produto.valorAcrescimo / 100)
+            } else {
+              valorAcrescimo = produto.valorAcrescimo
+            }
+          }
+
+          totalDescontosConta += valorDesconto
+          totalAcrescimosConta += valorAcrescimo
+
+          const totalLinha = produto.valorFinal ?? subtotal - valorDesconto + valorAcrescimo
+          totalItensLancados += totalLinha
+          if (vendaCancelada || produto.removido) {
+            totalItensCancelados += totalLinha
+          }
+        })
+
+        setResumoFinanceiroDetalhes({
+          totalItensLancados,
+          totalItensCancelados,
+          totalDosItens: totalItensLancados - totalItensCancelados,
+          totalDescontosConta,
+          totalAcrescimosConta,
+        })
       } else {
         console.warn(
           '⚠️ Nenhum produto encontrado na resposta da API. Campos disponíveis:',
           Object.keys(vendaData)
         )
         setProdutos([])
+        setResumoFinanceiroDetalhes(null)
       }
 
       // Pagamentos
       if (vendaData.pagamentos && Array.isArray(vendaData.pagamentos)) {
         const pagamentosMapeados: PagamentoSelecionado[] = vendaData.pagamentos
-          .filter((pag: any) => !pag.cancelado) // Filtrar pagamentos cancelados
           .map((pag: any) => ({
             meioPagamentoId: pag.meioPagamentoId || pag.id || '',
             valor: pag.valor || 0,
+            realizadoPorId: pag.realizadoPorId || null,
+            cancelado: Boolean(pag.cancelado),
+            canceladoPorId: pag.canceladoPorId || null,
+            dataCriacao: pag.dataCriacao || null,
+            dataCancelamento: pag.dataCancelamento || null,
+            isTefUsed: pag.isTefUsed === true,
+            isTefConfirmed: pag.isTefConfirmed === true,
+            tefIdentifier: pag.tefIdentifier || null,
+            tefAdquirente: pag.tefAdquirente || null,
+            cnpjAdquirente: pag.cnpjAdquirente || null,
+            codigoAutorizacao: pag.codigoAutorizacao || null,
+            tipoIntegracao: pag.tipoIntegracao || null,
+            bandeiraCartao: pag.bandeiraCartao || null,
           }))
         setPagamentos(pagamentosMapeados)
       }
+
+      // Resolver nomes de usuários em lote (sem exibir IDs)
+      const idsUsuarios = new Set<string>()
+      ;[
+        vendaData.abertoPorId,
+        vendaData.ultimoResponsavelId,
+        vendaData.canceladoPorId,
+      ].forEach((id: unknown) => {
+        const v = String(id || '').trim()
+        if (v) idsUsuarios.add(v)
+      })
+      ;(vendaData.produtosLancados || vendaData.produtos || []).forEach((prod: any) => {
+        const lancadoPorId = String(prod?.lancadoPorId || '').trim()
+        const removidoPorId = String(prod?.removidoPorId || '').trim()
+        if (lancadoPorId) idsUsuarios.add(lancadoPorId)
+        if (removidoPorId) idsUsuarios.add(removidoPorId)
+      })
+      ;(vendaData.pagamentos || []).forEach((pag: any) => {
+        const realizadoPorId = String(pag?.realizadoPorId || '').trim()
+        const canceladoPorId = String(pag?.canceladoPorId || '').trim()
+        if (realizadoPorId) idsUsuarios.add(realizadoPorId)
+        if (canceladoPorId) idsUsuarios.add(canceladoPorId)
+      })
+
+      const mapUsuarios: Record<string, string> = {}
+      await Promise.all(
+        Array.from(idsUsuarios).map(async usuarioId => {
+          try {
+            const endpoint =
+              tabelaOrigemVenda === 'venda_gestor'
+                ? `/api/pessoas/usuarios-gestor/${usuarioId}`
+                : `/api/usuarios/${usuarioId}`
+            const r = await fetch(endpoint, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            })
+            if (!r.ok) return
+            const d = await r.json()
+            const nome = String(d?.nome || d?.name || d?.username || '').trim()
+            if (nome) mapUsuarios[usuarioId] = nome
+          } catch {
+            // segue silenciosamente; a UI usa fallback amigável
+          }
+        })
+      )
+      setNomesUsuariosPedido(mapUsuarios)
+
+      // Resolver nomes de meios de pagamento faltantes da lista em memória (otimiza chamadas)
+      const mapMeios: Record<string, string> = {}
+      const idsMeios = new Set<string>()
+      ;(vendaData.pagamentos || []).forEach((pag: any) => {
+        const meioId = String(pag?.meioPagamentoId || '').trim()
+        if (meioId) idsMeios.add(meioId)
+      })
+
+      await Promise.all(
+        Array.from(idsMeios).map(async meioId => {
+          const meioCache = meiosPagamento.find(m => m.getId() === meioId)
+          if (meioCache) {
+            mapMeios[meioId] = meioCache.getNome()
+            return
+          }
+          try {
+            const r = await fetch(`/api/meios-pagamentos/${meioId}`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            })
+            if (!r.ok) return
+            const d = await r.json()
+            const nome = String(d?.nome || d?.name || '').trim()
+            if (nome) mapMeios[meioId] = nome
+          } catch {
+            // fallback visual amigável
+          }
+        })
+      )
+      setNomesMeiosPagamentoPedido(mapMeios)
 
       // Se estiver em modo visualização, ir direto para step 4
       if (modoVisualizacao) {
@@ -1835,7 +2107,7 @@ export function NovoPedidoModal({
     } finally {
       setIsLoadingVenda(false)
     }
-  }, [vendaId, open, auth, modoVisualizacao, onClose, tabelaOrigemVenda])
+  }, [vendaId, vendaIdCriada, open, auth, modoVisualizacao, onClose, tabelaOrigemVenda, meiosPagamento])
 
   // Sincroniza o estado interno com o prop open
   useEffect(() => {
@@ -1865,10 +2137,15 @@ export function NovoPedidoModal({
       if (!modoVisualizacao) {
         setCurrentStep(1)
       }
-      setAbaDetalhesPedido('dadosPedido')
+      setAbaDetalhesPedido('infoPedido')
       setResumoFiscal(null)
       setOrigemTextoApiDetalhe(null)
       setStatusVendaTextoApiDetalhe(null)
+      setDetalhesPedidoMeta(null)
+      setNomesUsuariosPedido({})
+      setNomesMeiosPagamentoPedido({})
+      setResumoFinanceiroDetalhes(null)
+      setVendaIdCriada(null)
     }
   }, [open, vendaId, modoVisualizacao, carregarVendaExistente])
 
@@ -2095,8 +2372,8 @@ export function NovoPedidoModal({
               )}
             </div>
 
-            {/* Abas: Detalhes do Pedido (modo visualização, após carregar venda) */}
-            {modoVisualizacao && currentStep === 4 && !isLoadingVenda && (
+            {/* Abas do passo 4 */}
+            {currentStep === 4 && !isLoadingVenda && (
               <div
                 className="mt-3 flex gap-1 border-b border-gray-200"
                 role="tablist"
@@ -2105,16 +2382,44 @@ export function NovoPedidoModal({
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={abaDetalhesPedido === 'dadosPedido'}
-                  id="tab-detalhes-dados-pedido"
-                  onClick={() => setAbaDetalhesPedido('dadosPedido')}
+                  aria-selected={abaDetalhesPedido === 'infoPedido'}
+                  id="tab-detalhes-info-pedido"
+                  onClick={() => setAbaDetalhesPedido('infoPedido')}
                   className={`font-nunito -mb-px border-b-2 px-4 py-2 text-sm font-semibold transition-colors ${
-                    abaDetalhesPedido === 'dadosPedido'
+                    abaDetalhesPedido === 'infoPedido'
                       ? 'border-primary text-primary'
                       : 'border-transparent text-gray-500 hover:text-gray-800'
                   }`}
                 >
-                  Dados do Pedido
+                  Info Pedidos
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={abaDetalhesPedido === 'listaProdutos'}
+                  id="tab-detalhes-lista-produtos"
+                  onClick={() => setAbaDetalhesPedido('listaProdutos')}
+                  className={`font-nunito -mb-px border-b-2 px-4 py-2 text-sm font-semibold transition-colors ${
+                    abaDetalhesPedido === 'listaProdutos'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-gray-500 hover:text-gray-800'
+                  }`}
+                >
+                  Lista Produtos
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={abaDetalhesPedido === 'pagamentos'}
+                  id="tab-detalhes-pagamentos"
+                  onClick={() => setAbaDetalhesPedido('pagamentos')}
+                  className={`font-nunito -mb-px border-b-2 px-4 py-2 text-sm font-semibold transition-colors ${
+                    abaDetalhesPedido === 'pagamentos'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-gray-500 hover:text-gray-800'
+                  }`}
+                >
+                  Pagamentos
                 </button>
                 {podeExibirAbaNotaFiscal && (
                   <button
@@ -2322,9 +2627,6 @@ export function NovoPedidoModal({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="GESTOR">Gestor (Manual)</SelectItem>
-                      <SelectItem value="IFOOD">iFood</SelectItem>
-                      <SelectItem value="RAPPI">Rappi</SelectItem>
-                      <SelectItem value="OUTROS">Outros</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -2343,7 +2645,7 @@ export function NovoPedidoModal({
                     </SelectTrigger>
                     <SelectContent>
                       {statusDisponiveis.map(st => (
-                        <SelectItem key={st.value} value={st.value}>
+                        <SelectItem key={st.value} value={st.value} disabled={st.value === 'ABERTA'}>
                           {st.label}
                         </SelectItem>
                       ))}
@@ -3164,9 +3466,7 @@ export function NovoPedidoModal({
             {/* STEP 4: Detalhes da Venda (visualização ou após criar pedido) */}
             {currentStep === 4 && !isLoadingVenda && (
               <div className="space-y-4 py-2">
-                {modoVisualizacao &&
-                abaDetalhesPedido === 'notaFiscal' &&
-                podeExibirAbaNotaFiscal ? (
+                {abaDetalhesPedido === 'notaFiscal' && podeExibirAbaNotaFiscal ? (
                   <div
                     className="space-y-3"
                     role="tabpanel"
@@ -3218,6 +3518,10 @@ export function NovoPedidoModal({
                                 label: 'Retorno SEFAZ',
                                 value: resumoFiscal.retornoSefaz ?? '—',
                                 multiline: true,
+                              },
+                              {
+                                label: 'Código retorno',
+                                value: (resumoFiscal as any).codigoRetorno ?? '—',
                               },
                               {
                                 label: 'Número ' + rotuloModeloNfe(resumoFiscal.modelo ?? null),
@@ -3279,10 +3583,10 @@ export function NovoPedidoModal({
                   </div>
                 ) : (
                   <>
-                  {/* Informações do Pedido */}
-                  <div className="rounded-lg border bg-gray-50 px-4">
+                  {abaDetalhesPedido === 'infoPedido' && (
+                  <div className="rounded-lg border bg-gray-50 px-4" role="tabpanel" aria-labelledby="tab-detalhes-info-pedido">
                     <h3 className="text-lg font-semibold">Informações do Pedido</h3>
-                    <div className="text-sm">
+                    <div className="flex flex-col gap-3 text-sm">
                       <div className="flex justify-between rounded-lg bg-white px-1">
                         <span className="text-gray-600">Data:</span>
                         <span className="font-medium">
@@ -3320,11 +3624,85 @@ export function NovoPedidoModal({
                           {produtos.length} {produtos.length === 1 ? 'produto' : 'produtos'}
                         </span>
                       </div>
+                      <div className="flex justify-between px-1">
+                        <span className="text-gray-600">Aberto por:</span>
+                        <span className="font-medium">
+                          {formatarUsuarioPorId(detalhesPedidoMeta?.abertoPorId)}
+                        </span>
+                      </div>
+                      {detalhesPedidoMeta?.ultimoResponsavelId && (
+                        <div className="flex justify-between rounded-lg bg-white px-1">
+                          <span className="text-gray-600">Última alteração por:</span>
+                          <span className="font-medium">
+                            {formatarUsuarioPorId(detalhesPedidoMeta.ultimoResponsavelId)}
+                          </span>
+                        </div>
+                      )}
+                      {detalhesPedidoMeta?.canceladoPorId && (
+                        <div className="flex justify-between px-1">
+                          <span className="text-gray-600">Cancelado por:</span>
+                          <span className="font-medium text-red-600">
+                            {formatarUsuarioPorId(detalhesPedidoMeta.canceladoPorId)}
+                          </span>
+                        </div>
+                      )}
+                      {detalhesPedidoMeta?.codigoTerminal && (
+                        <div className="flex justify-between rounded-lg bg-white px-1">
+                          <span className="text-gray-600">Código do terminal:</span>
+                          <span className="font-medium">{detalhesPedidoMeta.codigoTerminal}</span>
+                        </div>
+                      )}
+                      {detalhesPedidoMeta?.identificacao && (
+                        <div className="flex justify-between px-1">
+                          <span className="text-gray-600">Identificação:</span>
+                          <span className="font-medium">{detalhesPedidoMeta.identificacao}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between rounded-lg bg-white px-1">
+                        <span className="text-gray-600">Solicitar emissão fiscal:</span>
+                        <span className="font-medium">
+                          {detalhesPedidoMeta?.solicitarEmissaoFiscal ? 'Sim' : 'Não'}
+                        </span>
+                      </div>
+                      {detalhesPedidoMeta?.dataUltimaModificacao && (
+                        <div className="flex justify-between px-1">
+                          <span className="text-gray-600">Última modificação:</span>
+                          <span className="font-medium">
+                            {formatarDataDetalhePedido(detalhesPedidoMeta.dataUltimaModificacao)}
+                          </span>
+                        </div>
+                      )}
+                      {detalhesPedidoMeta?.dataUltimoProdutoLancado && (
+                        <div className="flex justify-between rounded-lg bg-white px-1">
+                          <span className="text-gray-600">Último produto lançado:</span>
+                          <span className="font-medium">
+                            {formatarDataDetalhePedido(detalhesPedidoMeta.dataUltimoProdutoLancado)}
+                          </span>
+                        </div>
+                      )}
+                      {detalhesPedidoMeta?.dataFinalizacao && (
+                        <div className="flex justify-between px-1">
+                          <span className="text-gray-600">Data finalização:</span>
+                          <span className="font-medium">
+                            {formatarDataDetalhePedido(detalhesPedidoMeta.dataFinalizacao)}
+                          </span>
+                        </div>
+                      )}
+                      {detalhesPedidoMeta?.dataCancelamento && (
+                        <div className="flex justify-between rounded-lg bg-white px-1">
+                          <span className="text-gray-600">Data cancelamento:</span>
+                          <span className="font-medium text-red-600">
+                            {formatarDataDetalhePedido(detalhesPedidoMeta.dataCancelamento)}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
+                  )}
 
                   {/* Lista de Produtos (Visualização) */}
-                  <div className="overflow-hidden rounded-lg border bg-gray-50">
+                  {abaDetalhesPedido === 'listaProdutos' && (
+                  <div className="overflow-hidden rounded-lg border bg-gray-50" role="tabpanel" aria-labelledby="tab-detalhes-lista-produtos">
                     <div className="p-2">
                       <h3 className="mb-2 text-lg font-semibold">Produtos do Pedido</h3>
                       {produtos.length > 0 ? (
@@ -3448,6 +3826,23 @@ export function NovoPedidoModal({
                                       </div>
                                     )
                                   })}
+                                  <div className="flex justify-start px-6 pb-1 text-[11px] text-gray-500">
+                                    <span>
+                                      Por:{' '}
+                                      {formatarUsuarioPorId(produto.lancadoPorId)} - {formatarDataDetalhePedido(produto.dataLancamento || null)}
+                                    </span>
+                                  </div>
+                                  {produto.removido && (
+                                    <div className="flex justify-between px-1 pb-1 text-[11px] text-red-600">
+                                      <span>
+                                        Removido por:{' '}
+                                        {formatarUsuarioPorId(produto.removidoPorId)}
+                                      </span>
+                                      <span>
+                                        {formatarDataDetalhePedido(produto.dataRemocao || null)}
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
                               )
                             })}
@@ -3460,23 +3855,69 @@ export function NovoPedidoModal({
                       )}
                     </div>
                   </div>
+                  )}
 
                   {/* Total do Pedido */}
+                  {abaDetalhesPedido === 'listaProdutos' && (
                   <div className="flex items-center justify-end gap-2">
                     <span className="text-sm font-semibold text-gray-700">Total do Pedido:</span>
                     <span className="text-lg font-bold text-primary">
                       {transformarParaReal(totalProdutos)}
                     </span>
                   </div>
+                  )}
+
+                  {abaDetalhesPedido === 'listaProdutos' && resumoFinanceiroDetalhes && (
+                    <div className="rounded-lg border bg-white px-4 py-3">
+                      <h3 className="mb-2 text-lg font-semibold">Resumo Financeiro</h3>
+                      <div className="space-y-1.5 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-700">A - Total de itens lançados (+)</span>
+                          <span className="font-semibold text-gray-900">
+                            {formatarNumeroComMilhar(resumoFinanceiroDetalhes.totalItensLancados)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-700">B - Total de itens cancelados (-)</span>
+                          <span className="font-semibold text-gray-900 line-through">
+                            {formatarNumeroComMilhar(resumoFinanceiroDetalhes.totalItensCancelados)}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex justify-between border-t pt-1.5">
+                          <span className="text-gray-700">C - Total dos itens (A - B)</span>
+                          <span className="font-semibold text-gray-900">
+                            {formatarNumeroComMilhar(resumoFinanceiroDetalhes.totalDosItens)}
+                          </span>
+                        </div>
+                        <div className="mt-3 flex justify-between">
+                          <span className="text-gray-700">Total de descontos na conta</span>
+                          <span className="font-semibold text-gray-900">
+                            {formatarNumeroComMilhar(resumoFinanceiroDetalhes.totalDescontosConta)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-700">Total de acréscimos na conta</span>
+                          <span className="font-semibold text-gray-900">
+                            {formatarNumeroComMilhar(resumoFinanceiroDetalhes.totalAcrescimosConta)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Pagamentos (se status finalizada ou pendente emissão) */}
-                  {(status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') &&
-                    pagamentos.length > 0 && (
-                      <div className="rounded-lg border bg-white px-4">
+                  {abaDetalhesPedido === 'pagamentos' && (
+                      <div className="rounded-lg border bg-white px-4" role="tabpanel" aria-labelledby="tab-detalhes-pagamentos">
                         <h3 className="mb-2 text-lg font-semibold">Pagamentos</h3>
 
                         {/* Total Pago e Troco */}
                         <div className="mb-2 border-t pt-2 text-sm">
+                        <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-gray-700">Total do Pedido:</span>
+                    <span className="text-lg font-bold text-primary">
+                      {transformarParaReal(totalProdutos)}
+                    </span>
+                  </div>
                           <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
                             <span className="font-semibold text-gray-700">Total Pago:</span>
                             <span className="text-base font-bold text-gray-900">
@@ -3500,9 +3941,11 @@ export function NovoPedidoModal({
                           </Label>
                           <div className="flex flex-wrap gap-3">
                             {pagamentos.map((pagamento, index) => {
-                              const meio = meiosPagamento.find(
-                                m => m.getId() === pagamento.meioPagamentoId
-                              )
+                              const meio = meiosPagamento.find(m => m.getId() === pagamento.meioPagamentoId)
+                              const nomeMeio =
+                                meio?.getNome() ||
+                                nomesMeiosPagamentoPedido[pagamento.meioPagamentoId] ||
+                                'Meio de pagamento'
                               const Icone = meio
                                 ? obterIconeMeioPagamento(meio.getNome())
                                 : MdCreditCard
@@ -3514,15 +3957,31 @@ export function NovoPedidoModal({
                                 >
                                   <Icone className="h-8 w-8 text-primary" />
                                   <span className="text-center text-xs font-medium">
-                                    {meio?.getNome() || 'Meio de pagamento'}
+                                    {nomeMeio}
                                   </span>
                                   <span className="text-sm font-bold text-primary">
                                     {transformarParaReal(pagamento.valor)}
                                   </span>
+                                  <span className="text-center text-[11px] text-gray-500">
+                                    Por: {formatarUsuarioPorId(pagamento.realizadoPorId)}
+                                  </span>
+                                  {pagamento.dataCriacao && (
+                                    <span className="text-center text-[11px] text-gray-500">
+                                      {formatarDataDetalhePedido(pagamento.dataCriacao)}
+                                    </span>
+                                  )}
+                                  {pagamento.isTefUsed && (
+                                    <span className="text-center text-[11px] text-gray-500">
+                                      TEF: {pagamento.isTefConfirmed ? 'Confirmado' : 'Pendente'}
+                                    </span>
+                                  )}
                                 </div>
                               )
                             })}
                           </div>
+                          {pagamentos.length === 0 && (
+                            <p className="py-4 text-sm text-gray-500">Nenhum pagamento registrado.</p>
+                          )}
                         </div>
                       </div>
                     )}
