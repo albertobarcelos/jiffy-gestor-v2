@@ -34,6 +34,8 @@ interface EmitirNfeModalProps {
   /** ID do cliente vinculado — NF-e (modelo 55) exige cliente cadastrado */
   clienteId?: string | null
   tabelaOrigem?: 'venda' | 'venda_gestor'
+  /** Valor atual da venda ao abrir o modal — repassado no PATCH de vincular cliente (sem forçar `true`). */
+  solicitarEmissaoFiscal?: boolean
 }
 
 export function EmitirNfeModal({
@@ -46,6 +48,7 @@ export function EmitirNfeModal({
   clienteNome,
   clienteId,
   tabelaOrigem = 'venda',
+  solicitarEmissaoFiscal,
 }: EmitirNfeModalProps) {
   const emitirNfePdv = useEmitirNfe()
   const emitirNfeGestor = useEmitirNfeGestor()
@@ -84,6 +87,7 @@ export function EmitirNfeModal({
         vendaId,
         clienteId: cliente.getId(),
         tabelaOrigem,
+        ...(solicitarEmissaoFiscal !== undefined ? { solicitarEmissaoFiscal } : {}),
       })
       setClienteVinculadoLocal({
         id: cliente.getId(),

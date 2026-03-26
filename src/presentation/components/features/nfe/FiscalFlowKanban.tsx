@@ -39,6 +39,8 @@ import {
   MdEdit,
   MdAdd,
   MdSwapHoriz,
+  MdArrowDownward,
+  MdArrowUpward,
 } from 'react-icons/md'
 import { EmitirNfeModal } from './EmitirNfeModal'
 import { SeletorClienteModal } from './SeletorClienteModal'
@@ -74,6 +76,10 @@ type Venda = VendaUnificadaDTO
 
 /** Exibido quando o nome do cliente está vazio (Kanban e arraste) */
 const LABEL_SEM_CLIENTE = 'SEM CLIENTE'
+
+/** Critério de ordenação por coluna (mantido apenas em memória). */
+type CriterioOrdenacaoKanban = 'data' | 'numero' | 'cliente'
+type DirecaoOrdenacaoKanban = 'asc' | 'desc'
 
 /** Venda sem nome de cliente preenchido (nome vazio ou só espaços) */
 function vendaSemNomeCliente(v: Venda): boolean {
@@ -116,6 +122,50 @@ function ordenarVendasKanbanPorDataDesc(vendas: Venda[]): Venda[] {
     const diff = timestampOrdenacao(b) - timestampOrdenacao(a)
     if (diff !== 0) return diff
     return b.id.localeCompare(a.id)
+  })
+}
+
+function ordenarVendasKanbanPorCriterio(
+  vendas: Venda[],
+  criterio: CriterioOrdenacaoKanban,
+  direcao: DirecaoOrdenacaoKanban
+): Venda[] {
+  if (criterio === 'data') {
+    if (direcao === 'desc') return ordenarVendasKanbanPorDataDesc(vendas)
+    return [...vendas].sort((a, b) => {
+      const timestampOrdenacao = (v: Venda): number => {
+        const raw =
+          v.dataFinalizacao?.trim() ||
+          v.dataEmissaoFiscal?.trim() ||
+          v.dataCriacao?.trim() ||
+          ''
+        if (!raw) return 0
+        const ms = new Date(raw).getTime()
+        return Number.isFinite(ms) ? ms : 0
+      }
+      const diff = timestampOrdenacao(a) - timestampOrdenacao(b) // asc
+      if (diff !== 0) return diff
+      return a.id.localeCompare(b.id)
+    })
+  }
+
+  if (criterio === 'numero') {
+    return [...vendas].sort((a, b) => {
+      const diff =
+        direcao === 'desc' ? b.numeroVenda - a.numeroVenda : a.numeroVenda - b.numeroVenda
+      if (diff !== 0) return diff
+      return direcao === 'desc' ? b.id.localeCompare(a.id) : a.id.localeCompare(b.id)
+    })
+  }
+
+  // criterio === 'cliente'
+  return [...vendas].sort((a, b) => {
+    const nomeA = a.cliente?.nome?.trim() ? a.cliente.nome.trim() : LABEL_SEM_CLIENTE
+    const nomeB = b.cliente?.nome?.trim() ? b.cliente.nome.trim() : LABEL_SEM_CLIENTE
+    const diff = nomeA.localeCompare(nomeB, 'pt-BR', { sensitivity: 'base' })
+    const diffFinal = direcao === 'desc' ? -diff : diff
+    if (diffFinal !== 0) return diffFinal
+    return direcao === 'desc' ? b.id.localeCompare(a.id) : a.id.localeCompare(b.id)
   })
 }
 
@@ -222,6 +272,7 @@ export function FiscalFlowKanban() {
     origemVenda?: string
     clienteId?: string | null
     clienteNome?: string | null
+    solicitarEmissaoFiscal?: boolean
   } | null>(null)
   const [emitirNfeModalOpen, setEmitirNfeModalOpen] = useState(false)
   // Estados dos filtros (alinhados à API GET /vendas/unificado)
@@ -248,6 +299,8 @@ export function FiscalFlowKanban() {
   const vendaParaVincularClienteRef = useRef<{
     id: string
     tabelaOrigem: 'venda' | 'venda_gestor'
+    /** Snapshot do Kanban — repassa no PATCH para não alterar o flag (substitui o antigo default `true`). */
+    solicitarEmissaoFiscal: boolean
   } | null>(null)
 
   const [novoPedidoModalOpen, setNovoPedidoModalOpen] = useState(false)
@@ -265,6 +318,24 @@ export function FiscalFlowKanban() {
   const [draggingVenda, setDraggingVenda] = useState<Venda | null>(null)
   /** Evita PATCH duplicado ao reativar solicitarEmissaoFiscal para REJEITADA (Strict Mode / re-renders) */
   const rejeitadaReativacaoEmAndamentoRef = useRef(false)
+
+  type ColunaId = 'FINALIZADAS' | 'PENDENTE_EMISSAO' | 'COM_NFE'
+  /** Ordenação individual por coluna: padrão sempre por data (reset ao recarregar a página). */
+  const [criterioOrdenacaoPorColuna, setCriterioOrdenacaoPorColuna] = useState<
+    Record<ColunaId, CriterioOrdenacaoKanban>
+  >({
+    FINALIZADAS: 'data',
+    PENDENTE_EMISSAO: 'data',
+    COM_NFE: 'data',
+  })
+  /** Direção (crescente/decrescente) individual por coluna — reset ao recarregar. */
+  const [direcaoOrdenacaoPorColuna, setDirecaoOrdenacaoPorColuna] = useState<
+    Record<ColunaId, DirecaoOrdenacaoKanban>
+  >({
+    FINALIZADAS: 'desc',
+    PENDENTE_EMISSAO: 'desc',
+    COM_NFE: 'desc',
+  })
 
   // Debounce da busca (q)
   useEffect(() => {
@@ -686,6 +757,7 @@ export function FiscalFlowKanban() {
       origemVenda: venda.origem,
       clienteId: venda.cliente?.id ?? null,
       clienteNome: venda.cliente?.nome ?? null,
+      solicitarEmissaoFiscal: venda.solicitarEmissaoFiscal,
     })
     setSelectedVendaId(venda.id) // Mantém para compatibilidade
     setEmitirNfeModalOpen(true)
@@ -721,7 +793,11 @@ export function FiscalFlowKanban() {
 
   const handleAbrirSeletorClienteVenda = useCallback(
     (venda: Venda, modo: 'incluir' | 'trocar' = 'incluir') => {
-      vendaParaVincularClienteRef.current = { id: venda.id, tabelaOrigem: venda.tabelaOrigem }
+      vendaParaVincularClienteRef.current = {
+        id: venda.id,
+        tabelaOrigem: venda.tabelaOrigem,
+        solicitarEmissaoFiscal: venda.solicitarEmissaoFiscal,
+      }
       setTituloSeletorClienteVenda(
         modo === 'trocar' ? 'Trocar cliente da venda' : 'Vincular cliente à venda'
       )
@@ -764,6 +840,7 @@ export function FiscalFlowKanban() {
           vendaId: ctx.id,
           clienteId: cliente.getId(),
           tabelaOrigem: 'venda_gestor',
+          solicitarEmissaoFiscal: ctx.solicitarEmissaoFiscal,
         })
       } catch {
         // Mensagem de erro exibida pelo hook
@@ -815,7 +892,11 @@ export function FiscalFlowKanban() {
       }
     })
 
-    return ordenarVendasKanbanPorDataDesc(Array.from(vendasUnicas.values()))
+    const criterio =
+      criterioOrdenacaoPorColuna[columnId as ColunaId] ?? ('data' as CriterioOrdenacaoKanban)
+    const direcao =
+      direcaoOrdenacaoPorColuna[columnId as ColunaId] ?? ('desc' as DirecaoOrdenacaoKanban)
+    return ordenarVendasKanbanPorCriterio(Array.from(vendasUnicas.values()), criterio, direcao)
   }
 
   if (isLoading) {
@@ -1022,6 +1103,70 @@ export function FiscalFlowKanban() {
                       <h3 className="text-xs font-medium text-gray-900">
                         {column.title} ({count})
                       </h3>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[11px] font-medium text-gray-700">Ordem</span>
+                      <FormControl size="small" sx={{ minWidth: 80 }}>
+                        <Select
+                          value={criterioOrdenacaoPorColuna[column.id as ColunaId] ?? 'data'}
+                          onChange={e => {
+                            const next = e.target.value as CriterioOrdenacaoKanban
+                            setCriterioOrdenacaoPorColuna(prev => ({
+                              ...prev,
+                              [column.id as ColunaId]: next,
+                            }))
+                          }}
+                          MenuProps={{
+                            PaperProps: {
+                              sx: {
+                                borderRadius: '4px',
+                                border: '1px solid #e5e7eb',
+                                boxShadow:
+                                  '0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.06)',
+                              },
+                            },
+                          }}
+                          sx={{
+                            height: 26,
+                            fontSize: 12,
+                            borderRadius: '8px',
+                            backgroundColor: 'rgba(255,255,255,0.9)',
+                            '& .MuiOutlinedInput-notchedOutline': {
+                              borderColor: '#e5e7eb',
+                            },
+                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                              borderColor: '#d1d5db',
+                            },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                              borderColor: '#d1d5db',
+                              borderWidth: '1px',
+                            },
+                          }}
+                        >
+                          <MenuItem value="data">Data</MenuItem>
+                          <MenuItem value="numero">Nº da venda</MenuItem>
+                          <MenuItem value="cliente">Cliente</MenuItem>
+                        </Select>
+                      </FormControl>
+                      <button
+                        type="button"
+                        className="flex h-6 w-5 items-center justify-center rounded bg-white/70 text-gray-700 hover:bg-white"
+                        onClick={() => {
+                          const colId = column.id as ColunaId
+                          setDirecaoOrdenacaoPorColuna(prev => ({
+                            ...prev,
+                            [colId]: prev[colId] === 'asc' ? 'desc' : 'asc',
+                          }))
+                        }}
+                        aria-label="Alternar direção da ordenação"
+                        title="Alternar: crescente/decrescente"
+                      >
+                        {direcaoOrdenacaoPorColuna[column.id as ColunaId] === 'asc' ? (
+                          <MdArrowUpward className="h-4 w-4" />
+                        ) : (
+                          <MdArrowDownward className="h-4 w-4" />
+                        )}
+                      </button>
                     </div>
                   </div>
 
@@ -1327,6 +1472,7 @@ export function FiscalFlowKanban() {
           clienteId={vendaSelecionadaParaEmissao.clienteId}
           clienteNome={vendaSelecionadaParaEmissao.clienteNome}
           tabelaOrigem={vendaSelecionadaParaEmissao.tabelaOrigem}
+          solicitarEmissaoFiscal={vendaSelecionadaParaEmissao.solicitarEmissaoFiscal}
         />
       )}
 
