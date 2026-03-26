@@ -735,12 +735,21 @@ export function PainelContadorView() {
                       
                       {/* Seta para expandir/colapsar mensagem da etapa 1 - logo após o título */}
                       {temMensagemEtapa1 && (
-                        <button
-                          onClick={(e) => {
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={e => {
                             e.stopPropagation()
                             setIsEtapa1Expanded(!isEtapa1Expanded)
                           }}
-                          className="flex-shrink-0 ml-1 p-0.5 hover:bg-white/10 rounded transition-colors cursor-pointer"
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setIsEtapa1Expanded(!isEtapa1Expanded)
+                            }
+                          }}
+                          className="flex-shrink-0 ml-1 inline-flex p-0.5 hover:bg-white/10 rounded transition-colors cursor-pointer"
                           aria-label={isEtapa1Expanded ? 'Ocultar detalhes' : 'Mostrar detalhes'}
                         >
                           {isEtapa1Expanded ? (
@@ -748,17 +757,26 @@ export function PainelContadorView() {
                           ) : (
                             <MdKeyboardArrowDown className="text-white" size={16} />
                           )}
-                        </button>
+                        </span>
                       )}
                       
                       {/* Seta para expandir/colapsar mensagem da etapa 2 - logo após o título */}
                       {temMensagemEtapa2 && (
-                        <button
-                          onClick={(e) => {
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={e => {
                             e.stopPropagation()
                             setIsEtapa2Expanded(!isEtapa2Expanded)
                           }}
-                          className="flex-shrink-0 ml-1 p-0.5 hover:bg-white/10 rounded transition-colors cursor-pointer"
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setIsEtapa2Expanded(!isEtapa2Expanded)
+                            }
+                          }}
+                          className="flex-shrink-0 ml-1 inline-flex p-0.5 hover:bg-white/10 rounded transition-colors cursor-pointer"
                           aria-label={isEtapa2Expanded ? 'Ocultar detalhes' : 'Mostrar detalhes'}
                         >
                           {isEtapa2Expanded ? (
@@ -766,17 +784,26 @@ export function PainelContadorView() {
                           ) : (
                             <MdKeyboardArrowDown className="text-white" size={16} />
                           )}
-                        </button>
+                        </span>
                       )}
                       
                       {/* Seta para expandir/colapsar mensagem da etapa 3 - logo após o título */}
                       {temMensagemEtapa3 && (
-                        <button
-                          onClick={(e) => {
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={e => {
                             e.stopPropagation()
                             setIsEtapa3Expanded(!isEtapa3Expanded)
                           }}
-                          className="flex-shrink-0 ml-1 p-0.5 hover:bg-white/10 rounded transition-colors cursor-pointer"
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setIsEtapa3Expanded(!isEtapa3Expanded)
+                            }
+                          }}
+                          className="flex-shrink-0 ml-1 inline-flex p-0.5 hover:bg-white/10 rounded transition-colors cursor-pointer"
                           aria-label={isEtapa3Expanded ? 'Ocultar detalhes' : 'Mostrar detalhes'}
                         >
                           {isEtapa3Expanded ? (
@@ -784,7 +811,7 @@ export function PainelContadorView() {
                           ) : (
                             <MdKeyboardArrowDown className="text-white" size={16} />
                           )}
-                        </button>
+                        </span>
                       )}
                       
                       {/* Loading individual para cada etapa - após a seta (se existir) ou após o título */}

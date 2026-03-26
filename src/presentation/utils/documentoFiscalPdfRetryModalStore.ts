@@ -31,8 +31,11 @@ export function getDocumentoFiscalPdfRetryModalSnapshot(): DocumentoFiscalPdfRet
   return state
 }
 
+/** Referência estável para SSR/hidratação — useSyncExternalStore exige o mesmo objeto em chamadas repetidas no servidor */
+const SNAPSHOT_SERVIDOR_FECHADO: DocumentoFiscalPdfRetryModalState = { open: false }
+
 export function getDocumentoFiscalPdfRetryModalServerSnapshot(): DocumentoFiscalPdfRetryModalState {
-  return { open: false }
+  return SNAPSHOT_SERVIDOR_FECHADO
 }
 
 /** Abre o modal e retorna a escolha do usuário (null = fechou sem escolher). */
