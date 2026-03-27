@@ -1477,16 +1477,18 @@ export function FiscalFlowKanban() {
       )}
 
       {/* Modal de Novo Pedido */}
-      <NovoPedidoModal
-        open={novoPedidoModalOpen}
-        onClose={() => {
-          setNovoPedidoModalOpen(false)
-        }}
-        onSuccess={() => {
-          setNovoPedidoModalOpen(false)
-          refetch()
-        }}
-      />
+      {novoPedidoModalOpen && (
+        <NovoPedidoModal
+          open={novoPedidoModalOpen}
+          onClose={() => {
+            setNovoPedidoModalOpen(false)
+          }}
+          onSuccess={() => {
+            setNovoPedidoModalOpen(false)
+            refetch()
+          }}
+        />
+      )}
 
       {/* Modal de Novo Pedido em Modo Visualização (Step 4) */}
       {pedidoVisualizacaoContext && (
@@ -1509,67 +1511,73 @@ export function FiscalFlowKanban() {
       )}
 
       {/* Modal de datas personalizadas (período por data de criação) */}
-      <EscolheDatasModal
-        open={isDatasModalOpen}
-        onClose={() => setIsDatasModalOpen(false)}
-        onConfirm={handleConfirmDatas}
-        dataInicial={periodoInicial}
-        dataFinal={periodoFinal}
-      />
+      {isDatasModalOpen && (
+        <EscolheDatasModal
+          open={isDatasModalOpen}
+          onClose={() => setIsDatasModalOpen(false)}
+          onConfirm={handleConfirmDatas}
+          dataInicial={periodoInicial}
+          dataFinal={periodoFinal}
+        />
+      )}
 
-      <SeletorClienteModal
-        open={seletorClienteVendaOpen}
-        onClose={handleFecharSeletorClienteVenda}
-        onSelect={handleClienteSelecionadoParaVenda}
-        title={tituloSeletorClienteVenda}
-      />
+      {seletorClienteVendaOpen && (
+        <SeletorClienteModal
+          open={seletorClienteVendaOpen}
+          onClose={handleFecharSeletorClienteVenda}
+          onSelect={handleClienteSelecionadoParaVenda}
+          title={tituloSeletorClienteVenda}
+        />
+      )}
 
-      <Dialog
-        open={editarClienteModalOpen && Boolean(editarClienteId)}
-        onOpenChange={open => {
-          if (!open) handleFecharEdicaoCliente()
-        }}
-        fullWidth
-        maxWidth="xl"
-        sx={{
-          '& .MuiDialog-container': {
-            zIndex: 1500,
-            justifyContent: { xs: 'center', md: 'flex-end' },
-            alignItems: 'stretch',
-            margin: 0,
-          },
-          '& .MuiBackdrop-root': { zIndex: 1500 },
-          '& .MuiDialog-paper': { zIndex: 1500 },
-        }}
-        PaperProps={{
-          sx: {
-            height: '100vh',
-            maxHeight: '100vh',
-            width: { xs: '95vw', sm: '90vw', md: 'min(900px, 60vw)' },
-            margin: { xs: 'auto', md: 0 },
-            borderRadius: 0,
-            display: 'flex',
-            flexDirection: 'column',
-          },
-        }}
-      >
-        <DialogContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
-          {editarClienteId && (
-            <div className="h-full overflow-y-auto">
-              <NovoCliente
-                key={editarClienteId}
-                clienteId={editarClienteId}
-                isEmbedded
-                onClose={handleFecharEdicaoCliente}
-                onSaved={() => {
-                  refetch()
-                  handleFecharEdicaoCliente()
-                }}
-              />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {editarClienteModalOpen && Boolean(editarClienteId) && (
+        <Dialog
+          open={editarClienteModalOpen && Boolean(editarClienteId)}
+          onOpenChange={open => {
+            if (!open) handleFecharEdicaoCliente()
+          }}
+          fullWidth
+          maxWidth="xl"
+          sx={{
+            '& .MuiDialog-container': {
+              zIndex: 1500,
+              justifyContent: { xs: 'center', md: 'flex-end' },
+              alignItems: 'stretch',
+              margin: 0,
+            },
+            '& .MuiBackdrop-root': { zIndex: 1500 },
+            '& .MuiDialog-paper': { zIndex: 1500 },
+          }}
+          PaperProps={{
+            sx: {
+              height: '100vh',
+              maxHeight: '100vh',
+              width: { xs: '95vw', sm: '90vw', md: 'min(900px, 60vw)' },
+              margin: { xs: 'auto', md: 0 },
+              borderRadius: 0,
+              display: 'flex',
+              flexDirection: 'column',
+            },
+          }}
+        >
+          <DialogContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
+            {editarClienteId && (
+              <div className="h-full overflow-y-auto">
+                <NovoCliente
+                  key={editarClienteId}
+                  clienteId={editarClienteId}
+                  isEmbedded
+                  onClose={handleFecharEdicaoCliente}
+                  onSaved={() => {
+                    refetch()
+                    handleFecharEdicaoCliente()
+                  }}
+                />
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

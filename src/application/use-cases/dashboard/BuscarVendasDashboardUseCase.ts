@@ -94,14 +94,6 @@ export class BuscarVendasDashboardUseCase {
     }
     
     const url = `/api/vendas?${params.toString()}`
-    console.log('🔍 BuscarVendasDashboardUseCase - URL da requisição:', url)
-    console.log('🔍 BuscarVendasDashboardUseCase - Parâmetros:', {
-      periodo,
-      statuses,
-      tipoVenda,
-      periodoInicialCustom: periodoInicialCustom?.toISOString(),
-      periodoFinalCustom: periodoFinalCustom?.toISOString(),
-    })
     
     const response = await fetch(url);
     
@@ -111,22 +103,7 @@ export class BuscarVendasDashboardUseCase {
     }
     
     const data = await response.json();
-    console.log('🔍 BuscarVendasDashboardUseCase - Resposta da API:', {
-      itemsCount: data.items?.length || 0,
-      hasMetricas: !!data.metricas,
-      metricas: data.metricas,
-      countVendasEfetivadas: data.metricas?.countVendasEfetivadas,
-      totalFaturado: data.metricas?.totalFaturado,
-      countProdutosVendidos: data.metricas?.countProdutosVendidos,
-      dataCompleta: data,
-    })
-    
     const dashboardVendas = DashboardVendas.fromJSON(data);
-    console.log('🔍 BuscarVendasDashboardUseCase - DashboardVendas criado:', {
-      countVendasEfetivadas: dashboardVendas.getCountVendasEfetivadas(),
-      totalFaturado: dashboardVendas.getTotalFaturado(),
-      countProdutosVendidos: dashboardVendas.getCountProdutosVendidos(),
-    })
     
     return dashboardVendas;
   }

@@ -133,7 +133,6 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
         currentPage++
       }
 
-      console.log('🔍 contarMesasAbertas - Total de mesas abertas encontradas:', totalCount)
       return totalCount
     } catch (error) {
       console.error('Erro ao contar mesas abertas:', error)

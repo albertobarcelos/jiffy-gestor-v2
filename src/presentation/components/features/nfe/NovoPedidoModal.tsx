@@ -386,6 +386,7 @@ export function NovoPedidoModal({
   const [isDraggingMeiosPagamento, setIsDraggingMeiosPagamento] = useState(false)
   const startXMeiosPagamentoRef = useRef(0)
   const scrollLeftMeiosPagamentoRef = useRef(0)
+  const nomeUsuarioCarregadoNoCicloRef = useRef(false)
 
   // Refs para long press na linha do produto
   const longPressTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -397,15 +398,20 @@ export function NovoPedidoModal({
   const hasMovedMeiosPagamentoRef = useRef(false)
   // Evita POST duplicado quando o usuário clica duas vezes rápido em "Criar Pedido" (isPending não bloqueia a tempo)
   const criacaoVendaGestorEmAndamentoRef = useRef(false)
+  /** Ignora clique fantasma no backdrop logo após abrir (ex.: mouse com bounce duplo) */
+  const ignorarBackdropAteRef = useRef(0)
 
   // Buscar grupos de produtos
   const {
     data: gruposData,
     isLoading: isLoadingGrupos,
-    refetch: refetchGrupos,
   } = useGruposProdutos({
     ativo: true,
     limit: 100,
+    // Step 2 usa grupos de produtos; evita carregar no step 1.
+    enabled: open && !modoVisualizacao && currentStep >= 2,
+    // Evita refetch ao voltar o foco da aba (não deve recarregar o modal inteiro)
+    refetchOnWindowFocus: false,
   })
 
   // Buscar produtos do grupo selecionado usando endpoint específico
@@ -448,16 +454,20 @@ export function NovoPedidoModal({
         count: data.count || produtos.length,
       }
     },
-    enabled: !!grupoSelecionadoId && !!auth?.getAccessToken(),
+    enabled: open && !!grupoSelecionadoId && !!auth?.getAccessToken(),
     staleTime: 0,
     gcTime: 1000 * 60 * 1,
     retry: 1,
+    refetchOnWindowFocus: false,
   })
 
   // Buscar meios de pagamento
   const { data: meiosPagamentoData } = useMeiosPagamentoInfinite({
     limit: 100,
     ativo: true,
+    // Step 3 usa meios de pagamento; em visualizacao/edicao pode ser usado para resolver nomes.
+    enabled: open && (currentStep >= 3 || modoVisualizacao || !!vendaId),
+    refetchOnWindowFocus: false,
   })
 
   // Handler para seleção de cliente
@@ -625,6 +635,14 @@ export function NovoPedidoModal({
     if (!meiosPagamentoData?.pages) return []
     return meiosPagamentoData.pages.flatMap(page => page.meiosPagamento || [])
   }, [meiosPagamentoData])
+
+  // Refs estáveis: evitam que `carregarVendaExistente` mude quando queries atualizam ao focar a aba
+  const meiosPagamentoRef = useRef(meiosPagamento)
+  meiosPagamentoRef.current = meiosPagamento
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+  const authRef = useRef(auth)
+  authRef.current = auth
 
   // Status disponíveis para vendas do gestor
   const statusDisponiveis = [
@@ -1650,9 +1668,10 @@ export function NovoPedidoModal({
   // Função para carregar dados de uma venda existente
   const carregarVendaExistente = useCallback(async (vendaIdOverride?: string | null) => {
     const vendaIdParaCarregar = vendaIdOverride || vendaId || vendaIdCriada
-    if (!vendaIdParaCarregar || !open || !auth) return
+    const authAtual = authRef.current
+    if (!vendaIdParaCarregar || !open || !authAtual) return
 
-    const token = auth.getAccessToken()
+    const token = authAtual.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado')
       return
@@ -2073,7 +2092,7 @@ export function NovoPedidoModal({
 
       await Promise.all(
         Array.from(idsMeios).map(async meioId => {
-          const meioCache = meiosPagamento.find(m => m.getId() === meioId)
+          const meioCache = meiosPagamentoRef.current.find(m => m.getId() === meioId)
           if (meioCache) {
             mapMeios[meioId] = meioCache.getNome()
             return
@@ -2103,15 +2122,18 @@ export function NovoPedidoModal({
     } catch (error: any) {
       console.error('Erro ao carregar venda:', error)
       showToast.error(error.message || 'Erro ao carregar dados da venda')
-      onClose()
+      onCloseRef.current()
     } finally {
       setIsLoadingVenda(false)
     }
-  }, [vendaId, vendaIdCriada, open, auth, modoVisualizacao, onClose, tabelaOrigemVenda, meiosPagamento])
+  }, [vendaId, vendaIdCriada, open, modoVisualizacao, tabelaOrigemVenda])
 
-  // Sincroniza o estado interno com o prop open
+  // Sincroniza o estado interno com o prop open; janela curta sem fechar pelo backdrop (hardware com duplo clique)
   useEffect(() => {
     setInternalDialogOpen(open)
+    if (open) {
+      ignorarBackdropAteRef.current = Date.now() + 550
+    }
   }, [open])
 
   // Carregar venda existente quando modal abrir com vendaId
@@ -2154,14 +2176,22 @@ export function NovoPedidoModal({
     const fetchNomeUsuario = async () => {
       if (!open || !auth) {
         setNomeUsuario('')
+        nomeUsuarioCarregadoNoCicloRef.current = false
+        setIsLoadingUsuario(false)
         return
       }
+
+      if (nomeUsuarioCarregadoNoCicloRef.current) {
+        return
+      }
+      nomeUsuarioCarregadoNoCicloRef.current = true
 
       try {
         setIsLoadingUsuario(true)
         const token = auth.getAccessToken()
         if (!token) {
           setNomeUsuario('')
+          nomeUsuarioCarregadoNoCicloRef.current = false
           return
         }
 
@@ -2176,6 +2206,7 @@ export function NovoPedidoModal({
 
         if (!meResponse.ok) {
           setNomeUsuario('')
+          nomeUsuarioCarregadoNoCicloRef.current = false
           return
         }
 
@@ -2184,6 +2215,7 @@ export function NovoPedidoModal({
 
         if (!userId) {
           setNomeUsuario('')
+          nomeUsuarioCarregadoNoCicloRef.current = false
           return
         }
 
@@ -2200,6 +2232,7 @@ export function NovoPedidoModal({
           // Se não encontrar, tenta usar o nome do User do authStore como fallback
           const user = auth.getUser()
           setNomeUsuario(user?.getName() || '')
+          nomeUsuarioCarregadoNoCicloRef.current = false
           return
         }
 
@@ -2209,6 +2242,7 @@ export function NovoPedidoModal({
         // Em caso de erro, tenta usar o nome do User do authStore como fallback
         const user = auth.getUser()
         setNomeUsuario(user?.getName() || '')
+        nomeUsuarioCarregadoNoCicloRef.current = false
       } finally {
         setIsLoadingUsuario(false)
       }
@@ -2217,17 +2251,22 @@ export function NovoPedidoModal({
     fetchNomeUsuario()
   }, [open, auth])
 
-  // Refetch grupos de produtos quando modal abrir e estiver na Step 2
-  // Isso garante que a ordem dos grupos esteja atualizada após reordenação
-  useEffect(() => {
-    if (open && currentStep === 2 && !modoVisualizacao) {
-      refetchGrupos()
-    }
-  }, [open, currentStep, modoVisualizacao, refetchGrupos])
+  // Refetch manual removido: o hook já controla atualização ao montar/abrir.
 
   // Intercepta o fechamento do Dialog
-  const handleDialogOpenChange = (isOpen: boolean) => {
+  const handleDialogOpenChange = (
+    isOpen: boolean,
+    reason?: 'backdropClick' | 'escapeKeyDown'
+  ) => {
     if (!isOpen) {
+      // Segundo "clique" do mouse pode cair no backdrop antes do painel capturar o foco
+      if (
+        reason === 'backdropClick' &&
+        Date.now() < ignorarBackdropAteRef.current
+      ) {
+        setInternalDialogOpen(true)
+        return
+      }
       // Tentando fechar o modal
       if (temDadosVenda()) {
         // Impede o fechamento e mostra o modal de confirmação
@@ -4092,11 +4131,13 @@ export function NovoPedidoModal({
           </DialogFooter>
         </DialogContent>
 
-        <SeletorClienteModal
-          open={seletorClienteOpen}
-          onClose={() => setSeletorClienteOpen(false)}
-          onSelect={handleSelectCliente}
-        />
+        {seletorClienteOpen && (
+          <SeletorClienteModal
+            open={seletorClienteOpen}
+            onClose={() => setSeletorClienteOpen(false)}
+            onSelect={handleSelectCliente}
+          />
+        )}
 
         {/* Modal de Complementos */}
         {modalComplementosOpen &&
