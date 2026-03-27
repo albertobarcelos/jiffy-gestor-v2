@@ -971,11 +971,14 @@ export function useReemitirNfe() {
       modelo,
       tipoDocumento,
       serie,
+      numero,
     }: {
       id: string
       modelo: 55 | 65
       tipoDocumento: 'NFE' | 'NFCE'
       serie: number
+      /** Número da nota rejeitada (body Swagger reemitir-nota) */
+      numero?: number
     }) => {
       if (!token) {
         throw new Error('Token não encontrado')
@@ -998,6 +1001,7 @@ export function useReemitirNfe() {
           serie,
           ambiente: fiscalConfig.ambiente,
           crt: fiscalConfig.crt,
+          ...(numero != null && Number.isFinite(numero) ? { numero } : {}),
         }),
       })
 
