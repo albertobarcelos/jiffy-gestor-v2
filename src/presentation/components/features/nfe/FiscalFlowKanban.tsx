@@ -77,6 +77,35 @@ type Venda = VendaUnificadaDTO
 /** Exibido quando o nome do cliente está vazio (Kanban e arraste) */
 const LABEL_SEM_CLIENTE = 'SEM CLIENTE'
 
+/** Colunas onde o arraste altera emissão — ordem “primeiro lugar” persiste só neste navegador */
+const COLUNAS_KANBAN_ARRASTAVEIS = new Set(['FINALIZADAS', 'PENDENTE_EMISSAO'])
+
+const KANBAN_PRIMEIRO_POR_COLUNA_KEY = 'jiffy-gestor-v2:kanban-primeiro-por-coluna'
+
+/** Lê mapa colunaId → vendaId que deve aparecer primeiro (localStorage). */
+function lerPrimeiroPorColunaDoStorage(): Record<string, string> {
+  if (typeof window === 'undefined') return {}
+  try {
+    const raw = window.localStorage.getItem(KANBAN_PRIMEIRO_POR_COLUNA_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as unknown
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, string>
+    }
+  } catch {
+    /* formato inválido ou storage indisponível */
+  }
+  return {}
+}
+
+function gravarPrimeiroPorColunaNoStorage(map: Record<string, string>) {
+  try {
+    window.localStorage.setItem(KANBAN_PRIMEIRO_POR_COLUNA_KEY, JSON.stringify(map))
+  } catch {
+    /* quota, modo privado, etc. */
+  }
+}
+
 /** Critério de ordenação por coluna (mantido apenas em memória). */
 type CriterioOrdenacaoKanban = 'data' | 'numero' | 'cliente'
 type DirecaoOrdenacaoKanban = 'asc' | 'desc'
@@ -204,7 +233,7 @@ function DroppableColumnContent({
   )
 }
 
-/** Preview do card durante o arraste: inclinado e com leve tremor (efeito de “arrastando na tela”) */
+/** Preview do card durante o arraste (DragOverlay): leve inclinação via classe global `.drag-preview-card` */
 function VendaCardDragPreview({ venda }: { venda: VendaUnificadaDTO }) {
   const valorFormatado = transformarParaReal(venda.valorFinal)
   const clienteNome = venda.cliente?.nome?.trim() ? venda.cliente.nome : LABEL_SEM_CLIENTE
@@ -316,6 +345,13 @@ export function FiscalFlowKanban() {
     Record<string, 'emitindo' | 'reemitindo'>
   >({})
   const [draggingVenda, setDraggingVenda] = useState<Venda | null>(null)
+  /** vendaId fixado no topo por coluna (Finalizadas / Pendente emissão), persistido em localStorage */
+  const [primeiroPorColuna, setPrimeiroPorColuna] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    setPrimeiroPorColuna(lerPrimeiroPorColunaDoStorage())
+  }, [])
+
   /** Evita PATCH duplicado ao reativar solicitarEmissaoFiscal para REJEITADA (Strict Mode / re-renders) */
   const rejeitadaReativacaoEmAndamentoRef = useRef(false)
 
@@ -683,6 +719,24 @@ export function FiscalFlowKanban() {
         handleDesmarcarEmissaoFiscal(venda.id, venda.tabelaOrigem)
       }
     }
+
+    // Card solto em coluna arrastável: mantém no topo para feedback imediato (só localStorage)
+    const colunaDestino = String(over.id)
+    if (COLUNAS_KANBAN_ARRASTAVEIS.has(colunaDestino)) {
+      const origemKanban = venda.getEtapaKanban()
+      setPrimeiroPorColuna(prev => {
+        const next = { ...prev }
+        if (
+          (origemKanban === 'FINALIZADAS' || origemKanban === 'PENDENTE_EMISSAO') &&
+          prev[origemKanban] === venda.id
+        ) {
+          delete next[origemKanban]
+        }
+        next[colunaDestino] = venda.id
+        gravarPrimeiroPorColunaNoStorage(next)
+        return next
+      })
+    }
   }
 
   const handleDesmarcarEmissaoFiscal = async (
@@ -896,7 +950,23 @@ export function FiscalFlowKanban() {
       criterioOrdenacaoPorColuna[columnId as ColunaId] ?? ('data' as CriterioOrdenacaoKanban)
     const direcao =
       direcaoOrdenacaoPorColuna[columnId as ColunaId] ?? ('desc' as DirecaoOrdenacaoKanban)
-    return ordenarVendasKanbanPorCriterio(Array.from(vendasUnicas.values()), criterio, direcao)
+    let ordenadas = ordenarVendasKanbanPorCriterio(
+      Array.from(vendasUnicas.values()),
+      criterio,
+      direcao
+    )
+
+    // Último card movido para esta coluna fica primeiro (persistido em localStorage)
+    const pinId = primeiroPorColuna[columnId]
+    if (pinId) {
+      const idx = ordenadas.findIndex(v => v.id === pinId)
+      if (idx > 0) {
+        const [pinned] = ordenadas.splice(idx, 1)
+        ordenadas = [pinned, ...ordenadas]
+      }
+    }
+
+    return ordenadas
   }
 
   if (isLoading) {
