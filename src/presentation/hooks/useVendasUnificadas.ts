@@ -147,7 +147,8 @@ export class VendaUnificadaDTO {
  * Parâmetros alinhados ao contrato do backend GET /vendas/unificado:
  * - origem, statusFiscal, periodoInicial, periodoFinal (dataCriacao)
  * - dataFinalizacaoInicio, dataFinalizacaoFim
- * - q (busca), offset, limit
+ * - q (busca)
+ * Paginação: `useVendasUnificadas` obtém **todas** as páginas (100 itens por requisição até acabar).
  */
 interface VendasUnificadasQueryParams {
     origem?: 'PDV' | 'GESTOR' | 'DELIVERY'
@@ -157,8 +158,6 @@ interface VendasUnificadasQueryParams {
     dataFinalizacaoInicio?: string // ISO date string
     dataFinalizacaoFim?: string    // ISO date string
     q?: string                     // termo de busca
-    offset?: number
-    limit?: number
 }
 
 /** Resposta do backend: PaginationResult<VendaUnificadaDTO> */
@@ -172,8 +171,58 @@ interface VendasUnificadasResponse {
     items: VendaUnificadaDTO[]
 }
 
+/** Tamanho máximo por requisição (API); busca completa é feita em páginas de 100 em 100. */
+export const VENDAS_UNIFICADAS_PAGE_SIZE = 100
+
+/** Converte um item bruto da API em DTO (reutilizado em cada página). */
+function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): VendaUnificadaDTO {
+    return new VendaUnificadaDTO(
+        v.id as string,
+        v.numeroVenda as number,
+        v.codigoVenda as string,
+        v.tipoVenda as string | null,
+        v.origem as VendaUnificadaDTO['origem'],
+        v.tabelaOrigem as VendaUnificadaDTO['tabelaOrigem'],
+        v.valorFinal as number,
+        v.totalDesconto as number,
+        v.totalAcrescimo as number,
+        v.dataCriacao as string,
+        v.dataFinalizacao as string | null,
+        (v.dataCancelamento ?? null) as string | null,
+        v.cliente as VendaUnificadaDTO['cliente'],
+        parseSolicitarEmissaoFiscal(v.solicitarEmissaoFiscal),
+        normalizarStatusFiscalUnificado(v),
+        (v.documentoFiscalId ?? null) as string | null,
+        v.abertoPor as VendaUnificadaDTO['abertoPor'],
+        v.numeroFiscal as number | null | undefined,
+        v.serieFiscal as string | null | undefined,
+        v.dataEmissaoFiscal as string | null | undefined,
+        v.tipoDocFiscal as VendaUnificadaDTO['tipoDocFiscal'],
+        v.retornoSefaz as string | null | undefined
+    )
+}
+
+function montarSearchParamsVendasUnificadas(
+    params: VendasUnificadasQueryParams,
+    offset: number,
+    limit: number
+): URLSearchParams {
+    const searchParams = new URLSearchParams()
+    if (params.origem) searchParams.append('origem', params.origem)
+    if (params.statusFiscal) searchParams.append('statusFiscal', params.statusFiscal)
+    if (params.periodoInicial) searchParams.append('periodoInicial', params.periodoInicial)
+    if (params.periodoFinal) searchParams.append('periodoFinal', params.periodoFinal)
+    if (params.dataFinalizacaoInicio) searchParams.append('dataFinalizacaoInicio', params.dataFinalizacaoInicio)
+    if (params.dataFinalizacaoFim) searchParams.append('dataFinalizacaoFim', params.dataFinalizacaoFim)
+    if (params.q?.trim()) searchParams.append('q', params.q.trim())
+    searchParams.append('offset', String(offset))
+    searchParams.append('limit', String(limit))
+    return searchParams
+}
+
 /**
- * Hook para buscar vendas unificadas (PDV + Gestor) com React Query
+ * Hook para buscar vendas unificadas (PDV + Gestor) com React Query.
+ * Busca todas as páginas automaticamente (100 itens por requisição até `hasNext` ser false).
  */
 export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
     const { auth } = useAuthStore()
@@ -188,78 +237,76 @@ export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
                 throw new Error('Token não encontrado')
             }
 
-            // Monta query params no formato do backend
-            const searchParams = new URLSearchParams()
-            if (params.origem) searchParams.append('origem', params.origem)
-            if (params.statusFiscal) searchParams.append('statusFiscal', params.statusFiscal)
-            if (params.periodoInicial) searchParams.append('periodoInicial', params.periodoInicial)
-            if (params.periodoFinal) searchParams.append('periodoFinal', params.periodoFinal)
-            if (params.dataFinalizacaoInicio) searchParams.append('dataFinalizacaoInicio', params.dataFinalizacaoInicio)
-            if (params.dataFinalizacaoFim) searchParams.append('dataFinalizacaoFim', params.dataFinalizacaoFim)
-            if (params.q?.trim()) searchParams.append('q', params.q.trim())
-            if (params.offset != null) searchParams.append('offset', params.offset.toString())
-            if (params.limit) searchParams.append('limit', params.limit.toString())
+            const pageSize = VENDAS_UNIFICADAS_PAGE_SIZE
+            const todosItens: VendaUnificadaDTO[] = []
+            let offset = 0
+            let totalCount = 0
+            let primeiraPaginaMeta: {
+                page: number
+                totalPages: number
+                hasPrevious: boolean
+            } | null = null
 
-            const response = await fetch(`/api/vendas/unificado?${searchParams.toString()}`, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                cache: 'no-store',
-            })
+            const maxPaginas = 500
+            let pagina = 0
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}))
-                const errorMessage = errorData.error || errorData.message || `Erro ${response.status}: ${response.statusText}`
-                throw new Error(errorMessage)
+            while (pagina < maxPaginas) {
+                pagina += 1
+                const searchParams = montarSearchParamsVendasUnificadas(params, offset, pageSize)
+
+                const response = await fetch(`/api/vendas/unificado?${searchParams.toString()}`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                    cache: 'no-store',
+                })
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}))
+                    const errorMessage =
+                        errorData.error || errorData.message || `Erro ${response.status}: ${response.statusText}`
+                    throw new Error(errorMessage)
+                }
+
+                const data = await response.json()
+                const rawItems = (data.items || []) as Record<string, unknown>[]
+                const batch = rawItems.map(mapItemJsonParaVendaUnificadaDTO)
+                todosItens.push(...batch)
+
+                if (pagina === 1) {
+                    totalCount = typeof data.count === 'number' ? data.count : todosItens.length
+                    primeiraPaginaMeta = {
+                        page: data.page ?? 1,
+                        totalPages: data.totalPages ?? 1,
+                        hasPrevious: data.hasPrevious ?? false,
+                    }
+                }
+
+                const hasNext = data.hasNext ?? false
+                if (!hasNext || batch.length === 0 || batch.length < pageSize) {
+                    break
+                }
+
+                offset += pageSize
             }
 
-            const data = await response.json()
-
-            // Converter objetos JSON para instâncias de VendaUnificadaDTO
-            const items = (data.items || []).map((v: Record<string, unknown>) =>
-                new VendaUnificadaDTO(
-                    v.id as string,
-                    v.numeroVenda as number,
-                    v.codigoVenda as string,
-                    v.tipoVenda as string | null,
-                    v.origem as VendaUnificadaDTO['origem'],
-                    v.tabelaOrigem as VendaUnificadaDTO['tabelaOrigem'],
-                    v.valorFinal as number,
-                    v.totalDesconto as number,
-                    v.totalAcrescimo as number,
-                    v.dataCriacao as string,
-                    v.dataFinalizacao as string | null,
-                    (v.dataCancelamento ?? null) as string | null,
-                    v.cliente as VendaUnificadaDTO['cliente'],
-                    parseSolicitarEmissaoFiscal(v.solicitarEmissaoFiscal),
-                    normalizarStatusFiscalUnificado(v),
-                    (v.documentoFiscalId ?? null) as string | null,
-                    v.abertoPor as VendaUnificadaDTO['abertoPor'],
-                    v.numeroFiscal as number | null | undefined,
-                    v.serieFiscal as string | null | undefined,
-                    v.dataEmissaoFiscal as string | null | undefined,
-                    v.tipoDocFiscal as VendaUnificadaDTO['tipoDocFiscal'],
-                    v.retornoSefaz as string | null | undefined
-                )
-            )
-
             return {
-                items,
-                count: data.count || 0,
-                page: data.page || 1,
-                limit: data.limit || 10,
-                totalPages: data.totalPages || 1,
-                hasNext: data.hasNext ?? false,
-                hasPrevious: data.hasPrevious ?? false,
+                items: todosItens,
+                count: totalCount,
+                page: primeiraPaginaMeta?.page ?? 1,
+                limit: todosItens.length,
+                totalPages: primeiraPaginaMeta?.totalPages ?? 1,
+                hasNext: false,
+                hasPrevious: primeiraPaginaMeta?.hasPrevious ?? false,
             }
         },
         enabled: !!token,
-        staleTime: 1000 * 30, // 30 segundos
-        refetchOnWindowFocus: true,
+        // Herda QueryProvider: staleTime 5min, refetchOnWindowFocus false, refetchOnMount false.
+        // Não redefinir staleTime curto nem refetchOnWindowFocus aqui: ao fechar modal o foco volta à janela
+        // e disparava novo GET em toda vez (dados stale após 30s).
         refetchOnReconnect: true,
-        // Polling por status fiscal (PENDENTE / EMITINDO / etc.) desativado temporariamente: vendas presas em
-        // PENDENTE geravam refetch contínuo. Atualizar manualmente (botão) ou ao focar a janela até nova estratégia.
+        // Polling por status fiscal (PENDENTE / EMITINDO / etc.) desativado: usar botão Atualizar no Kanban.
         refetchInterval: false,
     })
 }

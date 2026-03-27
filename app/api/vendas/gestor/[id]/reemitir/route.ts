@@ -11,9 +11,20 @@ type ApiErrorData = {
   categoria?: string
 }
 
+async function lerCorpoJsonSeguro(request: NextRequest): Promise<unknown> {
+  try {
+    const text = await request.text()
+    if (!text?.trim()) return {}
+    return JSON.parse(text) as unknown
+  } catch {
+    return {}
+  }
+}
+
 /**
  * POST /api/vendas/gestor/[id]/reemitir
- * Proxy para o backend: POST /api/v1/gestor/vendas/{id}/reemitir-nota (Swagger)
+ *
+ * Destino na API externa: `POST /api/v1/gestor/vendas/{id}/reemitir-nota`. O 500 no log do Next reflete o status HTTP do backend.
  */
 export async function POST(
   request: NextRequest,
@@ -31,7 +42,7 @@ export async function POST(
       return NextResponse.json({ error: 'ID da venda é obrigatório' }, { status: 400 })
     }
 
-    const body = await request.json()
+    const body = await lerCorpoJsonSeguro(request)
     const apiClient = new ApiClient()
 
     const response = await apiClient.request<any>(
@@ -50,19 +61,36 @@ export async function POST(
   } catch (error) {
     if (error instanceof ApiError) {
       const errorData =
-        error.data && typeof error.data === 'object'
-          ? (error.data as ApiErrorData)
+        error.data && typeof error.data === 'object' && !Array.isArray(error.data)
+          ? (error.data as ApiErrorData & Record<string, unknown>)
           : {}
+
+      if (process.env.NODE_ENV === 'development') {
+        console.error(
+          '[proxy Gestor reemitir-nota] status upstream:',
+          error.status,
+          'mensagem:',
+          error.message
+        )
+      }
 
       return NextResponse.json(
         {
-          error: error.message || errorData.message || errorData.error || 'Erro ao reemitir nota fiscal',
+          ...errorData,
+          error:
+            error.message ||
+            errorData.message ||
+            errorData.error ||
+            'Erro ao reemitir nota fiscal',
           codigo: errorData.codigo ?? errorData.codigoErro ?? null,
           codigoRejeicao: errorData.codigoRejeicao ?? null,
           categoria: errorData.categoria ?? null,
         },
         { status: error.status }
       )
+    }
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[proxy Gestor reemitir-nota] erro não-ApiError:', error)
     }
     return NextResponse.json(
       { error: 'Erro interno do servidor' },

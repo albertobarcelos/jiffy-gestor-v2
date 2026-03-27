@@ -957,6 +957,27 @@ export function useEmitirNfeGestor() {
   })
 }
 
+/** Body alinhado ao contrato de reemitir-nota: `documentId` obrigatório; `numero` opcional. */
+export type ReemitirNfeVariables = {
+  /** ID da venda na URL do proxy */
+  id: string
+  /** ID do documento fiscal (rejeitado) — mesmo valor do GET vendas unificado `documentoFiscalId` */
+  documentId: string
+  /** Número da nota rejeitada, se existir na listagem */
+  numero?: number
+}
+
+export function montarBodyReemitirNota(params: {
+  documentId: string
+  numero?: number
+}): Record<string, string | number> {
+  const body: Record<string, string | number> = { documentId: params.documentId.trim() }
+  if (params.numero != null && Number.isFinite(Number(params.numero))) {
+    body.numero = Number(params.numero)
+  }
+  return body
+}
+
 /**
  * Hook para reemitir NFe (NFC-e ou NF-e) de uma venda PDV rejeitada.
  */
@@ -966,27 +987,14 @@ export function useReemitirNfe() {
   const token = auth?.getAccessToken()
 
   return useMutation({
-    mutationFn: async ({
-      id,
-      modelo,
-      tipoDocumento,
-      serie,
-      numero,
-    }: {
-      id: string
-      modelo: 55 | 65
-      tipoDocumento: 'NFE' | 'NFCE'
-      serie: number
-      /** Número da nota rejeitada (body Swagger reemitir-nota) */
-      numero?: number
-    }) => {
+    mutationFn: async (variables: ReemitirNfeVariables) => {
       if (!token) {
         throw new Error('Token não encontrado')
       }
 
-      const fiscalConfig = await resolveFiscalEmissionConfig(token, modelo)
-      if (!Number.isFinite(serie) || serie <= 0) {
-        throw new Error('Série fiscal da rejeição não encontrada para reemissão.')
+      const { id, documentId, numero } = variables
+      if (!documentId?.trim()) {
+        throw new Error('documentId é obrigatório para reemissão.')
       }
 
       const response = await fetch(`/api/vendas/${id}/reemitir`, {
@@ -995,14 +1003,7 @@ export function useReemitirNfe() {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          tipoDocumento,
-          modelo,
-          serie,
-          ambiente: fiscalConfig.ambiente,
-          crt: fiscalConfig.crt,
-          ...(numero != null && Number.isFinite(numero) ? { numero } : {}),
-        }),
+        body: JSON.stringify(montarBodyReemitirNota({ documentId, numero })),
       })
 
       if (!response.ok) {
@@ -1051,27 +1052,14 @@ export function useReemitirNfeGestor() {
   const token = auth?.getAccessToken()
 
   return useMutation({
-    mutationFn: async ({
-      id,
-      modelo,
-      tipoDocumento,
-      serie,
-      numero,
-    }: {
-      id: string
-      modelo: 55 | 65
-      tipoDocumento: 'NFE' | 'NFCE'
-      serie: number
-      /** Número da nota rejeitada (Swagger: body opcional reemitir-nota) */
-      numero?: number
-    }) => {
+    mutationFn: async (variables: ReemitirNfeVariables) => {
       if (!token) {
         throw new Error('Token não encontrado')
       }
 
-      const fiscalConfig = await resolveFiscalEmissionConfig(token, modelo)
-      if (!Number.isFinite(serie) || serie <= 0) {
-        throw new Error('Série fiscal da rejeição não encontrada para reemissão.')
+      const { id, documentId, numero } = variables
+      if (!documentId?.trim()) {
+        throw new Error('documentId é obrigatório para reemissão.')
       }
 
       const response = await fetch(`/api/vendas/gestor/${id}/reemitir`, {
@@ -1080,14 +1068,7 @@ export function useReemitirNfeGestor() {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          tipoDocumento,
-          modelo,
-          serie,
-          ambiente: fiscalConfig.ambiente,
-          crt: fiscalConfig.crt,
-          ...(numero != null && Number.isFinite(numero) ? { numero } : {}),
-        }),
+        body: JSON.stringify(montarBodyReemitirNota({ documentId, numero })),
       })
 
       if (!response.ok) {

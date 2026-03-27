@@ -57,15 +57,78 @@ interface KanbanColumn {
   title: string
   color: string
   borderColor: string
-  borderColorClass: string // Classe Tailwind para a cor da borda
-  /** Fundo do card: mesma família de cor da coluna, mais suave que o header */
-  cardBackgroundClass: string
   icon: React.ReactNode
   placeholder: string
 }
 
 // Usar VendaUnificadaDTO do hook
 type Venda = VendaUnificadaDTO
+
+type ColunaKanbanId = 'FINALIZADAS' | 'PENDENTE_EMISSAO' | 'COM_NFE'
+
+/** Status em que a UI trata como aguardando resposta da SEFAZ (até o backend refletir rejeição/códigos). */
+const STATUS_FISCAL_AGUARDANDO_SEFAZ = new Set([
+  'PENDENTE',
+  'PENDENTE_AUTORIZACAO',
+  'EMITINDO',
+  'CONTINGENCIA',
+])
+
+function statusFiscalAguardandoSefaz(v: VendaUnificadaDTO): boolean {
+  const sf = String(v.statusFiscal ?? '').trim().toUpperCase()
+  return STATUS_FISCAL_AGUARDANDO_SEFAZ.has(sf)
+}
+
+/**
+ * Borda esquerda e fundo do card conforme coluna e statusFiscal.
+ * Finalizadas: primary. Pendente/Com nota: fiscal (emitida/cancelada/rejeitada), sem status na pendente → amarelo,
+ * reemitindo ou aguardando SEFAZ → custom-2.
+ */
+function getCardBorderEFundoKanban(
+  columnId: ColunaKanbanId,
+  v: VendaUnificadaDTO,
+  acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
+): { borderClass: string; cardBgClass: string } {
+  if (columnId === 'FINALIZADAS') {
+    return { borderClass: 'border-l-primary', cardBgClass: 'bg-white' }
+  }
+
+  if (acaoFiscalEmAndamentoPorVenda[v.id] === 'reemitindo') {
+    return { borderClass: 'border-l-custom-2', cardBgClass: 'bg-white' }
+  }
+
+  const sf = String(v.statusFiscal ?? '').trim().toUpperCase()
+
+  if (sf === 'EMITIDA') {
+    return { borderClass: 'border-l-green-500', cardBgClass: 'bg-white' }
+  }
+  if (sf === 'CANCELADA') {
+    return { borderClass: 'border-l-gray-400', cardBgClass: 'bg-gray-50' }
+  }
+  if (sf === 'REJEITADA') {
+    return { borderClass: 'border-l-red-500', cardBgClass: 'bg-white' }
+  }
+
+  // Aguardando SEFAZ
+  if (statusFiscalAguardandoSefaz(v)) {
+    return { borderClass: 'border-l-custom-2', cardBgClass: 'bg-white' }
+  }
+
+  // Coluna Pendente emissão sem statusFiscal na API → mantém amarelo (identidade da coluna)
+  if (columnId === 'PENDENTE_EMISSAO' && !sf) {
+    return { borderClass: 'border-l-yellow-400', cardBgClass: 'bg-white' }
+  }
+
+  if (columnId === 'PENDENTE_EMISSAO') {
+    return { borderClass: 'border-l-yellow-400', cardBgClass: 'bg-white' }
+  }
+
+  if (columnId === 'COM_NFE') {
+    return { borderClass: 'border-l-green-400', cardBgClass: 'bg-white' }
+  }
+
+  return { borderClass: 'border-l-gray-300', cardBgClass: 'bg-white' }
+}
 
 /** Exibido quando o nome do cliente está vazio (Kanban e arraste) */
 const LABEL_SEM_CLIENTE = 'SEM CLIENTE'
@@ -83,14 +146,9 @@ function vendaBloqueadaParaEmissaoInterativa(
 ): boolean {
   if (acaoFiscalEmAndamentoPorVenda[v.id]) return true
   const s = String(v.statusFiscal ?? '').trim().toUpperCase()
-  return (
-    s === 'PENDENTE' ||
-    s === 'PENDENTE_EMISSAO' ||
-    s === 'EMITINDO' ||
-    s === 'PENDENTE_AUTORIZACAO' ||
-    s === 'CONTINGENCIA' ||
-    s === 'EMITIDA'
-  )
+  if (s === 'EMITIDA' || s === 'PENDENTE_EMISSAO') return true
+  if (statusFiscalAguardandoSefaz(v)) return true
+  return false
 }
 
 const KANBAN_PRIMEIRO_POR_COLUNA_KEY = 'jiffy-gestor-v2:kanban-primeiro-por-coluna'
@@ -361,6 +419,8 @@ export function FiscalFlowKanban() {
 
   /** Evita PATCH duplicado ao reativar solicitarEmissaoFiscal para REJEITADA (Strict Mode / re-renders) */
   const rejeitadaReativacaoEmAndamentoRef = useRef(false)
+  /** IDs já reativados com sucesso — evita loop infinito se o GET ainda vier inconsistente (base de testes). */
+  const rejeitadaReativacaoJaTentadaIdsRef = useRef<Set<string>>(new Set())
 
   type ColunaId = 'FINALIZADAS' | 'PENDENTE_EMISSAO' | 'COM_NFE'
   /** Ordenação individual por coluna: padrão sempre por data (reset ao recarregar a página). */
@@ -452,8 +512,6 @@ export function FiscalFlowKanban() {
       periodoFinal: periodoFinalISO,
       dataFinalizacaoInicio: dataFinalizacaoInicioISO,
       dataFinalizacaoFim: dataFinalizacaoFimISO,
-      offset: 0,
-      limit: 100,
     }),
     [
       searchQuery,
@@ -466,12 +524,17 @@ export function FiscalFlowKanban() {
     ]
   )
 
+  const vendasUnificadasQueryKeyFingerprint = JSON.stringify(vendasUnificadasQueryParams)
+
+  useEffect(() => {
+    rejeitadaReativacaoJaTentadaIdsRef.current = new Set()
+  }, [vendasUnificadasQueryKeyFingerprint])
+
   // Buscar vendas unificadas (PDV + Gestor) com filtros da API
   const {
     data: vendasUnificadasData,
     isLoading,
     refetch,
-    dataUpdatedAt,
   } = useVendasUnificadas(vendasUnificadasQueryParams)
 
   const marcarEmissaoFiscal = useMarcarEmissaoFiscal()
@@ -485,7 +548,11 @@ export function FiscalFlowKanban() {
 
     const pendentes = vendasUnificadasData.items.filter(v => {
       const rejeitada = String(v.statusFiscal ?? '').trim().toUpperCase() === 'REJEITADA'
-      return rejeitada && !v.solicitarEmissaoFiscal
+      return (
+        rejeitada &&
+        !v.solicitarEmissaoFiscal &&
+        !rejeitadaReativacaoJaTentadaIdsRef.current.has(v.id)
+      )
     })
     if (pendentes.length === 0) return
 
@@ -493,23 +560,28 @@ export function FiscalFlowKanban() {
     let cancelled = false
     void (async () => {
       try {
+        let sucesso = 0
         for (const v of pendentes) {
           if (cancelled) break
-          await marcarEmissaoFiscal.mutateAsync({
-            id: v.id,
-            tabelaOrigem: v.tabelaOrigem,
-            silent: true,
-          })
+          try {
+            await marcarEmissaoFiscal.mutateAsync({
+              id: v.id,
+              tabelaOrigem: v.tabelaOrigem,
+              silent: true,
+            })
+            rejeitadaReativacaoJaTentadaIdsRef.current.add(v.id)
+            sucesso += 1
+          } catch {
+            // Erro por venda: não adiciona ao Set para permitir nova tentativa após novo carregamento
+          }
         }
-        if (!cancelled && pendentes.length > 0) {
+        if (!cancelled && sucesso > 0) {
           showToast.info(
-            pendentes.length === 1
+            sucesso === 1
               ? 'Solicitação de emissão reativada para a venda com nota rejeitada.'
-              : `Solicitação de emissão reativada para ${pendentes.length} vendas com nota rejeitada.`
+              : `Solicitação de emissão reativada para ${sucesso} vendas com nota rejeitada.`
           )
         }
-      } catch {
-        // onError do hook já exibe toast de erro
       } finally {
         rejeitadaReativacaoEmAndamentoRef.current = false
       }
@@ -518,7 +590,7 @@ export function FiscalFlowKanban() {
     return () => {
       cancelled = true
     }
-  }, [dataUpdatedAt, isLoading, vendasUnificadasData, marcarEmissaoFiscal])
+  }, [isLoading, vendasUnificadasData, marcarEmissaoFiscal])
 
   // Só PointerSensor: em touch, pointermove fica no document (melhor que TouchSensor no alvo + scroll).
   // TouchSensor junto com PointerSensor gerava gesto “travado” no mobile; distance evita arraste ao rolar.
@@ -568,6 +640,27 @@ export function FiscalFlowKanban() {
     }
   }
 
+  /**
+   * Mesma regra do drag ao soltar em "Com nota solicitada": o card fica primeiro na coluna COM_NFE (localStorage).
+   * Usado ao clicar Emitir/Reemitir na coluna Pendente emissão (sem arrastar).
+   */
+  const pinVendaComoPrimeiraEmComNotaSolicitada = (venda: Venda) => {
+    if (getEtapaKanbanParaExibicao(venda) !== 'PENDENTE_EMISSAO') return
+    const origemKanban = venda.getEtapaKanban()
+    setPrimeiroPorColuna(prev => {
+      const next = { ...prev }
+      if (
+        (origemKanban === 'FINALIZADAS' || origemKanban === 'PENDENTE_EMISSAO') &&
+        prev[origemKanban] === venda.id
+      ) {
+        delete next[origemKanban]
+      }
+      next.COM_NFE = venda.id
+      gravarPrimeiroPorColunaNoStorage(next)
+      return next
+    })
+  }
+
   // Todas as vendas unificadas retornadas pela API (já filtradas por q, período, origem, statusFiscal no backend)
   const todasVendas: Venda[] = vendasUnificadasData?.items || []
 
@@ -593,8 +686,6 @@ export function FiscalFlowKanban() {
       title: 'Finalizadas',
       color: 'bg-primary/15',
       borderColor: 'border-gray-400',
-      borderColorClass: 'border-l-primary',
-      cardBackgroundClass: 'bg-primary/10',
       icon: <MdReceipt className="h-4 w-4 text-gray-600" />,
       placeholder: 'Vendas finalizadas aguardando ação',
     },
@@ -603,8 +694,6 @@ export function FiscalFlowKanban() {
       title: 'Pendente Emissão Fiscal',
       color: 'bg-yellow-50',
       borderColor: 'border-yellow-400',
-      borderColorClass: 'border-l-yellow-400',
-      cardBackgroundClass: 'bg-yellow-400/10',
       icon: <MdSchedule className="h-4 w-4 text-yellow-600" />,
       placeholder: 'Vendas aguardando emissão de NFe',
     },
@@ -613,8 +702,6 @@ export function FiscalFlowKanban() {
       title: 'Com Nota Solicitada',
       color: 'bg-green-50',
       borderColor: 'border-green-400',
-      borderColorClass: 'border-l-green-400',
-      cardBackgroundClass: 'bg-green-400/10',
       icon: <MdCheckCircle className="h-4 w-4 text-green-600" />,
       placeholder: 'Vendas com nota fiscal solicitada',
     },
@@ -790,42 +877,34 @@ export function FiscalFlowKanban() {
   }
 
   const handleEmitirNfe = async (venda: Venda) => {
-    const modeloInicial: 55 | 65 = venda.tipoDocFiscal === 'NFE' ? 55 : 65
+    const numeroNotaRejeitada =
+      venda.numeroFiscal != null && Number.isFinite(Number(venda.numeroFiscal))
+        ? Number(venda.numeroFiscal)
+        : undefined
 
-    // Reemissão: rota explícita dedicada.
-    if (venda.statusFiscal === 'REJEITADA' && venda.tipoDocFiscal) {
-      const serieReemissao = Number(venda.serieFiscal)
-      if (!Number.isFinite(serieReemissao) || serieReemissao <= 0) {
+    // Reemissão: POST reemitir-nota com `documentId` + `numero` opcional (contrato validado no backend).
+    if (venda.statusFiscal === 'REJEITADA') {
+      const docId = venda.documentoFiscalId?.trim()
+      if (!docId) {
         showToast.error(
-          'Série fiscal da rejeição não encontrada. Não foi possível reemitir automaticamente.'
+          'Documento fiscal não encontrado para esta venda. Não é possível reemitir.'
         )
         return
       }
 
+      pinVendaComoPrimeiraEmComNotaSolicitada(venda)
+
       setAcaoFiscalEmAndamento(venda.id, 'reemitindo')
       try {
-        const basePayload = {
+        const payload = {
           id: venda.id,
-          modelo: modeloInicial,
-          tipoDocumento: venda.tipoDocFiscal,
-          serie: serieReemissao,
+          documentId: docId,
+          ...(numeroNotaRejeitada != null ? { numero: numeroNotaRejeitada } : {}),
         }
-
-        const numeroNotaRejeitada =
-          venda.numeroFiscal != null && Number.isFinite(Number(venda.numeroFiscal))
-            ? Number(venda.numeroFiscal)
-            : undefined
-
         if (venda.tabelaOrigem === 'venda_gestor') {
-          await reemitirNfeGestor.mutateAsync({
-            ...basePayload,
-            ...(numeroNotaRejeitada != null ? { numero: numeroNotaRejeitada } : {}),
-          })
+          await reemitirNfeGestor.mutateAsync(payload)
         } else {
-          await reemitirNfePdv.mutateAsync({
-            ...basePayload,
-            ...(numeroNotaRejeitada != null ? { numero: numeroNotaRejeitada } : {}),
-          })
+          await reemitirNfePdv.mutateAsync(payload)
         }
         await refetch()
         await refetchAteMudarStatusFiscal(venda.id, 'REJEITADA')
@@ -837,6 +916,8 @@ export function FiscalFlowKanban() {
         setAcaoFiscalEmAndamento(venda.id, null)
       }
     }
+
+    pinVendaComoPrimeiraEmComNotaSolicitada(venda)
 
     setVendaSelecionadaParaEmissao({
       id: venda.id,
@@ -1141,7 +1222,7 @@ export function FiscalFlowKanban() {
               return (
                 <div
                   key={column.id}
-                  className="flex w-64 flex-shrink-0 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white sm:w-60 md:w-64 lg:w-96"
+                  className="flex w-64 flex-shrink-0 flex-col overflow-hidden rounded-lg border border-gray-200 bg-gray-50 sm:w-60 md:w-64 lg:w-96"
                   style={{ height: 'calc(100vh - 180px)' }}
                 >
                   {/* Column Header - Apenas o header tem cor */}
@@ -1223,7 +1304,7 @@ export function FiscalFlowKanban() {
                   {/* Column Content - área droppable (incl. soltar em Com nota = emitir/reemitir) */}
                   <DroppableColumnContent
                     columnId={column.id}
-                    className={`scrollbar-thin min-h-0 flex-1 space-y-2 overflow-y-auto ${column.cardBackgroundClass} p-2.5`}
+                    className="scrollbar-thin min-h-0 flex-1 space-y-2 overflow-y-auto bg-gray-200 p-2.5"
                   >
                     {columnVendas.length === 0 ? (
                       <div className="py-6 text-center">
@@ -1236,15 +1317,14 @@ export function FiscalFlowKanban() {
                           ? venda.cliente.nome
                           : LABEL_SEM_CLIENTE
                         // Durante reemissão o card vai para Com nota solicitada; mantém lápis como em Pendente emissão
-                        const colunaPermiteEditarClienteGestor =
+                        const colunaPermiteEditarCliente =
                           column.id === 'FINALIZADAS' ||
                           column.id === 'PENDENTE_EMISSAO' ||
                           (column.id === 'COM_NFE' &&
                             acaoFiscalEmAndamentoPorVenda[venda.id] === 'reemitindo')
-                        // Editar cliente (lápis → NovoCliente): só Gestor, colunas Finalizadas e Pendente emissão, cliente já vinculado
-                        const podeEditarClienteVendaGestor =
-                          venda.tabelaOrigem === 'venda_gestor' &&
-                          colunaPermiteEditarClienteGestor &&
+                        // Editar cliente global (lápis → NovoCliente): PDV e Gestor; mesmas colunas; cliente já vinculado com nome
+                        const podeEditarClienteNaVenda =
+                          colunaPermiteEditarCliente &&
                           !vendaSemNomeCliente(venda) &&
                           Boolean(venda.cliente?.id?.trim())
                         // Vendas do Gestor são sempre balcão; exibir "Balcão" quando a API não retorna tipoVenda
@@ -1253,16 +1333,23 @@ export function FiscalFlowKanban() {
                             ? venda.tipoVenda || 'balcao'
                             : venda.tipoVenda
 
+                        const { borderClass: cardBorderClass, cardBgClass } =
+                          getCardBorderEFundoKanban(
+                            column.id as ColunaKanbanId,
+                            venda,
+                            acaoFiscalEmAndamentoPorVenda
+                          )
+
                         return (
                           <DraggableVendaCard key={venda.id} venda={venda} column={column}>
                             <div
-                              className={`relative rounded-lg border-l-4 ${column.borderColorClass} bg-white cursor-pointer border border-gray-200/80 p-3 transition-all hover:shadow-md`}
+                              className={`relative rounded-lg border-l-4 ${cardBorderClass} ${cardBgClass} cursor-pointer border border-gray-200/80 p-3 transition-all hover:shadow-md`}
                               title="Duplo clique para ver os detalhes do pedido"
                               onDoubleClick={() => handleViewDetails(venda)}
                             >
                               {/* Bloco número da venda até valor, com ícone ao lado */}
                               <div
-                                className={`mb-2 flex gap-2 ${podeEditarClienteVendaGestor ? 'pr-1' : ''}`}
+                                className={`mb-2 flex gap-2 ${podeEditarClienteNaVenda ? 'pr-1' : ''}`}
                               >
                                 <div className="min-w-0 flex-1 border-b border-gray-100 pb-1.5">
                                   <p className="mb-0.5 text-xs text-gray-500">
@@ -1274,7 +1361,7 @@ export function FiscalFlowKanban() {
                                     <p className="mb-0 min-w-0 flex-1 truncate text-sm font-semibold uppercase text-primary-text">
                                       {clienteNome}
                                     </p>
-                                    {podeEditarClienteVendaGestor && venda.cliente?.id && (
+                                    {podeEditarClienteNaVenda && venda.cliente?.id && (
                                       <button
                                         type="button"
                                         onClick={e => {
@@ -1381,13 +1468,10 @@ export function FiscalFlowKanban() {
                                         venda.tipoDocFiscal === 'NFE' ? 'NFe' : 'NFCe'
                                       if (venda.statusFiscal === 'REJEITADA')
                                         return `Reemitir ${documentoLabel}`
-                                      if (
-                                        venda.statusFiscal === 'PENDENTE' ||
-                                        venda.statusFiscal === 'PENDENTE_EMISSAO' ||
-                                        venda.statusFiscal === 'EMITINDO' ||
-                                        venda.statusFiscal === 'PENDENTE_AUTORIZACAO' ||
-                                        venda.statusFiscal === 'CONTINGENCIA'
-                                      ) {
+                                      if (venda.statusFiscal === 'PENDENTE_EMISSAO') {
+                                        return 'Aguardando...'
+                                      }
+                                      if (statusFiscalAguardandoSefaz(venda)) {
                                         return 'Aguardando...'
                                       }
                                       return `Emitir Nota`
