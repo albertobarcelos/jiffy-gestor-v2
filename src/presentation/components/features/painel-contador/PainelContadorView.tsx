@@ -1,15 +1,15 @@
 'use client'
 
 import React, { useEffect, useState, useCallback, useRef } from 'react'
-import { MdCheckCircle, MdBusiness, MdReceipt, MdAssessment, MdNumbers, MdTableChart, MdKeyboardArrowDown, MdKeyboardArrowUp } from 'react-icons/md'
+import { MdCheckCircle, MdBusiness, MdReceipt, MdAssessment, MdReceiptLong, MdKey, MdKeyboardArrowDown, MdKeyboardArrowUp } from 'react-icons/md'
 import { useTabsStore } from '@/src/presentation/stores/tabsStore'
 import { ConfiguracaoImpostosView } from '@/src/presentation/components/features/impostos/ConfiguracaoImpostosView'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { MapearProdutosView } from './MapearProdutosView'
 import { Etapa1DadosFiscaisEmpresa } from './Etapa1DadosFiscaisEmpresa'
 import { Etapa3EmissorFiscal } from './Etapa2EmissorFiscal'
-import { Etapa5NumeracoesFiscais } from './Etapa5NumeracoesFiscais'
-import { Etapa5TabelaIbpt } from './Etapa4TabelaIbpt'
+import { Etapa5NumeracoesFiscais } from './Etapa4InutilizarNotas'
+import { Etapa5TabelaIbpt } from './Etapa5TabelaIbpt'
 import { ConfiguracaoEmpresaCompleta } from './ConfiguracaoEmpresaCompleta'
 import { showToast } from '@/src/shared/utils/toast'
 
@@ -509,20 +509,20 @@ export function PainelContadorView() {
     {
       id: 'etapa-4-numeracoes-fiscais',
       step: 4,
-      title: 'Numerações Fiscais',
-      label: 'Numerações Fiscais',
-      path: '/painel-contador/etapa/numeracoes-fiscais',
+      title: 'Inutilizar Notas',
+      label: 'Inutilizar Notas',
+      path: '/painel-contador/etapa/inutilizar-notas',
       component: Etapa5NumeracoesFiscais,
-      icon: MdNumbers,
+      icon: MdReceiptLong,
     },
     {
-      id: 'etapa-5-tabela-ibpt',
+      id: 'etapa-5-chave-ibpt',
       step: 5,
-      title: 'Tabela IBPT',
-      label: 'Tabela IBPT',
-      path: '/painel-contador/etapa/tabela-ibpt',
+      title: 'Chave IBPT',
+      label: 'Chave IBPT',
+      path: '/painel-contador/etapa/chave-ibpt',
       component: Etapa5TabelaIbpt,
-      icon: MdTableChart,
+      icon: MdKey,
     },
   ]
 
@@ -866,13 +866,13 @@ export function PainelContadorView() {
         <SectionBox title="Configuração Contábil">
           {etapas.slice(0, 3).map((etapa, index) => {
             const IconComponent = etapa.icon
-            // Intercalar cores: índice par = bg-secondary, ímpar = bg-alternate
-            const bgColor = index % 2 === 0 
-              ? 'bg-secondary' // Primeiro, terceiro botão
-              : 'bg-alternate' // Segundo botão
-            
+            // Índice par = roxo forte (secondary); ímpar = verde accent1 (mesmo da barra de progresso)
+            const usarAccentVerde = index % 2 === 1
+            const bgColor = usarAccentVerde ? 'bg-white' : 'bg-secondary'
+            const corConteudo = usarAccentVerde ? 'text-secondary' : 'text-white'
+
             const estaHabilitada = isEtapaHabilitada(etapa.id)
-            
+
             return (
               <button
                 key={etapa.id}
@@ -888,14 +888,13 @@ export function PainelContadorView() {
                 </span>
 
                 <div className="flex flex-col items-center justify-center gap-2">
-                <IconComponent 
-                  className="text-white" 
-                  size={52}
-                />
-                
-                <span className="font-exo font-medium text-white text-sm sm:text-base md:text-lg">
-                  {etapa.title}
-                </span>
+                  <IconComponent className={corConteudo} size={52} />
+
+                  <span
+                    className={`font-exo font-medium text-sm sm:text-base md:text-lg ${corConteudo}`}
+                  >
+                    {etapa.title}
+                  </span>
                 </div>
               </button>
             )
@@ -906,11 +905,10 @@ export function PainelContadorView() {
         <SectionBox title="Outras Configurações">
           {etapas.slice(3).map((etapa, index) => {
             const IconComponent = etapa.icon
-            // Intercalar cores: índice par = bg-secondary, ímpar = bg-alternate
-            const bgColor = index % 2 === 0 
-              ? 'bg-secondary' // Primeiro botão (etapa 4)
-              : 'bg-alternate' // Segundo botão (etapa 5)
-            
+            const usarAccentVerde = index % 2 === 1
+            const bgColor = usarAccentVerde ? 'bg-secondary' : 'bg-white'
+            const corConteudo = usarAccentVerde ? 'text-white' : 'text-secondary'
+
             return (
               <button
                 key={etapa.id}
@@ -922,14 +920,13 @@ export function PainelContadorView() {
                 </span>
 
                 <div className="flex flex-col items-center justify-center gap-2">
-                <IconComponent 
-                  className="text-white" 
-                  size={52}
-                />
-                
-                <span className="font-exo font-medium text-white text-sm sm:text-base md:text-lg">
-                  {etapa.title}
-                </span>
+                  <IconComponent className={corConteudo} size={52} />
+
+                  <span
+                    className={`font-exo font-medium text-sm sm:text-base md:text-lg ${corConteudo}`}
+                  >
+                    {etapa.title}
+                  </span>
                 </div>
               </button>
             )

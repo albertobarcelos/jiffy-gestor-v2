@@ -40,6 +40,7 @@ import {
 } from 'react-icons/md'
 import { EmitirNfeModal } from './EmitirNfeModal'
 import { Button } from '@/src/presentation/components/ui/button'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { StatusFiscalBadge } from './StatusFiscalBadge'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 import { NovoPedidoModal } from './NovoPedidoModal'
@@ -75,7 +76,9 @@ const STATUS_FISCAL_AGUARDANDO_SEFAZ = new Set([
 ])
 
 function statusFiscalAguardandoSefaz(v: VendaUnificadaDTO): boolean {
-  const sf = String(v.statusFiscal ?? '').trim().toUpperCase()
+  const sf = String(v.statusFiscal ?? '')
+    .trim()
+    .toUpperCase()
   return STATUS_FISCAL_AGUARDANDO_SEFAZ.has(sf)
 }
 
@@ -97,7 +100,9 @@ function getCardBorderEFundoKanban(
     return { borderClass: 'border-l-custom-2', cardBgClass: 'bg-white' }
   }
 
-  const sf = String(v.statusFiscal ?? '').trim().toUpperCase()
+  const sf = String(v.statusFiscal ?? '')
+    .trim()
+    .toUpperCase()
 
   if (sf === 'EMITIDA') {
     return { borderClass: 'border-l-green-500', cardBgClass: 'bg-white' }
@@ -145,7 +150,9 @@ function vendaBloqueadaParaEmissaoInterativa(
   acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
 ): boolean {
   if (acaoFiscalEmAndamentoPorVenda[v.id]) return true
-  const s = String(v.statusFiscal ?? '').trim().toUpperCase()
+  const s = String(v.statusFiscal ?? '')
+    .trim()
+    .toUpperCase()
   if (s === 'EMITIDA' || s === 'PENDENTE_EMISSAO') return true
   if (statusFiscalAguardandoSefaz(v)) return true
   return false
@@ -210,10 +217,7 @@ type PeriodoOpcao =
 function ordenarVendasKanbanPorDataDesc(vendas: Venda[]): Venda[] {
   const timestampOrdenacao = (v: Venda): number => {
     const raw =
-      v.dataFinalizacao?.trim() ||
-      v.dataEmissaoFiscal?.trim() ||
-      v.dataCriacao?.trim() ||
-      ''
+      v.dataFinalizacao?.trim() || v.dataEmissaoFiscal?.trim() || v.dataCriacao?.trim() || ''
     if (!raw) return 0
     const ms = new Date(raw).getTime()
     return Number.isFinite(ms) ? ms : 0
@@ -235,10 +239,7 @@ function ordenarVendasKanbanPorCriterio(
     return [...vendas].sort((a, b) => {
       const timestampOrdenacao = (v: Venda): number => {
         const raw =
-          v.dataFinalizacao?.trim() ||
-          v.dataEmissaoFiscal?.trim() ||
-          v.dataCriacao?.trim() ||
-          ''
+          v.dataFinalizacao?.trim() || v.dataEmissaoFiscal?.trim() || v.dataCriacao?.trim() || ''
         if (!raw) return 0
         const ms = new Date(raw).getTime()
         return Number.isFinite(ms) ? ms : 0
@@ -361,7 +362,7 @@ function DraggableVendaCard({
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      className={`touch-none cursor-grab select-none active:cursor-grabbing ${isDragging ? 'opacity-40' : ''}`}
+      className={`cursor-grab touch-none select-none active:cursor-grabbing ${isDragging ? 'opacity-40' : ''}`}
       style={{ touchAction: 'none' }}
     >
       {children}
@@ -544,10 +545,18 @@ export function FiscalFlowKanban() {
 
   // REJEITADA com solicitarEmissaoFiscal false: reativa com o mesmo PATCH de "marcar emissão" (useMarcarEmissaoFiscal)
   useEffect(() => {
-    if (isLoading || !vendasUnificadasData?.items?.length || rejeitadaReativacaoEmAndamentoRef.current) return
+    if (
+      isLoading ||
+      !vendasUnificadasData?.items?.length ||
+      rejeitadaReativacaoEmAndamentoRef.current
+    )
+      return
 
     const pendentes = vendasUnificadasData.items.filter(v => {
-      const rejeitada = String(v.statusFiscal ?? '').trim().toUpperCase() === 'REJEITADA'
+      const rejeitada =
+        String(v.statusFiscal ?? '')
+          .trim()
+          .toUpperCase() === 'REJEITADA'
       return (
         rejeitada &&
         !v.solicitarEmissaoFiscal &&
@@ -594,9 +603,7 @@ export function FiscalFlowKanban() {
 
   // Só PointerSensor: em touch, pointermove fica no document (melhor que TouchSensor no alvo + scroll).
   // TouchSensor junto com PointerSensor gerava gesto “travado” no mobile; distance evita arraste ao rolar.
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 10 } })
-  )
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 10 } }))
 
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -781,6 +788,7 @@ export function FiscalFlowKanban() {
     const t = tipo.toLowerCase()
     if (t === 'balcao') return 'Balcão'
     if (t === 'mesa') return 'Mesa'
+    if (t === 'gestor') return 'Gestor'
     return tipo.charAt(0).toUpperCase() + tipo.slice(1).toLowerCase()
   }
 
@@ -812,7 +820,9 @@ export function FiscalFlowKanban() {
     } else if (over.id === 'FINALIZADAS') {
       // Rejeitada pode estar com solicitarEmissaoFiscal false — o bloqueio não pode depender só desse flag
       const fiscalRejeitada =
-        String(venda.statusFiscal ?? '').trim().toUpperCase() === 'REJEITADA'
+        String(venda.statusFiscal ?? '')
+          .trim()
+          .toUpperCase() === 'REJEITADA'
       if (fiscalRejeitada) {
         showToast.warning(
           'Vendas com nota rejeitada não podem ser movidas para Finalizadas. Use Reemitir na coluna Pendente Emissão.'
@@ -831,7 +841,9 @@ export function FiscalFlowKanban() {
         return
       }
       if (vendaBloqueadaParaEmissaoInterativa(venda, acaoFiscalEmAndamentoPorVenda)) {
-        showToast.info('Esta venda não pode ser emitida neste status. Use o botão quando estiver disponível.')
+        showToast.info(
+          'Esta venda não pode ser emitida neste status. Use o botão quando estiver disponível.'
+        )
         return
       }
       void handleEmitirNfe(venda)
@@ -886,9 +898,7 @@ export function FiscalFlowKanban() {
     if (venda.statusFiscal === 'REJEITADA') {
       const docId = venda.documentoFiscalId?.trim()
       if (!docId) {
-        showToast.error(
-          'Documento fiscal não encontrado para esta venda. Não é possível reemitir.'
-        )
+        showToast.error('Documento fiscal não encontrado para esta venda. Não é possível reemitir.')
         return
       }
 
@@ -987,10 +997,14 @@ export function FiscalFlowKanban() {
 
     switch (columnId) {
       case 'FINALIZADAS':
-        vendas = vendasParaFiltrar.filter((v: Venda) => getEtapaKanbanParaExibicao(v) === 'FINALIZADAS')
+        vendas = vendasParaFiltrar.filter(
+          (v: Venda) => getEtapaKanbanParaExibicao(v) === 'FINALIZADAS'
+        )
         break
       case 'PENDENTE_EMISSAO':
-        vendas = vendasParaFiltrar.filter((v: Venda) => getEtapaKanbanParaExibicao(v) === 'PENDENTE_EMISSAO')
+        vendas = vendasParaFiltrar.filter(
+          (v: Venda) => getEtapaKanbanParaExibicao(v) === 'PENDENTE_EMISSAO'
+        )
         break
       case 'COM_NFE':
         vendas = vendasParaFiltrar.filter((v: Venda) => getEtapaKanbanParaExibicao(v) === 'COM_NFE')
@@ -1032,8 +1046,8 @@ export function FiscalFlowKanban() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600"></div>
+      <div className="flex h-full items-center justify-center bg-gray-50">
+        <JiffyLoading />
       </div>
     )
   }
@@ -1059,22 +1073,22 @@ export function FiscalFlowKanban() {
           className={`flex flex-wrap items-end justify-center gap-x-1 gap-y-4 rounded-t-lg bg-custom-2 px-1 pb-2 pt-1.5 md:justify-start ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
         >
           <div className="flex flex-col gap-1">
-            <label className="font-nunito text-xs text-secondary-text pl-2">Pesquisar</label>
-          
-          <div className="relative w-full max-w-full px-1 lg:max-w-[250px]">
-            <MdSearch
-              className="absolute left-2 top-1/2 -translate-y-1/2 text-secondary-text"
-              size={20}
-            />
-            <input
-              type="text"
-              placeholder="Digite o código ou cliente"
-              value={searchInput}
-              onChange={e => setSearchInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && refetch()}
-              className="font-nunito h-8 w-full rounded-lg border bg-info pl-6 pr-4 text-sm shadow-sm"
-            />
-          </div>
+            <label className="font-nunito pl-2 text-xs text-secondary-text">Pesquisar</label>
+
+            <div className="relative w-full max-w-full px-1 lg:max-w-[250px]">
+              <MdSearch
+                className="absolute left-2 top-1/2 -translate-y-1/2 text-secondary-text"
+                size={20}
+              />
+              <input
+                type="text"
+                placeholder="Digite o código ou cliente"
+                value={searchInput}
+                onChange={e => setSearchInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && refetch()}
+                className="font-nunito h-8 w-full rounded-lg border bg-info pl-6 pr-4 text-sm shadow-sm"
+              />
+            </div>
           </div>
           <div className="flex flex-col gap-1">
             <label className="font-nunito text-xs text-secondary-text">Origem</label>
@@ -1327,11 +1341,9 @@ export function FiscalFlowKanban() {
                           colunaPermiteEditarCliente &&
                           !vendaSemNomeCliente(venda) &&
                           Boolean(venda.cliente?.id?.trim())
-                        // Vendas do Gestor são sempre balcão; exibir "Balcão" quando a API não retorna tipoVenda
+                        // Vendas da origem Gestor usam ícone/rótulo próprios (não confundir com balcão do PDV)
                         const tipoVendaExibicao =
-                          venda.tabelaOrigem === 'venda_gestor'
-                            ? venda.tipoVenda || 'balcao'
-                            : venda.tipoVenda
+                          venda.tabelaOrigem === 'venda_gestor' ? 'gestor' : venda.tipoVenda
 
                         const { borderClass: cardBorderClass, cardBgClass } =
                           getCardBorderEFundoKanban(
@@ -1353,8 +1365,7 @@ export function FiscalFlowKanban() {
                               >
                                 <div className="min-w-0 flex-1 border-b border-gray-100 pb-1.5">
                                   <p className="mb-0.5 text-xs text-gray-500">
-                                    {venda.origem} | 
-                                    Venda {venda.numeroVenda}
+                                    {venda.origem} | Venda {venda.numeroVenda}
                                     {venda.codigoVenda ? ` - #${venda.codigoVenda}` : ''}
                                   </p>
                                   <div className="flex min-w-0 items-start gap-1">
@@ -1383,31 +1394,40 @@ export function FiscalFlowKanban() {
                                     </span>
                                   </p>
                                   {venda.statusFiscal && (
-                                    <div className="flex flex-row gap-1 items-center justify-between">
+                                    <>
+                                      <div className="mt-1 flex items-center">
+                                        <StatusFiscalBadge
+                                          status={venda.statusFiscal}
+                                          tone="neutral"
+                                        />
+                                      </div>
                                       {venda.numeroFiscal && venda.statusFiscal === 'EMITIDA' && (
-                                        <div className="mt-1 inline-flex items-center gap-1 text-primary-text">
-                                          <span className="text-xs font-semibold">
+                                        <div className="mt-0.5">
+                                          <span className="text-xs font-semibold text-gray-900">
                                             {venda.tipoDocFiscal || 'NFe'} Nº {venda.numeroFiscal}
                                             {venda.serieFiscal && ` / Série ${venda.serieFiscal}`}
                                           </span>
                                         </div>
                                       )}
-                                      <StatusFiscalBadge status={venda.statusFiscal} />
-                                    </div>
+                                    </>
                                   )}
                                 </div>
                                 {tipoVendaExibicao &&
                                   (tipoVendaExibicao === 'balcao' ||
-                                    tipoVendaExibicao === 'mesa') && (
+                                    tipoVendaExibicao === 'mesa' ||
+                                    tipoVendaExibicao === 'gestor') && (
                                     <div className="flex flex-shrink-0 items-center justify-center">
                                       <TipoVendaIcon
-                                        tipoVenda={tipoVendaExibicao as 'balcao' | 'mesa'}
+                                        tipoVenda={
+                                          tipoVendaExibicao as 'balcao' | 'mesa' | 'gestor'
+                                        }
                                         numeroMesa="M"
                                         size={56}
                                         containerScale={0.9}
                                         corPrincipal="var(--color-primary)"
                                         corTexto="var(--color-info)"
                                         corBalcao="var(--color-primary)"
+                                        corGestor="var(--color-primary)"
                                         corBorda="var(--color-primary)"
                                       />
                                     </div>

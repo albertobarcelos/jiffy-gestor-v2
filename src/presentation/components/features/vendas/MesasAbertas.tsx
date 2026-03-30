@@ -15,7 +15,7 @@ interface Venda {
   codigoVenda: string
   numeroMesa?: number
   valorFinal: number
-  tipoVenda: 'balcao' | 'mesa'
+  tipoVenda: 'balcao' | 'mesa' | 'gestor'
   abertoPorId: string
   codigoTerminal: string
   terminalId: string
@@ -42,9 +42,8 @@ interface UsuarioPDV {
   nome: string
 }
 
-
 interface MesasAbertasProps {
-  initialPeriodo?: string; // Período inicial vindo da URL (ex: "Hoje", "Últimos 7 Dias")
+  initialPeriodo?: string // Período inicial vindo da URL (ex: "Hoje", "Últimos 7 Dias")
 }
 
 const COR_INICIAL = '#EEEFF5'
@@ -174,7 +173,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
     const clamped = Math.max(0, Math.min(1, t))
     const mix = (x: number, y: number) => Math.round(x + (y - x) * clamped)
     return `#${[mix(a.r, b.r), mix(a.g, b.g), mix(a.b, b.b)]
-      .map((v) => v.toString(16).padStart(2, '0'))
+      .map(v => v.toString(16).padStart(2, '0'))
       .join('')}`
   }
 
@@ -200,19 +199,18 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
    * Ordena por tempo sem movimentação (mais recente primeiro: menor diff).
    */
   const sortByUltimaMovimentacaoAsc = (items: Venda[]) =>
-    [...items].sort((a, b) => diffMinutosDesdeUltimaMovimentacao(a) - diffMinutosDesdeUltimaMovimentacao(b))
+    [...items].sort(
+      (a, b) => diffMinutosDesdeUltimaMovimentacao(a) - diffMinutosDesdeUltimaMovimentacao(b)
+    )
 
   /**
    * Retorna o tempo em minutos desde a última movimentação conhecida.
    */
   const diffMinutosDesdeUltimaMovimentacao = (venda: Venda): number => {
-    const referencia =
-      venda.dataUltimaModificacao 
+    const referencia = venda.dataUltimaModificacao
     const ref = parseDateLocalWallTime(referencia || venda.dataCriacao)
     return Math.floor((Date.now() - ref.getTime()) / (1000 * 60))
   }
-
-
 
   /**
    * Carrega todos os usuários PDV
@@ -270,7 +268,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
       if (!token || clienteIds.length === 0) return
 
       const results = await Promise.all(
-        clienteIds.map(async (clienteId) => {
+        clienteIds.map(async clienteId => {
           try {
             const response = await fetch(`/api/clientes/${clienteId}`, {
               headers: {
@@ -288,7 +286,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
         })
       )
 
-      setClienteNomeMap((prev) => {
+      setClienteNomeMap(prev => {
         const next = { ...prev }
         results.forEach(({ clienteId, nome }) => {
           next[clienteId] = nome // nome pode ser null para evitar refetch
@@ -297,7 +295,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
         if (process.env.NODE_ENV === 'development') {
           console.log('MesasAbertas: Nomes de clientes atualizados:', {
             resultados: results,
-            mapaAtualizado: next
+            mapaAtualizado: next,
           })
         }
         return next
@@ -316,7 +314,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
       if (!token || ids.length === 0) return
 
       const results = await Promise.all(
-        ids.map(async (id) => {
+        ids.map(async id => {
           try {
             const response = await fetch(`/api/vendas/${id}`, {
               headers: {
@@ -334,7 +332,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
         })
       )
 
-      setVendaClienteIdMap((prev) => {
+      setVendaClienteIdMap(prev => {
         const next = { ...prev }
         results.forEach(({ id, clienteId }) => {
           // marca mesmo que null para evitar refetch infinito
@@ -345,7 +343,6 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
     },
     [auth]
   )
-
 
   /**
    * Busca apenas mesas em aberto
@@ -388,12 +385,22 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
 
         // Debug: verifica se o clienteId está vindo na resposta da listagem
         if (process.env.NODE_ENV === 'development') {
-          const itemsComClienteId = (data.items || []).filter((item: any) => item.clienteId && item.clienteId.trim() !== '')
+          const itemsComClienteId = (data.items || []).filter(
+            (item: any) => item.clienteId && item.clienteId.trim() !== ''
+          )
           console.log('MesasAbertas: Resposta da API de listagem:', {
             totalItems: (data.items || []).length,
             itemsComClienteId: itemsComClienteId.length,
-            exemplosClienteId: itemsComClienteId.slice(0, 3).map((item: any) => ({ id: item.id, clienteId: item.clienteId })),
-            primeiroItem: data.items?.[0] ? { id: data.items[0].id, clienteId: data.items[0].clienteId, campos: Object.keys(data.items[0]) } : null
+            exemplosClienteId: itemsComClienteId
+              .slice(0, 3)
+              .map((item: any) => ({ id: item.id, clienteId: item.clienteId })),
+            primeiroItem: data.items?.[0]
+              ? {
+                  id: data.items[0].id,
+                  clienteId: data.items[0].clienteId,
+                  campos: Object.keys(data.items[0]),
+                }
+              : null,
           })
         }
 
@@ -421,7 +428,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
               totalFaturado: 0,
             })
           }
-          
+
           // Verifica se precisa carregar mais itens para preencher a tela
           setTimeout(() => {
             const container = scrollContainerRef.current
@@ -434,22 +441,23 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
             }
           }, 100)
         } else {
-          setVendas((prev) => {
+          setVendas(prev => {
             const next = [...prev, ...filteredItems]
             const nextCount = next.length
-            setMetricas((prevMetricas) => {
-              const base = data.metricas ?? prevMetricas ?? {
-                countVendasCanceladas: 0,
-                countProdutosVendidos: 0,
-                totalFaturado: 0,
-                countVendasEfetivadas: 0,
-              }
+            setMetricas(prevMetricas => {
+              const base = data.metricas ??
+                prevMetricas ?? {
+                  countVendasCanceladas: 0,
+                  countProdutosVendidos: 0,
+                  totalFaturado: 0,
+                  countVendasEfetivadas: 0,
+                }
               return { ...base, countVendasEfetivadas: nextCount }
             })
             return next
           })
           currentPageRef.current += 1
-          setCurrentPage((prev) => prev + 1)
+          setCurrentPage(prev => prev + 1)
         }
 
         setCanLoadMore(data.hasNext || false)
@@ -486,14 +494,15 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
   // Fallback: Buscar clienteId via detalhes da venda quando não estiver presente na listagem
   useEffect(() => {
     const idsParaBuscar = vendas
-      .filter((v) => {
+      .filter(v => {
         // Busca apenas vendas que não têm clienteId na resposta da listagem
         // e ainda não foram verificadas (não estão no cache)
-        const temClienteIdNaListagem = v.clienteId && typeof v.clienteId === 'string' && v.clienteId.trim() !== ''
+        const temClienteIdNaListagem =
+          v.clienteId && typeof v.clienteId === 'string' && v.clienteId.trim() !== ''
         const jaVerificado = v.id in vendaClienteIdMap
         return !temClienteIdNaListagem && !jaVerificado
       })
-      .map((v) => v.id)
+      .map(v => v.id)
 
     if (idsParaBuscar.length > 0) {
       if (process.env.NODE_ENV === 'development') {
@@ -509,26 +518,40 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
     // 1. Da resposta da listagem (venda.clienteId)
     // 2. Do cache de fallback (vendaClienteIdMap)
     const clienteIds = new Set<string>()
-    
-    vendas.forEach((v) => {
+
+    vendas.forEach(v => {
       // Prioriza clienteId da listagem, se disponível
       if (v.clienteId && typeof v.clienteId === 'string' && v.clienteId.trim() !== '') {
         clienteIds.add(v.clienteId)
-      } else if (vendaClienteIdMap[v.id] && typeof vendaClienteIdMap[v.id] === 'string' && vendaClienteIdMap[v.id]!.trim() !== '') {
+      } else if (
+        vendaClienteIdMap[v.id] &&
+        typeof vendaClienteIdMap[v.id] === 'string' &&
+        vendaClienteIdMap[v.id]!.trim() !== ''
+      ) {
         // Fallback: usa clienteId do cache de detalhes
         clienteIds.add(vendaClienteIdMap[v.id]!)
       }
     })
 
     // Filtra apenas clienteIds que ainda não estão no cache de nomes
-    const clienteIdsParaBuscar = Array.from(clienteIds).filter((cid) => !(cid in clienteNomeMap))
+    const clienteIdsParaBuscar = Array.from(clienteIds).filter(cid => !(cid in clienteNomeMap))
 
     if (clienteIdsParaBuscar.length > 0) {
       // Debug: verifica se os clienteIds estão sendo encontrados
       if (process.env.NODE_ENV === 'development') {
         console.log('MesasAbertas: Buscando nomes de clientes para IDs:', clienteIdsParaBuscar)
-        console.log('MesasAbertas: Vendas com clienteId (listagem):', vendas.filter(v => v.clienteId && v.clienteId.trim() !== '').map(v => ({ id: v.id, clienteId: v.clienteId })))
-        console.log('MesasAbertas: Vendas com clienteId (fallback):', Object.entries(vendaClienteIdMap).filter(([id, cid]) => cid && cid.trim() !== '').map(([id, cid]) => ({ id, clienteId: cid })))
+        console.log(
+          'MesasAbertas: Vendas com clienteId (listagem):',
+          vendas
+            .filter(v => v.clienteId && v.clienteId.trim() !== '')
+            .map(v => ({ id: v.id, clienteId: v.clienteId }))
+        )
+        console.log(
+          'MesasAbertas: Vendas com clienteId (fallback):',
+          Object.entries(vendaClienteIdMap)
+            .filter(([id, cid]) => cid && cid.trim() !== '')
+            .map(([id, cid]) => ({ id, clienteId: cid }))
+        )
       }
       fetchNomesClientes(clienteIdsParaBuscar)
     }
@@ -537,24 +560,23 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
   // Efeito para carregar dados auxiliares e iniciar a busca de vendas
   useEffect(() => {
     if (!auth || !cachesHydrated) return
-    
+
     loadAllUsuariosPDV()
     fetchVendas(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth, cachesHydrated, apenasSemMovimentacao])
 
   return (
-    <div className="flex flex-col h-full max-h-[calc(100vh-100px)] overflow-hidden">
+    <div className="flex h-full max-h-[calc(100vh-100px)] flex-col overflow-hidden">
       {/* Container principal */}
-      <div className="bg-primary-background rounded-t-lg rounded-b-lg md:px-2 flex flex-col h-full min-h-0 overflow-hidden">
-
+      <div className="bg-primary-background flex h-full min-h-0 flex-col overflow-hidden rounded-b-lg rounded-t-lg md:px-2">
         {/* Filtro por tempo sem movimentação */}
         <div className="flex items-center justify-end gap-2 py-2">
-          <label className="md:text-sm text-xs text-primary-text font-nunito flex items-center gap-2">
+          <label className="font-nunito flex items-center gap-2 text-xs text-primary-text md:text-sm">
             <input
               type="checkbox"
               checked={apenasSemMovimentacao}
-              onChange={(e) => {
+              onChange={e => {
                 const checked = e.target.checked
                 setApenasSemMovimentacao(checked)
                 fetchVendas(true, checked)
@@ -566,49 +588,57 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
         </div>
 
         {/* Cards de Métricas */}
-        <div className="flex md:gap-2 gap-1 my-1 flex-shrink-0 sticky top-0 z-10 bg-primary-background">
+        <div className="bg-primary-background sticky top-0 z-10 my-1 flex flex-shrink-0 gap-1 md:gap-2">
           {/* Vendas em Aberto (fixo) */}
-          <div className="flex-1 border-2 rounded-lg p-1 flex md:flex-row flex-col items-center justify-center md:gap-3 gap-1">
-            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0">
+          <div className="flex flex-1 flex-col items-center justify-center gap-1 rounded-lg border-2 p-1 md:flex-row md:gap-3">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full">
               <TipoVendaIcon
                 tipoVenda="mesa"
                 numeroMesa={metricas?.countVendasEfetivadas || 0}
                 size={60}
-                containerScale={0.90}
+                containerScale={0.9}
                 corTexto="var(--color-info)"
               />
             </div>
-            <div className="flex flex-col items-center md:items-end justify-between flex-1">
-              <span className="md:text-xs text-[10px] text-secondary-text text-center md:text-end font-nunito">
+            <div className="flex flex-1 flex-col items-center justify-between md:items-end">
+              <span className="font-nunito text-center text-[10px] text-secondary-text md:text-end md:text-xs">
                 Mesas Abertas
               </span>
-              <span className="md:text-[22px] text-lg text-primary font-exo">
+              <span className="font-exo text-lg text-primary md:text-[22px]">
                 {metricas?.countVendasEfetivadas || 0}
               </span>
             </div>
           </div>
 
           {/* Total de Produtos Vendidos */}
-          <div className="flex-1 rounded-lg border-2 p-1 flex md:flex-row flex-col items-center justify-center md:gap-3 gap-1">
-            <div className="w-10 h-10 rounded-full bg-warning flex items-center justify-center flex-shrink-0">
-              <span className="text-info text-xl"><MdRestaurant /></span>
+          <div className="flex flex-1 flex-col items-center justify-center gap-1 rounded-lg border-2 p-1 md:flex-row md:gap-3">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-warning">
+              <span className="text-xl text-info">
+                <MdRestaurant />
+              </span>
             </div>
-            <div className="flex flex-col items-center md:items-end justify-between flex-1">
-              <span className="md:text-xs text-[10px] text-secondary-text text-center font-nunito">Total de Produtos vendidos</span>
-              <span className="md:text-[22px] text-lg text-primary font-exo">
+            <div className="flex flex-1 flex-col items-center justify-between md:items-end">
+              <span className="font-nunito text-center text-[10px] text-secondary-text md:text-xs">
+                Total de Produtos vendidos
+              </span>
+              <span className="font-exo text-lg text-primary md:text-[22px]">
                 {metricas?.countProdutosVendidos || 0}
               </span>
             </div>
           </div>
 
           {/* Total Faturado */}
-          <div className="flex-1 rounded-lg border-2 p-1 flex md:flex-row flex-col items-center justify-center md:gap-3 gap-1">
-            <div className="w-10 h-10 rounded-full bg-accent1 flex items-center justify-center flex-shrink-0">
-              <span className="text-info text-xl"><MdAttachMoney /></span>
+          <div className="flex flex-1 flex-col items-center justify-center gap-1 rounded-lg border-2 p-1 md:flex-row md:gap-3">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-accent1">
+              <span className="text-xl text-info">
+                <MdAttachMoney />
+              </span>
             </div>
-            <div className="flex flex-col items-center md:items-end justify-between flex-1">
-              <span className="md:text-xs text-[10px] text-secondary-text text-center font-nunito">Total à faturar</span>
-              <span className="md:text-[22px] text-lg text-primary font-exo">
+            <div className="flex flex-1 flex-col items-center justify-between md:items-end">
+              <span className="font-nunito text-center text-[10px] text-secondary-text md:text-xs">
+                Total à faturar
+              </span>
+              <span className="font-exo text-lg text-primary md:text-[22px]">
                 {metricas?.totalFaturado ? formatCurrency(metricas.totalFaturado) : 'R$ 0,00'}
               </span>
             </div>
@@ -616,45 +646,53 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
         </div>
 
         {/* Tabela de Vendas */}
-        <div className="bg-info rounded-lg min-h-0 flex flex-col overflow-hidden">
+        <div className="flex min-h-0 flex-col overflow-hidden rounded-lg bg-info">
           {/* Lista com scroll */}
           <div
             ref={scrollContainerRef}
-            className="h-full overflow-y-auto overflow-x-hidden px-1 py-2 scrollbar-hide grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2"
+            className="scrollbar-hide grid h-full grid-cols-2 gap-2 overflow-y-auto overflow-x-hidden px-1 py-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6"
           >
             {isLoading && vendas.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-12 col-span-full">
+              <div className="col-span-full flex flex-col items-center justify-center py-12">
                 <img
                   src="/images/jiffy-loading.gif"
                   alt="Carregando"
                   className="w-20 object-contain"
                 />
-                <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
+                <span className="font-nunito text-sm font-medium text-primary-text">
+                  Carregando...
+                </span>
               </div>
             )}
 
             {vendas.length === 0 && !isLoading && hasLoadedOnce && (
-              <div className="flex items-center justify-center md:py-12 col-span-full">
+              <div className="col-span-full flex items-center justify-center md:py-12">
                 <p className="text-secondary-text">Nenhuma mesa em aberto encontrada.</p>
               </div>
             )}
 
-            {vendas.map((venda) => {
+            {vendas.map(venda => {
               // Texto "Movimentado há" usa data de criação; cor/tooltip usam movimentações
               const elapsedTime = formatElapsedTime(venda.dataCriacao)
               const usuarioNome =
-                usuariosPDV.find((u) => u.id === venda.abertoPorId)?.nome || venda.abertoPorId
+                usuariosPDV.find(u => u.id === venda.abertoPorId)?.nome || venda.abertoPorId
               // Obtém clienteId da listagem ou do fallback (detalhes)
-              const resolvedClienteId = 
-                (venda.clienteId && typeof venda.clienteId === 'string' && venda.clienteId.trim() !== '')
+              const resolvedClienteId =
+                venda.clienteId &&
+                typeof venda.clienteId === 'string' &&
+                venda.clienteId.trim() !== ''
                   ? venda.clienteId
-                  : (vendaClienteIdMap[venda.id] && typeof vendaClienteIdMap[venda.id] === 'string' && vendaClienteIdMap[venda.id]!.trim() !== '')
+                  : vendaClienteIdMap[venda.id] &&
+                      typeof vendaClienteIdMap[venda.id] === 'string' &&
+                      vendaClienteIdMap[venda.id]!.trim() !== ''
                     ? vendaClienteIdMap[venda.id]!
                     : null
-              
+
               // Busca o nome do cliente usando o clienteId resolvido
-              const clienteNome = resolvedClienteId ? (clienteNomeMap[resolvedClienteId] || null) : null
-              
+              const clienteNome = resolvedClienteId
+                ? clienteNomeMap[resolvedClienteId] || null
+                : null
+
               // Debug: verifica se o clienteId está presente e se o nome foi encontrado
               if (process.env.NODE_ENV === 'development' && resolvedClienteId) {
                 console.log('MesasAbertas: Cliente info para venda', venda.id, {
@@ -663,7 +701,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
                   resolvedClienteId,
                   clienteNome,
                   clienteNomeMap: resolvedClienteId ? clienteNomeMap[resolvedClienteId] : null,
-                  todasChaves: Object.keys(clienteNomeMap)
+                  todasChaves: Object.keys(clienteNomeMap),
                 })
               }
 
@@ -677,10 +715,10 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
                 venda.dataUltimaMovimentacao && venda.dataUltimaMovimentacao.length > 0
                   ? Math.floor((Date.now() - toMs(venda.dataUltimaMovimentacao)) / 60000)
                   : venda.dataUltimaModificacao && venda.dataUltimaModificacao.length > 0
-                  ? Math.floor((Date.now() - toMs(venda.dataUltimaModificacao)) / 60000)
-                  : venda.dataUltimoProdutoLancado && venda.dataUltimoProdutoLancado.length > 0
-                  ? Math.floor((Date.now() - toMs(venda.dataUltimoProdutoLancado)) / 60000)
-                  : Math.floor((Date.now() - toMs(venda.dataCriacao)) / 60000)
+                    ? Math.floor((Date.now() - toMs(venda.dataUltimaModificacao)) / 60000)
+                    : venda.dataUltimoProdutoLancado && venda.dataUltimoProdutoLancado.length > 0
+                      ? Math.floor((Date.now() - toMs(venda.dataUltimoProdutoLancado)) / 60000)
+                      : Math.floor((Date.now() - toMs(venda.dataCriacao)) / 60000)
 
               // Debug do tempo de movimentação
               if (typeof window !== 'undefined') {
@@ -728,40 +766,53 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
                 <div
                   key={venda.id}
                   onClick={() => setSelectedVendaId(venda.id)}
-                  className="cursor-pointer md:px-2 rounded-lg flex flex-col items-center justify-between shadow-sm shadow-primary-text/50 hover:bg-primary/5 transition-all md:w-[200px] h-[200px] md:h-[220px] relative bg-info">
-
-                  <div className="flex flex-col items-center justify-center flex-grow">
+                  className="relative flex h-[200px] cursor-pointer flex-col items-center justify-between rounded-lg bg-info shadow-sm shadow-primary-text/50 transition-all hover:bg-primary/5 md:h-[220px] md:w-[200px] md:px-2"
+                >
+                  <div className="flex flex-grow flex-col items-center justify-center">
                     <TipoVendaIcon
                       tipoVenda={venda.tipoVenda}
                       numeroMesa={venda.numeroMesa}
                       size={110} // Tamanho grande para o ícone
-                      containerScale={0.90} // Reduz espaço externo do ícone
+                      containerScale={0.9} // Reduz espaço externo do ícone
                       corTexto="var(--color-alternate)" // Cor do texto do número da mesa
                       corCirculoInterno={innerCircleColor} // Fundo dinâmico: branco -> amarelo
                       corBorda="var(--color-alternate)" // Borda sempre forte (roxo)
-                      className="mt-0 mb-0"
+                      className="mb-0 mt-0"
                       title={movimentoTooltip}
                     />
                     {clienteNome ? (
-                      <span className="text-xs text-primary-text font-semibold font-nunito">{clienteNome}</span>
-                    ) : <span className="text-xs text-info font-nunito">-</span>}
+                      <span className="font-nunito text-xs font-semibold text-primary-text">
+                        {clienteNome}
+                      </span>
+                    ) : (
+                      <span className="font-nunito text-xs text-info">-</span>
+                    )}
                   </div>
 
-                  <div className="w-full flex flex-col items-start px-2 mb-4">
-                    <div className="flex flex-col md:flex-row items-start md:items-center"><span className="text-xs text-primary-text font-nunito font-semibold">Usuário</span> <span className="font-normal text-xs">: {usuarioNome}</span></div>
-                    <div className="flex justify-between w-full text-xs text-primary-text font-nunito mt-1">
-                      <div className="flex flex-col items-start"><span className="font-semibold">Valor atual</span><span>{formatCurrency(venda.valorFinal)}</span></div>
-                      <div className="flex flex-col items-start"><span className="font-semibold">Aberta há</span><span>{elapsedTime}</span></div>
+                  <div className="mb-4 flex w-full flex-col items-start px-2">
+                    <div className="flex flex-col items-start md:flex-row md:items-center">
+                      <span className="font-nunito text-xs font-semibold text-primary-text">
+                        Usuário
+                      </span>{' '}
+                      <span className="text-xs font-normal">: {usuarioNome}</span>
+                    </div>
+                    <div className="font-nunito mt-1 flex w-full justify-between text-xs text-primary-text">
+                      <div className="flex flex-col items-start">
+                        <span className="font-semibold">Valor atual</span>
+                        <span>{formatCurrency(venda.valorFinal)}</span>
+                      </div>
+                      <div className="flex flex-col items-start">
+                        <span className="font-semibold">Aberta há</span>
+                        <span>{elapsedTime}</span>
+                      </div>
                     </div>
                   </div>
-
-                  
                 </div>
               )
             })}
 
             {isLoadingMore && (
-              <div className="flex justify-center py-4 col-span-full">
+              <div className="col-span-full flex justify-center py-4">
                 <CircularProgress size={24} />
               </div>
             )}
@@ -777,7 +828,6 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
           onClose={() => setSelectedVendaId(null)}
         />
       )}
-
     </div>
   )
 }

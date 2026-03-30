@@ -359,7 +359,7 @@ export function Etapa5NumeracoesFiscais() {
     <div className="space-y-3 md:p-4 p-2">
       
       <div className="rounded-lg border border-primary/20 bg-white p-3 space-y-2">
-      <h1 className="text-alternate font-exo font-bold text-lg sm:text-xl">Numerações Fiscais</h1>
+      <h1 className="text-alternate font-exo font-bold text-lg sm:text-xl">Inutilizar numerações fiscais</h1>
         <p className="font-inter text-xs lg:text-sm text-secondary-text">
           Consulte lacunas de numeração e histórico de inutilizações por modelo/série.
         </p>

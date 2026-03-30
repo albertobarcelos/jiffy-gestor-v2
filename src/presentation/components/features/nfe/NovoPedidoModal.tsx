@@ -25,6 +25,7 @@ import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
 import { Produto } from '@/src/domain/entities/Produto'
 import { Cliente } from '@/src/domain/entities/Cliente'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import {
   useCreateVendaGestor,
   useCancelarVendaGestor,
@@ -292,9 +293,9 @@ export function NovoPedidoModal({
   const [abaDetalhesPedido, setAbaDetalhesPedido] = useState<AbaDetalhesPedido>('infoPedido')
   const [detalhesPedidoMeta, setDetalhesPedidoMeta] = useState<DetalhesPedidoMeta | null>(null)
   const [nomesUsuariosPedido, setNomesUsuariosPedido] = useState<Record<string, string>>({})
-  const [nomesMeiosPagamentoPedido, setNomesMeiosPagamentoPedido] = useState<Record<string, string>>(
-    {}
-  )
+  const [nomesMeiosPagamentoPedido, setNomesMeiosPagamentoPedido] = useState<
+    Record<string, string>
+  >({})
   const [resumoFinanceiroDetalhes, setResumoFinanceiroDetalhes] =
     useState<ResumoFinanceiroDetalhes | null>(null)
   const [vendaIdCriada, setVendaIdCriada] = useState<string | null>(null)
@@ -402,10 +403,7 @@ export function NovoPedidoModal({
   const ignorarBackdropAteRef = useRef(0)
 
   // Buscar grupos de produtos
-  const {
-    data: gruposData,
-    isLoading: isLoadingGrupos,
-  } = useGruposProdutos({
+  const { data: gruposData, isLoading: isLoadingGrupos } = useGruposProdutos({
     ativo: true,
     limit: 100,
     // Step 2 usa grupos de produtos; evita carregar no step 1.
@@ -462,7 +460,11 @@ export function NovoPedidoModal({
   })
 
   // Buscar meios de pagamento
-  const { data: meiosPagamentoData } = useMeiosPagamentoInfinite({
+  const {
+    data: meiosPagamentoData,
+    isPending: isPendingMeiosPagamento,
+    isFetching: isFetchingMeiosPagamento,
+  } = useMeiosPagamentoInfinite({
     limit: 100,
     ativo: true,
     // Step 3 usa meios de pagamento; em visualizacao/edicao pode ser usado para resolver nomes.
@@ -635,6 +637,10 @@ export function NovoPedidoModal({
     if (!meiosPagamentoData?.pages) return []
     return meiosPagamentoData.pages.flatMap(page => page.meiosPagamento || [])
   }, [meiosPagamentoData])
+
+  /** Primeira carga ou fetch sem cache ainda — evita área vazia sem feedback */
+  const mostrarLoadingFormasPagamento =
+    isPendingMeiosPagamento || (isFetchingMeiosPagamento && meiosPagamentoData === undefined)
 
   // Refs estáveis: evitam que `carregarVendaExistente` mude quando queries atualizam ao focar a aba
   const meiosPagamentoRef = useRef(meiosPagamento)
@@ -1593,37 +1599,43 @@ export function NovoPedidoModal({
     setModalConfirmacaoSaidaOpen(false)
   }
 
-  const handleAbrirEdicaoProdutoDetalhes = useCallback((produtoId: string | null | undefined) => {
-    const id = String(produtoId || '').trim()
-    if (!id) {
-      showToast.error('Não foi possível abrir a edição: produto sem ID.')
-      return
-    }
-    const produtoPedido = produtos.find(p => p.produtoId === id)
-    const produtoParaEditar = Produto.create(
-      id,
-      '',
-      produtoPedido?.nome || 'Produto',
-      produtoPedido?.valorUnitario || 0,
-      true
-    )
-    setProdutoTabsModalState({
-      open: true,
-      tab: 'produto',
-      mode: 'edit',
-      produto: produtoParaEditar,
-      // Abrir direto na etapa fiscal para ajuste rápido da tributação
-      initialStepProduto: 2,
-    })
-  }, [produtos])
+  const handleAbrirEdicaoProdutoDetalhes = useCallback(
+    (produtoId: string | null | undefined) => {
+      const id = String(produtoId || '').trim()
+      if (!id) {
+        showToast.error('Não foi possível abrir a edição: produto sem ID.')
+        return
+      }
+      const produtoPedido = produtos.find(p => p.produtoId === id)
+      const produtoParaEditar = Produto.create(
+        id,
+        '',
+        produtoPedido?.nome || 'Produto',
+        produtoPedido?.valorUnitario || 0,
+        true
+      )
+      setProdutoTabsModalState({
+        open: true,
+        tab: 'produto',
+        mode: 'edit',
+        produto: produtoParaEditar,
+        // Abrir direto na etapa fiscal para ajuste rápido da tributação
+        initialStepProduto: 2,
+      })
+    },
+    [produtos]
+  )
 
   const handleFecharProdutoTabsModal = useCallback(() => {
     setProdutoTabsModalState(prev => ({ ...prev, open: false }))
   }, [])
 
-  const handleTabChangeProdutoModal = useCallback((tab: 'produto' | 'complementos' | 'impressoras' | 'grupo') => {
-    setProdutoTabsModalState(prev => ({ ...prev, tab }))
-  }, [])
+  const handleTabChangeProdutoModal = useCallback(
+    (tab: 'produto' | 'complementos' | 'impressoras' | 'grupo') => {
+      setProdutoTabsModalState(prev => ({ ...prev, tab }))
+    },
+    []
+  )
 
   /** Confirma cancelamento (venda gestor OU nota fiscal por origem) */
   const handleConfirmarCancelamentoVenda = async () => {
@@ -1666,138 +1678,139 @@ export function NovoPedidoModal({
   }
 
   // Função para carregar dados de uma venda existente
-  const carregarVendaExistente = useCallback(async (vendaIdOverride?: string | null) => {
-    const vendaIdParaCarregar = vendaIdOverride || vendaId || vendaIdCriada
-    const authAtual = authRef.current
-    if (!vendaIdParaCarregar || !open || !authAtual) return
+  const carregarVendaExistente = useCallback(
+    async (vendaIdOverride?: string | null) => {
+      const vendaIdParaCarregar = vendaIdOverride || vendaId || vendaIdCriada
+      const authAtual = authRef.current
+      if (!vendaIdParaCarregar || !open || !authAtual) return
 
-    const token = authAtual.getAccessToken()
-    if (!token) {
-      showToast.error('Token não encontrado')
-      return
-    }
-
-    setIsLoadingVenda(true)
-    setOrigemTextoApiDetalhe(null)
-    setStatusVendaTextoApiDetalhe(null)
-
-    try {
-      const urlVenda =
-        tabelaOrigemVenda === 'venda'
-          ? `/api/vendas/${vendaIdParaCarregar}?incluirFiscal=true`
-          : `/api/vendas/gestor/${vendaIdParaCarregar}?incluirFiscal=true`
-
-      const response = await fetch(urlVenda, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || errorData.message || 'Erro ao carregar venda')
+      const token = authAtual.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado')
+        return
       }
 
-      const vendaData = await response.json()
+      setIsLoadingVenda(true)
+      setOrigemTextoApiDetalhe(null)
+      setStatusVendaTextoApiDetalhe(null)
 
-      setDetalhesPedidoMeta({
-        numeroVenda: vendaData.numeroVenda ?? null,
-        codigoVenda: vendaData.codigoVenda ?? null,
-        tipoVenda: vendaData.tipoVenda ?? null,
-        numeroMesa: vendaData.numeroMesa ?? null,
-        statusMesa: vendaData.statusMesa ?? null,
-        abertoPorId: vendaData.abertoPorId ?? null,
-        ultimoResponsavelId: vendaData.ultimoResponsavelId ?? null,
-        canceladoPorId: vendaData.canceladoPorId ?? null,
-        codigoTerminal: vendaData.codigoTerminal ?? null,
-        terminalId: vendaData.terminalId ?? null,
-        identificacao: vendaData.identificacao ?? null,
-        solicitarEmissaoFiscal: vendaData.solicitarEmissaoFiscal ?? null,
-        dataCriacao: vendaData.dataCriacao ?? null,
-        dataFinalizacao: vendaData.dataFinalizacao ?? null,
-        dataCancelamento: vendaData.dataCancelamento ?? null,
-        dataUltimaModificacao: vendaData.dataUltimaModificacao ?? null,
-        dataUltimoProdutoLancado: vendaData.dataUltimoProdutoLancado ?? null,
-      })
+      try {
+        const urlVenda =
+          tabelaOrigemVenda === 'venda'
+            ? `/api/vendas/${vendaIdParaCarregar}?incluirFiscal=true`
+            : `/api/vendas/gestor/${vendaIdParaCarregar}?incluirFiscal=true`
 
-      if (vendaData.resumoFiscal && typeof vendaData.resumoFiscal === 'object') {
-        setResumoFiscal(vendaData.resumoFiscal as ResumoFiscalVenda)
-      } else {
-        setResumoFiscal(null)
-      }
+        const response = await fetch(urlVenda, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
 
-      setOrigemTextoApiDetalhe(
-        vendaData.origem !== undefined && vendaData.origem !== null
-          ? String(vendaData.origem)
-          : null
-      )
-      setStatusVendaTextoApiDetalhe(
-        vendaData.statusVenda !== undefined && vendaData.statusVenda !== null
-          ? String(vendaData.statusVenda)
-          : null
-      )
-
-      // Mapear dados da venda para os estados do componente
-      // Origem
-      if (vendaData.origem) {
-        setOrigem(vendaData.origem as OrigemVenda)
-      }
-
-      // Status
-      if (vendaData.statusVenda) {
-        setStatus(vendaData.statusVenda as StatusVenda)
-      } else if (vendaData.dataFinalizacao) {
-        setStatus('FINALIZADA')
-      } else {
-        setStatus('ABERTA')
-      }
-
-      // Cliente
-      if (vendaData.clienteId) {
-        setClienteId(vendaData.clienteId)
-        // Buscar nome do cliente
-        try {
-          const clienteResponse = await fetch(`/api/clientes/${vendaData.clienteId}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          })
-          if (clienteResponse.ok) {
-            const clienteData = await clienteResponse.json()
-            setClienteNome(clienteData.nome || clienteData.name || '')
-          }
-        } catch (error) {
-          console.error('Erro ao buscar nome do cliente:', error)
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || errorData.message || 'Erro ao carregar venda')
         }
-      }
 
-      // Data da venda
-      if (vendaData.dataCriacao) {
-        setDataVenda(vendaData.dataCriacao)
-      } else if (vendaData.dataFinalizacao) {
-        setDataVenda(vendaData.dataFinalizacao)
-      }
+        const vendaData = await response.json()
 
-      // Valor final da venda (já calculado pelo backend)
-      if (vendaData.valorFinal !== undefined && vendaData.valorFinal !== null) {
-        setValorFinalVenda(vendaData.valorFinal)
-      } else {
-        setValorFinalVenda(null)
-      }
+        setDetalhesPedidoMeta({
+          numeroVenda: vendaData.numeroVenda ?? null,
+          codigoVenda: vendaData.codigoVenda ?? null,
+          tipoVenda: vendaData.tipoVenda ?? null,
+          numeroMesa: vendaData.numeroMesa ?? null,
+          statusMesa: vendaData.statusMesa ?? null,
+          abertoPorId: vendaData.abertoPorId ?? null,
+          ultimoResponsavelId: vendaData.ultimoResponsavelId ?? null,
+          canceladoPorId: vendaData.canceladoPorId ?? null,
+          codigoTerminal: vendaData.codigoTerminal ?? null,
+          terminalId: vendaData.terminalId ?? null,
+          identificacao: vendaData.identificacao ?? null,
+          solicitarEmissaoFiscal: vendaData.solicitarEmissaoFiscal ?? null,
+          dataCriacao: vendaData.dataCriacao ?? null,
+          dataFinalizacao: vendaData.dataFinalizacao ?? null,
+          dataCancelamento: vendaData.dataCancelamento ?? null,
+          dataUltimaModificacao: vendaData.dataUltimaModificacao ?? null,
+          dataUltimoProdutoLancado: vendaData.dataUltimoProdutoLancado ?? null,
+        })
 
-      // Datas para regra de exibição do botão "Cancelar Venda" (gestor)
-      const df = vendaData.dataFinalizacao
-      setDataFinalizacaoCarregada(df != null && String(df).trim() !== '' ? String(df) : null)
-      setVendaGestorJaCancelada(Boolean(vendaData.dataCancelamento || vendaData.canceladoPorId))
+        if (vendaData.resumoFiscal && typeof vendaData.resumoFiscal === 'object') {
+          setResumoFiscal(vendaData.resumoFiscal as ResumoFiscalVenda)
+        } else {
+          setResumoFiscal(null)
+        }
 
-      // Produtos - Verificar tanto produtosLancados quanto produtos
-      // A API pode retornar em qualquer um dos formatos
-      const produtosRaw = vendaData.produtosLancados || vendaData.produtos
+        setOrigemTextoApiDetalhe(
+          vendaData.origem !== undefined && vendaData.origem !== null
+            ? String(vendaData.origem)
+            : null
+        )
+        setStatusVendaTextoApiDetalhe(
+          vendaData.statusVenda !== undefined && vendaData.statusVenda !== null
+            ? String(vendaData.statusVenda)
+            : null
+        )
 
-      if (produtosRaw && Array.isArray(produtosRaw)) {
-        const produtosMapeadosTodos: ProdutoSelecionado[] = produtosRaw.map((prod: any) => {
+        // Mapear dados da venda para os estados do componente
+        // Origem
+        if (vendaData.origem) {
+          setOrigem(vendaData.origem as OrigemVenda)
+        }
+
+        // Status
+        if (vendaData.statusVenda) {
+          setStatus(vendaData.statusVenda as StatusVenda)
+        } else if (vendaData.dataFinalizacao) {
+          setStatus('FINALIZADA')
+        } else {
+          setStatus('ABERTA')
+        }
+
+        // Cliente
+        if (vendaData.clienteId) {
+          setClienteId(vendaData.clienteId)
+          // Buscar nome do cliente
+          try {
+            const clienteResponse = await fetch(`/api/clientes/${vendaData.clienteId}`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            })
+            if (clienteResponse.ok) {
+              const clienteData = await clienteResponse.json()
+              setClienteNome(clienteData.nome || clienteData.name || '')
+            }
+          } catch (error) {
+            console.error('Erro ao buscar nome do cliente:', error)
+          }
+        }
+
+        // Data da venda
+        if (vendaData.dataCriacao) {
+          setDataVenda(vendaData.dataCriacao)
+        } else if (vendaData.dataFinalizacao) {
+          setDataVenda(vendaData.dataFinalizacao)
+        }
+
+        // Valor final da venda (já calculado pelo backend)
+        if (vendaData.valorFinal !== undefined && vendaData.valorFinal !== null) {
+          setValorFinalVenda(vendaData.valorFinal)
+        } else {
+          setValorFinalVenda(null)
+        }
+
+        // Datas para regra de exibição do botão "Cancelar Venda" (gestor)
+        const df = vendaData.dataFinalizacao
+        setDataFinalizacaoCarregada(df != null && String(df).trim() !== '' ? String(df) : null)
+        setVendaGestorJaCancelada(Boolean(vendaData.dataCancelamento || vendaData.canceladoPorId))
+
+        // Produtos - Verificar tanto produtosLancados quanto produtos
+        // A API pode retornar em qualquer um dos formatos
+        const produtosRaw = vendaData.produtosLancados || vendaData.produtos
+
+        if (produtosRaw && Array.isArray(produtosRaw)) {
+          const produtosMapeadosTodos: ProdutoSelecionado[] = produtosRaw.map((prod: any) => {
             // Buscar nome do produto
             let nomeProduto = prod.nomeProduto || prod.nome || 'Produto sem nome'
 
@@ -1945,188 +1958,189 @@ export function NovoPedidoModal({
             }
           })
 
-        const produtosMapeados = produtosMapeadosTodos.filter(prod => !prod.removido)
-        console.log('✅ Produtos mapeados:', produtosMapeados)
-        setProdutos(produtosMapeados)
+          const produtosMapeados = produtosMapeadosTodos.filter(prod => !prod.removido)
+          console.log('✅ Produtos mapeados:', produtosMapeados)
+          setProdutos(produtosMapeados)
 
-        // Resumo financeiro alinhado ao DetalhesVendas.tsx:
-        // A) total itens lançados (inclui removidos), B) itens cancelados, C) A-B, descontos e acréscimos
-        const vendaCancelada = Boolean(vendaData.dataCancelamento || vendaData.canceladoPorId)
-        let totalItensLancados = 0
-        let totalItensCancelados = 0
-        let totalDescontosConta = 0
-        let totalAcrescimosConta = 0
+          // Resumo financeiro alinhado ao DetalhesVendas.tsx:
+          // A) total itens lançados (inclui removidos), B) itens cancelados, C) A-B, descontos e acréscimos
+          const vendaCancelada = Boolean(vendaData.dataCancelamento || vendaData.canceladoPorId)
+          let totalItensLancados = 0
+          let totalItensCancelados = 0
+          let totalDescontosConta = 0
+          let totalAcrescimosConta = 0
 
-        produtosMapeadosTodos.forEach(produto => {
-          const valorBaseProduto = produto.valorUnitario * produto.quantidade
-          const valorComplementos = (produto.complementos || []).reduce((sum, comp) => {
-            const tipo = comp.tipoImpactoPreco || 'nenhum'
-            const valorTotal = comp.valor * comp.quantidade * produto.quantidade
-            if (tipo === 'aumenta') return sum + valorTotal
-            if (tipo === 'diminui') return sum - valorTotal
-            return sum
-          }, 0)
-          const subtotal = valorBaseProduto + valorComplementos
+          produtosMapeadosTodos.forEach(produto => {
+            const valorBaseProduto = produto.valorUnitario * produto.quantidade
+            const valorComplementos = (produto.complementos || []).reduce((sum, comp) => {
+              const tipo = comp.tipoImpactoPreco || 'nenhum'
+              const valorTotal = comp.valor * comp.quantidade * produto.quantidade
+              if (tipo === 'aumenta') return sum + valorTotal
+              if (tipo === 'diminui') return sum - valorTotal
+              return sum
+            }, 0)
+            const subtotal = valorBaseProduto + valorComplementos
 
-          let valorDesconto = 0
-          if (produto.tipoDesconto && produto.valorDesconto) {
-            if (produto.tipoDesconto === 'porcentagem') {
-              valorDesconto = subtotal * (produto.valorDesconto / 100)
-            } else {
-              valorDesconto = produto.valorDesconto
+            let valorDesconto = 0
+            if (produto.tipoDesconto && produto.valorDesconto) {
+              if (produto.tipoDesconto === 'porcentagem') {
+                valorDesconto = subtotal * (produto.valorDesconto / 100)
+              } else {
+                valorDesconto = produto.valorDesconto
+              }
             }
-          }
-          let valorAcrescimo = 0
-          if (produto.tipoAcrescimo && produto.valorAcrescimo) {
-            if (produto.tipoAcrescimo === 'porcentagem') {
-              valorAcrescimo = subtotal * (produto.valorAcrescimo / 100)
-            } else {
-              valorAcrescimo = produto.valorAcrescimo
+            let valorAcrescimo = 0
+            if (produto.tipoAcrescimo && produto.valorAcrescimo) {
+              if (produto.tipoAcrescimo === 'porcentagem') {
+                valorAcrescimo = subtotal * (produto.valorAcrescimo / 100)
+              } else {
+                valorAcrescimo = produto.valorAcrescimo
+              }
             }
+
+            totalDescontosConta += valorDesconto
+            totalAcrescimosConta += valorAcrescimo
+
+            const totalLinha = produto.valorFinal ?? subtotal - valorDesconto + valorAcrescimo
+            totalItensLancados += totalLinha
+            if (vendaCancelada || produto.removido) {
+              totalItensCancelados += totalLinha
+            }
+          })
+
+          setResumoFinanceiroDetalhes({
+            totalItensLancados,
+            totalItensCancelados,
+            totalDosItens: totalItensLancados - totalItensCancelados,
+            totalDescontosConta,
+            totalAcrescimosConta,
+          })
+        } else {
+          console.warn(
+            '⚠️ Nenhum produto encontrado na resposta da API. Campos disponíveis:',
+            Object.keys(vendaData)
+          )
+          setProdutos([])
+          setResumoFinanceiroDetalhes(null)
+        }
+
+        // Pagamentos
+        if (vendaData.pagamentos && Array.isArray(vendaData.pagamentos)) {
+          const pagamentosMapeados: PagamentoSelecionado[] = vendaData.pagamentos.map(
+            (pag: any) => ({
+              meioPagamentoId: pag.meioPagamentoId || pag.id || '',
+              valor: pag.valor || 0,
+              realizadoPorId: pag.realizadoPorId || null,
+              cancelado: Boolean(pag.cancelado),
+              canceladoPorId: pag.canceladoPorId || null,
+              dataCriacao: pag.dataCriacao || null,
+              dataCancelamento: pag.dataCancelamento || null,
+              isTefUsed: pag.isTefUsed === true,
+              isTefConfirmed: pag.isTefConfirmed === true,
+              tefIdentifier: pag.tefIdentifier || null,
+              tefAdquirente: pag.tefAdquirente || null,
+              cnpjAdquirente: pag.cnpjAdquirente || null,
+              codigoAutorizacao: pag.codigoAutorizacao || null,
+              tipoIntegracao: pag.tipoIntegracao || null,
+              bandeiraCartao: pag.bandeiraCartao || null,
+            })
+          )
+          setPagamentos(pagamentosMapeados)
+        }
+
+        // Resolver nomes de usuários em lote (sem exibir IDs)
+        const idsUsuarios = new Set<string>()
+        ;[vendaData.abertoPorId, vendaData.ultimoResponsavelId, vendaData.canceladoPorId].forEach(
+          (id: unknown) => {
+            const v = String(id || '').trim()
+            if (v) idsUsuarios.add(v)
           }
-
-          totalDescontosConta += valorDesconto
-          totalAcrescimosConta += valorAcrescimo
-
-          const totalLinha = produto.valorFinal ?? subtotal - valorDesconto + valorAcrescimo
-          totalItensLancados += totalLinha
-          if (vendaCancelada || produto.removido) {
-            totalItensCancelados += totalLinha
-          }
-        })
-
-        setResumoFinanceiroDetalhes({
-          totalItensLancados,
-          totalItensCancelados,
-          totalDosItens: totalItensLancados - totalItensCancelados,
-          totalDescontosConta,
-          totalAcrescimosConta,
-        })
-      } else {
-        console.warn(
-          '⚠️ Nenhum produto encontrado na resposta da API. Campos disponíveis:',
-          Object.keys(vendaData)
         )
-        setProdutos([])
-        setResumoFinanceiroDetalhes(null)
-      }
-
-      // Pagamentos
-      if (vendaData.pagamentos && Array.isArray(vendaData.pagamentos)) {
-        const pagamentosMapeados: PagamentoSelecionado[] = vendaData.pagamentos
-          .map((pag: any) => ({
-            meioPagamentoId: pag.meioPagamentoId || pag.id || '',
-            valor: pag.valor || 0,
-            realizadoPorId: pag.realizadoPorId || null,
-            cancelado: Boolean(pag.cancelado),
-            canceladoPorId: pag.canceladoPorId || null,
-            dataCriacao: pag.dataCriacao || null,
-            dataCancelamento: pag.dataCancelamento || null,
-            isTefUsed: pag.isTefUsed === true,
-            isTefConfirmed: pag.isTefConfirmed === true,
-            tefIdentifier: pag.tefIdentifier || null,
-            tefAdquirente: pag.tefAdquirente || null,
-            cnpjAdquirente: pag.cnpjAdquirente || null,
-            codigoAutorizacao: pag.codigoAutorizacao || null,
-            tipoIntegracao: pag.tipoIntegracao || null,
-            bandeiraCartao: pag.bandeiraCartao || null,
-          }))
-        setPagamentos(pagamentosMapeados)
-      }
-
-      // Resolver nomes de usuários em lote (sem exibir IDs)
-      const idsUsuarios = new Set<string>()
-      ;[
-        vendaData.abertoPorId,
-        vendaData.ultimoResponsavelId,
-        vendaData.canceladoPorId,
-      ].forEach((id: unknown) => {
-        const v = String(id || '').trim()
-        if (v) idsUsuarios.add(v)
-      })
-      ;(vendaData.produtosLancados || vendaData.produtos || []).forEach((prod: any) => {
-        const lancadoPorId = String(prod?.lancadoPorId || '').trim()
-        const removidoPorId = String(prod?.removidoPorId || '').trim()
-        if (lancadoPorId) idsUsuarios.add(lancadoPorId)
-        if (removidoPorId) idsUsuarios.add(removidoPorId)
-      })
-      ;(vendaData.pagamentos || []).forEach((pag: any) => {
-        const realizadoPorId = String(pag?.realizadoPorId || '').trim()
-        const canceladoPorId = String(pag?.canceladoPorId || '').trim()
-        if (realizadoPorId) idsUsuarios.add(realizadoPorId)
-        if (canceladoPorId) idsUsuarios.add(canceladoPorId)
-      })
-
-      const mapUsuarios: Record<string, string> = {}
-      await Promise.all(
-        Array.from(idsUsuarios).map(async usuarioId => {
-          try {
-            const endpoint =
-              tabelaOrigemVenda === 'venda_gestor'
-                ? `/api/pessoas/usuarios-gestor/${usuarioId}`
-                : `/api/usuarios/${usuarioId}`
-            const r = await fetch(endpoint, {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
-            })
-            if (!r.ok) return
-            const d = await r.json()
-            const nome = String(d?.nome || d?.name || d?.username || '').trim()
-            if (nome) mapUsuarios[usuarioId] = nome
-          } catch {
-            // segue silenciosamente; a UI usa fallback amigável
-          }
+        ;(vendaData.produtosLancados || vendaData.produtos || []).forEach((prod: any) => {
+          const lancadoPorId = String(prod?.lancadoPorId || '').trim()
+          const removidoPorId = String(prod?.removidoPorId || '').trim()
+          if (lancadoPorId) idsUsuarios.add(lancadoPorId)
+          if (removidoPorId) idsUsuarios.add(removidoPorId)
         })
-      )
-      setNomesUsuariosPedido(mapUsuarios)
-
-      // Resolver nomes de meios de pagamento faltantes da lista em memória (otimiza chamadas)
-      const mapMeios: Record<string, string> = {}
-      const idsMeios = new Set<string>()
-      ;(vendaData.pagamentos || []).forEach((pag: any) => {
-        const meioId = String(pag?.meioPagamentoId || '').trim()
-        if (meioId) idsMeios.add(meioId)
-      })
-
-      await Promise.all(
-        Array.from(idsMeios).map(async meioId => {
-          const meioCache = meiosPagamentoRef.current.find(m => m.getId() === meioId)
-          if (meioCache) {
-            mapMeios[meioId] = meioCache.getNome()
-            return
-          }
-          try {
-            const r = await fetch(`/api/meios-pagamentos/${meioId}`, {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
-            })
-            if (!r.ok) return
-            const d = await r.json()
-            const nome = String(d?.nome || d?.name || '').trim()
-            if (nome) mapMeios[meioId] = nome
-          } catch {
-            // fallback visual amigável
-          }
+        ;(vendaData.pagamentos || []).forEach((pag: any) => {
+          const realizadoPorId = String(pag?.realizadoPorId || '').trim()
+          const canceladoPorId = String(pag?.canceladoPorId || '').trim()
+          if (realizadoPorId) idsUsuarios.add(realizadoPorId)
+          if (canceladoPorId) idsUsuarios.add(canceladoPorId)
         })
-      )
-      setNomesMeiosPagamentoPedido(mapMeios)
 
-      // Se estiver em modo visualização, ir direto para step 4
-      if (modoVisualizacao) {
-        setCurrentStep(4)
+        const mapUsuarios: Record<string, string> = {}
+        await Promise.all(
+          Array.from(idsUsuarios).map(async usuarioId => {
+            try {
+              const endpoint =
+                tabelaOrigemVenda === 'venda_gestor'
+                  ? `/api/pessoas/usuarios-gestor/${usuarioId}`
+                  : `/api/usuarios/${usuarioId}`
+              const r = await fetch(endpoint, {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+              })
+              if (!r.ok) return
+              const d = await r.json()
+              const nome = String(d?.nome || d?.name || d?.username || '').trim()
+              if (nome) mapUsuarios[usuarioId] = nome
+            } catch {
+              // segue silenciosamente; a UI usa fallback amigável
+            }
+          })
+        )
+        setNomesUsuariosPedido(mapUsuarios)
+
+        // Resolver nomes de meios de pagamento faltantes da lista em memória (otimiza chamadas)
+        const mapMeios: Record<string, string> = {}
+        const idsMeios = new Set<string>()
+        ;(vendaData.pagamentos || []).forEach((pag: any) => {
+          const meioId = String(pag?.meioPagamentoId || '').trim()
+          if (meioId) idsMeios.add(meioId)
+        })
+
+        await Promise.all(
+          Array.from(idsMeios).map(async meioId => {
+            const meioCache = meiosPagamentoRef.current.find(m => m.getId() === meioId)
+            if (meioCache) {
+              mapMeios[meioId] = meioCache.getNome()
+              return
+            }
+            try {
+              const r = await fetch(`/api/meios-pagamentos/${meioId}`, {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+              })
+              if (!r.ok) return
+              const d = await r.json()
+              const nome = String(d?.nome || d?.name || '').trim()
+              if (nome) mapMeios[meioId] = nome
+            } catch {
+              // fallback visual amigável
+            }
+          })
+        )
+        setNomesMeiosPagamentoPedido(mapMeios)
+
+        // Se estiver em modo visualização, ir direto para step 4
+        if (modoVisualizacao) {
+          setCurrentStep(4)
+        }
+      } catch (error: any) {
+        console.error('Erro ao carregar venda:', error)
+        showToast.error(error.message || 'Erro ao carregar dados da venda')
+        onCloseRef.current()
+      } finally {
+        setIsLoadingVenda(false)
       }
-    } catch (error: any) {
-      console.error('Erro ao carregar venda:', error)
-      showToast.error(error.message || 'Erro ao carregar dados da venda')
-      onCloseRef.current()
-    } finally {
-      setIsLoadingVenda(false)
-    }
-  }, [vendaId, vendaIdCriada, open, modoVisualizacao, tabelaOrigemVenda])
+    },
+    [vendaId, vendaIdCriada, open, modoVisualizacao, tabelaOrigemVenda]
+  )
 
   // Sincroniza o estado interno com o prop open; janela curta sem fechar pelo backdrop (hardware com duplo clique)
   useEffect(() => {
@@ -2254,16 +2268,10 @@ export function NovoPedidoModal({
   // Refetch manual removido: o hook já controla atualização ao montar/abrir.
 
   // Intercepta o fechamento do Dialog
-  const handleDialogOpenChange = (
-    isOpen: boolean,
-    reason?: 'backdropClick' | 'escapeKeyDown'
-  ) => {
+  const handleDialogOpenChange = (isOpen: boolean, reason?: 'backdropClick' | 'escapeKeyDown') => {
     if (!isOpen) {
       // Segundo "clique" do mouse pode cair no backdrop antes do painel capturar o foco
-      if (
-        reason === 'backdropClick' &&
-        Date.now() < ignorarBackdropAteRef.current
-      ) {
+      if (reason === 'backdropClick' && Date.now() < ignorarBackdropAteRef.current) {
         setInternalDialogOpen(true)
         return
       }
@@ -2590,15 +2598,8 @@ export function NovoPedidoModal({
           >
             {/* Loading em modo visualização - não mostrar steps até carregar */}
             {modoVisualizacao && isLoadingVenda && (
-              <div className="flex items-center justify-center py-16">
-                <div className="text-center">
-                  <img
-                    src="/images/jiffy-loading.gif"
-                    alt="Carregando..."
-                    className="mx-auto mb-4 h-32 w-32"
-                  />
-                  <p className="text-sm text-gray-600">Carregando detalhes da venda...</p>
-                </div>
+              <div className="flex h-full items-center justify-center bg-gray-50">
+                <JiffyLoading />
               </div>
             )}
 
@@ -2684,7 +2685,11 @@ export function NovoPedidoModal({
                     </SelectTrigger>
                     <SelectContent>
                       {statusDisponiveis.map(st => (
-                        <SelectItem key={st.value} value={st.value} disabled={st.value === 'ABERTA'}>
+                        <SelectItem
+                          key={st.value}
+                          value={st.value}
+                          disabled={st.value === 'ABERTA'}
+                        >
                           {st.label}
                         </SelectItem>
                       ))}
@@ -3142,7 +3147,9 @@ export function NovoPedidoModal({
                           )}
                         </div>
                         {isLoadingGrupos ? (
-                          <div className="py-4 text-center text-gray-500">Carregando grupos...</div>
+                          <div className="py-4 text-center text-gray-500">
+                            <JiffyLoading />
+                          </div>
                         ) : grupos.length === 0 ? (
                           <div className="py-4 text-center text-gray-500">
                             Nenhum grupo encontrado
@@ -3251,7 +3258,7 @@ export function NovoPedidoModal({
                               </Label>
                               {isLoadingProdutos ? (
                                 <div className="py-4 text-center text-gray-500">
-                                  Carregando produtos...
+                                  <JiffyLoading />
                                 </div>
                               ) : produtosError ? (
                                 <div className="py-4 text-center text-red-500">
@@ -3402,39 +3409,49 @@ export function NovoPedidoModal({
                         </Label>
                         <div
                           ref={meiosPagamentoScrollRef}
-                          className="scrollbar-thin flex cursor-grab select-none gap-3 overflow-x-auto pb-2 active:cursor-grabbing"
+                          className={`scrollbar-thin flex gap-3 overflow-x-auto pb-2 ${mostrarLoadingFormasPagamento ? 'min-h-[120px] cursor-default' : 'cursor-grab select-none active:cursor-grabbing'}`}
                           style={{ scrollbarWidth: 'thin' }}
-                          onMouseDown={handleMouseDownMeiosPagamento}
+                          onMouseDown={
+                            mostrarLoadingFormasPagamento
+                              ? undefined
+                              : handleMouseDownMeiosPagamento
+                          }
                         >
-                          {meiosPagamento.map(meio => {
-                            const Icone = obterIconeMeioPagamento(meio.getNome())
+                          {mostrarLoadingFormasPagamento ? (
+                            <div className="flex w-full flex-1 items-center justify-center py-2">
+                              <JiffyLoading />
+                            </div>
+                          ) : (
+                            meiosPagamento.map(meio => {
+                              const Icone = obterIconeMeioPagamento(meio.getNome())
 
-                            return (
-                              <button
-                                key={meio.getId()}
-                                type="button"
-                                onClick={e => {
-                                  // Só executar o clique se não houve movimento significativo durante o arraste
-                                  if (
-                                    !hasMovedMeiosPagamentoRef.current &&
-                                    !isDraggingMeiosPagamento
-                                  ) {
-                                    adicionarPagamentoPorCard(meio.getId())
-                                  }
-                                }}
-                                onMouseDown={e => {
-                                  // Permitir que o evento propague para o container para iniciar o arraste
-                                }}
-                                disabled={valorAPagar <= 0}
-                                className={`flex min-w-[100px] flex-shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-primary bg-white p-2 transition-all hover:bg-primary hover:text-white ${valorAPagar <= 0 ? 'cursor-not-allowed opacity-50' : ''} `}
-                              >
-                                <Icone className="h-8 w-8" />
-                                <span className="text-center text-xs font-medium">
-                                  {meio.getNome()}
-                                </span>
-                              </button>
-                            )
-                          })}
+                              return (
+                                <button
+                                  key={meio.getId()}
+                                  type="button"
+                                  onClick={e => {
+                                    // Só executar o clique se não houve movimento significativo durante o arraste
+                                    if (
+                                      !hasMovedMeiosPagamentoRef.current &&
+                                      !isDraggingMeiosPagamento
+                                    ) {
+                                      adicionarPagamentoPorCard(meio.getId())
+                                    }
+                                  }}
+                                  onMouseDown={e => {
+                                    // Permitir que o evento propague para o container para iniciar o arraste
+                                  }}
+                                  disabled={valorAPagar <= 0}
+                                  className={`flex min-w-[100px] flex-shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-primary bg-white p-2 transition-all hover:bg-primary hover:text-white ${valorAPagar <= 0 ? 'cursor-not-allowed opacity-50' : ''} `}
+                                >
+                                  <Icone className="h-8 w-8" />
+                                  <span className="text-center text-xs font-medium">
+                                    {meio.getNome()}
+                                  </span>
+                                </button>
+                              )
+                            })
+                          )}
                         </div>
                       </div>
 
@@ -3539,8 +3556,8 @@ export function NovoPedidoModal({
                     {!resumoFiscal ? (
                       <div className="rounded-lg border border-dashed border-amber-300/80 bg-amber-50/90 px-6 py-10 text-center">
                         <p className="font-nunito text-sm leading-relaxed text-amber-950/90">
-                          Nenhum resumo fiscal disponível para esta venda. Isso pode ocorrer se ainda
-                          não houver nota emitida ou se o backend não retornou o objeto{' '}
+                          Nenhum resumo fiscal disponível para esta venda. Isso pode ocorrer se
+                          ainda não houver nota emitida ou se o backend não retornou o objeto{' '}
                           <span className="font-semibold">resumoFiscal</span>.
                         </p>
                       </div>
@@ -3622,341 +3639,379 @@ export function NovoPedidoModal({
                   </div>
                 ) : (
                   <>
-                  {abaDetalhesPedido === 'infoPedido' && (
-                  <div className="rounded-lg border bg-gray-50 px-4" role="tabpanel" aria-labelledby="tab-detalhes-info-pedido">
-                    <h3 className="text-lg font-semibold">Informações do Pedido</h3>
-                    <div className="flex flex-col gap-3 text-sm">
-                      <div className="flex justify-between rounded-lg bg-white px-1">
-                        <span className="text-gray-600">Data:</span>
-                        <span className="font-medium">
-                          {(dataVenda ? new Date(dataVenda) : new Date()).toLocaleString('pt-BR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
-                      </div>
-                      <div className="flex justify-between px-1">
-                        <span className="text-gray-600">Origem:</span>
-                        <span className="font-medium">
-                          {rotuloOrigemParaExibicao(origemTextoApiDetalhe)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between rounded-lg bg-white px-1">
-                        <span className="text-gray-600">Status:</span>
-                        <span className="font-medium">
-                          {statusDisponiveis.find(s => s.value === status)?.label}
-                        </span>
-                      </div>
-                      {clienteNome && (
-                        <div className="flex justify-between px-1">
-                          <span className="text-gray-600">Cliente:</span>
-                          <span className="font-medium">{clienteNome}</span>
-                        </div>
-                      )}
-
-                      <div className="flex justify-between rounded-lg bg-white px-1">
-                        <span className="text-gray-600">Total de Itens:</span>
-                        <span className="font-medium">
-                          {produtos.length} {produtos.length === 1 ? 'produto' : 'produtos'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between px-1">
-                        <span className="text-gray-600">Aberto por:</span>
-                        <span className="font-medium">
-                          {formatarUsuarioPorId(detalhesPedidoMeta?.abertoPorId)}
-                        </span>
-                      </div>
-                      {detalhesPedidoMeta?.ultimoResponsavelId && (
-                        <div className="flex justify-between rounded-lg bg-white px-1">
-                          <span className="text-gray-600">Última alteração por:</span>
-                          <span className="font-medium">
-                            {formatarUsuarioPorId(detalhesPedidoMeta.ultimoResponsavelId)}
-                          </span>
-                        </div>
-                      )}
-                      {detalhesPedidoMeta?.canceladoPorId && (
-                        <div className="flex justify-between px-1">
-                          <span className="text-gray-600">Cancelado por:</span>
-                          <span className="font-medium text-red-600">
-                            {formatarUsuarioPorId(detalhesPedidoMeta.canceladoPorId)}
-                          </span>
-                        </div>
-                      )}
-                      {detalhesPedidoMeta?.codigoTerminal && (
-                        <div className="flex justify-between rounded-lg bg-white px-1">
-                          <span className="text-gray-600">Código do terminal:</span>
-                          <span className="font-medium">{detalhesPedidoMeta.codigoTerminal}</span>
-                        </div>
-                      )}
-                      {detalhesPedidoMeta?.identificacao && (
-                        <div className="flex justify-between px-1">
-                          <span className="text-gray-600">Identificação:</span>
-                          <span className="font-medium">{detalhesPedidoMeta.identificacao}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between rounded-lg bg-white px-1">
-                        <span className="text-gray-600">Solicitar emissão fiscal:</span>
-                        <span className="font-medium">
-                          {detalhesPedidoMeta?.solicitarEmissaoFiscal ? 'Sim' : 'Não'}
-                        </span>
-                      </div>
-                      {detalhesPedidoMeta?.dataUltimaModificacao && (
-                        <div className="flex justify-between px-1">
-                          <span className="text-gray-600">Última modificação:</span>
-                          <span className="font-medium">
-                            {formatarDataDetalhePedido(detalhesPedidoMeta.dataUltimaModificacao)}
-                          </span>
-                        </div>
-                      )}
-                      {detalhesPedidoMeta?.dataUltimoProdutoLancado && (
-                        <div className="flex justify-between rounded-lg bg-white px-1">
-                          <span className="text-gray-600">Último produto lançado:</span>
-                          <span className="font-medium">
-                            {formatarDataDetalhePedido(detalhesPedidoMeta.dataUltimoProdutoLancado)}
-                          </span>
-                        </div>
-                      )}
-                      {detalhesPedidoMeta?.dataFinalizacao && (
-                        <div className="flex justify-between px-1">
-                          <span className="text-gray-600">Data finalização:</span>
-                          <span className="font-medium">
-                            {formatarDataDetalhePedido(detalhesPedidoMeta.dataFinalizacao)}
-                          </span>
-                        </div>
-                      )}
-                      {detalhesPedidoMeta?.dataCancelamento && (
-                        <div className="flex justify-between rounded-lg bg-white px-1">
-                          <span className="text-gray-600">Data cancelamento:</span>
-                          <span className="font-medium text-red-600">
-                            {formatarDataDetalhePedido(detalhesPedidoMeta.dataCancelamento)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  )}
-
-                  {/* Lista de Produtos (Visualização) */}
-                  {abaDetalhesPedido === 'listaProdutos' && (
-                  <div className="overflow-hidden rounded-lg border bg-gray-50" role="tabpanel" aria-labelledby="tab-detalhes-lista-produtos">
-                    <div className="p-2">
-                      <h3 className="mb-2 text-lg font-semibold">Produtos do Pedido</h3>
-                      {produtos.length > 0 ? (
-                        <div className="space-y-1">
-                          {/* Cabeçalho da tabela */}
-                          <div className="mb-2 flex gap-2 border-b border-gray-300 pb-2">
-                            <div className="flex w-[60px] flex-shrink-0 items-center justify-center">
-                              <span className="text-center text-xs font-semibold text-gray-700">
-                                Qtd
-                              </span>
-                            </div>
-                            <div className="flex-[4]">
-                              <span className="text-xs font-semibold text-gray-700">Produto</span>
-                            </div>
-                            <div className="flex flex-1 justify-end">
-                              <span className="text-right text-xs font-semibold text-gray-700">
-                                Desc./Acres.
-                              </span>
-                            </div>
-                            <div className="flex flex-1 justify-end">
-                              <span className="text-right text-xs font-semibold text-gray-700">
-                                Val Unit.
-                              </span>
-                            </div>
-                            <div className="flex flex-1 justify-end">
-                              <span className="text-right text-xs font-semibold text-gray-700">
-                                Total
-                              </span>
-                            </div>
+                    {abaDetalhesPedido === 'infoPedido' && (
+                      <div
+                        className="rounded-lg border bg-gray-50 px-4"
+                        role="tabpanel"
+                        aria-labelledby="tab-detalhes-info-pedido"
+                      >
+                        <h3 className="text-lg font-semibold">Informações do Pedido</h3>
+                        <div className="flex flex-col gap-3 text-sm">
+                          <div className="flex justify-between rounded-lg bg-white px-1">
+                            <span className="text-gray-600">Data:</span>
+                            <span className="font-medium">
+                              {(dataVenda ? new Date(dataVenda) : new Date()).toLocaleString(
+                                'pt-BR',
+                                {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                }
+                              )}
+                            </span>
                           </div>
-                          {/* Linhas de produtos */}
-                          <div className="space-y-1">
-                            {produtos.map((produto, index) => {
-                              // Total do produto: usar valorFinal vindo do backend (já calculado com desconto/acréscimo)
-                              const totalProdutoComComplementos =
-                                produto.valorFinal !== null && produto.valorFinal !== undefined
-                                  ? produto.valorFinal
-                                  : calcularTotalProduto(produto)
+                          <div className="flex justify-between px-1">
+                            <span className="text-gray-600">Origem:</span>
+                            <span className="font-medium">
+                              {rotuloOrigemParaExibicao(origemTextoApiDetalhe)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between rounded-lg bg-white px-1">
+                            <span className="text-gray-600">Status:</span>
+                            <span className="font-medium">
+                              {statusDisponiveis.find(s => s.value === status)?.label}
+                            </span>
+                          </div>
+                          {clienteNome && (
+                            <div className="flex justify-between px-1">
+                              <span className="text-gray-600">Cliente:</span>
+                              <span className="font-medium">{clienteNome}</span>
+                            </div>
+                          )}
 
-                              return (
-                                <div key={index} className="space-y-0">
-                                  {/* Linha do Produto Principal */}
-                                  <div
-                                    className={`flex items-center gap-1 rounded ${
-                                      index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                                    } cursor-pointer`}
-                                    onDoubleClick={() =>
-                                      handleAbrirEdicaoProdutoDetalhes(produto.produtoId)
-                                    }
-                                    title="Duplo clique para editar este produto"
-                                  >
-                                    {/* Quantidade */}
-                                    <div className="w-[60px] flex-shrink-0">
-                                      <span className="block text-center text-xs text-gray-900">
-                                        {Math.floor(produto.quantidade)}
-                                      </span>
-                                    </div>
-                                    {/* Nome do Produto */}
-                                    <div className="min-w-0 flex-[4]">
-                                      <span className="block truncate text-xs text-gray-900">
-                                        {produto.nome}
-                                      </span>
-                                    </div>
-                                    {/* Desconto/Acréscimo */}
-                                    <div className="flex-1">
-                                      <span className="block text-right text-xs text-gray-600">
-                                        {formatarDescontoAcrescimo(produto)}
-                                      </span>
-                                    </div>
-                                    {/* Valor Unitário */}
-                                    <div className="flex-1">
-                                      <span className="block text-right text-xs text-gray-900">
-                                        {formatarNumeroComMilhar(produto.valorUnitario)}
-                                      </span>
-                                    </div>
-                                    {/* Total */}
-                                    <div className="flex-1">
-                                      <span className="block text-right text-xs font-semibold text-gray-900">
-                                        R$ {formatarNumeroComMilhar(totalProdutoComComplementos)}
-                                      </span>
-                                    </div>
-                                  </div>
+                          <div className="flex justify-between rounded-lg bg-white px-1">
+                            <span className="text-gray-600">Total de Itens:</span>
+                            <span className="font-medium">
+                              {produtos.length} {produtos.length === 1 ? 'produto' : 'produtos'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between px-1">
+                            <span className="text-gray-600">Aberto por:</span>
+                            <span className="font-medium">
+                              {formatarUsuarioPorId(detalhesPedidoMeta?.abertoPorId)}
+                            </span>
+                          </div>
+                          {detalhesPedidoMeta?.ultimoResponsavelId && (
+                            <div className="flex justify-between rounded-lg bg-white px-1">
+                              <span className="text-gray-600">Última alteração por:</span>
+                              <span className="font-medium">
+                                {formatarUsuarioPorId(detalhesPedidoMeta.ultimoResponsavelId)}
+                              </span>
+                            </div>
+                          )}
+                          {detalhesPedidoMeta?.canceladoPorId && (
+                            <div className="flex justify-between px-1">
+                              <span className="text-gray-600">Cancelado por:</span>
+                              <span className="font-medium text-red-600">
+                                {formatarUsuarioPorId(detalhesPedidoMeta.canceladoPorId)}
+                              </span>
+                            </div>
+                          )}
+                          {detalhesPedidoMeta?.codigoTerminal && (
+                            <div className="flex justify-between rounded-lg bg-white px-1">
+                              <span className="text-gray-600">Código do terminal:</span>
+                              <span className="font-medium">
+                                {detalhesPedidoMeta.codigoTerminal}
+                              </span>
+                            </div>
+                          )}
+                          {detalhesPedidoMeta?.identificacao && (
+                            <div className="flex justify-between px-1">
+                              <span className="text-gray-600">Identificação:</span>
+                              <span className="font-medium">
+                                {detalhesPedidoMeta.identificacao}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex justify-between rounded-lg bg-white px-1">
+                            <span className="text-gray-600">Solicitar emissão fiscal:</span>
+                            <span className="font-medium">
+                              {detalhesPedidoMeta?.solicitarEmissaoFiscal ? 'Sim' : 'Não'}
+                            </span>
+                          </div>
+                          {detalhesPedidoMeta?.dataUltimaModificacao && (
+                            <div className="flex justify-between px-1">
+                              <span className="text-gray-600">Última modificação:</span>
+                              <span className="font-medium">
+                                {formatarDataDetalhePedido(
+                                  detalhesPedidoMeta.dataUltimaModificacao
+                                )}
+                              </span>
+                            </div>
+                          )}
+                          {detalhesPedidoMeta?.dataUltimoProdutoLancado && (
+                            <div className="flex justify-between rounded-lg bg-white px-1">
+                              <span className="text-gray-600">Último produto lançado:</span>
+                              <span className="font-medium">
+                                {formatarDataDetalhePedido(
+                                  detalhesPedidoMeta.dataUltimoProdutoLancado
+                                )}
+                              </span>
+                            </div>
+                          )}
+                          {detalhesPedidoMeta?.dataFinalizacao && (
+                            <div className="flex justify-between px-1">
+                              <span className="text-gray-600">Data finalização:</span>
+                              <span className="font-medium">
+                                {formatarDataDetalhePedido(detalhesPedidoMeta.dataFinalizacao)}
+                              </span>
+                            </div>
+                          )}
+                          {detalhesPedidoMeta?.dataCancelamento && (
+                            <div className="flex justify-between rounded-lg bg-white px-1">
+                              <span className="text-gray-600">Data cancelamento:</span>
+                              <span className="font-medium text-red-600">
+                                {formatarDataDetalhePedido(detalhesPedidoMeta.dataCancelamento)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
-                                  {/* Linhas dos Complementos */}
-                                  {produto.complementos.map((complemento, compIndex) => {
-                                    const compKey = `comp-${index}-${complemento.grupoId}-${complemento.id}`
-
-                                    return (
-                                      <div
-                                        key={compKey}
-                                        className={`-mt-0.5 flex items-center gap-1 rounded ${
-                                          index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                                        }`}
-                                        style={{ minHeight: '24px' }}
-                                      >
-                                        {/* Quantidade do Complemento */}
-                                        <div className="w-[60px] flex-shrink-0 pl-4">
-                                          <span className="block text-right text-xs text-gray-600">
-                                            {complemento.quantidade}
-                                          </span>
-                                        </div>
-                                        {/* Nome do Complemento com indentação */}
-                                        <div className="min-w-0 flex-[4] pl-4">
-                                          <span className="block truncate text-xs leading-tight text-gray-600">
-                                            {complemento.nome}
-                                          </span>
-                                        </div>
-                                        {/* Espaço vazio para Desconto/Acréscimo (complementos não têm) */}
-                                        <div className="flex-1"></div>
-                                        {/* Valor Unitário do Complemento - Apenas exibição */}
-                                        <div className="flex-1">
-                                          <span className="block text-right text-xs leading-tight text-gray-600">
-                                            {formatarValorComplemento(
-                                              complemento.valor,
-                                              complemento.tipoImpactoPreco
-                                            )}
-                                          </span>
-                                        </div>
-                                        {/* Espaço vazio onde seria o Total (complementos não têm total próprio) */}
-                                        <div className="flex-1"></div>
-                                      </div>
-                                    )
-                                  })}
-                                  <div className="flex justify-start px-6 pb-1 text-[11px] text-gray-500">
-                                    <span>
-                                      Por:{' '}
-                                      {formatarUsuarioPorId(produto.lancadoPorId)} - {formatarDataDetalhePedido(produto.dataLancamento || null)}
-                                    </span>
-                                  </div>
-                                  {produto.removido && (
-                                    <div className="flex justify-between px-1 pb-1 text-[11px] text-red-600">
-                                      <span>
-                                        Removido por:{' '}
-                                        {formatarUsuarioPorId(produto.removidoPorId)}
-                                      </span>
-                                      <span>
-                                        {formatarDataDetalhePedido(produto.dataRemocao || null)}
-                                      </span>
-                                    </div>
-                                  )}
+                    {/* Lista de Produtos (Visualização) */}
+                    {abaDetalhesPedido === 'listaProdutos' && (
+                      <div
+                        className="overflow-hidden rounded-lg border bg-gray-50"
+                        role="tabpanel"
+                        aria-labelledby="tab-detalhes-lista-produtos"
+                      >
+                        <div className="p-2">
+                          <h3 className="mb-2 text-lg font-semibold">Produtos do Pedido</h3>
+                          {produtos.length > 0 ? (
+                            <div className="space-y-1">
+                              {/* Cabeçalho da tabela */}
+                              <div className="mb-2 flex gap-2 border-b border-gray-300 pb-2">
+                                <div className="flex w-[60px] flex-shrink-0 items-center justify-center">
+                                  <span className="text-center text-xs font-semibold text-gray-700">
+                                    Qtd
+                                  </span>
                                 </div>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center py-4">
-                          <p className="text-sm text-gray-500">Nenhum produto selecionado</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  )}
+                                <div className="flex-[4]">
+                                  <span className="text-xs font-semibold text-gray-700">
+                                    Produto
+                                  </span>
+                                </div>
+                                <div className="flex flex-1 justify-end">
+                                  <span className="text-right text-xs font-semibold text-gray-700">
+                                    Desc./Acres.
+                                  </span>
+                                </div>
+                                <div className="flex flex-1 justify-end">
+                                  <span className="text-right text-xs font-semibold text-gray-700">
+                                    Val Unit.
+                                  </span>
+                                </div>
+                                <div className="flex flex-1 justify-end">
+                                  <span className="text-right text-xs font-semibold text-gray-700">
+                                    Total
+                                  </span>
+                                </div>
+                              </div>
+                              {/* Linhas de produtos */}
+                              <div className="space-y-1">
+                                {produtos.map((produto, index) => {
+                                  // Total do produto: usar valorFinal vindo do backend (já calculado com desconto/acréscimo)
+                                  const totalProdutoComComplementos =
+                                    produto.valorFinal !== null && produto.valorFinal !== undefined
+                                      ? produto.valorFinal
+                                      : calcularTotalProduto(produto)
 
-                  {/* Total do Pedido */}
-                  {abaDetalhesPedido === 'listaProdutos' && (
-                  <div className="flex items-center justify-end gap-2">
-                    <span className="text-sm font-semibold text-gray-700">Total do Pedido:</span>
-                    <span className="text-lg font-bold text-primary">
-                      {transformarParaReal(totalProdutos)}
-                    </span>
-                  </div>
-                  )}
+                                  return (
+                                    <div key={index} className="space-y-0">
+                                      {/* Linha do Produto Principal */}
+                                      <div
+                                        className={`flex items-center gap-1 rounded ${
+                                          index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                                        } cursor-pointer`}
+                                        onDoubleClick={() =>
+                                          handleAbrirEdicaoProdutoDetalhes(produto.produtoId)
+                                        }
+                                        title="Duplo clique para editar este produto"
+                                      >
+                                        {/* Quantidade */}
+                                        <div className="w-[60px] flex-shrink-0">
+                                          <span className="block text-center text-xs text-gray-900">
+                                            {Math.floor(produto.quantidade)}
+                                          </span>
+                                        </div>
+                                        {/* Nome do Produto */}
+                                        <div className="min-w-0 flex-[4]">
+                                          <span className="block truncate text-xs text-gray-900">
+                                            {produto.nome}
+                                          </span>
+                                        </div>
+                                        {/* Desconto/Acréscimo */}
+                                        <div className="flex-1">
+                                          <span className="block text-right text-xs text-gray-600">
+                                            {formatarDescontoAcrescimo(produto)}
+                                          </span>
+                                        </div>
+                                        {/* Valor Unitário */}
+                                        <div className="flex-1">
+                                          <span className="block text-right text-xs text-gray-900">
+                                            {formatarNumeroComMilhar(produto.valorUnitario)}
+                                          </span>
+                                        </div>
+                                        {/* Total */}
+                                        <div className="flex-1">
+                                          <span className="block text-right text-xs font-semibold text-gray-900">
+                                            R${' '}
+                                            {formatarNumeroComMilhar(totalProdutoComComplementos)}
+                                          </span>
+                                        </div>
+                                      </div>
 
-                  {abaDetalhesPedido === 'listaProdutos' && resumoFinanceiroDetalhes && (
-                    <div className="rounded-lg border bg-white px-4 py-3">
-                      <h3 className="mb-2 text-lg font-semibold">Resumo Financeiro</h3>
-                      <div className="space-y-1.5 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-700">A - Total de itens lançados (+)</span>
-                          <span className="font-semibold text-gray-900">
-                            {formatarNumeroComMilhar(resumoFinanceiroDetalhes.totalItensLancados)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-700">B - Total de itens cancelados (-)</span>
-                          <span className="font-semibold text-gray-900 line-through">
-                            {formatarNumeroComMilhar(resumoFinanceiroDetalhes.totalItensCancelados)}
-                          </span>
-                        </div>
-                        <div className="mt-1 flex justify-between border-t pt-1.5">
-                          <span className="text-gray-700">C - Total dos itens (A - B)</span>
-                          <span className="font-semibold text-gray-900">
-                            {formatarNumeroComMilhar(resumoFinanceiroDetalhes.totalDosItens)}
-                          </span>
-                        </div>
-                        <div className="mt-3 flex justify-between">
-                          <span className="text-gray-700">Total de descontos na conta</span>
-                          <span className="font-semibold text-gray-900">
-                            {formatarNumeroComMilhar(resumoFinanceiroDetalhes.totalDescontosConta)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-700">Total de acréscimos na conta</span>
-                          <span className="font-semibold text-gray-900">
-                            {formatarNumeroComMilhar(resumoFinanceiroDetalhes.totalAcrescimosConta)}
-                          </span>
+                                      {/* Linhas dos Complementos */}
+                                      {produto.complementos.map((complemento, compIndex) => {
+                                        const compKey = `comp-${index}-${complemento.grupoId}-${complemento.id}`
+
+                                        return (
+                                          <div
+                                            key={compKey}
+                                            className={`-mt-0.5 flex items-center gap-1 rounded ${
+                                              index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                                            }`}
+                                            style={{ minHeight: '24px' }}
+                                          >
+                                            {/* Quantidade do Complemento */}
+                                            <div className="w-[60px] flex-shrink-0 pl-4">
+                                              <span className="block text-right text-xs text-gray-600">
+                                                {complemento.quantidade}
+                                              </span>
+                                            </div>
+                                            {/* Nome do Complemento com indentação */}
+                                            <div className="min-w-0 flex-[4] pl-4">
+                                              <span className="block truncate text-xs leading-tight text-gray-600">
+                                                {complemento.nome}
+                                              </span>
+                                            </div>
+                                            {/* Espaço vazio para Desconto/Acréscimo (complementos não têm) */}
+                                            <div className="flex-1"></div>
+                                            {/* Valor Unitário do Complemento - Apenas exibição */}
+                                            <div className="flex-1">
+                                              <span className="block text-right text-xs leading-tight text-gray-600">
+                                                {formatarValorComplemento(
+                                                  complemento.valor,
+                                                  complemento.tipoImpactoPreco
+                                                )}
+                                              </span>
+                                            </div>
+                                            {/* Espaço vazio onde seria o Total (complementos não têm total próprio) */}
+                                            <div className="flex-1"></div>
+                                          </div>
+                                        )
+                                      })}
+                                      <div className="flex justify-start px-6 pb-1 text-[11px] text-gray-500">
+                                        <span>
+                                          Por: {formatarUsuarioPorId(produto.lancadoPorId)} -{' '}
+                                          {formatarDataDetalhePedido(
+                                            produto.dataLancamento || null
+                                          )}
+                                        </span>
+                                      </div>
+                                      {produto.removido && (
+                                        <div className="flex justify-between px-1 pb-1 text-[11px] text-red-600">
+                                          <span>
+                                            Removido por:{' '}
+                                            {formatarUsuarioPorId(produto.removidoPorId)}
+                                          </span>
+                                          <span>
+                                            {formatarDataDetalhePedido(produto.dataRemocao || null)}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center py-4">
+                              <p className="text-sm text-gray-500">Nenhum produto selecionado</p>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Pagamentos (se status finalizada ou pendente emissão) */}
-                  {abaDetalhesPedido === 'pagamentos' && (
-                      <div className="rounded-lg border bg-white px-4" role="tabpanel" aria-labelledby="tab-detalhes-pagamentos">
+                    {/* Total do Pedido */}
+                    {abaDetalhesPedido === 'listaProdutos' && (
+                      <div className="flex items-center justify-end gap-2">
+                        <span className="text-sm font-semibold text-gray-700">
+                          Total do Pedido:
+                        </span>
+                        <span className="text-lg font-bold text-primary">
+                          {transformarParaReal(totalProdutos)}
+                        </span>
+                      </div>
+                    )}
+
+                    {abaDetalhesPedido === 'listaProdutos' && resumoFinanceiroDetalhes && (
+                      <div className="rounded-lg border bg-white px-4 py-3">
+                        <h3 className="mb-2 text-lg font-semibold">Resumo Financeiro</h3>
+                        <div className="space-y-1.5 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-700">A - Total de itens lançados (+)</span>
+                            <span className="font-semibold text-gray-900">
+                              {formatarNumeroComMilhar(resumoFinanceiroDetalhes.totalItensLancados)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-700">B - Total de itens cancelados (-)</span>
+                            <span className="font-semibold text-gray-900 line-through">
+                              {formatarNumeroComMilhar(
+                                resumoFinanceiroDetalhes.totalItensCancelados
+                              )}
+                            </span>
+                          </div>
+                          <div className="mt-1 flex justify-between border-t pt-1.5">
+                            <span className="text-gray-700">C - Total dos itens (A - B)</span>
+                            <span className="font-semibold text-gray-900">
+                              {formatarNumeroComMilhar(resumoFinanceiroDetalhes.totalDosItens)}
+                            </span>
+                          </div>
+                          <div className="mt-3 flex justify-between">
+                            <span className="text-gray-700">Total de descontos na conta</span>
+                            <span className="font-semibold text-gray-900">
+                              {formatarNumeroComMilhar(
+                                resumoFinanceiroDetalhes.totalDescontosConta
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-700">Total de acréscimos na conta</span>
+                            <span className="font-semibold text-gray-900">
+                              {formatarNumeroComMilhar(
+                                resumoFinanceiroDetalhes.totalAcrescimosConta
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Pagamentos (se status finalizada ou pendente emissão) */}
+                    {abaDetalhesPedido === 'pagamentos' && (
+                      <div
+                        className="rounded-lg border bg-white px-4"
+                        role="tabpanel"
+                        aria-labelledby="tab-detalhes-pagamentos"
+                      >
                         <h3 className="mb-2 text-lg font-semibold">Pagamentos</h3>
 
                         {/* Total Pago e Troco */}
                         <div className="mb-2 border-t pt-2 text-sm">
-                        <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-gray-700">Total do Pedido:</span>
-                    <span className="text-lg font-bold text-primary">
-                      {transformarParaReal(totalProdutos)}
-                    </span>
-                  </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-semibold text-gray-700">
+                              Total do Pedido:
+                            </span>
+                            <span className="text-lg font-bold text-primary">
+                              {transformarParaReal(totalProdutos)}
+                            </span>
+                          </div>
                           <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
                             <span className="font-semibold text-gray-700">Total Pago:</span>
                             <span className="text-base font-bold text-gray-900">
@@ -3980,7 +4035,9 @@ export function NovoPedidoModal({
                           </Label>
                           <div className="flex flex-wrap gap-3">
                             {pagamentos.map((pagamento, index) => {
-                              const meio = meiosPagamento.find(m => m.getId() === pagamento.meioPagamentoId)
+                              const meio = meiosPagamento.find(
+                                m => m.getId() === pagamento.meioPagamentoId
+                              )
                               const nomeMeio =
                                 meio?.getNome() ||
                                 nomesMeiosPagamentoPedido[pagamento.meioPagamentoId] ||
@@ -4019,7 +4076,9 @@ export function NovoPedidoModal({
                             })}
                           </div>
                           {pagamentos.length === 0 && (
-                            <p className="py-4 text-sm text-gray-500">Nenhum pagamento registrado.</p>
+                            <p className="py-4 text-sm text-gray-500">
+                              Nenhum pagamento registrado.
+                            </p>
                           )}
                         </div>
                       </div>
