@@ -28,6 +28,19 @@ interface ConfiguracaoNumeracao {
 
 type AmbienteFiscal = 'HOMOLOGACAO' | 'PRODUCAO'
 
+/** Padrão quando ainda não existe registro no backend (primeiro cadastro de emissão) */
+const VALORES_INICIAIS_EMISSAO = {
+  ambiente: 'PRODUCAO' as AmbienteFiscal,
+  serie: '1',
+  proximoNumero: '1',
+}
+
+/** Exibição no dropdown com acento; o `value` enviado ao backend continua HOMOLOGACAO / PRODUCAO */
+const OPCOES_AMBIENTE: { valor: AmbienteFiscal; label: string }[] = [
+  { valor: 'HOMOLOGACAO', label: 'Homologação' },
+  { valor: 'PRODUCAO', label: 'Produção' },
+]
+
 interface ConfiguracaoEmissorFiscal {
   id?: string
   nfeAtivo: boolean
@@ -53,20 +66,20 @@ export function Etapa3EmissorFiscal() {
     nfceAtivo: false,
   })
   
-  // Formulário NF-e
+  // Formulário NF-e (defaults alinhados ao primeiro cadastro até o load do backend)
   const [nfeForm, setNfeForm] = useState({
-    serie: '',
-    proximoNumero: '',
-    ambiente: '' as AmbienteFiscal | '',
+    serie: VALORES_INICIAIS_EMISSAO.serie,
+    proximoNumero: VALORES_INICIAIS_EMISSAO.proximoNumero,
+    ambiente: VALORES_INICIAIS_EMISSAO.ambiente as AmbienteFiscal | '',
   })
-  
-  // Formulário NFC-e
+
+  // Formulário NFC-e — CSC vazio até vir do backend ou preenchimento manual
   const [nfceForm, setNfceForm] = useState({
-    serie: '',
-    proximoNumero: '',
+    serie: VALORES_INICIAIS_EMISSAO.serie,
+    proximoNumero: VALORES_INICIAIS_EMISSAO.proximoNumero,
     cscId: '',
     cscCodigo: '',
-    ambiente: '' as AmbienteFiscal | '',
+    ambiente: VALORES_INICIAIS_EMISSAO.ambiente as AmbienteFiscal | '',
   })
 
   /**
@@ -144,12 +157,12 @@ export function Etapa3EmissorFiscal() {
             nfeAtivo: nfeAtivoValue,
           }))
         } else {
-          // Se não encontrou configuração, limpar
+          // Primeiro cadastro: sem linha no backend — sugerir produção, série 1 e próxima 1
           setNfeNumeracao(null)
           setNfeForm({
-            serie: '',
-            proximoNumero: '',
-            ambiente: '',
+            serie: VALORES_INICIAIS_EMISSAO.serie,
+            proximoNumero: VALORES_INICIAIS_EMISSAO.proximoNumero,
+            ambiente: VALORES_INICIAIS_EMISSAO.ambiente,
           })
         }
         
@@ -176,16 +189,15 @@ export function Etapa3EmissorFiscal() {
             nfceAtivo: nfce.nfceAtivo ?? false,
           }))
         } else {
-          // Se não encontrou configuração, limpar
+          // Primeiro cadastro: CSC vazio; demais campos com o mesmo padrão da NF-e
           setNfceNumeracao(null)
-          setNfceForm(prev => ({
-            ...prev,
-            serie: '',
-            proximoNumero: '',
+          setNfceForm({
+            serie: VALORES_INICIAIS_EMISSAO.serie,
+            proximoNumero: VALORES_INICIAIS_EMISSAO.proximoNumero,
             cscId: '',
             cscCodigo: '',
-            ambiente: '',
-          }))
+            ambiente: VALORES_INICIAIS_EMISSAO.ambiente,
+          })
         }
       }
       if (!numeracaoResponse.ok) {
@@ -502,20 +514,14 @@ export function Etapa3EmissorFiscal() {
     }
   }
 
+  /** Apenas atualiza o estado local; a troca de ambiente é persistida ao clicar em Salvar configuração. */
   const handleChangeNfeAmbiente = (value: AmbienteFiscal | '') => {
     setNfeForm(prev => ({ ...prev, ambiente: value }))
-
-    if (value !== 'HOMOLOGACAO' && value !== 'PRODUCAO') return
-    if (isSavingNfe) return
-    void handleSaveNfe(value, { showFeedback: false })
   }
 
+  /** Apenas atualiza o estado local; a troca de ambiente é persistida ao clicar em Salvar configuração. */
   const handleChangeNfceAmbiente = (value: AmbienteFiscal | '') => {
     setNfceForm(prev => ({ ...prev, ambiente: value }))
-
-    if (value !== 'HOMOLOGACAO' && value !== 'PRODUCAO') return
-    if (isSavingNfce) return
-    void handleSaveNfce(value, { showFeedback: false })
   }
 
   const handleToggleNfe = async (ativo: boolean) => {
@@ -682,8 +688,11 @@ export function Etapa3EmissorFiscal() {
                   disabled={camposNfeDesabilitados}
                   className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <option value="HOMOLOGACAO">Homologacao</option>
-                  <option value="PRODUCAO">Producao</option>
+                  {OPCOES_AMBIENTE.map(({ valor, label }) => (
+                    <option key={valor} value={valor}>
+                      {label}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -791,8 +800,11 @@ export function Etapa3EmissorFiscal() {
                   disabled={camposNfceDesabilitados}
                   className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <option value="HOMOLOGACAO">Homologacao</option>
-                  <option value="PRODUCAO">Producao</option>
+                  {OPCOES_AMBIENTE.map(({ valor, label }) => (
+                    <option key={valor} value={valor}>
+                      {label}
+                    </option>
+                  ))}
                 </select>
               </div>
 
