@@ -15,6 +15,7 @@ import {
 } from '@/src/presentation/components/ui/select'
 import { MdCheckCircle, MdError, MdSave } from 'react-icons/md'
 import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 
 interface EmpresaData {
   id: string
@@ -488,7 +489,7 @@ export function ConfiguracaoEmpresaCompleta() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="text-secondary-text">Carregando dados da empresa...</div>
+        <JiffyLoading />
       </div>
     )
   }

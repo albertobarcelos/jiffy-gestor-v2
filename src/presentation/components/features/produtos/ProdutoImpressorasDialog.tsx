@@ -11,6 +11,7 @@ import {
 } from '@/src/presentation/components/ui/dialog'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { MdAdd, MdClose, MdDelete, MdPrint, MdSearch, MdEdit } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import {
@@ -363,12 +364,7 @@ export function ProdutoImpressorasDialog({
     if (isLoading) {
       return (
         <div className="flex flex-col items-center justify-center py-8 gap-2">
-          <img
-            src="/images/jiffy-loading.gif"
-            alt="Carregando"
-            className="w-20 object-contain"
-          />
-          <p className="text-sm text-secondary-text text-center">Carregando impressoras...</p>
+          <JiffyLoading />
         </div>
       )
     }
@@ -537,12 +533,7 @@ export function ProdutoImpressorasDialog({
         <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
           {isLoadingAllImpressoras ? (
             <div className="flex flex-col items-center justify-center py-6 gap-2">
-              <img
-                src="/images/jiffy-loading.gif"
-                alt="Carregando"
-                className="w-20 object-contain"
-              />
-              <p className="text-center text-secondary-text text-sm">Carregando impressoras...</p>
+              <JiffyLoading />
             </div>
           ) : filteredSelectableImpressoras.length ? (
             filteredSelectableImpressoras.map((impressora, index) => {

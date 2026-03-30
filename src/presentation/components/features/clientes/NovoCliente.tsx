@@ -15,6 +15,7 @@ import {
 } from '@/src/presentation/components/ui/select'
 import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { MdSearch, MdClear, MdPerson, MdLocationOn } from 'react-icons/md'
 
 interface NovoClienteProps {
@@ -657,12 +658,7 @@ export function NovoCliente({
   if (isLoadingCliente) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-2">
-        <img
-          src="/images/jiffy-loading.gif"
-          alt="Carregando..."
-          className="w-20 h-20"
-        />
-        <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
+        <JiffyLoading />
       </div>
     )
   }

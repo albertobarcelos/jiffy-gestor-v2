@@ -7,6 +7,7 @@ import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import Link from 'next/link'
 import { Produto } from '@/src/domain/entities/Produto'
 import { showToast } from '@/src/shared/utils/toast'
@@ -1658,12 +1659,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
         {/* Mostrar loading quando está carregando e não há produtos ainda */}
         {(isLoading || isFetching || isFetchingNextPage || (localProdutos.length === 0 && !data)) && (
           <div className="flex flex-col items-center justify-center py-12 gap-2">
-            <img
-              src="/images/jiffy-loading.gif"
-              alt="Carregando..."
-              className="w-20 h-20"
-            />
-            <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
+            <JiffyLoading />
           </div>
         )}
 

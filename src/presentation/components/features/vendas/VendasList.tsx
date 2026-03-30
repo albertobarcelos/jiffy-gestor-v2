@@ -13,6 +13,7 @@ import {
   MdFilterList,
 } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { DetalhesVendas } from './DetalhesVendas'
 import { EscolheDatasModal } from './EscolheDatasModal'
 import { GraficoVendasPorUsuarioModal } from './GraficoVendasPorUsuarioModal'
@@ -1178,14 +1179,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           >
             {isLoading && (
               <div className="flex flex-col items-center justify-center py-12">
-                <img
-                  src="/images/jiffy-loading.gif"
-                  alt="Carregando"
-                  className="w-20 object-contain"
-                />
-                <span className="font-nunito text-sm font-medium text-primary-text">
-                  Carregando...
-                </span>
+                <JiffyLoading />
               </div>
             )}
 

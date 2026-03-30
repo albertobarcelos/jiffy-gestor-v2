@@ -12,6 +12,7 @@ import { Etapa5NumeracoesFiscais } from './Etapa4InutilizarNotas'
 import { Etapa5TabelaIbpt } from './Etapa5TabelaIbpt'
 import { ConfiguracaoEmpresaCompleta } from './ConfiguracaoEmpresaCompleta'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 
 /**
  * Componente SectionBox para agrupar conteúdo com título separador
@@ -816,12 +817,8 @@ export function PainelContadorView() {
                       
                       {/* Loading individual para cada etapa - após a seta (se existir) ou após o título */}
                       {estaVerificando && (
-                        <div className="flex-shrink-0 ml-1">
-                          <img 
-                            src="/images/jiffy-loading.gif" 
-                            alt="Carregando..." 
-                            className="w-6 h-6"
-                          />
+                        <div className="ml-1 flex flex-shrink-0 items-center [&>div]:!gap-0 [&>div]:!py-0">
+                          <JiffyLoading className="!gap-0 !py-0" size={24} />
                         </div>
                       )}
                     </button>

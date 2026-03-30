@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
 
 // Siglas dos estados brasileiros em ordem alfabética
@@ -327,12 +328,7 @@ export function EmpresaTab() {
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <img
-          src="/images/jiffy-loading.gif"
-          alt="Carregando"
-          className="w-20 object-contain"
-        />
-        <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
+        <JiffyLoading />
       </div>
     )
   }

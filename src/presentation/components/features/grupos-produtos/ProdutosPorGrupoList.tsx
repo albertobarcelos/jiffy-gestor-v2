@@ -21,6 +21,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { ProdutosTabsModal, ProdutosTabsModalState } from '../produtos/ProdutosTabsModal'
 import { Produto } from '@/src/domain/entities/Produto'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
@@ -394,12 +395,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
       <div ref={listRef} className="flex-1 overflow-y-auto md:px-6 px-1 py-4 space-y-2">
       {isLoading && localProdutos.length === 0 && (
         <div className="flex flex-col items-center justify-center py-8 gap-2">
-          <img
-            src="/images/jiffy-loading.gif"
-            alt="Carregando"
-            className="w-20 object-contain"
-          />
-          <p className="text-sm text-secondary-text text-center">Carregando produtos...</p>
+          <JiffyLoading />
         </div>
       )}
 

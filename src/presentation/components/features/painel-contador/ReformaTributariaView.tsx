@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { ConfigurarReformaTributariaModal } from './ConfigurarReformaTributariaModal'
 
 interface ConfiguracaoReformaTributaria {
@@ -79,7 +80,7 @@ export function ReformaTributariaView() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-secondary-text">Carregando configurações...</div>
+        <JiffyLoading />
       </div>
     )
   }

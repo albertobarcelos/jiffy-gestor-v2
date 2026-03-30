@@ -6,6 +6,7 @@ import { MdAttachMoney, MdRestaurant, MdPrint } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { DetalhesVendas } from './DetalhesVendas'
 import { CircularProgress } from '@mui/material'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { TipoVendaIcon } from './TipoVendaIcon'
 import { formatElapsedTime } from '@/src/shared/utils/formatters'
 // Tipos
@@ -654,14 +655,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
           >
             {isLoading && vendas.length === 0 && (
               <div className="col-span-full flex flex-col items-center justify-center py-12">
-                <img
-                  src="/images/jiffy-loading.gif"
-                  alt="Carregando"
-                  className="w-20 object-contain"
-                />
-                <span className="font-nunito text-sm font-medium text-primary-text">
-                  Carregando...
-                </span>
+                <JiffyLoading />
               </div>
             )}
 

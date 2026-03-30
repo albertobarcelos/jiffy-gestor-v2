@@ -5,6 +5,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { MdClose, MdPhone, MdPrint } from 'react-icons/md'
 import {
   FormControl,
@@ -317,12 +318,7 @@ export function EditarTerminais({
       <div className="flex-1 overflow-y-auto px-[30px] pt-2 pb-0">
           {isLoadingTerminal ? (
             <div className="flex flex-col justify-center items-center py-6">
-              <img
-                src="/images/jiffy-loading.gif"
-                alt="Carregando"
-                className="w-16 h-16 object-contain"
-              />
-              <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
+              <JiffyLoading />
             </div>
           ) : (
             <>

@@ -5,6 +5,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Terminal } from '@/src/domain/entities/Terminal'
 import { MdPhone, MdPowerSettingsNew, MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { TerminaisTabsModal, TerminaisTabsModalState } from './TerminaisTabsModal'
 
 /**
@@ -725,12 +726,7 @@ export function TerminaisTab() {
 
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-8">
-            <img
-              src="/images/jiffy-loading.gif"
-              alt="Carregando"
-              className="w-20 object-contain"
-            />
-            <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
+            <JiffyLoading />
           </div>
         )}
       </div>

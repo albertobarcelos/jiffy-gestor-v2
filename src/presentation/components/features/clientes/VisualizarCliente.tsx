@@ -6,6 +6,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { Button } from '@/src/presentation/components/ui/button'
 import { MdEdit, MdPerson } from 'react-icons/md'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 
 // Funções de formatação
 const formatCPF = (value: string) => {
@@ -112,12 +113,7 @@ export function VisualizarCliente({
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-2">
-        <img
-          src="/images/jiffy-loading.gif"
-          alt="Carregando..."
-          className="w-20 h-20"
-        />
-        <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
+        <JiffyLoading />
       </div>
     )
   }

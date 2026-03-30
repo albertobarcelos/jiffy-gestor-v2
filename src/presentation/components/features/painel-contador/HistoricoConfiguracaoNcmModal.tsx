@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader } from '@/src/presentation/componen
 import { Button } from '@/src/presentation/components/ui/button'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 
 interface ConfiguracaoImpostoNcmHistorico {
   id: string
@@ -236,7 +237,7 @@ export function HistoricoConfiguracaoNcmModal({
 
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <div className="text-secondary-text">Carregando histórico...</div>
+            <JiffyLoading />
           </div>
         ) : historico.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8">

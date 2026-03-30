@@ -14,6 +14,7 @@ import {
   DialogActions,
 } from '@mui/material'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { TipoVendaIcon } from './TipoVendaIcon'
 import { useCancelarVendaGestor } from '@/src/presentation/hooks/useVendas'
 import { StatusFiscalBadge } from '@/src/presentation/components/features/nfe/StatusFiscalBadge'
@@ -896,14 +897,7 @@ export function DetalhesVendas({
         <div className="flex-1 overflow-y-auto bg-info py-2 md:px-2">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-12">
-              <img
-                src="/images/jiffy-loading.gif"
-                alt="Carregando"
-                className="w-20 object-contain"
-              />
-              <span className="font-nunito text-sm font-medium text-primary-text">
-                Carregando...
-              </span>
+              <JiffyLoading />
             </div>
           ) : venda ? (
             <>

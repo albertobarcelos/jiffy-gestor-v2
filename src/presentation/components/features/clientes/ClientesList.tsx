@@ -7,6 +7,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { ClientesTabsModal, ClientesTabsModalState } from './ClientesTabsModal'
 import { MdSearch, MdVisibility } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 
 interface ClientesListProps {
   onReload?: () => void
@@ -380,12 +381,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
         {/* Loading inicial */}
         {(isLoading || !hasLoadedInitialRef.current) && clientes.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 gap-2">
-            <img
-              src="/images/jiffy-loading.gif"
-              alt="Carregando..."
-              className="w-20 h-20"
-            />
-            <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
+            <JiffyLoading />
           </div>
         )}
 

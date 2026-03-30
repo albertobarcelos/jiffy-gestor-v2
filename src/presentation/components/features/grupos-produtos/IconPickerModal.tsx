@@ -3,6 +3,7 @@ import { Icon } from '@mdi/react' // Importa o componente Icon do @mdi/react
 import { mdiClose, mdiMagnify } from '@mdi/js' // Importa os paths dos ícones MDI específicos
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 
 interface IconData {
   name: string
@@ -177,12 +178,7 @@ export function IconPickerModal({
         <div className="flex-1 overflow-y-auto p-4">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center h-full gap-2">
-              <img
-                src="/images/jiffy-loading.gif"
-                alt="Carregando"
-                className="w-16 h-16 object-contain"
-              />
-              <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
+              <JiffyLoading />
             </div>
           ) : filteredIcons.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center">

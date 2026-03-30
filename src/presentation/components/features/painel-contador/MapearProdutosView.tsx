@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { ConfigurarNcmModal } from './ConfigurarNcmModal'
 import { HistoricoConfiguracaoNcmModal } from './HistoricoConfiguracaoNcmModal'
 import { CopiarConfiguracaoNcmModal } from './CopiarConfiguracaoNcmModal'
@@ -251,7 +252,7 @@ export function MapearProdutosView() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-secondary-text">Carregando configurações de impostos...</div>
+        <JiffyLoading />
       </div>
     )
   }

@@ -6,6 +6,7 @@ import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Label } from '@/src/presentation/components/ui/label'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 
 type InutilizacaoItem = {
   inutilizacaoId: string
@@ -469,7 +470,9 @@ export function Etapa5NumeracoesFiscais() {
         <h4 className="font-exo font-semibold text-alternate text-sm mb-2">Lacunas detectadas</h4>
 
         {isLoadingGaps ? (
-          <p className="text-xs text-secondary-text">Carregando lacunas...</p>
+          <div className="flex justify-start py-1">
+            <JiffyLoading className="!gap-0 !py-0" size={24} />
+          </div>
         ) : !gapsData ? (
           <p className="text-xs text-secondary-text">Faça uma consulta para ver as lacunas.</p>
         ) : (
@@ -569,7 +572,9 @@ export function Etapa5NumeracoesFiscais() {
         <h4 className="font-exo font-semibold text-alternate text-sm mb-2">Histórico de inutilizações</h4>
 
         {isLoadingHistorico ? (
-          <p className="text-xs text-secondary-text">Carregando histórico...</p>
+          <div className="flex justify-start py-1">
+            <JiffyLoading className="!gap-0 !py-0" size={24} />
+          </div>
         ) : !historicoDisponivel ? (
           <p className="text-xs text-secondary-text">
             Histórico de inutilizações indisponível na API atual.

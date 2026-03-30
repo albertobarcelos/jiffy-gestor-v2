@@ -7,6 +7,7 @@ import { transformarParaReal, brToEUA } from '@/src/shared/utils/formatters'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Checkbox } from '@/src/presentation/components/ui/checkbox'
@@ -1211,12 +1212,7 @@ export function AtualizarPrecoLote() {
       <div className="flex-1 overflow-auto py-2">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-12 gap-2">
-            <img
-              src="/images/jiffy-loading.gif"
-              alt="Carregando..."
-              className="w-20 h-20"
-            />
-            <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
+            <JiffyLoading />
           </div>
         ) : produtos.length === 0 ? (
           <div className="text-center py-12">

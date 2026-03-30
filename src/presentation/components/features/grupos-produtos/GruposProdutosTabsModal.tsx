@@ -3,6 +3,7 @@
 import { Suspense } from 'react'
 import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
 import { NovoGrupo } from './NovoGrupo'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 
 type TabKey = 'grupo'
 
@@ -90,14 +91,7 @@ export function GruposProdutosTabsModal({
               <Suspense
                 fallback={
                   <div className="flex flex-col items-center justify-center py-12 gap-2">
-                    <img
-                      src="/images/jiffy-loading.gif"
-                      alt="Carregando"
-                      className="w-16 h-16 object-contain"
-                    />
-                    <span className="text-sm font-medium font-nunito text-primary-text">
-                      Carregando...
-                    </span>
+                    <JiffyLoading />
                   </div>
                 }
               >
