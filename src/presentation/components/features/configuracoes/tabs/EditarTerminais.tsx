@@ -46,6 +46,7 @@ interface TerminalPreferences {
     name: string
   }
   compartilharMesas: boolean
+  fiscalAtivo?: boolean
 }
 
 /**
@@ -65,6 +66,7 @@ export function EditarTerminais({
   const [modeloDispositivo, setModeloDispositivo] = useState('')
   const [versaoApk, setVersaoApk] = useState('')
   const [compartilhaValue, setCompartilhaValue] = useState(false)
+  const [fiscalAtivoValue, setFiscalAtivoValue] = useState(false)
   const [impressoraSelecionadaId, setImpressoraSelecionadaId] = useState<string>('')
 
   // Estados de UI
@@ -195,6 +197,7 @@ export function EditarTerminais({
 
       // Preenche preferências
       setCompartilhaValue(data.compartilharMesas || false)
+      setFiscalAtivoValue(!!data.fiscalAtivo)
       if (data.impressoraFinalizacao?.id) {
         setImpressoraSelecionadaId(data.impressoraFinalizacao.id)
       }
@@ -260,11 +263,13 @@ export function EditarTerminais({
       }
 
       // 2. Atualizar preferências
-      const fields: any = {}
+      const fields: Record<string, unknown> = {
+        compartilharMesas: compartilhaValue,
+        fiscalAtivo: fiscalAtivoValue,
+      }
       if (impressoraSelecionadaId) {
         fields.impressoraFinalizacaoId = impressoraSelecionadaId
       }
-      fields.compartilharMesas = compartilhaValue
 
       const preferencesResponse = await fetch(`/api/preferencias-terminal`, {
         method: 'PUT',
@@ -323,13 +328,13 @@ export function EditarTerminais({
           ) : (
             <>
               {/* Seção 1: Informações Gerais */}
-              <div className="mb-4">
-                <h3 className="text-primary text-base font-bold font-nunito mb-4">
+              <div className="mb-2">
+                <h3 className="text-primary text-base font-bold font-nunito mb-2">
                   Informações Gerais
                 </h3>
 
                 {/* Header Visual com ícone */}
-                <div className="flex items-center gap-3 mb-5">
+                <div className="flex items-center gap-3 mb-2">
                   <div className="w-10 h-10 rounded-full bg-custom-2 flex items-center justify-center">
                     <MdPhone className="text-primary" size={20} />
                   </div>
@@ -339,7 +344,7 @@ export function EditarTerminais({
                 </div>
 
                 {/* Campo Nome do Terminal */}
-                <div className="mb-5">
+                <div className="mb-2">
                   <label className="block text-sm font-semibold text-primary-text mb-2 font-nunito">
                     Nome do Terminal
                   </label>
@@ -469,8 +474,50 @@ export function EditarTerminais({
                     )}
                   </div>
 
-                  {/* Dropdown de Impressora (Lado Direito) */}
+                  {/* Fiscal ativo (lado direito, alinhado à impressora) */}
                   <div className="flex-1">
+                    <Box
+                      sx={{
+                        backgroundColor: 'rgba(238, 238, 245, 1)',
+                        borderRadius: '8px',
+                        p: 2,
+                      }}
+                    >
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={fiscalAtivoValue}
+                            onChange={(e) => setFiscalAtivoValue(e.target.checked)}
+                            sx={{
+                              '& .MuiSwitch-switchBase.Mui-checked': {
+                                color: '#F5F5F5',
+                              },
+                              '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                                backgroundColor: '#003366',
+                                opacity: 1,
+                              },
+                            }}
+                          />
+                        }
+                        label={
+                          <div>
+                            <div className="text-sm font-semibold font-exo text-primary-text">
+                              Fiscal ativo
+                            </div>
+                            <div className="text-xs font-nunito text-secondary-text">
+                              Habilita operações fiscais neste terminal PDV
+                            </div>
+                          </div>
+                        }
+                        sx={{ margin: 0 }}
+                      />
+                    </Box>
+                  </div>
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-6 mt-4">
+                  {/* Dropdown de Impressora (largura total em desktop) */}
+                  <div className="flex-1 w-full">
                     <FormControl fullWidth>
                       <InputLabel id="impressora-label">Impressora de Finalização</InputLabel>
                       {loadingImpressoras ? (
