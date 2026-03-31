@@ -1,12 +1,13 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import IconButton from '@mui/material/IconButton'
 import InputAdornment from '@mui/material/InputAdornment'
 import { showToast } from '@/src/shared/utils/toast'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Label } from '@/src/presentation/components/ui/label'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
 import {
   MdDeleteOutline,
   MdSave,
@@ -32,6 +33,7 @@ function mensagemErroApi(body: Record<string, unknown> | null): string {
 }
 
 export function Etapa5TabelaIbpt() {
+  const { auth, isRehydrated } = useAuthStore()
   const [chaveIbpt, setChaveIbpt] = useState('')
   const [isSalvando, setIsSalvando] = useState(false)
   /** Distingue loading de salvar vs remover nos rótulos dos botões */
@@ -39,13 +41,56 @@ export function Etapa5TabelaIbpt() {
   /** Exibe a chave em texto claro apenas enquanto o usuário mantém o ícone pressionado */
   const [revelarChavePressionando, setRevelarChavePressionando] = useState(false)
   const [modalRemoverAberto, setModalRemoverAberto] = useState(false)
+  const [ibptTokenStatus, setIbptTokenStatus] = useState<'CADASTRADO' | 'NAO_CADASTRADO' | null>(
+    null
+  )
+  const [isCarregandoStatusIbpt, setIsCarregandoStatusIbpt] = useState(false)
+
+  const carregarStatusIbpt = useCallback(async () => {
+    if (!isRehydrated) return
+
+    const token = auth?.getAccessToken()
+    if (!token) {
+      setIbptTokenStatus(null)
+      return
+    }
+
+    setIsCarregandoStatusIbpt(true)
+    try {
+      const response = await fetch('/api/v1/fiscal/empresas-fiscais/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (!response.ok) {
+        setIbptTokenStatus(null)
+        return
+      }
+
+      const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
+      const status = data.ibptTokenStatus
+      if (status === 'CADASTRADO' || status === 'NAO_CADASTRADO') {
+        setIbptTokenStatus(status)
+      } else {
+        setIbptTokenStatus(null)
+      }
+    } catch {
+      setIbptTokenStatus(null)
+    } finally {
+      setIsCarregandoStatusIbpt(false)
+    }
+  }, [auth, isRehydrated])
+
+  useEffect(() => {
+    void carregarStatusIbpt()
+  }, [carregarStatusIbpt])
 
   /** Envia apenas ibptToken (merge parcial). `null` remove o token, conforme documentação da API. */
   const enviarIbptToken = async (ibptToken: string | null): Promise<boolean> => {
-    setAcaoEmAndamento(ibptToken === null ? 'remover' : 'salvar')
+    const isRemocao = ibptToken === null || ibptToken === ''
+    setAcaoEmAndamento(isRemocao ? 'remover' : 'salvar')
     setIsSalvando(true)
     const toastId = showToast.loading(
-      ibptToken === null ? 'Removendo chave IBPT...' : 'Salvando chave IBPT...'
+      isRemocao ? 'Removendo chave IBPT...' : 'Salvando chave IBPT...'
     )
 
     try {
@@ -65,11 +110,12 @@ export function Etapa5TabelaIbpt() {
 
       showToast.successLoading(
         toastId,
-        ibptToken === null
+        isRemocao
           ? 'Chave IBPT removida da configuração fiscal.'
           : 'Chave IBPT salva com sucesso.'
       )
       setChaveIbpt('')
+      void carregarStatusIbpt()
       return true
     } catch (error) {
       const msg =
@@ -94,7 +140,7 @@ export function Etapa5TabelaIbpt() {
   }
 
   const handleConfirmarRemocaoIbpt = async () => {
-    const ok = await enviarIbptToken(null)
+    const ok = await enviarIbptToken('')
     if (ok) {
       setModalRemoverAberto(false)
     }
@@ -211,6 +257,26 @@ export function Etapa5TabelaIbpt() {
               <li>Não compartilhe a chave com pessoas fora do seu controle; trate como credencial sensível.</li>
             </ul>
           </div>
+        </div>
+
+        <div className="space-y-2 w-full md:max-w-md">
+          {isCarregandoStatusIbpt ? (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-secondary-text">
+              Verificando status da chave IBPT...
+            </div>
+          ) : ibptTokenStatus === 'CADASTRADO' ? (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              Já existe chave IBPT cadastrada para esta empresa.
+            </div>
+          ) : ibptTokenStatus === 'NAO_CADASTRADO' ? (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-secondary-text">
+              Nenhuma chave IBPT cadastrada. Informe a chave abaixo para habilitar a consulta da tabela.
+            </div>
+          ) : (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-secondary-text">
+              Não foi possível verificar o status da chave IBPT no momento.
+            </div>
+          )}
         </div>
 
         <div className="space-y-2 w-full md:max-w-md">
