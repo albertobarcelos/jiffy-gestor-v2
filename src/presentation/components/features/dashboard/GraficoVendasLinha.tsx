@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useMemo } from 'react'
 import {
   LineChart,
   Line,
@@ -11,8 +11,8 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts'
-import { BuscarEvolucaoVendasUseCase } from '@/src/application/use-cases/dashboard/BuscarEvolucaoVendasUseCase'
-import { DashboardEvolucao } from '@/src/domain/entities/DashboardEvolucao'
+import { calculatePeriodo } from '@/src/shared/utils/dateFilters'
+import { useDashboardEvolucaoQuery } from '@/src/presentation/hooks/useDashboardEvolucaoQuery'
 
 interface GraficoVendasLinhaProps {
   periodo: string;
@@ -26,52 +26,24 @@ interface GraficoVendasLinhaProps {
  * Gráfico de coluna para evolução de vendas
  */
 export function GraficoVendasLinha({ periodo, selectedStatuses, periodoInicial, periodoFinal, intervaloHora = 30 }: GraficoVendasLinhaProps) {
-  const [data, setData] = useState<DashboardEvolucao[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  // Função para mapear o período do frontend para o formato esperado pelo caso de uso
-  const mapPeriodoToUseCaseFormat = (frontendPeriodo: string): string => {
-    switch (frontendPeriodo) {
-      case 'Hoje': return 'hoje';
-      case 'Últimos 7 Dias': return 'semana';
-      case 'Mês Atual': return 'mes';
-      case 'Últimos 30 Dias': return '30dias';
-      case 'Últimos 60 Dias': return '60dias';
-      case 'Últimos 90 Dias': return '90dias';
-      case 'Todos': return 'todos'; // O caso de uso lida com 'todos' retornando datas vazias
-      default: return 'todos'; // Valor padrão seguro
+  const { inicio, fim } = useMemo(() => {
+    if (periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) {
+      return { inicio: periodoInicial, fim: periodoFinal }
     }
-  };
-
-  useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true)
-      setError(null)
-      try {
-        const useCase = new BuscarEvolucaoVendasUseCase()
-        const mappedPeriodo = mapPeriodoToUseCaseFormat(periodo);
-        // Se período for "Datas Personalizadas", usa as datas fornecidas
-        const useCustomDates = periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal;
-        // Se período for "Hoje", também usa o intervalo de hora
-        const useIntervaloHora = periodo === 'Hoje' || useCustomDates;
-        const evolucao = await useCase.execute(
-          mappedPeriodo, 
-          selectedStatuses, 
-          useCustomDates ? periodoInicial : undefined, 
-          useCustomDates ? periodoFinal : undefined,
-          useIntervaloHora ? intervaloHora : undefined
-        )
-        setData(evolucao)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Erro ao carregar dados')
-      } finally {
-        setIsLoading(false)
-      }
+    if (periodo === 'Todos') {
+      return { inicio: null, fim: null }
     }
+    const { inicio: calcInicio, fim: calcFim } = calculatePeriodo(periodo)
+    return { inicio: calcInicio, fim: calcFim }
+  }, [periodo, periodoInicial, periodoFinal])
 
-    loadData()
-  }, [periodo, selectedStatuses, periodoInicial, periodoFinal, intervaloHora])
+  const useIntervaloHora = periodo === 'Hoje' || (periodo === 'Datas Personalizadas' && inicio && fim)
+  const { data, isLoading, error, refetch } = useDashboardEvolucaoQuery({
+    periodoInicial: inicio,
+    periodoFinal: fim,
+    selectedStatuses,
+    intervaloHora: useIntervaloHora ? intervaloHora : undefined,
+  })
 
   const formatCurrency = (value: number) => {
     return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -89,9 +61,9 @@ export function GraficoVendasLinha({ periodo, selectedStatuses, periodoInicial, 
     return (
       <div className="h-full min-h-[300px] flex items-center justify-center">
         <div className="text-center">
-          <p className="text-red-600 mb-4">{error}</p>
+          <p className="text-red-600 mb-4">{error instanceof Error ? error.message : 'Erro ao carregar dados'}</p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => void refetch()}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             Tentar novamente
@@ -111,10 +83,10 @@ export function GraficoVendasLinha({ periodo, selectedStatuses, periodoInicial, 
 
   // Preparar dados para o gráfico
   const chartData = data.map((item) => ({
-    data: item.getData(),
-    label: item.getLabel(),
-    valorFinalizadas: item.getValorFinalizadas(),
-    valorCanceladas: item.getValorCanceladas(),
+    data: item.data,
+    label: item.label,
+    valorFinalizadas: item.valorFinalizadas,
+    valorCanceladas: item.valorCanceladas,
   }))
 
   // Calcula min/max apenas para os valores que serão exibidos

@@ -351,29 +351,6 @@ export function DetalhesVendas({
       let documentoFiscalId = dataRaw.documentoFiscalId ?? null
       let retornoSefaz = dataRaw.retornoSefaz ?? null
 
-      try {
-        const statusEndpoint =
-          tabelaOrigem === 'venda_gestor'
-            ? `/api/vendas/gestor/${vendaId}/status-emissao`
-            : `/api/vendas/${vendaId}/status-emissao`
-
-        const statusResponse = await fetch(statusEndpoint, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-
-        if (statusResponse.ok) {
-          const statusData = await statusResponse.json()
-          statusFiscal = statusData.status ?? statusFiscal
-          documentoFiscalId = statusData.documentoFiscalId ?? documentoFiscalId
-          retornoSefaz = statusData.retornoSefaz ?? retornoSefaz
-        }
-      } catch {
-        // Mantém dados já retornados pela API principal em caso de falha no endpoint de status.
-      }
-
       // Venda do gestor não possui terminal no modelo atual.
       // Evita warning falso-positivo e tentativa de lookup desnecessária.
       let codigoTerminal = ''

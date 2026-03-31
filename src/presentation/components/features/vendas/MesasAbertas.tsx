@@ -111,6 +111,33 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const currentPageRef = useRef(0)
 
+  const resolveTotalCountFromResponse = (data: any): number | null => {
+    const candidates = [data?.count, data?.total, data?.totalCount]
+    for (const c of candidates) {
+      if (typeof c === 'number' && Number.isFinite(c)) return c
+    }
+    // Alguns endpoints podem expor contagem dentro de metricas
+    const m = data?.metricas
+    if (m && typeof m.countVendasEfetivadas === 'number' && Number.isFinite(m.countVendasEfetivadas)) {
+      return m.countVendasEfetivadas
+    }
+    return null
+  }
+
+  const resolveHasNextFromResponse = (data: any, currentPage: number): boolean => {
+    if (typeof data?.hasNext === 'boolean') return data.hasNext
+    if (typeof data?.totalPages === 'number' && Number.isFinite(data.totalPages) && data.totalPages > 0) {
+      return currentPage + 1 < data.totalPages
+    }
+    const count = resolveTotalCountFromResponse(data)
+    const limit = typeof data?.limit === 'number' && Number.isFinite(data.limit) ? data.limit : pageSize
+    if (typeof count === 'number' && count >= 0 && limit > 0) {
+      const totalPages = Math.ceil(count / limit)
+      return currentPage + 1 < totalPages
+    }
+    return false
+  }
+
   /**
    * Formata valor como moeda brasileira
    */
@@ -383,6 +410,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
         }
 
         const data = await response.json()
+        const totalCountFromApi = resolveTotalCountFromResponse(data)
 
         // Debug: verifica se o clienteId está vindo na resposta da listagem
         if (process.env.NODE_ENV === 'development') {
@@ -415,10 +443,16 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
         )
 
         if (resetPage) {
-          setVendas(filteredItems)
+          // Evita duplicidade por possíveis mudanças na paginação/ordenação do backend
+          const uniqueFirstPage = Array.from(
+            new Map(filteredItems.map((v: Venda) => [v.id, v] as const)).values()
+          )
+          setVendas(uniqueFirstPage)
           currentPageRef.current = 1
           setCurrentPage(1)
-          const nextCount = filteredItems.length
+          // A contagem exibida deve refletir o que está listado (cards) para manter consistência visual.
+          // A API pode retornar `count/metricas` divergente do payload de `items` em cenários de concorrência.
+          const nextCount = uniqueFirstPage.length
           if (data.metricas) {
             setMetricas({ ...data.metricas, countVendasEfetivadas: nextCount })
           } else {
@@ -443,7 +477,8 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
           }, 100)
         } else {
           setVendas(prev => {
-            const next = [...prev, ...filteredItems]
+            const merged = [...prev, ...filteredItems]
+            const next = Array.from(new Map(merged.map(v => [v.id, v] as const)).values())
             const nextCount = next.length
             setMetricas(prevMetricas => {
               const base = data.metricas ??
@@ -461,7 +496,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
           setCurrentPage(prev => prev + 1)
         }
 
-        setCanLoadMore(data.hasNext || false)
+        setCanLoadMore(resolveHasNextFromResponse(data, page))
       } catch (error) {
         console.error('Erro ao buscar vendas:', error)
         showToast.error('Erro ao buscar vendas')

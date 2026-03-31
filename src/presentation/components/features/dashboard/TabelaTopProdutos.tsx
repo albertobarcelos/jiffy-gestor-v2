@@ -1,14 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/src/presentation/components/ui/button'
-import { BuscarTopProdutosDetalhadoUseCase } from '@/src/application/use-cases/dashboard/BuscarTopProdutosDetalhadoUseCase'
 import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto'
 import { MdExpandMore, MdExpandLess } from 'react-icons/md'
+import { calculatePeriodo } from '@/src/shared/utils/dateFilters'
+import { useDashboardTopProdutosQuery } from '@/src/presentation/hooks/useDashboardTopProdutosQuery'
 
 interface TabelaTopProdutosProps {
   periodo: string;
-  onDataLoad: (data: DashboardTopProduto[]) => void; // Nova prop
+  onDataLoad?: (data: DashboardTopProduto[]) => void;
+  /** Quando fornecido, evita novo fetch e renderiza a partir do mesmo cache/payload. */
+  dataOverride?: DashboardTopProduto[];
   periodoInicial?: Date | null;
   periodoFinal?: Date | null;
 }
@@ -17,10 +20,13 @@ interface TabelaTopProdutosProps {
  * Tabela de top produtos vendidos
  * Design clean e minimalista usando divs e flexbox
  */
-export function TabelaTopProdutos({ periodo, onDataLoad, periodoInicial, periodoFinal }: TabelaTopProdutosProps) {
-  const [data, setData] = useState<DashboardTopProduto[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+export function TabelaTopProdutos({
+  periodo,
+  onDataLoad,
+  dataOverride,
+  periodoInicial,
+  periodoFinal,
+}: TabelaTopProdutosProps) {
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set())
 
   // Função para mapear o período do frontend para o formato esperado pelo caso de uso
@@ -37,27 +43,31 @@ export function TabelaTopProdutos({ periodo, onDataLoad, periodoInicial, periodo
     }
   };
 
-  useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true)
-      setError(null)
-      try {
-        const useCase = new BuscarTopProdutosDetalhadoUseCase()
-        const mappedPeriodo = mapPeriodoToUseCaseFormat(periodo);
-        // Se período for "Datas Personalizadas", usa as datas fornecidas
-        const useCustomDates = periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal;
-        const produtos = await useCase.execute(mappedPeriodo, 10, useCustomDates ? periodoInicial : undefined, useCustomDates ? periodoFinal : undefined)
-        setData(produtos)
-        onDataLoad(produtos); 
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Erro ao carregar dados')
-      } finally {
-        setIsLoading(false)
-      }
+  const { inicio, fim } = useMemo(() => {
+    if (periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) {
+      return { inicio: periodoInicial, fim: periodoFinal }
     }
+    if (periodo === 'Todos') return { inicio: null, fim: null }
+    const { inicio: calcInicio, fim: calcFim } = calculatePeriodo(periodo)
+    return { inicio: calcInicio, fim: calcFim }
+  }, [periodo, periodoInicial, periodoFinal])
 
-    loadData()
-  }, [periodo, onDataLoad, periodoInicial, periodoFinal])
+  const mappedPeriodo = mapPeriodoToUseCaseFormat(periodo)
+  const { data: queryData, isLoading: queryLoading, error: queryError, refetch } = useDashboardTopProdutosQuery({
+    periodo: mappedPeriodo,
+    limit: 10,
+    periodoInicial: inicio,
+    periodoFinal: fim,
+    enabled: !dataOverride,
+  })
+
+  const data = dataOverride ?? queryData
+  const isLoading = dataOverride ? false : queryLoading
+  const error = dataOverride ? null : queryError
+
+  useEffect(() => {
+    if (data && onDataLoad) onDataLoad(data)
+  }, [data, onDataLoad])
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -90,8 +100,8 @@ export function TabelaTopProdutos({ periodo, onDataLoad, periodoInicial, periodo
     return (
       <div className="h-64 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-red-600 mb-4">{error}</p>
-          <Button onClick={() => window.location.reload()} variant="contained">
+          <p className="text-red-600 mb-4">{error instanceof Error ? error.message : 'Erro ao carregar dados'}</p>
+          <Button onClick={() => void refetch()} variant="contained">
             Tentar novamente
           </Button>
         </div>

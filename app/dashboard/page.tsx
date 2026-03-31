@@ -1,13 +1,15 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { Suspense, useState, useRef, useEffect } from 'react'
+import { Suspense, useMemo, useState, useRef, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react'; // Importa os ícones
 import { Skeleton, FormControl, Select, MenuItem, FormGroup, FormControlLabel, Checkbox, Popover } from '@mui/material'
 import { motion } from 'framer-motion'; // Importar motion do Framer Motion
 import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto' // Importar a entidade
 import { EscolheDatasModal } from '@/src/presentation/components/features/vendas/EscolheDatasModal'
 import { MdCalendarToday } from 'react-icons/md'
+import { calculatePeriodo } from '@/src/shared/utils/dateFilters'
+import { useDashboardTopProdutosQuery } from '@/src/presentation/hooks/useDashboardTopProdutosQuery'
 
 // Função para obter o label do período
 const getPeriodoLabel = (periodo: string, dataInicial?: Date | null, dataFinal?: Date | null): string => {
@@ -133,7 +135,6 @@ const UltimasVendas = dynamic(
 export default function DashboardPage() {
   const [periodo, setPeriodo] = useState('Últimos 7 Dias'); // Estado para o período
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['FINALIZADA']); // Estado para os status selecionados
-  const [topProdutosData, setTopProdutosData] = useState<DashboardTopProduto[]>([]); // Novo estado para os top produtos
   const [periodoInicial, setPeriodoInicial] = useState<Date | null>(null); // Estado para data inicial personalizada
   const [periodoFinal, setPeriodoFinal] = useState<Date | null>(null); // Estado para data final personalizada
   const [isDatasModalOpen, setIsDatasModalOpen] = useState(false); // Estado para controlar o modal de datas
@@ -215,6 +216,35 @@ export default function DashboardPage() {
     setIsDatasModalOpen(false)
     setAnchorEl(null)
   };
+
+  const { inicio: topInicio, fim: topFim } = useMemo(() => {
+    if (periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) {
+      return { inicio: periodoInicial, fim: periodoFinal }
+    }
+    if (periodo === 'Todos') return { inicio: null, fim: null }
+    const { inicio, fim } = calculatePeriodo(periodo)
+    return { inicio, fim }
+  }, [periodo, periodoInicial, periodoFinal])
+
+  const mapPeriodoToTopProdutos = (frontendPeriodo: string): string => {
+    switch (frontendPeriodo) {
+      case 'Hoje': return 'hoje'
+      case 'Últimos 7 Dias': return 'semana'
+      case 'Mês Atual': return 'mes'
+      case 'Últimos 30 Dias': return '30dias'
+      case 'Últimos 60 Dias': return '60dias'
+      case 'Últimos 90 Dias': return '90dias'
+      case 'Todos': return 'todos'
+      default: return 'todos'
+    }
+  }
+
+  const { data: topProdutosData } = useDashboardTopProdutosQuery({
+    periodo: mapPeriodoToTopProdutos(periodo),
+    limit: 10,
+    periodoInicial: topInicio,
+    periodoFinal: topFim,
+  })
 
   return (
     <motion.div
@@ -492,9 +522,9 @@ export default function DashboardPage() {
               <Suspense fallback={<Skeleton variant="rectangular" height={400} />}>
                 <TabelaTopProdutos 
                   periodo={periodo} 
-                  onDataLoad={setTopProdutosData}
                   periodoInicial={periodoInicial}
                   periodoFinal={periodoFinal}
+                  dataOverride={topProdutosData ?? []}
                 />
               </Suspense>
             </div>
@@ -506,7 +536,7 @@ export default function DashboardPage() {
                 <p className="text-xs md:text-sm text-primary/70">Distribuição dos Top Produtos</p>
               </div>
               <Suspense fallback={<Skeleton variant="rectangular" height={400} />}>
-                <GraficoTopProdutos data={topProdutosData} />
+                <GraficoTopProdutos data={topProdutosData ?? []} />
               </Suspense>
             </div>
 
@@ -517,7 +547,7 @@ export default function DashboardPage() {
                 <p className="text-xs md:text-sm text-primary/70">Distribuição por Valor</p>
               </div>
               <Suspense fallback={<Skeleton variant="rectangular" height={400} />}>
-                <GraficoTopProdutosValor data={topProdutosData} />
+                <GraficoTopProdutosValor data={topProdutosData ?? []} />
               </Suspense>
             </div>
           </motion.div>

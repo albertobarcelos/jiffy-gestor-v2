@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import { Venda } from '@/src/domain/entities/Venda'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { DetalhesVendas } from '@/src/presentation/components/features/vendas/DetalhesVendas'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 import { calculatePeriodo } from '@/src/shared/utils/dateFilters' // Importar calculatePeriodo
+import { useDashboardUltimasVendasQuery } from '@/src/presentation/hooks/useDashboardUltimasVendasQuery'
 
 interface UserNamesMap {
   [key: string]: string
@@ -35,12 +35,6 @@ interface UltimasVendasProps {
  * Design clean inspirado no exemplo
  */
 export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: UltimasVendasProps) {
-  const [vendas, setVendas] = useState<Venda[]>([])
-  const [userNames, setUserNames] = useState<UserNamesMap>({})
-  const [vendasExtraInfo, setVendasExtraInfo] = useState<Map<string, VendaExtraInfo>>(new Map())
-  const [isLoading, setIsLoading] = useState(true)
-  const { auth } = useAuthStore()
-
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedVendaId, setSelectedVendaId] = useState<string | null>(null)
 
@@ -92,60 +86,34 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
     }
   }
 
-  useEffect(() => {
-    const loadVendas = async () => {
-      setIsLoading(true)
-      try {
-        const token = auth?.getAccessToken()
-        if (!token) {
-          setIsLoading(false)
-          return
-        }
+  const { inicio, fim } = useMemo(() => {
+    // Se período for "Datas Personalizadas" e datas foram fornecidas, usa elas
+    if (periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) {
+      return { inicio: periodoInicial, fim: periodoFinal }
+    }
 
-        // Buscar últimas vendas da API
-        const baseUrl = process.env.NEXT_PUBLIC_EXTERNAL_API_BASE_URL || ''
+    const mappedPeriodo = mapPeriodoToCalculateFormat(periodo)
+    // "Todos" => não aplica filtro
+    if (mappedPeriodo === 'Todos') return { inicio: null, fim: null }
 
-        // Buscar apenas vendas finalizadas (sem canceladas), ordenadas por data (mais recentes primeiro)
-        const params = new URLSearchParams({
-          limit: '100', // Aumentado para buscar mais vendas no período
-          offset: '0',
-        })
+    const { inicio: calcInicio, fim: calcFim } = calculatePeriodo(mappedPeriodo)
+    return { inicio: calcInicio, fim: calcFim }
+  }, [periodo, periodoInicial, periodoFinal])
 
-        // Se período for "Datas Personalizadas" e datas foram fornecidas, usa elas
-        if (periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) {
-          params.append('periodoInicial', periodoInicial.toISOString())
-          params.append('periodoFinal', periodoFinal.toISOString())
-        } else {
-          // Caso contrário, calcula com base no período
-          const mappedPeriodo = mapPeriodoToCalculateFormat(periodo)
-          const { inicio, fim } = calculatePeriodo(mappedPeriodo)
+  const { data, isLoading, error, refetch } = useDashboardUltimasVendasQuery({
+    periodoInicial: inicio,
+    periodoFinal: fim,
+    limit: 100,
+  })
 
-          // Só adiciona parâmetros de data se não for "Todos"
-          if (mappedPeriodo !== 'Todos' && inicio && fim) {
-            params.append('periodoInicial', inicio.toISOString())
-            params.append('periodoFinal', fim.toISOString())
-          }
-        }
+  const { vendas, vendasExtraInfo } = useMemo(() => {
+    const items = data?.items ?? []
+    if (!items.length) {
+      return { vendas: [] as Venda[], vendasExtraInfo: new Map<string, VendaExtraInfo>() }
+    }
 
-        // Filtrar apenas vendas FINALIZADAS (sem canceladas)
-        params.append('status', 'FINALIZADA')
-
-        const response = await fetch(`${baseUrl}/api/v1/operacao-pdv/vendas?${params}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-
-        if (!response.ok) {
-          throw new Error(`Erro ao buscar vendas: ${response.status}`)
-        }
-
-        const data = await response.json()
-
-        // Mapear dados da API para entidade Venda, extraindo userId
-        const extraInfoMap = new Map<string, VendaExtraInfo>()
-        const vendasMapeadas: Venda[] = (data.items || []).map((item: any) => {
+    const extraInfoMap = new Map<string, VendaExtraInfo>()
+    const vendasMapeadas: Venda[] = (items || []).map((item: any) => {
           const userId =
             item.abertoPor?.id ||
             item.usuarioPdv?.id ||
@@ -247,68 +215,13 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
             dataFinalizacao
           )
         })
-
-        setVendasExtraInfo(extraInfoMap)
-
-        // Ordenar as vendas pela data de finalização mais recente (ou data de abertura se não houver finalização)
-        const ultimasVendas = vendasMapeadas.sort((a, b) => {
-          const dataA = a.getDataFinalizacao() || a.getData()
-          const dataB = b.getDataFinalizacao() || b.getData()
-          return dataB.getTime() - dataA.getTime()
-        })
-
-        setVendas(ultimasVendas)
-
-        // Coletar IDs de usuários únicos
-        const uniqueUserIds = [
-          ...new Set(ultimasVendas.map(v => v.getUserId()).filter(id => id !== '')),
-        ]
-
-        // Buscar nomes dos usuários PDV
-        if (uniqueUserIds.length > 0) {
-          try {
-            const userNamesResponses: UserPdvApiResponse[] = await Promise.all(
-              uniqueUserIds.map(id => {
-                const userPdvUrl = `${baseUrl}/api/v1/pessoas/usuarios-pdv/${id}`
-                return fetch(userPdvUrl, {
-                  headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                  },
-                }).then((res: Response) => {
-                  if (!res.ok) {
-                    console.error(
-                      `Erro ao buscar usuário PDV ${id}: ${res.status} ${res.statusText}`
-                    )
-                    return { id: '', nome: '' } // Retorna objeto com estrutura mínima (direto)
-                  }
-                  return res.json() as Promise<UserPdvApiResponse>
-                })
-              })
-            )
-
-            const newUserNamesMap: UserNamesMap = {}
-            userNamesResponses.forEach((user: UserPdvApiResponse) => {
-              if (user && user.id && user.nome) {
-                newUserNamesMap[user.id] = user.nome
-              }
-            })
-            setUserNames(newUserNamesMap)
-          } catch (userError) {
-            console.error('Erro ao buscar nomes dos usuários PDV:', userError)
-          }
-        }
-      } catch (error) {
-        console.error('Erro ao carregar vendas:', error)
-        // Em caso de erro, manter array vazio ao invés de dados mockados
-        setVendas([])
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadVendas()
-  }, [auth, periodo, periodoInicial, periodoFinal])
+    const ultimasVendas = vendasMapeadas.sort((a, b) => {
+      const dataA = a.getDataFinalizacao() || a.getData()
+      const dataB = b.getDataFinalizacao() || b.getData()
+      return dataB.getTime() - dataA.getTime()
+    })
+    return { vendas: ultimasVendas, vendasExtraInfo: extraInfoMap }
+  }, [data])
 
   if (isLoading) {
     return (
@@ -322,6 +235,26 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
       </div>
     )
   }
+
+  if (error) {
+    return (
+      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">
+            {error instanceof Error ? error.message : 'Erro ao carregar vendas'}
+          </p>
+          <button
+            onClick={() => void refetch()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const userNames = data?.userNames ?? {}
 
   return (
     <>
