@@ -97,6 +97,8 @@ export class VendaUnificadaDTO {
     public readonly serieFiscal?: string | null,
     public readonly dataEmissaoFiscal?: string | null,
     public readonly tipoDocFiscal?: 'NFE' | 'NFCE' | null,
+    /** Modelo SEFAZ (55 NF-e, 65 NFC-e) quando a API envia explícito */
+    public readonly modelo?: 55 | 65 | null,
     public readonly retornoSefaz?: string | null
   ) {}
 
@@ -154,6 +156,24 @@ export class VendaUnificadaDTO {
   }
 }
 
+/** Normaliza `modelo` numérico da API para 55 | 65 | null */
+function parseModeloFiscalApi(raw: unknown): 55 | 65 | null {
+  const n = typeof raw === 'number' ? raw : Number(raw)
+  if (n === 55 || n === 65) return n as 55 | 65
+  return null
+}
+
+/**
+ * Modelo para POST emitir-nota quando já houve tentativa (ex.: REJEITADA sem documentoId).
+ * Prioriza `modelo` vindo da API; senão infere de `tipoDocFiscal` (NFE → 55, NFCE → 65).
+ */
+export function resolveModeloParaEmitirNota(v: VendaUnificadaDTO): 55 | 65 | null {
+  if (v.modelo === 55 || v.modelo === 65) return v.modelo
+  if (v.tipoDocFiscal === 'NFE') return 55
+  if (v.tipoDocFiscal === 'NFCE') return 65
+  return null
+}
+
 /**
  * Parâmetros alinhados ao contrato do backend GET /vendas/unificado:
  * - origem, statusFiscal, periodoInicial, periodoFinal (dataCriacao)
@@ -209,6 +229,7 @@ function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): VendaUnif
     v.serieFiscal as string | null | undefined,
     v.dataEmissaoFiscal as string | null | undefined,
     v.tipoDocFiscal as VendaUnificadaDTO['tipoDocFiscal'],
+    parseModeloFiscalApi(v.modelo),
     v.retornoSefaz as string | null | undefined
   )
 }

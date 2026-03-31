@@ -17,10 +17,13 @@ import {
   useDesmarcarEmissaoFiscal,
   useReemitirNfe,
   useReemitirNfeGestor,
+  useEmitirNfe,
+  useEmitirNfeGestor,
 } from '@/src/presentation/hooks/useVendas'
 import {
   useVendasUnificadas,
   VendaUnificadaDTO,
+  resolveModeloParaEmitirNota,
 } from '@/src/presentation/hooks/useVendasUnificadas'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { calculatePeriodo } from '@/src/shared/utils/dateFilters'
@@ -85,7 +88,7 @@ function statusFiscalAguardandoSefaz(v: VendaUnificadaDTO): boolean {
 /**
  * Borda esquerda e fundo do card conforme coluna e statusFiscal.
  * Finalizadas: primary. Pendente/Com nota: fiscal (emitida/cancelada/rejeitada), sem status na pendente → amarelo,
- * reemitindo ou aguardando SEFAZ → custom-2.
+ * reemitindo, emitindo (emitir-nota direto) ou aguardando SEFAZ → custom-2.
  */
 function getCardBorderEFundoKanban(
   columnId: ColunaKanbanId,
@@ -96,7 +99,8 @@ function getCardBorderEFundoKanban(
     return { borderClass: 'border-l-primary', cardBgClass: 'bg-white' }
   }
 
-  if (acaoFiscalEmAndamentoPorVenda[v.id] === 'reemitindo') {
+  const acao = acaoFiscalEmAndamentoPorVenda[v.id]
+  if (acao === 'reemitindo' || acao === 'emitindo') {
     return { borderClass: 'border-l-custom-2', cardBgClass: 'bg-white' }
   }
 
@@ -542,6 +546,8 @@ export function FiscalFlowKanban() {
   const desmarcarEmissaoFiscal = useDesmarcarEmissaoFiscal()
   const reemitirNfePdv = useReemitirNfe()
   const reemitirNfeGestor = useReemitirNfeGestor()
+  const emitirNotaPdv = useEmitirNfe()
+  const emitirNotaGestor = useEmitirNfeGestor()
 
   // REJEITADA com solicitarEmissaoFiscal false: reativa com o mesmo PATCH de "marcar emissão" (useMarcarEmissaoFiscal)
   useEffect(() => {
@@ -618,11 +624,12 @@ export function FiscalFlowKanban() {
   }
 
   /**
-   * Etapa do card no Kanban. Durante reemissão (botão "Reemitindo..."), exibe em Com nota solicitada;
-   * ao concluir, volta a usar `getEtapaKanban()` (emitida permanece na coluna; rejeitada retorna a Pendente emissão).
+   * Etapa do card no Kanban. Durante reemissão ("Reemitindo...") ou emissão direta ("Emitindo..."),
+   * exibe em Com nota solicitada; ao concluir, volta a usar `getEtapaKanban()`.
    */
   const getEtapaKanbanParaExibicao = (v: Venda): string => {
-    if (acaoFiscalEmAndamentoPorVenda[v.id] === 'reemitindo') {
+    const acao = acaoFiscalEmAndamentoPorVenda[v.id]
+    if (acao === 'reemitindo' || acao === 'emitindo') {
       return 'COM_NFE'
     }
     return v.getEtapaKanban()
@@ -894,37 +901,64 @@ export function FiscalFlowKanban() {
         ? Number(venda.numeroFiscal)
         : undefined
 
-    // Reemissão: POST reemitir-nota com `documentId` + `numero` opcional (contrato validado no backend).
+    // REJEITADA: com documento → reemitir-nota; sem documento mas com modelo/tipoDoc → emitir-nota direto; sem modelo → modal.
     if (venda.statusFiscal === 'REJEITADA') {
       const docId = venda.documentoFiscalId?.trim()
-      if (!docId) {
-        showToast.error('Documento fiscal não encontrado para esta venda. Não é possível reemitir.')
-        return
+      if (docId) {
+        // Reemissão: POST reemitir-nota com `documentId`; `numero` opcional.
+        pinVendaComoPrimeiraEmComNotaSolicitada(venda)
+
+        setAcaoFiscalEmAndamento(venda.id, 'reemitindo')
+        try {
+          const payload = {
+            id: venda.id,
+            documentId: docId,
+            ...(numeroNotaRejeitada != null ? { numero: numeroNotaRejeitada } : {}),
+          }
+          if (venda.tabelaOrigem === 'venda_gestor') {
+            await reemitirNfeGestor.mutateAsync(payload)
+          } else {
+            await reemitirNfePdv.mutateAsync(payload)
+          }
+          await refetch()
+          await refetchAteMudarStatusFiscal(venda.id, 'REJEITADA')
+          return
+        } catch (error) {
+          console.error('Erro ao tentar reemitir:', error)
+          return
+        } finally {
+          setAcaoFiscalEmAndamento(venda.id, null)
+        }
       }
 
-      pinVendaComoPrimeiraEmComNotaSolicitada(venda)
-
-      setAcaoFiscalEmAndamento(venda.id, 'reemitindo')
-      try {
-        const payload = {
-          id: venda.id,
-          documentId: docId,
-          ...(numeroNotaRejeitada != null ? { numero: numeroNotaRejeitada } : {}),
+      // Barrado antes da SEFAZ (sem documentoId): modelo já salvo → POST emitir-nota sem abrir modal.
+      const modeloEmitir = resolveModeloParaEmitirNota(venda)
+      if (modeloEmitir !== null) {
+        if (modeloEmitir === 55 && !venda.cliente?.id?.trim()) {
+          showToast.error(
+            'Para emitir NF-e (modelo 55) é obrigatório que a venda tenha um cliente cadastrado. Vincule o cliente na origem do pedido e tente novamente.'
+          )
+          return
         }
-        if (venda.tabelaOrigem === 'venda_gestor') {
-          await reemitirNfeGestor.mutateAsync(payload)
-        } else {
-          await reemitirNfePdv.mutateAsync(payload)
+        pinVendaComoPrimeiraEmComNotaSolicitada(venda)
+        setAcaoFiscalEmAndamento(venda.id, 'emitindo')
+        try {
+          if (venda.tabelaOrigem === 'venda_gestor') {
+            await emitirNotaGestor.mutateAsync({ id: venda.id, modelo: modeloEmitir })
+          } else {
+            await emitirNotaPdv.mutateAsync({ id: venda.id, modelo: modeloEmitir })
+          }
+          await refetch()
+          await refetchAteMudarStatusFiscal(venda.id, 'REJEITADA')
+          return
+        } catch (error) {
+          console.error('Erro ao emitir nota (rejeição sem documento fiscal):', error)
+          return
+        } finally {
+          setAcaoFiscalEmAndamento(venda.id, null)
         }
-        await refetch()
-        await refetchAteMudarStatusFiscal(venda.id, 'REJEITADA')
-        return
-      } catch (error) {
-        console.error('Erro ao tentar reemitir:', error)
-        return
-      } finally {
-        setAcaoFiscalEmAndamento(venda.id, null)
       }
+      // Sem modelo/tipoDoc definido: modal para escolher modelo.
     }
 
     pinVendaComoPrimeiraEmComNotaSolicitada(venda)
@@ -1330,12 +1364,13 @@ export function FiscalFlowKanban() {
                         const clienteNome = venda.cliente?.nome?.trim()
                           ? venda.cliente.nome
                           : LABEL_SEM_CLIENTE
-                        // Durante reemissão o card vai para Com nota solicitada; mantém lápis como em Pendente emissão
+                        // Durante reemissão ou emissão direta o card vai para Com nota solicitada; mantém lápis como em Pendente emissão
                         const colunaPermiteEditarCliente =
                           column.id === 'FINALIZADAS' ||
                           column.id === 'PENDENTE_EMISSAO' ||
                           (column.id === 'COM_NFE' &&
-                            acaoFiscalEmAndamentoPorVenda[venda.id] === 'reemitindo')
+                            (acaoFiscalEmAndamentoPorVenda[venda.id] === 'reemitindo' ||
+                              acaoFiscalEmAndamentoPorVenda[venda.id] === 'emitindo'))
                         // Editar cliente global (lápis → NovoCliente): PDV e Gestor; mesmas colunas; cliente já vinculado com nome
                         const podeEditarClienteNaVenda =
                           colunaPermiteEditarCliente &&
@@ -1456,9 +1491,10 @@ export function FiscalFlowKanban() {
                               </div>
                             )} */}
 
-                                {/* Emitir / Reemitir: coluna Pendente ou card temporário em Com nota durante reemissão */}
+                                {/* Emitir / Reemitir: Pendente ou card temporário em Com nota durante reemissão ou emissão direta */}
                                 {(column.id === 'PENDENTE_EMISSAO' ||
-                                  acaoFiscalEmAndamentoPorVenda[venda.id] === 'reemitindo') && (
+                                  acaoFiscalEmAndamentoPorVenda[venda.id] === 'reemitindo' ||
+                                  acaoFiscalEmAndamentoPorVenda[venda.id] === 'emitindo') && (
                                   <Button
                                     size="sm"
                                     variant="contained"
@@ -1486,8 +1522,15 @@ export function FiscalFlowKanban() {
                                       if (acaoEmAndamento === 'emitindo') return 'Emitindo...'
                                       const documentoLabel =
                                         venda.tipoDocFiscal === 'NFE' ? 'NFe' : 'NFCe'
-                                      if (venda.statusFiscal === 'REJEITADA')
-                                        return `Reemitir ${documentoLabel}`
+                                      if (venda.statusFiscal === 'REJEITADA') {
+                                        if (
+                                          venda.tipoDocFiscal === 'NFE' ||
+                                          venda.tipoDocFiscal === 'NFCE'
+                                        ) {
+                                          return `Reemitir ${documentoLabel}`
+                                        }
+                                        return 'Reemitir nota'
+                                      }
                                       if (venda.statusFiscal === 'PENDENTE_EMISSAO') {
                                         return 'Aguardando...'
                                       }
