@@ -16,7 +16,7 @@ import {
 import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
-import { MdSearch, MdClear, MdPerson, MdLocationOn } from 'react-icons/md'
+import { MdSearch, MdClear, MdPerson, MdLocationOn, MdReceiptLong } from 'react-icons/md'
 
 interface NovoClienteProps {
   clienteId?: string
@@ -56,6 +56,16 @@ const ESTADOS_BRASILEIROS = [
   { sigla: 'TO', nome: 'Tocantins' },
 ]
 
+/** Indicador da inscrição estadual (padrão SPED / documentação fiscal) */
+const INDICADOR_IE_OPCOES = [
+  { value: '1', label: 'Contribuinte ICMS' },
+  { value: '2', label: 'Contribuinte isento de IE' },
+  { value: '9', label: 'Não contribuinte' },
+] as const
+
+/** Valor interno do Select quando o indicador não foi escolhido (não enviado à API) */
+const INDICADOR_IE_NAO_INFORMADO = '__none__'
+
 /**
  * Componente para criar/editar cliente
  * Replica o design e funcionalidades do Flutter
@@ -78,6 +88,8 @@ export function NovoCliente({
   const [telefone, setTelefone] = useState('')
   const [email, setEmail] = useState('')
   const [nomeFantasia, setNomeFantasia] = useState('')
+  const [indicadorInscricaoEstadual, setIndicadorInscricaoEstadual] = useState('')
+  const [inscricaoEstadual, setInscricaoEstadual] = useState('')
   const [ativo, setAtivo] = useState(true)
   const [incluirEndereco, setIncluirEndereco] = useState(false)
 
@@ -160,6 +172,11 @@ export function NovoCliente({
           
           setEmail(cliente.getEmail() || '')
           setNomeFantasia(cliente.getNomeFantasia() || '')
+          const indIe = cliente.getIndicadorInscricaoEstadual()
+          setIndicadorInscricaoEstadual(
+            indIe != null && String(indIe).trim() !== '' ? String(indIe) : ''
+          )
+          setInscricaoEstadual(cliente.getInscricaoEstadual() ?? '')
           setAtivo(cliente.isAtivo())
           
           // Formata CEP e endereço ao carregar
@@ -531,6 +548,12 @@ export function NovoCliente({
         nomeFantasia: nomeFantasia || undefined,
         ativo,
       }
+
+      // Fiscal (raiz do payload — alinhado a POST/PATCH /pessoas/clientes)
+      if (indicadorInscricaoEstadual.trim()) {
+        body.indicadorInscricaoEstadual = indicadorInscricaoEstadual.trim()
+      }
+      body.inscricaoEstadual = inscricaoEstadual.trim()
 
       // CPF e CNPJ: na edição envia o que estiver no formulário (ambos se preenchidos); string vazia limpa no backend
       if (isEditing) {
@@ -919,8 +942,73 @@ export function NovoCliente({
             />
           </div>
 
+          {/* Fiscal (antes do endereço — mesmo nível do payload da API) */}
+          <div className="mt-2 rounded-lg bg-info md:px-5 px-1 py-2 space-y-4">
+            <h2 className="text-primary text-base font-semibold font-nunito mb-2 flex items-center gap-2">
+              <span className="text-xl text-primary">
+                <MdReceiptLong />
+              </span>
+              Fiscal
+            </h2>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:items-start">
+              <div className="flex min-h-0 flex-col">
+                <label
+                  htmlFor="cliente-indicador-ie"
+                  className="mb-2 text-sm font-medium leading-none text-primary-text"
+                >
+                  Indicador da inscrição estadual
+                </label>
+                <Select
+                  value={indicadorInscricaoEstadual || INDICADOR_IE_NAO_INFORMADO}
+                  onValueChange={(v) =>
+                    setIndicadorInscricaoEstadual(v === INDICADOR_IE_NAO_INFORMADO ? '' : v)
+                  }
+                >
+                  <SelectTrigger id="cliente-indicador-ie" className="h-[38px] bg-primary-bg">
+                    <SelectValue placeholder="Selecione um indicador" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={INDICADOR_IE_NAO_INFORMADO}>Não informado</SelectItem>
+                    {INDICADOR_IE_OPCOES.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex min-h-0 flex-col">
+                <label htmlFor="cliente-inscricao-estadual" className="mb-2 text-sm font-medium leading-none text-primary-text">
+                  Inscrição estadual
+                </label>
+                <Input
+                  id="cliente-inscricao-estadual"
+                  value={inscricaoEstadual}
+                  onChange={(e) => setInscricaoEstadual(e.target.value)}
+                  placeholder="Número da IE ou ISENTO"
+                  size="small"
+                  hiddenLabel
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      height: '38px',
+                      backgroundColor: 'var(--color-primary-bg)',
+                      borderRadius: '8px',
+                    },
+                    '& .MuiInputBase-input': {
+                      padding: '8px 14px',
+                      fontSize: '14px',
+                    },
+                    '& .MuiInputBase-root': {
+                      marginTop: 0,
+                    },
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Toggle Endereço */}
-          <div className="flex items-center justify-between px-5 bg-info">
+          <div className="flex items-center justify-between px-5 pt-4 bg-info">
             <div className="flex items-center gap-3">
               <span className="text-2xl text-primary"><MdLocationOn/></span>
               <span className="text-primary-text font-medium">

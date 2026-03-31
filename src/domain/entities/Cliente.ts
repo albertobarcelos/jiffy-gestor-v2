@@ -23,6 +23,9 @@ export class Cliente {
     private readonly telefone?: string,
     private readonly email?: string,
     private readonly nomeFantasia?: string,
+    /** Indicador da IE (ex.: SPED — 1 contribuinte, 2 isento, 9 não contribuinte) */
+    private readonly indicadorInscricaoEstadual?: string,
+    private readonly inscricaoEstadual?: string,
     private readonly ativo: boolean = true,
     private readonly empresaId?: string,
     private readonly endereco?: Endereco,
@@ -39,6 +42,8 @@ export class Cliente {
     telefone?: string,
     email?: string,
     nomeFantasia?: string,
+    indicadorInscricaoEstadual?: string,
+    inscricaoEstadual?: string,
     ativo: boolean = true,
     empresaId?: string,
     endereco?: Endereco,
@@ -57,6 +62,8 @@ export class Cliente {
       telefone,
       email,
       nomeFantasia,
+      indicadorInscricaoEstadual,
+      inscricaoEstadual,
       ativo,
       empresaId,
       endereco,
@@ -99,6 +106,12 @@ export class Cliente {
       data.telefone?.toString() || data.phone?.toString(),
       data.email?.toString(),
       data.nomeFantasia?.toString() || data.nome_fantasia?.toString(),
+      data.indicadorInscricaoEstadual != null && data.indicadorInscricaoEstadual !== ''
+        ? String(data.indicadorInscricaoEstadual)
+        : undefined,
+      data.inscricaoEstadual != null && String(data.inscricaoEstadual).trim() !== ''
+        ? String(data.inscricaoEstadual).trim()
+        : undefined,
       data.ativo === true || data.ativo === 'true',
       data.empresaId?.toString() || data.empresa_id?.toString(),
       data.endereco || data.endereco_data
@@ -150,6 +163,14 @@ export class Cliente {
     return this.nomeFantasia
   }
 
+  getIndicadorInscricaoEstadual(): string | undefined {
+    return this.indicadorInscricaoEstadual
+  }
+
+  getInscricaoEstadual(): string | undefined {
+    return this.inscricaoEstadual
+  }
+
   isAtivo(): boolean {
     return this.ativo
   }
@@ -177,6 +198,8 @@ export class Cliente {
       telefone: this.telefone,
       email: this.email,
       nomeFantasia: this.nomeFantasia,
+      indicadorInscricaoEstadual: this.indicadorInscricaoEstadual,
+      inscricaoEstadual: this.inscricaoEstadual,
       ativo: this.ativo,
       empresaId: this.empresaId,
       endereco: this.endereco,

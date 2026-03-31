@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { Button } from '@/src/presentation/components/ui/button'
-import { MdEdit, MdPerson } from 'react-icons/md'
+import { MdEdit, MdPerson, MdReceiptLong } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 
 // Funções de formatação
@@ -42,6 +42,19 @@ const formatCEP = (value: string) => {
     return numbers.replace(/(\d{5})(\d{3})/, '$1-$2')
   }
   return value
+}
+
+/** Mesmos códigos SPED usados em NovoCliente — exibição legível na visualização */
+const INDICADOR_IE_LABELS: Record<string, string> = {
+  '1': 'Contribuinte ICMS',
+  '2': 'Contribuinte isento de IE',
+  '9': 'Não contribuinte',
+}
+
+function textoIndicadorIe(valor: string | undefined): string {
+  if (valor == null || String(valor).trim() === '') return '-'
+  const v = String(valor).trim()
+  return INDICADOR_IE_LABELS[v] ?? v
 }
 
 interface VisualizarClienteProps {
@@ -179,9 +192,9 @@ export function VisualizarCliente({
       {/* Conteúdo */}
       <div className="flex-1 overflow-y-auto md:px-[30px] px-1 py-2">
         {/* Grid com duas colunas: Dados e Endereço */}
-        <div className="grid md:grid-cols-2 grid-cols-1 gap-2 mb-6">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:mb-4 mb-2">
           {/* Seção Dados (Esquerda) */}
-          <div className="bg-white rounded-lg md:px-6 px-2 py-2 shadow-sm">
+          <div className="rounded-lg bg-white px-2 py-2 shadow-sm md:px-6">
             <h2 className="text-primary text-lg font-semibold font-nunito mb-3 pb-2 border-b-2 border-primary">
               Dados Pessoais
             </h2>
@@ -241,7 +254,7 @@ export function VisualizarCliente({
           </div>
 
           {/* Seção Endereço (Direita) */}
-          <div className="bg-white rounded-lg md:px-6 px-2 py-2 shadow-sm">
+          <div className="rounded-lg bg-white px-2 py-2 shadow-sm md:px-6">
             <h2 className="text-primary text-lg font-semibold font-nunito mb-3 pb-2 border-b-2 border-primary">
               Endereço
             </h2>
@@ -291,6 +304,34 @@ export function VisualizarCliente({
                 <p className="text-secondary-text text-sm mb-1 font-medium">Cidade</p>
                 <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">{endereco?.cidade || '-'}</p>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Fiscal — fora das duas colunas, largura total; campos lado a lado no desktop */}
+        <div className="rounded-lg bg-white px-2 py-2 shadow-sm md:px-6 md:py-3">
+          <h2 className="text-primary text-lg font-semibold font-nunito mb-3 flex items-center gap-2 border-b-2 border-primary pb-2">
+            <span className="text-xl text-primary">
+              <MdReceiptLong />
+            </span>
+            Fiscal
+          </h2>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
+            <div className="flex min-h-0 flex-col">
+              <p className="mb-1 text-sm font-medium leading-none text-secondary-text">
+                Indicador da inscrição estadual
+              </p>
+              <p className="min-h-[42px] rounded-lg border border-primary/30 bg-primary-bg px-2 py-2 text-base text-primary-text">
+                {textoIndicadorIe(cliente.getIndicadorInscricaoEstadual())}
+              </p>
+            </div>
+            <div className="flex min-h-0 flex-col">
+              <p className="mb-1 text-sm font-medium leading-none text-secondary-text">
+                Inscrição estadual
+              </p>
+              <p className="min-h-[42px] rounded-lg border border-primary/30 bg-primary-bg px-2 py-2 text-base text-primary-text">
+                {cliente.getInscricaoEstadual()?.trim() || '-'}
+              </p>
             </div>
           </div>
         </div>
