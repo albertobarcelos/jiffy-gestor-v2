@@ -3,14 +3,14 @@
 import { useState } from 'react'
 import { EmpresaTab } from './tabs/EmpresaTab'
 import { TerminaisTab } from './tabs/TerminaisTab'
-import { OutrasConfiguracoesTab } from './tabs/OutrasConfiguracoesTab'
+import { ImpressorasList } from '@/src/presentation/components/features/impressoras/ImpressorasList'
 
 /**
  * Componente principal de Configurações
  * Replica o design e funcionalidades do Flutter
  */
 export function ConfiguracoesView() {
-  const [activeTab, setActiveTab] = useState<'empresa' | 'terminais' | 'outras'>('empresa')
+  const [activeTab, setActiveTab] = useState<'empresa' | 'terminais' | 'impressoras'>('empresa')
 
   return (
     <div className="flex flex-col h-full">
@@ -39,16 +39,16 @@ export function ConfiguracoesView() {
             >
               Terminais
             </button>
-            {/*<button
-              onClick={() => setActiveTab('outras')}
+            <button
+              onClick={() => setActiveTab('impressoras')}
               className={`px-5 py-2 text-sm font-semibold font-exo transition-colors ${
-                activeTab === 'outras'
+                activeTab === 'impressoras'
                   ? 'text-primary border-b-2 border-tertiary'
                   : 'text-secondary-text hover:text-primary'
               }`}
             >
-              Outras Configurações
-            </button>*/}
+              Impressoras
+            </button>
           </div>
         </div>
       </div>
@@ -58,7 +58,7 @@ export function ConfiguracoesView() {
         <div className="bg-info rounded-b-[10px] flex-1 flex flex-col overflow-hidden">
           {activeTab === 'empresa' && <EmpresaTab />}
           {activeTab === 'terminais' && <TerminaisTab />}
-          {activeTab === 'outras' && <OutrasConfiguracoesTab />}
+          {activeTab === 'impressoras' && <ImpressorasList />}
         </div>
       </div>
     </div>

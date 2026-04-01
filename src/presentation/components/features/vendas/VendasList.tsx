@@ -11,6 +11,7 @@ import {
   MdRestaurant,
   MdPrint,
   MdFilterList,
+  MdReceiptLong,
 } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -1295,7 +1296,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                       className="flex h-10 w-10 items-center justify-center rounded text-primary transition-colors hover:bg-primary/10"
                       title="Comprovante de Venda"
                     >
-                      <MdPrint size={20} />
+                      <MdReceiptLong size={25} />
                     </button>
                   </div>
                 </div>

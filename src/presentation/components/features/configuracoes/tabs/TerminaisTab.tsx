@@ -50,6 +50,22 @@ function rawToPreferenceData(data: any): TerminalPreferenceData {
   }
 }
 
+/** Preferências padrão quando o backend ainda não tem registro para o terminal */
+const DEFAULT_TERMINAL_PREFERENCES: TerminalPreferenceData = {
+  compartilharMesas: false,
+  impressoraFinalizacaoNome: 'Nenhuma',
+  impressoraFinalizacaoId: undefined,
+  fiscalAtivo: false,
+}
+
+/** Após carregar preferências, terminais sem registro usam o padrão (evita “Carregando...” infinito) */
+function resolvePreferencesForTerminal(
+  terminalId: string,
+  map: Record<string, TerminalPreferenceData>
+): TerminalPreferenceData {
+  return map[terminalId] ?? DEFAULT_TERMINAL_PREFERENCES
+}
+
 export function TerminaisTab() {
   const { auth } = useAuthStore()
   const [terminais, setTerminais] = useState<TerminalData[]>([])
@@ -58,6 +74,8 @@ export function TerminaisTab() {
   const [totalItems, setTotalItems] = useState(0)
   const [togglingStatus, setTogglingStatus] = useState<Record<string, boolean>>({})
   const [preferencesMap, setPreferencesMap] = useState<Record<string, TerminalPreferenceData>>({})
+  /** true somente após tentativa de carregar preferências (lista ou fallback por terminal) */
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false)
   const [updatingShare, setUpdatingShare] = useState<Record<string, boolean>>({})
   const [updatingFiscal, setUpdatingFiscal] = useState<Record<string, boolean>>({})
   const [updatingPrinter, setUpdatingPrinter] = useState<Record<string, boolean>>({})
@@ -86,10 +104,12 @@ export function TerminaisTab() {
       const token = auth?.getAccessToken()
       if (!token) {
         setIsLoading(false)
+        setPreferencesLoaded(true)
         return
       }
 
       setIsLoading(true)
+      setPreferencesLoaded(false)
 
       try {
         const allTerminais: TerminalData[] = []
@@ -255,6 +275,7 @@ export function TerminaisTab() {
         console.error('Erro ao carregar terminais:', error)
       } finally {
         setIsLoading(false)
+        setPreferencesLoaded(true)
       }
     },
     [auth]
@@ -773,9 +794,9 @@ export function TerminaisTab() {
           // Status: bloqueado = false significa ATIVO, bloqueado = true significa BLOQUEADO/INATIVO
           const bloqueado = rawData?.bloqueado ?? terminal.getBloqueado()
           const ativo = !bloqueado
-          const prefs = preferencesMap[terminal.getId()]
-          const compartilhamentoAtivo = prefs?.compartilharMesas ?? false
-          const fiscalAtivo = prefs?.fiscalAtivo ?? false
+          const prefs = resolvePreferencesForTerminal(terminal.getId(), preferencesMap)
+          const compartilhamentoAtivo = prefs.compartilharMesas
+          const fiscalAtivo = prefs.fiscalAtivo
 
           return (
               <div
@@ -806,9 +827,9 @@ export function TerminaisTab() {
                 {versao}
               </div>
               <div className="flex-[2] md:text-sm text-[10px] text-secondary-text font-nunito hidden md:flex">
-                {preferencesMap[terminal.getId()] ? (
+                {preferencesLoaded ? (
                   <select
-                    value={preferencesMap[terminal.getId()]?.impressoraFinalizacaoId ?? ''}
+                    value={prefs.impressoraFinalizacaoId ?? ''}
                     onChange={(event) => {
                       event.stopPropagation()
                       handleChangeImpressora(terminal.getId(), event.target.value)
