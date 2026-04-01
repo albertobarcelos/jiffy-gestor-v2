@@ -14,7 +14,6 @@ import {
   MdPeople, 
   MdPerson, 
   MdGroup, 
-  MdPrint, 
   MdPayment,
   MdCategory,
   MdAddCircle,
@@ -149,7 +148,6 @@ export function TopNav() {
         { name: 'Grupo de Complementos', path: '/cadastros/grupos-complementos', icon: MdCategory },
         { name: 'Complementos', path: '/cadastros/complementos', icon: MdAddCircle },
         { name: 'Cadastro por Planilhas', path: '/cadastro-por-planilha', icon: MdAirplaneTicket },
-        { name: 'Impressoras', path: '/cadastros/impressoras', icon: MdPrint },
       ],
     },
     {

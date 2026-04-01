@@ -1270,29 +1270,29 @@ export function DetalhesVendas({
                 <div className="space-y-2">
                   {venda.pagamentos
                     ?.filter(p => {
-                      // Exclui pagamentos cancelados (que são exibidos com cor vermelha em outro lugar se necessário)
                       const isCancelado =
                         p.cancelado === true ||
                         (p.dataCancelamento !== null && p.dataCancelamento !== undefined)
 
-                      // Verifica se o pagamento usa TEF e se está confirmado
-                      // Se isTefUsed === true, então isTefConfirmed deve ser === true
-                      // Se isTefUsed === false ou não existe, o pagamento é válido (não usa TEF)
                       const usaTef = p.isTefUsed === true
-                      if (usaTef) {
+                      // Oculta só TEF pendente de confirmação em pagamento ainda ativo
+                      // (cancelados permanecem visíveis no histórico mesmo com TEF não confirmado)
+                      if (usaTef && !isCancelado) {
                         const tefConfirmado = p.isTefConfirmed === true
                         if (!tefConfirmado) {
-                          return false // Exclui pagamentos TEF não confirmados
+                          return false
                         }
                       }
 
-                      // Exibe pagamentos válidos: não cancelados e (não usa TEF ou TEF confirmado)
-                      return !isCancelado
+                      return true
                     })
                     .map((pagamento, index) => {
                       const meio = nomesMeiosPagamento[pagamento.meioPagamentoId]
                       const formaPagamento = meio?.formaPagamentoFiscal || ''
-                      const isCancelado = pagamento.cancelado === true
+                      const isCancelado =
+                        pagamento.cancelado === true ||
+                        (pagamento.dataCancelamento !== null &&
+                          pagamento.dataCancelamento !== undefined)
 
                       const getIcon = () => {
                         if (formaPagamento.toLowerCase().includes('dinheiro')) return '💵'

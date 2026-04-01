@@ -1505,7 +1505,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
             </div>
             <div className="flex flex-col md:flex-row mb-2 items-center justify-end flex-1 md:gap-4 gap-1">
             <Link
-              href="/produtos/atualizar-preco"
+              href="/produtos/atualizar-produtos-lote"
               className="md:h-8 h-6 md:px-4 px-2 bg-info text-primary-text border border-primary/50 rounded-lg font-semibold font-exo md:text-sm text-xs flex items-center gap-2 hover:bg-primary/10 transition-colors"
             >
               Produtos em Lote
