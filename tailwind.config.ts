@@ -36,6 +36,7 @@ const config: Config = {
         // Aliases para retrocompatibilidade
         exo: ['var(--font-exo2)', 'sans-serif'],
         manrope: ['var(--font-manrope)', 'sans-serif'],
+        poppins: ['var(--font-poppins)', 'sans-serif'],
       },
     },
   },

@@ -4,6 +4,7 @@ import { ApiError } from '@/src/infrastructure/api/apiClient'
 import {
   deveExibirRodapeDanfe80mm,
   fetchVendaContingenciaPublica,
+  resolveDocumentoFiscalIdPublico,
 } from '@/src/infrastructure/api/fetchVendaContingenciaPublica'
 import { CupomFiscalContingencia } from '@/src/presentation/components/features/venda-contingencia/CupomFiscalContingencia'
 
@@ -54,27 +55,28 @@ export default async function NotaFiscalPublicPage({ params }: PageProps) {
     notFound()
   }
 
-  const rodapeDanfeSrc = deveExibirRodapeDanfe80mm(data)
-    ? `/api/public/notas-fiscais-consumidor/${encodeURIComponent(vendaId.trim())}/danfe-80`
-    : null
+  const documentoFiscalId = resolveDocumentoFiscalIdPublico(data)
+  const rodapeDanfeSrc =
+    deveExibirRodapeDanfe80mm(data) && documentoFiscalId
+      ? `/api/public/notas-fiscais-consumidor/${encodeURIComponent(documentoFiscalId)}/danfe-80`
+      : null
 
   return (
     <div
-      className="min-h-screen flex justify-center py-8 px-3"
+      className="min-h-screen flex justify-center py-8 px-4 sm:px-5"
       style={{ background: 'linear-gradient(to bottom right, #f8fafc, #e2e8f0)' }}
     >
       <article
-        className="w-full max-w-md rounded-xl shadow-lg overflow-hidden"
+        className="w-full max-w-lg rounded-xl border border-slate-200/90 bg-white shadow-lg shadow-slate-200/60 overflow-hidden"
         style={{
-          backgroundColor: '#FFFFD9',
           fontFamily: "'Roboto Mono', 'Courier New', monospace",
-          color: '#000000',
+          color: '#0f172a',
         }}
       >
-        <header className="px-4 pt-5 pb-2 border-b border-black/10">
-          <p className="text-xs text-center text-black/60">Jiffy Gestor</p>
+        <header className="px-5 sm:px-6 pt-5 pb-2 border-b border-slate-200">
+          <p className="text-xs text-center text-slate-500">Jiffy Gestor</p>
         </header>
-        <div className="px-4 py-4">
+        <div className="px-5 sm:px-6 py-5">
           <CupomFiscalContingencia data={data} rodapeDanfeSrc={rodapeDanfeSrc} />
         </div>
       </article>

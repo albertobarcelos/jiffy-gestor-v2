@@ -41,6 +41,31 @@ function linhaTotalItem(
   return q * vu
 }
 
+function rotuloTipoDocPorModelo(modelo: number | null | undefined): string | null {
+  if (modelo == null || Number.isNaN(modelo)) return null
+  if (modelo === 65) return 'NFC-e'
+  if (modelo === 55) return 'NF-e'
+  return `Modelo ${modelo}`
+}
+
+/** Título do cupom: Poppins extrabold; corpo do cupom segue monoespaçada. */
+function TituloCupomVenda({ data }: { data: VendaContingenciaPublica }) {
+  const codigoRaw = data.codigoVenda
+  const codigo =
+    codigoRaw != null && String(codigoRaw).trim() !== '' ? String(codigoRaw).trim() : '—'
+  const numero =
+    data.numeroVenda != null && !Number.isNaN(Number(data.numeroVenda))
+      ? String(data.numeroVenda)
+      : '—'
+
+  return (
+    <h1 className="font-poppins flex flex-wrap items-baseline justify-center gap-x-2 sm:gap-x-3 text-center text-lg md:text-xl font-extrabold text-black pb-1 leading-tight">
+      <span>VENDA #{codigo}</span>
+      <span>N° {numero}</span>
+    </h1>
+  )
+}
+
 interface CupomFiscalContingenciaProps {
   data: VendaContingenciaPublica
   /** URL do proxy PNG 80mm; só preencher quando nota emitida (página calcula). */
@@ -59,6 +84,8 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
   if (textoPuro) {
     return (
       <>
+        <TituloCupomVenda data={data} />
+        <div className="h-px bg-slate-300 my-2" />
         <pre
           className="whitespace-pre-wrap break-words text-sm leading-relaxed"
           style={{ fontFamily: "'Roboto Mono', 'Courier New', monospace" }}
@@ -73,22 +100,36 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
   const empresa =
     data.nomeEmpresa || data.empresa?.nome || 'Estabelecimento'
   const cnpj = data.empresa?.cnpj
+  const rf = data.resumoFiscal
+  const tipoDocExibicao =
+    data.tipoDocFiscal?.trim() || rotuloTipoDocPorModelo(rf?.modelo ?? undefined)
+  const statusFiscalExibicao = rf?.status?.trim() || data.statusFiscal
+  const numeroDocExibicao = rf?.numero ?? data.numeroFiscal
+  const serieExibicao = rf?.serie?.trim() || data.serieFiscal
+  const dataEmissaoExibicao = rf?.dataEmissao || data.dataEmissaoFiscal
+  const retornoSefazExibicao = rf?.retornoSefaz?.trim() || data.retornoSefaz
 
   const produtos = (data.produtosLancados || []).filter((p) => !p.removido)
   const pagamentos = (data.pagamentos || []).filter((p) => !p.cancelado)
 
   return (
     <div className="space-y-2 text-sm" style={{ fontFamily: "'Roboto Mono', 'Courier New', monospace" }}>
-      <h1 className="text-base md:text-lg font-bold text-center">CUPOM FISCAL — CONTINGÊNCIA</h1>
-      <div className="h-px bg-black/40 my-2" />
+      <TituloCupomVenda data={data} />
+      <div className="h-px bg-slate-300 my-2" />
 
       <div className="space-y-0.5">
         <div className="font-bold">{empresa}</div>
         {cnpj && <div>CNPJ: {cnpj}</div>}
         {data.codigoVenda != null && <div>Cód. venda: {data.codigoVenda}</div>}
         {data.numeroVenda != null && <div>Nº venda: {data.numeroVenda}</div>}
-        {data.codigoTerminal && <div>Terminal: {data.codigoTerminal}</div>}
-        {data.identificacao && <div>Cliente / identif.: {data.identificacao}</div>}
+        {(data.codigoTerminal || data.terminalNome) && (
+          <div>
+            Terminal: {[data.codigoTerminal, data.terminalNome].filter(Boolean).join(' — ')}
+          </div>
+        )}
+        {(data.identificacao || data.clienteNome) && (
+          <div>Cliente / identif.: {data.identificacao || data.clienteNome}</div>
+        )}
         <div>Abertura: {formatDateTime(data.dataCriacao)}</div>
         <div>Finalização: {formatDateTime(data.dataFinalizacao)}</div>
       </div>
@@ -97,17 +138,17 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
 
       <div className="space-y-1">
         <div className="font-bold">DOCUMENTO FISCAL</div>
-        {data.tipoDocFiscal && <div>Tipo: {data.tipoDocFiscal}</div>}
-        {data.statusFiscal && <div>Status: {data.statusFiscal}</div>}
-        {data.numeroFiscal != null && (
+        {tipoDocExibicao && <div>Tipo: {tipoDocExibicao}</div>}
+        {statusFiscalExibicao && <div>Status: {statusFiscalExibicao}</div>}
+        {numeroDocExibicao != null && (
           <div>
-            Nº doc.: {data.numeroFiscal}
-            {data.serieFiscal ? ` / Série ${data.serieFiscal}` : ''}
+            Nº doc.: {numeroDocExibicao}
+            {serieExibicao ? ` / Série ${serieExibicao}` : ''}
           </div>
         )}
-        {data.dataEmissaoFiscal && <div>Emissão: {formatDateTime(data.dataEmissaoFiscal)}</div>}
-        {data.retornoSefaz && (
-          <div className="text-xs break-words opacity-90">SEFAZ: {data.retornoSefaz}</div>
+        {dataEmissaoExibicao && <div>Emissão: {formatDateTime(dataEmissaoExibicao)}</div>}
+        {retornoSefazExibicao && (
+          <div className="text-xs break-words opacity-90">SEFAZ: {retornoSefazExibicao}</div>
         )}
       </div>
 
@@ -194,7 +235,7 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
             {pagamentos.map((pg, i) => (
               <li key={i} className="flex justify-between gap-2">
                 <span className="break-words">
-                  {pg.nomeMeioPagamento || pg.meioPagamentoId || 'Pagamento'}
+                  {pg.nomeMeioPagamento || pg.meioPagamentoNome || pg.meioPagamentoId || 'Pagamento'}
                 </span>
                 <span className="shrink-0">{formatCurrencyBrl(pg.valor)}</span>
               </li>

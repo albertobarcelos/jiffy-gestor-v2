@@ -10,6 +10,7 @@ import {
   Typography,
   Box,
 } from '@mui/material'
+import type { SxProps, Theme } from '@mui/material/styles'
 
 export interface DialogProps extends Omit<MuiDialogProps, 'open'> {
   open: boolean
@@ -69,22 +70,26 @@ export const DialogTitle = React.forwardRef<HTMLHeadingElement, DialogTitleProps
 
 DialogTitle.displayName = 'DialogTitle'
 
-export const DialogDescription = React.forwardRef<
-  HTMLParagraphElement,
-  React.HTMLAttributes<HTMLParagraphElement>
->(({ className, children, ...props }, ref) => {
-  return (
-    <Typography
-      ref={ref}
-      variant="body2"
-      color="text.secondary"
-      sx={{ mt: 1, fontFamily: 'Nunito, sans-serif' }}
-      {...props}
-    >
-      {children}
-    </Typography>
-  )
-})
+export interface DialogDescriptionProps extends React.HTMLAttributes<HTMLParagraphElement> {
+  sx?: SxProps<Theme>
+}
+
+export const DialogDescription = React.forwardRef<HTMLParagraphElement, DialogDescriptionProps>(
+  ({ className, children, sx, ...props }, ref) => {
+    return (
+      <Typography
+        ref={ref}
+        variant="body2"
+        color="text.secondary"
+        className={className}
+        sx={{ mt: 1, fontFamily: 'Nunito, sans-serif', ...sx }}
+        {...props}
+      >
+        {children}
+      </Typography>
+    )
+  }
+)
 
 DialogDescription.displayName = 'DialogDescription'
 

@@ -3,21 +3,21 @@ import { NextRequest, NextResponse } from 'next/server'
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /**
- * GET /api/public/notas-fiscais-consumidor/[vendaId]/danfe-80
- * Proxy público: PNG cupom 80mm (QR + dados fiscais) — backend gestor.
- * Autenticação: opcional X-Api-Key via EXTERNAL_API_PUBLIC_KEY (servidor).
+ * GET /api/public/notas-fiscais-consumidor/[documentId]/danfe-80
+ * Proxy: PNG rodapé NFC-e 80mm (QR + dados fiscais) — microserviço fiscal público.
+ * Upstream: GET {FISCAL_MICROSERVICE_BASE_URL}/v1/public/documentos/{documentId}/nfce-cupom-rodape-80mm
  */
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ vendaId: string }> }
+  { params }: { params: Promise<{ documentId: string }> }
 ) {
   try {
-    const { vendaId } = await params
-    if (!vendaId?.trim()) {
-      return NextResponse.json({ error: 'ID da venda é obrigatório' }, { status: 400 })
+    const { documentId } = await params
+    if (!documentId?.trim()) {
+      return NextResponse.json({ error: 'ID do documento fiscal é obrigatório' }, { status: 400 })
     }
 
-    const id = vendaId.trim()
+    const id = documentId.trim()
     if (!UUID_REGEX.test(id)) {
       return NextResponse.json(
         { error: 'ID inválido (deve ser um UUID)' },
@@ -25,22 +25,22 @@ export async function GET(
       )
     }
 
-    const backendUrl = (process.env.NEXT_PUBLIC_EXTERNAL_API_BASE_URL || '').replace(/\/$/, '')
+    const backendUrl = (process.env.FISCAL_MICROSERVICE_BASE_URL || '').replace(/\/$/, '')
     if (!backendUrl) {
       return NextResponse.json(
-        { error: 'Configuração do servidor incompleta (API base)' },
+        { error: 'Configuração do servidor incompleta (FISCAL_MICROSERVICE_BASE_URL)' },
         { status: 500 }
       )
     }
 
-    const query = process.env.PUBLIC_GESTOR_DANFE_80_QUERY?.trim()
-    const path = `${backendUrl}/api/v1/gestor/vendas/${encodeURIComponent(id)}/danfe`
+    const query = process.env.FISCAL_MICROSERVICE_NFCE_RODAPE_QUERY?.trim()
+    const path = `${backendUrl}/v1/public/documentos/${encodeURIComponent(id)}/nfce-cupom-rodape-80mm`
     const url = query ? `${path}?${query}` : path
 
     const headers: Record<string, string> = {
       Accept: 'image/png,image/*;q=0.9,*/*;q=0.1',
     }
-    const serviceKey = process.env.EXTERNAL_API_PUBLIC_KEY?.trim()
+    const serviceKey = process.env.FISCAL_MICROSERVICE_API_KEY?.trim()
     if (serviceKey) {
       headers['X-Api-Key'] = serviceKey
     }
@@ -100,7 +100,6 @@ export async function GET(
     }
 
     if (!isPng && looksLikeImage) {
-      // Pode ser JPEG/WebP etc.; repassa tipo quando reconhecível
       const ct = upstreamCt.split(';')[0]?.trim() || 'application/octet-stream'
       return new NextResponse(bytes, {
         status: 200,

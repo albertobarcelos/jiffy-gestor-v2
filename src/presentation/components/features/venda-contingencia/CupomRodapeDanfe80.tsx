@@ -80,14 +80,11 @@ export function CupomRodapeDanfe80({ src, alt = 'Dados fiscais e QR Code da NFC-
   }
 
   return (
-    <div className="mt-4 pt-3 border-t border-black/30 flex flex-col items-center">
-      <p className="text-[10px] text-center text-black/70 mb-2 uppercase tracking-wide">
-        Consulta NFC-e
-      </p>
+    <div className="mt-4 pt-3 border-t border-slate-300/80 flex flex-col items-center">
       <img
         src={displayUrl}
         alt={alt}
-        className="w-full max-w-[302px] h-auto object-contain"
+        className="w-full max-w-[min(100%,360px)] h-auto object-contain"
         loading="lazy"
         decoding="async"
       />
