@@ -8,7 +8,7 @@ import { motion } from 'framer-motion'; // Importar motion do Framer Motion
 import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto' // Importar a entidade
 import { EscolheDatasModal } from '@/src/presentation/components/features/vendas/EscolheDatasModal'
 import { MdCalendarToday } from 'react-icons/md'
-import { calculatePeriodo } from '@/src/shared/utils/dateFilters'
+import { calculatePeriodo, permiteOpcoesIntervaloPorHora } from '@/src/shared/utils/dateFilters'
 import { useDashboardTopProdutosQuery } from '@/src/presentation/hooks/useDashboardTopProdutosQuery'
 
 // Função para obter o label do período
@@ -45,6 +45,17 @@ const getPeriodoLabel = (periodo: string, dataInicial?: Date | null, dataFinal?:
       return 'Período Desconhecido';
   }
 };
+
+/** Meses curtos para exibir o intervalo escolhido em "Por datas" (ex.: 01-abr 00:00). */
+const MESES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'] as const
+
+function formatarDataHoraFiltroCurta(date: Date): string {
+  const dia = String(date.getDate()).padStart(2, '0')
+  const mes = MESES_ABREV[date.getMonth()]
+  const h = String(date.getHours()).padStart(2, '0')
+  const min = String(date.getMinutes()).padStart(2, '0')
+  return `${dia}-${mes} ${h}:${min}`
+}
 
 // Variantes para animação de fade-in e slide-up
 const containerVariants = {
@@ -248,9 +259,9 @@ export default function DashboardPage() {
       className="space-y-2 bg-custom-2/50 py-2 px-1 rounded-lg mt-2"
     >
       {/* Barra de seleção de período */}
-      <motion.div variants={itemVariants} className="flex flex-col md:flex-row items-center justify-start gap-2 mt-2">
+      <motion.div variants={itemVariants} className="flex flex-col md:flex-row items-center justify-start gap-2">
         <span className="text-primary text-sm font-exo">Período:</span>
-        <div className="flex flex-row items-center justify-start gap-2">
+        <div className="flex min-w-0 flex-row flex-wrap items-center justify-start gap-2">
         <FormControl size="small" sx={{ minWidth: 120 }}>
           <Select
             value={periodo}
@@ -289,6 +300,18 @@ export default function DashboardPage() {
           <MdCalendarToday size={10} />
           Por datas
         </button>
+        {periodoInicial && periodoFinal ? (
+          <div
+            className="flex shrink-0 flex-col gap-0 text-[11px] leading-snug text-primary/85 md:text-xs"
+          >
+            <span className="whitespace-nowrap text-right">
+              Dt. Ini.: {formatarDataHoraFiltroCurta(periodoInicial)}
+            </span>
+            <span className="whitespace-nowrap text-right">
+              Dt. Fim: {formatarDataHoraFiltroCurta(periodoFinal)}
+            </span>
+          </div>
+        ) : null}
         </div>
         {/* Botão Limpar Filtros */}
         <button
@@ -329,12 +352,25 @@ export default function DashboardPage() {
                       <h3 className="md:text-lg text-sm font-semibold text-primary">Evolução de Vendas</h3>
                       <p className="md:text-sm text-xs text-primary/70">{getPeriodoLabel(periodo, periodoInicial, periodoFinal)}</p>
                      </div>
-                     <div className="flex flex-col">
+                     <div className="flex min-w-0 flex-1 flex-col justify-center">
                        <FormGroup
                          sx={{
-                           flexDirection: { xs: 'row', md: 'row' },
-                           alignItems: { xs: 'flex-start', md: 'center' },
-                           gap: { xs: 0, md: 0 },
+                           flexDirection: 'row',
+                           flexWrap: 'nowrap',
+                           alignItems: 'center',
+                           gap: { xs: 0.25, sm: 0.5, md: 0.75 },
+                           width: '100%',
+                           minWidth: 0,
+                           overflowX: 'auto',
+                           overflowY: 'hidden',
+                           // Mantém Finalizadas → 1h numa única linha; em telas estreitas rola horizontalmente
+                           WebkitOverflowScrolling: 'touch',
+                           '& .MuiFormControlLabel-root': {
+                             marginRight: 1,
+                             flexShrink: 0,
+                             gap: 0.25,
+                           },
+                           '& .MuiCheckbox-root': { padding: 0.5 },
                          }}
                        >
                          <FormControlLabel
@@ -371,77 +407,69 @@ export default function DashboardPage() {
                            }
                            label={<span className="md:text-sm text-xs">Canceladas</span>}
                          />
+                         {/* Intervalos à direita de Canceladas, mesma linha (quebra só em telas muito estreitas) */}
+                         {(periodo === 'Hoje' ||
+                           (periodoInicial &&
+                             periodoFinal &&
+                             permiteOpcoesIntervaloPorHora(periodoInicial, periodoFinal))) ? (
+                           <>
+                             <span className="shrink-0 whitespace-nowrap px-0.5 text-xs text-primary/70 md:pl-1 md:text-sm">
+                               Intervalos:
+                             </span>
+                             <FormControlLabel
+                               control={
+                                 <Checkbox
+                                   checked={intervaloHora === 15}
+                                   onChange={handleIntervaloHoraChange}
+                                   value="15"
+                                   sx={{
+                                     color: '#530CA3',
+                                     '&.Mui-checked': {
+                                       color: '#530CA3',
+                                     },
+                                     size: 'small',
+                                   }}
+                                 />
+                               }
+                               label={<span className="md:text-sm text-xs">15 min</span>}
+                             />
+                             <FormControlLabel
+                               control={
+                                 <Checkbox
+                                   checked={intervaloHora === 30}
+                                   onChange={handleIntervaloHoraChange}
+                                   value="30"
+                                   sx={{
+                                     color: '#530CA3',
+                                     '&.Mui-checked': {
+                                       color: '#530CA3',
+                                     },
+                                     size: 'small',
+                                   }}
+                                 />
+                               }
+                               label={<span className="md:text-sm text-xs">30 min</span>}
+                             />
+                             <FormControlLabel
+                               control={
+                                 <Checkbox
+                                   checked={intervaloHora === 60}
+                                   onChange={handleIntervaloHoraChange}
+                                   value="60"
+                                   sx={{
+                                     color: '#530CA3',
+                                     '&.Mui-checked': {
+                                       color: '#530CA3',
+                                     },
+                                     size: 'small',
+                                   }}
+                                 />
+                               }
+                               label={<span className="md:text-sm text-xs">1h</span>}
+                             />
+                           </>
+                         ) : null}
                        </FormGroup>
-                       {/* Checkboxes para intervalo de tempo (apenas quando for exibir por hora) */}
-                       {((periodoInicial && periodoFinal) || periodo === 'Hoje') ? (
-                         <FormGroup
-                           sx={{
-                             flexDirection: { xs: 'row', md: 'row' },
-                             alignItems: { xs: 'flex-start', md: 'center' },
-                             gap: { xs: 0, md: 0 },
-                           }}
-                         >
-                          <div className="flex flex-col">
-                           <span className="md:text-sm text-xs text-primary/70 mr-2">Intervalo:</span>
-                           <div className="flex flex-row">
-                           <FormControlLabel
-                             control={
-                               <Checkbox
-                                 checked={intervaloHora === 15}
-                                 onChange={handleIntervaloHoraChange}
-                                 value="15"
-                                 sx={{
-                                   color: '#530CA3',
-                                   '&.Mui-checked': {
-                                     color: '#530CA3',
-                                   },
-                                   size: 'small',
-                                 }}
-                               />
-                             }
-                             label={<span className="md:text-sm text-xs">15 min</span>}
-                           />
-                           <FormControlLabel
-                             control={
-                               <Checkbox
-                                 checked={intervaloHora === 30}
-                                 onChange={handleIntervaloHoraChange}
-                                 value="30"
-                                 sx={{
-                                   color: '#530CA3',
-                                   '&.Mui-checked': {
-                                     color: '#530CA3',
-                                   },
-                                   size: 'small',
-                                 }}
-                               />
-                             }
-                             label={<span className="md:text-sm text-xs">30 min</span>}
-                           />
-                           <FormControlLabel
-                             control={
-                               <Checkbox
-                                 checked={intervaloHora === 60}
-                                 onChange={handleIntervaloHoraChange}
-                                 value="60"
-                                 sx={{
-                                   color: '#530CA3',
-                                   '&.Mui-checked': {
-                                     color: '#530CA3',
-                                   },
-                                   size: 'small',
-                                 }}
-                               />
-                             }
-                             label={<span className="md:text-sm text-xs">1h</span>}
-                           />
-                         </div>
-                         </div>
-                         </FormGroup>
-                         
-                       ) : (
-                         <div className="h-[32px]"></div>
-                       )}
                      </div>
                    </div>
             <div className="flex-1 min-h-0">

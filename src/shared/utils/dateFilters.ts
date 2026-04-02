@@ -69,3 +69,16 @@ export const calculatePeriodo = (opcao: string): { inicio: Date | null; fim: Dat
   }
 };
 
+/**
+ * Indica se o intervalo entre data inicial e final (apenas calendário, dias inclusivos)
+ * permite opções de agregação por hora (15/30/60 min) no dashboard.
+ * Até 2 dias inclusivos: permite; mais de 2 dias: só agregação por dia.
+ * Ex.: mesmo dia → 1 dia; dia 1 → dia seguinte → 2 dias; dia 1 → dois dias depois → 3 dias (não permite).
+ */
+export function permiteOpcoesIntervaloPorHora(inicio: Date, fim: Date): boolean {
+  const start = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate())
+  const end = new Date(fim.getFullYear(), fim.getMonth(), fim.getDate())
+  if (end.getTime() < start.getTime()) return false
+  const diasInclusivos = Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1
+  return diasInclusivos <= 2
+}
