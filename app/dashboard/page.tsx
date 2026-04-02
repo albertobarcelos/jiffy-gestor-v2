@@ -13,7 +13,8 @@ import { useDashboardTopProdutosQuery } from '@/src/presentation/hooks/useDashbo
 
 // Função para obter o label do período
 const getPeriodoLabel = (periodo: string, dataInicial?: Date | null, dataFinal?: Date | null): string => {
-  if (periodo === 'Datas Personalizadas' && dataInicial && dataFinal) {
+  // Intervalo escolhido em "Por datas" (Select mantém o preset, ex.: Últimos 7 Dias)
+  if (dataInicial && dataFinal) {
     const formatDate = (date: Date) => {
       const day = date.getDate().toString().padStart(2, '0')
       const month = (date.getMonth() + 1).toString().padStart(2, '0')
@@ -24,7 +25,7 @@ const getPeriodoLabel = (periodo: string, dataInicial?: Date | null, dataFinal?:
     }
     return `${formatDate(dataInicial)} - ${formatDate(dataFinal)}`
   }
-  
+
   switch (periodo) {
     case 'Todos':
       return 'Todos os Períodos';
@@ -40,8 +41,6 @@ const getPeriodoLabel = (periodo: string, dataInicial?: Date | null, dataFinal?:
       return 'Últimos 60 Dias';
     case 'Últimos 90 Dias':
       return 'Últimos 90 Dias';
-    case 'Datas Personalizadas':
-      return 'Datas Personalizadas';
     default:
       return 'Período Desconhecido';
   }
@@ -188,10 +187,7 @@ export default function DashboardPage() {
   const handleConfirmDatas = (dataInicial: Date | null, dataFinal: Date | null) => {
     setPeriodoInicial(dataInicial)
     setPeriodoFinal(dataFinal)
-    // Se pelo menos uma data foi selecionada, muda período para "Datas Personalizadas"
-    if (dataInicial || dataFinal) {
-      setPeriodo('Datas Personalizadas')
-    }
+    // O valor do dropdown (Período) não muda — o filtro por intervalo usa só as datas
   };
 
   /**
@@ -199,11 +195,9 @@ export default function DashboardPage() {
    */
   const handlePeriodoChange = (novoPeriodo: string) => {
     setPeriodo(novoPeriodo)
-    // Se não for "Datas Personalizadas", limpa as datas personalizadas
-    if (novoPeriodo !== 'Datas Personalizadas') {
-      setPeriodoInicial(null)
-      setPeriodoFinal(null)
-    }
+    // Ao trocar o preset no dropdown, remove o intervalo definido em "Por datas"
+    setPeriodoInicial(null)
+    setPeriodoFinal(null)
   };
 
   /**
@@ -218,7 +212,7 @@ export default function DashboardPage() {
   };
 
   const { inicio: topInicio, fim: topFim } = useMemo(() => {
-    if (periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) {
+    if (periodoInicial && periodoFinal) {
       return { inicio: periodoInicial, fim: periodoFinal }
     }
     if (periodo === 'Todos') return { inicio: null, fim: null }
@@ -281,7 +275,6 @@ export default function DashboardPage() {
             <MenuItem value="Últimos 30 Dias">Últimos 30 Dias</MenuItem>
             <MenuItem value="Últimos 60 Dias">Últimos 60 Dias</MenuItem>
             <MenuItem value="Últimos 90 Dias">Últimos 90 Dias</MenuItem>
-            <MenuItem value="Datas Personalizadas">Datas Personalizadas</MenuItem>
           </Select>
         </FormControl>
         
@@ -380,7 +373,7 @@ export default function DashboardPage() {
                          />
                        </FormGroup>
                        {/* Checkboxes para intervalo de tempo (apenas quando for exibir por hora) */}
-                       {((periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) || periodo === 'Hoje') ? (
+                       {((periodoInicial && periodoFinal) || periodo === 'Hoje') ? (
                          <FormGroup
                            sx={{
                              flexDirection: { xs: 'row', md: 'row' },

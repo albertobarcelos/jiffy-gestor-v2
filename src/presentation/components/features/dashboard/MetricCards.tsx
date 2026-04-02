@@ -41,7 +41,7 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
    * `null` indica que não deve aplicar filtro de data ("Todos").
    */
   const getPeriodoDates = (): { inicio: Date | null; fim: Date | null } => {
-    if (periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) {
+    if (periodoInicial && periodoFinal) {
       return { inicio: periodoInicial, fim: periodoFinal }
     }
     

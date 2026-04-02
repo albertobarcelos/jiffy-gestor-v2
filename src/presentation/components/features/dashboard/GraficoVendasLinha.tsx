@@ -27,7 +27,7 @@ interface GraficoVendasLinhaProps {
  */
 export function GraficoVendasLinha({ periodo, selectedStatuses, periodoInicial, periodoFinal, intervaloHora = 30 }: GraficoVendasLinhaProps) {
   const { inicio, fim } = useMemo(() => {
-    if (periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) {
+    if (periodoInicial && periodoFinal) {
       return { inicio: periodoInicial, fim: periodoFinal }
     }
     if (periodo === 'Todos') {
@@ -37,7 +37,9 @@ export function GraficoVendasLinha({ periodo, selectedStatuses, periodoInicial, 
     return { inicio: calcInicio, fim: calcFim }
   }, [periodo, periodoInicial, periodoFinal])
 
-  const useIntervaloHora = periodo === 'Hoje' || (periodo === 'Datas Personalizadas' && inicio && fim)
+  // Intervalo por hora: hoje ou intervalo escolhido em "Por datas"
+  const useIntervaloHora =
+    periodo === 'Hoje' || (!!(periodoInicial && periodoFinal))
   const { data, isLoading, error, refetch } = useDashboardEvolucaoQuery({
     periodoInicial: inicio,
     periodoFinal: fim,

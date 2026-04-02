@@ -44,7 +44,7 @@ export function TabelaTopProdutos({
   };
 
   const { inicio, fim } = useMemo(() => {
-    if (periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) {
+    if (periodoInicial && periodoFinal) {
       return { inicio: periodoInicial, fim: periodoFinal }
     }
     if (periodo === 'Todos') return { inicio: null, fim: null }
