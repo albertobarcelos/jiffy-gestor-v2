@@ -1604,31 +1604,30 @@ export function FiscalFlowKanban() {
         />
       )}
 
-      {/* Modal de Novo Pedido */}
-      {novoPedidoModalOpen && (
-        <NovoPedidoModal
-          open={novoPedidoModalOpen}
-          onClose={() => {
-            setNovoPedidoModalOpen(false)
-          }}
-          onSuccess={() => {
-            setNovoPedidoModalOpen(false)
-            refetch()
-          }}
-        />
-      )}
+      {/* Modal de Novo Pedido — sempre montado para o Slide de saída completar */}
+      <NovoPedidoModal
+        open={novoPedidoModalOpen}
+        onClose={() => {
+          setNovoPedidoModalOpen(false)
+        }}
+        onSuccess={() => {
+          setNovoPedidoModalOpen(false)
+          refetch()
+        }}
+      />
 
-      {/* Modal de Novo Pedido em Modo Visualização (Step 4) */}
+      {/* Modal de visualização: contexto só some após onExited do painel */}
       {pedidoVisualizacaoContext && (
         <NovoPedidoModal
           open={novoPedidoModalVisualizacaoOpen}
           onClose={() => {
             setNovoPedidoModalVisualizacaoOpen(false)
+          }}
+          onAfterClose={() => {
             setPedidoVisualizacaoContext(null)
           }}
           onSuccess={() => {
             setNovoPedidoModalVisualizacaoOpen(false)
-            setPedidoVisualizacaoContext(null)
             refetch()
           }}
           vendaId={pedidoVisualizacaoContext.id}

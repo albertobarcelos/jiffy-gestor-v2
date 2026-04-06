@@ -1,8 +1,10 @@
 'use client'
 
-import { useMemo } from 'react'
-import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
+import { useMemo, useState } from 'react'
+import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { NovoComplemento } from './NovoComplemento'
+
+const COMPLEMENTO_TABS_FORM_ID = 'complemento-tabs-modal-form'
 
 type TabKey = 'complemento'
 
@@ -30,51 +32,32 @@ export function ComplementosTabsModal({
     return state.mode === 'create' ? 'Novo Complemento' : 'Editar Complemento'
   }, [state.mode])
 
+  const [embedFormState, setEmbedFormState] = useState({
+    isSubmitting: false,
+    canSubmit: false,
+  })
+
   return (
-    <Dialog
+    <JiffySidePanelModal
       open={state.open}
-      onOpenChange={(open) => {
-        if (!open) {
-          onClose()
-        }
+      onClose={onClose}
+      title={title}
+      scrollableBody={false}
+      footerVariant="bar"
+      panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,60vw)]"
+      footerActions={{
+        showSave: true,
+        saveLabel: state.mode === 'edit' ? 'Atualizar' : 'Salvar',
+        saveFormId: COMPLEMENTO_TABS_FORM_ID,
+        saveLoading: embedFormState.isSubmitting,
+        saveDisabled: !embedFormState.canSubmit || embedFormState.isSubmitting,
       }}
-      fullWidth
-      maxWidth="xl"
-      sx={{
-        '& .MuiDialog-container': {
-          justifyContent: {
-            xs: 'center', // Centraliza em mobile
-            md: 'flex-end', // Alinha à direita em desktop
-          },
-          alignItems: 'stretch',
-          margin: 0,
-        },
-      }}
-      PaperProps={{
-        sx: {
-          height: '100vh',
-          maxHeight: '100vh',
-          width: {
-            xs: '95vw', // Em telas muito pequenas (mobile), ocupa 95% da largura
-            sm: '90vw', // Em telas pequenas, ocupa 90% da largura
-            md: 'min(900px, 60vw)', // Em telas médias e maiores, mantém o comportamento original
-          },
-          margin: {
-            xs: 'auto', // Centraliza em mobile (com width 95vw, deixa 2.5% de cada lado)
-            md: 0, // Sem margin em desktop
-          },
-          borderRadius: 0,
-          display: 'flex',
-          flexDirection: 'column',
-        },
-      }}
-    >
-      <DialogContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <div className="px-6 pt-2 flex gap-1 border-b border-gray-100 bg-white">
+      tabsSlot={
+        <div className="flex flex-wrap gap-1 px-2 pb-0">
           <button
             type="button"
             onClick={() => onTabChange('complemento')}
-            className={`px-4 py-2 rounded-t-lg text-sm font-semibold transition-colors ${
+            className={`rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors ${
               state.tab === 'complemento'
                 ? 'bg-primary text-white'
                 : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
@@ -83,25 +66,25 @@ export function ComplementosTabsModal({
             Complemento
           </button>
         </div>
-
-        <div className="flex-1 overflow-hidden">
-          {state.tab === 'complemento' && (
-            <div className="h-full overflow-y-auto">
-              <NovoComplemento
-                complementoId={state.mode === 'edit' ? state.complementoId : undefined}
-                isEmbedded
-                onSaved={() => {
-                  onReload?.()
-                  onClose()
-                }}
-                onCancel={onClose}
-              />
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+      }
+    >
+      <div className="flex min-h-0 flex-1 flex-col">
+        {state.tab === 'complemento' ? (
+          <NovoComplemento
+            complementoId={state.mode === 'edit' ? state.complementoId : undefined}
+            isEmbedded
+            hideEmbeddedHeader
+            embeddedFormId={COMPLEMENTO_TABS_FORM_ID}
+            hideEmbeddedFormActions
+            onEmbedFormStateChange={setEmbedFormState}
+            onSaved={() => {
+              onReload?.()
+              onClose()
+            }}
+            onCancel={onClose}
+          />
+        ) : null}
+      </div>
+    </JiffySidePanelModal>
   )
 }
-
-

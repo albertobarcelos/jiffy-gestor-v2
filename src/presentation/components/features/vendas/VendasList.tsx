@@ -70,6 +70,33 @@ interface VendasListProps {
   initialStatus?: string | null // Status inicial vindo da URL
 }
 
+/** Mesmas opções do dropdown do dashboard (sem "Datas Personalizadas"). */
+const PERIODOS_SELECT_VALIDOS = [
+  'Todos',
+  'Hoje',
+  'Mês Atual',
+  'Últimos 7 Dias',
+  'Últimos 30 Dias',
+  'Últimos 60 Dias',
+  'Últimos 90 Dias',
+] as const
+
+function normalizarPeriodoSelect(v: string | undefined): string {
+  if (v && (PERIODOS_SELECT_VALIDOS as readonly string[]).includes(v)) return v
+  return 'Todos'
+}
+
+/** Meses curtos para exibir o intervalo de "Por datas" (igual ao dashboard). */
+const MESES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'] as const
+
+function formatarDataHoraFiltroCurta(date: Date): string {
+  const dia = String(date.getDate()).padStart(2, '0')
+  const mes = MESES_ABREV[date.getMonth()]
+  const h = String(date.getHours()).padStart(2, '0')
+  const min = String(date.getMinutes()).padStart(2, '0')
+  return `${dia}-${mes} ${h}:${min}`
+}
+
 /**
  * Componente de listagem de vendas
  * Implementa scroll infinito, filtros avançados e cards de métricas
@@ -79,9 +106,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   const router = useRouter()
   const pathname = usePathname()
 
-  // Calculamos as datas iniciais com base no initialPeriodo logo no início
-  const initialPeriodoValue = initialPeriodo || 'Todos'
-  const initialDates = calculatePeriodo(initialPeriodoValue)
+  const initialPeriodoValue = normalizarPeriodoSelect(initialPeriodo)
 
   // Estados de filtros
   const [searchQuery, setSearchQuery] = useState('')
@@ -91,13 +116,9 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   const [statusFilter, setStatusFilter] = useState<string | null>(
     initialStatus?.toLowerCase() === 'aberta' ? null : initialStatus || null
   )
-  // Se período inicial for "Todos", garante que as datas sejam null
-  const [periodoInicial, setPeriodoInicial] = useState<Date | null>(
-    initialPeriodoValue === 'Todos' ? null : initialDates.inicio
-  )
-  const [periodoFinal, setPeriodoFinal] = useState<Date | null>(
-    initialPeriodoValue === 'Todos' ? null : initialDates.fim
-  )
+  // Intervalo explícito só via "Por datas" (preset do Select não grava datas aqui — igual ao dashboard)
+  const [periodoInicial, setPeriodoInicial] = useState<Date | null>(null)
+  const [periodoFinal, setPeriodoFinal] = useState<Date | null>(null)
   const [tipoVendaFilter, setTipoVendaFilter] = useState<string | null>(null)
   const [meioPagamentoFilter, setMeioPagamentoFilter] = useState<string>('')
   const [usuarioAbertoPorFilter, setUsuarioAbertoPorFilter] = useState<string>('')
@@ -460,23 +481,22 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         baseParams.append('terminalId', filters.terminalFilter)
       }
 
-      // Só envia parâmetros de período se o período não for "Todos" e as datas estiverem definidas
-      // A API externa usa dataFinalizacao quando periodoInicial/periodoFinal são enviados
-      if (filters.periodo !== 'Todos' && filters.periodo !== 'Datas Personalizadas') {
-        if (filters.periodoInicial) {
-          baseParams.append('periodoInicial', filters.periodoInicial.toISOString())
-        }
-        if (filters.periodoFinal) {
-          baseParams.append('periodoFinal', filters.periodoFinal.toISOString())
-        }
-      } else if (filters.periodo === 'Datas Personalizadas') {
-        // Para datas personalizadas, envia as datas que estiverem definidas
-        if (filters.periodoInicial) {
-          baseParams.append('periodoInicial', filters.periodoInicial.toISOString())
-        }
-        if (filters.periodoFinal) {
-          baseParams.append('periodoFinal', filters.periodoFinal.toISOString())
-        }
+      // Período na API: intervalo de "Por datas" tem prioridade; senão preset do Select; "Todos" sem datas
+      let inicioFiltro: Date | null = null
+      let fimFiltro: Date | null = null
+      if (filters.periodoInicial && filters.periodoFinal) {
+        inicioFiltro = filters.periodoInicial
+        fimFiltro = filters.periodoFinal
+      } else if (filters.periodo !== 'Todos') {
+        const { inicio, fim } = calculatePeriodo(filters.periodo)
+        inicioFiltro = inicio
+        fimFiltro = fim
+      }
+      if (inicioFiltro) {
+        baseParams.append('periodoInicial', inicioFiltro.toISOString())
+      }
+      if (fimFiltro) {
+        baseParams.append('periodoFinal', fimFiltro.toISOString())
       }
 
       // Busca todas as páginas automaticamente
@@ -604,9 +624,8 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       clearTimeout(debounceTimerRef.current)
     }
 
-    // Para datas personalizadas, busca imediatamente sem debounce
-    const isDatasPersonalizadas = periodo === 'Datas Personalizadas'
-    const delay = isDatasPersonalizadas ? 100 : 1000
+    // Ao confirmar "Por datas", refetch mais rápido (igual ideia do fluxo antigo)
+    const delay = periodoInicial && periodoFinal ? 100 : 1000
 
     debounceTimerRef.current = setTimeout(() => {
       fetchVendas()
@@ -641,23 +660,6 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     // Aciona a busca inicial de vendas com os filtros já configurados
     fetchVendas()
   }, [fetchVendas]) // Dependência apenas do fetchVendas
-
-  // Atualiza período quando muda (apenas se período não for "Datas Personalizadas")
-  useEffect(() => {
-    if (periodo === 'Datas Personalizadas') {
-      return
-    }
-
-    const { inicio, fim } = calculatePeriodo(periodo)
-    // Quando período for "Todos", garante que as datas sejam null
-    if (periodo === 'Todos') {
-      setPeriodoInicial(null)
-      setPeriodoFinal(null)
-    } else {
-      setPeriodoInicial(inicio)
-      setPeriodoFinal(fim)
-    }
-  }, [periodo])
 
   /**
    * Limpa todos os filtros
@@ -714,21 +716,21 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
    * Confirma seleção de datas e aplica filtro
    */
   const handleConfirmDatas = (dataInicial: Date | null, dataFinal: Date | null) => {
-    // Atualiza o filtersRef imediatamente para garantir que fetchVendas use os valores corretos
-    // Isso evita problemas de race condition com o useEffect
-    const novoPeriodo = dataInicial || dataFinal ? 'Datas Personalizadas' : 'Todos'
-
     filtersRef.current.periodoInicial = dataInicial
     filtersRef.current.periodoFinal = dataFinal
-    filtersRef.current.periodo = novoPeriodo
-
-    // Atualiza os estados (isso vai disparar o useEffect, mas o filtersRef já está atualizado)
     setPeriodoInicial(dataInicial)
     setPeriodoFinal(dataFinal)
-    setPeriodo(novoPeriodo)
+    // O valor do Select (Período) não muda — igual ao dashboard
+  }
 
-    // O useEffect com debounce vai disparar automaticamente e buscar as vendas
-    // O filtersRef já está atualizado, então fetchVendas() vai usar os valores corretos
+  /** Ao trocar o preset, remove o intervalo definido em "Por datas". */
+  const handlePeriodoSelectChange = (novoPeriodo: string) => {
+    setPeriodo(novoPeriodo)
+    setPeriodoInicial(null)
+    setPeriodoFinal(null)
+    filtersRef.current.periodo = novoPeriodo
+    filtersRef.current.periodoInicial = null
+    filtersRef.current.periodoFinal = null
   }
 
   return (
@@ -819,7 +821,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             <FormControl size="small" sx={{ minWidth: 150 }}>
               <Select
                 value={periodo}
-                onChange={e => setPeriodo(e.target.value)}
+                onChange={e => handlePeriodoSelectChange(e.target.value)}
                 sx={{
                   height: '32px',
                   backgroundColor: 'var(--color-primary)',
@@ -835,25 +837,33 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               >
                 <MenuItem value="Todos">Todos</MenuItem>
                 <MenuItem value="Hoje">Hoje</MenuItem>
-                <MenuItem value="Ontem">Ontem</MenuItem>
-                <MenuItem value="Últimos 7 Dias">Últimos 7 Dias</MenuItem>
                 <MenuItem value="Mês Atual">Mês Atual</MenuItem>
-                <MenuItem value="Mês Passado">Mês Passado</MenuItem>
+                <MenuItem value="Últimos 7 Dias">Últimos 7 Dias</MenuItem>
                 <MenuItem value="Últimos 30 Dias">Últimos 30 Dias</MenuItem>
                 <MenuItem value="Últimos 60 Dias">Últimos 60 Dias</MenuItem>
                 <MenuItem value="Últimos 90 Dias">Últimos 90 Dias</MenuItem>
-                <MenuItem value="Datas Personalizadas">Datas Personalizadas</MenuItem>
               </Select>
             </FormControl>
 
             {/* Botão Por Datas */}
             <button
+              type="button"
               onClick={() => setIsDatasModalOpen(true)}
               className="font-nunito flex h-8 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
             >
               <MdCalendarToday size={18} />
               Por datas
             </button>
+            {periodoInicial && periodoFinal ? (
+              <div className="flex shrink-0 flex-col gap-0 text-[11px] leading-snug text-primary/85 sm:text-xs">
+                <span className="whitespace-nowrap">
+                  Dt. Ini.: {formatarDataHoraFiltroCurta(periodoInicial)}
+                </span>
+                <span className="whitespace-nowrap">
+                  Dt. Fim: {formatarDataHoraFiltroCurta(periodoFinal)}
+                </span>
+              </div>
+            ) : null}
           </div>
         </div>
         {/* Filtros Avançados */}
@@ -1170,7 +1180,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               VL. Cancelado
             </div>
             <div className="flex-1 text-right text-xs uppercase md:text-sm">VL. Faturado</div>
-            <div className="hidden flex-1 justify-end uppercase md:flex">Cupom</div>
+            <div className="hidden flex-1 justify-end uppercase md:flex">Comprovante</div>
           </div>
 
           {/* Lista com scroll */}

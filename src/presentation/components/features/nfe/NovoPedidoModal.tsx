@@ -1,6 +1,19 @@
 'use client'
 
-import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
+import {
+  useState,
+  useMemo,
+  useRef,
+  useCallback,
+  useEffect,
+  forwardRef,
+  type ReactElement,
+  type Ref,
+} from 'react'
+import Box from '@mui/material/Box'
+import Slide from '@mui/material/Slide'
+import type { BackdropProps } from '@mui/material/Backdrop'
+import type { TransitionProps } from '@mui/material/transitions'
 import {
   Dialog,
   DialogContent,
@@ -74,6 +87,8 @@ interface NovoPedidoModalProps {
   open: boolean
   onClose: () => void
   onSuccess: () => void
+  /** Chamado após o painel terminar a transição de saída (permite desmontar o pai sem cortar o slide) */
+  onAfterClose?: () => void
   // Props opcionais para visualizar venda existente
   vendaId?: string // ID da venda para carregar e visualizar
   modoVisualizacao?: boolean // Se true, abre direto na step 4 em modo apenas visualização
@@ -225,6 +240,53 @@ function statusFiscalEhEmitida(
   return s === 'EMITIDA'
 }
 
+/** Painel alinhado à direita: entra deslizando da direita e, ao fechar, volta para a direita */
+const PedidoPainelSlide = forwardRef(function PedidoPainelSlide(
+  props: TransitionProps & { children: ReactElement },
+  ref: Ref<unknown>
+) {
+  return <Slide ref={ref} direction="left" {...props} />
+})
+PedidoPainelSlide.displayName = 'PedidoPainelSlide'
+
+/**
+ * Backdrop sem Fade interno do MUI — o Dialog repassa a mesma duração do papel ao Backdrop padrão,
+ * o que esmaece o fundo na entrada; aqui o overlay aparece no mesmo frame, só o painel desliza.
+ */
+const PainelPedidoBackdrop = forwardRef<HTMLDivElement, BackdropProps>(
+  function PainelPedidoBackdrop(
+    { open, invisible, className, sx, style, onClick, ...other },
+    ref
+  ) {
+    return (
+      <Box
+        ref={ref}
+        aria-hidden
+        className={['MuiBackdrop-root', className].filter(Boolean).join(' ')}
+        onClick={onClick}
+        {...other}
+        sx={[
+          {
+            position: 'fixed',
+            right: 0,
+            bottom: 0,
+            top: 0,
+            left: 0,
+            zIndex: -1,
+            display: open ? 'block' : 'none',
+            WebkitTapHighlightColor: 'transparent',
+            bgcolor: invisible ? 'transparent' : 'rgba(0, 0, 0, 0.5)',
+            transition: 'none',
+          },
+          ...(Array.isArray(sx) ? sx : sx != null ? [sx] : []),
+        ]}
+        style={style}
+      />
+    )
+  }
+)
+PainelPedidoBackdrop.displayName = 'PainelPedidoBackdrop'
+
 function statusFiscalPermiteCancelarNota(
   resumoStatus: string | null | undefined,
   statusUnificado: string | null | undefined,
@@ -242,6 +304,7 @@ export function NovoPedidoModal({
   open,
   onClose,
   onSuccess,
+  onAfterClose,
   vendaId,
   modoVisualizacao,
   tabelaOrigemVenda = 'venda_gestor',
@@ -1030,7 +1093,7 @@ export function NovoPedidoModal({
     const abreComplementos = produto.abreComplementosAtivo()
     const temComplementos = produtoTemComplementos(produto)
 
-    // Se o produto tem complementos e abreComplementos é true, abrir modal antes de adicionar
+    // Só abre o modal ao escolher no grupo quando abreComplementos está true; na lista o usuário abre pelo botão
     if (abreComplementos && temComplementos) {
       setProdutoSelecionadoParaComplementos(produto)
       setProdutoIndexEdicaoComplementos(null) // Novo produto, não está editando
@@ -1153,11 +1216,7 @@ export function NovoPedidoModal({
 
     if (!produto) return
 
-    const abreComplementos = produto.abreComplementosAtivo()
-    const temComplementos = produtoTemComplementos(produto)
-
-    if (!abreComplementos || !temComplementos) return
-
+    // Na lista o modal abre sempre (permite vincular complementos mesmo sem grupos ainda); abreComplementos só controla abertura automática ao adicionar no grid
     setProdutoSelecionadoParaComplementos(produto)
     setProdutoIndexEdicaoComplementos(index)
 
@@ -1542,6 +1601,9 @@ export function NovoPedidoModal({
     setNomesMeiosPagamentoPedido({})
     setResumoFinanceiroDetalhes(null)
     setVendaIdCriada(null)
+    setDataVenda('')
+    setNomeUsuario('')
+    nomeUsuarioCarregadoNoCicloRef.current = false
 
     // Limpar timeouts de long press de complementos
     if (longPressComplementoTimeoutRef.current) {
@@ -1549,7 +1611,17 @@ export function NovoPedidoModal({
       longPressComplementoTimeoutRef.current = null
     }
     longPressComplementoIndexRef.current = null
+    setIsLoadingVenda(false)
   }
+
+  const resetFormRef = useRef(resetForm)
+  resetFormRef.current = resetForm
+
+  /** Após o Slide de saída: evita reset síncrono que quebra a animação e notifica o pai (ex.: desmontar com contexto) */
+  const handlePedidoPainelExited = useCallback(() => {
+    resetFormRef.current()
+    onAfterClose?.()
+  }, [onAfterClose])
 
   // Cleanup de timeouts quando o componente for desmontado
   useEffect(() => {
@@ -1575,7 +1647,6 @@ export function NovoPedidoModal({
   const handleClose = () => {
     // Em modo visualização, fechar diretamente sem confirmação
     if (vendaId && modoVisualizacao) {
-      resetForm()
       onClose()
       return
     }
@@ -1583,13 +1654,11 @@ export function NovoPedidoModal({
     if (temDadosVenda()) {
       setModalConfirmacaoSaidaOpen(true)
     } else {
-      resetForm()
       onClose()
     }
   }
 
   const handleConfirmarSaida = () => {
-    resetForm()
     setModalConfirmacaoSaidaOpen(false)
     setInternalDialogOpen(false)
     onClose()
@@ -1668,7 +1737,6 @@ export function NovoPedidoModal({
       setModalCancelarVendaOpen(false)
       setJustificativaCancelamento('')
       setTipoCancelamentoSelecionado('venda')
-      resetForm()
       setInternalDialogOpen(false)
       onSuccess()
       onClose()
@@ -2161,34 +2229,17 @@ export function NovoPedidoModal({
         setCurrentStep(1)
       }
       carregarVendaExistente()
-    } else if (!open) {
-      // Limpar dados quando modal fechar
-      setDataVenda('')
-      setValorFinalVenda(null) // Limpar valor final quando modal fechar
-      setDataFinalizacaoCarregada(null)
-      setVendaGestorJaCancelada(false)
-      setModalCancelarVendaOpen(false)
-      setJustificativaCancelamento('')
-      // Resetar step apenas se não estiver em modo visualização
-      if (!modoVisualizacao) {
-        setCurrentStep(1)
-      }
-      setAbaDetalhesPedido('infoPedido')
-      setResumoFiscal(null)
-      setOrigemTextoApiDetalhe(null)
-      setStatusVendaTextoApiDetalhe(null)
-      setDetalhesPedidoMeta(null)
-      setNomesUsuariosPedido({})
-      setNomesMeiosPagamentoPedido({})
-      setResumoFinanceiroDetalhes(null)
-      setVendaIdCriada(null)
     }
+    // Limpeza ao fechar fica em resetForm via Transition onExited (evita sumir o conteúdo no meio do slide)
   }, [open, vendaId, modoVisualizacao, carregarVendaExistente])
 
   // Buscar nome do usuário gestor quando o modal abrir
   useEffect(() => {
     const fetchNomeUsuario = async () => {
-      if (!open || !auth) {
+      if (!open) {
+        return
+      }
+      if (!auth) {
         setNomeUsuario('')
         nomeUsuarioCarregadoNoCicloRef.current = false
         setIsLoadingUsuario(false)
@@ -2281,9 +2332,8 @@ export function NovoPedidoModal({
         setInternalDialogOpen(true)
         setModalConfirmacaoSaidaOpen(true)
       } else {
-        // Permite o fechamento se não houver dados
+        // Permite o fechamento se não houver dados (reset após Slide — onExited)
         setInternalDialogOpen(false)
-        resetForm()
         onClose()
       }
     } else {
@@ -2369,6 +2419,10 @@ export function NovoPedidoModal({
         open={internalDialogOpen}
         onOpenChange={handleDialogOpenChange}
         maxWidth={false}
+        TransitionComponent={PedidoPainelSlide}
+        transitionDuration={{ enter: 420, exit: 380 }}
+        TransitionProps={{ onExited: handlePedidoPainelExited }}
+        slots={{ backdrop: PainelPedidoBackdrop }}
         sx={{
           '& .MuiDialog-container': {
             zIndex: 1300,
@@ -2376,7 +2430,11 @@ export function NovoPedidoModal({
             alignItems: 'stretch',
             justifyContent: 'flex-end',
           },
-          '& .MuiBackdrop-root': { zIndex: 1300, backgroundColor: 'rgba(0, 0, 0, 0.5)' },
+          '& .MuiBackdrop-root': {
+            zIndex: 1300,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            transition: 'none',
+          },
           '& .MuiDialog-paper': {
             zIndex: 1300,
             backgroundColor: '#ffffff',
@@ -2744,6 +2802,11 @@ export function NovoPedidoModal({
                         {produtos.map((produto, index) => {
                           // calcularTotalProduto já inclui complementos e desconto/acréscimo
                           const totalProdutoComComplementos = calcularTotalProduto(produto)
+                          const produtoEntityAcoes = produtosList.find(
+                            p => p.getId() === produto.produtoId
+                          )
+                          // Botão sempre que o produto estiver na lista do grupo (modal permite vincular complementos ao produto)
+                          const exibirBotaoComplementos = !!produtoEntityAcoes
 
                           return (
                             <div key={index} className="space-y-0">
@@ -2924,48 +2987,48 @@ export function NovoPedidoModal({
                                     R$ {formatarNumeroComMilhar(totalProdutoComComplementos)}
                                   </span>
                                 </div>
-                                {/* Ações (Editar, Complementos e Remover) */}
-                                <div className="flex flex-1 justify-end gap-1">
-                                  <button
-                                    onClick={() => abrirModalEdicaoProduto(index)}
-                                    type="button"
-                                    title="Editar produto"
-                                    className="flex h-7 min-h-[28px] w-7 min-w-[28px] items-center justify-center rounded border-0 p-0 transition-colors hover:bg-gray-200"
-                                  >
-                                    <MdEdit className="h-4 w-4 text-primary" />
-                                  </button>
-                                  {(() => {
-                                    const produtoEntity = produtosList.find(
-                                      p => p.getId() === produto.produtoId
-                                    )
-                                    if (!produtoEntity) return null
-
-                                    const abreComplementos = produtoEntity.abreComplementosAtivo()
-                                    const temComplementos = produtoTemComplementos(produtoEntity)
-
-                                    if (!abreComplementos || !temComplementos) return null
-
-                                    return (
+                                {/* Ações: colunas fixas (editar | complementos | excluir) */}
+                                <div
+                                  className="flex w-[76px] flex-shrink-0 items-center justify-end gap-0"
+                                  role="group"
+                                  aria-label="Ações do produto"
+                                >
+                                  <div className="flex h-6 w-6 shrink-0 items-center justify-center">
+                                    <button
+                                      onClick={() => abrirModalEdicaoProduto(index)}
+                                      type="button"
+                                      title="Editar produto"
+                                      className="flex h-5 w-5 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-gray-200"
+                                    >
+                                      <MdEdit className="h-4 w-4 text-primary" />
+                                    </button>
+                                  </div>
+                                  <div className="flex h-6 w-6 shrink-0 items-center justify-center">
+                                    {exibirBotaoComplementos ? (
                                       <button
                                         onClick={() =>
                                           abrirModalComplementosProdutoExistente(index)
                                         }
                                         type="button"
-                                        className="flex h-7 min-h-[28px] w-7 min-w-[28px] items-center justify-center rounded border-0 p-0 transition-colors hover:bg-gray-200"
-                                        title="Editar complementos"
+                                        className="flex h-5 w-5 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-gray-200"
+                                        title="Complementos (editar ou vincular)"
                                       >
                                         <MdLaunch className="h-4 w-4 text-primary" />
                                       </button>
-                                    )
-                                  })()}
-                                  <button
-                                    onClick={() => removerProduto(index)}
-                                    type="button"
-                                    title="Remover produto"
-                                    className="flex h-7 min-h-[28px] w-7 min-w-[28px] items-center justify-center rounded border-0 p-0 transition-colors hover:bg-red-100"
-                                  >
-                                    <MdDelete className="h-4 w-4 text-red-500" />
-                                  </button>
+                                    ) : (
+                                      <span className="block h-6 w-6 shrink-0" aria-hidden />
+                                    )}
+                                  </div>
+                                  <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+                                    <button
+                                      onClick={() => removerProduto(index)}
+                                      type="button"
+                                      title="Remover produto"
+                                      className="flex h-6 w-6 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-red-100"
+                                    >
+                                      <MdDelete className="h-4 w-4 text-red-500" />
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
 
@@ -2998,11 +3061,6 @@ export function NovoPedidoModal({
                                         p => p.getId() === produto.produtoId
                                       )
                                       if (!produtoEntity) return
-
-                                      const abreComplementos = produtoEntity.abreComplementosAtivo()
-                                      const temComplementos = produtoTemComplementos(produtoEntity)
-
-                                      if (!abreComplementos || !temComplementos) return
 
                                       longPressComplementoIndexRef.current = index
                                       longPressComplementoTimeoutRef.current = setTimeout(() => {
@@ -3070,16 +3128,20 @@ export function NovoPedidoModal({
                                     </div>
                                     {/* Espaço vazio onde seria o Total (complementos não têm total próprio) */}
                                     <div className="flex-1"></div>
-                                    {/* Botão Remover Complemento */}
-                                    <div className="flex flex-1 justify-end">
-                                      <button
-                                        onClick={() => removerComplemento(index, compIndex)}
-                                        type="button"
-                                        title="Remover complemento"
-                                        className="flex h-5 min-h-[20px] w-5 min-w-[20px] items-center justify-center border-0 p-0"
-                                      >
-                                        <MdClear className="h-3 w-3 text-red-500" />
-                                      </button>
+                                    {/* Mesma grade de ações da linha do produto: remove alinhado à coluna Exc. */}
+                                    <div className="flex w-[76px] flex-shrink-0 items-center justify-end gap-0.5">
+                                      <span className="block h-6 w-6 shrink-0" aria-hidden />
+                                      <span className="block h-6 w-6 shrink-0" aria-hidden />
+                                      <div className="flex h-6 w-6 shrink-0 items-center justify-center">
+                                        <button
+                                          onClick={() => removerComplemento(index, compIndex)}
+                                          type="button"
+                                          title="Remover complemento"
+                                          className="flex h-6 w-6 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-red-50"
+                                        >
+                                          <MdClear className="h-3.5 w-3.5 text-red-500" />
+                                        </button>
+                                      </div>
                                     </div>
                                   </div>
                                 )
@@ -4135,7 +4197,6 @@ export function NovoPedidoModal({
                 <Button
                   size="large"
                   onClick={() => {
-                    resetForm()
                     onSuccess()
                     onClose()
                   }}

@@ -1,17 +1,27 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Complemento } from '@/src/domain/entities/Complemento'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
 import { showToast } from '@/src/shared/utils/toast'
-import { MdOutlineOfflinePin } from 'react-icons/md'
 
 interface NovoComplementoProps {
   complementoId?: string
   isEmbedded?: boolean
+  /** Quando true com isEmbedded, omite o cabeçalho interno (título + Cancelar) — o shell do modal já fornece */
+  hideEmbeddedHeader?: boolean
+  /** `id` do `<form>` para o rodapé externo usar `form="..."` no botão Salvar */
+  embeddedFormId?: string
+  /** Omite a linha de Salvar dentro do formulário (ações ficam no rodapé do painel) */
+  hideEmbeddedFormActions?: boolean
+  /** Sincroniza estado com o rodapé do modal (loading / pode submeter) */
+  onEmbedFormStateChange?: (state: {
+    isSubmitting: boolean
+    canSubmit: boolean
+  }) => void
   onSaved?: () => void
   onCancel?: () => void
 }
@@ -23,6 +33,10 @@ interface NovoComplementoProps {
 export function NovoComplemento({
   complementoId,
   isEmbedded,
+  hideEmbeddedHeader,
+  embeddedFormId,
+  hideEmbeddedFormActions,
+  onEmbedFormStateChange,
   onSaved,
   onCancel,
 }: NovoComplementoProps) {
@@ -41,6 +55,17 @@ export function NovoComplemento({
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingComplemento, setIsLoadingComplemento] = useState(false)
   const hasLoadedComplementoRef = useRef(false)
+
+  const emitEmbedFormState = useCallback(() => {
+    onEmbedFormStateChange?.({
+      isSubmitting: isLoading,
+      canSubmit: nome.trim().length > 0,
+    })
+  }, [isLoading, nome, onEmbedFormStateChange])
+
+  useEffect(() => {
+    emitEmbedFormState()
+  }, [emitEmbedFormState])
 
   // Carregar dados do complemento se estiver editando
   useEffect(() => {
@@ -183,31 +208,42 @@ export function NovoComplemento({
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header fixo */}
-      <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[20px] shadow-md md:px-[30px] px-2 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            
-            <h1 className="text-primary md:text-lg text-sm font-semibold font-exo">
-              {isEditing
-                ? `Editar Complemento: ${nome || ''}`
-                : `Novo Complemento: ${nome || ''}`}
-            </h1>
+    <div
+      className={
+        isEmbedded && hideEmbeddedHeader
+          ? 'flex min-h-0 flex-1 flex-col'
+          : 'flex h-full flex-col'
+      }
+    >
+      {/* Header fixo — omitido quando o modal shell já exibe título e fechar */}
+      {!(isEmbedded && hideEmbeddedHeader) ? (
+        <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[20px] shadow-md md:px-[30px] px-2 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h1 className="text-primary md:text-lg text-sm font-semibold font-exo">
+                {isEditing
+                  ? `Editar Complemento: ${nome || ''}`
+                  : `Novo Complemento: ${nome || ''}`}
+              </h1>
+            </div>
+            <Button
+              onClick={handleCancel}
+              variant="outlined"
+              className="h-8 px-[26px] rounded-lg border-primary/15 text-primary bg-primary/10 hover:bg-primary/20"
+            >
+              Cancelar
+            </Button>
           </div>
-          <Button
-            onClick={handleCancel}
-            variant="outlined"
-            className="h-8 px-[26px] rounded-lg border-primary/15 text-primary bg-primary/10 hover:bg-primary/20"
-          >
-            Cancelar
-          </Button>
         </div>
-      </div>
+      ) : null}
 
       {/* Formulário com scroll */}
       <div className="flex-1 overflow-y-auto md:px-[30px] px-1 py-[30px]">
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form
+          id={embeddedFormId}
+          onSubmit={handleSubmit}
+          className="space-y-6"
+        >
           {/* Dados */}
           <div className="bg-info rounded-[10px] p-2">
             <div className="flex items-center gap-5 mb-2">
@@ -293,17 +329,20 @@ export function NovoComplemento({
             </div>
           </div>
 
-          {/* Botões de ação */}
-          <div className="flex justify-end pt-4">
-            
-            <Button type="submit" disabled={isLoading || !nome} 
-            sx={{
-              backgroundColor: 'var(--color-primary)',
-            }}
-            className="text-white hover:bg-primary/80 w-32 h-8">
-              {isLoading ? 'Salvando...' : isEditing ? 'Atualizar' : 'Salvar'}
-            </Button>
-          </div>
+          {hideEmbeddedFormActions ? null : (
+            <div className="flex justify-end pt-4">
+              <Button
+                type="submit"
+                disabled={isLoading || !nome}
+                sx={{
+                  backgroundColor: 'var(--color-primary)',
+                }}
+                className="h-8 w-32 text-white hover:bg-primary/80"
+              >
+                {isLoading ? 'Salvando...' : isEditing ? 'Atualizar' : 'Salvar'}
+              </Button>
+            </div>
+          )}
         </form>
       </div>
     </div>

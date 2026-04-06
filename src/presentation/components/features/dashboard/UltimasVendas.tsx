@@ -130,16 +130,19 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
     }
 
     const extraInfoMap = new Map<string, VendaExtraInfo>()
-    const vendasMapeadas: Venda[] = (items || []).map((item: any) => {
+    const vendasMapeadas: Venda[] = (items || []).map((item: any, index: number) => {
+          const userIdBruto =
+            item.abertoPor?.id ??
+            item.usuarioPdv?.id ??
+            item.usuario?.id ??
+            item.abertoPorId ??
+            item.usuarioId
           const userId =
-            item.abertoPor?.id ||
-            item.usuarioPdv?.id ||
-            item.usuario?.id ||
-            item.abertoPorId ||
-            item.usuarioId ||
-            ''
+            userIdBruto != null && String(userIdBruto).trim() !== ''
+              ? String(userIdBruto)
+              : 'desconhecido'
 
-          const dataVenda = item.dataCriacao
+          let dataVenda = item.dataCriacao
             ? new Date(item.dataCriacao)
             : item.data
               ? new Date(item.data)
@@ -148,8 +151,21 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
                 : item.dataAbertura
                   ? new Date(item.dataAbertura)
                   : new Date()
+          if (Number.isNaN(dataVenda.getTime())) {
+            dataVenda = new Date()
+          }
           const valorFaturado = item.valorFinal || item.valorTotal || item.valor || 0
-          const numeroVenda = item.numeroVenda || item.numero || item.id || ''
+          // Não usar item.id (UUID) como número: parseInt em UUID vira NaN → 0 e quebra Venda.create
+          const brutoNumero = item.numeroVenda ?? item.numero
+          let numeroVendaNum =
+            typeof brutoNumero === 'number' && Number.isFinite(brutoNumero) && brutoNumero > 0
+              ? brutoNumero
+              : typeof brutoNumero === 'string' && /^\d+$/.test(brutoNumero.trim())
+                ? parseInt(brutoNumero.trim(), 10)
+                : NaN
+          if (!Number.isFinite(numeroVendaNum) || numeroVendaNum <= 0) {
+            numeroVendaNum = index + 1
+          }
           const tipoVendaRaw = item.tipoVenda || item.tipo || 'Balcão'
           // Normalizar tipoVenda para o formato esperado pelo TipoVendaIcon
           // Aceita variações: 'Mesa', 'mesa', 'MESA', etc.
@@ -194,7 +210,12 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
           const dataCancelamento = item.dataCancelamento ? new Date(item.dataCancelamento) : null
           const dataFinalizacao = item.dataFinalizacao ? new Date(item.dataFinalizacao) : null
 
-          const vendaId = item.id?.toString() || ''
+          const vendaId =
+            item.id != null && String(item.id).trim() !== ''
+              ? String(item.id)
+              : item.vendaId != null && String(item.vendaId).trim() !== ''
+                ? String(item.vendaId)
+                : `venda-lista-${index}`
 
           // Armazenar informações extras para o TipoVendaIcon
           // Converte numeroMesa para número, tratando 0 como valor válido
@@ -216,7 +237,7 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
           return Venda.create(
             vendaId,
             dataVenda,
-            typeof numeroVenda === 'number' ? numeroVenda : parseInt(numeroVenda) || 0,
+            numeroVendaNum,
             userId,
             tipoVendaRaw,
             valorFaturado, // valorInicial

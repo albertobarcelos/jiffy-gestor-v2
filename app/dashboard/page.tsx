@@ -505,7 +505,7 @@ export default function DashboardPage() {
           variants={slideFromLeftVariants}
           initial="hidden"
           animate="visible"
-          className="flex md:flex-row flex-col md:space-x-2 space-y- bg-transparent overflow-x-hidden md:overflow-x-auto border border-primary/50 rounded-lg md:px-2 px-1 pt-2 md:cursor-grab md:active:cursor-grabbing select-none"
+          className="flex md:flex-row flex-col md:space-x-2 space-y-2 bg-transparent overflow-x-hidden md:overflow-x-auto border border-primary/50 rounded-lg md:px-2 px-1 pt-2 md:cursor-grab md:active:cursor-grabbing select-none"
           ref={scrollContainerRef}
           style={{ scrollBehavior: 'smooth' }}
           onMouseDown={handleDragStart}
