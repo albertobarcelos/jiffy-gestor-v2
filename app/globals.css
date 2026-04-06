@@ -179,13 +179,25 @@
 body {
   color: var(--color-primary-text);
   background: var(--color-primary-background);
-  /* Exo 2 aplicada automaticamente via Next.js font optimization */
+  font-family: var(--font-general-sans), system-ui, sans-serif;
+  /* Texto corrido: peso regular (400) — mínimo legível padrão na web */
+  font-weight: 400;
 }
 
-/* Títulos usam Manrope */
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-manrope), sans-serif;
+/* Títulos principais */
+h1,
+h2 {
+  font-family: var(--font-general-sans), system-ui, sans-serif;
   font-weight: 600;
+}
+
+/* Subtítulos e cabeçalhos de apoio */
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-general-sans), system-ui, sans-serif;
+  font-weight: 400;
 }
 
 @layer utilities {

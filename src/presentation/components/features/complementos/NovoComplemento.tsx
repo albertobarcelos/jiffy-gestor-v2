@@ -1,12 +1,61 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Complemento } from '@/src/domain/entities/Complemento'
+import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
+
+/** Labels outlined em preto (MUI usa cinza por padrão) */
+const sxOutlinedLabelTextoEscuro = {
+  '& .MuiInputLabel-root': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiInputLabel-root.Mui-focused': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiInputLabel-root.MuiInputLabel-shrink': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiFormLabel-asterisk': {
+    color: 'var(--color-error)',
+  },
+} as const
+
+/** Padding interno reduzido — base para TextField / Select deste formulário */
+const entradaCompactaInput = {
+  padding: '10px',
+  fontSize: '0.875rem',
+} as const
+
+const entradaCompactaSelect = {
+  padding: '10px',
+  fontSize: '0.875rem',
+  minHeight: '1.5em',
+  lineHeight: 1.4,
+  display: 'flex',
+  alignItems: 'center',
+} as const
+
+const sxEntradaCompactaComplemento = {
+  ...sxOutlinedLabelTextoEscuro,
+  '& .MuiOutlinedInput-input': entradaCompactaInput,
+  '& .MuiSelect-select': entradaCompactaSelect,
+} as const
+
+/** Nome e descrição: exibição em maiúsculas + estado já normalizado no onChange */
+const sxCampoTextoMaiusculo = {
+  ...sxEntradaCompactaComplemento,
+  '& .MuiOutlinedInput-input': {
+    ...entradaCompactaInput,
+    textTransform: 'uppercase' as const,
+  },
+} as const
 
 interface NovoComplementoProps {
   complementoId?: string
@@ -42,6 +91,7 @@ export function NovoComplemento({
 }: NovoComplementoProps) {
   const router = useRouter()
   const { auth } = useAuthStore()
+  const accessToken = auth?.getAccessToken()
   const isEditing = !!complementoId
 
   // Estados do formulário
@@ -54,7 +104,6 @@ export function NovoComplemento({
   // Estados de loading
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingComplemento, setIsLoadingComplemento] = useState(false)
-  const hasLoadedComplementoRef = useRef(false)
 
   const emitEmbedFormState = useCallback(() => {
     onEmbedFormStateChange?.({
@@ -67,31 +116,37 @@ export function NovoComplemento({
     emitEmbedFormState()
   }, [emitEmbedFormState])
 
-  // Carregar dados do complemento se estiver editando
+  // Carregar dados do complemento em modo edição (cancela se id mudar ou desmontar)
   useEffect(() => {
-    if (!isEditing || hasLoadedComplementoRef.current) return
+    if (!isEditing || !complementoId) {
+      setIsLoadingComplemento(false)
+      return
+    }
+
+    let cancelled = false
+    if (!accessToken) {
+      return
+    }
+
+    setIsLoadingComplemento(true)
 
     const loadComplemento = async () => {
-      const token = auth?.getAccessToken()
-      if (!token) return
-
-      setIsLoadingComplemento(true)
-      hasLoadedComplementoRef.current = true
-
       try {
         const response = await fetch(`/api/complementos/${complementoId}`, {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
           },
         })
+
+        if (cancelled) return
 
         if (response.ok) {
           const data = await response.json()
           const complemento = Complemento.fromJSON(data)
 
-          setNome(complemento.getNome())
-          setDescricao(complemento.getDescricao() || '')
+          setNome(complemento.getNome().toUpperCase())
+          setDescricao((complemento.getDescricao() || '').toUpperCase())
           setValor(formatValorFromNumber(complemento.getValor()))
           const tipoBanco = (complemento.getTipoImpactoPreco() || 'nenhum').toLowerCase()
           const tipoNormalizado =
@@ -100,15 +155,22 @@ export function NovoComplemento({
           setAtivo(complemento.isAtivo())
         }
       } catch (error) {
-        console.error('Erro ao carregar complemento:', error)
+        if (!cancelled) {
+          console.error('Erro ao carregar complemento:', error)
+        }
       } finally {
-        setIsLoadingComplemento(false)
+        if (!cancelled) {
+          setIsLoadingComplemento(false)
+        }
       }
     }
 
-    loadComplemento()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditing, complementoId])
+    void loadComplemento()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isEditing, complementoId, accessToken])
 
   // Formatação de valor monetário
   const formatValorInput = (value: string) => {
@@ -150,9 +212,12 @@ export function NovoComplemento({
     try {
       const valorNumero = parseValorToNumber(valor)
 
+      const nomeUpper = nome.trim().toUpperCase()
+      const descUpper = descricao.trim().toUpperCase()
+
       const body: any = {
-        nome,
-        descricao: descricao || undefined,
+        nome: nomeUpper,
+        descricao: descUpper || undefined,
         valor: valorNumero,
         ativo,
         tipoImpactoPreco,
@@ -201,8 +266,14 @@ export function NovoComplemento({
 
   if (isLoadingComplemento) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div
+        className={
+          isEmbedded
+            ? 'flex min-h-0 flex-1 flex-col items-center justify-center'
+            : 'flex min-h-[40vh] flex-col items-center justify-center'
+        }
+      >
+        <JiffyLoading />
       </div>
     )
   }
@@ -253,77 +324,97 @@ export function NovoComplemento({
               <div className="flex-1 h-px bg-primary/70"></div>
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-end gap-3 rounded-lg px-4 py-1">
-                <span className="text-primary-text font-medium">Ativo</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={ativo}
-                    onChange={(e) => setAtivo(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[9px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-                </label>
-              </div>
+            <div className="space-y-6">
+              <JiffyIconSwitch
+                checked={ativo}
+                onChange={e => setAtivo(e.target.checked)}
+                label="Ativo"
+                bordered={false}
+                className="justify-end"
+              />
 
               <Input
                 label="Nome do Complemento"
                 value={nome}
-                onChange={(e) => setNome(e.target.value)}
+                onChange={e => setNome(e.target.value.toUpperCase())}
                 required
+                size="small"
                 placeholder="Nome do complemento"
-                className="bg-primary-bg"
-                InputLabelProps={{
-                  required: true,
-                  sx: {
-                    '& .MuiFormLabel-asterisk': {
-                      color: 'var(--color-error)',
-                    },
-                  },
-                }}
+                className="bg-white"
+                sx={sxCampoTextoMaiusculo}
+                InputLabelProps={{ required: true }}
               />
 
               <Input
                 label="Descrição"
                 value={descricao}
-                onChange={(e) => setDescricao(e.target.value)}
+                onChange={e => setDescricao(e.target.value.toUpperCase())}
+                size="small"
                 placeholder="Descrição do complemento"
-                className="bg-primary-bg"
+                className="bg-white"
+                sx={sxCampoTextoMaiusculo}
               />
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Valor (R$)
-                  </label>
-                  <input
-                    type="text"
+                  <Input
+                    label="Valor (R$)"
                     value={valor}
                     onChange={(e) => setValor(formatValorInput(e.target.value))}
+                    size="small"
                     placeholder="R$ 0,00"
-                    className="w-full px-4 py-3 rounded-xl border-[1.5px] border-gray-400 bg-primary-bg text-gray-900 placeholder:text-gray-500 focus:outline-none focus:border-2 focus:border-primary-text"
+                    className="bg-white"
+                    sx={sxEntradaCompactaComplemento}
+                    inputProps={{
+                      inputMode: 'decimal',
+                      autoComplete: 'off',
+                    }}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tipo Impacto
-                  </label>
-                  <select
-                    value={tipoImpactoPreco}
-                    onChange={(e) => {
-                      const value = e.target.value.toLowerCase()
-                      setTipoImpactoPreco(
-                        value === 'aumenta' || value === 'diminui' ? value : 'nenhum'
-                      )
+                  <FormControl
+                    fullWidth
+                    size="small"
+                    variant="outlined"
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        backgroundColor: '#fff',
+                      },
+                      ...sxEntradaCompactaComplemento,
+                      '& .MuiSelect-select': {
+                        ...entradaCompactaSelect,
+                        textTransform: 'uppercase',
+                      },
                     }}
-                    className="w-full px-4 py-3 rounded-xl border-[1.5px] border-gray-400 bg-primary-bg text-gray-900 focus:outline-none focus:border-2 focus:border-primary-text"
                   >
-                    <option value="nenhum">Nenhum</option>
-                    <option value="aumenta">Aumenta</option>
-                    <option value="diminui">Diminui</option>
-                  </select>
+                    <InputLabel id="novo-complemento-tipo-impacto-label">
+                      Tipo Impacto
+                    </InputLabel>
+                    <Select
+                      labelId="novo-complemento-tipo-impacto-label"
+                      id="novo-complemento-tipo-impacto"
+                      label="Tipo Impacto"
+                      size="small"
+                      value={tipoImpactoPreco}
+                      onChange={e => {
+                        const value = String(e.target.value).toLowerCase()
+                        setTipoImpactoPreco(
+                          value === 'aumenta' || value === 'diminui' ? value : 'nenhum'
+                        )
+                      }}
+                    >
+                      <MenuItem value="nenhum" sx={{ textTransform: 'uppercase' }}>
+                        Nenhum
+                      </MenuItem>
+                      <MenuItem value="aumenta" sx={{ textTransform: 'uppercase' }}>
+                        Aumenta
+                      </MenuItem>
+                      <MenuItem value="diminui" sx={{ textTransform: 'uppercase' }}>
+                        Diminui
+                      </MenuItem>
+                    </Select>
+                  </FormControl>
                 </div>
               </div>
             </div>
@@ -333,7 +424,7 @@ export function NovoComplemento({
             <div className="flex justify-end pt-4">
               <Button
                 type="submit"
-                disabled={isLoading || !nome}
+                disabled={isLoading || !nome.trim()}
                 sx={{
                   backgroundColor: 'var(--color-primary)',
                 }}

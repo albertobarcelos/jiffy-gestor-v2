@@ -66,7 +66,7 @@ export function JiffySidePanelModalDemo() {
           },
         }}
       >
-        <div className="space-y-3 font-['Nunito',sans-serif] text-sm text-primaryText">
+        <div className="space-y-3 font-['Nunito',sans-serif] text-sm text-primary-text">
           <p>
             Conteúdo da aba <strong>{tab === 'a' ? 'A' : 'B'}</strong> — passo simulado:{' '}
             <strong>{step}</strong>/3

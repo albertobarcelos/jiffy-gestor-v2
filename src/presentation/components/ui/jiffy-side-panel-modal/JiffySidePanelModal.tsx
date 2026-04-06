@@ -362,12 +362,12 @@ export function JiffySidePanelModal({
             <div className="min-w-0 flex-1 pr-2">
               <h2
                 id="jiffy-side-panel-title"
-                className="font-['Exo',sans-serif] text-lg font-semibold text-primaryText md:text-xl"
+                className="font-['Exo',sans-serif] text-lg font-semibold uppercase tracking-wide text-primary-text md:text-xl"
               >
                 {title}
               </h2>
               {subtitle ? (
-                <p className="mt-1 font-['Nunito',sans-serif] text-sm text-secondary-text">
+                <p className="mt-1 font-['Nunito',sans-serif] text-sm font-medium uppercase tracking-wide text-primary-text">
                   {subtitle}
                 </p>
               ) : null}
@@ -376,7 +376,7 @@ export function JiffySidePanelModal({
               type="button"
               variant="ghost"
               size="icon"
-              className="shrink-0 text-secondary-text hover:bg-gray-100 hover:text-primaryText"
+              className="shrink-0 text-secondary-text hover:bg-gray-100 hover:text-primary-text"
               aria-label="Fechar"
               onClick={requestClose}
             >

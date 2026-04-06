@@ -143,10 +143,12 @@ const config: Config = {
         'tremor-metric': ['1.875rem', { lineHeight: '2.25rem' }],
       },
       fontFamily: {
-        sans: ['var(--font-exo2)', 'sans-serif'],
-        heading: ['var(--font-manrope)', 'sans-serif'],
-        exo: ['var(--font-exo2)', 'sans-serif'],
-        manrope: ['var(--font-manrope)', 'sans-serif'],
+        sans: ['var(--font-general-sans)', 'system-ui', 'sans-serif'],
+        heading: ['var(--font-general-sans)', 'system-ui', 'sans-serif'],
+        /** Legado: antes Exo 2 — agora General Sans */
+        exo: ['var(--font-general-sans)', 'system-ui', 'sans-serif'],
+        /** Legado: antes Manrope — agora General Sans */
+        manrope: ['var(--font-general-sans)', 'system-ui', 'sans-serif'],
       },
     },
   },

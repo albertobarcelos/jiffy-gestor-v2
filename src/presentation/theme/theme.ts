@@ -49,43 +49,41 @@ export const theme = createTheme({
     },
   },
   typography: {
-    fontFamily: [
-      'Nunito',
-      '-apple-system',
-      'BlinkMacSystemFont',
-      '"Segoe UI"',
-      'Roboto',
-      '"Helvetica Neue"',
-      'Arial',
-      'sans-serif',
-    ].join(','),
+    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
+    body1: { fontWeight: 400 },
+    body2: { fontWeight: 400 },
+    subtitle1: { fontWeight: 400 },
+    subtitle2: { fontWeight: 400 },
+    caption: { fontWeight: 400 },
+    overline: { fontWeight: 400 },
     h1: {
-      fontFamily: 'Exo, sans-serif',
-      fontWeight: 700,
+      fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
+      fontWeight: 600,
     },
     h2: {
-      fontFamily: 'Exo, sans-serif',
-      fontWeight: 700,
+      fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
+      fontWeight: 600,
     },
     h3: {
-      fontFamily: 'Exo, sans-serif',
-      fontWeight: 600,
+      fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
+      fontWeight: 400,
     },
     h4: {
-      fontFamily: 'Exo, sans-serif',
-      fontWeight: 600,
+      fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
+      fontWeight: 400,
     },
     h5: {
-      fontFamily: 'Exo, sans-serif',
-      fontWeight: 600,
+      fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
+      fontWeight: 400,
     },
     h6: {
-      fontFamily: 'Exo, sans-serif',
-      fontWeight: 600,
+      fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
+      fontWeight: 400,
     },
     button: {
       textTransform: 'none',
-      fontWeight: 600,
+      /* Botões: leve ênfase sem igualar título */
+      fontWeight: 500,
     },
   },
   shape: {
@@ -97,7 +95,7 @@ export const theme = createTheme({
         root: {
           borderRadius: 8,
           padding: '8px 16px',
-          fontWeight: 600,
+          fontWeight: 500,
           textTransform: 'none',
           boxShadow: 'none',
           '&:hover': {

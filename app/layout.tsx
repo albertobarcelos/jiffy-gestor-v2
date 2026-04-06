@@ -1,24 +1,19 @@
 import type { Metadata } from 'next'
-import { Exo_2, Manrope } from 'next/font/google'
+import localFont from 'next/font/local'
 import { Toaster } from 'react-hot-toast'
 import { ThemeProvider } from '@/src/presentation/providers/ThemeProvider'
 import { QueryProvider } from '@/src/presentation/providers/QueryProvider'
 import { DocumentoFiscalPdfRetryModal } from '@/src/presentation/components/features/nfe/DocumentoFiscalPdfRetryModal'
 import './globals.css'
 
-// Exo 2 - Fonte para textos normais (corpo do texto)
-const exo2 = Exo_2({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
-  variable: '--font-exo2',
-  display: 'swap',
-})
-
-// Manrope - Fonte para títulos
-const manrope = Manrope({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'],
-  variable: '--font-manrope',
+/**
+ * General Sans (variável, 200–700) — self-hosted em app/fonts/general-sans/
+ * Variável CSS --font-general-sans para Tailwind (font-sans, etc.)
+ */
+const generalSans = localFont({
+  src: './fonts/general-sans/GeneralSans-Variable.woff2',
+  variable: '--font-general-sans',
+  weight: '200 700',
   display: 'swap',
 })
 
@@ -29,12 +24,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" className={generalSans.variable}>
       {/* suppressHydrationWarning: extensões (ex. ColorZilla) injetam atributos no body e disparam falso positivo de hidratação */}
-      <body
-        className={`${exo2.variable} ${manrope.variable} ${exo2.className}`}
-        suppressHydrationWarning
-      >
+      <body className={`${generalSans.className} antialiased`} suppressHydrationWarning>
         <QueryProvider>
           <ThemeProvider>
             {children}
