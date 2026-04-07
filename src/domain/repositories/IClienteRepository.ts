@@ -15,6 +15,8 @@ export interface CriarClienteDTO {
   telefone?: string
   email?: string
   nomeFantasia?: string
+  indicadorInscricaoEstadual?: string
+  inscricaoEstadual?: string
   ativo?: boolean
   endereco?: {
     rua?: string
@@ -30,11 +32,15 @@ export interface CriarClienteDTO {
 export interface AtualizarClienteDTO {
   nome?: string
   razaoSocial?: string
-  cpf?: string
-  cnpj?: string
-  telefone?: string
+  /** null limpa o valor na API (alinhado ao schema Zod e ao repositório) */
+  cpf?: string | null
+  cnpj?: string | null
+  telefone?: string | null
   email?: string
   nomeFantasia?: string
+  indicadorInscricaoEstadual?: string
+  /** null limpa a IE na API */
+  inscricaoEstadual?: string | null
   ativo?: boolean
   endereco?: {
     rua?: string

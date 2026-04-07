@@ -21,7 +21,11 @@ import { CSS } from '@dnd-kit/utilities'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { ProdutosTabsModal, ProdutosTabsModalState } from '../produtos/ProdutosTabsModal'
+import { Produto } from '@/src/domain/entities/Produto'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { MdEdit } from 'react-icons/md'
 
 interface ProdutoGrupo {
   id: string
@@ -45,6 +49,7 @@ interface ProdutosPorGrupoListProps {
 const PAGE_SIZE = 10
 
 export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListProps) {
+  const { auth } = useAuthStore()
   const [localProdutos, setLocalProdutos] = useState<ProdutoGrupo[]>([])
   const [tabsModalState, setTabsModalState] = useState<ProdutosTabsModalState>({
     open: false,
@@ -56,6 +61,9 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
   })
   const listRef = useRef<HTMLDivElement>(null)
   const loadMoreRef = useRef<HTMLDivElement>(null)
+  const previousLocalProdutosRef = useRef<ProdutoGrupo[]>([])
+  const isInitialLoadRef = useRef(true)
+  const previousGrupoIdRef = useRef<string | undefined>(undefined)
 
   // Sensores para drag and drop
   // TouchSensor para mobile - delay curto para melhor UX, tolerance para evitar conflito com scroll
@@ -113,8 +121,56 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
   }, [data])
 
   useEffect(() => {
-    setLocalProdutos(serverProdutos)
-  }, [serverProdutos])
+    // Resetar quando o grupo mudar
+    if (previousGrupoIdRef.current !== grupoProdutoId) {
+      isInitialLoadRef.current = true
+      previousLocalProdutosRef.current = []
+      previousGrupoIdRef.current = grupoProdutoId
+    }
+
+    // Na primeira carga, usar diretamente os produtos do servidor
+    if (isInitialLoadRef.current) {
+      setLocalProdutos(serverProdutos)
+      previousLocalProdutosRef.current = serverProdutos
+      isInitialLoadRef.current = false
+      return
+    }
+
+    // Preservar a ordem atual dos produtos ao fazer merge com dados do servidor
+    // Isso evita que produtos editados mudem de posição
+    if (previousLocalProdutosRef.current.length > 0 && serverProdutos.length > 0) {
+      // Criar um mapa de produtos do servidor por ID para acesso rápido
+      const serverProdutosMap = new Map(serverProdutos.map((p) => [p.id, p]))
+      
+      // Manter produtos existentes na mesma ordem, atualizando seus dados
+      const preservedOrder: ProdutoGrupo[] = []
+      const processedIds = new Set<string>()
+      
+      // Primeiro, manter produtos que já existem na lista local na mesma ordem
+      previousLocalProdutosRef.current.forEach((localProduto) => {
+        const serverProduto = serverProdutosMap.get(localProduto.id)
+        if (serverProduto) {
+          // Atualizar dados mas manter a posição
+          preservedOrder.push(serverProduto)
+          processedIds.add(localProduto.id)
+        }
+      })
+      
+      // Depois, adicionar novos produtos que não estavam na lista local
+      serverProdutos.forEach((serverProduto) => {
+        if (!processedIds.has(serverProduto.id)) {
+          preservedOrder.push(serverProduto)
+        }
+      })
+      
+      setLocalProdutos(preservedOrder)
+      previousLocalProdutosRef.current = preservedOrder
+    } else {
+      // Se não há produtos locais ou no servidor, usar diretamente os do servidor
+      setLocalProdutos(serverProdutos)
+      previousLocalProdutosRef.current = serverProdutos
+    }
+  }, [serverProdutos, grupoProdutoId])
 
   useEffect(() => {
     const sentinel = loadMoreRef.current
@@ -183,6 +239,46 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
     []
   )
 
+  const handleEditProduto = useCallback(
+    async (produtoId: string) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      try {
+        const response = await fetch(`/api/produtos/${produtoId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || 'Erro ao carregar produto')
+        }
+
+        const produtoData = await response.json()
+        const produto = Produto.fromJSON(produtoData)
+
+        setTabsModalState({
+          open: true,
+          tab: 'produto',
+          mode: 'edit',
+          produto,
+          prefillGrupoProdutoId: undefined,
+          grupoId: produto.getGrupoId(),
+        })
+      } catch (err) {
+        console.error('Erro ao carregar produto:', err)
+        showToast.error(err instanceof Error ? err.message : 'Erro ao carregar produto')
+      }
+    },
+    [auth]
+  )
+
   const handleDragEnd = useCallback(
     async (event: DragEndEvent) => {
       const { active, over } = event
@@ -201,6 +297,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
       const previousState = [...localProdutos]
       const updatedState = arrayMove([...localProdutos], oldIndex, newIndex)
       setLocalProdutos(updatedState)
+      previousLocalProdutosRef.current = updatedState
 
       const novaPosicao = newIndex + 1
       try {
@@ -222,6 +319,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
       } catch (err: any) {
         console.error('Erro ao reordenar produto:', err)
         setLocalProdutos(previousState)
+        previousLocalProdutosRef.current = previousState
         showToast.error(err?.message || 'Erro ao reordenar produto')
       }
     },
@@ -297,12 +395,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
       <div ref={listRef} className="flex-1 overflow-y-auto md:px-6 px-1 py-4 space-y-2">
       {isLoading && localProdutos.length === 0 && (
         <div className="flex flex-col items-center justify-center py-8 gap-2">
-          <img
-            src="/images/jiffy-loading.gif"
-            alt="Carregando"
-            className="w-20 object-contain"
-          />
-          <p className="text-sm text-secondary-text text-center">Carregando produtos...</p>
+          <JiffyLoading />
         </div>
       )}
 
@@ -321,6 +414,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
                 produto={produto}
                 index={index}
                 formatCurrency={formatCurrency}
+                onEdit={handleEditProduto}
               />
             ))}
           </SortableContext>
@@ -363,10 +457,12 @@ function ProdutoItem({
   produto,
   index,
   formatCurrency,
+  onEdit,
 }: {
   produto: ProdutoGrupo
   index: number
   formatCurrency: (value: number) => string
+  onEdit: (produtoId: string) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: produto.id,
@@ -387,7 +483,21 @@ function ProdutoItem({
     >
       <div className="col-span-1 md:text-sm text-xs font-semibold text-primary-text">{index + 1}</div>
       <div className="col-span-6 md:text-sm text-xs text-primary-text whitespace-normal break-words">
-        {produto.nome}
+        <div className="flex items-center gap-2">
+          <span>{produto.nome}</span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onEdit(produto.id)
+            }}
+            className="text-primary hover:text-primary/80 transition-colors"
+            aria-label={`Editar ${produto.nome}`}
+            title="Editar produto"
+          >
+            <MdEdit size={16} />
+          </button>
+        </div>
       </div>
       <div className="col-span-3 md:text-sm text-xs text-primary-text">{formatCurrency(produto.valor)}</div>
       <div

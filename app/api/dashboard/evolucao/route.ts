@@ -1,0 +1,255 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { validateRequest } from '@/src/shared/utils/validateRequest'
+import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
+
+type Status = 'FINALIZADA' | 'CANCELADA'
+
+type VendaLike = {
+  dataFinalizacao?: string
+  dataCriacao?: string
+  valorFinal?: number
+  dataCancelamento?: string | null
+}
+
+type VendasPage = {
+  items?: VendaLike[]
+  totalPages?: number
+  count?: number
+  limit?: number
+}
+
+function parseDateSafe(value: unknown): Date | null {
+  if (typeof value !== 'string' || !value) return null
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+function resolveVendaDate(v: VendaLike): Date | null {
+  return parseDateSafe(v.dataFinalizacao) ?? parseDateSafe(v.dataCriacao)
+}
+
+function resolveVendaValor(v: VendaLike): number {
+  return typeof v.valorFinal === 'number' && Number.isFinite(v.valorFinal) ? v.valorFinal : 0
+}
+
+function formatDayLabel(date: Date): string {
+  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
+}
+
+function pad2(n: number): string {
+  return n.toString().padStart(2, '0')
+}
+
+function buildHourKey(date: Date, roundedMinutes: number): { key: string; label: string } {
+  const year = date.getFullYear()
+  const month = pad2(date.getMonth() + 1)
+  const day = pad2(date.getDate())
+  const hour = pad2(date.getHours())
+  const minutes = pad2(roundedMinutes)
+  const key = `${year}-${month}-${day} ${hour}:${minutes}`
+  const label = `${day}/${month} ${hour}:${minutes}`
+  return { key, label }
+}
+
+function roundMinutesForInterval(minutes: number, intervaloMinutos: number): number {
+  if (intervaloMinutos === 15) {
+    const r = Math.round(minutes / 15) * 15
+    return r === 60 ? 0 : r
+  }
+  if (intervaloMinutos === 30) {
+    return minutes < 15 ? 0 : 30
+  }
+  if (intervaloMinutos === 60) return 0
+  return minutes < 15 ? 0 : 30
+}
+
+function shouldGroupByHour(params: {
+  periodoInicial?: Date | null
+  periodoFinal?: Date | null
+  isCustomDates: boolean
+  intervaloHora?: number | null
+}): boolean {
+  const { periodoInicial, periodoFinal, isCustomDates, intervaloHora } = params
+  if (isCustomDates && periodoInicial && periodoFinal) {
+    const diffInHours = (periodoFinal.getTime() - periodoInicial.getTime()) / (1000 * 60 * 60)
+    const hasSpecificHours =
+      periodoInicial.getHours() !== 0 ||
+      periodoInicial.getMinutes() !== 0 ||
+      periodoFinal.getHours() !== 23 ||
+      periodoFinal.getMinutes() !== 59
+    return diffInHours < 48 || hasSpecificHours
+  }
+  // Caso "Hoje" no frontend: o client já manda intervaloHora quando quer agrupar.
+  return typeof intervaloHora === 'number' && intervaloHora > 0
+}
+
+async function fetchAllVendasStatus(args: {
+  apiClient: ApiClient
+  headers: Record<string, string>
+  periodoInicial?: string
+  periodoFinal?: string
+  status: Status
+}): Promise<VendaLike[]> {
+  const { apiClient, headers, periodoInicial, periodoFinal, status } = args
+  const limit = 100
+  let offset = 0
+  let totalPages = 1
+  const all: VendaLike[] = []
+
+  while (offset / limit < totalPages) {
+    const params = new URLSearchParams()
+    if (periodoInicial) params.append('periodoInicial', periodoInicial)
+    if (periodoFinal) params.append('periodoFinal', periodoFinal)
+    params.append('status', status)
+    params.append('limit', String(limit))
+    params.append('offset', String(offset))
+
+    const resp = await apiClient.request<VendasPage>(`/api/v1/operacao-pdv/vendas?${params.toString()}`, {
+      method: 'GET',
+      headers,
+    })
+
+    const page = resp.data ?? {}
+    const items = Array.isArray(page.items) ? page.items : []
+    all.push(...items)
+
+    if (offset === 0) {
+      if (typeof page.totalPages === 'number' && page.totalPages > 0) {
+        totalPages = page.totalPages
+      } else if (typeof page.count === 'number' && typeof page.limit === 'number' && page.limit > 0) {
+        totalPages = Math.ceil(page.count / page.limit)
+      } else {
+        totalPages = items.length < limit ? 1 : 200
+      }
+      totalPages = Math.max(1, Math.min(totalPages, 200))
+    }
+
+    if (items.length < limit) break
+    offset += limit
+  }
+
+  return all
+}
+
+/**
+ * GET /api/dashboard/evolucao
+ *
+ * Retorna pontos já agregados para o gráfico, evitando múltiplos fetches e agregação no client.
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const validation = validateRequest(request)
+    if (!validation.valid || !validation.tokenInfo) {
+      return validation.error!
+    }
+    const { tokenInfo } = validation
+
+    const { searchParams } = new URL(request.url)
+    const periodoInicial = searchParams.get('periodoInicial') || ''
+    const periodoFinal = searchParams.get('periodoFinal') || ''
+    const statuses = searchParams.getAll('status').filter(Boolean) as Status[]
+    const intervaloHoraRaw = searchParams.get('intervaloHora')
+    const intervaloHora = intervaloHoraRaw ? Number(intervaloHoraRaw) : null
+    const isCustomDates = Boolean(periodoInicial && periodoFinal)
+
+    const apiClient = new ApiClient()
+    const headers = {
+      Authorization: `Bearer ${tokenInfo.token}`,
+      'Content-Type': 'application/json',
+    }
+
+    const selectedStatuses: Status[] =
+      statuses.length > 0 ? statuses.filter(s => s === 'FINALIZADA' || s === 'CANCELADA') : ['FINALIZADA']
+
+    const [finalizadas, canceladas] = await Promise.all([
+      selectedStatuses.includes('FINALIZADA')
+        ? fetchAllVendasStatus({
+            apiClient,
+            headers,
+            periodoInicial: periodoInicial || undefined,
+            periodoFinal: periodoFinal || undefined,
+            status: 'FINALIZADA',
+          })
+        : Promise.resolve([]),
+      selectedStatuses.includes('CANCELADA')
+        ? fetchAllVendasStatus({
+            apiClient,
+            headers,
+            periodoInicial: periodoInicial || undefined,
+            periodoFinal: periodoFinal || undefined,
+            status: 'CANCELADA',
+          })
+        : Promise.resolve([]),
+    ])
+
+    const intervaloMinutos = intervaloHora && Number.isFinite(intervaloHora) ? intervaloHora : 30
+    const groupByHour = shouldGroupByHour({
+      periodoInicial: isCustomDates ? new Date(periodoInicial) : null,
+      periodoFinal: isCustomDates ? new Date(periodoFinal) : null,
+      isCustomDates,
+      intervaloHora,
+    })
+
+    const mapFinalizadas = new Map<string, { label: string; valor: number }>()
+    const mapCanceladas = new Map<string, { label: string; valor: number }>()
+
+    const addToMap = (m: Map<string, { label: string; valor: number }>, key: string, label: string, value: number) => {
+      const current = m.get(key)
+      if (current) {
+        m.set(key, { label: current.label, valor: current.valor + value })
+      } else {
+        m.set(key, { label, valor: value })
+      }
+    }
+
+    const addVenda = (v: VendaLike, target: 'FINALIZADA' | 'CANCELADA') => {
+      const date = resolveVendaDate(v)
+      if (!date) return
+      const valor = resolveVendaValor(v)
+
+      if (groupByHour) {
+        const rounded = roundMinutesForInterval(date.getMinutes(), intervaloMinutos)
+        const { key, label } = buildHourKey(date, rounded)
+        if (target === 'FINALIZADA') addToMap(mapFinalizadas, key, label, valor)
+        else addToMap(mapCanceladas, key, label, valor)
+      } else {
+        const year = date.getFullYear()
+        const month = pad2(date.getMonth() + 1)
+        const day = pad2(date.getDate())
+        const key = `${year}-${month}-${day}`
+        const label = formatDayLabel(date)
+        if (target === 'FINALIZADA') addToMap(mapFinalizadas, key, label, valor)
+        else addToMap(mapCanceladas, key, label, valor)
+      }
+    }
+
+    finalizadas.forEach(v => addVenda(v, 'FINALIZADA'))
+    canceladas.forEach(v => addVenda(v, 'CANCELADA'))
+
+    // Montar um eixo de datas consistente entre os dois mapas
+    const keys = Array.from(new Set([...mapFinalizadas.keys(), ...mapCanceladas.keys()])).sort()
+
+    const points = keys.map(key => {
+      const f = mapFinalizadas.get(key)
+      const c = mapCanceladas.get(key)
+      return {
+        data: key,
+        label: f?.label ?? c?.label ?? key,
+        valorFinalizadas: f?.valor ?? 0,
+        valorCanceladas: c?.valor ?? 0,
+      }
+    })
+
+    return NextResponse.json(points)
+  } catch (error) {
+    console.error('Erro ao buscar evolução do dashboard:', error)
+    if (error instanceof ApiError) {
+      return NextResponse.json(
+        { error: error.message || 'Erro ao buscar evolução do dashboard' },
+        { status: error.status }
+      )
+    }
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
+  }
+}
+

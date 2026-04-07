@@ -58,6 +58,9 @@ export class ProdutoRepository implements IProdutoRepository {
       if (grupoComplementosId) {
         url += `&grupoComplementosId=${encodeURIComponent(grupoComplementosId)}`
       }
+      // Tentar incluir impressoras na resposta (algumas APIs usam include ou expand)
+      // Se a API não suportar, será ignorado
+      url += `&include=impressoras`
 
       const response = await this.apiClient.request<{
         items: any[]
@@ -80,8 +83,9 @@ export class ProdutoRepository implements IProdutoRepository {
         total: response.data.count || 0,
       }
     } catch (error) {
+      // Preserva ApiError para manter o status code (ex: 504 para timeout)
       if (error instanceof ApiError) {
-        throw new Error(error.message || 'Erro ao buscar produtos')
+        throw error
       }
       throw error
     }

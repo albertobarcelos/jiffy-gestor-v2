@@ -8,6 +8,7 @@ import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import toast from 'react-hot-toast'
 import { MdPerson, MdClose, MdSearch } from 'react-icons/md'
 import {
@@ -395,12 +396,7 @@ export function NovoPerfilUsuario({
   if (isLoadingPerfil) {
     return (
       <div className="flex flex-col items-center justify-center h-full">
-        <img
-          src="/images/jiffy-loading.gif"
-          alt="Carregando"
-          className="w-20 h-20 object-contain"
-        />
-        <span className="text-sm font-medium text-primary-text font-nunito mt-2">Carregando...</span>
+        <JiffyLoading />
       </div>
     )
   }

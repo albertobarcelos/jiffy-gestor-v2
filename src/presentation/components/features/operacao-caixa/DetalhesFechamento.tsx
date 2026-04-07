@@ -6,6 +6,7 @@ import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
 import { MdClose } from 'react-icons/md'
 import { CircularProgress } from '@mui/material'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 
 // Tipos
 interface OperacaoCaixaDetalhada {
@@ -243,12 +244,7 @@ export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesF
         >
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-12">
-              <img
-                src="/images/jiffy-loading.gif"
-                alt="Carregando"
-                className="w-20 object-contain"
-              />
-              <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
+              <JiffyLoading />
             </div>
           ) : operacaoCaixa ? (
             <>

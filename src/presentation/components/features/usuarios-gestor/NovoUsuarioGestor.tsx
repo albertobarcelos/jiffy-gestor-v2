@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from '@/src/presentation/components/ui/select'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { MdPerson, MdVisibility, MdVisibilityOff } from 'react-icons/md'
 
 interface NovoUsuarioGestorProps {
@@ -333,12 +334,7 @@ export function NovoUsuarioGestor({
   if (isLoadingUsuario) {
     return (
       <div className="flex flex-col items-center justify-center h-full">
-        <img
-          src="/images/jiffy-loading.gif"
-          alt="Carregando"
-          className="w-20 h-20 object-contain"
-        />
-        <span className="text-sm font-medium text-primary-text font-nunito mt-2">Carregando...</span>
+        <JiffyLoading />
       </div>
     )
   }
@@ -434,11 +430,7 @@ export function NovoUsuarioGestor({
                 </label>
                 {isLoadingPerfis ? (
                   <div className="w-full px-4 py-3 rounded-lg border border-gray-400 bg-info flex items-center justify-center">
-                    <img
-                      src="/images/jiffy-loading.gif"
-                      alt="Carregando"
-                      className="w-6 h-6"
-                    />
+                    <JiffyLoading className="!gap-0 !py-0" size={24} />
                   </div>
                 ) : (
                   <Select
@@ -554,12 +546,7 @@ export function NovoUsuarioGestor({
                   </div>
                 ) : !perfilGestorCompleto ? (
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center">
-                    <img
-                      src="/images/jiffy-loading.gif"
-                      alt="Carregando"
-                      className="w-6 h-6"
-                    />
-                    <span className="ml-2 text-sm text-secondary-text">Carregando módulos...</span>
+                    <JiffyLoading className="!gap-0 !py-0" size={24} />
                   </div>
                 ) : (
                   <div className="space-y-2">

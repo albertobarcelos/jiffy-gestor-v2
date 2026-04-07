@@ -9,6 +9,7 @@ import { Complemento } from '@/src/domain/entities/Complemento'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useComplementos } from '@/src/presentation/hooks/useComplementos'
 import {
   ComplementosTabsModal,
@@ -244,12 +245,7 @@ export function NovoGrupoComplemento({
   if (isLoadingGrupo) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-2">
-        <img
-          src="/images/jiffy-loading.gif"
-          alt="Carregando"
-          className="w-16 h-16 object-contain"
-        />
-        <p className="text-sm text-secondary-text text-center">Carregando grupo...</p>
+        <JiffyLoading />
       </div>
     )
   }

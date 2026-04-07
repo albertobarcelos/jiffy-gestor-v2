@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, Suspense, useRef, useCallback } from 'rea
 import { useRouter, useSearchParams } from 'next/navigation'
 import { InformacoesProdutoStep } from './NovoProduto/InformacoesProdutoStep'
 import { ConfiguracoesGeraisStep } from './NovoProduto/ConfiguracoesGeraisStep'
+import { ConfiguracaoFiscalStep } from './NovoProduto/ConfiguracaoFiscalStep'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
@@ -13,6 +14,7 @@ interface NovoProdutoProps {
   produtoId?: string
   isCopyMode?: boolean
   defaultGrupoProdutoId?: string
+  initialStep?: 0 | 1 | 2
   onClose?: () => void
   onSuccess?: (produtoData?: { produtoId: string; produtoData: any }) => void
 }
@@ -24,6 +26,7 @@ function NovoProdutoContent({
   produtoId,
   isCopyMode = false,
   defaultGrupoProdutoId,
+  initialStep = 0,
   onClose,
   onSuccess,
 }: NovoProdutoProps) {
@@ -31,8 +34,8 @@ function NovoProdutoContent({
   const searchParams = useSearchParams()
   const { auth } = useAuthStore()
 
-  // Estado do step atual (0 = Informações, 1 = Configurações)
-  const [selectedPage, setSelectedPage] = useState(0)
+  // Estado do step atual (0 = Informações, 1 = Configurações, 2 = Configuração Fiscal)
+  const [selectedPage, setSelectedPage] = useState<0 | 1 | 2>(initialStep)
 
   // Estados do formulário
   const [nomeProduto, setNomeProduto] = useState('')
@@ -49,6 +52,42 @@ function NovoProdutoContent({
   const [impressorasIds, setImpressorasIds] = useState<string[]>([])
   // Guardar os grupos originais para comparar na remoção
   const [originalGrupoComplementosIds, setOriginalGrupoComplementosIds] = useState<string[]>([])
+
+  // Estados fiscais
+  const [ncm, setNcm] = useState('')
+  const [cest, setCest] = useState('')
+  const [origemMercadoria, setOrigemMercadoria] = useState<string | null>('0') // Padrão: 0 - Nacional
+  const [tipoProduto, setTipoProduto] = useState<string | null>('00') // Padrão: 00 - Mercadoria para Revenda
+  const [indicadorProducaoEscala, setIndicadorProducaoEscala] = useState<string | null>(null)
+  // Status de disponibilidade do microsserviço fiscal (retornado pelo backend)
+  const [fiscalStatus, setFiscalStatus] = useState<'available' | 'unavailable' | undefined>(undefined)
+
+  // Estado de validação do NCM via API do backend
+  const [ncmValidation, setNcmValidation] = useState<{
+    codigo: string
+    valido: boolean
+    descricao?: string
+    mensagem: string
+  } | null>(null)
+  const [isValidatingNcm, setIsValidatingNcm] = useState(false)
+  const ncmValidationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Armazena o último NCM validado para evitar chamadas duplicadas
+  const lastValidatedNcmRef = useRef<string>('')
+
+  // Estado de validação do CEST e lista de CESTs compatíveis com o NCM
+  const [cestsDisponiveis, setCestsDisponiveis] = useState<
+    { codigo: string; descricao: string; segmento: string; numeroAnexo?: string }[]
+  >([])
+  const [isLoadingCests, setIsLoadingCests] = useState(false)
+  const [cestValidation, setCestValidation] = useState<{
+    codigo: string
+    valido: boolean
+    descricao?: string
+    segmento?: string
+    mensagem: string
+  } | null>(null)
+  const [isValidatingCest, setIsValidatingCest] = useState(false)
+  const lastFetchedNcmForCestsRef = useRef<string>('')
 
   // Estados de loading
   const [isLoadingProduto, setIsLoadingProduto] = useState(false)
@@ -67,6 +106,12 @@ function NovoProdutoContent({
     if (defaultGrupoProdutoId && defaultGrupoProdutoId !== grupoProduto) {
       setGrupoProduto(defaultGrupoProdutoId)
     }
+    // Resetar campos fiscais para valores padrão na criação
+    setNcm('')
+    setCest('')
+    setOrigemMercadoria('0') // Padrão na criação
+    setTipoProduto('00') // Padrão na criação
+    setIndicadorProducaoEscala(null)
   }, [defaultGrupoProdutoId, effectiveProdutoId, effectiveIsCopyMode, grupoProduto])
 
   // Refs para evitar loops infinitos
@@ -74,6 +119,17 @@ function NovoProdutoContent({
   const loadedProdutoIdRef = useRef<string | null>(null)
   const lastProdutoIdRef = useRef<string | null | undefined>(null)
   const lastIsCopyModeRef = useRef<boolean>(false)
+  // Ref para armazenar dados fiscais do produto carregado (sem preencher campos ainda)
+  const fiscalDataFromProductRef = useRef<{
+    ncm?: string
+    cest?: string
+    origemMercadoria?: string
+    tipoProduto?: string
+    indicadorProducaoEscala?: string | null
+    fiscalStatus?: 'available' | 'unavailable' | undefined
+  } | null>(null)
+  // Ref para controlar se os dados fiscais já foram carregados no passo 3
+  const hasLoadedFiscalDataRef = useRef(false)
 
   // Carregar grupos de produtos usando React Query (com cache)
   const formatCurrency = useCallback((value: number | string) => {
@@ -175,6 +231,27 @@ function NovoProdutoContent({
           setGrupoComplementosIds(gruposIds)
           setOriginalGrupoComplementosIds(gruposIds) // Guardar os grupos originais
           setImpressorasIds(produto.impressoras?.map((i: any) => i.id) || [])
+          
+          // IMPORTANTE: Não preencher campos fiscais imediatamente para evitar chamadas ao microserviço fiscal
+          // Os dados fiscais serão carregados apenas quando o usuário chegar no passo 3 (ConfiguracaoFiscalStep)
+          // Armazenar dados fiscais em uma ref para uso posterior
+          const dadosFiscais = produto.fiscal || {}
+          fiscalDataFromProductRef.current = {
+            ncm: dadosFiscais.ncm || produto.ncm || '',
+            cest: dadosFiscais.cest || '',
+            origemMercadoria: dadosFiscais.origemMercadoria?.toString() || 
+              produto.origemMercadoria?.toString() || 
+              '',
+            tipoProduto: dadosFiscais.tipoProduto || 
+              produto.tipoProduto || 
+              '',
+            indicadorProducaoEscala: dadosFiscais.indicadorProducaoEscala || 
+              produto.indicadorProducaoEscala || 
+              null,
+            fiscalStatus: produto.fiscalStatus || undefined,
+          }
+          // Resetar flag de carregamento fiscal quando produto muda
+          hasLoadedFiscalDataRef.current = false
 
           if (currentEffectiveIsCopyMode) {
             const nomeOriginal = produto.nome || ''
@@ -203,12 +280,454 @@ function NovoProdutoContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [produtoId, isCopyMode]) // Apenas quando produtoId ou isCopyMode mudarem (valores estáveis das props)
 
+  // Carregar dados fiscais apenas quando o usuário chegar no passo 3 (ConfiguracaoFiscalStep)
+  // Isso evita chamadas desnecessárias ao microserviço fiscal durante o carregamento inicial
+  useEffect(() => {
+    // Só carregar dados fiscais se estivermos no passo 3 e ainda não carregamos
+    if (selectedPage !== 2 || hasLoadedFiscalDataRef.current) {
+      return
+    }
+
+    // Se temos dados fiscais armazenados do produto carregado, preencher os campos
+    if (fiscalDataFromProductRef.current) {
+      const fiscalData = fiscalDataFromProductRef.current
+      setNcm(fiscalData.ncm || '')
+      setCest(fiscalData.cest || '')
+      setOrigemMercadoria(fiscalData.origemMercadoria || '0')
+      setTipoProduto(fiscalData.tipoProduto || '00')
+      setIndicadorProducaoEscala(fiscalData.indicadorProducaoEscala || null)
+      setFiscalStatus(fiscalData.fiscalStatus || undefined)
+      hasLoadedFiscalDataRef.current = true
+    } else if (effectiveProdutoId) {
+      // Se não temos dados fiscais armazenados mas estamos editando, buscar do produto
+      // Isso pode acontecer se o usuário navegou diretamente para o passo 3
+      const token = auth?.getAccessToken()
+      if (!token) return
+
+      const loadFiscalData = async () => {
+        try {
+          const response = await fetch(`/api/produtos/${effectiveProdutoId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          })
+
+          if (response.ok) {
+            const produto = await response.json()
+            const dadosFiscais = produto.fiscal || {}
+            setNcm(dadosFiscais.ncm || produto.ncm || '')
+            setCest(dadosFiscais.cest || '')
+            setOrigemMercadoria(
+              dadosFiscais.origemMercadoria?.toString() || 
+              produto.origemMercadoria?.toString() || 
+              '0'
+            )
+            setTipoProduto(
+              dadosFiscais.tipoProduto || 
+              produto.tipoProduto || 
+              '00'
+            )
+            setIndicadorProducaoEscala(
+              dadosFiscais.indicadorProducaoEscala || 
+              produto.indicadorProducaoEscala || 
+              null
+            )
+            setFiscalStatus(produto.fiscalStatus || undefined)
+            hasLoadedFiscalDataRef.current = true
+          }
+        } catch (error) {
+          console.error('Erro ao carregar dados fiscais:', error)
+        }
+      }
+
+      loadFiscalData()
+    }
+  }, [selectedPage, effectiveProdutoId, auth])
+
+  // Validação do NCM via API do backend (com debounce de 600ms)
+  // IMPORTANTE: Só valida se estivermos no passo 3 (ConfiguracaoFiscalStep) para evitar chamadas desnecessárias
+  // Fluxo: Frontend → Backend → Microserviço Fiscal (frontend nunca se comunica diretamente com o fiscal)
+  useEffect(() => {
+    // Não validar se não estivermos no passo fiscal
+    if (selectedPage !== 2) {
+      return
+    }
+
+    // Limpar timer anterior
+    if (ncmValidationTimerRef.current) {
+      clearTimeout(ncmValidationTimerRef.current)
+    }
+
+    const ncmTrimmed = ncm.trim()
+
+    // Se vazio, limpar validação sem chamar API
+    if (!ncmTrimmed) {
+      setNcmValidation(null)
+      setIsValidatingNcm(false)
+      lastValidatedNcmRef.current = ''
+      return
+    }
+
+    // Se não tem 8 dígitos numéricos, mostrar erro local (sem chamar API)
+    if (!/^\d{8}$/.test(ncmTrimmed)) {
+      setNcmValidation(null)
+      setIsValidatingNcm(false)
+      lastValidatedNcmRef.current = ''
+      return
+    }
+
+    // Se já validamos esse mesmo NCM, verificar se o estado está sincronizado
+    if (lastValidatedNcmRef.current === ncmTrimmed) {
+      // Se o estado ncmValidation não corresponde ao NCM atual, limpar e revalidar
+      // Isso pode acontecer se o usuário voltar para um NCM anteriormente validado
+      if (ncmValidation && ncmValidation.codigo !== ncmTrimmed) {
+        // Estado dessincronizado - limpar e permitir revalidação
+        setNcmValidation(null)
+        lastValidatedNcmRef.current = ''
+        // Continuar o fluxo para revalidar
+      } else if (ncmValidation && ncmValidation.codigo === ncmTrimmed) {
+        // Estado sincronizado - usar cache
+        return
+      }
+    }
+
+    // Debounce: aguardar 600ms após parar de digitar
+    setIsValidatingNcm(true)
+    ncmValidationTimerRef.current = setTimeout(async () => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        setIsValidatingNcm(false)
+        return
+      }
+
+      // Timeout de 5 segundos para evitar espera longa se microserviço fiscal estiver off
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+      try {
+        const response = await fetch(
+          `/api/v1/fiscal/configuracoes/ncms/validar/${ncmTrimmed}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            signal: controller.signal,
+          }
+        )
+
+        clearTimeout(timeoutId)
+
+        if (response.ok) {
+          const result = await response.json()
+          setNcmValidation(result)
+          lastValidatedNcmRef.current = ncmTrimmed
+        } else {
+          // Se erro de comunicação com fiscal, não bloquear o usuário
+          setNcmValidation(null)
+          lastValidatedNcmRef.current = ''
+        }
+      } catch (error) {
+        clearTimeout(timeoutId)
+        // Erro de rede ou timeout — não bloquear o usuário
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          // Timeout: microserviço fiscal pode estar off
+          console.warn('Timeout ao validar NCM - microserviço fiscal pode estar indisponível')
+        }
+        setNcmValidation(null)
+        lastValidatedNcmRef.current = ''
+      } finally {
+        setIsValidatingNcm(false)
+      }
+    }, 600)
+
+    // Cleanup do timer ao desmontar ou re-executar
+    return () => {
+      if (ncmValidationTimerRef.current) {
+        clearTimeout(ncmValidationTimerRef.current)
+      }
+    }
+  }, [ncm, auth, selectedPage])
+
+  // Buscar CESTs compatíveis quando o NCM é validado com sucesso
+  // Fluxo: Frontend → Backend → Microserviço Fiscal (frontend nunca se comunica diretamente com o fiscal)
+  // IMPORTANTE: Só busca se estivermos no passo 3 (ConfiguracaoFiscalStep) para evitar chamadas desnecessárias
+  useEffect(() => {
+    // Não buscar se não estivermos no passo fiscal
+    if (selectedPage !== 2) {
+      return
+    }
+
+    const ncmTrimmed = ncm.trim()
+
+    // Se NCM não está validado como válido, limpar lista de CESTs
+    // IMPORTANTE: Verificar se o código do NCM validado corresponde ao NCM atual
+    if (!ncmValidation || !ncmValidation.valido || ncmTrimmed.length !== 8 || ncmValidation.codigo !== ncmTrimmed) {
+      setCestsDisponiveis([])
+      setCestValidation(null)
+      lastFetchedNcmForCestsRef.current = ''
+      return
+    }
+
+    // Se já buscamos CESTs para este NCM, não buscar novamente
+    if (lastFetchedNcmForCestsRef.current === ncmTrimmed) {
+      return
+    }
+
+    const fetchCests = async () => {
+      const token = auth?.getAccessToken()
+      if (!token) return
+
+      setIsLoadingCests(true)
+      // Timeout de 5 segundos para evitar espera longa se microserviço fiscal estiver off
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+      try {
+        const response = await fetch(
+          `/api/v1/fiscal/configuracoes/cests/por-ncm/${ncmTrimmed}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            signal: controller.signal,
+          }
+        )
+
+        clearTimeout(timeoutId)
+
+        if (response.ok) {
+          const result = await response.json()
+          setCestsDisponiveis(Array.isArray(result) ? result : [])
+          lastFetchedNcmForCestsRef.current = ncmTrimmed
+        } else {
+          // Se erro de comunicação com fiscal, não bloquear o usuário
+          setCestsDisponiveis([])
+          lastFetchedNcmForCestsRef.current = ''
+        }
+      } catch (error) {
+        clearTimeout(timeoutId)
+        // Erro de rede ou timeout — não bloquear o usuário
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          // Timeout: microserviço fiscal pode estar off
+          console.warn('Timeout ao buscar CESTs - microserviço fiscal pode estar indisponível')
+        }
+        setCestsDisponiveis([])
+        lastFetchedNcmForCestsRef.current = ''
+      } finally {
+        setIsLoadingCests(false)
+      }
+    }
+
+    fetchCests()
+  }, [ncmValidation, ncm, auth, selectedPage])
+
+  // Validar CEST selecionado via API do backend (com debounce de 400ms)
+  // Inclui validação de compatibilidade CEST x NCM quando o NCM está disponível.
+  // Usa AbortController para cancelar requisições pendentes se o CEST/NCM mudar.
+  // IMPORTANTE: Só valida se estivermos no passo 3 (ConfiguracaoFiscalStep) para evitar chamadas desnecessárias
+  useEffect(() => {
+    // Não validar se não estivermos no passo fiscal
+    if (selectedPage !== 2) {
+      return
+    }
+
+    const cestTrimmed = cest.trim()
+    const ncmTrimmed = ncm.trim()
+
+    // Se CEST vazio, limpar validação
+    if (!cestTrimmed) {
+      setCestValidation(null)
+      setIsValidatingCest(false)
+      return
+    }
+
+    // Se não tem 7 dígitos numéricos, não chamar API
+    if (!/^\d{7}$/.test(cestTrimmed)) {
+      setCestValidation(null)
+      setIsValidatingCest(false)
+      return
+    }
+
+    // Se o CEST está na lista de disponíveis para o NCM atual, já sabemos que é compatível
+    const cestDisponivel = cestsDisponiveis.find(c => c.codigo === cestTrimmed)
+    if (cestDisponivel) {
+      setCestValidation({
+        codigo: cestTrimmed,
+        valido: true,
+        descricao: cestDisponivel.descricao,
+        segmento: cestDisponivel.segmento,
+        mensagem: 'CEST válido (compatível com o NCM informado)',
+      })
+      setIsValidatingCest(false)
+      return
+    }
+
+    // Se não está na lista, validar via API (com verificação de compatibilidade NCM)
+    const abortController = new AbortController()
+    setIsValidatingCest(true)
+
+    const timer = setTimeout(async () => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        setIsValidatingCest(false)
+        return
+      }
+
+      // Timeout de 5 segundos para evitar espera longa se microserviço fiscal estiver off
+      const timeoutId = setTimeout(() => abortController.abort(), 5000)
+
+      try {
+        // Se temos um NCM válido, validar compatibilidade CEST x NCM diretamente
+        const hasValidNcm = /^\d{8}$/.test(ncmTrimmed) && ncmValidation?.valido
+        const url = hasValidNcm
+          ? `/api/v1/fiscal/configuracoes/cests/validar/${cestTrimmed}/ncm/${ncmTrimmed}`
+          : `/api/v1/fiscal/configuracoes/cests/validar/${cestTrimmed}`
+
+        const response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          signal: abortController.signal,
+        })
+
+        clearTimeout(timeoutId)
+
+        if (abortController.signal.aborted) return
+
+        if (response.ok) {
+          const result = await response.json()
+
+          // Normalizar a resposta (endpoints retornam campos diferentes)
+          if (hasValidNcm) {
+            // Resposta de compatibilidade: { cestCodigo, ncmCodigo, compativel, descricaoCest, mensagem }
+            setCestValidation({
+              codigo: result.cestCodigo || cestTrimmed,
+              valido: result.compativel ?? false,
+              descricao: result.descricaoCest,
+              mensagem: result.mensagem || (result.compativel
+                ? 'CEST compatível com o NCM informado'
+                : 'CEST não é compatível com o NCM informado'),
+            })
+          } else {
+            // Resposta de validação simples: { codigo, valido, descricao, segmento, mensagem }
+            setCestValidation(result)
+          }
+        } else {
+          // Erro de comunicação: não bloquear o usuário
+          setCestValidation(null)
+        }
+      } catch (error) {
+        clearTimeout(timeoutId)
+        // Ignorar erros de abort (cancelamento intencional ou timeout)
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          // Timeout: microserviço fiscal pode estar off
+          console.warn('Timeout ao validar CEST - microserviço fiscal pode estar indisponível')
+          return
+        }
+        setCestValidation(null)
+      } finally {
+        if (!abortController.signal.aborted) {
+          setIsValidatingCest(false)
+        }
+      }
+    }, 400)
+
+    return () => {
+      clearTimeout(timer)
+      abortController.abort()
+    }
+  }, [cest, ncm, ncmValidation, cestsDisponiveis, auth, selectedPage])
+
+  // Preencher automaticamente o Indicador de Produção em Escala Relevante quando CEST for preenchido
+  useEffect(() => {
+    if (cest && cest.trim() !== '') {
+      // Se CEST foi preenchido e o indicador está vazio, preenche automaticamente com "Produzido em Escala Relevante"
+      if (!indicadorProducaoEscala) {
+        setIndicadorProducaoEscala('1')
+      }
+    }
+    // Não limpa o indicador quando CEST é removido - o usuário pode querer manter
+  }, [cest]) // Apenas monitora o CEST, não o indicador
+
+  // Função de retry: recarrega os dados do produto (resetando cache para forçar nova busca fiscal)
+  const handleRetryFiscal = useCallback(() => {
+    hasLoadedProdutoRef.current = false
+    loadedProdutoIdRef.current = null
+    // Forçar re-execução do useEffect mudando a ref interna
+    const currentCopyFromId = searchParams.get('copyFrom')
+    const currentEffectiveProdutoId = produtoId || currentCopyFromId
+    const currentEffectiveIsCopyMode = isCopyMode || !!currentCopyFromId
+
+    if (!currentEffectiveProdutoId) return
+
+    const token = auth?.getAccessToken()
+    if (!token) return
+
+    setIsLoadingProduto(true)
+    fetch(`/api/produtos/${currentEffectiveProdutoId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    })
+      .then(async (response) => {
+        if (response.ok) {
+          const produto = await response.json()
+          const dadosFiscais = produto.fiscal || {}
+          setNcm(dadosFiscais.ncm || produto.ncm || '')
+          setCest(dadosFiscais.cest || '')
+          setOrigemMercadoria(
+            dadosFiscais.origemMercadoria?.toString() ||
+            produto.origemMercadoria?.toString() ||
+            ''
+          )
+          setTipoProduto(
+            dadosFiscais.tipoProduto ||
+            produto.tipoProduto ||
+            ''
+          )
+          setIndicadorProducaoEscala(
+            dadosFiscais.indicadorProducaoEscala ||
+            produto.indicadorProducaoEscala ||
+            null
+          )
+          setFiscalStatus(produto.fiscalStatus || undefined)
+
+          // Marcar como carregado para não duplicar
+          hasLoadedProdutoRef.current = true
+          loadedProdutoIdRef.current = `${currentEffectiveProdutoId}-${currentEffectiveIsCopyMode}`
+        }
+      })
+      .catch((error) => {
+        console.error('Erro ao recarregar dados fiscais:', error)
+      })
+      .finally(() => {
+        setIsLoadingProduto(false)
+      })
+  }, [produtoId, isCopyMode, searchParams, auth])
+
   const handleNext = () => {
-    setSelectedPage(1)
+    if (selectedPage < 2) {
+      setSelectedPage((selectedPage + 1) as 0 | 1 | 2)
+    }
   }
 
   const handleBack = () => {
-    setSelectedPage(0)
+    if (selectedPage > 0) {
+      setSelectedPage((selectedPage - 1) as 0 | 1 | 2)
+    }
+  }
+
+  const handleBackFromFiscal = () => {
+    setSelectedPage(1)
+  }
+
+  const handleNextFromFiscal = () => {
+    handleSave()
   }
 
   const handleCancel = () => {
@@ -220,10 +739,54 @@ function NovoProdutoContent({
   }
 
   const handleSave = async () => {
-    // Validação
+    // Validação do Preço de Venda
     const precoVendaNum = parseFloat(precoVenda.replace(/[^\d,]/g, '').replace(',', '.'))
     if (!precoVenda || precoVendaNum === 0) {
       showToast.error('O campo "Preço de Venda" não pode ser vazio ou zero.')
+      return
+    }
+
+    // Validação do NCM: deve ter exatamente 8 dígitos numéricos quando preenchido
+    if (ncm && ncm.trim() !== '') {
+      const ncmTrimmed = ncm.trim()
+      if (!/^\d{8}$/.test(ncmTrimmed)) {
+        showToast.error('O código NCM deve conter exatamente 8 dígitos numéricos.')
+        return
+      }
+      // Bloquear se a validação da API indicou NCM inválido
+      if (ncmValidation && !ncmValidation.valido) {
+        showToast.error(ncmValidation.mensagem || 'O código NCM informado não é válido.')
+        return
+      }
+      // Bloquear se ainda está validando
+      if (isValidatingNcm) {
+        showToast.error('Aguarde a validação do NCM antes de salvar.')
+        return
+      }
+    }
+
+    // Validação do CEST: deve ter exatamente 7 dígitos numéricos quando preenchido
+    if (cest && cest.trim() !== '') {
+      const cestTrimmed = cest.trim()
+      if (!/^\d{7}$/.test(cestTrimmed)) {
+        showToast.error('O código CEST deve conter exatamente 7 dígitos numéricos.')
+        return
+      }
+      // Bloquear se a validação da API indicou CEST inválido
+      if (cestValidation && !cestValidation.valido) {
+        showToast.error(cestValidation.mensagem || 'O código CEST informado não é válido.')
+        return
+      }
+      // Bloquear se ainda está validando
+      if (isValidatingCest) {
+        showToast.error('Aguarde a validação do CEST antes de salvar.')
+        return
+      }
+    }
+
+    // Validação: Se o Indicador de Produção em Escala Relevante estiver preenchido, o CEST deve estar preenchido
+    if (indicadorProducaoEscala && (!cest || cest.trim() === '')) {
+      showToast.error('A informação sobre a "Produção em Escala Relevante" foi preenchida sem preencher o código CEST')
       return
     }
 
@@ -240,7 +803,15 @@ function NovoProdutoContent({
         return
       }
 
-      const body = {
+      // Montar objeto de dados fiscais (só inclui se houver pelo menos um campo preenchido)
+      const fiscalData: any = {}
+      if (ncm && ncm.trim() !== '') fiscalData.ncm = ncm.trim()
+      if (cest && cest.trim() !== '') fiscalData.cest = cest.trim()
+      if (origemMercadoria) fiscalData.origemMercadoria = parseInt(origemMercadoria)
+      if (tipoProduto) fiscalData.tipoProduto = tipoProduto
+      if (indicadorProducaoEscala) fiscalData.indicadorProducaoEscala = indicadorProducaoEscala
+
+      const body: any = {
         nome: nomeProduto,
         descricao: descricaoProduto,
         valor: precoVendaNum,
@@ -252,7 +823,14 @@ function NovoProdutoContent({
         permiteDesconto,
         gruposComplementosIds: grupoComplementosIds,
         impressorasIds,
+        // Manter ncm no body para compatibilidade (backend ainda aceita)
+        ncm: ncm || undefined,
         ...(effectiveProdutoId ? { ativo } : {}),
+      }
+
+      // Adicionar objeto fiscal apenas se houver dados fiscais
+      if (Object.keys(fiscalData).length > 0) {
+        body.fiscal = fiscalData
       }
 
       const url = effectiveProdutoId && !effectiveIsCopyMode
@@ -441,22 +1019,34 @@ function NovoProdutoContent({
         <div className="flex items-center justify-center gap-4">
           <div
             className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-bold font-exo transition-colors ${
-              selectedPage === 0 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-primary'
+              selectedPage >= 0 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-primary'
             }`}
           >
             1
           </div>
           <div
             className={`h-[2px] w-28 transition-colors ${
-              selectedPage === 1 ? 'bg-[#B7E246]' : 'bg-[#CEDCF8]'
+              selectedPage >= 1 ? 'bg-[#B7E246]' : 'bg-[#CEDCF8]'
             }`}
           />
           <div
             className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-bold font-exo transition-colors ${
-              selectedPage === 1 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-[#1D3B53]'
+              selectedPage >= 1 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-[#1D3B53]'
             }`}
           >
             2
+          </div>
+          <div
+            className={`h-[2px] w-28 transition-colors ${
+              selectedPage >= 2 ? 'bg-[#B7E246]' : 'bg-[#CEDCF8]'
+            }`}
+          />
+          <div
+            className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-bold font-exo transition-colors ${
+              selectedPage >= 2 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-[#1D3B53]'
+            }`}
+          >
+            3
           </div>
         </div>
       </div>
@@ -479,7 +1069,7 @@ function NovoProdutoContent({
             isLoadingGrupos={isLoadingGrupos}
             onNext={handleNext}
           />
-        ) : (
+        ) : selectedPage === 1 ? (
           <ConfiguracoesGeraisStep
             favorito={favorito}
             onFavoritoChange={setFavorito}
@@ -498,7 +1088,32 @@ function NovoProdutoContent({
             isEditMode={!!effectiveProdutoId && !effectiveIsCopyMode}
             canManageAtivo={canManageAtivo}
             onBack={handleBack}
-            onSave={handleSave}
+            onSave={handleNext}
+            saveButtonText="Próximo"
+          />
+        ) : (
+          <ConfiguracaoFiscalStep
+            fiscalStatus={fiscalStatus}
+            onRetryFiscal={handleRetryFiscal}
+            isLoadingFiscal={isLoadingProduto}
+            ncm={ncm}
+            onNcmChange={setNcm}
+            ncmValidation={ncmValidation}
+            isValidatingNcm={isValidatingNcm}
+            cest={cest}
+            onCestChange={setCest}
+            cestsDisponiveis={cestsDisponiveis}
+            isLoadingCests={isLoadingCests}
+            cestValidation={cestValidation}
+            isValidatingCest={isValidatingCest}
+            origemMercadoria={origemMercadoria}
+            onOrigemMercadoriaChange={setOrigemMercadoria}
+            tipoProduto={tipoProduto}
+            onTipoProdutoChange={setTipoProduto}
+            indicadorProducaoEscala={indicadorProducaoEscala}
+            onIndicadorProducaoEscalaChange={setIndicadorProducaoEscala}
+            onBack={handleBackFromFiscal}
+            onNext={handleNextFromFiscal}
           />
         )}
       </div>
@@ -514,6 +1129,7 @@ export function NovoProduto({
   produtoId,
   isCopyMode = false,
   defaultGrupoProdutoId,
+  initialStep = 0,
   onClose,
   onSuccess,
 }: NovoProdutoProps) {
@@ -523,6 +1139,7 @@ export function NovoProduto({
         produtoId={produtoId}
         isCopyMode={isCopyMode}
         defaultGrupoProdutoId={defaultGrupoProdutoId}
+        initialStep={initialStep}
         onClose={onClose}
         onSuccess={onSuccess}
       />

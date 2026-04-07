@@ -3,9 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/dev-server.js",
+    "dev:port": "next dev -p",
     "build": "next build",
-    "start": "next start",
+    "start": "node scripts/start-server.js",
+    "start:port": "next start -p",
     "lint": "next lint",
     "type-check": "tsc --noEmit"
   },
@@ -31,6 +33,9 @@
     "@radix-ui/react-tabs": "^1.1.1",
     "@tanstack/react-query": "^5.56.0",
     "@tanstack/react-query-devtools": "^5.91.0",
+    "@headlessui/react": "^2.2.0",
+    "@remixicon/react": "^4.4.0",
+    "@tremor/react": "^3.18.7",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "critters": "^0.0.24",
@@ -51,6 +56,7 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@tailwindcss/forms": "^0.5.11",
     "@types/js-cookie": "^3.0.6",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.0.0",

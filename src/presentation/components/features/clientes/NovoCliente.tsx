@@ -6,8 +6,17 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/src/presentation/components/ui/select'
+import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
 import { showToast } from '@/src/shared/utils/toast'
-import { MdSearch, MdClear, MdPerson, MdLocationOn } from 'react-icons/md'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { MdSearch, MdClear, MdPerson, MdLocationOn, MdReceiptLong } from 'react-icons/md'
 
 interface NovoClienteProps {
   clienteId?: string
@@ -15,6 +24,47 @@ interface NovoClienteProps {
   onClose?: () => void
   onSaved?: () => void
 }
+
+// Siglas dos estados brasileiros em ordem alfabética
+const ESTADOS_BRASILEIROS = [
+  { sigla: 'AC', nome: 'Acre' },
+  { sigla: 'AL', nome: 'Alagoas' },
+  { sigla: 'AP', nome: 'Amapá' },
+  { sigla: 'AM', nome: 'Amazonas' },
+  { sigla: 'BA', nome: 'Bahia' },
+  { sigla: 'CE', nome: 'Ceará' },
+  { sigla: 'DF', nome: 'Distrito Federal' },
+  { sigla: 'ES', nome: 'Espírito Santo' },
+  { sigla: 'GO', nome: 'Goiás' },
+  { sigla: 'MA', nome: 'Maranhão' },
+  { sigla: 'MT', nome: 'Mato Grosso' },
+  { sigla: 'MS', nome: 'Mato Grosso do Sul' },
+  { sigla: 'MG', nome: 'Minas Gerais' },
+  { sigla: 'PA', nome: 'Pará' },
+  { sigla: 'PB', nome: 'Paraíba' },
+  { sigla: 'PR', nome: 'Paraná' },
+  { sigla: 'PE', nome: 'Pernambuco' },
+  { sigla: 'PI', nome: 'Piauí' },
+  { sigla: 'RJ', nome: 'Rio de Janeiro' },
+  { sigla: 'RN', nome: 'Rio Grande do Norte' },
+  { sigla: 'RS', nome: 'Rio Grande do Sul' },
+  { sigla: 'RO', nome: 'Rondônia' },
+  { sigla: 'RR', nome: 'Roraima' },
+  { sigla: 'SC', nome: 'Santa Catarina' },
+  { sigla: 'SP', nome: 'São Paulo' },
+  { sigla: 'SE', nome: 'Sergipe' },
+  { sigla: 'TO', nome: 'Tocantins' },
+]
+
+/** Indicador da inscrição estadual (padrão SPED / documentação fiscal) */
+const INDICADOR_IE_OPCOES = [
+  { value: '1', label: 'Contribuinte ICMS' },
+  { value: '2', label: 'Contribuinte isento de IE' },
+  { value: '9', label: 'Não contribuinte' },
+] as const
+
+/** Valor interno do Select quando o indicador não foi escolhido (não enviado à API) */
+const INDICADOR_IE_NAO_INFORMADO = '__none__'
 
 /**
  * Componente para criar/editar cliente
@@ -38,6 +88,8 @@ export function NovoCliente({
   const [telefone, setTelefone] = useState('')
   const [email, setEmail] = useState('')
   const [nomeFantasia, setNomeFantasia] = useState('')
+  const [indicadorInscricaoEstadual, setIndicadorInscricaoEstadual] = useState('')
+  const [inscricaoEstadual, setInscricaoEstadual] = useState('')
   const [ativo, setAtivo] = useState(true)
   const [incluirEndereco, setIncluirEndereco] = useState(false)
 
@@ -49,6 +101,9 @@ export function NovoCliente({
   const [estado, setEstado] = useState('')
   const [cep, setCep] = useState('')
   const [complemento, setComplemento] = useState('')
+  const [cidadeValida, setCidadeValida] = useState<boolean | null>(null)
+  const [codigoCidadeIbge, setCodigoCidadeIbge] = useState<string>('')
+  const [codigoEstadoIbge, setCodigoEstadoIbge] = useState<string>('')
 
   // Estados de loading
   const [isLoading, setIsLoading] = useState(false)
@@ -117,6 +172,11 @@ export function NovoCliente({
           
           setEmail(cliente.getEmail() || '')
           setNomeFantasia(cliente.getNomeFantasia() || '')
+          const indIe = cliente.getIndicadorInscricaoEstadual()
+          setIndicadorInscricaoEstadual(
+            indIe != null && String(indIe).trim() !== '' ? String(indIe) : ''
+          )
+          setInscricaoEstadual(cliente.getInscricaoEstadual() ?? '')
           setAtivo(cliente.isAtivo())
           
           // Formata CEP e endereço ao carregar
@@ -127,10 +187,22 @@ export function NovoCliente({
             setNumero(endereco.numero || '')
             setBairro(endereco.bairro || '')
             setCidade(endereco.cidade || '')
-            setEstado(endereco.estado || '')
+            const estadoValue = endereco.estado || ''
+            setEstado(estadoValue)
             const cepValue = endereco.cep || ''
             setCep(cepValue ? formatCEP(cepValue) : '')
             setComplemento(endereco.complemento || '')
+            
+            // Carrega códigos IBGE se disponíveis
+            if (endereco.codigoCidadeIbge) {
+              setCodigoCidadeIbge(endereco.codigoCidadeIbge)
+            }
+            if (endereco.codigoEstadoIbge) {
+              setCodigoEstadoIbge(endereco.codigoEstadoIbge)
+            } else if (estadoValue) {
+              // Se não tiver código do estado, busca pelo mapeamento
+              setCodigoEstadoIbge(getCodigoEstadoIbge(estadoValue))
+            }
             
             // Verifica se há algum campo de endereço preenchido
             const temEnderecoPreenchido = !!(
@@ -198,6 +270,36 @@ export function NovoCliente({
       return numbers.replace(/(\d{5})(\d{3})/, '$1-$2')
     }
     return value
+  }
+
+  /**
+   * Mapeamento de siglas de estados para códigos IBGE
+   * Fonte: https://www.ibge.gov.br/explica/codigos-dos-municipios.php
+   */
+  const getCodigoEstadoIbge = (uf: string): string => {
+    const codigos: Record<string, string> = {
+      'AC': '12', 'AL': '27', 'AP': '16', 'AM': '13', 'BA': '29',
+      'CE': '23', 'DF': '53', 'ES': '32', 'GO': '52', 'MA': '21',
+      'MT': '51', 'MS': '50', 'MG': '31', 'PA': '15', 'PB': '25',
+      'PR': '41', 'PE': '26', 'PI': '22', 'RJ': '33', 'RN': '24',
+      'RS': '43', 'RO': '11', 'RR': '14', 'SC': '42', 'SP': '35',
+      'SE': '28', 'TO': '17'
+    }
+    return codigos[uf] || ''
+  }
+
+  /**
+   * Handler para mudança de estado - busca código IBGE do estado
+   */
+  const handleEstadoChange = (newEstado: string) => {
+    setEstado(newEstado)
+    if (newEstado) {
+      setCodigoEstadoIbge(getCodigoEstadoIbge(newEstado))
+    } else {
+      setCodigoEstadoIbge('')
+    }
+    // Limpa código da cidade quando muda o estado
+    setCodigoCidadeIbge('')
   }
 
   /**
@@ -286,6 +388,8 @@ export function NovoCliente({
     setComplemento('')
     setCidade('')
     setEstado('')
+    setCodigoCidadeIbge('')
+    setCodigoEstadoIbge('')
 
     try {
       // API ViaCEP - gratuita e pública
@@ -327,7 +431,9 @@ export function NovoCliente({
         setCidade(data.localidade)
       }
       if (data.uf) {
-        setEstado(data.uf.toUpperCase())
+        const ufUpper = data.uf.toUpperCase()
+        setEstado(ufUpper)
+        setCodigoEstadoIbge(getCodigoEstadoIbge(ufUpper))
       }
 
       // Garante que o endereço está incluído
@@ -351,45 +457,133 @@ export function NovoCliente({
     setCep('')
   }
 
+  /**
+   * Limpa todos os campos de endereço
+   */
+  const handleLimparEndereco = () => {
+    setRua('')
+    setNumero('')
+    setBairro('')
+    setCidade('')
+    setEstado('')
+    setCep('')
+    setComplemento('')
+    setCidadeValida(null)
+    setCodigoCidadeIbge('')
+    setCodigoEstadoIbge('')
+  }
+
+  /**
+   * Handler para mudança do switch "Incluir Endereço"
+   * Limpa os campos quando o switch é desativado
+   */
+  const handleToggleEndereco = (checked: boolean) => {
+    setIncluirEndereco(checked)
+    if (!checked) {
+      // Limpa os campos quando desativar o switch
+      handleLimparEndereco()
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const token = auth?.getAccessToken()
     if (!token) {
-      alert('Token não encontrado')
+      showToast.error('Token não encontrado')
       return
+    }
+
+    const cpfLimpo = cpf.replace(/\D/g, '')
+    const cnpjLimpo = cnpj.replace(/\D/g, '')
+
+    const telefoneLimpo = telefone.replace(/\D/g, '')
+    // API externa exige DDD + número completo (10 fixo ou 11 celular no Brasil)
+    if (telefoneLimpo.length > 0 && telefoneLimpo.length !== 10 && telefoneLimpo.length !== 11) {
+      showToast.error(
+        'Telefone com DDD deve ter 10 dígitos (fixo) ou 11 (celular). Verifique o número digitado.'
+      )
+      return
+    }
+
+    // Validar cidade antes de salvar
+    if (cidade && estado) {
+      if (cidadeValida === false) {
+        showToast.error(
+          `Cidade "${cidade}" não encontrada no estado ${estado}. Por favor, selecione uma cidade válida da lista de sugestões.`
+        )
+        return
+      }
+
+      // Se ainda não foi validada, validar agora
+      if (cidadeValida === null) {
+        try {
+          const response = await fetch(
+            `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(cidade)}&uf=${estado}`
+          )
+          if (response.ok) {
+            const data = await response.json()
+            if (!data.valido) {
+              showToast.error(
+                `Cidade "${cidade}" não encontrada no estado ${estado}. Por favor, selecione uma cidade válida da lista de sugestões.`
+              )
+              return
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao validar cidade:', error)
+          // Continuar mesmo se a validação falhar (pode ser problema de rede)
+        }
+      }
     }
 
     setIsLoading(true)
 
     try {
-      // Remove formatação dos campos antes de enviar
-      const cpfLimpo = cpf.replace(/\D/g, '')
-      const cnpjLimpo = cnpj.replace(/\D/g, '')
-      const telefoneLimpo = telefone.replace(/\D/g, '')
       const cepLimpo = cep.replace(/\D/g, '')
 
       const body: any = {
         nome,
         razaoSocial: razaoSocial || undefined,
-        telefone: telefoneLimpo || undefined,
         email: email || undefined,
         nomeFantasia: nomeFantasia || undefined,
         ativo,
       }
 
-      // CPF e CNPJ: sempre envia se tiver valor, ou string vazia se estiver editando
-      // Isso garante que o campo seja atualizado mesmo que vazio
+      // Fiscal (raiz do payload — alinhado a POST/PATCH /pessoas/clientes)
+      if (indicadorInscricaoEstadual.trim()) {
+        body.indicadorInscricaoEstadual = indicadorInscricaoEstadual.trim()
+      }
+      body.inscricaoEstadual = inscricaoEstadual.trim()
+
+      // CPF e CNPJ: na edição envia o que estiver no formulário (ambos se preenchidos); string vazia limpa no backend
       if (isEditing) {
-        // Em edição, sempre envia CPF e CNPJ (mesmo vazios) para garantir atualização
-        // IMPORTANTE: Envia string vazia explicitamente, não undefined
-        // Garante que o campo sempre exista no body, mesmo que vazio
         body.cpf = cpfLimpo || ''
         body.cnpj = cnpjLimpo || ''
+
+        // Telefone: null limpa na API externa (string vazia aciona validação de 11 dígitos)
+        body.telefone = telefoneLimpo ? telefoneLimpo : null
       } else {
-        // Em criação, envia apenas se tiver valor
         if (cpfLimpo) body.cpf = cpfLimpo
         if (cnpjLimpo) body.cnpj = cnpjLimpo
+        if (telefoneLimpo) body.telefone = telefoneLimpo
       }
+
+      // Tratamento do endereço
+      if (incluirEndereco) {
+        // Se o switch estiver ativado, envia os dados do endereço
+        body.endereco = {
+          rua: rua || undefined,
+          numero: numero || undefined,
+          bairro: bairro || undefined,
+          cidade: cidade || undefined,
+          estado: estado || undefined,
+          cep: cepLimpo || undefined,
+          complemento: complemento || undefined,
+          codigoCidadeIbge: codigoCidadeIbge || undefined,
+          codigoEstadoIbge: codigoEstadoIbge || undefined,
+        }
+      }
+      // Se o switch estiver desativado, não envia o campo endereco
 
       console.log('📤 Dados sendo enviados do componente:', {
         modo: isEditing ? 'edição' : 'criação',
@@ -403,20 +597,10 @@ export function NovoCliente({
         cnpjOriginal: cnpj,
         cnpjLimpo: cnpjLimpo,
         cnpjEnviado: body.cnpj,
+        incluirEndereco,
+        enderecoEnviado: body.endereco,
         bodyCompleto: JSON.stringify(body, null, 2),
       })
-
-      if (incluirEndereco) {
-        body.endereco = {
-          rua: rua || undefined,
-          numero: numero || undefined,
-          bairro: bairro || undefined,
-          cidade: cidade || undefined,
-          estado: estado || undefined,
-          cep: cepLimpo || undefined,
-          complemento: complemento || undefined,
-        }
-      }
 
       const url = isEditing
         ? `/api/clientes/${clienteId}`
@@ -432,12 +616,34 @@ export function NovoCliente({
         body: JSON.stringify(body),
       })
 
+      const result: { error?: string; message?: string } = await response
+        .json()
+        .catch(() => ({}))
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Erro ao salvar cliente')
+        const msgErro =
+          (typeof result.error === 'string' && result.error.trim()) ||
+          (typeof result.message === 'string' && result.message.trim()) ||
+          'Erro ao salvar cliente'
+        throw new Error(msgErro)
       }
 
       showToast.success(isEditing ? 'Cliente atualizado com sucesso!' : 'Cliente criado com sucesso!')
+
+      // API pode retornar aviso informativo no corpo (ex.: prioridade CPF ao enviar CPF + CNPJ)
+      const mensagemApi =
+        typeof result.message === 'string' ? result.message.trim() : ''
+
+      // Debug: conferir se `message` veio na resposta (toasts podem sobrepor no tempo)
+      console.debug('[NovoCliente] salvar cliente — campo message da API', {
+        'result.message': result.message,
+        mensagemApiAposTrim: mensagemApi || '(vazia — sem toast info)',
+        chavesNoBody: Object.keys(result),
+      })
+
+      if (mensagemApi) {
+        showToast.info(mensagemApi)
+      }
       
       if (onSaved) {
         onSaved()
@@ -446,7 +652,17 @@ export function NovoCliente({
       }
     } catch (error) {
       console.error('Erro ao salvar cliente:', error)
-      alert(error instanceof Error ? error.message : 'Erro ao salvar cliente')
+      const mensagem =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'string'
+            ? error
+            : 'Erro ao salvar cliente'
+      // Remove prefixo do repositório para o toast mostrar só o texto da API quando existir
+      const textoToast = mensagem
+        .replace(/^Erro ao (atualizar|criar) cliente:\s*/i, '')
+        .trim()
+      showToast.error(textoToast || mensagem)
     } finally {
       setIsLoading(false)
     }
@@ -465,15 +681,16 @@ export function NovoCliente({
   if (isLoadingCliente) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-2">
-        <img
-          src="/images/jiffy-loading.gif"
-          alt="Carregando..."
-          className="w-20 h-20"
-        />
-        <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
+        <JiffyLoading />
       </div>
     )
   }
+
+  // Aviso de UX: CPF e CNPJ não devem ser preenchidos juntos (validação definitiva no backend)
+  const cpfSoDigitos = cpf.replace(/\D/g, '')
+  const cnpjSoDigitos = cnpj.replace(/\D/g, '')
+  const exibeAvisoCpfECnpjPreenchidos =
+    cpfSoDigitos.length > 0 && cnpjSoDigitos.length > 0
 
   return (
     <div className="flex flex-col h-full">
@@ -654,6 +871,16 @@ export function NovoCliente({
               </div>
             </div>
 
+            {exibeAvisoCpfECnpjPreenchidos && (
+              <p
+                role="alert"
+                className="text-sm font-nunito rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-950"
+              >
+                Informe apenas CPF ou CNPJ — não é possível preencher os dois ao mesmo tempo.
+                Remova um dos campos.
+              </p>
+            )}
+
             <div className="grid md:grid-cols-2 grid-cols-1 gap-3">
               <Input
                 label="Telefone"
@@ -715,8 +942,73 @@ export function NovoCliente({
             />
           </div>
 
+          {/* Fiscal (antes do endereço — mesmo nível do payload da API) */}
+          <div className="mt-2 rounded-lg bg-info md:px-5 px-1 py-2 space-y-4">
+            <h2 className="text-primary text-base font-semibold font-nunito mb-2 flex items-center gap-2">
+              <span className="text-xl text-primary">
+                <MdReceiptLong />
+              </span>
+              Fiscal
+            </h2>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:items-start">
+              <div className="flex min-h-0 flex-col">
+                <label
+                  htmlFor="cliente-indicador-ie"
+                  className="mb-2 text-sm font-medium leading-none text-primary-text"
+                >
+                  Indicador da inscrição estadual
+                </label>
+                <Select
+                  value={indicadorInscricaoEstadual || INDICADOR_IE_NAO_INFORMADO}
+                  onValueChange={(v) =>
+                    setIndicadorInscricaoEstadual(v === INDICADOR_IE_NAO_INFORMADO ? '' : v)
+                  }
+                >
+                  <SelectTrigger id="cliente-indicador-ie" className="h-[38px] bg-primary-bg">
+                    <SelectValue placeholder="Selecione um indicador" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={INDICADOR_IE_NAO_INFORMADO}>Não informado</SelectItem>
+                    {INDICADOR_IE_OPCOES.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex min-h-0 flex-col">
+                <label htmlFor="cliente-inscricao-estadual" className="mb-2 text-sm font-medium leading-none text-primary-text">
+                  Inscrição estadual
+                </label>
+                <Input
+                  id="cliente-inscricao-estadual"
+                  value={inscricaoEstadual}
+                  onChange={(e) => setInscricaoEstadual(e.target.value)}
+                  placeholder="Número da IE ou ISENTO"
+                  size="small"
+                  hiddenLabel
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      height: '38px',
+                      backgroundColor: 'var(--color-primary-bg)',
+                      borderRadius: '8px',
+                    },
+                    '& .MuiInputBase-input': {
+                      padding: '8px 14px',
+                      fontSize: '14px',
+                    },
+                    '& .MuiInputBase-root': {
+                      marginTop: 0,
+                    },
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Toggle Endereço */}
-          <div className="flex items-center justify-between px-5 bg-info">
+          <div className="flex items-center justify-between px-5 pt-4 bg-info">
             <div className="flex items-center gap-3">
               <span className="text-2xl text-primary"><MdLocationOn/></span>
               <span className="text-primary-text font-medium">
@@ -727,7 +1019,7 @@ export function NovoCliente({
               <input
                 type="checkbox"
                 checked={incluirEndereco}
-                onChange={(e) => setIncluirEndereco(e.target.checked)}
+                onChange={(e) => handleToggleEndereco(e.target.checked)}
                 className="sr-only peer"
               />
               <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[28px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
@@ -812,7 +1104,7 @@ export function NovoCliente({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 <Input
                   label="Número"
                   value={numero}
@@ -837,46 +1129,7 @@ export function NovoCliente({
                   onChange={(e) => setBairro(e.target.value)}
                   placeholder="Bairro"
                   size="small"
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    height: '38px',
-                    backgroundColor: 'var(--color-primary-bg)',
-                    borderRadius: '8px',
-                  },
-                  '& .MuiInputBase-input': {
-                    padding: '8px 14px',
-                    fontSize: '14px',
-                  },
-                }}
-                />
-              </div>
-
-              <div className="grid md:grid-cols-3 grid-cols-1 gap-3">
-                <Input
-                  label="Cidade"
-                  value={cidade}
-                  onChange={(e) => setCidade(e.target.value)}
-                  placeholder="Cidade"
-                  size="small"
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    height: '38px',
-                    backgroundColor: 'var(--color-primary-bg)',
-                    borderRadius: '8px',
-                  },
-                  '& .MuiInputBase-input': {
-                    padding: '8px 14px',
-                    fontSize: '14px',
-                  },
-                }}
-                />
-                <Input
-                  label="Estado"
-                  value={estado}
-                  onChange={(e) => setEstado(e.target.value)}
-                  placeholder="UF"
-                  inputProps={{ maxLength: 2 }}
-                  size="small"
+                  className="col-span-2"
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -907,6 +1160,55 @@ export function NovoCliente({
                   },
                 }}
                 />
+              </div>
+
+              <div className="grid md:grid-cols-2 grid-cols-1 gap-3">
+                <div className="flex flex-col">
+                  <label className="text-sm font-medium text-primary-text mb-2">
+                    Estado
+                  </label>
+                  <Select
+                    value={estado}
+                    onValueChange={handleEstadoChange}
+                  >
+                    <SelectTrigger className="h-[38px] bg-primary-bg">
+                      <SelectValue placeholder="Selecione o estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ESTADOS_BRASILEIROS.map((estadoOption) => (
+                        <SelectItem key={estadoOption.sigla} value={estadoOption.sigla}>
+                          {estadoOption.sigla} - {estadoOption.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col">
+                  <CidadeAutocomplete
+                    value={cidade}
+                    onChange={setCidade}
+                    estado={estado}
+                    label="Cidade"
+                    placeholder="Digite o nome da cidade"
+                    required={false}
+                    disabled={!estado}
+                    onValidationChange={setCidadeValida}
+                    onCidadeSelecionada={setCodigoCidadeIbge}
+                    className="w-full"
+                    size="small"
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        height: '38px',
+                        backgroundColor: 'var(--color-primary-bg)',
+                        borderRadius: '8px',
+                      },
+                      '& .MuiInputBase-input': {
+                        padding: '8px 14px',
+                        fontSize: '14px',
+                      },
+                    }}
+                  />
+                </div>
               </div>
             </div>
           )}

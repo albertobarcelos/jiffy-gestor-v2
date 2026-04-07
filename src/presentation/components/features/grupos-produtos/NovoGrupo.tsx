@@ -9,6 +9,7 @@ import { IconPickerModal } from './IconPickerModal'
 import { ColorPickerModal } from './ColorPickerModal'
 import { ProdutosPorGrupoList } from './ProdutosPorGrupoList'
 import { useQueryClient } from '@tanstack/react-query'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 
 interface NovoGrupoProps {
   grupoId?: string
@@ -215,12 +216,7 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
     return (
       <div className="flex items-center justify-center h-screen bg-info">
         <div className="text-center flex flex-col items-center gap-2">
-          <img
-            src="/images/jiffy-loading.gif"
-            alt="Carregando"
-            className="w-20 object-contain"
-          />
-          <p className="text-primary-text font-nunito">Carregando dados do grupo...</p>
+          <JiffyLoading />
         </div>
       </div>
     )

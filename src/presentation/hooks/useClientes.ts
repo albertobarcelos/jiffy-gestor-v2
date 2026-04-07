@@ -76,7 +76,9 @@ export function useClientesInfinite(params: Omit<ClientesQueryParams, 'offset'> 
 
   return useInfiniteQuery({
     queryKey: ['clientes', 'infinite', params],
-    queryFn: async ({ pageParam = 0 }): Promise<{ clientes: Cliente[]; count: number; nextOffset: number | null }> => {
+    queryFn: async ({
+      pageParam = 0,
+    }): Promise<{ clientes: Cliente[]; count: number; nextOffset: number | null }> => {
       if (!token) {
         throw new Error('Token não encontrado')
       }
@@ -106,18 +108,22 @@ export function useClientesInfinite(params: Omit<ClientesQueryParams, 'offset'> 
       const data: ClientesResponse = await response.json()
 
       const clientes = (data.items || []).map((item: any) => Cliente.fromJSON(item))
-      const hasMore = clientes.length === limit
-      const nextOffset = hasMore ? pageParam + clientes.length : null
+      const total = data.count ?? 0
+      const carregadosAteAgora = pageParam + clientes.length
+      // Preferir `count` da API para saber se há próxima página (evita loop quando length === limit mas já não há mais registros)
+      const hasMore = total > 0 ? carregadosAteAgora < total : clientes.length === limit
+
+      const nextOffset = hasMore ? carregadosAteAgora : null
 
       return {
         clientes,
-        count: data.count || 0,
+        count: total,
         nextOffset,
       }
     },
     enabled: !!token,
     initialPageParam: 0,
-    getNextPageParam: (lastPage) => lastPage.nextOffset,
+    getNextPageParam: lastPage => lastPage.nextOffset,
     staleTime: 1000 * 60 * 5, // 5 minutos
   })
 }
@@ -170,7 +176,15 @@ export function useClienteMutation() {
   const token = auth?.getAccessToken()
 
   return useMutation({
-    mutationFn: async ({ clienteId, data, isUpdate }: { clienteId?: string; data: any; isUpdate: boolean }) => {
+    mutationFn: async ({
+      clienteId,
+      data,
+      isUpdate,
+    }: {
+      clienteId?: string
+      data: any
+      isUpdate: boolean
+    }) => {
       if (!token) {
         throw new Error('Token não encontrado')
       }
@@ -215,10 +229,9 @@ export function useClienteMutation() {
       if (variables.clienteId) {
         queryClient.invalidateQueries({ queryKey: ['cliente', variables.clienteId] })
       }
-      showToast.success(variables.isUpdate ? 'Cliente atualizado com sucesso!' : 'Cliente criado com sucesso!')
+      showToast.success(
+        variables.isUpdate ? 'Cliente atualizado com sucesso!' : 'Cliente criado com sucesso!'
+      )
     },
   })
 }
-
-
-

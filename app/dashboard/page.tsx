@@ -1,17 +1,20 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { Suspense, useState, useRef, useEffect } from 'react'
+import { Suspense, useMemo, useState, useRef, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react'; // Importa os ícones
 import { Skeleton, FormControl, Select, MenuItem, FormGroup, FormControlLabel, Checkbox, Popover } from '@mui/material'
 import { motion } from 'framer-motion'; // Importar motion do Framer Motion
 import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto' // Importar a entidade
 import { EscolheDatasModal } from '@/src/presentation/components/features/vendas/EscolheDatasModal'
 import { MdCalendarToday } from 'react-icons/md'
+import { calculatePeriodo, permiteOpcoesIntervaloPorHora } from '@/src/shared/utils/dateFilters'
+import { useDashboardTopProdutosQuery } from '@/src/presentation/hooks/useDashboardTopProdutosQuery'
 
 // Função para obter o label do período
 const getPeriodoLabel = (periodo: string, dataInicial?: Date | null, dataFinal?: Date | null): string => {
-  if (periodo === 'Datas Personalizadas' && dataInicial && dataFinal) {
+  // Intervalo escolhido em "Por datas" (Select mantém o preset, ex.: Últimos 7 Dias)
+  if (dataInicial && dataFinal) {
     const formatDate = (date: Date) => {
       const day = date.getDate().toString().padStart(2, '0')
       const month = (date.getMonth() + 1).toString().padStart(2, '0')
@@ -22,7 +25,7 @@ const getPeriodoLabel = (periodo: string, dataInicial?: Date | null, dataFinal?:
     }
     return `${formatDate(dataInicial)} - ${formatDate(dataFinal)}`
   }
-  
+
   switch (periodo) {
     case 'Todos':
       return 'Todos os Períodos';
@@ -38,12 +41,21 @@ const getPeriodoLabel = (periodo: string, dataInicial?: Date | null, dataFinal?:
       return 'Últimos 60 Dias';
     case 'Últimos 90 Dias':
       return 'Últimos 90 Dias';
-    case 'Datas Personalizadas':
-      return 'Datas Personalizadas';
     default:
       return 'Período Desconhecido';
   }
 };
+
+/** Meses curtos para exibir o intervalo escolhido em "Por datas" (ex.: 01-abr 00:00). */
+const MESES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'] as const
+
+function formatarDataHoraFiltroCurta(date: Date): string {
+  const dia = String(date.getDate()).padStart(2, '0')
+  const mes = MESES_ABREV[date.getMonth()]
+  const h = String(date.getHours()).padStart(2, '0')
+  const min = String(date.getMinutes()).padStart(2, '0')
+  return `${dia}-${mes} ${h}:${min}`
+}
 
 // Variantes para animação de fade-in e slide-up
 const containerVariants = {
@@ -133,7 +145,6 @@ const UltimasVendas = dynamic(
 export default function DashboardPage() {
   const [periodo, setPeriodo] = useState('Últimos 7 Dias'); // Estado para o período
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['FINALIZADA']); // Estado para os status selecionados
-  const [topProdutosData, setTopProdutosData] = useState<DashboardTopProduto[]>([]); // Novo estado para os top produtos
   const [periodoInicial, setPeriodoInicial] = useState<Date | null>(null); // Estado para data inicial personalizada
   const [periodoFinal, setPeriodoFinal] = useState<Date | null>(null); // Estado para data final personalizada
   const [isDatasModalOpen, setIsDatasModalOpen] = useState(false); // Estado para controlar o modal de datas
@@ -187,10 +198,7 @@ export default function DashboardPage() {
   const handleConfirmDatas = (dataInicial: Date | null, dataFinal: Date | null) => {
     setPeriodoInicial(dataInicial)
     setPeriodoFinal(dataFinal)
-    // Se pelo menos uma data foi selecionada, muda período para "Datas Personalizadas"
-    if (dataInicial || dataFinal) {
-      setPeriodo('Datas Personalizadas')
-    }
+    // O valor do dropdown (Período) não muda — o filtro por intervalo usa só as datas
   };
 
   /**
@@ -198,11 +206,9 @@ export default function DashboardPage() {
    */
   const handlePeriodoChange = (novoPeriodo: string) => {
     setPeriodo(novoPeriodo)
-    // Se não for "Datas Personalizadas", limpa as datas personalizadas
-    if (novoPeriodo !== 'Datas Personalizadas') {
-      setPeriodoInicial(null)
-      setPeriodoFinal(null)
-    }
+    // Ao trocar o preset no dropdown, remove o intervalo definido em "Por datas"
+    setPeriodoInicial(null)
+    setPeriodoFinal(null)
   };
 
   /**
@@ -216,6 +222,35 @@ export default function DashboardPage() {
     setAnchorEl(null)
   };
 
+  const { inicio: topInicio, fim: topFim } = useMemo(() => {
+    if (periodoInicial && periodoFinal) {
+      return { inicio: periodoInicial, fim: periodoFinal }
+    }
+    if (periodo === 'Todos') return { inicio: null, fim: null }
+    const { inicio, fim } = calculatePeriodo(periodo)
+    return { inicio, fim }
+  }, [periodo, periodoInicial, periodoFinal])
+
+  const mapPeriodoToTopProdutos = (frontendPeriodo: string): string => {
+    switch (frontendPeriodo) {
+      case 'Hoje': return 'hoje'
+      case 'Últimos 7 Dias': return 'semana'
+      case 'Mês Atual': return 'mes'
+      case 'Últimos 30 Dias': return '30dias'
+      case 'Últimos 60 Dias': return '60dias'
+      case 'Últimos 90 Dias': return '90dias'
+      case 'Todos': return 'todos'
+      default: return 'todos'
+    }
+  }
+
+  const { data: topProdutosData } = useDashboardTopProdutosQuery({
+    periodo: mapPeriodoToTopProdutos(periodo),
+    limit: 10,
+    periodoInicial: topInicio,
+    periodoFinal: topFim,
+  })
+
   return (
     <motion.div
       variants={containerVariants}
@@ -224,9 +259,9 @@ export default function DashboardPage() {
       className="space-y-2 bg-custom-2/50 py-2 px-1 rounded-lg mt-2"
     >
       {/* Barra de seleção de período */}
-      <motion.div variants={itemVariants} className="flex flex-col md:flex-row items-center justify-start gap-2 mt-2">
+      <motion.div variants={itemVariants} className="flex flex-col md:flex-row items-center justify-start gap-2">
         <span className="text-primary text-sm font-exo">Período:</span>
-        <div className="flex flex-row items-center justify-start gap-2">
+        <div className="flex min-w-0 flex-row flex-wrap items-center justify-start gap-2">
         <FormControl size="small" sx={{ minWidth: 120 }}>
           <Select
             value={periodo}
@@ -251,7 +286,6 @@ export default function DashboardPage() {
             <MenuItem value="Últimos 30 Dias">Últimos 30 Dias</MenuItem>
             <MenuItem value="Últimos 60 Dias">Últimos 60 Dias</MenuItem>
             <MenuItem value="Últimos 90 Dias">Últimos 90 Dias</MenuItem>
-            <MenuItem value="Datas Personalizadas">Datas Personalizadas</MenuItem>
           </Select>
         </FormControl>
         
@@ -266,6 +300,18 @@ export default function DashboardPage() {
           <MdCalendarToday size={10} />
           Por datas
         </button>
+        {periodoInicial && periodoFinal ? (
+          <div
+            className="flex shrink-0 flex-col gap-0 text-[11px] leading-snug text-primary/85 md:text-xs"
+          >
+            <span className="whitespace-nowrap text-right">
+              Dt. Ini.: {formatarDataHoraFiltroCurta(periodoInicial)}
+            </span>
+            <span className="whitespace-nowrap text-right">
+              Dt. Fim: {formatarDataHoraFiltroCurta(periodoFinal)}
+            </span>
+          </div>
+        ) : null}
         </div>
         {/* Botão Limpar Filtros */}
         <button
@@ -306,12 +352,25 @@ export default function DashboardPage() {
                       <h3 className="md:text-lg text-sm font-semibold text-primary">Evolução de Vendas</h3>
                       <p className="md:text-sm text-xs text-primary/70">{getPeriodoLabel(periodo, periodoInicial, periodoFinal)}</p>
                      </div>
-                     <div className="flex flex-col">
+                     <div className="flex min-w-0 flex-1 flex-col justify-center">
                        <FormGroup
                          sx={{
-                           flexDirection: { xs: 'row', md: 'row' },
-                           alignItems: { xs: 'flex-start', md: 'center' },
-                           gap: { xs: 0, md: 0 },
+                           flexDirection: 'row',
+                           flexWrap: 'nowrap',
+                           alignItems: 'center',
+                           gap: { xs: 0.25, sm: 0.5, md: 0.75 },
+                           width: '100%',
+                           minWidth: 0,
+                           overflowX: 'auto',
+                           overflowY: 'hidden',
+                           // Mantém Finalizadas → 1h numa única linha; em telas estreitas rola horizontalmente
+                           WebkitOverflowScrolling: 'touch',
+                           '& .MuiFormControlLabel-root': {
+                             marginRight: 1,
+                             flexShrink: 0,
+                             gap: 0.25,
+                           },
+                           '& .MuiCheckbox-root': { padding: 0.5 },
                          }}
                        >
                          <FormControlLabel
@@ -348,77 +407,69 @@ export default function DashboardPage() {
                            }
                            label={<span className="md:text-sm text-xs">Canceladas</span>}
                          />
+                         {/* Intervalos à direita de Canceladas, mesma linha (quebra só em telas muito estreitas) */}
+                         {(periodo === 'Hoje' ||
+                           (periodoInicial &&
+                             periodoFinal &&
+                             permiteOpcoesIntervaloPorHora(periodoInicial, periodoFinal))) ? (
+                           <>
+                             <span className="shrink-0 whitespace-nowrap px-0.5 text-xs text-primary/70 md:pl-1 md:text-sm">
+                               Intervalos:
+                             </span>
+                             <FormControlLabel
+                               control={
+                                 <Checkbox
+                                   checked={intervaloHora === 15}
+                                   onChange={handleIntervaloHoraChange}
+                                   value="15"
+                                   sx={{
+                                     color: '#530CA3',
+                                     '&.Mui-checked': {
+                                       color: '#530CA3',
+                                     },
+                                     size: 'small',
+                                   }}
+                                 />
+                               }
+                               label={<span className="md:text-sm text-xs">15 min</span>}
+                             />
+                             <FormControlLabel
+                               control={
+                                 <Checkbox
+                                   checked={intervaloHora === 30}
+                                   onChange={handleIntervaloHoraChange}
+                                   value="30"
+                                   sx={{
+                                     color: '#530CA3',
+                                     '&.Mui-checked': {
+                                       color: '#530CA3',
+                                     },
+                                     size: 'small',
+                                   }}
+                                 />
+                               }
+                               label={<span className="md:text-sm text-xs">30 min</span>}
+                             />
+                             <FormControlLabel
+                               control={
+                                 <Checkbox
+                                   checked={intervaloHora === 60}
+                                   onChange={handleIntervaloHoraChange}
+                                   value="60"
+                                   sx={{
+                                     color: '#530CA3',
+                                     '&.Mui-checked': {
+                                       color: '#530CA3',
+                                     },
+                                     size: 'small',
+                                   }}
+                                 />
+                               }
+                               label={<span className="md:text-sm text-xs">1h</span>}
+                             />
+                           </>
+                         ) : null}
                        </FormGroup>
-                       {/* Checkboxes para intervalo de tempo (apenas quando for exibir por hora) */}
-                       {((periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) || periodo === 'Hoje') ? (
-                         <FormGroup
-                           sx={{
-                             flexDirection: { xs: 'row', md: 'row' },
-                             alignItems: { xs: 'flex-start', md: 'center' },
-                             gap: { xs: 0, md: 0 },
-                           }}
-                         >
-                          <div className="flex flex-col">
-                           <span className="md:text-sm text-xs text-primary/70 mr-2">Intervalo:</span>
-                           <div className="flex flex-row">
-                           <FormControlLabel
-                             control={
-                               <Checkbox
-                                 checked={intervaloHora === 15}
-                                 onChange={handleIntervaloHoraChange}
-                                 value="15"
-                                 sx={{
-                                   color: '#530CA3',
-                                   '&.Mui-checked': {
-                                     color: '#530CA3',
-                                   },
-                                   size: 'small',
-                                 }}
-                               />
-                             }
-                             label={<span className="md:text-sm text-xs">15 min</span>}
-                           />
-                           <FormControlLabel
-                             control={
-                               <Checkbox
-                                 checked={intervaloHora === 30}
-                                 onChange={handleIntervaloHoraChange}
-                                 value="30"
-                                 sx={{
-                                   color: '#530CA3',
-                                   '&.Mui-checked': {
-                                     color: '#530CA3',
-                                   },
-                                   size: 'small',
-                                 }}
-                               />
-                             }
-                             label={<span className="md:text-sm text-xs">30 min</span>}
-                           />
-                           <FormControlLabel
-                             control={
-                               <Checkbox
-                                 checked={intervaloHora === 60}
-                                 onChange={handleIntervaloHoraChange}
-                                 value="60"
-                                 sx={{
-                                   color: '#530CA3',
-                                   '&.Mui-checked': {
-                                     color: '#530CA3',
-                                   },
-                                   size: 'small',
-                                 }}
-                               />
-                             }
-                             label={<span className="md:text-sm text-xs">1h</span>}
-                           />
-                         </div>
-                         </div>
-                         </FormGroup>
-                         
-                       ) : (
-                         <div className="h-[32px]"></div>
-                       )}
                      </div>
                    </div>
             <div className="flex-1 min-h-0">
@@ -492,9 +543,9 @@ export default function DashboardPage() {
               <Suspense fallback={<Skeleton variant="rectangular" height={400} />}>
                 <TabelaTopProdutos 
                   periodo={periodo} 
-                  onDataLoad={setTopProdutosData}
                   periodoInicial={periodoInicial}
                   periodoFinal={periodoFinal}
+                  dataOverride={topProdutosData ?? []}
                 />
               </Suspense>
             </div>
@@ -506,7 +557,7 @@ export default function DashboardPage() {
                 <p className="text-xs md:text-sm text-primary/70">Distribuição dos Top Produtos</p>
               </div>
               <Suspense fallback={<Skeleton variant="rectangular" height={400} />}>
-                <GraficoTopProdutos data={topProdutosData} />
+                <GraficoTopProdutos data={topProdutosData ?? []} />
               </Suspense>
             </div>
 
@@ -517,7 +568,7 @@ export default function DashboardPage() {
                 <p className="text-xs md:text-sm text-primary/70">Distribuição por Valor</p>
               </div>
               <Suspense fallback={<Skeleton variant="rectangular" height={400} />}>
-                <GraficoTopProdutosValor data={topProdutosData} />
+                <GraficoTopProdutosValor data={topProdutosData ?? []} />
               </Suspense>
             </div>
           </motion.div>

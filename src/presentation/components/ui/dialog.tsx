@@ -11,19 +11,24 @@ import {
   Box,
 } from '@mui/material'
 
-export interface DialogProps extends Omit<MuiDialogProps, 'open'> {
+export interface DialogProps extends Omit<MuiDialogProps, 'open' | 'onClose'> {
   open: boolean
-  onOpenChange?: (open: boolean) => void
+  onOpenChange?: (open: boolean, reason?: 'backdropClick' | 'escapeKeyDown') => void
+  /** Repasse opcional do onClose nativo do MUI (chamado junto com onOpenChange) */
+  onClose?: MuiDialogProps['onClose']
 }
 
 export const Dialog = React.forwardRef<HTMLDivElement, DialogProps>(
-  ({ open, onOpenChange, children, ...props }, ref) => {
+  ({ open, onOpenChange, onClose: userOnClose, children, ...rest }, ref) => {
     return (
       <MuiDialog
         ref={ref}
         open={open}
-        onClose={() => onOpenChange?.(false)}
-        {...props}
+        onClose={(event, reason) => {
+          userOnClose?.(event, reason)
+          onOpenChange?.(false, reason)
+        }}
+        {...rest}
       >
         {children}
       </MuiDialog>
@@ -33,10 +38,14 @@ export const Dialog = React.forwardRef<HTMLDivElement, DialogProps>(
 
 Dialog.displayName = 'Dialog'
 
-export const DialogHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, children, ...props }, ref) => {
+export interface DialogHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
+  sx?: any
+}
+
+export const DialogHeader = React.forwardRef<HTMLDivElement, DialogHeaderProps>(
+  ({ className, children, sx, ...props }, ref) => {
     return (
-      <Box ref={ref} sx={{ p: 1, pb: 1.5 }} {...props}>
+      <Box ref={ref} sx={{ p: 1, pb: 1.5, ...sx }} {...props}>
         {children}
       </Box>
     )

@@ -68,7 +68,8 @@ export class BuscarVendasDashboardUseCase {
     periodo: string = 'hoje', 
     statuses: string[] = [],
     periodoInicialCustom?: Date | null,
-    periodoFinalCustom?: Date | null
+    periodoFinalCustom?: Date | null,
+    tipoVenda?: string // Parâmetro opcional para filtrar por tipo de venda (mesa/balcao)
   ): Promise<DashboardVendas> {
     const params = new URLSearchParams();
     
@@ -86,7 +87,15 @@ export class BuscarVendasDashboardUseCase {
     }
 
     statuses.forEach(status => params.append('status', status));
-    const response = await fetch(`/api/vendas?${params.toString()}`);
+    
+    // Adiciona filtro de tipo de venda se fornecido
+    if (tipoVenda) {
+      params.append('tipoVenda', tipoVenda);
+    }
+    
+    const url = `/api/vendas?${params.toString()}`
+    
+    const response = await fetch(url);
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -94,7 +103,9 @@ export class BuscarVendasDashboardUseCase {
     }
     
     const data = await response.json();
-    return DashboardVendas.fromJSON(data);
+    const dashboardVendas = DashboardVendas.fromJSON(data);
+    
+    return dashboardVendas;
   }
 }
 

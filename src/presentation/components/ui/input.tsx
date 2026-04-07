@@ -5,15 +5,33 @@ import { TextField, TextFieldProps } from '@mui/material'
 
 export interface InputProps extends Omit<TextFieldProps, 'variant'> {
   variant?: 'outlined' | 'filled' | 'standard'
+  min?: string | number
+  max?: string | number
+  step?: string | number
+  maxLength?: number
+  minLength?: number
+  pattern?: string
 }
 
 /**
- * Componente Input usando Material UI TextField
+ * Componente Input usando Material UI TextField.
+ * Padrão visual alinhado ao Select (Radix UI):
+ * - size="small" → altura ~40px (h-10)
+ * - borderRadius: 6px → equivalente ao rounded-md do Tailwind
  */
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ variant = 'outlined', value, size, ...props }, ref) => {
-    // Garante que o value seja sempre uma string para evitar problemas com placeholder
+  ({ variant = 'outlined', value, size, min, max, step, maxLength, minLength, pattern, inputProps, ...props }, ref) => {
     const normalizedValue = value === null || value === undefined ? '' : value
+
+    const mergedInputProps = {
+      ...inputProps,
+      ...(min !== undefined && { min }),
+      ...(max !== undefined && { max }),
+      ...(step !== undefined && { step }),
+      ...(maxLength !== undefined && { maxLength }),
+      ...(minLength !== undefined && { minLength }),
+      ...(pattern !== undefined && { pattern }),
+    }
     
     return (
       <TextField
@@ -22,6 +40,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         fullWidth
         value={normalizedValue}
         size={size}
+        inputProps={mergedInputProps}
         {...props}
       />
     )

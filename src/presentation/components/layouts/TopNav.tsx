@@ -14,7 +14,6 @@ import {
   MdPeople, 
   MdPerson, 
   MdGroup, 
-  MdPrint, 
   MdPayment,
   MdCategory,
   MdAddCircle,
@@ -149,7 +148,6 @@ export function TopNav() {
         { name: 'Grupo de Complementos', path: '/cadastros/grupos-complementos', icon: MdCategory },
         { name: 'Complementos', path: '/cadastros/complementos', icon: MdAddCircle },
         { name: 'Cadastro por Planilhas', path: '/cadastro-por-planilha', icon: MdAirplaneTicket },
-        { name: 'Impressoras', path: '/cadastros/impressoras', icon: MdPrint },
       ],
     },
     {
@@ -259,12 +257,12 @@ export function TopNav() {
       <div className="absolute inset-y-0 left-0 w-11/12 max-w-xs bg-white shadow-xl p-5 overflow-y-auto flex flex-col gap-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="relative w-10 h-10">
+            <div className="relative w-14 h-14">
               <Image
                 src="/images/jiffy-100x100.gif"
                 alt="Jiffy"
                 fill
-                sizes="40px"
+                sizes="50px"
                 className="object-contain"
               />
             </div>
@@ -383,7 +381,7 @@ export function TopNav() {
         {/* Logo */}
         <div className="flex items-center">
           <Link href="/dashboard" className="flex items-center">
-            <div className="relative ml-6 md:ml-0 w-12 h-12 sm:w-20 sm:h-14">
+            <div className="relative ml-6 md:ml-0 w-12 h-12 sm:w-20 sm:h-16">
               <Image
                 src="/images/jiffy-100x100.gif"
                 alt="Jiffy"

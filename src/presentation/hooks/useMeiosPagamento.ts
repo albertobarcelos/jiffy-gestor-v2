@@ -9,6 +9,9 @@ interface MeiosPagamentoQueryParams {
   ativo?: boolean | null
   limit?: number
   offset?: number
+  enabled?: boolean
+  /** Padrão false (igual ao QueryProvider); evita refetch ao focar aba em fluxos longos */
+  refetchOnWindowFocus?: boolean
 }
 
 interface MeiosPagamentoResponse {
@@ -22,6 +25,7 @@ interface MeiosPagamentoResponse {
 export function useMeiosPagamentoInfinite(params: Omit<MeiosPagamentoQueryParams, 'offset'> = {}) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
+  const queryEnabled = !!token && (params.enabled ?? true)
 
   return useInfiniteQuery({
     queryKey: ['meios-pagamentos', 'infinite', params],
@@ -64,10 +68,11 @@ export function useMeiosPagamentoInfinite(params: Omit<MeiosPagamentoQueryParams
         nextOffset,
       }
     },
-    enabled: !!token,
+    enabled: queryEnabled,
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextOffset,
     staleTime: 1000 * 60 * 5, // 5 minutos
+    refetchOnWindowFocus: params.refetchOnWindowFocus ?? false,
   })
 }
 

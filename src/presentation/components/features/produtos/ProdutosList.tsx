@@ -7,6 +7,7 @@ import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import Link from 'next/link'
 import { Produto } from '@/src/domain/entities/Produto'
 import { showToast } from '@/src/shared/utils/toast'
@@ -618,7 +619,7 @@ const ProdutoListItem = function ProdutoListItem({
  * Lista de produtos com scroll infinito
  * Usa React Query para cache automático e deduplicação de requisições
  */
-export function ProdutosList({ onReload }: ProdutosListProps) {
+  export function ProdutosList({ onReload }: ProdutosListProps) {
   const { auth } = useAuthStore()
   const queryClient = useQueryClient()
   const router = useRouter()
@@ -971,7 +972,8 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
       ativoLocal: ativoLocalBoolean,
       ativoDelivery: ativoDeliveryBoolean,
       grupoProdutoId: grupoProdutoFilter || undefined,
-      grupoComplementosId: grupoComplementoFilter || undefined,
+      // Se for "__none__", não passa o parâmetro para a API (filtrará no frontend)
+      grupoComplementosId: grupoComplementoFilter === '__none__' ? undefined : grupoComplementoFilter || undefined,
       limit: limitFilter,
     }),
     [
@@ -1015,8 +1017,18 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
       })
     })
     
-    return Array.from(produtosMap.values())
-  }, [data])
+    let produtosList = Array.from(produtosMap.values())
+    
+    // Filtrar produtos sem grupo de complementos se o filtro "Nenhum" estiver ativo
+    if (grupoComplementoFilter === '__none__') {
+      produtosList = produtosList.filter((produto) => {
+        const gruposComplementos = produto.getGruposComplementos()
+        return !gruposComplementos || gruposComplementos.length === 0
+      })
+    }
+    
+    return produtosList
+  }, [data, grupoComplementoFilter])
 
   const totalProdutos = useMemo(() => {
     return data?.pages?.[0]?.count ?? 0
@@ -1493,10 +1505,10 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
             </div>
             <div className="flex flex-col md:flex-row mb-2 items-center justify-end flex-1 md:gap-4 gap-1">
             <Link
-              href="/produtos/atualizar-preco"
+              href="/produtos/atualizar-produtos-lote"
               className="md:h-8 h-6 md:px-4 px-2 bg-info text-primary-text border border-primary/50 rounded-lg font-semibold font-exo md:text-sm text-xs flex items-center gap-2 hover:bg-primary/10 transition-colors"
             >
-              Atualizar Preços
+              Produtos em Lote
             </Link>
               <button
                 onClick={() =>
@@ -1616,6 +1628,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
               className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <option value="">{isLoadingGruposComplementos ? 'Carregando...' : 'Todos'}</option>
+              <option value="__none__">Nenhum</option>
               {!isLoadingGruposComplementos &&
                 gruposComplementos.map((grupo) => (
                   <option key={grupo.getId()} value={grupo.getId()}>
@@ -1646,12 +1659,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
         {/* Mostrar loading quando está carregando e não há produtos ainda */}
         {(isLoading || isFetching || isFetchingNextPage || (localProdutos.length === 0 && !data)) && (
           <div className="flex flex-col items-center justify-center py-12 gap-2">
-            <img
-              src="/images/jiffy-loading.gif"
-              alt="Carregando..."
-              className="w-20 h-20"
-            />
-            <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
+            <JiffyLoading />
           </div>
         )}
 

@@ -6,14 +6,17 @@ import { z } from 'zod'
 export const AtualizarClienteSchema = z.object({
   nome: z.string().min(1, 'Nome é obrigatório').optional(),
   razaoSocial: z.string().optional(),
-  // CPF e CNPJ: aceita qualquer string (incluindo vazia) ou undefined
-  // IMPORTANTE: z.string() aceita strings vazias por padrão
-  // .optional() apenas torna o campo opcional, não remove strings vazias
-  cpf: z.string().optional(),
-  cnpj: z.string().optional(),
-  telefone: z.string().optional(),
+  // CPF e CNPJ: aceita string, null ou undefined
+  // null é usado para limpar/apagar o valor na API externa
+  // string vazia também será convertida para null no repositório
+  cpf: z.string().nullable().optional(),
+  cnpj: z.string().nullable().optional(),
+  // null ou '' limpam o valor na API (mesmo padrão de cpf/cnpj no repositório)
+  telefone: z.string().nullable().optional(),
   email: z.string().email('Email inválido').optional().or(z.literal('')),
   nomeFantasia: z.string().optional(),
+  indicadorInscricaoEstadual: z.string().optional(),
+  inscricaoEstadual: z.string().optional().nullable(),
   ativo: z.boolean().optional(),
   endereco: z
     .object({
@@ -24,6 +27,8 @@ export const AtualizarClienteSchema = z.object({
       estado: z.string().optional(),
       cep: z.string().optional(),
       complemento: z.string().optional(),
+      codigoCidadeIbge: z.string().optional(),
+      codigoEstadoIbge: z.string().optional(),
     })
     .optional(),
 })

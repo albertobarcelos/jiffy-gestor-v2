@@ -4,6 +4,8 @@
 interface ProdutoComplementoResumo {
   id: string
   nome: string
+  valor?: number
+  tipoImpactoPreco?: 'aumenta' | 'diminui' | 'nenhum'
 }
 
 interface ProdutoGrupoComplementoResumo {
@@ -75,9 +77,19 @@ export class Produto {
   }
 
   static fromJSON(data: any): Produto {
+    const impressorasMapeadas = Array.isArray(data.impressoras)
+      ? data.impressoras
+          .filter((imp: any) => imp && imp.id) // Filtra impressoras válidas
+          .map((imp: any) => ({
+            id: imp.id?.toString() || '',
+            nome: imp.nome?.toString() || 'Impressora',
+            ativo: imp.ativo === true || imp.ativo === 'true' || imp.ativo === undefined, // Se não tiver campo ativo, assume true
+          }))
+      : []
+
     return Produto.create(
       data.id?.toString() || '',
-      data.codigoProduto?.toString() || '',
+      data.codigoProduto?.toString() || (typeof data.codigoProduto === 'number' ? data.codigoProduto.toString() : ''),
       data.nome?.toString() || '',
       typeof data.valor === 'number' ? data.valor : parseFloat(data.valor) || 0,
       data.ativo === true || data.ativo === 'true',
@@ -96,6 +108,8 @@ export class Produto {
               ? grupo.complementos.map((comp: any) => ({
                   id: comp.id?.toString() || '',
                   nome: comp.nome?.toString() || '',
+                  valor: typeof comp.valor === 'number' ? comp.valor : (comp.valor ? parseFloat(comp.valor) : 0),
+                  tipoImpactoPreco: comp.tipoImpactoPreco || 'nenhum',
                 }))
               : [],
           }))

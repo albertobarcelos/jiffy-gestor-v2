@@ -11,7 +11,8 @@ import {
 } from '@/src/presentation/components/ui/dialog'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
-import { MdAdd, MdClose, MdDelete, MdPrint, MdSearch } from 'react-icons/md'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { MdAdd, MdClose, MdDelete, MdPrint, MdSearch, MdEdit } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import {
   ImpressorasTabsModal,
@@ -255,12 +256,25 @@ export function ProdutoImpressorasDialog({
 
   const handleCloseImpressorasModal = () => {
     setImpressorasModalState((prev) => ({ ...prev, open: false }))
+    // Recarregar impressoras após fechar o modal de edição
+    loadImpressoras()
   }
 
   const handleImpressorasModalReload = () => {
     // Recarregar lista de impressoras disponíveis quando uma nova for criada
     loadAllImpressoras()
+    // Recarregar também as impressoras vinculadas ao produto
+    loadImpressoras()
   }
+
+  const handleEditImpressora = useCallback((impressora: ProdutoImpressora) => {
+    setImpressorasModalState({
+      open: true,
+      tab: 'impressora',
+      mode: 'edit',
+      impressoraId: impressora.id,
+    })
+  }, [])
 
   const handleImpressorasTabChange = (tab: 'impressora') => {
     setImpressorasModalState((prev) => ({ ...prev, tab }))
@@ -350,12 +364,7 @@ export function ProdutoImpressorasDialog({
     if (isLoading) {
       return (
         <div className="flex flex-col items-center justify-center py-8 gap-2">
-          <img
-            src="/images/jiffy-loading.gif"
-            alt="Carregando"
-            className="w-20 object-contain"
-          />
-          <p className="text-sm text-secondary-text text-center">Carregando impressoras...</p>
+          <JiffyLoading />
         </div>
       )
     }
@@ -409,7 +418,19 @@ export function ProdutoImpressorasDialog({
                 <MdPrint />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-semibold text-primary-text">{impressora.nome}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-primary-text">{impressora.nome}</p>
+                  <button
+                    type="button"
+                    onClick={() => handleEditImpressora(impressora)}
+                    disabled={isUpdating}
+                    className="text-primary hover:text-primary/80 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    aria-label={`Editar ${impressora.nome}`}
+                    title="Editar impressora"
+                  >
+                    <MdEdit size={16} />
+                  </button>
+                </div>
                 <p className="text-xs text-secondary-text">
                   {impressora.modelo || 'Modelo não informado'}
                 </p>
@@ -512,12 +533,7 @@ export function ProdutoImpressorasDialog({
         <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
           {isLoadingAllImpressoras ? (
             <div className="flex flex-col items-center justify-center py-6 gap-2">
-              <img
-                src="/images/jiffy-loading.gif"
-                alt="Carregando"
-                className="w-20 object-contain"
-              />
-              <p className="text-center text-secondary-text text-sm">Carregando impressoras...</p>
+              <JiffyLoading />
             </div>
           ) : filteredSelectableImpressoras.length ? (
             filteredSelectableImpressoras.map((impressora, index) => {

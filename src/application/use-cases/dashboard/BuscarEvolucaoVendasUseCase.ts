@@ -157,7 +157,8 @@ export class BuscarEvolucaoVendasUseCase {
     const canceladasDailyMap = new Map<string, number>();
 
     allVendasData.forEach((venda: any) => {
-      const saleDate = new Date(venda.dataCriacao);
+      // Usa dataFinalizacao se disponível, caso contrário usa dataCriacao como fallback
+      const saleDate = new Date(venda.dataFinalizacao || venda.dataCriacao);
       const year = saleDate.getFullYear();
       const month = (saleDate.getMonth() + 1).toString().padStart(2, '0');
       const day = saleDate.getDate().toString().padStart(2, '0');
@@ -236,7 +237,8 @@ export class BuscarEvolucaoVendasUseCase {
       }
     } else if (allVendasData.length > 0) {
       // Se o período for 'todos', determina o intervalo de datas a partir dos dados obtidos
-      const dates = allVendasData.map((venda: any) => new Date(venda.dataCriacao));
+      // Usa dataFinalizacao se disponível, caso contrário usa dataCriacao como fallback
+      const dates = allVendasData.map((venda: any) => new Date(venda.dataFinalizacao || venda.dataCriacao));
       effectiveStartDate = new Date(Math.min(...dates.map(date => date.getTime())));
       effectiveEndDate = new Date(Math.max(...dates.map(date => date.getTime())));
       effectiveStartDate.setHours(0, 0, 0, 0);

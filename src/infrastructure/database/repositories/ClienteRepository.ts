@@ -95,14 +95,17 @@ export class ClienteRepository implements IClienteRepository {
 
   async criarCliente(data: CriarClienteDTO): Promise<Cliente> {
     try {
+      const telDigits = (data.telefone || '').replace(/\D/g, '')
       const bodyMap: any = {
         nome: data.nome,
         razaoSocial: data.razaoSocial || '',
         cpf: data.cpf || '',
         cnpj: data.cnpj || '',
-        telefone: data.telefone || '',
+        telefone: telDigits.length > 0 ? telDigits : null,
         email: data.email || '',
         nomeFantasia: data.nomeFantasia || '',
+        indicadorInscricaoEstadual: data.indicadorInscricaoEstadual ?? '',
+        inscricaoEstadual: data.inscricaoEstadual ?? '',
         ativo: data.ativo !== undefined ? data.ativo : true,
       }
 
@@ -152,15 +155,43 @@ export class ClienteRepository implements IClienteRepository {
       if (data.nome) requestBody.nome = data.nome
       if (data.razaoSocial !== undefined) requestBody.razaoSocial = data.razaoSocial || ''
       
-      // CPF e CNPJ: sempre envia (mesmo que vazio) para garantir atualização
-      // IMPORTANTE: Envia da mesma forma que criarCliente para manter consistência
-      // Se estiver presente no DTO, envia o valor; se não, envia string vazia
-      requestBody.cpf = data.cpf !== undefined && data.cpf !== null ? data.cpf : ''
-      requestBody.cnpj = data.cnpj !== undefined && data.cnpj !== null ? data.cnpj : ''
+      // CPF e CNPJ: 
+      // - Se o campo estiver presente no DTO e for string vazia, envia null (para limpar/apagar)
+      // - Se o campo estiver presente e tiver valor, envia o valor
+      // - Se o campo não estiver presente, não envia (omitir - não atualiza)
+      if ('cpf' in data) {
+        if (data.cpf === null || (typeof data.cpf === 'string' && data.cpf.trim() === '')) {
+          requestBody.cpf = null
+        } else if (data.cpf) {
+          requestBody.cpf = data.cpf
+        }
+      }
+      if ('cnpj' in data) {
+        if (data.cnpj === null || (typeof data.cnpj === 'string' && data.cnpj.trim() === '')) {
+          requestBody.cnpj = null
+        } else if (data.cnpj) {
+          requestBody.cnpj = data.cnpj
+        }
+      }
       
-      if (data.telefone !== undefined) requestBody.telefone = data.telefone || ''
+      // String vazia na API externa dispara validação "11 dígitos"; usar null para limpar (como cpf/cnpj)
+      if (data.telefone !== undefined) {
+        const t = data.telefone
+        if (t === null || (typeof t === 'string' && t.replace(/\D/g, '').length === 0)) {
+          requestBody.telefone = null
+        } else if (typeof t === 'string') {
+          requestBody.telefone = t.replace(/\D/g, '')
+        }
+      }
       if (data.email !== undefined) requestBody.email = data.email || ''
       if (data.nomeFantasia !== undefined) requestBody.nomeFantasia = data.nomeFantasia || ''
+      if (data.indicadorInscricaoEstadual !== undefined) {
+        requestBody.indicadorInscricaoEstadual = data.indicadorInscricaoEstadual
+      }
+      if (data.inscricaoEstadual !== undefined) {
+        requestBody.inscricaoEstadual =
+          data.inscricaoEstadual === null ? null : data.inscricaoEstadual ?? ''
+      }
       if (data.ativo !== undefined) requestBody.ativo = data.ativo
       
       console.log('📤 Repository - Processamento CPF/CNPJ:', {

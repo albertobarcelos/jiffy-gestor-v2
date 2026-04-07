@@ -26,20 +26,13 @@ export async function DELETE(
   try {
     const apiClient = new ApiClient()
     const targetUrl = `/api/v1/cardapio/produtos/${id}/grupos-complementos/${grupoComplementoId}`
-    console.log('[API] Removendo grupo de complemento', {
-      produtoId: id,
-      grupoComplementoId,
-      targetUrl,
-    })
 
-    const response = await apiClient.request(targetUrl, {
+    await apiClient.request(targetUrl, {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${validation.tokenInfo.token}`,
       },
     })
-
-    console.log('[API] Remoção concluída', { status: response.status })
 
     return NextResponse.json({ success: true, message: 'Grupo removido do produto com sucesso' })
   } catch (error: any) {

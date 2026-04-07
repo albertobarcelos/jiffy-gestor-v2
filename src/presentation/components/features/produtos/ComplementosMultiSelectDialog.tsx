@@ -13,9 +13,11 @@ import { Complemento } from '@/src/domain/entities/Complemento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
-import { MdClose, MdSearch, MdKeyboardArrowDown, MdDelete, MdAdd, MdAddCircle, MdAddShoppingCart, MdGroupAdd, MdAddAPhoto, MdCheck } from 'react-icons/md'
+import { MdClose, MdSearch, MdKeyboardArrowDown, MdDelete, MdAdd, MdAddCircle, MdAddShoppingCart, MdGroupAdd, MdAddAPhoto, MdCheck, MdEdit } from 'react-icons/md'
 import { GruposComplementosTabsModal, GruposComplementosTabsModalState } from '../grupos-complementos/GruposComplementosTabsModal'
+import { GrupoComplemento as GrupoComplementoEntity } from '@/src/domain/entities/GrupoComplemento'
 
 interface GrupoComplemento {
   id: string
@@ -373,6 +375,32 @@ export function ComplementosMultiSelectDialog({
     })
   }, [])
 
+  const handleEditGrupo = useCallback((grupo: GrupoComplemento) => {
+    // Converter o grupo simples para uma instância de GrupoComplemento
+    try {
+      const grupoEntity = GrupoComplementoEntity.create(
+        grupo.id,
+        grupo.nome,
+        grupo.qtdMinima,
+        grupo.qtdMaxima,
+        true, // Assumindo que está ativo se está vinculado ao produto
+        undefined, // ordem
+        grupo.complementos.map((c) => c.getId()), // complementosIds
+        grupo.complementos // complementos
+      )
+
+      setGruposTabsModalState({
+        open: true,
+        tab: 'grupo',
+        mode: 'edit',
+        grupo: grupoEntity,
+      })
+    } catch (error) {
+      console.error('Erro ao criar instância de GrupoComplemento:', error)
+      showToast.error('Erro ao abrir edição do grupo')
+    }
+  }, [])
+
   const handleCloseGruposTabsModal = useCallback(() => {
     setGruposTabsModalState((prev) => ({
       ...prev,
@@ -392,16 +420,20 @@ export function ComplementosMultiSelectDialog({
     await loadSelectableGroups()
   }, [loadGroups, loadSelectableGroups])
 
+  const handleGruposTabsClose = useCallback(() => {
+    setGruposTabsModalState((prev) => ({
+      ...prev,
+      open: false,
+    }))
+    // Recarregar grupos após fechar o modal de edição
+    loadGroups()
+  }, [loadGroups])
+
   const renderContent = () => {
     if (isLoading) {
       return (
         <div className="flex flex-col items-center justify-center py-12 gap-2">
-          <img
-            src="/images/jiffy-loading.gif"
-            alt="Carregando"
-            className="w-16 h-16 object-contain"
-          />
-          <p className="text-secondary-text text-sm text-center">Carregando complementos...</p>
+          <JiffyLoading />
         </div>
       )
     }
@@ -455,7 +487,7 @@ export function ComplementosMultiSelectDialog({
                 }}
                 className="w-full flex items-center justify-between md:px-4 px-1.5 py-3 text-left cursor-pointer"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-1">
                   <button
                     type="button"
                     onClick={(event) => {
@@ -467,8 +499,22 @@ export function ComplementosMultiSelectDialog({
                   >
                     <MdDelete size={18} />
                   </button>
-                  <div>
-                    <p className="text-sm font-semibold text-primary-text">{grupo.nome}</p>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-primary-text">{grupo.nome}</p>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          handleEditGrupo(grupo)
+                        }}
+                        className="text-primary hover:text-primary/80 transition-colors"
+                        aria-label={`Editar grupo ${grupo.nome}`}
+                        title="Editar grupo"
+                      >
+                        <MdEdit size={16} />
+                      </button>
+                    </div>
                     <p className="text-xs text-secondary-text">
                       {minLabel} • {maxLabel}
                     </p>
@@ -578,12 +624,7 @@ export function ComplementosMultiSelectDialog({
         <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
           {isLoadingSelectableGroups ? (
             <div className="flex flex-col items-center justify-center py-6 gap-2">
-              <img
-                src="/images/jiffy-loading.gif"
-                alt="Carregando"
-                className="w-16 h-16 object-contain"
-              />
-              <p className="text-secondary-text text-sm text-center">Carregando grupos...</p>
+              <JiffyLoading />
             </div>
           ) : filteredSelectableGroups.length ? (
             filteredSelectableGroups.map((grupo, index) => {
@@ -686,7 +727,7 @@ export function ComplementosMultiSelectDialog({
         {selectionDialogNode}
         <GruposComplementosTabsModal
           state={gruposTabsModalState}
-          onClose={handleCloseGruposTabsModal}
+          onClose={handleGruposTabsClose}
           onTabChange={handleGruposTabsTabChange}
           onReload={handleGruposTabsReload}
         />
