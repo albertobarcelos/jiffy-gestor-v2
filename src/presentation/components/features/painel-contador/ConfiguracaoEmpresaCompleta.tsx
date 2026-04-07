@@ -75,6 +75,34 @@ const ESTADOS_BRASILEIROS = [
   { sigla: 'TO', nome: 'Tocantins' },
 ]
 
+/** Máscara CNPJ 00.000.000/0000-00 a partir de qualquer string (só dígitos contam) */
+function formatarCnpjMascara(valor: string): string {
+  const n = valor.replace(/\D/g, '').slice(0, 14)
+  if (n.length <= 2) return n
+  if (n.length <= 5) return `${n.slice(0, 2)}.${n.slice(2)}`
+  if (n.length <= 8) return `${n.slice(0, 2)}.${n.slice(2, 5)}.${n.slice(5)}`
+  if (n.length <= 12) return `${n.slice(0, 2)}.${n.slice(2, 5)}.${n.slice(5, 8)}/${n.slice(8)}`
+  return `${n.slice(0, 2)}.${n.slice(2, 5)}.${n.slice(5, 8)}/${n.slice(8, 12)}-${n.slice(12)}`
+}
+
+/** Máscara telefone BR: (00) 0000-0000 ou (00) 00000-0000 (máx. 11 dígitos) */
+function formatarTelefoneMascara(valor: string): string {
+  const n = valor.replace(/\D/g, '').slice(0, 11)
+  if (n.length === 0) return ''
+  if (n.length === 1) return `(${n}`
+  if (n.length === 2) return `(${n})`
+  if (n.length <= 6) return `(${n.slice(0, 2)}) ${n.slice(2)}`
+  if (n.length <= 10) return `(${n.slice(0, 2)}) ${n.slice(2, 6)}-${n.slice(6)}`
+  return `(${n.slice(0, 2)}) ${n.slice(2, 7)}-${n.slice(7)}`
+}
+
+/** Máscara CEP 00000-000 (8 dígitos) */
+function formatarCepMascara(valor: string): string {
+  const n = valor.replace(/\D/g, '').slice(0, 8)
+  if (n.length <= 5) return n
+  return `${n.slice(0, 5)}-${n.slice(5)}`
+}
+
 export function ConfiguracaoEmpresaCompleta() {
   const { auth, isRehydrated } = useAuthStore()
   const [isLoading, setIsLoading] = useState(true)
@@ -142,12 +170,12 @@ export function ConfiguracaoEmpresaCompleta() {
         setEmpresa(empresaData)
         
         setFormDataEmpresa({
-          cnpj: empresaData.cnpj || '',
+          cnpj: formatarCnpjMascara(empresaData.cnpj || ''),
           razaoSocial: empresaData.razaoSocial || empresaData.nome || '',
           nomeFantasia: empresaData.nomeFantasia || '',
           email: empresaData.email || '',
-          telefone: empresaData.telefone || '',
-          cep: empresaData.endereco?.cep || '',
+          telefone: formatarTelefoneMascara(empresaData.telefone || ''),
+          cep: formatarCepMascara(empresaData.endereco?.cep || ''),
           rua: empresaData.endereco?.rua || empresaData.endereco?.logradouro || '',
           numero: empresaData.endereco?.numero || '',
           complemento: empresaData.endereco?.complemento || '',
@@ -511,10 +539,11 @@ export function ConfiguracaoEmpresaCompleta() {
                 <Label htmlFor="cnpj">CNPJ *</Label>
                 <Input
                   id="cnpj"
+                  inputProps={{ inputMode: 'numeric', autoComplete: 'off' }}
                   value={formDataEmpresa.cnpj}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/\D/g, '').slice(0, 14)
-                    setFormDataEmpresa({ ...formDataEmpresa, cnpj: value })
+                  onChange={e => {
+                    const mascarado = formatarCnpjMascara(e.target.value)
+                    setFormDataEmpresa(prev => ({ ...prev, cnpj: mascarado }))
                   }}
                   placeholder="00.000.000/0000-00"
                   required
@@ -567,10 +596,11 @@ export function ConfiguracaoEmpresaCompleta() {
                 <Label htmlFor="telefone">Telefone</Label>
                 <Input
                   id="telefone"
+                  inputProps={{ inputMode: 'numeric', autoComplete: 'tel' }}
                   value={formDataEmpresa.telefone}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/\D/g, '')
-                    setFormDataEmpresa({ ...formDataEmpresa, telefone: value })
+                  onChange={e => {
+                    const mascarado = formatarTelefoneMascara(e.target.value)
+                    setFormDataEmpresa(prev => ({ ...prev, telefone: mascarado }))
                   }}
                   placeholder="(00) 00000-0000"
                   size="small"
@@ -590,10 +620,11 @@ export function ConfiguracaoEmpresaCompleta() {
                 <Label htmlFor="cep">CEP</Label>
                 <Input
                   id="cep"
+                  inputProps={{ inputMode: 'numeric', autoComplete: 'postal-code' }}
                   value={formDataEmpresa.cep}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/\D/g, '').slice(0, 8)
-                    setFormDataEmpresa({ ...formDataEmpresa, cep: value })
+                  onChange={e => {
+                    const mascarado = formatarCepMascara(e.target.value)
+                    setFormDataEmpresa(prev => ({ ...prev, cep: mascarado }))
                   }}
                   placeholder="00000-000"
                   size="small"
