@@ -599,8 +599,25 @@ export function ConfiguracaoEmpresaCompleta() {
                   inputProps={{ inputMode: 'numeric', autoComplete: 'tel' }}
                   value={formDataEmpresa.telefone}
                   onChange={e => {
-                    const mascarado = formatarTelefoneMascara(e.target.value)
-                    setFormDataEmpresa(prev => ({ ...prev, telefone: mascarado }))
+                    const raw = e.target.value
+                    const newDigits = raw.replace(/\D/g, '').slice(0, 11)
+                    setFormDataEmpresa(prev => {
+                      const prevMasked = prev.telefone
+                      const prevDigits = prevMasked.replace(/\D/g, '')
+                      // Apagou só ), espaço ou - no fim: dígitos iguais mas texto mais curto — remove 1 dígito
+                      const apagouPontuacaoNoFim =
+                        raw.length < prevMasked.length &&
+                        newDigits === prevDigits &&
+                        prevDigits.length > 0 &&
+                        raw === prevMasked.slice(0, raw.length)
+                      if (apagouPontuacaoNoFim) {
+                        return {
+                          ...prev,
+                          telefone: formatarTelefoneMascara(prevDigits.slice(0, -1)),
+                        }
+                      }
+                      return { ...prev, telefone: formatarTelefoneMascara(newDigits) }
+                    })
                   }}
                   placeholder="(00) 00000-0000"
                   size="small"
