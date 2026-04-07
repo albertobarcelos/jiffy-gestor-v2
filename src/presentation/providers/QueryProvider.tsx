@@ -52,8 +52,11 @@ export function QueryProvider({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
+      {/* Fora do fluxo: evita o host dos Devtools aumentar scrollHeight do body (faixa branca abaixo das telas full-viewport). */}
       {process.env.NODE_ENV === 'development' && (
-        <ReactQueryDevtools initialIsOpen={false} />
+        <div className="pointer-events-none fixed bottom-0 right-0 z-[2147483000] h-0 w-0 overflow-visible [&>*]:pointer-events-auto">
+          <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />
+        </div>
       )}
     </QueryClientProvider>
   )

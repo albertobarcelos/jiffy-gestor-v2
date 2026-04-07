@@ -1,12 +1,15 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { Complemento } from '@/src/domain/entities/Complemento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { MdAddCircle, MdOutlineOfflinePin, MdSearch } from 'react-icons/md'
+import { MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { useComplementosInfinite } from '@/src/presentation/hooks/useComplementos'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   ComplementosTabsModal,
   ComplementosTabsModalState,
@@ -17,15 +20,123 @@ interface ComplementosListProps {
 }
 
 /**
- * Lista de complementos com scroll infinito
- * Replica exatamente o design e lógica do Flutter
+ * Linha da tabela (memo) — mesmo padrão de GruposComplementosList / GrupoItem
  */
+const ComplementoRow = memo(function ComplementoRow({
+  complemento,
+  index,
+  valorDisplay,
+  onValorChange,
+  onValorSubmit,
+  onValorKeyDown,
+  onValorFocus,
+  onTipoChange,
+  onToggleStatus,
+  onRowClick,
+  savingValor,
+  savingTipo,
+  togglingStatus,
+}: {
+  complemento: Complemento
+  index: number
+  valorDisplay: string
+  onValorChange: (id: string, value: string) => void
+  onValorSubmit: (id: string) => void
+  onValorKeyDown: (id: string, e: React.KeyboardEvent<HTMLInputElement>) => void
+  onValorFocus: (e: React.FocusEvent<HTMLInputElement>) => void
+  onTipoChange: (id: string, v: 'nenhum' | 'aumenta' | 'diminui') => void
+  onToggleStatus: (c: Complemento, novo: boolean) => void
+  onRowClick: (c: Complemento) => void
+  savingValor: boolean
+  savingTipo: boolean
+  togglingStatus: boolean
+}) {
+  const isZebraEven = index % 2 === 0
+  const bgClass = isZebraEven ? 'bg-gray-50' : 'bg-white'
+
+  return (
+    <div
+      onClick={() => onRowClick(complemento)}
+      className={`${bgClass} rounded-lg md:px-4 px-1 py-3 flex items-center md:gap-[10px] gap-1 hover:bg-secondary-bg/15 cursor-pointer`}
+    >
+      <div className="md:flex-[3] flex-[2] font-nunito font-semibold md:text-sm text-[10px] text-primary-text flex items-center gap-1">
+        <span># {complemento.getNome()}</span>
+      </div>
+      <div className="flex-[3] font-nunito text-sm text-secondary-text hidden md:flex">
+        {complemento.getDescricao() || 'Nenhuma'}
+      </div>
+
+      <div className="flex-[2]" onClick={e => e.stopPropagation()}>
+        <div className="flex flex-col items-start gap-1">
+          <div className="flex items-center justify-end gap-2 px-3 py-1 rounded-lg border border-gray-300 bg-white max-w-[140px]">
+            <input
+              type="text"
+              value={valorDisplay}
+              onChange={e => onValorChange(complemento.getId(), e.target.value)}
+              onFocus={onValorFocus}
+              onBlur={() => onValorSubmit(complemento.getId())}
+              onKeyDown={e => onValorKeyDown(complemento.getId(), e)}
+              onClick={e => e.stopPropagation()}
+              disabled={savingValor}
+              className={`w-full bg-transparent text-left md:text-sm text-[10px] font-semibold text-primary-text focus:outline-none ${
+                savingValor ? 'opacity-70 cursor-not-allowed' : ''
+              }`}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="flex-1 font-nunito md:text-sm text-[10px] text-secondary-text text-center"
+        onClick={e => e.stopPropagation()}
+      >
+        <select
+          value={(complemento.getTipoImpactoPreco() || 'nenhum').toLowerCase()}
+          onChange={e =>
+            onTipoChange(complemento.getId(), e.target.value as 'nenhum' | 'aumenta' | 'diminui')
+          }
+          onClick={e => e.stopPropagation()}
+          disabled={savingTipo}
+          className={`w-full px-0 py-1 rounded-lg border border-gray-300 bg-white md:text-sm text-[10px] font-semibold text-primary-text focus:outline-none focus:border-primary text-center ${
+            savingTipo ? 'opacity-70 cursor-not-allowed' : ''
+          }`}
+        >
+          <option value="nenhum">Nenhum</option>
+          <option value="aumenta">Aumenta</option>
+          <option value="diminui">Diminui</option>
+        </select>
+      </div>
+      <div
+        className="md:flex-[2] flex-[1] flex md:justify-center justify-end"
+        onClick={e => e.stopPropagation()}
+        onMouseDown={e => e.stopPropagation()}
+        onTouchStart={e => e.stopPropagation()}
+        title={complemento.isAtivo() ? 'Complemento Ativo' : 'Complemento Desativado'}
+      >
+        <JiffyIconSwitch
+          checked={complemento.isAtivo()}
+          onChange={event => {
+            event.stopPropagation()
+            onToggleStatus(complemento, event.target.checked)
+          }}
+          disabled={togglingStatus}
+          bordered={false}
+          className="gap-0 rounded-none px-0 py-0"
+          inputProps={{
+            'aria-label': complemento.isAtivo() ? 'Desativar complemento' : 'Ativar complemento',
+            onClick: e => e.stopPropagation(),
+          }}
+        />
+      </div>
+    </div>
+  )
+})
+
 export function ComplementosList({ onReload }: ComplementosListProps) {
-  const [complementos, setComplementos] = useState<Complemento[]>([])
-  const [isLoading, setIsLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
-  const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
-  const [totalComplementos, setTotalComplementos] = useState(0)
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Todos')
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
   const [togglingStatus, setTogglingStatus] = useState<Record<string, boolean>>({})
   const [valorInputs, setValorInputs] = useState<Record<string, string>>({})
   const [savingValorMap, setSavingValorMap] = useState<Record<string, boolean>>({})
@@ -36,46 +147,66 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
     mode: 'create',
     complementoId: undefined,
   })
+
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const valorDebounceTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
   const handleValorSubmitRef = useRef<((complementoId: string) => Promise<void>) | null>(null)
-  const hasLoadedInitialRef = useRef(false)
-  const { auth, isAuthenticated } = useAuthStore()
+
+  const { auth } = useAuthStore()
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
+  const queryClient = useQueryClient()
 
-  // Refs para evitar dependências desnecessárias no useCallback
-  const isLoadingRef = useRef(false)
-  const searchTextRef = useRef('')
-  const filterStatusRef = useRef<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
-
-  // Atualiza refs quando os valores mudam
-  useEffect(() => {
-    isLoadingRef.current = isLoading
-  }, [isLoading])
-
-  useEffect(() => {
-    searchTextRef.current = searchText
-  }, [searchText])
-
-  useEffect(() => {
-    filterStatusRef.current = filterStatus
+  const ativoFilter = useMemo<boolean | null>(() => {
+    return filterStatus === 'Ativo' ? true : filterStatus === 'Desativado' ? false : null
   }, [filterStatus])
 
-  const formatValorInput = useCallback((value: string) => {
-    // Remove tudo exceto dígitos
-    const digits = value.replace(/\D/g, '')
-    if (!digits) return 'R$ 0,00'
-    const numberValue = parseInt(digits, 10)
-    // Formata como moeda brasileira
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(numberValue / 100)
-  }, [])
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetching,
+    isFetchingNextPage,
+    isLoading,
+    error,
+    refetch,
+  } = useComplementosInfinite({
+    q: debouncedSearch || undefined,
+    ativo: ativoFilter,
+    limit: 10,
+  })
 
+  useEffect(() => {
+    if (!isLoading && !isFetching) {
+      setHasLoadedOnce(true)
+    }
+  }, [isLoading, isFetching])
+
+  const complementos = useMemo(() => {
+    return data?.pages.flatMap(page => page.complementos) || []
+  }, [data])
+
+  const totalComplementos = useMemo(() => data?.pages[0]?.count ?? 0, [data])
+
+  // Debounce da busca (500ms) — igual GruposComplementosList
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(searchText)
+    }, 500)
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+    }
+  }, [searchText])
+
+  // Preenche inputs de valor quando novos itens entram (páginas infinitas)
   const formatValorFromNumber = useCallback((value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -83,206 +214,252 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
     }).format(value || 0)
   }, [])
 
+  useEffect(() => {
+    setValorInputs(prev => {
+      let changed = false
+      const next = { ...prev }
+      for (const c of complementos) {
+        if (next[c.getId()] === undefined) {
+          next[c.getId()] = formatValorFromNumber(c.getValor())
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [complementos, formatValorFromNumber])
+
+  const formatValorInput = useCallback((value: string) => {
+    const digits = value.replace(/\D/g, '')
+    if (!digits) return 'R$ 0,00'
+    const numberValue = parseInt(digits, 10)
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(numberValue / 100)
+  }, [])
+
   const parseValorToNumber = useCallback((value: string) => {
-    // Remove R$ e espaços, depois remove pontos (milhares) e substitui vírgula por ponto
     const normalized = value.replace(/R\$/g, '').trim().replace(/\./g, '').replace(',', '.')
     const parsed = parseFloat(normalized)
     return Number.isNaN(parsed) ? 0 : parsed
   }, [])
 
-  const loadComplementos = useCallback(async () => {
-    const token = auth?.getAccessToken()
-    if (!token || isLoadingRef.current) {
+  const handleScroll = useCallback(() => {
+    if (scrollTimeoutRef.current) {
       return
     }
+    scrollTimeoutRef.current = setTimeout(() => {
+      const container = scrollContainerRef.current
+      if (!container) {
+        scrollTimeoutRef.current = null
+        return
+      }
+      const { scrollTop, scrollHeight, clientHeight } = container
+      const distanceFromBottom = scrollHeight - (scrollTop + clientHeight)
+      if (distanceFromBottom < 400) {
+        if (hasNextPage && !isFetchingNextPage) {
+          fetchNextPage()
+        }
+      }
+      scrollTimeoutRef.current = null
+    }, 100)
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
-    setIsLoading(true)
-    isLoadingRef.current = true
-
-    // Determina o filtro ativo
-    let ativoFilter: boolean | null = null
-    if (filterStatusRef.current === 'Ativo') {
-      ativoFilter = true
-    } else if (filterStatusRef.current === 'Desativado') {
-      ativoFilter = false
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      container.removeEventListener('scroll', handleScroll)
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current)
+      }
     }
+  }, [handleScroll])
 
-    try {
-      const limit = 10
-      let currentOffset = 0
-      let hasMore = true
-      const acumulado: Complemento[] = []
-      let totalFromApi: number | null = null
+  // Próximas páginas automáticas — mesmo efeito que GruposComplementosList
+  useEffect(() => {
+    if (!hasNextPage) return
+    if (!isFetching && !isFetchingNextPage) {
+      fetchNextPage()
+    }
+  }, [hasNextPage, isFetching, isFetchingNextPage, fetchNextPage])
 
-      while (hasMore) {
-        const params = new URLSearchParams({
-          limit: limit.toString(),
-          offset: currentOffset.toString(),
-        })
-
-        if (searchTextRef.current) {
-          params.append('q', searchTextRef.current)
-        }
-
-        if (ativoFilter !== null) {
-          params.append('ativo', ativoFilter.toString())
-        }
-
-        const response = await fetch(`/api/complementos?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          const errorMessage = errorData.error || `Erro ${response.status}: ${response.statusText}`
-          throw new Error(errorMessage)
-        }
-
-        const data = await response.json()
-
-        const newComplementos = (data.items || []).map((item: any) =>
-          Complemento.fromJSON(item)
-        )
-
-        if (typeof data.count === 'number') {
-          totalFromApi = data.count
-        }
-
-        acumulado.push(...newComplementos)
-
-        if (totalFromApi !== null) {
-          setTotalComplementos(totalFromApi)
-        }
-
-        currentOffset += newComplementos.length
-        hasMore =
-          newComplementos.length === limit &&
-          (totalFromApi ? currentOffset < totalFromApi : true)
-
-        if (newComplementos.length === 0) {
-          hasMore = false
-        }
-      }
-
-      setComplementos(acumulado)
-      setTotalComplementos(totalFromApi ?? acumulado.length)
-      if (totalFromApi !== null && totalFromApi !== acumulado.length) {
-        setTotalComplementos(acumulado.length)
-      }
-      setValorInputs(
-        acumulado.reduce<Record<string, string>>((acc, item) => {
-          acc[item.getId()] = formatValorFromNumber(item.getValor())
-          return acc
-        }, {})
-      )
-    } catch (error) {
+  useEffect(() => {
+    if (error) {
       console.error('Erro ao carregar complementos:', error)
-    } finally {
-      setIsLoading(false)
-      isLoadingRef.current = false
     }
-  }, [auth])
+  }, [error])
 
-  // Debounce da busca
-  useEffect(() => {
-    const token = auth?.getAccessToken()
-    if (!token) return
-
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current)
-    }
-
-    debounceTimerRef.current = setTimeout(() => {
-      loadComplementos()
-    }, 500)
-
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current)
-      }
-    }
-  }, [searchText, auth, loadComplementos])
-
-  // Recarrega ao trocar filtro de status
-  useEffect(() => {
-    const token = auth?.getAccessToken()
-    if (!token) return
-
-    loadComplementos()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterStatus])
-
-  // Carrega complementos iniciais apenas quando o token estiver disponível
-  useEffect(() => {
-    if (!isAuthenticated || hasLoadedInitialRef.current) return
-
-    const token = auth?.getAccessToken()
-    if (!token) return
-
-    hasLoadedInitialRef.current = true
-    loadComplementos()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated])
-
-  // Limpa todos os timers de debounce ao desmontar o componente
   useEffect(() => {
     return () => {
-      valorDebounceTimersRef.current.forEach((timer) => {
-        clearTimeout(timer)
-      })
+      valorDebounceTimersRef.current.forEach(t => clearTimeout(t))
       valorDebounceTimersRef.current.clear()
     }
   }, [])
 
-  const handleStatusChange = () => {
-    loadComplementos()
+  const handleActionsReload = useCallback(async () => {
+    await refetch()
     onReload?.()
-  }
+  }, [refetch, onReload])
 
-  const openTabsModal = useCallback((config: Partial<ComplementosTabsModalState> = {}) => {
-    setTabsModalState(() => ({
-      open: true,
-      tab: config.tab ?? 'complemento',
-      mode: config.mode ?? 'create',
-      complementoId: config.complementoId,
-    }))
-
-    // Adicionar um parâmetro na URL para forçar o recarregamento ao fechar o modal
-    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
-    currentSearchParams.set('modalComplementoOpen', 'true')
-    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
-  }, [router, searchParams, pathname])
-
-  const closeTabsModal = useCallback(() => {
-    setTabsModalState((prev) => ({
-      ...prev,
-      open: false,
-      complementoId: undefined,
-    }))
-
-    // Remover o parâmetro da URL para forçar o recarregamento da rota
-    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
-    currentSearchParams.delete('modalComplementoOpen')
-    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
-    router.refresh() // Força a revalidação da rota principal
-    loadComplementos() // Recarrega a lista de complementos
-    onReload?.()
-  }, [router, searchParams, pathname, loadComplementos, onReload])
-
-  const handleTabsModalReload = useCallback(() => {
-    loadComplementos()
-    onReload?.()
-  }, [loadComplementos, onReload])
-
-  const handleTabsModalTabChange = useCallback((tab: 'complemento') => {
-    setTabsModalState((prev) => ({
-      ...prev,
-      tab,
-    }))
+  const clearValorDebounceTimer = useCallback((complementoId: string) => {
+    const timer = valorDebounceTimersRef.current.get(complementoId)
+    if (timer) {
+      clearTimeout(timer)
+      valorDebounceTimersRef.current.delete(complementoId)
+    }
   }, [])
+
+  const handleValorInputChange = useCallback(
+    (complementoId: string, value: string) => {
+      setValorInputs(prev => ({
+        ...prev,
+        [complementoId]: formatValorInput(value),
+      }))
+      clearValorDebounceTimer(complementoId)
+      const timer = setTimeout(() => {
+        if (handleValorSubmitRef.current) {
+          handleValorSubmitRef.current(complementoId)
+        }
+        valorDebounceTimersRef.current.delete(complementoId)
+      }, 2000)
+      valorDebounceTimersRef.current.set(complementoId, timer)
+    },
+    [formatValorInput, clearValorDebounceTimer]
+  )
+
+  const handleValorSubmit = useCallback(
+    async (complementoId: string) => {
+      clearValorDebounceTimer(complementoId)
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      const valorString = valorInputs[complementoId]
+      const novoValor = parseValorToNumber(valorString ?? '')
+      if (Number.isNaN(novoValor)) {
+        showToast.error('Informe um valor válido.')
+        return
+      }
+
+      const complementoAtual = complementos.find(item => item.getId() === complementoId)
+      if (!complementoAtual) {
+        showToast.error('Complemento não encontrado.')
+        return
+      }
+
+      if (novoValor === complementoAtual.getValor()) {
+        return
+      }
+
+      setSavingValorMap(prev => ({ ...prev, [complementoId]: true }))
+
+      try {
+        const response = await fetch(`/api/complementos/${complementoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ valor: novoValor }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || 'Erro ao atualizar valor')
+        }
+
+        showToast.success('Valor atualizado com sucesso!')
+        await refetch()
+        onReload?.()
+      } catch (err: unknown) {
+        console.error('Erro ao atualizar valor do complemento:', err)
+        const message = err instanceof Error ? err.message : 'Erro ao atualizar valor do complemento'
+        showToast.error(message)
+        setValorInputs(prev => ({
+          ...prev,
+          [complementoId]: formatValorFromNumber(complementoAtual.getValor()),
+        }))
+      } finally {
+        setSavingValorMap(prev => {
+          const { [complementoId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [
+      auth,
+      valorInputs,
+      parseValorToNumber,
+      complementos,
+      formatValorFromNumber,
+      clearValorDebounceTimer,
+      refetch,
+      onReload,
+    ]
+  )
+
+  useEffect(() => {
+    handleValorSubmitRef.current = handleValorSubmit
+  }, [handleValorSubmit])
+
+  const handleTipoImpactoChange = useCallback(
+    async (complementoId: string, novoTipo: 'nenhum' | 'aumenta' | 'diminui') => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      const complementoAtual = complementos.find(item => item.getId() === complementoId)
+      if (!complementoAtual) {
+        showToast.error('Complemento não encontrado.')
+        return
+      }
+
+      const tipoAtual = (complementoAtual.getTipoImpactoPreco() || 'nenhum').toLowerCase()
+      if (tipoAtual === novoTipo) {
+        return
+      }
+
+      setSavingTipoMap(prev => ({ ...prev, [complementoId]: true }))
+
+      try {
+        const payloadTipo = novoTipo.toLowerCase()
+        const response = await fetch(`/api/complementos/${complementoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ tipoImpactoPreco: payloadTipo }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || 'Erro ao atualizar tipo de impacto')
+        }
+
+        showToast.success('Tipo de impacto atualizado com sucesso!')
+        await refetch()
+        onReload?.()
+      } catch (err: unknown) {
+        console.error('Erro ao atualizar tipo de impacto:', err)
+        const message =
+          err instanceof Error ? err.message : 'Erro ao atualizar tipo de impacto'
+        showToast.error(message)
+      } finally {
+        setSavingTipoMap(prev => {
+          const { [complementoId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [auth, complementos, refetch, onReload]
+  )
 
   const handleToggleComplementoStatus = useCallback(
     async (complemento: Complemento, novoStatus: boolean) => {
@@ -293,24 +470,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
       }
 
       const complementoId = complemento.getId()
-      const previousComplementos = complementos
-
-      setTogglingStatus((prev) => ({ ...prev, [complementoId]: true }))
-      setComplementos((prev) =>
-        prev.map((item) =>
-          item.getId() === complementoId
-            ? Complemento.create(
-                item.getId(),
-                item.getNome(),
-                item.getDescricao(),
-                item.getValor(),
-                novoStatus,
-                item.getTipoImpactoPreco(),
-                item.getOrdem()
-              )
-            : item
-        )
-      )
+      setTogglingStatus(prev => ({ ...prev, [complementoId]: true }))
 
       try {
         const response = await fetch(`/api/complementos/${complementoId}`, {
@@ -330,223 +490,100 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         showToast.success(
           novoStatus ? 'Complemento ativado com sucesso!' : 'Complemento desativado com sucesso!'
         )
-        await loadComplementos()
-        onReload?.()
-      } catch (error: any) {
-        console.error('Erro ao atualizar status do complemento:', error)
-        showToast.error(error.message || 'Erro ao atualizar status do complemento')
-        setComplementos([...previousComplementos])
+        await handleActionsReload()
+      } catch (err: unknown) {
+        console.error('Erro ao atualizar status do complemento:', err)
+        const message =
+          err instanceof Error ? err.message : 'Erro ao atualizar status do complemento'
+        showToast.error(message)
       } finally {
-        setTogglingStatus((prev) => {
+        setTogglingStatus(prev => {
           const { [complementoId]: _, ...rest } = prev
           return rest
         })
       }
     },
-    [auth, complementos, loadComplementos, onReload]
+    [auth, handleActionsReload]
   )
 
-  const clearValorDebounceTimer = useCallback((complementoId: string) => {
-    const timer = valorDebounceTimersRef.current.get(complementoId)
-    if (timer) {
-      clearTimeout(timer)
-      valorDebounceTimersRef.current.delete(complementoId)
-    }
+  const openTabsModal = useCallback(
+    (config: Partial<ComplementosTabsModalState> = {}) => {
+      setTabsModalState(() => ({
+        open: true,
+        tab: config.tab ?? 'complemento',
+        mode: config.mode ?? 'create',
+        complementoId: config.complementoId,
+      }))
+      const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+      currentSearchParams.set('modalComplementoOpen', 'true')
+      router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+    },
+    [router, searchParams, pathname]
+  )
+
+  const closeTabsModal = useCallback(async () => {
+    setTabsModalState(prev => ({
+      ...prev,
+      open: false,
+      complementoId: undefined,
+    }))
+    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
+    currentSearchParams.delete('modalComplementoOpen')
+    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
+    router.refresh()
+    await queryClient.invalidateQueries({ queryKey: ['complementos'], exact: false })
+  }, [router, searchParams, pathname, queryClient])
+
+  const handleTabsModalReload = useCallback(async () => {
+    await handleActionsReload()
+  }, [handleActionsReload])
+
+  const handleTabsModalTabChange = useCallback((tab: 'complemento') => {
+    setTabsModalState(prev => ({
+      ...prev,
+      tab,
+    }))
   }, [])
 
-  const handleValorInputChange = useCallback(
-    (complementoId: string, value: string) => {
-      setValorInputs((prev) => ({
-        ...prev,
-        [complementoId]: formatValorInput(value),
-      }))
-
-      // Limpa o timer anterior se existir
-      clearValorDebounceTimer(complementoId)
-
-      // Cria um novo timer para salvar automaticamente após 2 segundos
-      const timer = setTimeout(() => {
-        if (handleValorSubmitRef.current) {
-          handleValorSubmitRef.current(complementoId)
-        }
-        valorDebounceTimersRef.current.delete(complementoId)
-      }, 2000)
-
-      valorDebounceTimersRef.current.set(complementoId, timer)
+  const handleRowOpenEdit = useCallback(
+    (c: Complemento) => {
+      openTabsModal({
+        mode: 'edit',
+        complementoId: c.getId(),
+      })
     },
-    [formatValorInput, clearValorDebounceTimer]
+    [openTabsModal]
   )
 
-  const handleValorSubmit = useCallback(
-    async (complementoId: string) => {
-      // Limpa o timer de debounce se existir
-      clearValorDebounceTimer(complementoId)
-
-      const token = auth?.getAccessToken()
-      if (!token) {
-        showToast.error('Token não encontrado. Faça login novamente.')
-        return
-      }
-
-      const valorString = valorInputs[complementoId]
-      const novoValor = parseValorToNumber(valorString ?? '')
-      if (Number.isNaN(novoValor)) {
-        showToast.error('Informe um valor válido.')
-        return
-      }
-
-      const complementoAtual = complementos.find((item) => item.getId() === complementoId)
-      if (!complementoAtual) {
-        showToast.error('Complemento não encontrado.')
-        return
-      }
-
-      if (novoValor === complementoAtual.getValor()) {
-        return
-      }
-
-      setSavingValorMap((prev) => ({ ...prev, [complementoId]: true }))
-
-      try {
-        const response = await fetch(`/api/complementos/${complementoId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ valor: novoValor }),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.message || 'Erro ao atualizar valor')
-        }
-
-        showToast.success('Valor atualizado com sucesso!')
-        setComplementos((prev) =>
-          prev.map((item) =>
-            item.getId() === complementoId
-              ? Complemento.create(
-                  item.getId(),
-                  item.getNome(),
-                  item.getDescricao(),
-                  novoValor,
-                  item.isAtivo(),
-                  item.getTipoImpactoPreco(),
-                  item.getOrdem()
-                )
-              : item
-          )
-        )
-      } catch (error: any) {
-        console.error('Erro ao atualizar valor do complemento:', error)
-        showToast.error(error.message || 'Erro ao atualizar valor do complemento')
-        setValorInputs((prev) => ({
-          ...prev,
-          [complementoId]: formatValorFromNumber(complementoAtual.getValor()),
-        }))
-      } finally {
-        setSavingValorMap((prev) => {
-          const { [complementoId]: _, ...rest } = prev
-          return rest
-        })
+  const handleValorKeyDown = useCallback(
+    (id: string, e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        handleValorSubmit(id)
       }
     },
-    [auth, valorInputs, parseValorToNumber, complementos, formatValorFromNumber, clearValorDebounceTimer]
-  )
-
-  // Atualiza a ref quando handleValorSubmit mudar
-  useEffect(() => {
-    handleValorSubmitRef.current = handleValorSubmit
-  }, [handleValorSubmit])
-
-  const handleTipoImpactoChange = useCallback(
-    async (complementoId: string, novoTipo: 'nenhum' | 'aumenta' | 'diminui') => {
-      const token = auth?.getAccessToken()
-      if (!token) {
-        showToast.error('Token não encontrado. Faça login novamente.')
-        return
-      }
-
-      const complementoAtual = complementos.find((item) => item.getId() === complementoId)
-      if (!complementoAtual) {
-        showToast.error('Complemento não encontrado.')
-        return
-      }
-
-      const tipoAtual = (complementoAtual.getTipoImpactoPreco() || 'nenhum').toLowerCase()
-      if (tipoAtual === novoTipo) {
-        return
-      }
-
-      setSavingTipoMap((prev) => ({ ...prev, [complementoId]: true }))
-
-      try {
-        const payloadTipo = novoTipo.toLowerCase()
-        const response = await fetch(`/api/complementos/${complementoId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ tipoImpactoPreco: payloadTipo }),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.message || 'Erro ao atualizar tipo de impacto')
-        }
-
-        showToast.success('Tipo de impacto atualizado com sucesso!')
-        setComplementos((prev) =>
-          prev.map((item) =>
-            item.getId() === complementoId
-              ? Complemento.create(
-                  item.getId(),
-                  item.getNome(),
-                  item.getDescricao(),
-                  item.getValor(),
-                  item.isAtivo(),
-                  payloadTipo,
-                  item.getOrdem()
-                )
-              : item
-          )
-        )
-      } catch (error: any) {
-        console.error('Erro ao atualizar tipo de impacto:', error)
-        showToast.error(error.message || 'Erro ao atualizar tipo de impacto')
-      } finally {
-        setSavingTipoMap((prev) => {
-          const { [complementoId]: _, ...rest } = prev
-          return rest
-        })
-      }
-    },
-    [auth, complementos]
+    [handleValorSubmit]
   )
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header com título e botão */}
-      <div className="md:px-[30px] px-1 py-2 flex-shrink-0">
-        <div className="flex flex-wrap md:items-end gap-4">
-          <div className="md:min-w-[220px] flex-1 pl-5">
-            <p className="text-primary text-sm font-semibold font-nunito">
-              Complementos Cadastrados
-            </p>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="md:px-[30px] flex-shrink-0 px-2 py-[4px]">
+        <div className="flex flex-row items-center justify-between">
+          <div className="flex flex-col md:pl-5">
+            <p className="text-primary text-sm font-semibold font-nunito">Complementos Cadastrados</p>
             <p className="text-tertiary md:text-[22px] text-sm font-medium font-nunito">
               Total {complementos.length} de {totalComplementos}
             </p>
           </div>
           <button
+            type="button"
             onClick={() =>
               openTabsModal({
                 mode: 'create',
                 complementoId: undefined,
               })
             }
-            className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+            className="h-8 md:px-[30px] px-4 bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
           >
             Novo
             <span className="text-lg">+</span>
@@ -554,194 +591,109 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         </div>
       </div>
 
-      <div className="h-[4px] border-t-2 border-primary/70 flex-shrink-0"></div>
-      <div className="flex gap-3 md:px-[20px] px-1 flex-shrink-0">
-        <div className="flex-1 min-w-[180px] max-w-[360px]">
-            <label
-              htmlFor="complementos-search"
-              className="text-xs font-semibold text-secondary-text mb-1 block"
-            >
-              Buscar complemento...
-            </label>
-            <div className="relative h-8">
-              <MdSearch
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
-                size={18}
-              />
-              <input
-                id="complementos-search"
-                type="text"
-                placeholder="Pesquisar complemento..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
-              />
-            </div>
-          </div>
+      <div className="h-[2px] border-t-2 border-primary/70 flex-shrink-0" />
 
-          <div className="w-full sm:w-[160px]">
-            <label className="text-xs font-semibold text-secondary-text mb-1 block">
-              Status
-            </label>
-            <select
-              value={filterStatus}
-              onChange={(e) =>
-                setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
-              }
-              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
-            >
-              <option value="Todos">Todos</option>
-              <option value="Ativo">Ativo</option>
-              <option value="Desativado">Desativado</option>
-            </select>
+      <div className="flex flex-shrink-0 gap-3 md:px-[20px] px-2 py-2">
+        <div className="max-w-[360px] min-w-[180px] flex-1">
+          <label
+            htmlFor="complementos-search"
+            className="text-secondary-text mb-1 block text-xs font-semibold"
+          >
+            Buscar complemento...
+          </label>
+          <div className="relative h-8">
+            <MdSearch
+              className="text-secondary-text absolute left-4 top-1/2 -translate-y-1/2"
+              size={18}
+            />
+            <input
+              id="complementos-search"
+              type="text"
+              placeholder="Pesquisar complemento..."
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+              className="font-nunito focus:border-primary h-full w-full rounded-lg border border-gray-200 bg-info pl-12 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:outline-none"
+            />
           </div>
-          </div>
+        </div>
 
-      {/* Cabeçalho da tabela */}
-      <div className="md:px-[30px] py-2 flex-shrink-0">
-        <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center md:gap-[10px]">
-          <div className="md:flex-[3] flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text">
+        <div className="w-full sm:w-[160px]">
+          <label className="text-secondary-text mb-1 block text-xs font-semibold">Status</label>
+          <select
+            value={filterStatus}
+            onChange={e => setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')}
+            className="font-nunito focus:border-primary h-8 w-full rounded-lg border border-gray-200 bg-info px-5 text-sm text-primary-text focus:outline-none"
+          >
+            <option value="Todos">Todos</option>
+            <option value="Ativo">Ativo</option>
+            <option value="Desativado">Desativado</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="md:px-[30px] mt-0 flex-shrink-0 px-1">
+        <div className="bg-custom-2 flex h-10 items-center gap-[10px] rounded-lg px-1 md:px-4">
+          <div className="md:flex-[3] flex-[2] font-nunito font-semibold text-xs text-primary-text md:text-sm">
             Nome
           </div>
-          <div className="flex-[3] font-nunito font-semibold md:text-sm text-xs text-primary-text hidden md:flex">
+          <div className="hidden flex-[3] font-nunito font-semibold text-xs text-primary-text md:flex md:text-sm">
             Descrição
           </div>
-          <div className="flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="flex-[2] font-nunito font-semibold text-xs text-primary-text md:text-sm">
             Valor
           </div>
-          <div className="flex-[1] font-nunito font-semibold md:text-sm text-xs text-primary-text text-center">
+          <div className="flex-[1] text-center font-nunito font-semibold text-xs text-primary-text md:text-sm">
             Impacto
           </div>
-          <div className="md:flex-[2] flex-[1] md:text-center text-right font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="md:flex-[2] flex-[1] text-right font-nunito font-semibold text-xs text-primary-text md:mt-0 md:text-center md:text-sm">
             Status
           </div>
         </div>
       </div>
 
-      {/* Lista de complementos com scroll */}
+      {/* Só as linhas rolam: ocupa todo o espaço restante abaixo do cabeçalho das colunas (sem max-h). */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto md:px-[30px] mt-2 scrollbar-hide"
-        style={{ maxHeight: 'calc(100vh - 300px)' }}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-2 pb-2 pt-2 scrollbar-hide md:px-[30px]"
       >
-        {/* Mostrar loading apenas quando está carregando e não há complementos ainda */}
-        {(isLoading || !hasLoadedInitialRef.current) && complementos.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 gap-2">
+        {(isLoading || (complementos.length === 0 && isFetching)) && (
+          <div className="flex flex-col items-center justify-center gap-2 py-8">
             <JiffyLoading />
           </div>
         )}
 
-        {/* Só exibir mensagem de "nenhum complemento" quando realmente não há complementos e já houve tentativa de carregamento */}
-        {complementos.length === 0 && !isLoading && hasLoadedInitialRef.current && (
+        {complementos.length === 0 && !isLoading && !isFetching && hasLoadedOnce && (
           <div className="flex items-center justify-center py-12">
             <p className="text-secondary-text">Nenhum complemento encontrado.</p>
           </div>
         )}
 
-        {complementos.map((complemento, index) => {
-          // Handler para abrir edição ao clicar na linha
-          const handleRowClick = () => {
-            openTabsModal({
-              mode: 'edit',
-              complementoId: complemento.getId(),
-            })
-          }
-
-          // Intercala cores de fundo: cinza-50 para pares, branco para ímpares
-          const isZebraEven = index % 2 === 0
-          const bgClass = isZebraEven ? 'bg-gray-50' : 'bg-white'
-
-          return (
-          <div
+        {complementos.map((complemento, index) => (
+          <ComplementoRow
             key={complemento.getId()}
-            onClick={handleRowClick}
-            className={`${bgClass} rounded-lg md:px-4 px-1 py-3 flex items-center md:gap-[10px] gap-1 hover:bg-secondary-bg/15 cursor-pointer`}
-          >
-            <div className="md:flex-[3] flex-[2] font-nunito font-semibold md:text-sm text-[10px] text-primary-text flex items-center gap-1">
-              <span># {complemento.getNome()}</span>
-            </div>
-            <div className="flex-[3] font-nunito text-sm text-secondary-text hidden md:flex">
-              {complemento.getDescricao() || 'Nenhuma'}
-            </div>
+            complemento={complemento}
+            index={index}
+            valorDisplay={
+              valorInputs[complemento.getId()] ?? formatValorFromNumber(complemento.getValor())
+            }
+            onValorChange={handleValorInputChange}
+            onValorSubmit={handleValorSubmit}
+            onValorKeyDown={handleValorKeyDown}
+            onValorFocus={e => e.target.select()}
+            onTipoChange={handleTipoImpactoChange}
+            onToggleStatus={handleToggleComplementoStatus}
+            onRowClick={handleRowOpenEdit}
+            savingValor={!!savingValorMap[complemento.getId()]}
+            savingTipo={!!savingTipoMap[complemento.getId()]}
+            togglingStatus={!!togglingStatus[complemento.getId()]}
+          />
+        ))}
 
-            <div className="flex-[2]" onClick={(e) => e.stopPropagation()}>
-              <div className="flex flex-col items-start gap-1">
-                 <div className="flex items-center justify-end gap-2 px-3 py-1 rounded-lg border border-gray-300 bg-white max-w-[140px]">
-                 
-                   <input
-                    type="text"
-                    value={
-                      valorInputs[complemento.getId()] ??
-                      formatValorFromNumber(complemento.getValor())
-                    }
-                    onChange={(e) => handleValorInputChange(complemento.getId(), e.target.value)}
-                    onFocus={(e) => e.target.select()}
-                    onBlur={() => handleValorSubmit(complemento.getId())}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        handleValorSubmit(complemento.getId())
-                      }
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    disabled={!!savingValorMap[complemento.getId()]}
-                    className={`w-full bg-transparent text-left md:text-sm text-[10px] font-semibold text-primary-text focus:outline-none ${
-                      savingValorMap[complemento.getId()] ? 'opacity-70 cursor-not-allowed' : ''
-                    }`}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex-1 font-nunito md:text-sm text-[10px] text-secondary-text text-center" onClick={(e) => e.stopPropagation()}>
-              <select
-                value={(complemento.getTipoImpactoPreco() || 'nenhum').toLowerCase()}
-                onChange={(e) =>
-                  handleTipoImpactoChange(
-                    complemento.getId(),
-                    e.target.value as 'nenhum' | 'aumenta' | 'diminui'
-                  )
-                }
-                onClick={(e) => e.stopPropagation()}
-                disabled={!!savingTipoMap[complemento.getId()]}
-                className={`w-full px-0 py-1 rounded-lg border border-gray-300 bg-white md:text-sm text-[10px] font-semibold text-primary-text focus:outline-none focus:border-primary text-center ${
-                  savingTipoMap[complemento.getId()] ? 'opacity-70 cursor-not-allowed' : ''
-                }`}
-              >
-                <option value="nenhum">Nenhum</option>
-                <option value="aumenta">Aumenta</option>
-                <option value="diminui">Diminui</option>
-              </select>
-            </div>
-            <div className="md:flex-[2] flex-[1] flex md:justify-center justify-end" onClick={(e) => e.stopPropagation()}>
-              <label
-                className={`relative inline-flex md:h-5 h-4 md:w-12 w-8 items-center ${
-                  togglingStatus[complemento.getId()]
-                    ? 'cursor-not-allowed opacity-60'
-                    : 'cursor-pointer'
-                }`}
-                title={complemento.isAtivo() ? 'Complemento Ativo' : 'Complemento Desativado'}
-                onMouseDown={(e) => e.stopPropagation()}
-                onTouchStart={(e) => e.stopPropagation()}
-              >
-                <input
-                  type="checkbox"
-                  className="sr-only peer"
-                  checked={complemento.isAtivo()}
-                  onChange={(event) => {
-                    event.stopPropagation()
-                    handleToggleComplementoStatus(complemento, event.target.checked)
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  disabled={!!togglingStatus[complemento.getId()]}
-                />
-                <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                <span className="absolute md:left-1 left-0.5 top-1/2 block md:h-3 h-2.5 md:w-3 w-2.5 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 md:peer-checked:translate-x-6 peer-checked:translate-x-[18px]" />
-              </label>
-            </div>
+        {isFetchingNextPage && (
+          <div className="flex justify-center py-4">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
           </div>
-          )
-        })}
+        )}
       </div>
 
       <ComplementosTabsModal
@@ -753,5 +705,3 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
     </div>
   )
 }
-
-
