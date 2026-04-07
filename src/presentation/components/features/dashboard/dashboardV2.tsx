@@ -490,7 +490,7 @@ export default function DashboardV2() {
       </div>
 
       {/* Top produtos + Top garçons — duas colunas; listas com flex (sem tabela) */}
-      <div className="mx-2 mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2 md:mx-4">
+      <div className="mx-2 mt-2 grid grid-cols-1 gap-2 lg:grid-cols-2 md:mx-4">
         <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-5">
           <div className="mb-4 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between xl:gap-3">
             <h2 className="font-exo shrink-0 text-lg font-semibold text-primary-text md:text-xl">Top produtos</h2>
@@ -560,9 +560,9 @@ export default function DashboardV2() {
                   }`}
                 >
                   <div className="flex min-w-0 flex-[1.4] items-center gap-2 md:flex-[1.6]">
-                    <span className="text-sm font-medium text-primary-text">{p.nome}</span>
+                    <span className="text-sm font-regular text-primary-text">{p.nome}</span>
                   </div>
-                  <div className="min-w-0 flex-1 text-center text-primary-text">
+                  <div className="min-w-0 flex-1 text-center text-sm font-regular text-primary-text">
                     {p.qtd} <span className="text-xs">un</span>
                   </div>
                   <div className="min-w-0 flex-1">
@@ -572,12 +572,12 @@ export default function DashboardV2() {
                         className="absolute left-0 top-0 z-0 h-full rounded-lg bg-secondary transition-all"
                         style={{ width: `${Math.min(100, larguraBarra)}%` }}
                       />
-                      <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-xs font-medium tabular-nums text-primary-text">
+                      <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-xs font-regular tabular-nums text-primary-text">
                         {rotuloMeio}
                       </span>
                     </div>
                   </div>
-                  <div className="min-w-0 flex-1 text-right text-sm font-medium text-primary-text">
+                  <div className="min-w-0 flex-1 text-right text-sm font-regular text-primary-text">
                     {formatarMoeda(p.valor)}
                   </div>
                 </div>
@@ -601,7 +601,7 @@ export default function DashboardV2() {
               <select
                 value={filtroTopGarcom}
                 onChange={e => setFiltroTopGarcom(e.target.value)}
-                className="focus:border-secondary w-full appearance-none rounded-lg border border-gray-200 bg-gray-50 py-2 pl-3 pr-9 text-sm font-semibold text-primary-text"
+                className="focus:border-secondary w-full appearance-none rounded-lg border border-gray-200 bg-gray-50 py-2 pl-3 pr-9 text-sm font-medium text-primary-text"
               >
                 <option value="hoje">Hoje</option>
                 <option value="semana">Últimos 7 dias</option>
@@ -611,11 +611,11 @@ export default function DashboardV2() {
             </div>
           </div>
 
-          <div className="mb-2 flex gap-2 border-b border-gray-200 pb-2 text-[11px] font-semibold uppercase tracking-wide text-secondary-text md:text-xs">
+          <div className="mb-2 flex gap-2 border-b border-gray-200 pb-2 text-[11px] font-medium uppercase tracking-wide text-primary-text md:text-xs">
             <div className="min-w-0 flex-1">Nome</div>
-            <div className="w-14 shrink-0 text-right md:w-16">Quantidade</div>
-            <div className="w-20 shrink-0 text-right md:w-24">Mesas Aten.</div>
-            <div className="w-24 shrink-0 text-right md:w-28">Valor Total</div>
+            <div className="min-w-0 flex-1 text-center">Quantidade</div>
+            <div className="min-w-0 flex-1 text-center">Mesas Aten.</div>
+            <div className="min-w-0 flex-1 text-right">Valor Total</div>
           </div>
 
           <div className="flex flex-col">
@@ -626,10 +626,10 @@ export default function DashboardV2() {
                   idx > 0 ? 'border-t border-gray-100' : ''
                 }`}
               >
-                <div className="min-w-0 flex-1 truncate font-medium text-primary-text">{g.nome}</div>
-                <div className="w-14 shrink-0 text-right text-secondary-text md:w-16">{g.qtd}</div>
-                <div className="w-20 shrink-0 text-right text-secondary-text md:w-24">{g.mesas}</div>
-                <div className="w-24 shrink-0 text-right text-sm font-semibold text-primary-text md:w-28">
+                <div className="min-w-0 flex-1 truncate font-regular text-primary-text">{g.nome}</div>
+                <div className="min-w-0 flex-1 text-center text-sm font-regular text-primary-text">{g.qtd}</div>
+                <div className="min-w-0 flex-1 text-center text-sm font-regular text-primary-text">{g.mesas}</div>
+                <div className="min-w-0 flex-1 text-right text-sm font-regular text-primary-text">
                   {formatarMoeda(g.valor)}
                 </div>
               </div>
