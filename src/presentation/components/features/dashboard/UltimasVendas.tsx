@@ -131,16 +131,13 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
 
     const extraInfoMap = new Map<string, VendaExtraInfo>()
     const vendasMapeadas: Venda[] = (items || []).map((item: any, index: number) => {
-          const userIdBruto =
-            item.abertoPor?.id ??
-            item.usuarioPdv?.id ??
-            item.usuario?.id ??
-            item.abertoPorId ??
-            item.usuarioId
           const userId =
-            userIdBruto != null && String(userIdBruto).trim() !== ''
-              ? String(userIdBruto)
-              : 'desconhecido'
+            item.abertoPor?.id ||
+            item.usuarioPdv?.id ||
+            item.usuario?.id ||
+            item.abertoPorId ||
+            item.usuarioId ||
+            'sistema'
 
           let dataVenda = item.dataCriacao
             ? new Date(item.dataCriacao)
@@ -155,16 +152,16 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
             dataVenda = new Date()
           }
           const valorFaturado = item.valorFinal || item.valorTotal || item.valor || 0
-          // Não usar item.id (UUID) como número: parseInt em UUID vira NaN → 0 e quebra Venda.create
+          // Não usar item.id como número: UUID gera parseInt NaN → 0 e Venda.create lança erro
           const brutoNumero = item.numeroVenda ?? item.numero
-          let numeroVendaNum =
-            typeof brutoNumero === 'number' && Number.isFinite(brutoNumero) && brutoNumero > 0
-              ? brutoNumero
-              : typeof brutoNumero === 'string' && /^\d+$/.test(brutoNumero.trim())
-                ? parseInt(brutoNumero.trim(), 10)
-                : NaN
-          if (!Number.isFinite(numeroVendaNum) || numeroVendaNum <= 0) {
-            numeroVendaNum = index + 1
+          let numeroVendaNumerico: number
+          if (typeof brutoNumero === 'number' && Number.isFinite(brutoNumero) && brutoNumero > 0) {
+            numeroVendaNumerico = brutoNumero
+          } else if (brutoNumero != null && String(brutoNumero).trim() !== '') {
+            const parsed = parseInt(String(brutoNumero), 10)
+            numeroVendaNumerico = Number.isFinite(parsed) && parsed > 0 ? parsed : 1
+          } else {
+            numeroVendaNumerico = 1
           }
           const tipoVendaRaw = item.tipoVenda || item.tipo || 'Balcão'
           // Normalizar tipoVenda para o formato esperado pelo TipoVendaIcon
@@ -210,12 +207,7 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
           const dataCancelamento = item.dataCancelamento ? new Date(item.dataCancelamento) : null
           const dataFinalizacao = item.dataFinalizacao ? new Date(item.dataFinalizacao) : null
 
-          const vendaId =
-            item.id != null && String(item.id).trim() !== ''
-              ? String(item.id)
-              : item.vendaId != null && String(item.vendaId).trim() !== ''
-                ? String(item.vendaId)
-                : `venda-lista-${index}`
+          const vendaId = item.id?.toString() || `sem-id-${index}`
 
           // Armazenar informações extras para o TipoVendaIcon
           // Converte numeroMesa para número, tratando 0 como valor válido
@@ -237,7 +229,7 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
           return Venda.create(
             vendaId,
             dataVenda,
-            numeroVendaNum,
+            numeroVendaNumerico,
             userId,
             tipoVendaRaw,
             valorFaturado, // valorInicial
