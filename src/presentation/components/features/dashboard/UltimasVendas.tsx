@@ -1,21 +1,11 @@
 'use client'
 
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import { Venda } from '@/src/domain/entities/Venda'
 import { DetalhesVendas } from '@/src/presentation/components/features/vendas/DetalhesVendas'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 import { calculatePeriodo } from '@/src/shared/utils/dateFilters' // Importar calculatePeriodo
 import { useDashboardUltimasVendasQuery } from '@/src/presentation/hooks/useDashboardUltimasVendasQuery'
-
-interface UserNamesMap {
-  [key: string]: string
-}
-
-interface UserPdvApiResponse {
-  id: string
-  nome: string
-  // Adicione outras propriedades relevantes se necessário
-}
 
 interface VendaExtraInfo {
   tipoVenda: 'mesa' | 'balcao' | 'gestor'
@@ -28,15 +18,15 @@ interface UltimasVendasProps {
   periodoFinal?: Date | null
 }
 
-// Removido limite de exibição - agora exibe todas as vendas retornadas (até 100)
-
 /**
  * Componente de Últimas Vendas
- * Design clean inspirado no exemplo
+ * Paginação infinita (20 por página) ao rolar até o fim da lista.
  */
 export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: UltimasVendasProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedVendaId, setSelectedVendaId] = useState<string | null>(null)
+  const scrollRootRef = useRef<HTMLDivElement>(null)
+  const sentinelRef = useRef<HTMLDivElement>(null)
 
   const formatCurrency = useCallback((value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -87,8 +77,8 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
   }
 
   const { inicio, fim } = useMemo(() => {
-    // Se período for "Datas Personalizadas" e datas foram fornecidas, usa elas
-    if (periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) {
+    // Intervalo definido em "Por datas" (dropdown mantém outro preset)
+    if (periodoInicial && periodoFinal) {
       return { inicio: periodoInicial, fim: periodoFinal }
     }
 
@@ -100,11 +90,38 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
     return { inicio: calcInicio, fim: calcFim }
   }, [periodo, periodoInicial, periodoFinal])
 
-  const { data, isLoading, error, refetch } = useDashboardUltimasVendasQuery({
+  const {
+    data,
+    isLoading,
+    error,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useDashboardUltimasVendasQuery({
     periodoInicial: inicio,
     periodoFinal: fim,
-    limit: 100,
+    limit: 20,
   })
+
+  // Carrega próxima página ao chegar no fim da área rolável
+  useEffect(() => {
+    const root = scrollRootRef.current
+    const sentinel = sentinelRef.current
+    if (!root || !sentinel || !hasNextPage) return
+
+    const observer = new IntersectionObserver(
+      entries => {
+        const [entry] = entries
+        if (!entry?.isIntersecting) return
+        void fetchNextPage()
+      },
+      { root, rootMargin: '120px', threshold: 0 }
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasNextPage, fetchNextPage, data?.items?.length])
 
   const { vendas, vendasExtraInfo } = useMemo(() => {
     const items = data?.items ?? []
@@ -258,7 +275,10 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
 
   return (
     <>
-      <div className="scrollbar-hide h-[440px] overflow-y-auto rounded-lg border border-gray-200 bg-white p-2 shadow-sm shadow-primary/70 md:p-6">
+      <div
+        ref={scrollRootRef}
+        className="scrollbar-hide h-[440px] overflow-y-auto rounded-lg border border-gray-200 bg-white p-2 shadow-sm shadow-primary/70 md:p-6"
+      >
         <div className="mb-2 flex items-center justify-center md:mb-6 md:justify-between">
           <h3 className="text-lg font-semibold text-primary">Vendas do Período</h3>
         </div>
@@ -340,6 +360,18 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
             })
           )}
         </div>
+
+        {hasNextPage && (
+          <div
+            ref={sentinelRef}
+            className="flex min-h-[48px] items-center justify-center py-2"
+            aria-hidden
+          >
+            {isFetchingNextPage && (
+              <span className="text-xs text-gray-500">Carregando mais vendas…</span>
+            )}
+          </div>
+        )}
       </div>
       <DetalhesVendas
         vendaId={selectedVendaId || ''}

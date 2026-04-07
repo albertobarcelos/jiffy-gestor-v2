@@ -619,7 +619,7 @@ const ProdutoListItem = function ProdutoListItem({
  * Lista de produtos com scroll infinito
  * Usa React Query para cache automático e deduplicação de requisições
  */
-export function ProdutosList({ onReload }: ProdutosListProps) {
+  export function ProdutosList({ onReload }: ProdutosListProps) {
   const { auth } = useAuthStore()
   const queryClient = useQueryClient()
   const router = useRouter()

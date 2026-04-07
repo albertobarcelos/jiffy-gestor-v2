@@ -43,7 +43,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const periodoInicial = searchParams.get('periodoInicial') || ''
     const periodoFinal = searchParams.get('periodoFinal') || ''
-    const limit = Math.min(Math.max(Number(searchParams.get('limit') || '100'), 1), 100)
+    const limit = Math.min(Math.max(Number(searchParams.get('limit') || '20'), 1), 100)
+    const offset = Math.max(Number(searchParams.get('offset') || '0'), 0)
 
     const apiClient = new ApiClient()
     const headers = {
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
 
     const params = new URLSearchParams()
     params.append('limit', String(limit))
-    params.append('offset', '0')
+    params.append('offset', String(offset))
     params.append('status', 'FINALIZADA')
     if (periodoInicial) params.append('periodoInicial', periodoInicial)
     if (periodoFinal) params.append('periodoFinal', periodoFinal)
@@ -86,7 +87,9 @@ export async function GET(request: NextRequest) {
       })
     )
 
-    return NextResponse.json({ items, userNames })
+    const hasMore = items.length === limit
+
+    return NextResponse.json({ items, userNames, hasMore })
   } catch (error) {
     console.error('Erro ao buscar últimas vendas do dashboard:', error)
     if (error instanceof ApiError) {

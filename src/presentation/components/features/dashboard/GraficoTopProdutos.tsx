@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts'
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import type { PieLabelRenderProps } from 'recharts'
 import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto'
 
@@ -54,39 +54,67 @@ export function GraficoTopProdutos({ data }: GraficoTopProdutosProps) {
     );
   };
 
+  const chartHeight = 340
+
   return (
-    <ResponsiveContainer width="100%" height={400}>
-      <PieChart>
-        <Pie
-          data={chartData}
-          cx="50%"
-          cy="50%"
-          labelLine={false}
-          label={renderLabel}
-          outerRadius={120}
-          fill="#8884d8"
-          dataKey="value"
-          fontSize={10}
-          nameKey="name"
-        >
-          {chartData.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-          ))}
-        </Pie>
-        <Legend
-          wrapperStyle={{
-            paddingTop: '20px',
-          }}
-          layout="horizontal"
-          verticalAlign="bottom"
-          align="center"
-          iconType="circle"
-          formatter={(value, entry) => (
-            <span style={{ color: '#666', fontSize: '10px' }}>{value}</span>
-          )}
-        />
-      </PieChart>
-    </ResponsiveContainer>
-  );
+    <div className="w-full min-w-0">
+      <div className="w-full" style={{ height: chartHeight }}>
+        <ResponsiveContainer width="100%" height={chartHeight}>
+          <PieChart>
+            <Pie
+              data={chartData}
+              cx="50%"
+              cy="50%"
+              labelLine={false}
+              label={renderLabel}
+              outerRadius={120}
+              fill="#8884d8"
+              dataKey="value"
+              fontSize={10}
+              nameKey="name"
+            >
+              {chartData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              ))}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Legenda em grid 2 colunas (fora do SVG, igual ao modal de métodos de pagamento) */}
+      {chartData.length > 0 && (
+        <div className="mt-3 w-full border border-gray-200 p-2">
+          <h3
+            id="grafico-top-produtos-legenda-titulo"
+            className="mb-2 font-exo text-sm font-semibold text-primary-text"
+          >
+            Legenda
+          </h3>
+          <div
+            className="grid grid-cols-2 gap-x-3 gap-y-2 text-left"
+            role="list"
+            aria-labelledby="grafico-top-produtos-legenda-titulo"
+          >
+            {chartData.map((entry, index) => (
+              <div
+                key={`${entry.name}-${index}`}
+                className="flex min-w-0 items-start gap-2"
+                role="listitem"
+              >
+                <span
+                  className="mt-0.5 h-3 w-3 shrink-0 rounded-sm"
+                  style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                  aria-hidden
+                />
+                <span className="break-words font-nunito text-[11px] leading-snug text-primary-text sm:text-xs">
+                  {entry.name}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
