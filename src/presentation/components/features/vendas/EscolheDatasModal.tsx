@@ -148,7 +148,7 @@ export function EscolheDatasModal({
     <>
       {/* Header */}
       <div className="bg-white rounded-t-lg px-4 py-3 flex items-center justify-between border-b border-gray-200">
-        <h2 className="text-lg font-bold font-exo text-primary-text">Escolha as Datas</h2>
+        <h2 className="text-lg font-semibold font-exo text-primary-text">Escolha as Datas</h2>
         <button
           onClick={handleClose}
           className="w-8 h-8 flex items-center justify-center text-primary-text hover:bg-gray-100 rounded-full transition-colors"

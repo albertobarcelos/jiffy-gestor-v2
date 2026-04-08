@@ -164,7 +164,7 @@ export function GraficoVendasPorUsuarioModal({
       return (
         <div className="bg-white p-2 rounded-lg shadow-lg border border-gray-200">
           <p className="font-semibold text-xs text-primary-text">{data.name}</p>
-          <p className="text-xs text-primary font-bold">{formatCurrency(data.value)}</p>
+          <p className="text-xs text-primary font-semibold">{formatCurrency(data.value)}</p>
           <p className="text-xs text-secondary-text">{percentual}% do total</p>
         </div>
       )
@@ -318,10 +318,10 @@ export function GraficoVendasPorUsuarioModal({
                     })}
                     <div className="border-t-2 border-primary mt-3 pt-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-bold font-exo text-primary-text">
+                        <span className="text-sm font-semibold font-exo text-primary-text">
                           TOTAL
                         </span>
-                        <span className="text-sm font-bold font-exo text-primary">
+                        <span className="text-sm font-semibold font-exo text-primary">
                           {formatCurrency(totalGeral)}
                         </span>
                       </div>

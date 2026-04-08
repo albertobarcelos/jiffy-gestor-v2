@@ -122,7 +122,7 @@ export function EmitirNfeModal({
       <Dialog open={open} onOpenChange={isOpen => !isOpen && onClose()}>
         <DialogContent sx={{ maxWidth: 520, padding: '0px 24px 24px 24px' }}>
           <div className="flex items-center justify-between">
-            <h1 className="text-primary font-exo py-4 text-lg font-bold sm:text-2xl">Emitir Nota</h1>
+            <h1 className="text-primary font-exo py-4 text-lg font-semibold sm:text-2xl">Emitir Nota</h1>
             <button
               onClick={onClose}
               style={{

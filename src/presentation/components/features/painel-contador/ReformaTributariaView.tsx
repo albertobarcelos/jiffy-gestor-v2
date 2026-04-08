@@ -96,7 +96,7 @@ export function ReformaTributariaView() {
 
       <div className="flex flex-col h-full w-full p-6 bg-info">
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-secondary-text mb-2">
+          <h2 className="text-2xl font-semibold text-secondary-text mb-2">
             Reforma Tributária - Configurações por NCM
           </h2>
           <p className="text-sm text-secondary-text/70">

@@ -249,7 +249,7 @@ export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesF
           ) : operacaoCaixa ? (
             <>
               {/* Título Principal */}
-              <h2 className="text-sm md:text-lg font-bold mb-2">
+              <h2 className="text-sm md:text-lg font-semibold mb-2">
                 FECHAMENTO TERMINAL - #{operacaoCaixa.codigoTerminal || operacaoCaixa.nomeTerminal || 'N/A'}
               </h2>
 
@@ -271,12 +271,12 @@ export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesF
               {/* RESUMO VENDAS */}
               {operacaoCaixa.resumoOperacao && (
                 <>
-                  <h3 className="text-sm md:text-lg font-bold mt-2 mb-1">RESUMO VENDAS</h3>
+                  <h3 className="text-sm md:text-lg font-semibold mt-2 mb-1">RESUMO VENDAS</h3>
                   <table className="w-full mb-2" style={{ borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
-                        <th className="text-left py-1 text-sm font-bold" style={{ padding: '4px' }}>Campo</th>
-                        <th className="text-right py-1 text-sm font-bold" style={{ padding: '4px' }}>Valor</th>
+                        <th className="text-left py-1 text-sm font-semibold" style={{ padding: '4px' }}>Campo</th>
+                        <th className="text-right py-1 text-sm font-semibold" style={{ padding: '4px' }}>Valor</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -313,7 +313,7 @@ export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesF
                     </tbody>
                   </table>
                   <div className="h-[1px] bg-primary-text/50 my-2"></div>
-                  <div className="text-right text-sm md:text-lg font-bold mb-2">
+                  <div className="text-right text-sm md:text-lg font-semibold mb-2">
                     FAT. LIQUIDO: R$ {formatMoney(operacaoCaixa.resumoOperacao.totalLiquido)}
                   </div>
                   <div className="h-[1px] bg-primary-text/50 my-2"></div>
@@ -323,12 +323,12 @@ export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesF
               {/* RESUMO PAGAMENTOS */}
               {operacaoCaixa.resumoPagamentos && (
                 <>
-                  <h3 className="text-sm md:text-lg font-bold mt-2 mb-1">RESUMO PAGAMENTOS</h3>
+                  <h3 className="text-sm md:text-lg font-semibold mt-2 mb-1">RESUMO PAGAMENTOS</h3>
                   <table className="w-full mb-2" style={{ borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
-                        <th className="text-left py-1 text-sm font-bold" style={{ padding: '4px' }}>Meio de Pagamento</th>
-                        <th className="text-right py-1 text-sm font-bold" style={{ padding: '4px' }}>Valor</th>
+                        <th className="text-left py-1 text-sm font-semibold" style={{ padding: '4px' }}>Meio de Pagamento</th>
+                        <th className="text-right py-1 text-sm font-semibold" style={{ padding: '4px' }}>Valor</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -352,7 +352,7 @@ export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesF
                     </tbody>
                   </table>
                   <div className="h-[1px] bg-primary-text/50 my-2"></div>
-                  <div className="text-right text-sm md:text-lg font-bold mb-2">
+                  <div className="text-right text-sm md:text-lg font-semibold mb-2">
                     TOT. LIQUIDO: R$ {formatMoney(operacaoCaixa.resumoPagamentos.totalLiquido)}
                   </div>
                   <div className="h-[1px] bg-primary-text/50 my-2"></div>
@@ -362,12 +362,12 @@ export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesF
               {/* RESUMO CAIXA */}
               {operacaoCaixa.resumoCaixa && (
                 <>
-                  <h3 className="text-sm md:text-lg font-bold mt-2 mb-1">RESUMO CAIXA</h3>
+                  <h3 className="text-sm md:text-lg font-semibold mt-2 mb-1">RESUMO CAIXA</h3>
                   <table className="w-full mb-2" style={{ borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
-                        <th className="text-left py-1 text-sm font-bold" style={{ padding: '4px' }}>Campo</th>
-                        <th className="text-right py-1 text-sm font-bold" style={{ padding: '4px' }}>Valor</th>
+                        <th className="text-left py-1 text-sm font-semibold" style={{ padding: '4px' }}>Campo</th>
+                        <th className="text-right py-1 text-sm font-semibold" style={{ padding: '4px' }}>Valor</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -398,7 +398,7 @@ export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesF
                     </tbody>
                   </table>
                   <div className="h-[1px] bg-primary-text/50 my-2"></div>
-                  <div className="text-right text-sm md:text-lg font-bold mb-2">
+                  <div className="text-right text-sm md:text-lg font-semibold mb-2">
                     TOT. CAIXA: R$ {formatMoney(operacaoCaixa.resumoCaixa.valorLiquidoDinheiroCaixa)}
                   </div>
                   <div className="h-[1px] bg-primary-text/50 my-2"></div>
@@ -408,13 +408,13 @@ export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesF
               {/* CONFERÊNCIA CAIXA */}
               {(operacaoCaixa.resumoFechamento || operacaoCaixa.resumoCaixa) && (
                 <>
-                  <h3 className="text-sm md:text-lg font-bold mt-2 mb-1">CONFERÊNCIA CAIXA</h3>
+                  <h3 className="text-sm md:text-lg font-semibold mt-2 mb-1">CONFERÊNCIA CAIXA</h3>
                   <table className="w-full mb-2" style={{ borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
-                        <th className="text-left py-1 text-sm font-bold" style={{ padding: '4px' }}>CONT.</th>
-                        <th className="text-left py-1 text-sm font-bold" style={{ padding: '4px' }}>FORN.</th>
-                        <th className="text-right py-1 text-sm font-bold" style={{ padding: '4px' }}>DIF.</th>
+                        <th className="text-left py-1 text-sm font-semibold" style={{ padding: '4px' }}>CONT.</th>
+                        <th className="text-left py-1 text-sm font-semibold" style={{ padding: '4px' }}>FORN.</th>
+                        <th className="text-right py-1 text-sm font-semibold" style={{ padding: '4px' }}>DIF.</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -438,12 +438,12 @@ export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesF
               {/* PRODUTOS VENDIDOS */}
               {operacaoCaixa.totalProdutosVendidos && operacaoCaixa.totalProdutosVendidos.length > 0 && (
                 <>
-                  <h3 className="text-sm md:text-lg font-bold mt-2 mb-1">PRODUTOS VENDIDOS</h3>
+                  <h3 className="text-sm md:text-lg font-semibold mt-2 mb-1">PRODUTOS VENDIDOS</h3>
                   <table className="w-full mb-2" style={{ borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
-                        <th className="text-left py-1 text-sm font-bold" style={{ padding: '4px' }}>Produtos</th>
-                        <th className="text-right py-1 text-sm font-bold" style={{ padding: '4px' }}>Valor</th>
+                        <th className="text-left py-1 text-sm font-semibold" style={{ padding: '4px' }}>Produtos</th>
+                        <th className="text-right py-1 text-sm font-semibold" style={{ padding: '4px' }}>Valor</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -466,11 +466,11 @@ export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesF
               {/* ADICIONAIS VENDIDOS */}
               {operacaoCaixa.totalAdicionaisVendidos && operacaoCaixa.totalAdicionaisVendidos.length > 0 && (
                 <>
-                  <h3 className="text-sm md:text-lg font-bold mt-2 mb-1">ADICIONAIS VENDIDOS</h3>
+                  <h3 className="text-sm md:text-lg font-semibold mt-2 mb-1">ADICIONAIS VENDIDOS</h3>
                   <table className="w-full mb-2" style={{ borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
-                        <th className="text-left py-1 text-sm font-bold" style={{ padding: '4px' }}>Adicionais</th>
+                        <th className="text-left py-1 text-sm font-semibold" style={{ padding: '4px' }}>Adicionais</th>
                       </tr>
                     </thead>
                     <tbody>

@@ -115,7 +115,7 @@ export function MeuCaixaView() {
               </p>
             </div>
             <div className="flex-1 flex items-center justify-center">
-              <p className="text-tertiary text-xl font-bold font-exo">
+              <p className="text-tertiary text-xl font-semibold font-exo">
                 {formatarMoeda(saldoCaixa)}
               </p>
             </div>
@@ -133,7 +133,7 @@ export function MeuCaixaView() {
               </p>
             </div>
             <div className="flex-1 flex items-center justify-center">
-              <p className="text-success text-xl font-bold font-exo">
+              <p className="text-success text-xl font-semibold font-exo">
                 {formatarMoeda(somaSuprimentos)}
               </p>
             </div>
@@ -151,7 +151,7 @@ export function MeuCaixaView() {
               </p>
             </div>
             <div className="flex-1 flex items-center justify-center">
-              <p className="text-error text-xl font-bold font-exo">
+              <p className="text-error text-xl font-semibold font-exo">
                 {formatarMoeda(somaSangrias)}
               </p>
             </div>
@@ -199,7 +199,7 @@ export function MeuCaixaView() {
                       </div>
                     </div>
                     <p
-                      className={`text-sm font-bold ${
+                      className={`text-sm font-semibold ${
                         operacao.isSuprimento() ? 'text-success' : 'text-error'
                       }`}
                     >

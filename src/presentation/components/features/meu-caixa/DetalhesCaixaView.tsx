@@ -102,11 +102,11 @@ export function DetalhesCaixaView({ caixaRef, conferenciaCaixaRef }: DetalhesCai
         {/* Header com data de abertura */}
         <div className="mb-6">
           <div className="h-10 bg-white rounded-tl-[16px] rounded-br-[6px] rounded-bl-[6px] rounded-tr-[6px] flex items-center px-5">
-            <p className="text-secondary-text text-base font-bold font-nunito">
+            <p className="text-secondary-text text-base font-semibold font-nunito">
               Abertura: {formatarData(caixa.getDataAbertura())}
             </p>
             {caixa.getDataFechamento() && (
-              <p className="text-secondary-text text-base font-bold font-nunito ml-4">
+              <p className="text-secondary-text text-base font-semibold font-nunito ml-4">
                 | Fechamento: {formatarData(caixa.getDataFechamento() || new Date())}
               </p>
             )}
@@ -123,7 +123,7 @@ export function DetalhesCaixaView({ caixaRef, conferenciaCaixaRef }: DetalhesCai
               </p>
             </div>
             <div className="flex-1 flex items-center justify-center">
-              <p className="text-tertiary text-xl font-bold font-exo">
+              <p className="text-tertiary text-xl font-semibold font-exo">
                 {formatarMoeda(saldoCaixa)}
               </p>
             </div>
@@ -137,7 +137,7 @@ export function DetalhesCaixaView({ caixaRef, conferenciaCaixaRef }: DetalhesCai
               </p>
             </div>
             <div className="flex-1 flex items-center justify-center">
-              <p className="text-success text-xl font-bold font-exo">
+              <p className="text-success text-xl font-semibold font-exo">
                 {formatarMoeda(somaSuprimentos)}
               </p>
             </div>
@@ -151,7 +151,7 @@ export function DetalhesCaixaView({ caixaRef, conferenciaCaixaRef }: DetalhesCai
               </p>
             </div>
             <div className="flex-1 flex items-center justify-center">
-              <p className="text-error text-xl font-bold font-exo">
+              <p className="text-error text-xl font-semibold font-exo">
                 {formatarMoeda(somaSangrias)}
               </p>
             </div>
@@ -179,25 +179,25 @@ export function DetalhesCaixaView({ caixaRef, conferenciaCaixaRef }: DetalhesCai
             <div className="space-y-3">
               <div className="flex items-center justify-between p-3 bg-primary-bg rounded-lg">
                 <p className="text-sm font-medium text-primary-text">Total de Vendas</p>
-                <p className="text-sm font-bold text-primary-text">
+                <p className="text-sm font-semibold text-primary-text">
                   {formatarMoeda(0)}
                 </p>
               </div>
               <div className="flex items-center justify-between p-3 bg-primary-bg rounded-lg">
                 <p className="text-sm font-medium text-primary-text">Total de Suprimentos</p>
-                <p className="text-sm font-bold text-success">
+                <p className="text-sm font-semibold text-success">
                   {formatarMoeda(somaSuprimentos)}
                 </p>
               </div>
               <div className="flex items-center justify-between p-3 bg-primary-bg rounded-lg">
                 <p className="text-sm font-medium text-primary-text">Total de Sangrias</p>
-                <p className="text-sm font-bold text-error">
+                <p className="text-sm font-semibold text-error">
                   {formatarMoeda(somaSangrias)}
                 </p>
               </div>
               <div className="flex items-center justify-between p-3 bg-primary-bg rounded-lg border-t-2 border-alternate">
-                <p className="text-sm font-bold text-primary-text">Saldo Final</p>
-                <p className="text-lg font-bold text-tertiary">
+                <p className="text-sm font-semibold text-primary-text">Saldo Final</p>
+                <p className="text-lg font-semibold text-tertiary">
                   {formatarMoeda(saldoCaixa)}
                 </p>
               </div>
@@ -246,7 +246,7 @@ export function DetalhesCaixaView({ caixaRef, conferenciaCaixaRef }: DetalhesCai
                       </div>
                     </div>
                     <p
-                      className={`text-sm font-bold ${
+                      className={`text-sm font-semibold ${
                         operacao.isSuprimento() ? 'text-success' : 'text-error'
                       }`}
                     >

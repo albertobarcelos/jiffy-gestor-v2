@@ -369,7 +369,7 @@ export function CadastroPorPlanilha() {
                 <p className="text-xs md:text-sm font-semibold text-primary font-exo uppercase tracking-wide">
                   Cadastro em Massa
                 </p>
-                <h2 className="text-base md:text-xl font-bold text-primary font-exo leading-tight">
+                <h2 className="text-base md:text-xl font-semibold text-primary font-exo leading-tight">
                   Importar por Planilha
                 </h2>
                 <p className="text-xs md:text-sm text-secondary-text font-nunito">
@@ -390,7 +390,7 @@ export function CadastroPorPlanilha() {
           {[0, 1, 2, 3].map((step) => (
             <div key={step} className="flex items-center flex-shrink-0">
               <div
-                className={`w-7 h-7 md:w-9 md:h-9 rounded-full flex items-center justify-center text-xs md:text-base font-bold font-exo transition-colors ${
+                className={`w-7 h-7 md:w-9 md:h-9 rounded-full flex items-center justify-center text-xs md:text-base font-semibold font-exo transition-colors ${
                   selectedStep === step
                     ? 'bg-[#B7E246] text-primary'
                     : selectedStep > step

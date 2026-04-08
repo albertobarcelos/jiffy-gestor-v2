@@ -655,7 +655,7 @@ export function AtualizarPrecoLote() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between bg-primary-bg border-b border-primary/70 md:px-6 px-1 py-1 md:gap-4 gap-2">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="md:text-2xl text-sm font-bold text-primary">
+            <h1 className="md:text-2xl text-sm font-semibold text-primary">
               {activeTab === 'precos'
                 ? 'Atualizar Preços em Lote'
                 : activeTab === 'impressoras'

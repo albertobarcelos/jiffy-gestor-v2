@@ -134,7 +134,7 @@ export function CopiarConfiguracaoNcmModal({
     >
       <DialogContent>
         <DialogHeader>
-          <h1 className="text-alternate font-exo font-bold text-lg sm:text-xl">Copiar Configuração de Impostos</h1>
+          <h1 className="text-alternate font-exo font-semibold text-lg sm:text-xl">Copiar Configuração de Impostos</h1>
         </DialogHeader>
 
         <div className="space-y-4 py-4">

@@ -224,7 +224,7 @@ function MetricCard({
     >
       <div className="flex flex-col items-start justify-between mb-2">
         <h3 className="md:text-sm text-xs font-medium text-gray-600">{title}</h3>
-        <p className="md:text-xl text-sm font-bold text-gray-900">{value}</p>
+        <p className="md:text-xl text-sm font-semibold text-gray-900">{value}</p>
       </div>
       <div className={`md:w-12 md:h-12 w-8 h-8 rounded-full ${bgColorClass} flex items-center justify-center flex-shrink-0`}>
           <span className={`${iconColorClass} md:text-xl text-sm`}>{icon}</span>

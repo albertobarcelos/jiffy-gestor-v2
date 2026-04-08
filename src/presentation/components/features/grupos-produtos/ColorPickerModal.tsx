@@ -111,7 +111,7 @@ export function ColorPickerModal({ open, onClose, onSelect }: ColorPickerModalPr
       <div className="relative bg-white rounded-2xl md:w-[600px] md:h-[600px] w-[300px] h-[500px] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.2)] flex flex-col">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h2 className="md:text-lg text-sm font-bold text-primary-text">Selecione uma cor</h2>
+            <h2 className="md:text-lg text-sm font-semibold text-primary-text">Selecione uma cor</h2>
             <p className="md:text-sm text-xs text-secondary-text">
               Clique em uma cor para aplicar imediatamente
             </p>

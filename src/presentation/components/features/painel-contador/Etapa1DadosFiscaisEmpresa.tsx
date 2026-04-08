@@ -286,12 +286,12 @@ export function Etapa1DadosFiscaisEmpresa() {
         {/* Passo 1: Configurar Dados Fiscais */}
         <div className="flex flex-col gap-4 rounded-lg border-2 border-alternate/30 bg-white p-5 sm:p-6 shadow-sm">
           <div className="flex items-start gap-4">
-            <div className="md:flex-shrink-0 md:flex hidden items-center justify-center w-10 h-10 rounded-full bg-alternate text-white font-bold text-lg">
+            <div className="md:flex-shrink-0 md:flex hidden items-center justify-center w-10 h-10 rounded-full bg-alternate text-white font-semibold text-lg">
               1
             </div>
             <div className="flex-1 flex flex-col gap-2">
               <div className="flex flex-col gap-2">
-                <h3 className="font-exo font-bold text-alternate text-lg sm:text-xl">
+                <h3 className="font-exo font-semibold text-alternate text-lg sm:text-xl">
                   Passo 1: Configurar Dados Fiscais da Empresa
                 </h3>
                 <p className="font-inter font-normal text-secondary-text text-sm sm:text-base leading-relaxed">
@@ -375,12 +375,12 @@ export function Etapa1DadosFiscaisEmpresa() {
         {/* Passo 2: Gerenciar Certificado Digital */}
         <div className="flex flex-col gap-4 rounded-lg border-2 border-alternate/30 bg-white p-5 sm:p-6 shadow-sm">
           <div className="flex items-start gap-4">
-            <div className="md:flex-shrink-0 md:flex hidden items-center justify-center w-10 h-10 rounded-full bg-alternate text-white font-bold text-lg">
+            <div className="md:flex-shrink-0 md:flex hidden items-center justify-center w-10 h-10 rounded-full bg-alternate text-white font-semibold text-lg">
               2
             </div>
             <div className="flex-1 flex flex-col gap-3">
               <div className="flex flex-col gap-2">
-                <h3 className="font-exo font-bold text-alternate text-lg sm:text-xl">
+                <h3 className="font-exo font-semibold text-alternate text-lg sm:text-xl">
                   Passo 2: Gerenciar Certificado Digital
                 </h3>
                 <p className="font-inter font-normal text-secondary-text text-sm sm:text-base leading-relaxed">

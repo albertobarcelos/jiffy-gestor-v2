@@ -856,7 +856,7 @@ export function DetalhesVendas({
               />
             )}
             <div className="flex flex-col">
-              <span className="font-exo text-xl font-bold text-white">
+              <span className="font-exo text-xl font-semibold text-white">
                 Venda Nº. {venda?.numeroVenda}
               </span>
               <span className="font-nunito text-lg text-white">#{venda?.codigoVenda}</span>
@@ -880,7 +880,7 @@ export function DetalhesVendas({
             <>
               {/* Card Informações da Venda */}
               <div className="mb-2 p-2">
-                <h2 className="font-exo text-lg font-bold text-primary-text">
+                <h2 className="font-exo text-lg font-semibold text-primary-text">
                   Informações da Venda
                 </h2>
                 <div className="mb-2 border-t border-dashed border-gray-400"></div>
@@ -1029,7 +1029,7 @@ export function DetalhesVendas({
 
               {/* Card Produtos Lançados */}
               <div className="mb-2 p-2">
-                <h2 className="font-exo text-lg font-bold text-primary-text">Produtos Lançados</h2>
+                <h2 className="font-exo text-lg font-semibold text-primary-text">Produtos Lançados</h2>
                 <div className="mb-2 border-t border-dashed border-gray-400"></div>
 
                 <div className="space-y-2">
@@ -1247,11 +1247,11 @@ export function DetalhesVendas({
                   {/* Total da Venda */}
                   <div className="rounded-lg border-2 border-primary bg-primary/10 px-3 py-2">
                     <div className="flex items-center justify-between">
-                      <span className="font-nunito text-base font-bold text-primary-text">
+                      <span className="font-nunito text-base font-semibold text-primary-text">
                         Total da Venda:
                       </span>
                       <span
-                        className={`font-nunito text-base font-bold text-primary ${statusVenda === 'CANCELADA' ? 'line-through' : ''}`}
+                        className={`font-nunito text-base font-semibold text-primary ${statusVenda === 'CANCELADA' ? 'line-through' : ''}`}
                       >
                         {formatCurrency(totalVendaCalculado)}
                       </span>
@@ -1262,7 +1262,7 @@ export function DetalhesVendas({
 
               {/* Card Pagamentos Realizados */}
               <div className="mb-4 px-2">
-                <h2 className="mb-2 font-exo text-lg font-bold text-primary-text">
+                <h2 className="mb-2 font-exo text-lg font-semibold text-primary-text">
                   Pagamentos Realizados
                 </h2>
                 <div className="mb-3 border-t border-dashed border-gray-400"></div>
@@ -1320,7 +1320,7 @@ export function DetalhesVendas({
                             <span className="text-2xl text-white">{getIcon()}</span>
                           </div>
                           <div className="flex-1">
-                            <div className="font-nunito text-sm font-bold text-primary-text">
+                            <div className="font-nunito text-sm font-semibold text-primary-text">
                               {meio?.nome || 'Meio de pagamento desconhecido'}
                               {isCancelado && (
                                 <span className="ml-2 text-xs font-semibold text-error">
@@ -1331,7 +1331,7 @@ export function DetalhesVendas({
                             <div className="font-nunito text-xs text-secondary-text">
                               {formatDateTime(pagamento.dataCriacao)}
                             </div>
-                            <div className="font-nunito text-sm font-bold text-primary-text">
+                            <div className="font-nunito text-sm font-semibold text-primary-text">
                               {formatCurrency(pagamento.valor)}
                             </div>
                             <div className="font-nunito text-xs text-secondary-text">
@@ -1377,7 +1377,7 @@ export function DetalhesVendas({
 
               {/* Card Resumo Financeiro */}
               <div className="mb-4 px-2">
-                <h2 className="mb-2 font-exo text-sm font-bold text-primary-text">
+                <h2 className="mb-2 font-exo text-sm font-semibold text-primary-text">
                   Resumo Financeiro
                 </h2>
                 <div className="border-t border-dashed border-gray-400"></div>
@@ -1470,7 +1470,7 @@ export function DetalhesVendas({
               Esta ação cancelará a venda e, se houver nota fiscal emitida, também a cancelará na
               SEFAZ.
             </p>
-            <p className="font-nunito text-sm font-bold text-error">
+            <p className="font-nunito text-sm font-semibold text-error">
               Esta ação não pode ser desfeita!
             </p>
             <TextField

@@ -162,7 +162,7 @@ export function TipoVendaIcon({
             }}
           >
             <span
-              className="font-bold leading-none"
+              className="font-semibold leading-none"
               style={{ color: corTexto, fontSize: `${textFontSize}px` }}
             >
               {numeroMesa?.toString() || ''}

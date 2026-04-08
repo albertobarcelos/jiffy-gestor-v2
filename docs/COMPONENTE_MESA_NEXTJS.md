@@ -124,7 +124,7 @@ export const TipoVendaIcon: React.FC<TipoVendaIconProps> = ({
           {/* Texto do número da mesa */}
           <div className="absolute flex items-center justify-center">
             <span
-              className="font-bold"
+              className="font-semibold"
               style={{
                 fontSize: `${fontSize}px`,
                 color: colors.secondary,
@@ -207,7 +207,7 @@ export const TipoVendaIcon: React.FC<TipoVendaIconProps> = ({
 
           {/* Número da mesa */}
           <div className="absolute flex items-center justify-center">
-            <span className="text-lg font-bold text-gray-700">
+            <span className="text-lg font-semibold text-gray-700">
               {numeroMesa?.toString() || ''}
             </span>
           </div>
@@ -483,7 +483,7 @@ export function TipoVendaIcon({ tipoVenda, numeroMesa }: TipoVendaIconProps) {
           
           {/* Número */}
           <div className="absolute">
-            <span className="text-lg font-bold text-gray-700">
+            <span className="text-lg font-semibold text-gray-700">
               {numeroMesa?.toString() || ''}
             </span>
           </div>

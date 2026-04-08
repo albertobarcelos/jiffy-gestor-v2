@@ -970,7 +970,7 @@ function NovoProdutoContent({
                   <p className="text-sm font-semibold text-primary font-exo uppercase tracking-wide">
                     {getPageTitle()}
                   </p>
-                  <h2 className="md:text-xl text-lg font-bold text-primary font-exo leading-tight">
+                  <h2 className="md:text-xl text-lg font-semibold text-primary font-exo leading-tight">
                     {displayNome}
                   </h2>
                   <p className="md:text-sm text-xs text-secondary-text font-nunito">
@@ -1018,7 +1018,7 @@ function NovoProdutoContent({
       <div className="px-5 py-1">
         <div className="flex items-center justify-center gap-4">
           <div
-            className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-bold font-exo transition-colors ${
+            className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-semibold font-exo transition-colors ${
               selectedPage >= 0 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-primary'
             }`}
           >
@@ -1030,7 +1030,7 @@ function NovoProdutoContent({
             }`}
           />
           <div
-            className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-bold font-exo transition-colors ${
+            className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-semibold font-exo transition-colors ${
               selectedPage >= 1 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-[#1D3B53]'
             }`}
           >
@@ -1042,7 +1042,7 @@ function NovoProdutoContent({
             }`}
           />
           <div
-            className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-bold font-exo transition-colors ${
+            className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-semibold font-exo transition-colors ${
               selectedPage >= 2 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-[#1D3B53]'
             }`}
           >

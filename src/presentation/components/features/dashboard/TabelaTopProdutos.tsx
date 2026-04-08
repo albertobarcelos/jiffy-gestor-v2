@@ -120,7 +120,7 @@ export function TabelaTopProdutos({
   return (
     <div className="flex flex-col w-full max-w-full text-sm overflow-x-hidden">
       {/* Cabeçalho da "tabela" - Desktop apenas */}
-      <div className="hidden md:flex bg-custom-2 rounded-lg px-2 border border-primary font-bold text-primary py-2">
+      <div className="hidden md:flex bg-custom-2 rounded-lg px-2 border border-primary font-semibold text-primary py-2">
         <div className="w-1/12">#</div>
         <div className="w-6/12">Produto</div>
         <div className="w-3/12 text-center">Quant.</div>

@@ -285,7 +285,7 @@ export function MapearProdutosView() {
 
       <div className="flex flex-col h-full w-full md:p-6 p-2 bg-info">
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-alternate mb-2">
+          <h2 className="text-2xl font-semibold text-alternate mb-2">
             Configurações de Impostos por NCM
           </h2>
           <p className="text-sm text-secondary-text">

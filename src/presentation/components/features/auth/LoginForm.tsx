@@ -209,7 +209,7 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={isLoading}
-        className="w-full py-3 px-4 bg-[var(--color-alternate)] hover:bg-[var(--color-secondary)] text-white font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        className="w-full py-3 px-4 bg-[var(--color-alternate)] hover:bg-[var(--color-secondary)] text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         style={{
           backgroundColor: 'var(--color-alternate)',
         }}

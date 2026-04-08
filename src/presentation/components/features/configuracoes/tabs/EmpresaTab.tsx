@@ -378,7 +378,7 @@ export function EmpresaTab() {
       <div className="bg-info md:px-[18px] px-1 space-y-4">
         {/* Dados Básicos */}
         <div>
-          <h4 className="text-primary text-lg font-bold font-nunito mb-2">
+          <h4 className="text-primary text-lg font-semibold font-nunito mb-2">
             Dados Básicos
           </h4>
           <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
@@ -447,7 +447,7 @@ export function EmpresaTab() {
 
         {/* Endereço */}
         <div>
-          <h4 className="text-primary text-lg font-bold font-nunito mb-2">
+          <h4 className="text-primary text-lg font-semibold font-nunito mb-2">
             Endereço
           </h4>
           <div className="grid md:grid-cols-3 grid-cols-1 gap-4">

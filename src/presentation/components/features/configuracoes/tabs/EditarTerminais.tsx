@@ -304,7 +304,7 @@ export function EditarTerminais({
       {!isEmbedded && (
         <div className="px-[30px] pt-[30px] pb-4 flex items-start justify-between border-b border-[#B9CCD8]">
           <div>
-            <h2 className="text-primary text-2xl font-bold font-exo">Editar Terminal</h2>
+            <h2 className="text-primary text-2xl font-semibold font-exo">Editar Terminal</h2>
             <p className="text-[#57636C] text-sm font-nunito mt-1">
               Atualize os dados do Terminal PDV
             </p>
@@ -329,7 +329,7 @@ export function EditarTerminais({
             <>
               {/* Seção 1: Informações Gerais */}
               <div className="mb-2">
-                <h3 className="text-primary text-base font-bold font-nunito mb-2">
+                <h3 className="text-primary text-base font-semibold font-nunito mb-2">
                   Informações Gerais
                 </h3>
 
@@ -412,7 +412,7 @@ export function EditarTerminais({
 
               {/* Seção 2: Preferências do Terminal */}
               <div className="mb-0">
-                <h3 className="text-secondary-text text-sm font-bold font-nunito mb-4">
+                <h3 className="text-secondary-text text-sm font-semibold font-nunito mb-4">
                   Preferências do Terminal
                 </h3>
 

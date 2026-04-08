@@ -1106,7 +1106,7 @@ export function NovaImpressora({
       {/* Header fixo */}
       <div className="sticky top-0 z-10 bg-primary-bg md:px-[30px] px-1 py-2 border-b-2 border-primary/70">
         <div className="flex items-center justify-between">
-          <h1 className="text-primary md:text-xl text-sm font-bold font-exo">{pageTitle}</h1>
+          <h1 className="text-primary md:text-xl text-sm font-semibold font-exo">{pageTitle}</h1>
           <div className="flex md:flex-row flex-col-reverse items-center gap-2">
           <button
             onClick={handleCancel}

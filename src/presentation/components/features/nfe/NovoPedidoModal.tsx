@@ -2463,7 +2463,7 @@ export function NovoPedidoModal({
         >
           <div className="px-4 py-2">
             <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold">
+              <h1 className="text-2xl font-semibold">
                 {modoVisualizacao ? 'Detalhes do Pedido' : 'Novo Pedido'}
               </h1>
               {nomeUsuario && (
@@ -3161,7 +3161,7 @@ export function NovoPedidoModal({
                 {/* Total do Pedido */}
                 <div className="flex flex-shrink-0 items-center justify-end gap-2">
                   <span className="text-sm font-semibold text-gray-700">Total do Pedido:</span>
-                  <span className="text-lg font-bold text-primary">
+                  <span className="text-lg font-semibold text-primary">
                     {transformarParaReal(totalProdutos)}
                   </span>
                 </div>
@@ -3435,14 +3435,14 @@ export function NovoPedidoModal({
                       <div className="mb-2 space-y-2 text-sm">
                         <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
                           <span className="font-medium text-gray-700">Total do Pedido:</span>
-                          <span className="text-base font-bold text-primary">
+                          <span className="text-base font-semibold text-primary">
                             {transformarParaReal(totalProdutos)}
                           </span>
                         </div>
                         <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
                           <span className="font-medium text-gray-700">A pagar:</span>
                           <span
-                            className={`text-base font-bold ${
+                            className={`text-base font-semibold ${
                               valorAPagar > 0 ? 'text-red-600' : 'text-green-600'
                             }`}
                           >
@@ -3521,14 +3521,14 @@ export function NovoPedidoModal({
                       <div className="border-t pt-2 text-sm">
                         <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
                           <span className="font-semibold text-gray-700">Total Pago:</span>
-                          <span className="text-base font-bold text-gray-900">
+                          <span className="text-base font-semibold text-gray-900">
                             {transformarParaReal(totalPagamentos)}
                           </span>
                         </div>
                         {troco > 0 && (
                           <div className="flex items-center justify-between">
                             <span className="font-semibold text-gray-700">Troco:</span>
-                            <span className="text-base font-bold text-green-600">
+                            <span className="text-base font-semibold text-green-600">
                               {transformarParaReal(troco)}
                             </span>
                           </div>
@@ -3558,7 +3558,7 @@ export function NovoPedidoModal({
                                     <span className="text-xs font-medium text-green-900">
                                       {meio?.getNome() || 'Meio de pagamento'}
                                     </span>
-                                    <span className="text-xs font-bold text-green-900">
+                                    <span className="text-xs font-semibold text-green-900">
                                       {transformarParaReal(pagamento.valor)}
                                     </span>
                                   </div>
@@ -4005,7 +4005,7 @@ export function NovoPedidoModal({
                         <span className="text-sm font-semibold text-gray-700">
                           Total do Pedido:
                         </span>
-                        <span className="text-lg font-bold text-primary">
+                        <span className="text-lg font-semibold text-primary">
                           {transformarParaReal(totalProdutos)}
                         </span>
                       </div>
@@ -4070,20 +4070,20 @@ export function NovoPedidoModal({
                             <span className="text-sm font-semibold text-gray-700">
                               Total do Pedido:
                             </span>
-                            <span className="text-lg font-bold text-primary">
+                            <span className="text-lg font-semibold text-primary">
                               {transformarParaReal(totalProdutos)}
                             </span>
                           </div>
                           <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
                             <span className="font-semibold text-gray-700">Total Pago:</span>
-                            <span className="text-base font-bold text-gray-900">
+                            <span className="text-base font-semibold text-gray-900">
                               {transformarParaReal(totalPagamentos)}
                             </span>
                           </div>
                           {troco > 0 && (
                             <div className="mt-2 flex items-center justify-between">
                               <span className="font-semibold text-gray-700">Troco:</span>
-                              <span className="text-base font-bold text-green-600">
+                              <span className="text-base font-semibold text-green-600">
                                 {transformarParaReal(troco)}
                               </span>
                             </div>
@@ -4117,7 +4117,7 @@ export function NovoPedidoModal({
                                   <span className="text-center text-xs font-medium">
                                     {nomeMeio}
                                   </span>
-                                  <span className="text-sm font-bold text-primary">
+                                  <span className="text-sm font-semibold text-primary">
                                     {transformarParaReal(pagamento.valor)}
                                   </span>
                                   <span className="text-center text-[11px] text-gray-500">
@@ -4715,7 +4715,7 @@ export function NovoPedidoModal({
                     ? 'Esta ação cancelará a nota fiscal vinculada à venda do Gestor na SEFAZ.'
                     : 'Esta ação cancelará a nota fiscal vinculada à venda PDV na SEFAZ.'}
               </p>
-              <p className="text-sm font-bold text-red-600">Esta ação não pode ser desfeita!</p>
+              <p className="text-sm font-semibold text-red-600">Esta ação não pode ser desfeita!</p>
               <Textarea
                 label="Justificativa do Cancelamento"
                 placeholder="Digite o motivo do cancelamento (mínimo 15 caracteres)"

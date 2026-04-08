@@ -60,7 +60,7 @@ export default function LoginPage() {
               </div>
 
               {/* Título - exatamente como Flutter */}
-              <h1 className="text-[28px] font-bold text-gray-900 text-center mb-2 font-heading">
+              <h1 className="text-[28px] font-semibold text-gray-900 text-center mb-2 font-heading">
                 Bem-vindo ao Jiffy Gestor!
               </h1>
               <p className="text-accent1 text-base text-center mb-8">

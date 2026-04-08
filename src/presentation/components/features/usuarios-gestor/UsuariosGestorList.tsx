@@ -706,9 +706,9 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
 
                 {/* Labels dos campos */}
                 <div className="flex items-center mb-2 px-1 gap-2">
-                  <span className="text-[11px] font-bold text-secondary-text flex-[2] text-left">E-Mail</span>
-                  <span className="text-[11px] font-bold text-secondary-text flex-1.5 text-left">Perfil</span>
-                  <span className="text-[11px] font-bold text-secondary-text flex-1 w-12 text-right">Status</span>
+                  <span className="text-[11px] font-semibold text-secondary-text flex-[2] text-left">E-Mail</span>
+                  <span className="text-[11px] font-semibold text-secondary-text flex-1.5 text-left">Perfil</span>
+                  <span className="text-[11px] font-semibold text-secondary-text flex-1 w-12 text-right">Status</span>
                 </div>
 
                 {/* Valores dos campos */}

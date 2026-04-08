@@ -308,7 +308,7 @@ export function ModalMetodosPagamento({
                   <div className="px-2 pt-2">
                     <div className="flex items-center justify-between">
                       <p className="font-exo text-lg font-semibold text-primary-text">Total</p>
-                      <p className="font-exo text-lg font-bold text-primary">
+                      <p className="font-exo text-lg font-semibold text-primary">
                         {formatCurrency(total)}
                       </p>
                     </div>

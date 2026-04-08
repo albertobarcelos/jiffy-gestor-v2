@@ -2,7 +2,14 @@
 
 import { Exo_2 } from 'next/font/google'
 import Image from 'next/image'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import { useDashboardResumoQuery } from '@/src/presentation/hooks/useDashboardResumoQuery'
+import {
+  calculatePeriodo,
+  calculatePeriodoAnteriorParaComparacao,
+} from '@/src/shared/utils/dateFilters'
 import {
   Line,
   LineChart,
@@ -19,6 +26,7 @@ import {
   CalendarDays,
   ChevronDown,
   ChevronRight,
+  RefreshCw,
   DollarSign,
   CreditCard,
   FileX2,
@@ -36,6 +44,7 @@ import {
 import { MdOutlineMonetizationOn, MdReceiptLong, MdRestaurantMenu, MdAdd  } from "react-icons/md";
 import { TbReceiptFilled } from "react-icons/tb";
 import { IoReceipt } from "react-icons/io5";
+import { Tooltip as MuiTooltip } from '@mui/material'
 
 
 /** Exo 2 (Google) — o token Tailwind `font-exo` aponta para General Sans; aqui usamos a família real */
@@ -44,18 +53,6 @@ const exo2CabecalhoFaturamento = Exo_2({
   weight: '600',
   display: 'swap',
 })
-
-/** Dados mock — substituir por hooks/API quando integrar */
-const MOCK_FATURAMENTO_HOJE = 7251.2
-const MOCK_ONTEM = 8240.0
-const MOCK_VAR_PCT = -12
-
-const MOCK_METRICAS = {
-  pedidosHoje: { valor: 128, variacao: '+5%', ontem: 110, positivo: true },
-  ticketMedio: { valor: 'R$ 428,00', variacao: '-R$30,00', ontem: 'Ontem: R$ 398,00', positivo: false },
-  itensPorPedido: { valor: '1,2', variacao: '+5%', ontem: 'Ontem: 2', positivo: true },
-  cancelamentos: { valor: 7, variacao: '+ Alto', ontem: 'Ontem: 3', positivo: false },
-}
 
 const MOCK_VENDAS_HORA = [
   { hora: '8h', hoje: 400, ontem: 520 },
@@ -102,8 +99,78 @@ const MOCK_TOP_GARCONS = [
 const LINHA_HOJE = '#530CA3'
 const LINHA_ONTEM = '#D1D5DB'
 
+/** Trigger do select de empresa (alinhado ao SelectTrigger Radix) */
+const CLASSES_SELECT_EMPRESA =
+  'h-auto min-h-[42px] w-full rounded-lg bg-primary/5 py-2 pl-4 pr-3 text-sm font-medium text-primary shadow-none ring-offset-0 focus:outline-none focus:ring-2 focus:ring-primary/35 focus:ring-offset-0 data-[state=open]:border-primary [&>svg]:text-primary'
+
 function formatarMoeda(n: number) {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+/** Contagem inteira com separador de milhar (pt-BR) */
+function formatarContagemPedidos(n: number): string {
+  return Math.round(n)
+    .toString()
+    .replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+}
+
+type OpcoesBadgeVariacao = { menorMelhor?: boolean }
+
+/**
+ * Variação percentual atual vs referência (contagem, ticket médio, etc.).
+ * Com `menorMelhor`, queda ou estabilidade vira badge verde (ex.: cancelamentos).
+ */
+function badgeVariacaoPercentual(
+  atual: number,
+  referencia: number,
+  opcoes?: OpcoesBadgeVariacao
+): { texto: string; positivo: boolean } {
+  const menorMelhor = opcoes?.menorMelhor === true
+  if (referencia <= 0 && atual <= 0) return { texto: '0%', positivo: true }
+  if (referencia <= 0 && atual > 0) return { texto: 'Novo', positivo: !menorMelhor }
+  const pct = Math.round(((atual - referencia) / referencia) * 100)
+  const texto = `${pct > 0 ? '+' : ''}${pct}%`
+  if (menorMelhor) return { texto, positivo: pct <= 0 }
+  return { texto, positivo: pct >= 0 }
+}
+
+/**
+ * Badge do card Cancelamentos: % + "Alto" (vermelho) se subiu vs período anterior, senão + "Baixo" (verde).
+ */
+function badgeTextoCancelamentos(atual: number, anterior: number): { texto: string; positivo: boolean } {
+  if (anterior <= 0 && atual <= 0) {
+    return { texto: '0% Baixo', positivo: true }
+  }
+  if (anterior <= 0 && atual > 0) {
+    return { texto: 'Novo +Alto', positivo: false }
+  }
+  const pct = Math.round(((atual - anterior) / anterior) * 100)
+  const pctStr = `${pct > 0 ? '+' : ''}${pct}%`
+  if (atual > anterior) {
+    return { texto: `${pctStr} +Alto`, positivo: false }
+  }
+  return { texto: `${pctStr} +Baixo`, positivo: true }
+}
+
+/** Ticket médio = faturamento ÷ vendas efetivadas (0 se não houver vendas). */
+function ticketMedioResumo(totalFaturado: number, countVendasEfetivadas: number): number {
+  if (countVendasEfetivadas <= 0) return 0
+  return totalFaturado / countVendasEfetivadas
+}
+
+/** Itens por pedido = produtos vendidos ÷ vendas efetivadas (0 se não houver vendas). */
+function itensPorPedidoResumo(countProdutosVendidos: number, countVendasEfetivadas: number): number {
+  if (countVendasEfetivadas <= 0) return 0
+  return countProdutosVendidos / countVendasEfetivadas
+}
+
+/** Número pt-BR com vírgula decimal (1–2 casas), p.ex. 1,2 */
+function formatarItensPorPedido(n: number): string {
+  if (!Number.isFinite(n)) return '—'
+  return n.toLocaleString('pt-BR', {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 2,
+  })
 }
 
 function labelDataHoje() {
@@ -113,6 +180,184 @@ function labelDataHoje() {
     month: 'long',
     year: 'numeric',
   })
+}
+
+/**
+ * Valores do Select de período (V2) → rótulos esperados por `calculatePeriodo`
+ * (mesmo contrato do dashboard em `MetricCards` + `page.tsx`).
+ */
+function periodoSelectV2ParaOpcaoCalculatePeriodo(periodoData: string): string {
+  switch (periodoData) {
+    case 'hoje':
+      return 'Hoje'
+    case 'ontem':
+      return 'Ontem'
+    case 'semana':
+      return 'Últimos 7 Dias'
+    case '30dias':
+      return 'Últimos 30 Dias'
+    default:
+      return 'Hoje'
+  }
+}
+
+/**
+ * Preset do filtro V2 → valor de `periodo` na URL de `/relatorios` (VendasList).
+ * `null` quando não há opção equivalente no select de relatórios (ex.: Ontem).
+ */
+function periodoV2ParaQueryRelatorios(periodoData: string): string | null {
+  switch (periodoData) {
+    case 'hoje':
+      return 'Hoje'
+    case 'semana':
+      return 'Últimos 7 Dias'
+    case '30dias':
+      return 'Últimos 30 Dias'
+    default:
+      return null
+  }
+}
+
+/** Título da faixa de faturamento conforme o filtro global */
+function tituloFaturamentoBanner(periodoData: string): string {
+  switch (periodoData) {
+    case 'hoje':
+      return 'Hoje você faturou'
+    case 'ontem':
+      return 'Ontem você faturou'
+    case 'semana':
+      return 'Nos últimos 7 dias você faturou'
+    case '30dias':
+      return 'Nos últimos 30 dias você faturou'
+    default:
+      return 'Você faturou'
+  }
+}
+
+/** Rótulo do rodapé dos 4 cards (valor do período anterior equivalente) */
+function rotuloRodapeComparacaoCards(periodoData: string): string {
+  switch (periodoData) {
+    case 'hoje':
+      return 'Ontem'
+    case 'ontem':
+      return 'Ante-ontem'
+    case 'semana':
+      return '7 dias anteriores'
+    case '30dias':
+      return '30 dias anteriores'
+    default:
+      return 'Período anterior'
+  }
+}
+
+/** Parte do título do card após " - " (fonte menor, font-regular) */
+function rotuloPeriodoTituloCard(periodoData: string): string | null {
+  switch (periodoData) {
+    case 'hoje':
+      return 'hoje'
+    case 'ontem':
+      return 'ontem'
+    case 'semana':
+      return '7 dias'
+    case '30dias':
+      return '30 dias'
+    default:
+      return null
+  }
+}
+
+/** Comparação do período selecionado com o bloco anterior equivalente (API) */
+type ComparacaoComPeriodoAnterior =
+  | { status: 'carregando' }
+  | { status: 'erro' }
+  | { status: 'semBase'; atual: number }
+  | { status: 'ok'; pct: number; atual: number; anterior: number }
+
+/** Textos da comparação com o período anterior equivalente (gramática pt-BR) */
+function textosComparacaoPeriodoAnterior(periodoData: string): {
+  sufixoVs: string
+  acimaResto: string
+  abaixoResto: string
+  alinhadoCom: string
+} {
+  switch (periodoData) {
+    case 'hoje':
+      return {
+        sufixoVs: 'ontem',
+        acimaResto: 'de ontem',
+        abaixoResto: 'de ontem',
+        alinhadoCom: 'ontem',
+      }
+    case 'ontem':
+      return {
+        sufixoVs: 'no ante-ontem',
+        acimaResto: 'de ante-ontem',
+        abaixoResto: 'de ante-ontem',
+        alinhadoCom: 'ante-ontem',
+      }
+    case 'semana':
+      return {
+        sufixoVs: 'nos 7 dias anteriores',
+        acimaResto: 'dos 7 dias anteriores',
+        abaixoResto: 'dos 7 dias anteriores',
+        alinhadoCom: 'os 7 dias anteriores',
+      }
+    case '30dias':
+      return {
+        sufixoVs: 'nos 30 dias anteriores',
+        acimaResto: 'dos 30 dias anteriores',
+        abaixoResto: 'dos 30 dias anteriores',
+        alinhadoCom: 'os 30 dias anteriores',
+      }
+    default:
+      return {
+        sufixoVs: 'no período anterior',
+        acimaResto: 'do período anterior',
+        abaixoResto: 'do período anterior',
+        alinhadoCom: 'o período anterior',
+      }
+  }
+}
+
+/** Início da frase quando a base de comparação veio zerada */
+function prefixoSemFaturamentoNaBase(periodoData: string): string {
+  switch (periodoData) {
+    case 'hoje':
+      return 'Ontem não houve faturamento'
+    case 'ontem':
+      return 'Ante-ontem não houve faturamento'
+    case 'semana':
+      return 'Nos 7 dias anteriores não houve faturamento'
+    case '30dias':
+      return 'Nos 30 dias anteriores não houve faturamento'
+    default:
+      return 'No período de comparação não houve faturamento'
+  }
+}
+
+/**
+ * Rótulo "Atualizado …" em português a partir do timestamp da última carga dos dados.
+ * Com React Query, use o mesmo instante que `dataUpdatedAt` (ou `Date.now()` após fetch ok).
+ */
+function textoUltimaAtualizacao(ultimaAtualizacaoMs: number): string {
+  const diffMs = Math.max(0, Date.now() - ultimaAtualizacaoMs)
+  const segundos = Math.floor(diffMs / 1000)
+  if (segundos < 45) return 'Atualizado agora há pouco'
+  if (segundos < 90) return 'Atualizado há 1 minuto'
+  const minutos = Math.floor(segundos / 60)
+  if (minutos < 60) {
+    return minutos === 1 ? 'Atualizado há 1 minuto' : `Atualizado há ${minutos} minutos`
+  }
+  const horas = Math.floor(minutos / 60)
+  if (horas < 24) {
+    return horas === 1 ? 'Atualizado há 1 hora' : `Atualizado há ${horas} horas`
+  }
+  const dias = Math.floor(horas / 24)
+  if (dias < 7) {
+    return dias === 1 ? 'Atualizado há 1 dia' : `Atualizado há ${dias} dias`
+  }
+  const d = new Date(ultimaAtualizacaoMs)
+  return `Atualizado em ${d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
 }
 
 /** Mini donut para cada forma de pagamento (layout Figma 2x2) */
@@ -168,61 +413,371 @@ function DonutFormaPagamento({
  * Conteúdo abaixo do TopNav — navegação global fica no layout `app/dashboard/layout.tsx`.
  */
 export default function DashboardV2() {
-  const [loja, setLoja] = useState('ki-delicia')
+  const router = useRouter()
+  const { empresa: empresaLogada, isLoading: carregandoEmpresa, error: erroEmpresa, refetch: refetchEmpresa } =
+    useEmpresaMe()
+  const [lojaId, setLojaId] = useState('')
   const [periodoData, setPeriodoData] = useState('hoje')
   const [granularidade, setGranularidade] = useState('hora')
   const [modoTopProduto, setModoTopProduto] = useState<'porcentagem' | 'valor'>('porcentagem')
   const [filtroTopProduto, setFiltroTopProduto] = useState('hoje')
   const [filtroTopGarcom, setFiltroTopGarcom] = useState('hoje')
 
+  /** Momento em que os dados do dashboard foram considerados atualizados (mock: montagem; com API: após fetch bem-sucedido) */
+  const [dadosAtualizadosEm, setDadosAtualizadosEm] = useState(() => Date.now())
+  const [, setTickRelogio] = useState(0)
+
+  useEffect(() => {
+    const id = window.setInterval(() => setTickRelogio(n => n + 1), 30_000)
+    return () => window.clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    const aoVisibilidade = () => {
+      if (document.visibilityState === 'visible') setTickRelogio(n => n + 1)
+    }
+    document.addEventListener('visibilitychange', aoVisibilidade)
+    return () => document.removeEventListener('visibilitychange', aoVisibilidade)
+  }, [])
+
   const maxValorProduto = useMemo(
     () => Math.max(...MOCK_TOP_PRODUTOS.map(p => p.valor), 1),
     []
   )
 
-  const subtituloAtualizacao = useMemo(() => {
-    return 'Atualizado há 2 minutos'
-  }, [])
+  const opcaoCalculatePeriodo = useMemo(
+    () => periodoSelectV2ParaOpcaoCalculatePeriodo(periodoData),
+    [periodoData]
+  )
+
+  const { inicio: inicioResumo, fim: fimResumo } = useMemo(() => {
+    return calculatePeriodo(opcaoCalculatePeriodo)
+  }, [opcaoCalculatePeriodo, dadosAtualizadosEm])
+
+  const { inicio: inicioAnterior, fim: fimAnterior } = useMemo(() => {
+    const r = calculatePeriodoAnteriorParaComparacao(opcaoCalculatePeriodo)
+    if (!r) return { inicio: null, fim: null }
+    return r
+  }, [opcaoCalculatePeriodo, dadosAtualizadosEm])
+
+  const {
+    data: dadosResumo,
+    isLoading: carregandoResumo,
+    isError: erroResumo,
+    refetch: refetchResumo,
+  } = useDashboardResumoQuery({
+    periodoInicial: inicioResumo,
+    periodoFinal: fimResumo,
+  })
+
+  const {
+    data: dadosResumoAnterior,
+    isLoading: carregandoResumoAnterior,
+    isError: erroResumoAnterior,
+    refetch: refetchResumoAnterior,
+  } = useDashboardResumoQuery({
+    periodoInicial: inicioAnterior,
+    periodoFinal: fimAnterior,
+    enabled: inicioAnterior != null && fimAnterior != null,
+  })
+
+  const rotuloRodapeCards = rotuloRodapeComparacaoCards(periodoData)
+
+  const cardPedidosHojeProps = useMemo(() => {
+    const carregando =
+      (carregandoResumo && dadosResumo == null) ||
+      (carregandoResumoAnterior && dadosResumoAnterior == null)
+    if (erroResumo || erroResumoAnterior) {
+      return {
+        valor: '—',
+        badge: '—',
+        rodape: 'Erro ao carregar vendas',
+        badgePositivo: false,
+      }
+    }
+    if (carregando) {
+      return {
+        valor: '…',
+        badge: '…',
+        rodape: `${rotuloRodapeCards}: …`,
+        badgePositivo: true,
+      }
+    }
+    const atual = dadosResumo?.metricas?.total?.countVendasEfetivadas ?? 0
+    const anterior = dadosResumoAnterior?.metricas?.total?.countVendasEfetivadas ?? 0
+    const { texto, positivo } = badgeVariacaoPercentual(atual, anterior)
+    return {
+      valor: formatarContagemPedidos(atual),
+      badge: texto,
+      rodape: `${rotuloRodapeCards}: ${formatarContagemPedidos(anterior)}`,
+      badgePositivo: positivo,
+    }
+  }, [
+    rotuloRodapeCards,
+    carregandoResumo,
+    carregandoResumoAnterior,
+    dadosResumo,
+    dadosResumoAnterior,
+    erroResumo,
+    erroResumoAnterior,
+  ])
+
+  const cardTicketMedioProps = useMemo(() => {
+    const carregando =
+      (carregandoResumo && dadosResumo == null) ||
+      (carregandoResumoAnterior && dadosResumoAnterior == null)
+    if (erroResumo || erroResumoAnterior) {
+      return {
+        valor: '—',
+        badge: '—',
+        rodape: 'Erro ao carregar ticket médio',
+        badgePositivo: false,
+      }
+    }
+    if (carregando) {
+      return {
+        valor: '…',
+        badge: '…',
+        rodape: `${rotuloRodapeCards}: …`,
+        badgePositivo: true,
+      }
+    }
+    const mA = dadosResumo?.metricas?.total
+    const mRef = dadosResumoAnterior?.metricas?.total
+    const ticketAtual = ticketMedioResumo(
+      mA?.totalFaturado ?? 0,
+      mA?.countVendasEfetivadas ?? 0
+    )
+    const ticketAnterior = ticketMedioResumo(
+      mRef?.totalFaturado ?? 0,
+      mRef?.countVendasEfetivadas ?? 0
+    )
+    const { texto, positivo } = badgeVariacaoPercentual(ticketAtual, ticketAnterior)
+    return {
+      valor: formatarMoeda(ticketAtual),
+      badge: texto,
+      rodape: `${rotuloRodapeCards}: ${formatarMoeda(ticketAnterior)}`,
+      badgePositivo: positivo,
+    }
+  }, [
+    rotuloRodapeCards,
+    carregandoResumo,
+    carregandoResumoAnterior,
+    dadosResumo,
+    dadosResumoAnterior,
+    erroResumo,
+    erroResumoAnterior,
+  ])
+
+  const cardItensPorPedidoProps = useMemo(() => {
+    const carregando =
+      (carregandoResumo && dadosResumo == null) ||
+      (carregandoResumoAnterior && dadosResumoAnterior == null)
+    if (erroResumo || erroResumoAnterior) {
+      return {
+        valor: '—',
+        badge: '—',
+        rodape: 'Erro ao carregar itens por pedido',
+        badgePositivo: false,
+      }
+    }
+    if (carregando) {
+      return {
+        valor: '…',
+        badge: '…',
+        rodape: `${rotuloRodapeCards}: …`,
+        badgePositivo: true,
+      }
+    }
+    const mA = dadosResumo?.metricas?.total
+    const mRef = dadosResumoAnterior?.metricas?.total
+    const itensAtual = itensPorPedidoResumo(
+      mA?.countProdutosVendidos ?? 0,
+      mA?.countVendasEfetivadas ?? 0
+    )
+    const itensAnterior = itensPorPedidoResumo(
+      mRef?.countProdutosVendidos ?? 0,
+      mRef?.countVendasEfetivadas ?? 0
+    )
+    const { texto, positivo } = badgeVariacaoPercentual(itensAtual, itensAnterior)
+    return {
+      valor: formatarItensPorPedido(itensAtual),
+      badge: texto,
+      rodape: `${rotuloRodapeCards}: ${formatarItensPorPedido(itensAnterior)}`,
+      badgePositivo: positivo,
+    }
+  }, [
+    rotuloRodapeCards,
+    carregandoResumo,
+    carregandoResumoAnterior,
+    dadosResumo,
+    dadosResumoAnterior,
+    erroResumo,
+    erroResumoAnterior,
+  ])
+
+  const cardCancelamentosProps = useMemo(() => {
+    const carregando =
+      (carregandoResumo && dadosResumo == null) ||
+      (carregandoResumoAnterior && dadosResumoAnterior == null)
+    if (erroResumo || erroResumoAnterior) {
+      return {
+        valor: '—',
+        badge: '—',
+        rodape: 'Erro ao carregar cancelamentos',
+        badgePositivo: false,
+      }
+    }
+    if (carregando) {
+      return {
+        valor: '…',
+        badge: '…',
+        rodape: `${rotuloRodapeCards}: …`,
+        badgePositivo: true,
+      }
+    }
+    const atual =
+      dadosResumo?.metricas?.canceladas?.countVendasCanceladas ?? 0
+    const anterior =
+      dadosResumoAnterior?.metricas?.canceladas?.countVendasCanceladas ?? 0
+    const { texto, positivo } = badgeTextoCancelamentos(atual, anterior)
+    return {
+      valor: formatarContagemPedidos(atual),
+      badge: texto,
+      rodape: `${rotuloRodapeCards}: ${formatarContagemPedidos(anterior)}`,
+      badgePositivo: positivo,
+    }
+  }, [
+    rotuloRodapeCards,
+    carregandoResumo,
+    carregandoResumoAnterior,
+    dadosResumo,
+    dadosResumoAnterior,
+    erroResumo,
+    erroResumoAnterior,
+  ])
+
+  const totalFaturadoPeriodo = dadosResumo?.metricas?.total?.totalFaturado ?? 0
+
+  const comparacaoPeriodoAnterior = useMemo((): ComparacaoComPeriodoAnterior => {
+    if (erroResumo || erroResumoAnterior) return { status: 'erro' }
+    if (dadosResumo == null || dadosResumoAnterior == null) return { status: 'carregando' }
+    const atual = dadosResumo.metricas?.total?.totalFaturado ?? 0
+    const anterior = dadosResumoAnterior.metricas?.total?.totalFaturado ?? 0
+    if (anterior <= 0 && atual > 0) return { status: 'semBase', atual }
+    if (anterior <= 0 && atual <= 0) return { status: 'ok', pct: 0, atual, anterior }
+    const pct = Math.round(((atual - anterior) / anterior) * 100)
+    return { status: 'ok', pct, atual, anterior }
+  }, [erroResumo, erroResumoAnterior, dadosResumo, dadosResumoAnterior])
+
+  const subtituloAtualizacao = textoUltimaAtualizacao(dadosAtualizadosEm)
+
+  /** Com uma única empresa, o id vem do `/me`; com várias no futuro, prevalece o escolhido em `lojaId` */
+  const valorEmpresaSelect = lojaId || empresaLogada?.id || ''
+
+  const handleAtualizarDashboard = () => {
+    void Promise.all([refetchEmpresa(), refetchResumo(), refetchResumoAnterior()]).then(() => {
+      setDadosAtualizadosEm(Date.now())
+      setTickRelogio(n => n + 1)
+    })
+  }
+
+  const copyComparacao = textosComparacaoPeriodoAnterior(periodoData)
+
+  const irParaRelatoriosVendas = () => {
+    const preset = periodoV2ParaQueryRelatorios(periodoData)
+    if (preset) {
+      router.push(`/relatorios?${new URLSearchParams({ periodo: preset }).toString()}`)
+    } else {
+      router.push('/relatorios')
+    }
+  }
 
   return (
     <div className="min-h-0 w-full bg-gray-50 pb-8 pt-2 font-nunito">
       {/* Cabeçalho + filtros */}
-      <div className="mb-2 flex flex-col gap-8 px-2 md:flex-row md:items-end md:px-4">
+      <div className="mb-2 flex flex-col px-2 md:flex-row md:items-end md:px-4">
         <div>
           <h1 className="font-exo text-xl font-semibold text-primary-text md:text-xl">Visão Geral</h1>
           <p className="mt-1 flex flex-wrap items-center font-regular gap-2 text-sm text-primary-text">
             {subtituloAtualizacao}
           </p>
         </div>
+        <MuiTooltip
+          title="Atualizar dados"
+          placement="bottom"
+          slotProps={{
+            tooltip: {
+              sx: {
+                bgcolor: '#ffffff',
+                color: '#111827',
+                border: '1px solid #e5e7eb',
+                boxShadow: 2,
+                fontSize: '0.8125rem',
+              },
+            },
+          }}
+        >
+          <span className="ml-2 mr-8 inline-flex shrink-0">
+            <button
+              type="button"
+              onClick={handleAtualizarDashboard}
+              disabled={carregandoEmpresa}
+              className="inline-flex h-[42px] w-[42px] items-center justify-center rounded-lg border border-primary/20 bg-white text-primary shadow-sm transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="Atualizar dados do dashboard"
+            >
+              <RefreshCw
+                className={`h-5 w-5 ${carregandoEmpresa ? 'animate-spin' : ''}`}
+                aria-hidden
+              />
+            </button>
+          </span>
+        </MuiTooltip>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <span className="inline-flex h-2 w-2 rounded-full bg-secondary" aria-hidden />
-          <div className="relative min-w-[200px]">
-            <label htmlFor="dashboard-loja" className="sr-only">
-              Loja
+          <div className="flex min-w-0 items-center gap-2">
+           
+            <span className="inline-flex h-2 w-2 rounded-full bg-secondary" aria-hidden />
+            <div className="relative min-w-[200px] flex-1">
+            <label htmlFor="dashboard-empresa" className="sr-only">
+              Empresa
             </label>
-            {/* Radix Select: item destacado com primary (select nativo não permite estilizar a lista) */}
-            <Select value={loja} onValueChange={setLoja}>
-              <SelectTrigger
-                id="dashboard-loja"
-                className="h-auto min-h-[42px] w-full rounded-lg bg-primary/5 py-2 pl-4 pr-3 text-sm font-medium text-primary shadow-none ring-offset-0 focus:outline-none focus:ring-2 focus:ring-primary/35 focus:ring-offset-0 data-[state=open]:border-primary [&>svg]:text-primary"
+            {carregandoEmpresa ? (
+              <div
+                className={`${CLASSES_SELECT_EMPRESA} flex cursor-wait items-center text-primary/70`}
+                aria-busy="true"
               >
-                <SelectValue placeholder="Selecione a loja" />
-              </SelectTrigger>
-              <SelectContent className="border-gray-200 bg-white rounded-lg">
-                <SelectItem
-                  value="ki-delicia"
-                  className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:!bg-primary data-[highlighted]:!text-white data-[highlighted]:rounded-lg data-[state=checked]:bg-primary/10 data-[state=checked]:text-primary data-[state=checked]:rounded-lg"
+                Carregando empresa…
+              </div>
+            ) : erroEmpresa || !empresaLogada ? (
+              <div
+                className={`${CLASSES_SELECT_EMPRESA} flex flex-col gap-1 border border-red-200 bg-red-50/80 py-2 text-xs text-red-800`}
+                role="alert"
+              >
+                <span>{erroEmpresa ?? 'Empresa não disponível'}</span>
+                <button
+                  type="button"
+                  onClick={() => void refetchEmpresa()}
+                  className="self-start text-[11px] font-semibold text-primary underline-offset-2 hover:underline"
                 >
-                  Restaurante Ki Delicia
-                </SelectItem>
-                <SelectItem
-                    value="demo"
+                  Tentar novamente
+                </button>
+              </div>
+            ) : (
+              <Select value={valorEmpresaSelect} onValueChange={setLojaId}>
+                <SelectTrigger id="dashboard-empresa" className={CLASSES_SELECT_EMPRESA}>
+                  <SelectValue placeholder="Empresa" />
+                </SelectTrigger>
+                <SelectContent className="rounded-lg border-gray-200 bg-white">
+                  <SelectItem
+                    value={empresaLogada.id}
                     className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:!bg-primary data-[highlighted]:!text-white data-[highlighted]:rounded-lg data-[state=checked]:bg-primary/10 data-[state=checked]:text-primary data-[state=checked]:rounded-lg"
-                >
-                  Loja demonstração
-                </SelectItem>
-              </SelectContent>
-            </Select>
+                  >
+                    {empresaLogada.nomeExibicao}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+            </div>
           </div>
           <span className="inline-flex h-2 w-2 rounded-full bg-secondary" aria-hidden />
           <div className="relative min-w-[200px]">
@@ -263,10 +818,10 @@ export default function DashboardV2() {
                   Últimos 7 dias
                 </SelectItem>
                 <SelectItem
-                  value="mes"
+                  value="30dias"
                   className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:!bg-primary data-[highlighted]:!text-white data-[highlighted]:rounded-lg data-[state=checked]:bg-primary/10 data-[state=checked]:text-primary data-[state=checked]:rounded-lg"
                 >
-                  Mês atual
+                  Últimos 30 dias
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -284,24 +839,91 @@ export default function DashboardV2() {
                 <MdOutlineMonetizationOn
                 className="h-8 w-8 text-[#F59E0B]" size={30} />
                 <span className={`${exo2CabecalhoFaturamento.className} text-lg`}>
-                  Hoje você faturou
+                  {tituloFaturamentoBanner(periodoData)}
                 </span>
               </div>
-              <p className="font-exo text-2xl font-semibold text-white md:text-[40px]">
-                {formatarMoeda(MOCK_FATURAMENTO_HOJE)}
+              <p
+                className={`font-exo text-2xl font-semibold text-white md:text-[40px] ${
+                  carregandoResumo ? 'animate-pulse opacity-80' : ''
+                }`}
+              >
+                {erroResumo
+                  ? '—'
+                  : carregandoResumo && dadosResumo == null
+                    ? '…'
+                    : formatarMoeda(totalFaturadoPeriodo)}
               </p>
-              <div className="mt-3 inline-flex items-center gap-1 py-1 text-base font-regular text-white/90">
-                <span className="text-sm font-semibold bg-red-600 rounded-lg px-3 py-0.5">{MOCK_VAR_PCT}%</span> 
-                <span className="text-base font-regular">vs. {formatarMoeda(MOCK_ONTEM)} ontem</span>
-                
+              <div className="mt-3 inline-flex flex-wrap items-center gap-1 py-1 text-base font-regular text-white/90">
+                {comparacaoPeriodoAnterior.status === 'carregando' ? (
+                  <span className="text-sm opacity-80">Carregando comparação…</span>
+                ) : comparacaoPeriodoAnterior.status === 'erro' ? (
+                  <span className="text-sm opacity-90">
+                    Não foi possível carregar o período de comparação
+                  </span>
+                ) : comparacaoPeriodoAnterior.status === 'semBase' ? (
+                  <span className="text-base font-regular">
+                    vs. {formatarMoeda(0)} {copyComparacao.sufixoVs}
+                  </span>
+                ) : comparacaoPeriodoAnterior.status === 'ok' ? (
+                  <>
+                    <span
+                      className={`rounded-lg px-3 py-0.5 text-sm font-semibold ${
+                        comparacaoPeriodoAnterior.pct > 0
+                          ? 'bg-[#00B074]'
+                          : comparacaoPeriodoAnterior.pct < 0
+                            ? 'bg-red-600'
+                            : 'bg-white/25'
+                      }`}
+                    >
+                      {comparacaoPeriodoAnterior.pct > 0 ? '+' : ''}
+                      {comparacaoPeriodoAnterior.pct}%
+                    </span>
+                    <span className="text-base font-regular">
+                      vs. {formatarMoeda(comparacaoPeriodoAnterior.anterior)}{' '}
+                      {copyComparacao.sufixoVs}
+                    </span>
+                  </>
+                ) : null}
               </div>
             </div>
-            <div className="flex flex-col col-span-2 items-start text-white/90 gap-4 lg:items-center lg:text-center">
-            <span className= "text-lg font-semibold tracking-wide">
-            Suas vendas estão <span className="font-bold text-xl">{Math.abs(MOCK_VAR_PCT)}%</span> abaixo de ontem
-              </span>
+            <div className="col-span-2 flex flex-col items-start gap-4 text-white/90 lg:items-center lg:text-center">
+              {comparacaoPeriodoAnterior.status === 'carregando' ? (
+                <span className="text-lg font-semibold tracking-wide opacity-80">…</span>
+              ) : comparacaoPeriodoAnterior.status === 'erro' ? (
+                <span className="text-lg font-semibold tracking-wide opacity-90">
+                  Atualize a página ou tente novamente em instantes
+                </span>
+              ) : comparacaoPeriodoAnterior.status === 'semBase' ? (
+                <span className="text-lg font-semibold tracking-wide">
+                  {prefixoSemFaturamentoNaBase(periodoData)}
+                </span>
+              ) : comparacaoPeriodoAnterior.status === 'ok' ? (
+                comparacaoPeriodoAnterior.pct > 0 ? (
+                  <span className="text-lg font-semibold tracking-wide">
+                    Suas vendas estão{' '}
+                    <span className="text-xl font-bold text-[#00B074]">
+                      {comparacaoPeriodoAnterior.pct}%
+                    </span>{' '}
+                    acima {copyComparacao.acimaResto}
+                  </span>
+                ) : comparacaoPeriodoAnterior.pct < 0 ? (
+                  <span className="text-lg font-semibold tracking-wide">
+                    Suas vendas estão{' '}
+                    <span className="text-xl font-bold">
+                      {Math.abs(comparacaoPeriodoAnterior.pct)}%
+                    </span>{' '}
+                    abaixo {copyComparacao.abaixoResto}
+                  </span>
+                ) : (
+                  <span className="text-lg font-semibold tracking-wide">
+                    Faturamento alinhado com {copyComparacao.alinhadoCom} (
+                    {formatarMoeda(comparacaoPeriodoAnterior.anterior)})
+                  </span>
+                )
+              ) : null}
               <button
                 type="button"
+                onClick={irParaRelatoriosVendas}
                 className="inline-flex items-center text-lg gap-2 rounded-full bg-accent1 px-8 py-2 font-semibold text-white shadow-md transition hover:brightness-95"
               >
                 Veja suas vendas em tempo real
@@ -332,40 +954,44 @@ export default function DashboardV2() {
       {/* 4 cards de métricas */}
       <div className="mx-2 mb-2 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4 md:mx-4">
         <MetricCard
-          titulo="Pedidos hoje"
+          tituloBase="Pedidos"
+          tituloPeriodo={rotuloPeriodoTituloCard(periodoData)}
           icon={
             <div className="relative flex h-8 w-8 items-center justify-center">
               <MdReceiptLong className="text-[#1E3A8A]" size={30} aria-hidden />
               <span
                 className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center"
               >
-                <MdAdd  className="text-green-500 font-bold" size={34} />
+                <MdAdd  className="text-[#00B074] font-bold" size={34} />
               </span>
             </div>
           }
-          valor={String(MOCK_METRICAS.pedidosHoje.valor)}
-          badge={MOCK_METRICAS.pedidosHoje.variacao}
-          rodape={`Ontem: ${MOCK_METRICAS.pedidosHoje.ontem}`}
-          badgePositivo={MOCK_METRICAS.pedidosHoje.positivo}
+          valor={cardPedidosHojeProps.valor}
+          badge={cardPedidosHojeProps.badge}
+          rodape={cardPedidosHojeProps.rodape}
+          badgePositivo={cardPedidosHojeProps.badgePositivo}
         />
         <MetricCard
-          titulo="Ticket médio"
+          tituloBase="Ticket médio"
+          tituloPeriodo={rotuloPeriodoTituloCard(periodoData)}
           icon={<TbReceiptFilled size={32} />}
-          valor={MOCK_METRICAS.ticketMedio.valor}
-          badge={MOCK_METRICAS.ticketMedio.variacao}
-          rodape={MOCK_METRICAS.ticketMedio.ontem}
-          badgePositivo={MOCK_METRICAS.ticketMedio.positivo}
+          valor={cardTicketMedioProps.valor}
+          badge={cardTicketMedioProps.badge}
+          rodape={cardTicketMedioProps.rodape}
+          badgePositivo={cardTicketMedioProps.badgePositivo}
         />
         <MetricCard
-          titulo="Itens por pedido"
+          tituloBase="Itens por pedido"
+          tituloPeriodo={rotuloPeriodoTituloCard(periodoData)}
           icon={<MdRestaurantMenu size={32} />}
-          valor={MOCK_METRICAS.itensPorPedido.valor}
-          badge={MOCK_METRICAS.itensPorPedido.variacao}
-          rodape={MOCK_METRICAS.itensPorPedido.ontem}
-          badgePositivo={MOCK_METRICAS.itensPorPedido.positivo}
+          valor={cardItensPorPedidoProps.valor}
+          badge={cardItensPorPedidoProps.badge}
+          rodape={cardItensPorPedidoProps.rodape}
+          badgePositivo={cardItensPorPedidoProps.badgePositivo}
         />
         <MetricCard
-          titulo="Cancelamentos"
+          tituloBase="Cancelamentos"
+          tituloPeriodo={rotuloPeriodoTituloCard(periodoData)}
           icon={
             <div className="relative flex h-8 w-8 items-center justify-center">
               <IoReceipt className="text-[#1E3A8A]" size={30} aria-hidden />
@@ -377,10 +1003,10 @@ export default function DashboardV2() {
               </span>
             </div>
           }
-          valor={String(MOCK_METRICAS.cancelamentos.valor)}
-          badge={MOCK_METRICAS.cancelamentos.variacao}
-          rodape={MOCK_METRICAS.cancelamentos.ontem}
-          badgePositivo={MOCK_METRICAS.cancelamentos.positivo}
+          valor={cardCancelamentosProps.valor}
+          badge={cardCancelamentosProps.badge}
+          rodape={cardCancelamentosProps.rodape}
+          badgePositivo={cardCancelamentosProps.badgePositivo}
         />
       </div>
 
@@ -650,14 +1276,17 @@ export default function DashboardV2() {
 }
 
 function MetricCard({
-  titulo,
+  tituloBase,
+  tituloPeriodo,
   icon,
   valor,
   badge,
   rodape,
   badgePositivo,
 }: {
-  titulo: string
+  tituloBase: string
+  /** Ex.: "7 dias"; null = só o título base */
+  tituloPeriodo: string | null
   icon: ReactNode
   valor: string
   badge: string
@@ -673,14 +1302,19 @@ function MetricCard({
         </div>
         {/* Título, valor + badge e rodapé à direita */}
         <div className="min-w-0 flex-1">
-          <p className="text-lg font-semibold text-primary-text">{titulo}</p>
-          <div className="flex flex-wrap items-center gap-2">
+          <p className="text-lg font-semibold text-primary-text">
+            {tituloBase}
+            {tituloPeriodo ? (
+              <span className="text-sm font-normal text-primary-text/90"> ({tituloPeriodo})</span>
+            ) : null}
+          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-2xl font-semibold tracking-tight text-primary-text md:text-[32px]">
               {valor}
             </span>
             <span
-              className={`rounded-md px-2 py-0.5 text-sm font-semibold text-white ${
-                badgePositivo ? 'bg-emerald-500' : 'bg-red-500'
+              className={`rounded-md mr-4 px-2 py-0.5 text-sm font-medium text-white ${
+                badgePositivo ? 'bg-[#00B074]' : 'bg-red-500'
               }`}
             >
               {badge}

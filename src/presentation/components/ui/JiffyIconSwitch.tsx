@@ -59,7 +59,7 @@ export function JiffyIconSwitch({
     >
       <span
         className={cn(
-          'pointer-events-none absolute left-[7px] top-1/2 -translate-y-1/2 text-[11px] font-bold leading-none text-white transition-opacity duration-200',
+          'pointer-events-none absolute left-[7px] top-1/2 -translate-y-1/2 text-[11px] font-semibold leading-none text-white transition-opacity duration-200',
           checked ? 'opacity-100' : 'opacity-0'
         )}
       >
@@ -68,7 +68,7 @@ export function JiffyIconSwitch({
       <span
         className={cn(
           // text-white sempre — se só opacity-0 no “ligado”, herda cor escura do label e o ✕ pisca preto ao desligar
-          'pointer-events-none absolute right-[7px] top-1/2 -translate-y-1/2 text-[11px] font-bold leading-none text-white transition-opacity duration-200',
+          'pointer-events-none absolute right-[7px] top-1/2 -translate-y-1/2 text-[11px] font-semibold leading-none text-white transition-opacity duration-200',
           checked ? 'opacity-0' : 'opacity-100'
         )}
       >
