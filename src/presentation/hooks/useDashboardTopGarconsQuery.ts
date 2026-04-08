@@ -11,6 +11,7 @@ type ApiItem = {
 
 type ApiResponse = {
   items: ApiItem[]
+  totalUsuariosComVendas?: number
 }
 
 type Params = {
@@ -21,7 +22,12 @@ type Params = {
   enabled?: boolean
 }
 
-async function fetchTopGarcons(params: Params): Promise<DashboardTopGarcom[]> {
+export type DashboardTopGarconsQueryData = {
+  garcons: DashboardTopGarcom[]
+  totalUsuariosComVendas: number
+}
+
+async function fetchTopGarcons(params: Params): Promise<DashboardTopGarconsQueryData> {
   const search = new URLSearchParams()
   search.append('periodo', params.periodo)
   search.append('limit', String(params.limit ?? 10))
@@ -39,7 +45,12 @@ async function fetchTopGarcons(params: Params): Promise<DashboardTopGarcom[]> {
 
   const payload = data as unknown as ApiResponse
   const items = Array.isArray(payload.items) ? payload.items : []
-  return items.map((item, index) =>
+  const totalUsuariosComVendas =
+    typeof payload.totalUsuariosComVendas === 'number'
+      ? payload.totalUsuariosComVendas
+      : items.length
+
+  const garcons = items.map((item, index) =>
     DashboardTopGarcom.create({
       rank: index + 1,
       nome: item.nome,
@@ -48,6 +59,8 @@ async function fetchTopGarcons(params: Params): Promise<DashboardTopGarcom[]> {
       valorTotal: item.valorTotal,
     })
   )
+
+  return { garcons, totalUsuariosComVendas }
 }
 
 export function useDashboardTopGarconsQuery({

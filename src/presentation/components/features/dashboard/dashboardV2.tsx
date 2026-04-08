@@ -73,8 +73,10 @@ const LIMITE_TOP_PRODUTOS_V2_COMPLETO = 500
 /** No resumo pedimos 11 itens, exibimos 10; o 11º indica que existe lista maior (habilita o botão). */
 const LIMITE_TOP_PRODUTOS_V2_RESUMO = 10
 const LIMITE_TOP_PRODUTOS_V2_RESUMO_FETCH = LIMITE_TOP_PRODUTOS_V2_RESUMO + 1
-/** Ranking fixo de garçons no card Top Garçons V2 (sempre 10 linhas). */
+/** Ranking fixo de garçons no card Top Garçons V2 (resumo: 10 linhas). */
 const LIMITE_TOP_GARCONS_V2 = 10
+/** Após “Ver todos os usuários”, lista completa (API limita após agregar). */
+const LIMITE_TOP_GARCONS_V2_COMPLETO = 500
 
 /** Paleta cíclica para N métodos distintos (mesma ideia do modal de métodos). */
 const PALETA_PRINCIPAL_FORMAS_PAGAMENTO = [
@@ -610,6 +612,8 @@ export default function DashboardV2() {
   /** Após clicar em “Ver todos”, busca com limite alto; volta ao resumo ao mudar o filtro de período. */
   const [topProdutosListaCompleta, setTopProdutosListaCompleta] = useState(false)
   const [filtroTopGarcom, setFiltroTopGarcom] = useState('hoje')
+  /** Lista expandida com todos os garçons do ranking (quando > 10 usuários com venda). */
+  const [topGarconsListaCompleta, setTopGarconsListaCompleta] = useState(false)
 
   const corComparativoLinhaAtual =
     metricaGraficoComparativo === 'CANCELADA' ? LINHA_CANCEL_ATUAL : LINHA_PERIODO_ATUAL
@@ -654,6 +658,10 @@ export default function DashboardV2() {
   useEffect(() => {
     setTopProdutosListaCompleta(false)
   }, [filtroTopProduto])
+
+  useEffect(() => {
+    setTopGarconsListaCompleta(false)
+  }, [filtroTopGarcom])
 
   const opcaoPeriodoTopProduto = useMemo(
     () => filtroTopProdutoV2ParaOpcaoCalculatePeriodo(filtroTopProduto),
@@ -743,20 +751,43 @@ export default function DashboardV2() {
   )
 
   const {
-    data: dadosTopGarcons,
+    data: dadosTopGarconsQuery,
     isLoading: carregandoTopGarcons,
     isError: erroTopGarcons,
   } = useDashboardTopGarconsQuery({
     periodo: periodoApiTopGarcom,
-    limit: LIMITE_TOP_GARCONS_V2,
+    limit: topGarconsListaCompleta ? LIMITE_TOP_GARCONS_V2_COMPLETO : LIMITE_TOP_GARCONS_V2,
     periodoInicial: inicioTopGarcom,
     periodoFinal: fimTopGarcom,
     enabled: inicioTopGarcom != null && fimTopGarcom != null,
   })
 
-  /** Sempre 10 posições numeradas; posições sem dado exibem traço. */
+  const dadosTopGarcons = dadosTopGarconsQuery?.garcons ?? []
+  const totalUsuariosComVendasTopGarcons = dadosTopGarconsQuery?.totalUsuariosComVendas ?? 0
+
+  /** Botão “Ver todos” só se houver mais de 10 usuários com venda no período (amostra da API). */
+  const verTodosGarconsDesabilitado =
+    carregandoTopGarcons ||
+    erroTopGarcons ||
+    topGarconsListaCompleta ||
+    totalUsuariosComVendasTopGarcons <= LIMITE_TOP_GARCONS_V2
+
+  /**
+   * Resumo: 10 linhas fixas (com traços). Lista completa: todas as linhas retornadas, com rolagem se necessário.
+   */
   const linhasTopGarconsV2 = useMemo(() => {
-    const lista = dadosTopGarcons ?? []
+    const lista = dadosTopGarcons
+    if (topGarconsListaCompleta) {
+      return lista.map((g, i) => ({
+        key: `garcom-rank-${i + 1}-${g.getNome()}`,
+        rank: i + 1,
+        vazio: false as const,
+        nome: g.getNome(),
+        qtdProdutos: g.getQtdProdutos(),
+        qtdVendas: g.getQtdVendas(),
+        valorTotal: g.getValorTotal(),
+      }))
+    }
     return Array.from({ length: LIMITE_TOP_GARCONS_V2 }, (_, i) => {
       const g = lista[i]
       if (!g) {
@@ -776,7 +807,7 @@ export default function DashboardV2() {
         valorTotal: g.getValorTotal(),
       }
     })
-  }, [dadosTopGarcons])
+  }, [dadosTopGarcons, topGarconsListaCompleta])
 
   /** Totais apenas dos garçons presentes no ranking (até 10), no período filtrado. */
   const totaisTopGarconsV2 = useMemo(() => {
@@ -1722,7 +1753,9 @@ export default function DashboardV2() {
                       }`}
                     >
                       <div className="flex min-w-0 flex-[1.4] items-center gap-2 md:flex-[1.6]">
-                        <span className="font-regular text-sm uppercase text-primary-text">{p.nome}</span>
+                        <span className="font-regular text-sm uppercase text-primary-text">
+                          {p.nome}
+                        </span>
                       </div>
                       <div className="font-regular min-w-0 flex-1 text-center text-sm text-primary-text">
                         {p.qtd} <span className="text-xs">un</span>
@@ -1825,30 +1858,38 @@ export default function DashboardV2() {
               </p>
             ) : (
               <>
-                {linhasTopGarconsV2.map((linha, idx) => (
-                  <div
-                    key={linha.key}
-                    className={`flex items-center gap-2 py-2 text-sm md:gap-3 ${
-                      idx > 0 ? 'border-t border-gray-100' : ''
-                    }`}
-                  >
-                    <div className="flex w-7 shrink-0 items-center justify-center md:w-8">
-                      <IconeColocacaoTopGarcom rank={linha.rank} />
+                <div
+                  className={
+                    topGarconsListaCompleta
+                      ? 'scrollbar-hide max-h-[min(70vh,560px)] min-h-0 overflow-y-auto overscroll-y-contain'
+                      : ''
+                  }
+                >
+                  {linhasTopGarconsV2.map((linha, idx) => (
+                    <div
+                      key={linha.key}
+                      className={`flex items-center gap-2 py-2 text-sm md:gap-3 ${
+                        idx > 0 ? 'border-t border-gray-100' : ''
+                      }`}
+                    >
+                      <div className="flex w-7 shrink-0 items-center justify-center md:w-8">
+                        <IconeColocacaoTopGarcom rank={linha.rank} />
+                      </div>
+                      <div className="font-regular min-w-0 flex-1 truncate text-primary-text">
+                        {linha.vazio ? '—' : linha.nome}
+                      </div>
+                      <div className="font-regular min-w-0 flex-1 text-center text-sm tabular-nums text-primary-text">
+                        {linha.vazio ? '—' : formatarContagemPedidos(linha.qtdProdutos)}
+                      </div>
+                      <div className="font-regular min-w-0 flex-1 text-center text-sm tabular-nums text-primary-text">
+                        {linha.vazio ? '—' : formatarContagemPedidos(linha.qtdVendas)}
+                      </div>
+                      <div className="font-regular min-w-0 flex-1 text-right text-sm tabular-nums text-primary-text">
+                        {linha.vazio ? '—' : formatarMoeda(linha.valorTotal)}
+                      </div>
                     </div>
-                    <div className="font-regular min-w-0 flex-1 truncate text-primary-text">
-                      {linha.vazio ? '—' : linha.nome}
-                    </div>
-                    <div className="font-regular min-w-0 flex-1 text-center text-sm tabular-nums text-primary-text">
-                      {linha.vazio ? '—' : formatarContagemPedidos(linha.qtdProdutos)}
-                    </div>
-                    <div className="font-regular min-w-0 flex-1 text-center text-sm tabular-nums text-primary-text">
-                      {linha.vazio ? '—' : formatarContagemPedidos(linha.qtdVendas)}
-                    </div>
-                    <div className="font-regular min-w-0 flex-1 text-right text-sm tabular-nums text-primary-text">
-                      {linha.vazio ? '—' : formatarMoeda(linha.valorTotal)}
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
                 <div className="mt-1 flex items-center gap-2 border-t border-gray-200 py-3 text-sm md:gap-3">
                   <div className="w-7 shrink-0 md:w-8" />
                   <div className="min-w-0 flex-1">
@@ -1870,7 +1911,9 @@ export default function DashboardV2() {
 
           <button
             type="button"
-            className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-secondary transition hover:text-secondary/85"
+            disabled={verTodosGarconsDesabilitado}
+            onClick={() => setTopGarconsListaCompleta(true)}
+            className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-secondary transition hover:text-secondary/85 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-secondary"
           >
             Ver todos os usuários
             <ChevronRight className="h-4 w-4" />

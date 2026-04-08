@@ -93,7 +93,8 @@ type VendaDetalhe = Record<string, unknown> & {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const periodo = searchParams.get('periodo') || 'hoje'
-  const limit = Math.min(Math.max(Number(searchParams.get('limit') || '10'), 1), 10)
+  /** Resumo: 10 linhas; “ver todos”: até 500 (mesma ideia do top produtos). */
+  const limit = Math.min(Math.max(Number(searchParams.get('limit') || '10'), 1), 500)
   const periodoInicialCustom = searchParams.get('periodoInicial')
   const periodoFinalCustom = searchParams.get('periodoFinal')
 
@@ -136,7 +137,10 @@ export async function GET(request: NextRequest) {
     })
     const cached = globalThis.__jiffyTopGarconsCache?.get(cacheKey)
     if (cached && cached.expiresAt > Date.now()) {
-      return NextResponse.json({ items: cached.items })
+      return NextResponse.json({
+        items: cached.items,
+        totalUsuariosComVendas: cached.totalUsuariosComVendas,
+      })
     }
 
     const vendasResponse = await apiClient.request<{ items?: Array<{ id: string }> }>(
@@ -147,7 +151,7 @@ export async function GET(request: NextRequest) {
     const vendaIds: string[] = (vendasResponse.data?.items || []).map(venda => venda.id)
 
     if (vendaIds.length === 0) {
-      return NextResponse.json({ items: [] })
+      return NextResponse.json({ items: [], totalUsuariosComVendas: 0 })
     }
 
     const fetchWithConcurrency = async <T, R>(
@@ -207,14 +211,18 @@ export async function GET(request: NextRequest) {
       porUsuario.set(uid, agg)
     }
 
-    const ordenados = Array.from(porUsuario.entries())
+    const ordenadosFull = Array.from(porUsuario.entries())
       .map(([usuarioId, agg]) => ({ usuarioId, ...agg }))
       .sort((a, b) => {
         if (b.valorTotal !== a.valorTotal) return b.valorTotal - a.valorTotal
         if (b.qtdVendas !== a.qtdVendas) return b.qtdVendas - a.qtdVendas
         return b.qtdProdutos - a.qtdProdutos
       })
-      .slice(0, limit)
+
+    // Distintos com pelo menos uma venda finalizada na amostra (qtdVendas ≥ 1 por usuário).
+    const totalUsuariosComVendas = ordenadosFull.length
+
+    const ordenados = ordenadosFull.slice(0, limit)
 
     const itemsComNome = await fetchWithConcurrency(ordenados, 8, async row => {
       let nome = ''
@@ -241,9 +249,10 @@ export async function GET(request: NextRequest) {
     globalThis.__jiffyTopGarconsCache.set(cacheKey, {
       expiresAt: Date.now() + ttlMs,
       items: itemsComNome,
+      totalUsuariosComVendas,
     })
 
-    return NextResponse.json({ items: itemsComNome })
+    return NextResponse.json({ items: itemsComNome, totalUsuariosComVendas })
   } catch (error) {
     console.error('Erro ao buscar top garçons:', error)
     if (error instanceof ApiError) {

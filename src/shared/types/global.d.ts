@@ -22,6 +22,7 @@ declare global {
         string,
         {
           expiresAt: number
+          totalUsuariosComVendas: number
           items: Array<{
             usuarioId: string
             nome: string
