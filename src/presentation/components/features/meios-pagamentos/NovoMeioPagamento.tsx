@@ -6,6 +6,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { MeioPagamento } from '@/src/domain/entities/MeioPagamento'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 
 interface NovoMeioPagamentoProps {
   meioPagamentoId?: string
@@ -168,7 +169,7 @@ export function NovoMeioPagamento({
   if (isLoadingMeioPagamento) {
     return (
       <div className="flex items-center justify-center h-full">
-        <img src="/images/jiffy-loading.gif" alt="Carregando..." className="w-20 h-20" />
+        <JiffyLoading />
       </div>
     )
   }

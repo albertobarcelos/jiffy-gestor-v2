@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { UsuarioGestor } from '@/src/domain/entities/UsuarioGestor'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { MdSearch } from 'react-icons/md'
 import { Select, MenuItem, FormControl } from '@mui/material'
@@ -567,12 +568,7 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
         {/* Mostrar loading quando está carregando ou ainda não houve tentativa de carregamento */}
         {(isLoading || !hasLoadedInitialRef.current) && usuarios.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 gap-2">
-            <img
-              src="/images/jiffy-loading.gif"
-              alt="Carregando..."
-              className="w-20 h-20"
-            />
-            <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
+            <JiffyLoading />
           </div>
         )}
 

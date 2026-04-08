@@ -23,6 +23,7 @@ import { useGruposProdutosInfinite } from '@/src/presentation/hooks/useGruposPro
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useQueryClient } from '@tanstack/react-query'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdSearch } from 'react-icons/md'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
@@ -531,12 +532,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
         {showInitialLoading && (
           <div className="flex items-center justify-center py-8">
             <div className="flex flex-col items-center gap-2">
-              <img
-                src="/images/jiffy-loading.gif"
-                alt="Carregando"
-                className="w-20 h-20 object-contain"
-              />
-              <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
+              <JiffyLoading />
             </div>
           </div>
         )}

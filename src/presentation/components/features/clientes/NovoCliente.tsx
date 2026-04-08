@@ -15,7 +15,8 @@ import {
 } from '@/src/presentation/components/ui/select'
 import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
 import { showToast } from '@/src/shared/utils/toast'
-import { MdSearch, MdClear, MdPerson, MdLocationOn } from 'react-icons/md'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { MdSearch, MdClear, MdPerson, MdLocationOn, MdReceiptLong } from 'react-icons/md'
 
 interface NovoClienteProps {
   clienteId?: string
@@ -55,6 +56,16 @@ const ESTADOS_BRASILEIROS = [
   { sigla: 'TO', nome: 'Tocantins' },
 ]
 
+/** Indicador da inscrição estadual (padrão SPED / documentação fiscal) */
+const INDICADOR_IE_OPCOES = [
+  { value: '1', label: 'Contribuinte ICMS' },
+  { value: '2', label: 'Contribuinte isento de IE' },
+  { value: '9', label: 'Não contribuinte' },
+] as const
+
+/** Valor interno do Select quando o indicador não foi escolhido (não enviado à API) */
+const INDICADOR_IE_NAO_INFORMADO = '__none__'
+
 /**
  * Componente para criar/editar cliente
  * Replica o design e funcionalidades do Flutter
@@ -77,6 +88,8 @@ export function NovoCliente({
   const [telefone, setTelefone] = useState('')
   const [email, setEmail] = useState('')
   const [nomeFantasia, setNomeFantasia] = useState('')
+  const [indicadorInscricaoEstadual, setIndicadorInscricaoEstadual] = useState('')
+  const [inscricaoEstadual, setInscricaoEstadual] = useState('')
   const [ativo, setAtivo] = useState(true)
   const [incluirEndereco, setIncluirEndereco] = useState(false)
 
@@ -159,6 +172,11 @@ export function NovoCliente({
           
           setEmail(cliente.getEmail() || '')
           setNomeFantasia(cliente.getNomeFantasia() || '')
+          const indIe = cliente.getIndicadorInscricaoEstadual()
+          setIndicadorInscricaoEstadual(
+            indIe != null && String(indIe).trim() !== '' ? String(indIe) : ''
+          )
+          setInscricaoEstadual(cliente.getInscricaoEstadual() ?? '')
           setAtivo(cliente.isAtivo())
           
           // Formata CEP e endereço ao carregar
@@ -471,20 +489,12 @@ export function NovoCliente({
     e.preventDefault()
     const token = auth?.getAccessToken()
     if (!token) {
-      alert('Token não encontrado')
+      showToast.error('Token não encontrado')
       return
     }
 
     const cpfLimpo = cpf.replace(/\D/g, '')
     const cnpjLimpo = cnpj.replace(/\D/g, '')
-
-    // Pessoa física ou jurídica: não permite CPF e CNPJ preenchidos ao mesmo tempo
-    if (cpfLimpo.length > 0 && cnpjLimpo.length > 0) {
-      showToast.error(
-        'Informe apenas CPF ou CNPJ, não os dois. Remova um dos documentos para salvar.'
-      )
-      return
-    }
 
     const telefoneLimpo = telefone.replace(/\D/g, '')
     // API externa exige DDD + número completo (10 fixo ou 11 celular no Brasil)
@@ -539,18 +549,16 @@ export function NovoCliente({
         ativo,
       }
 
-      // CPF e CNPJ: exclusivos (validação acima); envia só um — o outro vazio para limpar na edição
+      // Fiscal (raiz do payload — alinhado a POST/PATCH /pessoas/clientes)
+      if (indicadorInscricaoEstadual.trim()) {
+        body.indicadorInscricaoEstadual = indicadorInscricaoEstadual.trim()
+      }
+      body.inscricaoEstadual = inscricaoEstadual.trim()
+
+      // CPF e CNPJ: na edição envia o que estiver no formulário (ambos se preenchidos); string vazia limpa no backend
       if (isEditing) {
-        if (cpfLimpo) {
-          body.cpf = cpfLimpo
-          body.cnpj = ''
-        } else if (cnpjLimpo) {
-          body.cnpj = cnpjLimpo
-          body.cpf = ''
-        } else {
-          body.cpf = ''
-          body.cnpj = ''
-        }
+        body.cpf = cpfLimpo || ''
+        body.cnpj = cnpjLimpo || ''
 
         // Telefone: null limpa na API externa (string vazia aciona validação de 11 dígitos)
         body.telefone = telefoneLimpo ? telefoneLimpo : null
@@ -608,12 +616,34 @@ export function NovoCliente({
         body: JSON.stringify(body),
       })
 
+      const result: { error?: string; message?: string } = await response
+        .json()
+        .catch(() => ({}))
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Erro ao salvar cliente')
+        const msgErro =
+          (typeof result.error === 'string' && result.error.trim()) ||
+          (typeof result.message === 'string' && result.message.trim()) ||
+          'Erro ao salvar cliente'
+        throw new Error(msgErro)
       }
 
       showToast.success(isEditing ? 'Cliente atualizado com sucesso!' : 'Cliente criado com sucesso!')
+
+      // API pode retornar aviso informativo no corpo (ex.: prioridade CPF ao enviar CPF + CNPJ)
+      const mensagemApi =
+        typeof result.message === 'string' ? result.message.trim() : ''
+
+      // Debug: conferir se `message` veio na resposta (toasts podem sobrepor no tempo)
+      console.debug('[NovoCliente] salvar cliente — campo message da API', {
+        'result.message': result.message,
+        mensagemApiAposTrim: mensagemApi || '(vazia — sem toast info)',
+        chavesNoBody: Object.keys(result),
+      })
+
+      if (mensagemApi) {
+        showToast.info(mensagemApi)
+      }
       
       if (onSaved) {
         onSaved()
@@ -622,7 +652,17 @@ export function NovoCliente({
       }
     } catch (error) {
       console.error('Erro ao salvar cliente:', error)
-      alert(error instanceof Error ? error.message : 'Erro ao salvar cliente')
+      const mensagem =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'string'
+            ? error
+            : 'Erro ao salvar cliente'
+      // Remove prefixo do repositório para o toast mostrar só o texto da API quando existir
+      const textoToast = mensagem
+        .replace(/^Erro ao (atualizar|criar) cliente:\s*/i, '')
+        .trim()
+      showToast.error(textoToast || mensagem)
     } finally {
       setIsLoading(false)
     }
@@ -641,15 +681,16 @@ export function NovoCliente({
   if (isLoadingCliente) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-2">
-        <img
-          src="/images/jiffy-loading.gif"
-          alt="Carregando..."
-          className="w-20 h-20"
-        />
-        <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
+        <JiffyLoading />
       </div>
     )
   }
+
+  // Aviso de UX: CPF e CNPJ não devem ser preenchidos juntos (validação definitiva no backend)
+  const cpfSoDigitos = cpf.replace(/\D/g, '')
+  const cnpjSoDigitos = cnpj.replace(/\D/g, '')
+  const exibeAvisoCpfECnpjPreenchidos =
+    cpfSoDigitos.length > 0 && cnpjSoDigitos.length > 0
 
   return (
     <div className="flex flex-col h-full">
@@ -830,6 +871,16 @@ export function NovoCliente({
               </div>
             </div>
 
+            {exibeAvisoCpfECnpjPreenchidos && (
+              <p
+                role="alert"
+                className="text-sm font-nunito rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-950"
+              >
+                Informe apenas CPF ou CNPJ — não é possível preencher os dois ao mesmo tempo.
+                Remova um dos campos.
+              </p>
+            )}
+
             <div className="grid md:grid-cols-2 grid-cols-1 gap-3">
               <Input
                 label="Telefone"
@@ -891,8 +942,73 @@ export function NovoCliente({
             />
           </div>
 
+          {/* Fiscal (antes do endereço — mesmo nível do payload da API) */}
+          <div className="mt-2 rounded-lg bg-info md:px-5 px-1 py-2 space-y-4">
+            <h2 className="text-primary text-base font-semibold font-nunito mb-2 flex items-center gap-2">
+              <span className="text-xl text-primary">
+                <MdReceiptLong />
+              </span>
+              Fiscal
+            </h2>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:items-start">
+              <div className="flex min-h-0 flex-col">
+                <label
+                  htmlFor="cliente-indicador-ie"
+                  className="mb-2 text-sm font-medium leading-none text-primary-text"
+                >
+                  Indicador da inscrição estadual
+                </label>
+                <Select
+                  value={indicadorInscricaoEstadual || INDICADOR_IE_NAO_INFORMADO}
+                  onValueChange={(v) =>
+                    setIndicadorInscricaoEstadual(v === INDICADOR_IE_NAO_INFORMADO ? '' : v)
+                  }
+                >
+                  <SelectTrigger id="cliente-indicador-ie" className="h-[38px] bg-primary-bg">
+                    <SelectValue placeholder="Selecione um indicador" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={INDICADOR_IE_NAO_INFORMADO}>Não informado</SelectItem>
+                    {INDICADOR_IE_OPCOES.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex min-h-0 flex-col">
+                <label htmlFor="cliente-inscricao-estadual" className="mb-2 text-sm font-medium leading-none text-primary-text">
+                  Inscrição estadual
+                </label>
+                <Input
+                  id="cliente-inscricao-estadual"
+                  value={inscricaoEstadual}
+                  onChange={(e) => setInscricaoEstadual(e.target.value)}
+                  placeholder="Número da IE ou ISENTO"
+                  size="small"
+                  hiddenLabel
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      height: '38px',
+                      backgroundColor: 'var(--color-primary-bg)',
+                      borderRadius: '8px',
+                    },
+                    '& .MuiInputBase-input': {
+                      padding: '8px 14px',
+                      fontSize: '14px',
+                    },
+                    '& .MuiInputBase-root': {
+                      marginTop: 0,
+                    },
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Toggle Endereço */}
-          <div className="flex items-center justify-between px-5 bg-info">
+          <div className="flex items-center justify-between px-5 pt-4 bg-info">
             <div className="flex items-center gap-3">
               <span className="text-2xl text-primary"><MdLocationOn/></span>
               <span className="text-primary-text font-medium">

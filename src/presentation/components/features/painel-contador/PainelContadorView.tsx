@@ -1,17 +1,18 @@
 'use client'
 
 import React, { useEffect, useState, useCallback, useRef } from 'react'
-import { MdCheckCircle, MdBusiness, MdReceipt, MdAssessment, MdNumbers, MdTableChart, MdKeyboardArrowDown, MdKeyboardArrowUp } from 'react-icons/md'
+import { MdCheckCircle, MdBusiness, MdReceipt, MdAssessment, MdReceiptLong, MdKey, MdKeyboardArrowDown, MdKeyboardArrowUp } from 'react-icons/md'
 import { useTabsStore } from '@/src/presentation/stores/tabsStore'
 import { ConfiguracaoImpostosView } from '@/src/presentation/components/features/impostos/ConfiguracaoImpostosView'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { MapearProdutosView } from './MapearProdutosView'
 import { Etapa1DadosFiscaisEmpresa } from './Etapa1DadosFiscaisEmpresa'
 import { Etapa3EmissorFiscal } from './Etapa2EmissorFiscal'
-import { Etapa5NumeracoesFiscais } from './Etapa5NumeracoesFiscais'
-import { Etapa5TabelaIbpt } from './Etapa4TabelaIbpt'
+import { Etapa5NumeracoesFiscais } from './Etapa4InutilizarNotas'
+import { Etapa5TabelaIbpt } from './Etapa5TabelaIbpt'
 import { ConfiguracaoEmpresaCompleta } from './ConfiguracaoEmpresaCompleta'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 
 /**
  * Componente SectionBox para agrupar conteúdo com título separador
@@ -509,20 +510,20 @@ export function PainelContadorView() {
     {
       id: 'etapa-4-numeracoes-fiscais',
       step: 4,
-      title: 'Numerações Fiscais',
-      label: 'Numerações Fiscais',
-      path: '/painel-contador/etapa/numeracoes-fiscais',
+      title: 'Inutilizar Notas',
+      label: 'Inutilizar Notas',
+      path: '/painel-contador/etapa/inutilizar-notas',
       component: Etapa5NumeracoesFiscais,
-      icon: MdNumbers,
+      icon: MdReceiptLong,
     },
     {
-      id: 'etapa-5-tabela-ibpt',
+      id: 'etapa-5-chave-ibpt',
       step: 5,
-      title: 'Tabela IBPT',
-      label: 'Tabela IBPT',
-      path: '/painel-contador/etapa/tabela-ibpt',
+      title: 'Chave IBPT',
+      label: 'Chave IBPT',
+      path: '/painel-contador/etapa/chave-ibpt',
       component: Etapa5TabelaIbpt,
-      icon: MdTableChart,
+      icon: MdKey,
     },
   ]
 
@@ -620,7 +621,7 @@ export function PainelContadorView() {
   return (
     <div className="pb-2 flex w-full flex-col items-stretch bg-info lg:flex-row lg:h-full">
       {/* Painel Esquerdo - Roxo */}
-      <div className="flex min-h-[350px] flex-1 md:w-[70%] lg:w-[72%] w-full flex-col overflow-hidden rounded-tr-none rounded-br-none bg-secondary lg:h-full lg:rounded-tr-[48px] lg:rounded-br-[48px]">
+      <div className="flex min-h-[300px] flex-1 md:w-[70%] lg:w-[72%] w-full flex-col overflow-hidden rounded-tr-none rounded-br-none bg-secondary lg:h-full lg:rounded-tr-[48px] lg:rounded-br-[48px]">
         {/* Seção Superior com Título e Ilustração */}
         <div className="flex flex-col gap-3 sm:gap-4 lg:gap-6 border-b border-[#330468] bg-[rgba(131,56,236,0.4)] sm:rounded-tr-[24px] md:rounded-tr-[32px] lg:rounded-tr-[48px] p-3 sm:p-4">
           <div className="flex flex-row items-center justify-center gap-4 sm:gap-16">
@@ -629,7 +630,7 @@ export function PainelContadorView() {
               <img
                 src="/images/jiffy-contador.png"
                 alt="Jiffy Contador"
-                className="w-64 h-64 p-2 object-contain object-left-top"
+                className="md:w-64 md:h-64 w-28 h-28 p-2 object-contain object-left-top"
               />
             </div>
 
@@ -735,12 +736,21 @@ export function PainelContadorView() {
                       
                       {/* Seta para expandir/colapsar mensagem da etapa 1 - logo após o título */}
                       {temMensagemEtapa1 && (
-                        <button
-                          onClick={(e) => {
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={e => {
                             e.stopPropagation()
                             setIsEtapa1Expanded(!isEtapa1Expanded)
                           }}
-                          className="flex-shrink-0 ml-1 p-0.5 hover:bg-white/10 rounded transition-colors cursor-pointer"
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setIsEtapa1Expanded(!isEtapa1Expanded)
+                            }
+                          }}
+                          className="flex-shrink-0 ml-1 inline-flex p-0.5 hover:bg-white/10 rounded transition-colors cursor-pointer"
                           aria-label={isEtapa1Expanded ? 'Ocultar detalhes' : 'Mostrar detalhes'}
                         >
                           {isEtapa1Expanded ? (
@@ -748,17 +758,26 @@ export function PainelContadorView() {
                           ) : (
                             <MdKeyboardArrowDown className="text-white" size={16} />
                           )}
-                        </button>
+                        </span>
                       )}
                       
                       {/* Seta para expandir/colapsar mensagem da etapa 2 - logo após o título */}
                       {temMensagemEtapa2 && (
-                        <button
-                          onClick={(e) => {
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={e => {
                             e.stopPropagation()
                             setIsEtapa2Expanded(!isEtapa2Expanded)
                           }}
-                          className="flex-shrink-0 ml-1 p-0.5 hover:bg-white/10 rounded transition-colors cursor-pointer"
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setIsEtapa2Expanded(!isEtapa2Expanded)
+                            }
+                          }}
+                          className="flex-shrink-0 ml-1 inline-flex p-0.5 hover:bg-white/10 rounded transition-colors cursor-pointer"
                           aria-label={isEtapa2Expanded ? 'Ocultar detalhes' : 'Mostrar detalhes'}
                         >
                           {isEtapa2Expanded ? (
@@ -766,17 +785,26 @@ export function PainelContadorView() {
                           ) : (
                             <MdKeyboardArrowDown className="text-white" size={16} />
                           )}
-                        </button>
+                        </span>
                       )}
                       
                       {/* Seta para expandir/colapsar mensagem da etapa 3 - logo após o título */}
                       {temMensagemEtapa3 && (
-                        <button
-                          onClick={(e) => {
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={e => {
                             e.stopPropagation()
                             setIsEtapa3Expanded(!isEtapa3Expanded)
                           }}
-                          className="flex-shrink-0 ml-1 p-0.5 hover:bg-white/10 rounded transition-colors cursor-pointer"
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setIsEtapa3Expanded(!isEtapa3Expanded)
+                            }
+                          }}
+                          className="flex-shrink-0 ml-1 inline-flex p-0.5 hover:bg-white/10 rounded transition-colors cursor-pointer"
                           aria-label={isEtapa3Expanded ? 'Ocultar detalhes' : 'Mostrar detalhes'}
                         >
                           {isEtapa3Expanded ? (
@@ -784,17 +812,13 @@ export function PainelContadorView() {
                           ) : (
                             <MdKeyboardArrowDown className="text-white" size={16} />
                           )}
-                        </button>
+                        </span>
                       )}
                       
                       {/* Loading individual para cada etapa - após a seta (se existir) ou após o título */}
                       {estaVerificando && (
-                        <div className="flex-shrink-0 ml-1">
-                          <img 
-                            src="/images/jiffy-loading.gif" 
-                            alt="Carregando..." 
-                            className="w-6 h-6"
-                          />
+                        <div className="ml-1 flex flex-shrink-0 items-center [&>div]:!gap-0 [&>div]:!py-0">
+                          <JiffyLoading className="!gap-0 !py-0" size={24} />
                         </div>
                       )}
                     </button>
@@ -839,13 +863,13 @@ export function PainelContadorView() {
         <SectionBox title="Configuração Contábil">
           {etapas.slice(0, 3).map((etapa, index) => {
             const IconComponent = etapa.icon
-            // Intercalar cores: índice par = bg-secondary, ímpar = bg-alternate
-            const bgColor = index % 2 === 0 
-              ? 'bg-secondary' // Primeiro, terceiro botão
-              : 'bg-alternate' // Segundo botão
-            
+            // Índice par = roxo forte (secondary); ímpar = verde accent1 (mesmo da barra de progresso)
+            const usarAccentVerde = index % 2 === 1
+            const bgColor = usarAccentVerde ? 'bg-white' : 'bg-secondary'
+            const corConteudo = usarAccentVerde ? 'text-secondary' : 'text-white'
+
             const estaHabilitada = isEtapaHabilitada(etapa.id)
-            
+
             return (
               <button
                 key={etapa.id}
@@ -861,14 +885,13 @@ export function PainelContadorView() {
                 </span>
 
                 <div className="flex flex-col items-center justify-center gap-2">
-                <IconComponent 
-                  className="text-white" 
-                  size={52}
-                />
-                
-                <span className="font-exo font-medium text-white text-sm sm:text-base md:text-lg">
-                  {etapa.title}
-                </span>
+                  <IconComponent className={corConteudo} size={52} />
+
+                  <span
+                    className={`font-exo font-medium text-sm sm:text-base md:text-lg ${corConteudo}`}
+                  >
+                    {etapa.title}
+                  </span>
                 </div>
               </button>
             )
@@ -879,11 +902,10 @@ export function PainelContadorView() {
         <SectionBox title="Outras Configurações">
           {etapas.slice(3).map((etapa, index) => {
             const IconComponent = etapa.icon
-            // Intercalar cores: índice par = bg-secondary, ímpar = bg-alternate
-            const bgColor = index % 2 === 0 
-              ? 'bg-secondary' // Primeiro botão (etapa 4)
-              : 'bg-alternate' // Segundo botão (etapa 5)
-            
+            const usarAccentVerde = index % 2 === 1
+            const bgColor = usarAccentVerde ? 'bg-secondary' : 'bg-white'
+            const corConteudo = usarAccentVerde ? 'text-white' : 'text-secondary'
+
             return (
               <button
                 key={etapa.id}
@@ -895,14 +917,13 @@ export function PainelContadorView() {
                 </span>
 
                 <div className="flex flex-col items-center justify-center gap-2">
-                <IconComponent 
-                  className="text-white" 
-                  size={52}
-                />
-                
-                <span className="font-exo font-medium text-white text-sm sm:text-base md:text-lg">
-                  {etapa.title}
-                </span>
+                  <IconComponent className={corConteudo} size={52} />
+
+                  <span
+                    className={`font-exo font-medium text-sm sm:text-base md:text-lg ${corConteudo}`}
+                  >
+                    {etapa.title}
+                  </span>
                 </div>
               </button>
             )

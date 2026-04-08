@@ -104,6 +104,8 @@ export class ClienteRepository implements IClienteRepository {
         telefone: telDigits.length > 0 ? telDigits : null,
         email: data.email || '',
         nomeFantasia: data.nomeFantasia || '',
+        indicadorInscricaoEstadual: data.indicadorInscricaoEstadual ?? '',
+        inscricaoEstadual: data.inscricaoEstadual ?? '',
         ativo: data.ativo !== undefined ? data.ativo : true,
       }
 
@@ -183,6 +185,13 @@ export class ClienteRepository implements IClienteRepository {
       }
       if (data.email !== undefined) requestBody.email = data.email || ''
       if (data.nomeFantasia !== undefined) requestBody.nomeFantasia = data.nomeFantasia || ''
+      if (data.indicadorInscricaoEstadual !== undefined) {
+        requestBody.indicadorInscricaoEstadual = data.indicadorInscricaoEstadual
+      }
+      if (data.inscricaoEstadual !== undefined) {
+        requestBody.inscricaoEstadual =
+          data.inscricaoEstadual === null ? null : data.inscricaoEstadual ?? ''
+      }
       if (data.ativo !== undefined) requestBody.ativo = data.ativo
       
       console.log('📤 Repository - Processamento CPF/CNPJ:', {

@@ -6,6 +6,7 @@ import { MeioPagamento } from '@/src/domain/entities/MeioPagamento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { MdSearch, MdDelete } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import {
   MeiosPagamentosTabsModal,
   MeiosPagamentosTabsModalState,
@@ -655,12 +656,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
 
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-12">
-            <img
-              src="/images/jiffy-loading.gif"
-              alt="Carregando"
-              className="w-20 h-20 object-contain"
-            />
-            <span className="text-sm font-medium text-primary-text font-nunito mt-2">Carregando...</span>
+            <JiffyLoading />
           </div>
         )}
       </div>

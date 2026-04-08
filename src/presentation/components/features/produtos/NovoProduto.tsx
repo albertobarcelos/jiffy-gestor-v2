@@ -14,6 +14,7 @@ interface NovoProdutoProps {
   produtoId?: string
   isCopyMode?: boolean
   defaultGrupoProdutoId?: string
+  initialStep?: 0 | 1 | 2
   onClose?: () => void
   onSuccess?: (produtoData?: { produtoId: string; produtoData: any }) => void
 }
@@ -25,6 +26,7 @@ function NovoProdutoContent({
   produtoId,
   isCopyMode = false,
   defaultGrupoProdutoId,
+  initialStep = 0,
   onClose,
   onSuccess,
 }: NovoProdutoProps) {
@@ -33,7 +35,7 @@ function NovoProdutoContent({
   const { auth } = useAuthStore()
 
   // Estado do step atual (0 = Informações, 1 = Configurações, 2 = Configuração Fiscal)
-  const [selectedPage, setSelectedPage] = useState(0)
+  const [selectedPage, setSelectedPage] = useState<0 | 1 | 2>(initialStep)
 
   // Estados do formulário
   const [nomeProduto, setNomeProduto] = useState('')
@@ -710,13 +712,13 @@ function NovoProdutoContent({
 
   const handleNext = () => {
     if (selectedPage < 2) {
-      setSelectedPage(selectedPage + 1)
+      setSelectedPage((selectedPage + 1) as 0 | 1 | 2)
     }
   }
 
   const handleBack = () => {
     if (selectedPage > 0) {
-      setSelectedPage(selectedPage - 1)
+      setSelectedPage((selectedPage - 1) as 0 | 1 | 2)
     }
   }
 
@@ -1127,6 +1129,7 @@ export function NovoProduto({
   produtoId,
   isCopyMode = false,
   defaultGrupoProdutoId,
+  initialStep = 0,
   onClose,
   onSuccess,
 }: NovoProdutoProps) {
@@ -1136,6 +1139,7 @@ export function NovoProduto({
         produtoId={produtoId}
         isCopyMode={isCopyMode}
         defaultGrupoProdutoId={defaultGrupoProdutoId}
+        initialStep={initialStep}
         onClose={onClose}
         onSuccess={onSuccess}
       />

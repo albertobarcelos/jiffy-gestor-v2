@@ -1,17 +1,11 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/src/presentation/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader } from '@/src/presentation/components/ui/dialog'
 import { Button } from '@/src/presentation/components/ui/button'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
-import { extractTokenInfo } from '@/src/shared/utils/validateToken'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 
 interface ConfiguracaoImpostoNcmHistorico {
   id: string
@@ -70,7 +64,9 @@ export function HistoricoConfiguracaoNcmModal({
   const { auth } = useAuthStore()
   const [isLoading, setIsLoading] = useState(false)
   const [historico, setHistorico] = useState<ConfiguracaoImpostoNcmHistorico[]>([])
-  
+  /** Mobile: detalhes do card expandidos por id do registro */
+  const [mobileExpandidoPorId, setMobileExpandidoPorId] = useState<Record<string, boolean>>({})
+
   // Ref para armazenar o AbortController e cancelar requisições pendentes
   const abortControllerRef = useRef<AbortController | null>(null)
 
@@ -142,6 +138,7 @@ export function HistoricoConfiguracaoNcmModal({
       // Limpar estado quando o modal fechar
       setHistorico([])
       setIsLoading(false)
+      setMobileExpandidoPorId({})
     }
 
     // Cleanup: cancelar requisições pendentes quando o componente desmontar ou o modal fechar
@@ -185,17 +182,42 @@ export function HistoricoConfiguracaoNcmModal({
     return `${aliquota.toFixed(2)}%`
   }
 
+  const toggleMobileDetalhes = (id: string) => {
+    setMobileExpandidoPorId(prev => ({ ...prev, [id]: !prev[id] }))
+  }
+
   return (
     <Dialog 
       open={open} 
       onOpenChange={(open) => !open && onClose()}
       maxWidth="md"
       fullWidth
+      sx={{
+        '& .MuiDialog-paper': {
+          backgroundColor: '#ffffff',
+          width: { xs: '95vw', sm: 'auto' },
+          maxWidth: { xs: '95vw !important', sm: undefined },
+          height: { xs: '95vh', sm: 'auto' },
+          maxHeight: { xs: '95vh', sm: undefined },
+          margin: { xs: 'auto', sm: undefined },
+          display: { xs: 'flex', sm: 'block' },
+          flexDirection: { xs: 'column', sm: 'initial' },
+        },
+      }}
     >
-      <DialogContent sx={{ maxHeight: '90vh', overflowY: 'auto' }}>
+      <DialogContent
+        sx={{
+          flex: { xs: 1, sm: 'none' },
+          minHeight: { xs: 0, sm: 'auto' },
+          maxHeight: { xs: '100%', sm: '90vh' },
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         <DialogHeader>
           <div className="flex items-center justify-between">
-          <h1 className="text-alternate font-exo font-bold text-lg sm:text-xl">Histórico de Alterações - NCM {codigoNcm}</h1>
+          <h1 className="text-alternate font-exo font-bold text-sm sm:text-xl">Histórico de Alterações - NCM {codigoNcm}</h1>
           <Button 
             onClick={onClose} 
             variant="outlined"
@@ -215,7 +237,7 @@ export function HistoricoConfiguracaoNcmModal({
 
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <div className="text-secondary-text">Carregando histórico...</div>
+            <JiffyLoading />
           </div>
         ) : historico.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8">
@@ -226,69 +248,136 @@ export function HistoricoConfiguracaoNcmModal({
           </div>
         ) : (
           <div className="space-y-4">
-            {historico.map((item) => (
+            {historico.map((item) => {
+              const mobileExpandido = Boolean(mobileExpandidoPorId[item.id])
+
+              return (
               <div
                 key={item.id}
                 className="border border-gray-200 rounded-lg p-4 bg-white"
               >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2 py-1 text-xs font-semibold rounded ${getAcaoColor(item.acao)}`}>
+                {/* Mobile: só status + data + Exibir/Ocultar */}
+                <div className="flex items-start justify-between gap-2 md:mb-3">
+                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className={`shrink-0 px-2 py-1 text-xs font-semibold rounded ${getAcaoColor(item.acao)}`}>
                       {item.acao}
                     </span>
                     <span className="text-sm text-secondary-text">
                       {formatarData(item.dataAlteracao)}
                     </span>
                   </div>
-                  {item.usuarioId && (
-                    <span className="text-xs text-secondary-text/70">
-                      Usuário: {item.usuarioId}
-                    </span>
-                  )}
+                  <div className="flex shrink-0 items-center gap-2">
+                    {item.usuarioId && (
+                      <span className="hidden text-xs text-secondary-text/70 md:inline">
+                        Usuário: {item.usuarioId}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => toggleMobileDetalhes(item.id)}
+                      className="rounded border border-alternate/40 px-2.5 py-1 text-xs font-medium text-alternate hover:bg-alternate/10 md:hidden"
+                    >
+                      {mobileExpandido ? 'Ocultar' : 'Exibir'}
+                    </button>
+                  </div>
                 </div>
 
-                {item.observacoes && (
-                  <div className="mb-3 p-2 bg-gray-50 rounded text-sm text-secondary-text">
-                    {item.observacoes}
+                {/* Mobile: observações e impostos só expandidos; uma coluna */}
+                <div
+                  className={`md:hidden ${mobileExpandido ? 'mt-3 space-y-3 border-t border-gray-100 pt-3' : 'hidden'}`}
+                >
+                  {item.usuarioId && (
+                    <p className="text-xs text-secondary-text/70">
+                      <span className="font-semibold text-secondary-text">Usuário:</span>{' '}
+                      {item.usuarioId}
+                    </p>
+                  )}
+                  {item.observacoes && (
+                    <div className="rounded bg-gray-50 p-2 text-sm text-secondary-text">
+                      {item.observacoes}
+                    </div>
+                  )}
+                  <div className="space-y-2 text-sm">
+                    <div className="break-words">
+                      <span className="font-semibold text-secondary-text">CFOP:</span>{' '}
+                      <span className="text-secondary-text/70">{item.cfop || '--'}</span>
+                    </div>
+                    <div className="break-words">
+                      <span className="font-semibold text-secondary-text">CSOSN:</span>{' '}
+                      <span className="text-secondary-text/70">{item.csosn || '--'}</span>
+                    </div>
+                    {item.icms && (
+                      <>
+                        <div className="break-words">
+                          <span className="font-semibold text-secondary-text">ICMS CST:</span>{' '}
+                          <span className="text-secondary-text/70">{item.icms.cst || '--'}</span>
+                        </div>
+                        <div className="break-words">
+                          <span className="font-semibold text-secondary-text">ICMS Alíquota:</span>{' '}
+                          <span className="text-secondary-text/70">{formatarAliquota(item.icms.aliquota)}</span>
+                        </div>
+                      </>
+                    )}
+                    {item.pis && (
+                      <div className="break-words">
+                        <span className="font-semibold text-secondary-text">PIS CST:</span>{' '}
+                        <span className="text-secondary-text/70">{item.pis.cst || '--'}</span>
+                      </div>
+                    )}
+                    {item.cofins && (
+                      <div className="break-words">
+                        <span className="font-semibold text-secondary-text">COFINS CST:</span>{' '}
+                        <span className="text-secondary-text/70">{item.cofins.cst || '--'}</span>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <span className="font-semibold text-secondary-text">CFOP:</span>{' '}
-                    <span className="text-secondary-text/70">{item.cfop || '--'}</span>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-secondary-text">CSOSN:</span>{' '}
-                    <span className="text-secondary-text/70">{item.csosn || '--'}</span>
-                  </div>
-                  {item.icms && (
-                    <>
-                      <div>
-                        <span className="font-semibold text-secondary-text">ICMS CST:</span>{' '}
-                        <span className="text-secondary-text/70">{item.icms.cst || '--'}</span>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-secondary-text">ICMS Alíquota:</span>{' '}
-                        <span className="text-secondary-text/70">{formatarAliquota(item.icms.aliquota)}</span>
-                      </div>
-                    </>
-                  )}
-                  {item.pis && (
-                    <div>
-                      <span className="font-semibold text-secondary-text">PIS CST:</span>{' '}
-                      <span className="text-secondary-text/70">{item.pis.cst || '--'}</span>
+                {/* Desktop: layout original em grade */}
+                <div className="hidden md:block">
+                  {item.observacoes && (
+                    <div className="mb-3 rounded bg-gray-50 p-2 text-sm text-secondary-text">
+                      {item.observacoes}
                     </div>
                   )}
-                  {item.cofins && (
+                  <div className="grid grid-cols-2 gap-4 text-sm lg:grid-cols-4">
                     <div>
-                      <span className="font-semibold text-secondary-text">COFINS CST:</span>{' '}
-                      <span className="text-secondary-text/70">{item.cofins.cst || '--'}</span>
+                      <span className="font-semibold text-secondary-text">CFOP:</span>{' '}
+                      <span className="text-secondary-text/70">{item.cfop || '--'}</span>
                     </div>
-                  )}
+                    <div>
+                      <span className="font-semibold text-secondary-text">CSOSN:</span>{' '}
+                      <span className="text-secondary-text/70">{item.csosn || '--'}</span>
+                    </div>
+                    {item.icms && (
+                      <>
+                        <div>
+                          <span className="font-semibold text-secondary-text">ICMS CST:</span>{' '}
+                          <span className="text-secondary-text/70">{item.icms.cst || '--'}</span>
+                        </div>
+                        <div>
+                          <span className="font-semibold text-secondary-text">ICMS Alíquota:</span>{' '}
+                          <span className="text-secondary-text/70">{formatarAliquota(item.icms.aliquota)}</span>
+                        </div>
+                      </>
+                    )}
+                    {item.pis && (
+                      <div>
+                        <span className="font-semibold text-secondary-text">PIS CST:</span>{' '}
+                        <span className="text-secondary-text/70">{item.pis.cst || '--'}</span>
+                      </div>
+                    )}
+                    {item.cofins && (
+                      <div>
+                        <span className="font-semibold text-secondary-text">COFINS CST:</span>{' '}
+                        <span className="text-secondary-text/70">{item.cofins.cst || '--'}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </DialogContent>

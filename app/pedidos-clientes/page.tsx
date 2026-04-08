@@ -1,16 +1,24 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { Suspense } from 'react'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 
-// Novo componente Kanban baseado no modelo moderno
+/**
+ * Kanban carregado sob demanda (bundle separado).
+ * O `loading` do dynamic cobre o download do chunk; não usar Suspense extra aqui —
+ * o FiscalFlowKanban não suspende com `use()`, e Suspense+dynamic gerava dois spinners
+ * seguidos antes do loading interno (dados) do próprio Kanban.
+ */
 const PedidosClientesKanban = dynamic(
-  () => import('@/src/presentation/components/features/nfe/FiscalFlowKanban').then((mod) => ({ default: mod.FiscalFlowKanban })),
+  () =>
+    import('@/src/presentation/components/features/nfe/FiscalFlowKanban').then(mod => ({
+      default: mod.FiscalFlowKanban,
+    })),
   {
     ssr: false,
     loading: () => (
-      <div className="h-full flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex h-full items-center justify-center bg-gray-50">
+        <JiffyLoading />
       </div>
     ),
   }
@@ -19,16 +27,7 @@ const PedidosClientesKanban = dynamic(
 export default function PedidosClientesPage() {
   return (
     <div className="h-full">
-      <Suspense
-        fallback={
-          <div className="h-full flex items-center justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          </div>
-        }
-      >
-        <PedidosClientesKanban />
-      </Suspense>
+      <PedidosClientesKanban />
     </div>
   )
 }
-

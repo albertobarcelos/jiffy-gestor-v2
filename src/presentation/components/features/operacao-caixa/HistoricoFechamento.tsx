@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { MdSearch, MdCalendarToday, MdFilterAltOff, MdFilterList, MdClose } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import {
   FormControl,
   Select,
@@ -831,12 +832,7 @@ export function HistoricoFechamento() {
         >
           {isLoading && operacoesCaixa.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
-              <img
-                src="/images/jiffy-loading.gif"
-                alt="Carregando"
-                className="w-20 object-contain"
-              />
-              <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
+              <JiffyLoading />
             </div>
           ) : operacoesCaixa.length === 0 ? (
             <div className="flex justify-center items-center py-12">

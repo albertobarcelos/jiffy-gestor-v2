@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { validateRequest } from '@/src/shared/utils/validateRequest'
+import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 
 interface PeriodoDates {
   periodoInicial: string
@@ -63,23 +65,17 @@ function getPeriodoDates(periodo: string): PeriodoDates {
 }
 
 export async function GET(request: NextRequest) {
-  const tokenHeader = request.headers.get('authorization')
-  const token = tokenHeader?.replace(/^Bearer\s+/i, '')
-  const baseUrl = process.env.NEXT_PUBLIC_EXTERNAL_API_BASE_URL
-
-  if (!token) {
-    return NextResponse.json({ error: 'Token não fornecido.' }, { status: 401 })
-  }
-
-  if (!baseUrl) {
-    return NextResponse.json({ error: 'URL da API não configurada.' }, { status: 500 })
-  }
-
   const { searchParams } = new URL(request.url)
   const periodo = searchParams.get('periodo') || 'hoje'
   const limit = Number(searchParams.get('limit') || '10')
   const periodoInicialCustom = searchParams.get('periodoInicial')
   const periodoFinalCustom = searchParams.get('periodoFinal')
+
+  const validation = validateRequest(request)
+  if (!validation.valid || !validation.tokenInfo) {
+    return validation.error!
+  }
+  const { tokenInfo } = validation
 
   const params = new URLSearchParams()
 
@@ -99,97 +95,135 @@ export async function GET(request: NextRequest) {
   params.append('status', 'FINALIZADA')
   params.append('limit', '100')
 
-  const headers = {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${token}`,
-  }
-
   try {
-    const vendasResponse = await fetch(`${baseUrl}/api/v1/operacao-pdv/vendas?${params.toString()}`, {
-      headers,
-    })
-
-    if (!vendasResponse.ok) {
-      const errorText = await vendasResponse.text().catch(() => '')
-      return NextResponse.json(
-        { error: `Erro ao buscar vendas por período. ${errorText || ''}` },
-        { status: vendasResponse.status }
-      )
+    const apiClient = new ApiClient()
+    const headers = {
+      Authorization: `Bearer ${tokenInfo.token}`,
+      'Content-Type': 'application/json',
     }
 
-    const vendasData = await vendasResponse.json()
-    const vendaIds: string[] = (vendasData.items || []).map((venda: { id: string }) => venda.id)
+    const cacheKey = JSON.stringify({
+      empresaId: tokenInfo.empresaId,
+      periodo,
+      limit,
+      periodoInicial: periodoInicialCustom || '',
+      periodoFinal: periodoFinalCustom || '',
+    })
+    const cached = globalThis.__jiffyTopProdutosCache?.get(cacheKey)
+    if (cached && cached.expiresAt > Date.now()) {
+      return NextResponse.json({ items: cached.items })
+    }
+
+    const vendasResponse = await apiClient.request<{ items?: Array<{ id: string }> }>(
+      `/api/v1/operacao-pdv/vendas?${params.toString()}`,
+      { method: 'GET', headers }
+    )
+
+    const vendaIds: string[] = (vendasResponse.data?.items || []).map((venda) => venda.id)
 
     if (vendaIds.length === 0) {
       return NextResponse.json({ items: [] })
     }
 
-    const productNamesCache = new Map<string, string>()
-    const getProductName = async (id: string): Promise<string> => {
-      if (productNamesCache.has(id)) {
-        return productNamesCache.get(id) as string
-      }
+    const fetchWithConcurrency = async <T, R>(
+      items: T[],
+      concurrency: number,
+      handler: (item: T) => Promise<R>
+    ): Promise<R[]> => {
+      const results: R[] = new Array(items.length)
+      let idx = 0
 
-      const response = await fetch(`${baseUrl}/api/v1/cardapio/produtos/${id}`, { headers })
-      if (!response.ok) {
-        console.warn(`Não foi possível buscar o nome para o produto ID: ${id}. Status: ${response.status}`)
-        return 'Produto Desconhecido'
-      }
+      const workers = Array.from({ length: Math.max(1, concurrency) }, async () => {
+        while (idx < items.length) {
+          const current = idx++
+          results[current] = await handler(items[current])
+        }
+      })
 
-      const data = await response.json()
-      const nome = data?.nome ?? 'Produto Desconhecido'
-      productNamesCache.set(id, nome)
-      return nome
+      await Promise.all(workers)
+      return results
     }
 
-    const detailedVendasPromises = vendaIds.map(async (vendaId) => {
-      const detalhesResponse = await fetch(`${baseUrl}/api/v1/operacao-pdv/vendas/${vendaId}`, { headers })
-      if (!detalhesResponse.ok) {
-        console.warn(`Não foi possível buscar detalhes para a venda ID: ${vendaId}. Status: ${detalhesResponse.status}`)
-        return null
+    const detalhes = await fetchWithConcurrency(
+      vendaIds,
+      10,
+      async (vendaId) => {
+        try {
+          const resp = await apiClient.request<{ produtosLancados?: Array<{ produtoId: string; quantidade: number; valorFinal: number }> }>(
+            `/api/v1/operacao-pdv/vendas/${vendaId}`,
+            { method: 'GET', headers }
+          )
+          return resp.data
+        } catch {
+          return null
+        }
       }
-      return detalhesResponse.json()
-    })
+    )
 
-    const detailedVendas = (await Promise.all(detailedVendasPromises)).filter(Boolean) as Array<{
-      produtosLancados: { produtoId: string; quantidade: number; valorFinal: number }[]
-    }>
-
-    const productAggregation = new Map<string, { produto: string; quantidade: number; valorTotal: number }>()
-
-    for (const venda of detailedVendas) {
-      for (const produtoLancado of venda.produtosLancados) {
-        const produtoId = produtoLancado.produtoId
-        const quantidade = produtoLancado.quantidade
-        const valorUnitarioTotalDoItem = produtoLancado.valorFinal
-
-        const produtoNome = await getProductName(produtoId)
-
-        if (productAggregation.has(produtoNome)) {
-          const existing = productAggregation.get(produtoNome)!
+    const aggregationByProdutoId = new Map<string, { quantidade: number; valorTotal: number }>()
+    for (const venda of detalhes) {
+      if (!venda?.produtosLancados) continue
+      for (const p of venda.produtosLancados) {
+        if (!p?.produtoId) continue
+        const existing = aggregationByProdutoId.get(p.produtoId)
+        const quantidade = typeof p.quantidade === 'number' ? p.quantidade : 0
+        const valorTotal = typeof p.valorFinal === 'number' ? p.valorFinal : 0
+        if (existing) {
           existing.quantidade += quantidade
-          existing.valorTotal += valorUnitarioTotalDoItem
-          productAggregation.set(produtoNome, existing)
+          existing.valorTotal += valorTotal
         } else {
-          productAggregation.set(produtoNome, {
-            produto: produtoNome,
-            quantidade,
-            valorTotal: valorUnitarioTotalDoItem,
-          })
+          aggregationByProdutoId.set(p.produtoId, { quantidade, valorTotal })
         }
       }
     }
 
-    const items = Array.from(productAggregation.values())
+    const produtoIds = Array.from(aggregationByProdutoId.keys())
+    const nomesCache: Map<string, string> =
+      globalThis.__jiffyProdutoNomeCache ?? (globalThis.__jiffyProdutoNomeCache = new Map())
+
+    const nomes = await fetchWithConcurrency(produtoIds, 10, async (produtoId) => {
+      const cachedName = nomesCache.get(produtoId)
+      if (cachedName) return cachedName
+      try {
+        const resp = await apiClient.request<{ nome?: string }>(`/api/v1/cardapio/produtos/${produtoId}`, {
+          method: 'GET',
+          headers,
+        })
+        const nome = resp.data?.nome ?? 'Produto Desconhecido'
+        nomesCache.set(produtoId, nome)
+        return nome
+      } catch {
+        const nome = 'Produto Desconhecido'
+        nomesCache.set(produtoId, nome)
+        return nome
+      }
+    })
+
+    const produtoIdToNome = new Map<string, string>()
+    produtoIds.forEach((id, i) => produtoIdToNome.set(id, nomes[i]))
+
+    const items = Array.from(aggregationByProdutoId.entries())
+      .map(([produtoId, agg]) => ({
+        produto: produtoIdToNome.get(produtoId) ?? 'Produto Desconhecido',
+        quantidade: agg.quantidade,
+        valorTotal: agg.valorTotal,
+      }))
       .sort((a, b) => b.quantidade - a.quantidade)
       .slice(0, limit)
+
+    const ttlMs = 30_000
+    globalThis.__jiffyTopProdutosCache ??= new Map()
+    globalThis.__jiffyTopProdutosCache.set(cacheKey, { expiresAt: Date.now() + ttlMs, items })
 
     return NextResponse.json({ items })
   } catch (error) {
     console.error('Erro ao buscar top produtos:', error)
-    return NextResponse.json(
-      { error: 'Erro interno ao buscar top produtos.' },
-      { status: 500 }
-    )
+    if (error instanceof ApiError) {
+      return NextResponse.json(
+        { error: error.message || 'Erro ao buscar top produtos.' },
+        { status: error.status }
+      )
+    }
+    return NextResponse.json({ error: 'Erro interno ao buscar top produtos.' }, { status: 500 })
   }
 }

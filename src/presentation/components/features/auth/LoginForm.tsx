@@ -59,27 +59,11 @@ export function LoginForm() {
       // Reconstrói Auth a partir da resposta
       const authData = data.data
       
-      // Debug: Verificar dados recebidos da API
-      console.log('🔍 [LoginForm] Dados recebidos da API:', {
-        authData: authData,
-        userData: authData?.user,
-        userId: authData?.user?.id,
-        userEmail: authData?.user?.email,
-        userName: authData?.user?.name
-      })
-
       const user = User.create(
         authData.user.id,
         authData.user.email,
         authData.user.name
       )
-
-      console.log('🔍 [LoginForm] User criado:', {
-        userId: user.getId(),
-        userEmail: user.getEmail(),
-        userName: user.getName(),
-        userJSON: user.toJSON()
-      })
 
       const expiresAt = new Date(authData.expiresAt)
       const hoursUntilExpiry = Math.ceil(
@@ -87,15 +71,8 @@ export function LoginForm() {
       )
       const auth = Auth.create(authData.accessToken, user, hoursUntilExpiry)
 
-      console.log('🔍 [LoginForm] Auth criado antes de salvar no store:', {
-        hasToken: !!auth.getAccessToken(),
-        userFromAuth: auth.getUser().toJSON()
-      })
-
       // Atualiza o store
       login(auth)
-
-      console.log('🔍 [LoginForm] Auth salvo no store')
 
       // Redireciona para dashboard
       window.location.href = '/dashboard'

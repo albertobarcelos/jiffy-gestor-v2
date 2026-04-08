@@ -286,7 +286,7 @@ export function Etapa1DadosFiscaisEmpresa() {
         {/* Passo 1: Configurar Dados Fiscais */}
         <div className="flex flex-col gap-4 rounded-lg border-2 border-alternate/30 bg-white p-5 sm:p-6 shadow-sm">
           <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-alternate text-white font-bold text-lg">
+            <div className="md:flex-shrink-0 md:flex hidden items-center justify-center w-10 h-10 rounded-full bg-alternate text-white font-bold text-lg">
               1
             </div>
             <div className="flex-1 flex flex-col gap-2">
@@ -349,7 +349,7 @@ export function Etapa1DadosFiscaisEmpresa() {
                   </div>
                 ) : null}
               </div>
-              <div className="flex justify-end">
+              <div className="flex md:justify-end justify-center">
                 <Button
                   onClick={() => {
                     addTab({
@@ -375,7 +375,7 @@ export function Etapa1DadosFiscaisEmpresa() {
         {/* Passo 2: Gerenciar Certificado Digital */}
         <div className="flex flex-col gap-4 rounded-lg border-2 border-alternate/30 bg-white p-5 sm:p-6 shadow-sm">
           <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-alternate text-white font-bold text-lg">
+            <div className="md:flex-shrink-0 md:flex hidden items-center justify-center w-10 h-10 rounded-full bg-alternate text-white font-bold text-lg">
               2
             </div>
             <div className="flex-1 flex flex-col gap-3">

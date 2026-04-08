@@ -7,7 +7,7 @@ import { DocumentoFiscalPdfRetryModal } from '@/src/presentation/components/feat
 import './globals.css'
 
 // Exo 2 - Fonte para textos normais (corpo do texto)
-const exo2 = Exo_2({ 
+const exo2 = Exo_2({
   subsets: ['latin'],
   weight: ['300', '400', '500', '600', '700'],
   variable: '--font-exo2',
@@ -15,7 +15,7 @@ const exo2 = Exo_2({
 })
 
 // Manrope - Fonte para títulos
-const manrope = Manrope({ 
+const manrope = Manrope({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700', '800'],
   variable: '--font-manrope',
@@ -35,11 +35,7 @@ export const metadata: Metadata = {
   description: 'Sistema de gestão empresarial Jiffy',
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR">
       <body className={`${exo2.variable} ${manrope.variable} ${poppins.variable} ${exo2.className}`}>
@@ -48,33 +44,32 @@ export default function RootLayout({
             {children}
             <DocumentoFiscalPdfRetryModal />
             <Toaster
-            position="top-right"
-            toastOptions={{
-              duration: 4000,
-              style: {
-                background: '#fff',
-                color: '#333',
-                borderRadius: '8px',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-              },
-              success: {
-                iconTheme: {
-                  primary: '#10b981',
-                  secondary: '#fff',
+              position="top-right"
+              toastOptions={{
+                duration: 4000,
+                style: {
+                  background: '#fff',
+                  color: '#333',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                 },
-              },
-              error: {
-                iconTheme: {
-                  primary: '#ef4444',
-                  secondary: '#fff',
+                success: {
+                  iconTheme: {
+                    primary: '#10b981',
+                    secondary: '#fff',
+                  },
                 },
-              },
-            }}
-          />
+                error: {
+                  iconTheme: {
+                    primary: '#ef4444',
+                    secondary: '#fff',
+                  },
+                },
+              }}
+            />
           </ThemeProvider>
         </QueryProvider>
       </body>
     </html>
   )
 }
-

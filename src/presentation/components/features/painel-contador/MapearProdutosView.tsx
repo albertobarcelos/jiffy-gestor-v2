@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { ConfigurarNcmModal } from './ConfigurarNcmModal'
 import { HistoricoConfiguracaoNcmModal } from './HistoricoConfiguracaoNcmModal'
 import { CopiarConfiguracaoNcmModal } from './CopiarConfiguracaoNcmModal'
@@ -73,6 +74,10 @@ export function MapearProdutosView() {
   const [showCopiarModal, setShowCopiarModal] = useState(false)
   const [ncmSelecionado, setNcmSelecionado] = useState<string | null>(null)
   const [regimeTributario, setRegimeTributario] = useState<number | null>(null)
+  /** Mobile: linhas expandidas na lista em cards (chave = código NCM ou índice) */
+  const [ncmExpandidoMobile, setNcmExpandidoMobile] = useState<Record<string, boolean>>({})
+  /** Mobile: duplo toque na área do NCM para abrir o modal (onDoubleClick nem sempre dispara bem no touch) */
+  const ultimoToqueNcmMobileRef = useRef<{ ncm: string; timestamp: number } | null>(null)
 
   // Buscar regime tributário da empresa
   useEffect(() => {
@@ -166,6 +171,23 @@ export function MapearProdutosView() {
     setShowModal(true)
   }
 
+  const handleToqueNcmMobile = (config: ConfiguracaoImpostoNcm) => {
+    const codigoNcm = config.ncm?.codigo
+    if (!codigoNcm) return
+
+    const agora = Date.now()
+    const ultimo = ultimoToqueNcmMobileRef.current
+    const duploToque = ultimo?.ncm === codigoNcm && agora - ultimo.timestamp <= 350
+
+    if (duploToque) {
+      handleDoubleClick(config)
+      ultimoToqueNcmMobileRef.current = null
+      return
+    }
+
+    ultimoToqueNcmMobileRef.current = { ncm: codigoNcm, timestamp: agora }
+  }
+
   const handleModalClose = () => {
     setShowModal(false)
     setSelectedConfig(null)
@@ -206,6 +228,13 @@ export function MapearProdutosView() {
     return `${aliquota.toFixed(2)}%`
   }
 
+  const chaveLinhaNcm = (config: ConfiguracaoImpostoNcm, index: number) =>
+    config.ncm?.codigo ?? `row-${index}`
+
+  const toggleDetalhesMobile = (key: string) => {
+    setNcmExpandidoMobile(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
   const formatarPisCofins = (pis?: { cst?: string; aliquota?: number }, cofins?: { cst?: string; aliquota?: number }): string => {
     const pisStr = pis?.cst ? `PIS: ${pis.cst}${pis.aliquota ? ` (${formatarAliquota(pis.aliquota)})` : ''}` : ''
     const cofinsStr = cofins?.cst ? `COFINS: ${cofins.cst}${cofins.aliquota ? ` (${formatarAliquota(cofins.aliquota)})` : ''}` : ''
@@ -223,7 +252,7 @@ export function MapearProdutosView() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-secondary-text">Carregando configurações de impostos...</div>
+        <JiffyLoading />
       </div>
     )
   }
@@ -254,7 +283,7 @@ export function MapearProdutosView() {
         </>
       )}
 
-      <div className="flex flex-col h-full w-full p-6 bg-info">
+      <div className="flex flex-col h-full w-full md:p-6 p-2 bg-info">
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-alternate mb-2">
             Configurações de Impostos por NCM
@@ -275,7 +304,8 @@ export function MapearProdutosView() {
           </div>
         ) : (
           <div className="flex-1 overflow-auto">
-            <div className="bg-white rounded-lg shadow-sm border border-secondary/10">
+            {/* Desktop: tabela completa */}
+            <div className="hidden bg-white rounded-lg shadow-sm border border-secondary/10 md:block">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-alternate/10">
@@ -300,7 +330,7 @@ export function MapearProdutosView() {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="">
+                  <tbody>
                     {configuracoesImpostos.map((config, index) => (
                       <tr
                         key={config.ncm?.codigo || index}
@@ -316,10 +346,9 @@ export function MapearProdutosView() {
                           {config.cfop || '--'}
                         </td>
                         <td className="px-4 py-3 text-sm text-secondary-text">
-                          {isSimplesNacional 
-                            ? (config.csosn || '--')
-                            : (config.icms?.cst || '--')
-                          }
+                          {isSimplesNacional
+                            ? config.csosn || '--'
+                            : config.icms?.cst || '--'}
                         </td>
                         <td className="px-4 py-3 text-sm text-secondary-text">
                           {formatarPisCofins(config.pis, config.cofins)}
@@ -332,7 +361,8 @@ export function MapearProdutosView() {
                             {config.ncm?.codigo && (
                               <>
                                 <button
-                                  onClick={(e) => {
+                                  type="button"
+                                  onClick={e => {
                                     e.stopPropagation()
                                     handleViewHistorico(config.ncm!.codigo)
                                   }}
@@ -342,7 +372,8 @@ export function MapearProdutosView() {
                                   Histórico
                                 </button>
                                 <button
-                                  onClick={(e) => {
+                                  type="button"
+                                  onClick={e => {
                                     e.stopPropagation()
                                     handleCopiarConfiguracao(config.ncm!.codigo)
                                   }}
@@ -361,8 +392,109 @@ export function MapearProdutosView() {
                 </table>
               </div>
             </div>
+
+            {/* Mobile: só NCM + Exibir; detalhes em coluna única ao expandir */}
+            <div className="space-y-2 md:hidden">
+              {configuracoesImpostos.map((config, index) => {
+                const key = chaveLinhaNcm(config, index)
+                const expandido = Boolean(ncmExpandidoMobile[key])
+                const csosnOuCst = isSimplesNacional
+                  ? config.csosn || '--'
+                  : config.icms?.cst || '--'
+
+                return (
+                  <div
+                    key={key}
+                    className={`rounded-lg border border-secondary/10 bg-white p-3 shadow-sm ${
+                      index % 2 === 1 ? 'bg-alternate/5' : ''
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div
+                        className="min-w-0 flex-1 cursor-pointer"
+                        onDoubleClick={() => handleDoubleClick(config)}
+                        onClick={() => handleToqueNcmMobile(config)}
+                        title="Duplo toque/clique no NCM para configurar"
+                      >
+                        <p className="text-xs font-semibold uppercase text-alternate">NCM</p>
+                        <p className="break-all font-mono text-base font-medium text-secondary-text">
+                          {config.ncm?.codigo || '--'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleDetalhesMobile(key)}
+                        className="shrink-0 rounded border border-alternate/40 px-2.5 py-1 text-xs font-medium text-alternate hover:bg-alternate/10"
+                      >
+                        {expandido ? 'Ocultar' : 'Exibir'}
+                      </button>
+                    </div>
+
+                    {expandido && (
+                      <div className="mt-3 space-y-2 border-t border-gray-200 pt-3 text-sm text-secondary-text">
+                        <div className="break-words">
+                          <span className="font-semibold text-alternate">CFOP:</span>{' '}
+                          <span className="text-secondary-text/90">{config.cfop || '--'}</span>
+                        </div>
+                        <div className="break-words">
+                          <span className="font-semibold text-alternate">
+                            {isSimplesNacional ? 'CSOSN:' : 'CST ICMS:'}
+                          </span>{' '}
+                          <span className="text-secondary-text/90">{csosnOuCst}</span>
+                        </div>
+                        <div className="break-words">
+                          <span className="font-semibold text-alternate">PIS:</span>{' '}
+                          <span className="text-secondary-text/90">
+                            {config.pis?.cst
+                              ? `${config.pis.cst}${config.pis.aliquota != null ? ` (${formatarAliquota(config.pis.aliquota)})` : ''}`
+                              : '--'}
+                          </span>
+                        </div>
+                        <div className="break-words">
+                          <span className="font-semibold text-alternate">COFINS:</span>{' '}
+                          <span className="text-secondary-text/90">
+                            {config.cofins?.cst
+                              ? `${config.cofins.cst}${config.cofins.aliquota != null ? ` (${formatarAliquota(config.cofins.aliquota)})` : ''}`
+                              : '--'}
+                          </span>
+                        </div>
+                        <div className="break-words">
+                          <span className="font-semibold text-alternate">Alíquota ICMS (%):</span>{' '}
+                          <span className="text-secondary-text/90">
+                            {formatarAliquota(config.icms?.aliquota)}
+                          </span>
+                        </div>
+                        {config.ncm?.codigo && (
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => handleViewHistorico(config.ncm!.codigo)}
+                              className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                            >
+                              Histórico
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleCopiarConfiguracao(config.ncm!.codigo)}
+                              className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
+                            >
+                              Copiar
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
             <div className="mt-4 text-sm text-secondary-text/70">
-              <p>💡 Dica: Dê duplo clique em um NCM para configurá-lo</p>
+              <p className="hidden md:block">💡 Dica: Dê duplo clique em um NCM para configurá-lo</p>
+              <p className="md:hidden">
+                💡 Dica: toque duas vezes no código NCM para abrir a configuração; use Exibir para ver CFOP e
+                impostos.
+              </p>
             </div>
           </div>
         )}

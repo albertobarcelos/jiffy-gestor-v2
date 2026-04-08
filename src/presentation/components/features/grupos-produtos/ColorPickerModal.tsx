@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 
 interface ColorPickerModalProps {
   open: boolean
@@ -127,12 +128,7 @@ export function ColorPickerModal({ open, onClose, onSelect }: ColorPickerModalPr
         <div className="flex-1 overflow-y-auto">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center h-full gap-2">
-              <img
-                src="/images/jiffy-loading.gif"
-                alt="Carregando"
-                className="w-12 h-12 object-contain"
-              />
-              <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
+              <JiffyLoading />
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center h-full gap-2">

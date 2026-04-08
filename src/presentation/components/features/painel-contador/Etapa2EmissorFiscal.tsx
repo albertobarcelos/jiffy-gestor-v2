@@ -7,6 +7,7 @@ import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Label } from '@/src/presentation/components/ui/label'
 import { Switch } from '@/src/presentation/components/ui/switch'
+import { JiffyLoading } from '../../ui/JiffyLoading'
 
 interface ConfiguracaoNumeracao {
   id: string
@@ -27,6 +28,19 @@ interface ConfiguracaoNumeracao {
 
 type AmbienteFiscal = 'HOMOLOGACAO' | 'PRODUCAO'
 
+/** Padrão quando ainda não existe registro no backend (primeiro cadastro de emissão) */
+const VALORES_INICIAIS_EMISSAO = {
+  ambiente: 'PRODUCAO' as AmbienteFiscal,
+  serie: '1',
+  proximoNumero: '1',
+}
+
+/** Exibição no dropdown com acento; o `value` enviado ao backend continua HOMOLOGACAO / PRODUCAO */
+const OPCOES_AMBIENTE: { valor: AmbienteFiscal; label: string }[] = [
+  { valor: 'HOMOLOGACAO', label: 'Homologação' },
+  { valor: 'PRODUCAO', label: 'Produção' },
+]
+
 interface ConfiguracaoEmissorFiscal {
   id?: string
   nfeAtivo: boolean
@@ -38,7 +52,9 @@ interface ConfiguracaoEmissorFiscal {
 export function Etapa3EmissorFiscal() {
   const { auth, isRehydrated } = useAuthStore()
   const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
+  /** Salvamento independente por card — evita desabilitar NF-e ao salvar NFC-e e vice-versa */
+  const [isSavingNfe, setIsSavingNfe] = useState(false)
+  const [isSavingNfce, setIsSavingNfce] = useState(false)
   
   // Configurações de numeração
   const [nfeNumeracao, setNfeNumeracao] = useState<ConfiguracaoNumeracao | null>(null)
@@ -50,20 +66,20 @@ export function Etapa3EmissorFiscal() {
     nfceAtivo: false,
   })
   
-  // Formulário NF-e
+  // Formulário NF-e (defaults alinhados ao primeiro cadastro até o load do backend)
   const [nfeForm, setNfeForm] = useState({
-    serie: '',
-    proximoNumero: '',
-    ambiente: '' as AmbienteFiscal | '',
+    serie: VALORES_INICIAIS_EMISSAO.serie,
+    proximoNumero: VALORES_INICIAIS_EMISSAO.proximoNumero,
+    ambiente: VALORES_INICIAIS_EMISSAO.ambiente as AmbienteFiscal | '',
   })
-  
-  // Formulário NFC-e
+
+  // Formulário NFC-e — CSC vazio até vir do backend ou preenchimento manual
   const [nfceForm, setNfceForm] = useState({
-    serie: '',
-    proximoNumero: '',
+    serie: VALORES_INICIAIS_EMISSAO.serie,
+    proximoNumero: VALORES_INICIAIS_EMISSAO.proximoNumero,
     cscId: '',
     cscCodigo: '',
-    ambiente: '' as AmbienteFiscal | '',
+    ambiente: VALORES_INICIAIS_EMISSAO.ambiente as AmbienteFiscal | '',
   })
 
   /**
@@ -141,12 +157,12 @@ export function Etapa3EmissorFiscal() {
             nfeAtivo: nfeAtivoValue,
           }))
         } else {
-          // Se não encontrou configuração, limpar
+          // Primeiro cadastro: sem linha no backend — sugerir produção, série 1 e próxima 1
           setNfeNumeracao(null)
           setNfeForm({
-            serie: '',
-            proximoNumero: '',
-            ambiente: '',
+            serie: VALORES_INICIAIS_EMISSAO.serie,
+            proximoNumero: VALORES_INICIAIS_EMISSAO.proximoNumero,
+            ambiente: VALORES_INICIAIS_EMISSAO.ambiente,
           })
         }
         
@@ -173,16 +189,15 @@ export function Etapa3EmissorFiscal() {
             nfceAtivo: nfce.nfceAtivo ?? false,
           }))
         } else {
-          // Se não encontrou configuração, limpar
+          // Primeiro cadastro: CSC vazio; demais campos com o mesmo padrão da NF-e
           setNfceNumeracao(null)
-          setNfceForm(prev => ({
-            ...prev,
-            serie: '',
-            proximoNumero: '',
+          setNfceForm({
+            serie: VALORES_INICIAIS_EMISSAO.serie,
+            proximoNumero: VALORES_INICIAIS_EMISSAO.proximoNumero,
             cscId: '',
             cscCodigo: '',
-            ambiente: '',
-          }))
+            ambiente: VALORES_INICIAIS_EMISSAO.ambiente,
+          })
         }
       }
       if (!numeracaoResponse.ok) {
@@ -213,7 +228,7 @@ export function Etapa3EmissorFiscal() {
       return
     }
 
-    setIsSaving(true)
+    setIsSavingNfe(true)
     const toastId = showFeedback ? showToast.loading('Salvando configuração NF-e...') : null
 
     try {
@@ -330,7 +345,7 @@ export function Etapa3EmissorFiscal() {
         showToast.error(errorMessage)
       }
     } finally {
-      setIsSaving(false)
+      setIsSavingNfe(false)
     }
   }
 
@@ -373,7 +388,7 @@ export function Etapa3EmissorFiscal() {
       }
     }
 
-    setIsSaving(true)
+    setIsSavingNfce(true)
     const toastId = showFeedback ? showToast.loading('Salvando configuração NFC-e...') : null
 
     try {
@@ -495,24 +510,18 @@ export function Etapa3EmissorFiscal() {
         showToast.error(errorMessage)
       }
     } finally {
-      setIsSaving(false)
+      setIsSavingNfce(false)
     }
   }
 
+  /** Apenas atualiza o estado local; a troca de ambiente é persistida ao clicar em Salvar configuração. */
   const handleChangeNfeAmbiente = (value: AmbienteFiscal | '') => {
     setNfeForm(prev => ({ ...prev, ambiente: value }))
-
-    if (value !== 'HOMOLOGACAO' && value !== 'PRODUCAO') return
-    if (isSaving) return
-    void handleSaveNfe(value, { showFeedback: false })
   }
 
+  /** Apenas atualiza o estado local; a troca de ambiente é persistida ao clicar em Salvar configuração. */
   const handleChangeNfceAmbiente = (value: AmbienteFiscal | '') => {
     setNfceForm(prev => ({ ...prev, ambiente: value }))
-
-    if (value !== 'HOMOLOGACAO' && value !== 'PRODUCAO') return
-    if (isSaving) return
-    void handleSaveNfce(value, { showFeedback: false })
   }
 
   const handleToggleNfe = async (ativo: boolean) => {
@@ -528,7 +537,7 @@ export function Etapa3EmissorFiscal() {
       return
     }
 
-    setIsSaving(true)
+    setIsSavingNfe(true)
     try {
       const ambiente = nfeForm.ambiente || nfeNumeracao?.ambiente
       if (ambiente !== 'HOMOLOGACAO' && ambiente !== 'PRODUCAO') {
@@ -563,7 +572,7 @@ export function Etapa3EmissorFiscal() {
       // Reverter toggle em caso de erro
       setEmissorFiscal(prev => ({ ...prev, nfeAtivo: !ativo }))
     } finally {
-      setIsSaving(false)
+      setIsSavingNfe(false)
     }
   }
 
@@ -580,7 +589,7 @@ export function Etapa3EmissorFiscal() {
       return
     }
 
-    setIsSaving(true)
+    setIsSavingNfce(true)
     try {
       const ambiente = nfceForm.ambiente || nfceNumeracao?.ambiente
       if (ambiente !== 'HOMOLOGACAO' && ambiente !== 'PRODUCAO') {
@@ -618,57 +627,72 @@ export function Etapa3EmissorFiscal() {
       // Reverter toggle em caso de erro
       setEmissorFiscal(prev => ({ ...prev, nfceAtivo: !ativo }))
     } finally {
-      setIsSaving(false)
+      setIsSavingNfce(false)
     }
   }
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-4">
-        <div className="text-secondary-text">Carregando configurações...</div>
+      <div className="flex h-full items-center justify-center p-4">
+        <JiffyLoading />
       </div>
     )
   }
 
-  return (
-    <div className="space-y-2 p-2 sm:p-4">
-      {/* NF-e */}
-      <div className="rounded-lg border border-alternate/20 bg-white px-2 py-1">
-        <div className="flex items-center justify-between">
-          <h4 className="font-exo font-semibold text-alternate text-base">NF-e (Nota Fiscal Eletrônica)</h4>
-          <div className="flex items-center gap-1">
-            <Label htmlFor="nfe-ativo" className="text-sm">NF-e</Label>
-            <Switch
-              id="nfe-ativo"
-              checked={emissorFiscal.nfeAtivo}
-              onChange={(e) => handleToggleNfe(e.target.checked)}
-              disabled={isSaving}
-              sx={{
-                '& .MuiSwitch-switchBase.Mui-checked': {
-                  color: 'var(--color-alternate)',
-                },
-                '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                  backgroundColor: 'var(--color-alternate)',
-                },
-              }}
-            />
-          </div>
-        </div>
+  const camposNfeDesabilitados = !emissorFiscal.nfeAtivo || isSavingNfe
+  const camposNfceDesabilitados = !emissorFiscal.nfceAtivo || isSavingNfce
 
-        {/* Mostrar campos e botão apenas se NF-e estiver ativada */}
-        {emissorFiscal.nfeAtivo && (
-          <>
-            <div className="grid grid-cols-2 gap-2">
+  return (
+    <div className="p-2 sm:p-4">
+      <h2 className="font-exo font-semibold text-alternate text-lg sm:text-xl mb-4">
+        Configurar modelo de Emissor Fiscal
+      </h2>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
+        {/* NF-e */}
+        <div className="flex h-full min-h-0 flex-col rounded-lg border border-alternate/20 bg-white p-2 sm:p-3">
+          <div className="flex shrink-0 items-center justify-between">
+            <h4 className="font-exo font-semibold text-alternate text-base">
+              NF-e (Nota Fiscal Eletrônica)
+            </h4>
+            <div className="flex items-center gap-1">
+              <Label htmlFor="nfe-ativo" className="text-sm">
+                NF-e
+              </Label>
+              <Switch
+                id="nfe-ativo"
+                checked={emissorFiscal.nfeAtivo}
+                onChange={e => handleToggleNfe(e.target.checked)}
+                disabled={isSavingNfe}
+                sx={{
+                  '& .MuiSwitch-switchBase.Mui-checked': {
+                    color: 'var(--color-alternate)',
+                  },
+                  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                    backgroundColor: 'var(--color-alternate)',
+                  },
+                }}
+              />
+            </div>
+          </div>
+
+          <div
+            className={`mt-2 flex min-h-0 flex-1 flex-col ${camposNfeDesabilitados && !isSavingNfe ? 'opacity-75' : ''}`}
+          >
+            <div className="grid flex-1 grid-cols-2 gap-2">
               <div className="">
                 <Label htmlFor="nfe-ambiente">Ambiente *</Label>
                 <select
                   id="nfe-ambiente"
                   value={nfeForm.ambiente}
                   onChange={e => handleChangeNfeAmbiente(e.target.value as AmbienteFiscal | '')}
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  disabled={camposNfeDesabilitados}
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <option value="HOMOLOGACAO">Homologacao</option>
-                  <option value="PRODUCAO">Producao</option>
+                  {OPCOES_AMBIENTE.map(({ valor, label }) => (
+                    <option key={valor} value={valor}>
+                      {label}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -680,13 +704,14 @@ export function Etapa3EmissorFiscal() {
                   id="nfe-serie"
                   type="number"
                   value={nfeForm.serie}
-                  onChange={(e) => {
+                  onChange={e => {
                     const newValue = e.target.value
                     setNfeForm({ ...nfeForm, serie: newValue })
                   }}
                   placeholder="1"
                   inputProps={{ min: 1 }}
                   size="small"
+                  disabled={camposNfeDesabilitados}
                 />
               </div>
 
@@ -696,74 +721,90 @@ export function Etapa3EmissorFiscal() {
                   id="nfe-proximo"
                   type="number"
                   value={nfeForm.proximoNumero}
-                  onChange={(e) => setNfeForm({ ...nfeForm, proximoNumero: e.target.value })}
+                  onChange={e => setNfeForm({ ...nfeForm, proximoNumero: e.target.value })}
                   placeholder="1"
                   inputProps={{ min: 1 }}
                   size="small"
+                  disabled={camposNfeDesabilitados}
                 />
               </div>
             </div>
 
-            <div className="mt-2 flex justify-end">
+            {!emissorFiscal.nfeAtivo && (
+             <div className="mb-2 rounded-lg border border-primary-text bg-gray-50 p-2">
+             <p className="text-sm text-primary-text">
+             Ative o switch NFC-e para editar e salvar esta configuração.
+             </p>
+           </div>
+            )}
+
+            <div className="mt-auto flex justify-end pt-3">
               <Button
                 onClick={() => void handleSaveNfe()}
-                disabled={isSaving || !nfeForm.ambiente || !nfeForm.serie || !nfeForm.proximoNumero}
+                disabled={
+                  camposNfeDesabilitados ||
+                  !nfeForm.ambiente ||
+                  !nfeForm.serie ||
+                  !nfeForm.proximoNumero
+                }
                 className="rounded-lg px-4 py-2 text-white text-sm font-medium"
                 sx={{
                   backgroundColor: 'var(--color-secondary)',
                   '&:hover': { backgroundColor: 'var(--color-alternate)' },
+                  '&:disabled': { backgroundColor: '#ccc', cursor: 'not-allowed' },
                 }}
               >
                 Salvar Configuração NF-e
               </Button>
             </div>
-          </>
-        )}
-      </div>
-
-      {/* NFC-e */}
-      <div className="rounded-lg border border-alternate/20 bg-white p-2">
-        <div className="flex items-center justify-between">
-          <h4 className="font-exo font-semibold text-alternate text-base">NFC-e (Nota Fiscal de Consumidor Eletrônica)</h4>
-          <div className="flex items-center gap-1">
-            <Label htmlFor="nfce-ativo" className="text-sm">NFC-e</Label>
-            <Switch
-              id="nfce-ativo"
-              checked={emissorFiscal.nfceAtivo}
-              onChange={(e) => handleToggleNfce(e.target.checked)}
-              disabled={isSaving}
-              sx={{
-                '& .MuiSwitch-switchBase.Mui-checked': {
-                  color: 'var(--color-alternate)',
-                },
-                '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                  backgroundColor: 'var(--color-alternate)',
-                },
-              }}
-            />
           </div>
         </div>
 
-        {/* Mostrar campos e botão apenas se NFC-e estiver ativada */}
-        {emissorFiscal.nfceAtivo && (
-          <>
-            <div className="mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-sm text-yellow-800">
-                ⚠️ <strong>CSC é obrigatório</strong> para emissão de NFC-e. Configure abaixo.
-              </p>
+        {/* NFC-e */}
+        <div className="flex h-full min-h-0 flex-col rounded-lg border border-alternate/20 bg-white p-2 sm:p-3">
+          <div className="flex shrink-0 items-center justify-between">
+            <h4 className="font-exo font-semibold text-alternate text-base">
+              NFC-e (Nota Fiscal de Consumidor Eletrônica)
+            </h4>
+            <div className="flex items-center gap-1">
+              <Label htmlFor="nfce-ativo" className="text-sm">
+                NFC-e
+              </Label>
+              <Switch
+                id="nfce-ativo"
+                checked={emissorFiscal.nfceAtivo}
+                onChange={e => handleToggleNfce(e.target.checked)}
+                disabled={isSavingNfce}
+                sx={{
+                  '& .MuiSwitch-switchBase.Mui-checked': {
+                    color: 'var(--color-alternate)',
+                  },
+                  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                    backgroundColor: 'var(--color-alternate)',
+                  },
+                }}
+              />
             </div>
+          </div>
 
-            <div className="grid grid-cols-2 gap-2 mb-2">
+          <div
+            className={`mt-2 flex min-h-0 flex-1 flex-col ${camposNfceDesabilitados && !isSavingNfce ? 'opacity-75' : ''}`}
+          >
+            <div className="mb-2 grid grid-cols-2 gap-2">
               <div className="">
                 <Label htmlFor="nfce-ambiente">Ambiente *</Label>
                 <select
                   id="nfce-ambiente"
                   value={nfceForm.ambiente}
                   onChange={e => handleChangeNfceAmbiente(e.target.value as AmbienteFiscal | '')}
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  disabled={camposNfceDesabilitados}
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <option value="HOMOLOGACAO">Homologacao</option>
-                  <option value="PRODUCAO">Producao</option>
+                  {OPCOES_AMBIENTE.map(({ valor, label }) => (
+                    <option key={valor} value={valor}>
+                      {label}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -775,13 +816,14 @@ export function Etapa3EmissorFiscal() {
                   id="nfce-serie"
                   type="number"
                   value={nfceForm.serie}
-                  onChange={(e) => {
+                  onChange={e => {
                     const newValue = e.target.value
                     setNfceForm({ ...nfceForm, serie: newValue })
                   }}
                   placeholder="1"
                   inputProps={{ min: 1 }}
                   size="small"
+                  disabled={camposNfceDesabilitados}
                 />
               </div>
 
@@ -791,10 +833,11 @@ export function Etapa3EmissorFiscal() {
                   id="nfce-proximo"
                   type="number"
                   value={nfceForm.proximoNumero}
-                  onChange={(e) => setNfceForm({ ...nfceForm, proximoNumero: e.target.value })}
+                  onChange={e => setNfceForm({ ...nfceForm, proximoNumero: e.target.value })}
                   placeholder="1"
                   inputProps={{ min: 1 }}
                   size="small"
+                  disabled={camposNfceDesabilitados}
                 />
               </div>
             </div>
@@ -805,13 +848,12 @@ export function Etapa3EmissorFiscal() {
                 <Input
                   id="nfce-csc-id"
                   value={nfceForm.cscId}
-                  onChange={(e) => setNfceForm({ ...nfceForm, cscId: e.target.value })}
+                  onChange={e => setNfceForm({ ...nfceForm, cscId: e.target.value })}
                   placeholder="CODIGO-CSC-ID-CONTRIBUINTE"
                   size="small"
+                  disabled={camposNfceDesabilitados}
                 />
-                <p className="text-xs text-secondary-text/70">
-                  Obtido na SEFAZ da sua UF
-                </p>
+                <p className="text-xs text-secondary-text/70">Obtido na SEFAZ da sua UF</p>
               </div>
 
               <div className="">
@@ -819,20 +861,39 @@ export function Etapa3EmissorFiscal() {
                 <Input
                   id="nfce-csc-codigo"
                   value={nfceForm.cscCodigo}
-                  onChange={(e) => setNfceForm({ ...nfceForm, cscCodigo: e.target.value })}
+                  onChange={e => setNfceForm({ ...nfceForm, cscCodigo: e.target.value })}
                   placeholder="12345678"
                   size="small"
+                  disabled={camposNfceDesabilitados}
                 />
-                <p className="text-xs text-secondary-text/70">
-                  Código de 8 dígitos obtido na SEFAZ
-                </p>
+                <p className="text-xs text-secondary-text/70">Obtido na SEFAZ da sua UF</p>
               </div>
             </div>
 
-            <div className="mt-2 flex justify-end">
+            {emissorFiscal.nfceAtivo ? (
+              <div className="mb-2 p-2">
+               
+              </div>
+            ) : (
+              <div className="mb-2 rounded-lg border border-primary-text bg-gray-50 p-2">
+                <p className="text-sm text-primary-text">
+                Ative o switch NFC-e para editar e salvar esta configuração.
+                </p>
+              </div>
+            )}
+
+            <div className="mt-auto flex justify-end pt-3">
               <Button
                 onClick={() => void handleSaveNfce()}
-                disabled={isSaving || (emissorFiscal.nfceAtivo && (!nfceForm.ambiente || !nfceForm.serie || !nfceForm.proximoNumero || !nfceForm.cscId || !nfceForm.cscCodigo))}
+                disabled={
+                  camposNfceDesabilitados ||
+                  (emissorFiscal.nfceAtivo &&
+                    (!nfceForm.ambiente ||
+                      !nfceForm.serie ||
+                      !nfceForm.proximoNumero ||
+                      !nfceForm.cscId ||
+                      !nfceForm.cscCodigo))
+                }
                 className="rounded-lg px-4 py-2 text-white text-sm font-medium"
                 sx={{
                   backgroundColor: 'var(--color-secondary)',
@@ -843,8 +904,8 @@ export function Etapa3EmissorFiscal() {
                 Salvar Configuração NFC-e
               </Button>
             </div>
-          </>
-        )}
+          </div>
+        </div>
       </div>
     </div>
   )

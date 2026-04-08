@@ -1,11 +1,10 @@
 'use client'
 
-'use client'
-
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { useGruposComplementosInfinite } from '@/src/presentation/hooks/useGruposComplementos'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import {
   MdSearch,
   MdExtension,
@@ -612,12 +611,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
         {/* Skeleton loaders para carregamento inicial - sempre mostra durante loading */}
         {(isLoading || (grupos.length === 0 && isFetching)) && (
           <div className="flex flex-col items-center justify-center py-8 gap-2">
-            <img
-              src="/images/jiffy-loading.gif"
-              alt="Carregando"
-              className="w-16 h-16 object-contain"
-            />
-            <p className="text-sm text-secondary-text text-center">Carregando grupos...</p>
+            <JiffyLoading />
           </div>
         )}
 

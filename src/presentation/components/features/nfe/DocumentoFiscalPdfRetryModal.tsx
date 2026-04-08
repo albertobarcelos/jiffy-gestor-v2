@@ -68,7 +68,7 @@ export function DocumentoFiscalPdfRetryModal() {
                 <DialogTitle sx={{ mb: 0, fontSize: '1.15rem' }}>
                   {documentoLabel} indisponível no momento
                 </DialogTitle>
-                <DialogDescription sx={{ mt: 0.5 }}>
+                <DialogDescription className="mt-0.5">
                   O PDF ainda pode estar sendo gerado no servidor fiscal.
                 </DialogDescription>
               </Box>

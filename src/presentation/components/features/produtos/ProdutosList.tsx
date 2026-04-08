@@ -7,6 +7,7 @@ import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import Link from 'next/link'
 import { Produto } from '@/src/domain/entities/Produto'
 import { showToast } from '@/src/shared/utils/toast'
@@ -618,7 +619,7 @@ const ProdutoListItem = function ProdutoListItem({
  * Lista de produtos com scroll infinito
  * Usa React Query para cache automático e deduplicação de requisições
  */
-export function ProdutosList({ onReload }: ProdutosListProps) {
+  export function ProdutosList({ onReload }: ProdutosListProps) {
   const { auth } = useAuthStore()
   const queryClient = useQueryClient()
   const router = useRouter()
@@ -1504,7 +1505,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
             </div>
             <div className="flex flex-col md:flex-row mb-2 items-center justify-end flex-1 md:gap-4 gap-1">
             <Link
-              href="/produtos/atualizar-preco"
+              href="/produtos/atualizar-produtos-lote"
               className="md:h-8 h-6 md:px-4 px-2 bg-info text-primary-text border border-primary/50 rounded-lg font-semibold font-exo md:text-sm text-xs flex items-center gap-2 hover:bg-primary/10 transition-colors"
             >
               Produtos em Lote
@@ -1658,12 +1659,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
         {/* Mostrar loading quando está carregando e não há produtos ainda */}
         {(isLoading || isFetching || isFetchingNextPage || (localProdutos.length === 0 && !data)) && (
           <div className="flex flex-col items-center justify-center py-12 gap-2">
-            <img
-              src="/images/jiffy-loading.gif"
-              alt="Carregando..."
-              className="w-20 h-20"
-            />
-            <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
+            <JiffyLoading />
           </div>
         )}
 

@@ -22,8 +22,6 @@ export async function GET(
       return NextResponse.json({ error: 'ID do usuário gestor é obrigatório' }, { status: 400 })
     }
 
-    console.log('🔍 [usuarios-gestor] Buscando usuário gestor com ID:', id)
-
     const apiClient = new ApiClient()
     const response = await apiClient.request<any>(`/api/v1/pessoas/usuarios-gestor/${id}`, {
       method: 'GET',
@@ -32,7 +30,6 @@ export async function GET(
       },
     })
 
-    console.log('🔍 [usuarios-gestor] Resposta recebida:', response.data)
     return NextResponse.json(response.data)
   } catch (error) {
     console.error('Erro ao buscar usuário gestor:', error)
@@ -70,7 +67,6 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    console.log('🔍 [usuarios-gestor] Atualizando usuário gestor:', { id, body })
 
     const apiClient = new ApiClient()
     const response = await apiClient.request<any>(`/api/v1/pessoas/usuarios-gestor/${id}`, {
@@ -82,7 +78,6 @@ export async function PATCH(
       body: JSON.stringify(body),
     })
 
-    console.log('🔍 [usuarios-gestor] Resposta da atualização:', response.data)
     return NextResponse.json(response.data)
   } catch (error) {
     console.error('Erro ao atualizar usuário gestor:', error)

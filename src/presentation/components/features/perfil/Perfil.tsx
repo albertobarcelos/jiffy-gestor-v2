@@ -4,6 +4,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { MdPerson, MdLock, MdEdit, MdSave, MdClose, MdBusiness } from 'react-icons/md'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 
 interface UserMeData {
   sub?: string
@@ -202,12 +203,7 @@ export function Perfil() {
     return (
       <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
         <div className="text-center">
-          <img 
-            src="/images/jiffy-loading.gif" 
-            alt="Carregando..." 
-            className="w-20 h-20 mx-auto mb-4" 
-          />
-          <p className="text-gray-600">Carregando perfil...</p>
+          <JiffyLoading />
         </div>
       </div>
     )
@@ -713,11 +709,7 @@ export function Perfil() {
                         >
                           {isSaving ? (
                             <>
-                              <img 
-                                src="/images/jiffy-loading.gif" 
-                                alt="Salvando..." 
-                                className="w-4 h-4" 
-                              />
+                              <JiffyLoading className="!gap-0 !py-0" size={20} />
                               Salvando...
                             </>
                           ) : (

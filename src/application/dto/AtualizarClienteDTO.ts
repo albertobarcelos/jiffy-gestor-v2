@@ -15,6 +15,8 @@ export const AtualizarClienteSchema = z.object({
   telefone: z.string().nullable().optional(),
   email: z.string().email('Email inválido').optional().or(z.literal('')),
   nomeFantasia: z.string().optional(),
+  indicadorInscricaoEstadual: z.string().optional(),
+  inscricaoEstadual: z.string().optional().nullable(),
   ativo: z.boolean().optional(),
   endereco: z
     .object({

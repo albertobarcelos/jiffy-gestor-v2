@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Impressora } from '@/src/domain/entities/Impressora'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { MdArrowDropUp, MdArrowDropDown, MdPhone } from 'react-icons/md'
 
 interface TerminalConfig {
@@ -1095,12 +1096,7 @@ export function NovaImpressora({
   if (isLoadingImpressora) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-2">
-        <img
-          src="/images/jiffy-loading.gif"
-          alt="Carregando..."
-          className="w-20 h-20"
-        />
-        <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
+        <JiffyLoading />
       </div>
     )
   }
@@ -1341,12 +1337,7 @@ export function NovaImpressora({
               >
               {(isLoadingTerminais || !hasLoadedTerminaisRef.current) && terminaisConfig.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-12 gap-2">
-                  <img
-                    src="/images/jiffy-loading.gif"
-                    alt="Carregando..."
-                    className="w-20 h-20"
-                  />
-                  <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
+                  <JiffyLoading />
                 </div>
               )}
               {terminaisConfig.length === 0 && !isLoadingTerminais && hasLoadedTerminaisRef.current && !isLoadingMore && (
@@ -1586,12 +1577,7 @@ export function NovaImpressora({
 
               {isLoadingMore && terminaisConfig.length > 0 && (
                 <div className="flex flex-col items-center justify-center py-4 gap-2">
-                  <img
-                    src="/images/jiffy-loading.gif"
-                    alt="Carregando..."
-                    className="w-16 h-16"
-                  />
-                  <span className="text-sm font-medium text-primary-text font-nunito">Carregando mais...</span>
+                  <JiffyLoading />
                 </div>
               )}
               </div>

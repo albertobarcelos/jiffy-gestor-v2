@@ -6,6 +6,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { MdAddCircle, MdOutlineOfflinePin, MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import {
   ComplementosTabsModal,
   ComplementosTabsModalState,
@@ -626,12 +627,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         {/* Mostrar loading apenas quando está carregando e não há complementos ainda */}
         {(isLoading || !hasLoadedInitialRef.current) && complementos.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 gap-2">
-            <img
-              src="/images/jiffy-loading.gif"
-              alt="Carregando..."
-              className="w-20 h-20"
-            />
-            <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
+            <JiffyLoading />
           </div>
         )}
 

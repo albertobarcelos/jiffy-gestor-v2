@@ -1,14 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation' // Importar useRouter
 import { MdAttachMoney, MdRestaurant, MdShoppingCart } from 'react-icons/md'
 import { LuDoorOpen } from "react-icons/lu";
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { BuscarVendasDashboardUseCase } from '@/src/application/use-cases/dashboard/BuscarVendasDashboardUseCase'
-import { DashboardVendas } from '@/src/domain/entities/DashboardVendas'
 import { ModalMetodosPagamento } from './ModalMetodosPagamento'
 import { calculatePeriodo } from '@/src/shared/utils/dateFilters' // Importar calculatePeriodo
+import { useDashboardResumoQuery } from '@/src/presentation/hooks/useDashboardResumoQuery'
 
 interface MetricCardsProps {
   periodo: string;
@@ -22,14 +20,6 @@ interface MetricCardsProps {
  */
 export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCardsProps) {
   const router = useRouter() // Obter instância do router
-  const { auth } = useAuthStore()
-  const [dataTotal, setDataTotal] = useState<DashboardVendas | null>(null);
-  const [dataFinalizadas, setDataFinalizadas] = useState<DashboardVendas | null>(null);
-  const [dataCanceladas, setDataCanceladas] = useState<DashboardVendas | null>(null);
-  const [mesasAbertas, setMesasAbertas] = useState<number>(0); // Estado para armazenar a quantidade de mesas abertas
-  const [totalCancelado, setTotalCancelado] = useState<number>(0); // Estado para armazenar a soma das vendas canceladas
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Função para mapear o período do frontend para o formato esperado pelo caso de uso
@@ -47,10 +37,11 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
   };
 
   /**
-   * Calcula o período para as datas personalizadas ou usa a função calculatePeriodo
+   * Calcula o período para as datas personalizadas ou usa a função calculatePeriodo.
+   * `null` indica que não deve aplicar filtro de data ("Todos").
    */
   const getPeriodoDates = (): { inicio: Date | null; fim: Date | null } => {
-    if (periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal) {
+    if (periodoInicial && periodoFinal) {
       return { inicio: periodoInicial, fim: periodoFinal }
     }
     
@@ -63,197 +54,11 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
     return { inicio, fim }
   }
 
-  /**
-   * Conta todas as mesas abertas (status=ABERTA e tipoVenda=mesa)
-   * Não aplica filtro de período, pois vendas abertas não têm data de finalização
-   */
-  const contarMesasAbertas = useCallback(async (): Promise<number> => {
-    const token = auth?.getAccessToken()
-    if (!token) return 0
-
-    try {
-      const baseParams = new URLSearchParams()
-      
-      // Filtros fixos: apenas mesas abertas
-      baseParams.append('status', 'ABERTA')
-      baseParams.append('tipoVenda', 'mesa')
-      // Não aplica filtro de período para vendas abertas
-
-      let totalCount = 0
-      let currentPage = 0
-      let totalPages = 1
-      const pageSize = 100
-
-      while (currentPage < totalPages) {
-        const params = new URLSearchParams(baseParams.toString())
-        params.append('limit', pageSize.toString())
-        params.append('offset', (currentPage * pageSize).toString())
-
-        const response = await fetch(`/api/vendas?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-
-        if (!response.ok) {
-          console.error('Erro ao buscar mesas abertas:', response.status)
-          break
-        }
-
-        const data = await response.json()
-        const items = data.items || []
-
-        // Conta os itens retornados nesta página
-        totalCount += items.length
-
-        // Calcula total de páginas na primeira requisição
-        if (currentPage === 0) {
-          if (data.totalPages) {
-            totalPages = data.totalPages
-          } else if (data.count && data.limit) {
-            totalPages = Math.ceil(data.count / data.limit)
-          } else if (data.hasNext === false) {
-            totalPages = 1
-          } else if (items.length < pageSize) {
-            totalPages = 1
-          } else {
-            // Se não há informação de paginação e retornou pageSize itens,
-            // assume que pode haver mais páginas
-            // Continua buscando até retornar menos itens que pageSize
-            totalPages = 999 // Limite de segurança (máximo 99.900 mesas)
-          }
-        }
-
-        // Se retornou menos itens que o pageSize, é a última página
-        if (items.length < pageSize) {
-          break
-        }
-
-        currentPage++
-      }
-
-      console.log('🔍 contarMesasAbertas - Total de mesas abertas encontradas:', totalCount)
-      return totalCount
-    } catch (error) {
-      console.error('Erro ao contar mesas abertas:', error)
-      return 0
-    }
-  }, [auth])
-
-  /**
-   * Busca todas as vendas canceladas e calcula a soma dos valores
-   */
-  const calcularTotalCancelado = useCallback(async (): Promise<number> => {
-    const token = auth?.getAccessToken()
-    if (!token) return 0
-
-    try {
-      const { inicio, fim } = getPeriodoDates()
-      const baseParams = new URLSearchParams()
-      
-      // Adiciona filtro de status CANCELADA
-      baseParams.append('status', 'CANCELADA')
-      
-      // Adiciona filtros de período se disponíveis
-      if (inicio) {
-        baseParams.append('periodoInicial', inicio.toISOString())
-      }
-      if (fim) {
-        baseParams.append('periodoFinal', fim.toISOString())
-      }
-
-      let total = 0
-      let currentPage = 0
-      let totalPages = 1
-      const pageSize = 100
-
-      while (currentPage < totalPages) {
-        const params = new URLSearchParams(baseParams.toString())
-        params.append('limit', pageSize.toString())
-        params.append('offset', (currentPage * pageSize).toString())
-
-        const response = await fetch(`/api/vendas?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-
-        if (!response.ok) {
-          console.error('Erro ao buscar vendas canceladas:', response.status)
-          break
-        }
-
-        const data = await response.json()
-        const items = data.items || []
-
-        // Soma os valores de valorFinal de todas as vendas canceladas
-        const somaPagina = items.reduce((acc: number, venda: any) => {
-          const valorFinal = venda.valorFinal || venda.valorTotal || venda.valor || 0
-          return acc + (typeof valorFinal === 'number' ? valorFinal : 0)
-        }, 0)
-
-        total += somaPagina
-
-        // Calcula total de páginas na primeira requisição
-        if (currentPage === 0) {
-          if (data.totalPages) {
-            totalPages = data.totalPages
-          } else if (data.count && data.limit) {
-            totalPages = Math.ceil(data.count / data.limit)
-          } else if (items.length < pageSize) {
-            totalPages = 1
-          }
-        }
-
-        currentPage++
-      }
-
-      return total
-    } catch (error) {
-      console.error('Erro ao calcular total cancelado:', error)
-      return 0
-    }
-  }, [auth, periodo, periodoInicial, periodoFinal])
-
-  useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const useCase = new BuscarVendasDashboardUseCase();
-        const mappedPeriodo = mapPeriodoToUseCaseFormat(periodo);
-        // Se período for "Datas Personalizadas", usa as datas fornecidas
-        const useCustomDates = periodo === 'Datas Personalizadas' && periodoInicial && periodoFinal;
-        const total = await useCase.execute(mappedPeriodo, ['FINALIZADA', 'CANCELADA'], useCustomDates ? periodoInicial : undefined, useCustomDates ? periodoFinal : undefined);
-        const finalizadas = await useCase.execute(mappedPeriodo, ['FINALIZADA'], useCustomDates ? periodoInicial : undefined, useCustomDates ? periodoFinal : undefined);
-        const canceladas = await useCase.execute(mappedPeriodo, ['CANCELADA'], useCustomDates ? periodoInicial : undefined, useCustomDates ? periodoFinal : undefined);
-        // IMPORTANTE: Vendas ABERTA sempre buscam todas as mesas abertas no momento,
-        // independente do período selecionado, pois representam estado atual do sistema
-        const abertas = await useCase.execute('todos', ['ABERTA'], undefined, undefined);
-        
-        setDataTotal(total);
-        setDataFinalizadas(finalizadas);
-        setDataCanceladas(canceladas);
-
-        // Conta mesas abertas diretamente da API (sem usar metricas)
-        const totalMesasAbertas = await contarMesasAbertas();
-        setMesasAbertas(totalMesasAbertas);
-
-        // Calcula o total cancelado somando os valores das vendas canceladas
-        const totalCanceladoCalculado = await calcularTotalCancelado();
-        setTotalCancelado(totalCanceladoCalculado);
-
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Erro ao carregar dados');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadData();
-  }, [periodo, periodoInicial, periodoFinal, auth, calcularTotalCancelado, contarMesasAbertas]);
+  const { inicio, fim } = getPeriodoDates()
+  const { data, isLoading, error, refetch } = useDashboardResumoQuery({
+    periodoInicial: inicio,
+    periodoFinal: fim,
+  })
 
   const formatCurrency = (value?: number) => {
     if (!value) return 'R$ 0,00'
@@ -286,7 +91,7 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
       <div className="h-32 flex flex-col items-center justify-center bg-white rounded-xl border border-gray-200">
         <p className="text-red-600 mb-4">Erro ao carregar dados</p>
         <button
-          onClick={() => window.location.reload()}
+          onClick={() => void refetch()}
           className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           Tentar novamente
@@ -295,6 +100,8 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
     )
   }
 
+  const metricas = data?.metricas
+
   return (
     <>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1">
@@ -302,7 +109,7 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
         {/* Total Faturado */}
         <MetricCard className=" border hover:border-primary/50"
           title="Total Faturado"
-          value={formatCurrency(dataTotal?.getTotalFaturado())}
+          value={formatCurrency(metricas?.total.totalFaturado)}
           icon={<MdAttachMoney size={20} color="var(--color-primary)" />}
           bgColorClass="bg-info border-2 border-primary"
           iconColorClass="text-info"
@@ -313,7 +120,7 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
         {/* Vendas Finalizadas */}
         <MetricCard className=" border hover:border-primary/50"
           title="Vendas Finalizadas"
-          value={formatNumber(dataFinalizadas?.getCountVendasEfetivadas())}
+          value={formatNumber(metricas?.finalizadas.countVendasEfetivadas)}
           icon={<span className="text-primary"><MdShoppingCart size={20} /></span>}
           bgColorClass="bg-info border-2 border-primary"
           iconColorClass="text-info"
@@ -326,7 +133,7 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
          {/* Total Cancelado */}
          <MetricCard className=" border hover:border-error/50"
           title="Total Cancelado"
-          value={formatCurrency(totalCancelado)}
+          value={formatCurrency(data?.totalCancelado)}
           icon={<MdAttachMoney size={20} color="var(--color-error)" />}
           bgColorClass="bg-error/15 border-2 border-error"
           iconColorClass="text-primary"
@@ -339,7 +146,7 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
         {/* Vendas Canceladas */}
         <MetricCard className=" border hover:border-error/50"
           title="Vendas Canceladas"
-          value={formatNumber(dataCanceladas?.getCountVendasCanceladas())}
+          value={formatNumber(metricas?.canceladas.countVendasCanceladas)}
           icon={<span className="text-error">✕</span>}
           bgColorClass="bg-error/15 border-2 border-error"
           iconColorClass="text-info"
@@ -352,7 +159,7 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
         {/* Vendas em Aberto */}
         <MetricCard className=" border hover:border-primary/50"
           title="Mesas Abertas"
-          value={formatNumber(mesasAbertas)}
+          value={formatNumber(data?.mesasAbertas)}
           icon={<LuDoorOpen size={20} color="var(--color-primary)" />}
           bgColorClass="bg-info border-2 border-primary"
           iconColorClass="text-info"
@@ -365,7 +172,7 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
         {/* Produtos Vendidos */}
         <MetricCard className=" border hover:border-primary/50"
           title="Produtos Vendidos"
-          value={formatNumber(dataTotal?.getCountProdutosVendidos())}
+          value={formatNumber(metricas?.total.countProdutosVendidos)}
           icon={<MdRestaurant size={20} color="var(--color-primary)"/>}
           bgColorClass="bg-info border-2 border-primary"
           iconColorClass="text-info"

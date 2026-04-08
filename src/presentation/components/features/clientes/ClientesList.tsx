@@ -7,9 +7,22 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { ClientesTabsModal, ClientesTabsModalState } from './ClientesTabsModal'
 import { MdSearch, MdVisibility } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 
 interface ClientesListProps {
   onReload?: () => void
+}
+
+const INDICADOR_IE_LABELS: Record<string, string> = {
+  '1': 'Contribuinte ICMS',
+  '2': 'Contribuinte isento de IE',
+  '9': 'Não contribuinte',
+}
+
+function textoIndicadorIeLista(valor: string | undefined): string {
+  if (valor == null || String(valor).trim() === '') return '-'
+  const v = String(valor).trim()
+  return INDICADOR_IE_LABELS[v] ?? v
 }
 
 /**
@@ -305,7 +318,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
       </div>
 
       <div className="h-[4px] border-t-2 border-primary/70 flex-shrink-0"></div>
-      <div className="flex gap-3 md:px-[20px] px-1 pb-2 flex-shrink-0">
+      <div className="flex gap-3 md:px-[0px] px-1 pb-2 flex-shrink-0">
         <div className="flex-1 min-w-[180px] max-w-[360px]">
             <label
               htmlFor="clientes-search"
@@ -348,7 +361,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
           </div>
 
       {/* Cabeçalho da tabela */}
-      <div className="md:px-[30px] mt-0 flex-shrink-0">
+      <div className="md:px-[0px] mt-0 flex-shrink-0">
         <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-2">
           <div className="flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Nome
@@ -358,6 +371,12 @@ export function ClientesList({ onReload }: ClientesListProps) {
           </div>
           <div className="flex-[1.5] font-nunito font-semibold text-sm text-primary-text hidden md:flex">
             CNPJ
+          </div>
+          <div className="flex-[1.5] font-nunito font-semibold text-sm text-primary-text hidden md:flex min-w-0">
+            Indicador IE
+          </div>
+          <div className="flex-[1.5] font-nunito font-semibold text-sm text-primary-text hidden md:flex min-w-0">
+            Inscrição est.
           </div>
           <div className="md:flex-[2] flex-[1.5] font-nunito font-semibold md:text-sm text-xs text-center md:text-start text-primary-text">
             Telefone
@@ -374,18 +393,13 @@ export function ClientesList({ onReload }: ClientesListProps) {
       {/* Lista de clientes com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto md:px-[30px] px-1 mt-1 scrollbar-hide"
+        className="flex-1 overflow-y-auto md:px-[0px] px-1 mt-1 scrollbar-hide"
         style={{ maxHeight: 'calc(100vh - 300px)' }}
       >
         {/* Loading inicial */}
         {(isLoading || !hasLoadedInitialRef.current) && clientes.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 gap-2">
-            <img
-              src="/images/jiffy-loading.gif"
-              alt="Carregando..."
-              className="w-20 h-20"
-            />
-            <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
+            <JiffyLoading />
           </div>
         )}
 
@@ -429,6 +443,18 @@ export function ClientesList({ onReload }: ClientesListProps) {
             </div>
             <div className="flex-[1.5] font-nunito text-sm text-secondary-text hidden md:flex">
               {cliente.getCnpj() || '-'}
+            </div>
+            <div
+              className="flex-[1.5] font-nunito text-sm text-secondary-text hidden md:flex min-w-0 items-center"
+              title={textoIndicadorIeLista(cliente.getIndicadorInscricaoEstadual())}
+            >
+              <span className="truncate">{textoIndicadorIeLista(cliente.getIndicadorInscricaoEstadual())}</span>
+            </div>
+            <div
+              className="flex-[1.5] font-nunito text-sm text-secondary-text hidden md:flex min-w-0 items-center"
+              title={cliente.getInscricaoEstadual()?.trim() || '-'}
+            >
+              <span className="truncate">{cliente.getInscricaoEstadual()?.trim() || '-'}</span>
             </div>
             <div className="md:flex-[2] flex-[1.5] font-nunito md:text-sm text-xs text-center md:text-start text-secondary-text">
               {cliente.getTelefone() || '-'}

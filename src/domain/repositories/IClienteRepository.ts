@@ -15,6 +15,8 @@ export interface CriarClienteDTO {
   telefone?: string
   email?: string
   nomeFantasia?: string
+  indicadorInscricaoEstadual?: string
+  inscricaoEstadual?: string
   ativo?: boolean
   endereco?: {
     rua?: string
@@ -36,6 +38,9 @@ export interface AtualizarClienteDTO {
   telefone?: string | null
   email?: string
   nomeFantasia?: string
+  indicadorInscricaoEstadual?: string
+  /** null limpa a IE na API */
+  inscricaoEstadual?: string | null
   ativo?: boolean
   endereco?: {
     rua?: string

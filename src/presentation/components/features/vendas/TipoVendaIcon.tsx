@@ -1,10 +1,11 @@
 'use client'
 
 import React from 'react'
+import { MdMonitor, MdPointOfSale, MdRestaurant, MdRestaurantMenu } from 'react-icons/md'
 import { RiBeerFill } from 'react-icons/ri'
 
 interface TipoVendaIconProps {
-  tipoVenda: 'mesa' | 'balcao'
+  tipoVenda: 'mesa' | 'balcao' | 'gestor'
   numeroMesa?: number | string | null
   className?: string
   size?: number // Adicionado a prop size
@@ -18,19 +19,24 @@ interface TipoVendaIconProps {
   corBorda?: string // Cor da borda - padrão: rgba(131, 56, 236, 0.5)
   corFundo?: string // Cor de fundo do círculo externo - padrão: var(--color-primary-background)
   corBalcao?: string // Cor do ícone de balcão - padrão: var(--color-alternate)
+  corGestor?: string // Cor do rótulo "Gestor" - padrão: var(--color-alternate)
 }
 
 /**
- * Componente para representar o tipo de venda (Mesa ou Balcão)
- * 
+ * Componente para representar o tipo de venda (Mesa, Balcão ou Gestor)
+ *
  * Para Mesa:
  * - Círculo central sólido roxo (alternate) com número branco
  * - Borda roxa mais clara ao redor
  * - Quatro pétalas decorativas em azul claro (accent3) ao redor
- * 
+ *
  * Para Balcão:
- * - Ícone de cerveja (RiBeerFill) com 28px
+ * - Ícone de cerveja (RiBeerFill)
  * - Texto "Balcão" abaixo
+ *
+ * Para Gestor:
+ * - Composição MdMonitor + MdRestaurant (tela + food; não há um único glifo MD com os dois)
+ * - Texto "Gestor" abaixo
  */
 export function TipoVendaIcon({
   tipoVenda,
@@ -45,6 +51,7 @@ export function TipoVendaIcon({
   corBorda = 'var(--color-alternate)',
   corFundo = 'var(--color-primary-background)',
   corBalcao = 'var(--color-alternate)',
+  corGestor = 'var(--color-alternate)',
   title,
 }: TipoVendaIconProps) {
   const scale = containerScale
@@ -56,6 +63,7 @@ export function TipoVendaIcon({
   const textFontSize = size / 4 // Tamanho da fonte do número da mesa
   const beerIconSize = size // Tamanho do ícone da cerveja para balcão
   const balcaoTextSize = size / 5 // Tamanho da fonte do texto "Balcão"
+  const gestorTextSize = size / 5 // Tamanho da fonte do texto "Gestor"
 
   if (tipoVenda === 'mesa') {
     return (
@@ -65,7 +73,10 @@ export function TipoVendaIcon({
         {...(title ? { 'data-tooltip': title } : {})}
       >
         {/* Container Stack - equivalente ao Stack do Flutter */}
-        <div className="relative flex items-center justify-center" style={{ width: `${outerCircleSize}px`, height: `${outerCircleSize}px` }}>
+        <div
+          className="relative flex items-center justify-center"
+          style={{ width: `${outerCircleSize}px`, height: `${outerCircleSize}px` }}
+        >
           {/* Quatro pétalas decorativas ao redor */}
           <svg
             width={outerCircleSize}
@@ -148,7 +159,6 @@ export function TipoVendaIcon({
               transform: 'translate(-50%, -50%)',
               border: '1px solid',
               borderColor: corBorda,
-              
             }}
           >
             <span
@@ -166,24 +176,66 @@ export function TipoVendaIcon({
   // Componente de Balcão - usa o tamanho da prop size
   if (tipoVenda === 'balcao') {
     return (
-      <div 
-        className={`flex flex-col items-center justify-center ${className}`} 
-        style={{ 
-          height: `${iconHeight}px`, 
+      <div
+        className={`flex flex-col items-center justify-center ${className}`}
+        style={{
+          height: `${iconHeight}px`,
           width: `${outerCircleSize}px`,
           minHeight: `${iconHeight}px`,
           minWidth: `${outerCircleSize}px`,
           maxHeight: `${iconHeight}px`,
           maxWidth: `${outerCircleSize}px`,
-          flexShrink: 0
+          flexShrink: 0,
         }}
       >
         <RiBeerFill size={beerIconSize} color={corBalcao} />
-        <span className="mt-1 font-medium whitespace-nowrap" style={{ color: corBalcao, fontSize: `${balcaoTextSize}px`, lineHeight: 1 }}>Balcão</span>
+        <span
+          className="mt-1 whitespace-nowrap font-medium"
+          style={{ color: corBalcao, fontSize: `${balcaoTextSize}px`, lineHeight: 1 }}
+        >
+          Balcão
+        </span>
+      </div>
+    )
+  }
+
+  // Venda originada no Gestor — ícone MD + rótulo (mesmo padrão de área útil do balcão)
+  if (tipoVenda === 'gestor') {
+    return (
+      <div
+        className={`flex flex-col items-center justify-center ${title ? 'tooltip-hover' : ''} ${className}`}
+        style={{
+          height: `${iconHeight}px`,
+          width: `${outerCircleSize}px`,
+          minHeight: `${iconHeight}px`,
+          minWidth: `${outerCircleSize}px`,
+          maxHeight: `${iconHeight}px`,
+          maxWidth: `${outerCircleSize}px`,
+          flexShrink: 0,
+        }}
+        {...(title ? { 'data-tooltip': title } : {})}
+      >
+        <div
+          className="relative flex items-center justify-center"
+          style={{ width: beerIconSize, height: beerIconSize }}
+          aria-hidden
+        >
+          <MdPointOfSale  
+            size={Math.round(beerIconSize * 0.82)}
+            color={corGestor}
+            className="block shrink-0"
+          />
+          
+        </div>
+        <span
+          className="mt-1 whitespace-nowrap font-medium"
+          style={{ color: corGestor, fontSize: `${gestorTextSize}px`, lineHeight: 1 }}
+        >
+          Gestor
+        </span>
       </div>
     )
   }
 
   return null
 }
-

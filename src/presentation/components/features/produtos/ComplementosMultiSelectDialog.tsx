@@ -13,6 +13,7 @@ import { Complemento } from '@/src/domain/entities/Complemento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { MdClose, MdSearch, MdKeyboardArrowDown, MdDelete, MdAdd, MdAddCircle, MdAddShoppingCart, MdGroupAdd, MdAddAPhoto, MdCheck, MdEdit } from 'react-icons/md'
 import { GruposComplementosTabsModal, GruposComplementosTabsModalState } from '../grupos-complementos/GruposComplementosTabsModal'
@@ -432,12 +433,7 @@ export function ComplementosMultiSelectDialog({
     if (isLoading) {
       return (
         <div className="flex flex-col items-center justify-center py-12 gap-2">
-          <img
-            src="/images/jiffy-loading.gif"
-            alt="Carregando"
-            className="w-16 h-16 object-contain"
-          />
-          <p className="text-secondary-text text-sm text-center">Carregando complementos...</p>
+          <JiffyLoading />
         </div>
       )
     }
@@ -628,12 +624,7 @@ export function ComplementosMultiSelectDialog({
         <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
           {isLoadingSelectableGroups ? (
             <div className="flex flex-col items-center justify-center py-6 gap-2">
-              <img
-                src="/images/jiffy-loading.gif"
-                alt="Carregando"
-                className="w-16 h-16 object-contain"
-              />
-              <p className="text-secondary-text text-sm text-center">Carregando grupos...</p>
+              <JiffyLoading />
             </div>
           ) : filteredSelectableGroups.length ? (
             filteredSelectableGroups.map((grupo, index) => {

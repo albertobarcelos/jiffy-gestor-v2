@@ -7,7 +7,6 @@ import {
   DragStartEvent,
   DragOverlay,
   PointerSensor,
-  TouchSensor,
   useSensor,
   useSensors,
   useDraggable,
@@ -16,22 +15,20 @@ import {
 import {
   useMarcarEmissaoFiscal,
   useDesmarcarEmissaoFiscal,
-  useVincularClienteNaVenda,
-  useEmitirNfe,
-  useEmitirNfeGestor,
   useReemitirNfe,
   useReemitirNfeGestor,
+  useEmitirNfe,
+  useEmitirNfeGestor,
 } from '@/src/presentation/hooks/useVendas'
 import {
   useVendasUnificadas,
   VendaUnificadaDTO,
+  resolveModeloParaEmitirNota,
 } from '@/src/presentation/hooks/useVendasUnificadas'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { calculatePeriodo } from '@/src/shared/utils/dateFilters'
 import {
   MdReceipt,
-  MdAdd,
-  MdVisibility,
   MdSchedule,
   MdRefresh,
   MdCheckCircle,
@@ -39,14 +36,14 @@ import {
   MdFilterAltOff,
   MdSearch,
   MdCalendarToday,
-  MdMoreVert,
   MdEdit,
+  MdAdd,
+  MdArrowDownward,
+  MdArrowUpward,
 } from 'react-icons/md'
 import { EmitirNfeModal } from './EmitirNfeModal'
-import { SeletorClienteModal } from './SeletorClienteModal'
-import { Cliente } from '@/src/domain/entities/Cliente'
 import { Button } from '@/src/presentation/components/ui/button'
-import { Badge } from '@/src/presentation/components/ui/badge'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { StatusFiscalBadge } from './StatusFiscalBadge'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 import { NovoPedidoModal } from './NovoPedidoModal'
@@ -64,9 +61,6 @@ interface KanbanColumn {
   title: string
   color: string
   borderColor: string
-  borderColorClass: string // Classe Tailwind para a cor da borda
-  /** Fundo do card: mesma família de cor da coluna, mais suave que o header */
-  cardBackgroundClass: string
   icon: React.ReactNode
   placeholder: string
 }
@@ -74,8 +68,129 @@ interface KanbanColumn {
 // Usar VendaUnificadaDTO do hook
 type Venda = VendaUnificadaDTO
 
+type ColunaKanbanId = 'FINALIZADAS' | 'PENDENTE_EMISSAO' | 'COM_NFE'
+
+/** Status em que a UI trata como aguardando resposta da SEFAZ (até o backend refletir rejeição/códigos). */
+const STATUS_FISCAL_AGUARDANDO_SEFAZ = new Set([
+  'PENDENTE',
+  'PENDENTE_AUTORIZACAO',
+  'EMITINDO',
+  'CONTINGENCIA',
+])
+
+function statusFiscalAguardandoSefaz(v: VendaUnificadaDTO): boolean {
+  const sf = String(v.statusFiscal ?? '')
+    .trim()
+    .toUpperCase()
+  return STATUS_FISCAL_AGUARDANDO_SEFAZ.has(sf)
+}
+
+/**
+ * Borda esquerda e fundo do card conforme coluna e statusFiscal.
+ * Finalizadas: primary. Pendente/Com nota: fiscal (emitida/cancelada/rejeitada), sem status na pendente → amarelo,
+ * reemitindo, emitindo (emitir-nota direto) ou aguardando SEFAZ → custom-2.
+ */
+function getCardBorderEFundoKanban(
+  columnId: ColunaKanbanId,
+  v: VendaUnificadaDTO,
+  acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
+): { borderClass: string; cardBgClass: string } {
+  if (columnId === 'FINALIZADAS') {
+    return { borderClass: 'border-l-primary', cardBgClass: 'bg-white' }
+  }
+
+  const acao = acaoFiscalEmAndamentoPorVenda[v.id]
+  if (acao === 'reemitindo' || acao === 'emitindo') {
+    return { borderClass: 'border-l-custom-2', cardBgClass: 'bg-white' }
+  }
+
+  const sf = String(v.statusFiscal ?? '')
+    .trim()
+    .toUpperCase()
+
+  if (sf === 'EMITIDA') {
+    return { borderClass: 'border-l-green-500', cardBgClass: 'bg-white' }
+  }
+  if (sf === 'CANCELADA') {
+    return { borderClass: 'border-l-gray-400', cardBgClass: 'bg-gray-50' }
+  }
+  if (sf === 'REJEITADA') {
+    return { borderClass: 'border-l-red-500', cardBgClass: 'bg-white' }
+  }
+
+  // Aguardando SEFAZ
+  if (statusFiscalAguardandoSefaz(v)) {
+    return { borderClass: 'border-l-custom-2', cardBgClass: 'bg-white' }
+  }
+
+  // Coluna Pendente emissão sem statusFiscal na API → mantém amarelo (identidade da coluna)
+  if (columnId === 'PENDENTE_EMISSAO' && !sf) {
+    return { borderClass: 'border-l-yellow-400', cardBgClass: 'bg-white' }
+  }
+
+  if (columnId === 'PENDENTE_EMISSAO') {
+    return { borderClass: 'border-l-yellow-400', cardBgClass: 'bg-white' }
+  }
+
+  if (columnId === 'COM_NFE') {
+    return { borderClass: 'border-l-green-400', cardBgClass: 'bg-white' }
+  }
+
+  return { borderClass: 'border-l-gray-300', cardBgClass: 'bg-white' }
+}
+
 /** Exibido quando o nome do cliente está vazio (Kanban e arraste) */
 const LABEL_SEM_CLIENTE = 'SEM CLIENTE'
+
+/** Colunas de onde o card pode ser arrastado (Com Nota Solicitada não arrasta para trás) */
+const COLUNAS_KANBAN_ORIGEM_DRAG = new Set(['FINALIZADAS', 'PENDENTE_EMISSAO'])
+
+/** Colunas onde o “primeiro da lista” é persistido no localStorage ao soltar */
+const COLUNAS_KANBAN_DESTINO_PIN = new Set(['FINALIZADAS', 'PENDENTE_EMISSAO', 'COM_NFE'])
+
+/** Mesma regra de desabilitar o botão “Emitir nota” — usada no drop em Com nota solicitada */
+function vendaBloqueadaParaEmissaoInterativa(
+  v: VendaUnificadaDTO,
+  acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
+): boolean {
+  if (acaoFiscalEmAndamentoPorVenda[v.id]) return true
+  const s = String(v.statusFiscal ?? '')
+    .trim()
+    .toUpperCase()
+  if (s === 'EMITIDA' || s === 'PENDENTE_EMISSAO') return true
+  if (statusFiscalAguardandoSefaz(v)) return true
+  return false
+}
+
+const KANBAN_PRIMEIRO_POR_COLUNA_KEY = 'jiffy-gestor-v2:kanban-primeiro-por-coluna'
+
+/** Lê mapa colunaId → vendaId que deve aparecer primeiro (localStorage). */
+function lerPrimeiroPorColunaDoStorage(): Record<string, string> {
+  if (typeof window === 'undefined') return {}
+  try {
+    const raw = window.localStorage.getItem(KANBAN_PRIMEIRO_POR_COLUNA_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as unknown
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, string>
+    }
+  } catch {
+    /* formato inválido ou storage indisponível */
+  }
+  return {}
+}
+
+function gravarPrimeiroPorColunaNoStorage(map: Record<string, string>) {
+  try {
+    window.localStorage.setItem(KANBAN_PRIMEIRO_POR_COLUNA_KEY, JSON.stringify(map))
+  } catch {
+    /* quota, modo privado, etc. */
+  }
+}
+
+/** Critério de ordenação por coluna (mantido apenas em memória). */
+type CriterioOrdenacaoKanban = 'data' | 'numero' | 'cliente'
+type DirecaoOrdenacaoKanban = 'asc' | 'desc'
 
 /** Venda sem nome de cliente preenchido (nome vazio ou só espaços) */
 function vendaSemNomeCliente(v: Venda): boolean {
@@ -99,61 +214,67 @@ type PeriodoOpcao =
   | 'Últimos 90 Dias'
   | 'Datas Personalizadas'
 
-const KANBAN_ORDEM_STORAGE_KEY = 'kanban-ordem-colunas'
-
-/** Ordem preferida dos IDs por coluna (persistida no localStorage para sobreviver ao refresh) */
-type OrdemColunasStorage = Record<string, string[]>
-
-function getOrdemFromStorage(): OrdemColunasStorage {
-  if (typeof window === 'undefined') return {}
-  try {
-    const raw = window.localStorage.getItem(KANBAN_ORDEM_STORAGE_KEY)
-    if (!raw) return {}
-    const parsed = JSON.parse(raw) as OrdemColunasStorage
-    return typeof parsed === 'object' && parsed !== null ? parsed : {}
-  } catch {
-    return {}
+/**
+ * Ordena por data mais recente primeiro (igual em todas as colunas, sem depender de localStorage).
+ * Prioridade: data de finalização → data de emissão fiscal → data de criação.
+ */
+function ordenarVendasKanbanPorDataDesc(vendas: Venda[]): Venda[] {
+  const timestampOrdenacao = (v: Venda): number => {
+    const raw =
+      v.dataFinalizacao?.trim() || v.dataEmissaoFiscal?.trim() || v.dataCriacao?.trim() || ''
+    if (!raw) return 0
+    const ms = new Date(raw).getTime()
+    return Number.isFinite(ms) ? ms : 0
   }
+  return [...vendas].sort((a, b) => {
+    const diff = timestampOrdenacao(b) - timestampOrdenacao(a)
+    if (diff !== 0) return diff
+    return b.id.localeCompare(a.id)
+  })
 }
 
-function setOrdemInStorage(columnId: string, orderedIds: string[]) {
-  if (typeof window === 'undefined') return
-  try {
-    const current = getOrdemFromStorage()
-    const next = { ...current, [columnId]: orderedIds }
-    window.localStorage.setItem(KANBAN_ORDEM_STORAGE_KEY, JSON.stringify(next))
-  } catch {
-    // localStorage cheio ou indisponível
+function ordenarVendasKanbanPorCriterio(
+  vendas: Venda[],
+  criterio: CriterioOrdenacaoKanban,
+  direcao: DirecaoOrdenacaoKanban
+): Venda[] {
+  if (criterio === 'data') {
+    if (direcao === 'desc') return ordenarVendasKanbanPorDataDesc(vendas)
+    return [...vendas].sort((a, b) => {
+      const timestampOrdenacao = (v: Venda): number => {
+        const raw =
+          v.dataFinalizacao?.trim() || v.dataEmissaoFiscal?.trim() || v.dataCriacao?.trim() || ''
+        if (!raw) return 0
+        const ms = new Date(raw).getTime()
+        return Number.isFinite(ms) ? ms : 0
+      }
+      const diff = timestampOrdenacao(a) - timestampOrdenacao(b) // asc
+      if (diff !== 0) return diff
+      return a.id.localeCompare(b.id)
+    })
   }
+
+  if (criterio === 'numero') {
+    return [...vendas].sort((a, b) => {
+      const diff =
+        direcao === 'desc' ? b.numeroVenda - a.numeroVenda : a.numeroVenda - b.numeroVenda
+      if (diff !== 0) return diff
+      return direcao === 'desc' ? b.id.localeCompare(a.id) : a.id.localeCompare(b.id)
+    })
+  }
+
+  // criterio === 'cliente'
+  return [...vendas].sort((a, b) => {
+    const nomeA = a.cliente?.nome?.trim() ? a.cliente.nome.trim() : LABEL_SEM_CLIENTE
+    const nomeB = b.cliente?.nome?.trim() ? b.cliente.nome.trim() : LABEL_SEM_CLIENTE
+    const diff = nomeA.localeCompare(nomeB, 'pt-BR', { sensitivity: 'base' })
+    const diffFinal = direcao === 'desc' ? -diff : diff
+    if (diffFinal !== 0) return diffFinal
+    return direcao === 'desc' ? b.id.localeCompare(a.id) : a.id.localeCompare(b.id)
+  })
 }
 
-/** Coloca no topo da ordem da coluna o id movido e remove da outra coluna */
-function persistirOrdemAoMover(movedId: string, colunaDestino: 'PENDENTE_EMISSAO' | 'FINALIZADAS') {
-  const current = getOrdemFromStorage()
-  const outraColuna = colunaDestino === 'PENDENTE_EMISSAO' ? 'FINALIZADAS' : 'PENDENTE_EMISSAO'
-  const listaDestino = current[colunaDestino] ?? []
-  const listaOutra = (current[outraColuna] ?? []).filter(id => id !== movedId)
-  const novaListaDestino = [movedId, ...listaDestino.filter(id => id !== movedId)]
-  setOrdemInStorage(colunaDestino, novaListaDestino)
-  setOrdemInStorage(outraColuna, listaOutra)
-}
-
-/** Reordena a lista de vendas conforme a ordem preferida (IDs que estão no topo no storage ficam primeiro) */
-function aplicarOrdemPreferida(vendas: Venda[], orderedIds: string[]): Venda[] {
-  if (orderedIds.length === 0) return vendas
-  const byId = new Map(vendas.map(v => [v.id, v]))
-  const result: Venda[] = []
-  for (const id of orderedIds) {
-    const v = byId.get(id)
-    if (v) result.push(v)
-  }
-  for (const v of vendas) {
-    if (!orderedIds.includes(v.id)) result.push(v)
-  }
-  return result
-}
-
-/** Coluna droppable: Pendente Emissão = "marcar para emissão"; Finalizadas = "desmarcar da emissão" */
+/** Área droppable da coluna: slots visuais ao arrastar (Finalizadas, Pendente emissão, Com nota solicitada). */
 function DroppableColumnContent({
   columnId,
   children,
@@ -166,11 +287,14 @@ function DroppableColumnContent({
   const { setNodeRef, isOver } = useDroppable({ id: columnId })
   const showDropSlotPendente = columnId === 'PENDENTE_EMISSAO' && isOver
   const showDropSlotFinalizadas = columnId === 'FINALIZADAS' && isOver
+  const showDropSlotComNfe = columnId === 'COM_NFE' && isOver
   const isOverClass = showDropSlotPendente
     ? 'ring-2 ring-yellow-400 ring-inset bg-yellow-50/50'
     : showDropSlotFinalizadas
       ? 'ring-2 ring-blue-400 ring-inset bg-blue-50/50'
-      : ''
+      : showDropSlotComNfe
+        ? 'ring-2 ring-green-400 ring-inset bg-green-50/50'
+        : ''
   return (
     <div ref={setNodeRef} className={`${className ?? ''} ${isOverClass}`}>
       {showDropSlotPendente && (
@@ -183,12 +307,17 @@ function DroppableColumnContent({
           Solte aqui para voltar à coluna Finalizadas
         </div>
       )}
+      {showDropSlotComNfe && (
+        <div className="mb-2 flex min-h-[72px] items-center justify-center rounded-lg border-2 border-dashed border-green-500 bg-green-50/90 px-2 text-center text-sm font-medium text-green-800 transition-all">
+          Solte aqui para emitir ou reemitir nota
+        </div>
+      )}
       {children}
     </div>
   )
 }
 
-/** Preview do card durante o arraste: inclinado e com leve tremor (efeito de “arrastando na tela”) */
+/** Preview do card durante o arraste (DragOverlay): leve inclinação via classe global `.drag-preview-card` */
 function VendaCardDragPreview({ venda }: { venda: VendaUnificadaDTO }) {
   const valorFormatado = transformarParaReal(venda.valorFinal)
   const clienteNome = venda.cliente?.nome?.trim() ? venda.cliente.nome : LABEL_SEM_CLIENTE
@@ -209,7 +338,11 @@ function VendaCardDragPreview({ venda }: { venda: VendaUnificadaDTO }) {
   )
 }
 
-/** Card draggable em Finalizadas (→ Pendente Emissão) e em Pendente Emissão (→ Finalizadas); PDV e Gestor */
+/**
+ * Card draggable em Finalizadas e Pendente Emissão (incl. arrastar para Com nota solicitada).
+ * Coluna Com nota solicitada: cards não arrastam (não voltam às colunas anteriores via DnD).
+ * PDV e Gestor.
+ */
 function DraggableVendaCard({
   venda,
   column,
@@ -220,7 +353,7 @@ function DraggableVendaCard({
   children: React.ReactNode
 }) {
   const isDraggable =
-    (column.id === 'FINALIZADAS' || column.id === 'PENDENTE_EMISSAO') &&
+    COLUNAS_KANBAN_ORIGEM_DRAG.has(column.id) &&
     (venda.tabelaOrigem === 'venda' || venda.tabelaOrigem === 'venda_gestor')
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `venda-${venda.id}`,
@@ -233,15 +366,10 @@ function DraggableVendaCard({
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      className="cursor-grab active:cursor-grabbing"
+      className={`cursor-grab touch-none select-none active:cursor-grabbing ${isDragging ? 'opacity-40' : ''}`}
+      style={{ touchAction: 'none' }}
     >
-      {isDragging ? (
-        <div className="flex min-h-[100px] items-center justify-center rounded border-2 border-dashed border-gray-300 bg-gray-50/80">
-          <span className="text-xs text-gray-400">Arrastando...</span>
-        </div>
-      ) : (
-        children
-      )}
+      {children}
     </div>
   )
 }
@@ -272,14 +400,8 @@ export function FiscalFlowKanban() {
   const [filtrosVisiveisMobile, setFiltrosVisiveisMobile] = useState(false)
   const [isDatasModalOpen, setIsDatasModalOpen] = useState(false)
   const debounceSearchRef = useRef<NodeJS.Timeout | undefined>(undefined)
-  const [seletorClienteVendaOpen, setSeletorClienteVendaOpen] = useState(false)
   const [editarClienteModalOpen, setEditarClienteModalOpen] = useState(false)
   const [editarClienteId, setEditarClienteId] = useState<string | null>(null)
-  /** Contexto da venda ao abrir o seletor (PATCH clienteId só em /api/vendas/gestor/:id) */
-  const vendaParaVincularClienteRef = useRef<{
-    id: string
-    tabelaOrigem: 'venda' | 'venda_gestor'
-  } | null>(null)
 
   const [novoPedidoModalOpen, setNovoPedidoModalOpen] = useState(false)
   const [novoPedidoModalVisualizacaoOpen, setNovoPedidoModalVisualizacaoOpen] = useState(false)
@@ -289,17 +411,39 @@ export function FiscalFlowKanban() {
     tabelaOrigem: 'venda' | 'venda_gestor'
     statusFiscal: Venda['statusFiscal']
   } | null>(null)
-  const [menuAcoesVendaIdAberto, setMenuAcoesVendaIdAberto] = useState<string | null>(null)
   const [acaoFiscalEmAndamentoPorVenda, setAcaoFiscalEmAndamentoPorVenda] = useState<
     Record<string, 'emitindo' | 'reemitindo'>
   >({})
   const [draggingVenda, setDraggingVenda] = useState<Venda | null>(null)
-  const [vendaRecemMovidaParaPendenteId, setVendaRecemMovidaParaPendenteId] = useState<
-    string | null
-  >(null)
-  const [vendaRecemMovidaParaFinalizadasId, setVendaRecemMovidaParaFinalizadasId] = useState<
-    string | null
-  >(null)
+  /** vendaId fixado no topo por coluna (Finalizadas / Pendente emissão), persistido em localStorage */
+  const [primeiroPorColuna, setPrimeiroPorColuna] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    setPrimeiroPorColuna(lerPrimeiroPorColunaDoStorage())
+  }, [])
+
+  /** Evita PATCH duplicado ao reativar solicitarEmissaoFiscal para REJEITADA (Strict Mode / re-renders) */
+  const rejeitadaReativacaoEmAndamentoRef = useRef(false)
+  /** IDs já reativados com sucesso — evita loop infinito se o GET ainda vier inconsistente (base de testes). */
+  const rejeitadaReativacaoJaTentadaIdsRef = useRef<Set<string>>(new Set())
+
+  type ColunaId = 'FINALIZADAS' | 'PENDENTE_EMISSAO' | 'COM_NFE'
+  /** Ordenação individual por coluna: padrão sempre por data (reset ao recarregar a página). */
+  const [criterioOrdenacaoPorColuna, setCriterioOrdenacaoPorColuna] = useState<
+    Record<ColunaId, CriterioOrdenacaoKanban>
+  >({
+    FINALIZADAS: 'data',
+    PENDENTE_EMISSAO: 'data',
+    COM_NFE: 'data',
+  })
+  /** Direção (crescente/decrescente) individual por coluna — reset ao recarregar. */
+  const [direcaoOrdenacaoPorColuna, setDirecaoOrdenacaoPorColuna] = useState<
+    Record<ColunaId, DirecaoOrdenacaoKanban>
+  >({
+    FINALIZADAS: 'desc',
+    PENDENTE_EMISSAO: 'desc',
+    COM_NFE: 'desc',
+  })
 
   // Debounce da busca (q)
   useEffect(() => {
@@ -373,8 +517,6 @@ export function FiscalFlowKanban() {
       periodoFinal: periodoFinalISO,
       dataFinalizacaoInicio: dataFinalizacaoInicioISO,
       dataFinalizacaoFim: dataFinalizacaoFimISO,
-      offset: 0,
-      limit: 100,
     }),
     [
       searchQuery,
@@ -387,6 +529,12 @@ export function FiscalFlowKanban() {
     ]
   )
 
+  const vendasUnificadasQueryKeyFingerprint = JSON.stringify(vendasUnificadasQueryParams)
+
+  useEffect(() => {
+    rejeitadaReativacaoJaTentadaIdsRef.current = new Set()
+  }, [vendasUnificadasQueryKeyFingerprint])
+
   // Buscar vendas unificadas (PDV + Gestor) com filtros da API
   const {
     data: vendasUnificadasData,
@@ -396,17 +544,72 @@ export function FiscalFlowKanban() {
 
   const marcarEmissaoFiscal = useMarcarEmissaoFiscal()
   const desmarcarEmissaoFiscal = useDesmarcarEmissaoFiscal()
-  const vincularClienteNaVenda = useVincularClienteNaVenda()
-  const emitirNfePdv = useEmitirNfe()
-  const emitirNfeGestor = useEmitirNfeGestor()
   const reemitirNfePdv = useReemitirNfe()
   const reemitirNfeGestor = useReemitirNfeGestor()
+  const emitirNotaPdv = useEmitirNfe()
+  const emitirNotaGestor = useEmitirNfeGestor()
 
-  // Sensores para drag-and-drop: evita conflito com clique (abrir detalhes)
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 100, tolerance: 8 } })
-  )
+  // REJEITADA com solicitarEmissaoFiscal false: reativa com o mesmo PATCH de "marcar emissão" (useMarcarEmissaoFiscal)
+  useEffect(() => {
+    if (
+      isLoading ||
+      !vendasUnificadasData?.items?.length ||
+      rejeitadaReativacaoEmAndamentoRef.current
+    )
+      return
+
+    const pendentes = vendasUnificadasData.items.filter(v => {
+      const rejeitada =
+        String(v.statusFiscal ?? '')
+          .trim()
+          .toUpperCase() === 'REJEITADA'
+      return (
+        rejeitada &&
+        !v.solicitarEmissaoFiscal &&
+        !rejeitadaReativacaoJaTentadaIdsRef.current.has(v.id)
+      )
+    })
+    if (pendentes.length === 0) return
+
+    rejeitadaReativacaoEmAndamentoRef.current = true
+    let cancelled = false
+    void (async () => {
+      try {
+        let sucesso = 0
+        for (const v of pendentes) {
+          if (cancelled) break
+          try {
+            await marcarEmissaoFiscal.mutateAsync({
+              id: v.id,
+              tabelaOrigem: v.tabelaOrigem,
+              silent: true,
+            })
+            rejeitadaReativacaoJaTentadaIdsRef.current.add(v.id)
+            sucesso += 1
+          } catch {
+            // Erro por venda: não adiciona ao Set para permitir nova tentativa após novo carregamento
+          }
+        }
+        if (!cancelled && sucesso > 0) {
+          showToast.info(
+            sucesso === 1
+              ? 'Solicitação de emissão reativada para a venda com nota rejeitada.'
+              : `Solicitação de emissão reativada para ${sucesso} vendas com nota rejeitada.`
+          )
+        }
+      } finally {
+        rejeitadaReativacaoEmAndamentoRef.current = false
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isLoading, vendasUnificadasData, marcarEmissaoFiscal])
+
+  // Só PointerSensor: em touch, pointermove fica no document (melhor que TouchSensor no alvo + scroll).
+  // TouchSensor junto com PointerSensor gerava gesto “travado” no mobile; distance evita arraste ao rolar.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 10 } }))
 
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -418,6 +621,18 @@ export function FiscalFlowKanban() {
       }
       return { ...prev, [vendaId]: acao }
     })
+  }
+
+  /**
+   * Etapa do card no Kanban. Durante reemissão ("Reemitindo...") ou emissão direta ("Emitindo..."),
+   * exibe em Com nota solicitada; ao concluir, volta a usar `getEtapaKanban()`.
+   */
+  const getEtapaKanbanParaExibicao = (v: Venda): string => {
+    const acao = acaoFiscalEmAndamentoPorVenda[v.id]
+    if (acao === 'reemitindo' || acao === 'emitindo') {
+      return 'COM_NFE'
+    }
+    return v.getEtapaKanban()
   }
 
   const refetchAteMudarStatusFiscal = async (
@@ -437,6 +652,27 @@ export function FiscalFlowKanban() {
 
       await sleep(intervaloMs)
     }
+  }
+
+  /**
+   * Mesma regra do drag ao soltar em "Com nota solicitada": o card fica primeiro na coluna COM_NFE (localStorage).
+   * Usado ao clicar Emitir/Reemitir na coluna Pendente emissão (sem arrastar).
+   */
+  const pinVendaComoPrimeiraEmComNotaSolicitada = (venda: Venda) => {
+    if (getEtapaKanbanParaExibicao(venda) !== 'PENDENTE_EMISSAO') return
+    const origemKanban = venda.getEtapaKanban()
+    setPrimeiroPorColuna(prev => {
+      const next = { ...prev }
+      if (
+        (origemKanban === 'FINALIZADAS' || origemKanban === 'PENDENTE_EMISSAO') &&
+        prev[origemKanban] === venda.id
+      ) {
+        delete next[origemKanban]
+      }
+      next.COM_NFE = venda.id
+      gravarPrimeiroPorColunaNoStorage(next)
+      return next
+    })
   }
 
   // Todas as vendas unificadas retornadas pela API (já filtradas por q, período, origem, statusFiscal no backend)
@@ -464,8 +700,6 @@ export function FiscalFlowKanban() {
       title: 'Finalizadas',
       color: 'bg-primary/15',
       borderColor: 'border-gray-400',
-      borderColorClass: 'border-l-primary',
-      cardBackgroundClass: 'bg-primary/10',
       icon: <MdReceipt className="h-4 w-4 text-gray-600" />,
       placeholder: 'Vendas finalizadas aguardando ação',
     },
@@ -474,8 +708,6 @@ export function FiscalFlowKanban() {
       title: 'Pendente Emissão Fiscal',
       color: 'bg-yellow-50',
       borderColor: 'border-yellow-400',
-      borderColorClass: 'border-l-yellow-400',
-      cardBackgroundClass: 'bg-yellow-400/10',
       icon: <MdSchedule className="h-4 w-4 text-yellow-600" />,
       placeholder: 'Vendas aguardando emissão de NFe',
     },
@@ -484,8 +716,6 @@ export function FiscalFlowKanban() {
       title: 'Com Nota Solicitada',
       color: 'bg-green-50',
       borderColor: 'border-green-400',
-      borderColorClass: 'border-l-green-400',
-      cardBackgroundClass: 'bg-green-400/10',
       icon: <MdCheckCircle className="h-4 w-4 text-green-600" />,
       placeholder: 'Vendas com nota fiscal solicitada',
     },
@@ -565,6 +795,7 @@ export function FiscalFlowKanban() {
     const t = tipo.toLowerCase()
     if (t === 'balcao') return 'Balcão'
     if (t === 'mesa') return 'Mesa'
+    if (t === 'gestor') return 'Gestor'
     return tipo.charAt(0).toUpperCase() + tipo.slice(1).toLowerCase()
   }
 
@@ -580,8 +811,9 @@ export function FiscalFlowKanban() {
   }
 
   // Ao soltar: Finalizadas → Pendente Emissão = marcar; Pendente Emissão → Finalizadas = desmarcar
-  // - Só chama marcar se solicitarEmissaoFiscal ainda não é true (evita requisição ao reordenar em Pendente ou soltar de volta sem sair da coluna).
+  // - Só chama marcar se solicitarEmissaoFiscal ainda não é true (evita requisição ao soltar de volta na mesma coluna sem mudar de etapa).
   // - Só chama desmarcar se solicitarEmissaoFiscal é true (evita requisição ao soltar em Finalizadas sem ter vindo de Pendente).
+  // - statusFiscal REJEITADA: não permite soltar em Finalizadas (toast sempre, mesmo com solicitarEmissaoFiscal false).
   const handleDragEnd = (event: DragEndEvent) => {
     setDraggingVenda(null)
     const { active, over } = event
@@ -589,15 +821,57 @@ export function FiscalFlowKanban() {
     const venda = active.data.current?.venda as Venda | undefined
     if (!venda) return
     if (over.id === 'PENDENTE_EMISSAO') {
-      setVendaRecemMovidaParaPendenteId(venda.id)
-      persistirOrdemAoMover(venda.id, 'PENDENTE_EMISSAO')
       if (venda.solicitarEmissaoFiscal !== true) {
         handleMarcarEmissaoFiscal(venda.id, venda.tabelaOrigem)
       }
-    } else if (over.id === 'FINALIZADAS' && venda.solicitarEmissaoFiscal === true) {
-      setVendaRecemMovidaParaFinalizadasId(venda.id)
-      persistirOrdemAoMover(venda.id, 'FINALIZADAS')
-      handleDesmarcarEmissaoFiscal(venda.id, venda.tabelaOrigem)
+    } else if (over.id === 'FINALIZADAS') {
+      // Rejeitada pode estar com solicitarEmissaoFiscal false — o bloqueio não pode depender só desse flag
+      const fiscalRejeitada =
+        String(venda.statusFiscal ?? '')
+          .trim()
+          .toUpperCase() === 'REJEITADA'
+      if (fiscalRejeitada) {
+        showToast.warning(
+          'Vendas com nota rejeitada não podem ser movidas para Finalizadas. Use Reemitir na coluna Pendente Emissão.'
+        )
+        return
+      }
+      if (venda.solicitarEmissaoFiscal === true) {
+        handleDesmarcarEmissaoFiscal(venda.id, venda.tabelaOrigem)
+      }
+    } else if (over.id === 'COM_NFE') {
+      // Só a partir de Pendente emissão: mesmo fluxo do botão Emitir / Reemitir
+      if (venda.getEtapaKanban() !== 'PENDENTE_EMISSAO') {
+        showToast.info(
+          'Arraste para esta coluna apenas vendas que estão em Pendente emissão fiscal.'
+        )
+        return
+      }
+      if (vendaBloqueadaParaEmissaoInterativa(venda, acaoFiscalEmAndamentoPorVenda)) {
+        showToast.info(
+          'Esta venda não pode ser emitida neste status. Use o botão quando estiver disponível.'
+        )
+        return
+      }
+      void handleEmitirNfe(venda)
+    }
+
+    // Card solto: mantém no topo na coluna de destino (localStorage)
+    const colunaDestino = String(over.id)
+    if (COLUNAS_KANBAN_DESTINO_PIN.has(colunaDestino)) {
+      const origemKanban = venda.getEtapaKanban()
+      setPrimeiroPorColuna(prev => {
+        const next = { ...prev }
+        if (
+          (origemKanban === 'FINALIZADAS' || origemKanban === 'PENDENTE_EMISSAO') &&
+          prev[origemKanban] === venda.id
+        ) {
+          delete next[origemKanban]
+        }
+        next[colunaDestino] = venda.id
+        gravarPrimeiroPorColunaNoStorage(next)
+        return next
+      })
     }
   }
 
@@ -622,42 +896,72 @@ export function FiscalFlowKanban() {
   }
 
   const handleEmitirNfe = async (venda: Venda) => {
-    const modeloInicial: 55 | 65 = venda.tipoDocFiscal === 'NFE' ? 55 : 65
+    const numeroNotaRejeitada =
+      venda.numeroFiscal != null && Number.isFinite(Number(venda.numeroFiscal))
+        ? Number(venda.numeroFiscal)
+        : undefined
 
-    // Reemissão: rota explícita dedicada.
-    if (venda.statusFiscal === 'REJEITADA' && venda.tipoDocFiscal) {
-      setAcaoFiscalEmAndamento(venda.id, 'reemitindo')
-      try {
-        const serieReemissao = Number(venda.serieFiscal)
-        if (!Number.isFinite(serieReemissao) || serieReemissao <= 0) {
+    // REJEITADA: com documento → reemitir-nota; sem documento mas com modelo/tipoDoc → emitir-nota direto; sem modelo → modal.
+    if (venda.statusFiscal === 'REJEITADA') {
+      const docId = venda.documentoFiscalId?.trim()
+      if (docId) {
+        // Reemissão: POST reemitir-nota com `documentId`; `numero` opcional.
+        pinVendaComoPrimeiraEmComNotaSolicitada(venda)
+
+        setAcaoFiscalEmAndamento(venda.id, 'reemitindo')
+        try {
+          const payload = {
+            id: venda.id,
+            documentId: docId,
+            ...(numeroNotaRejeitada != null ? { numero: numeroNotaRejeitada } : {}),
+          }
+          if (venda.tabelaOrigem === 'venda_gestor') {
+            await reemitirNfeGestor.mutateAsync(payload)
+          } else {
+            await reemitirNfePdv.mutateAsync(payload)
+          }
+          await refetch()
+          await refetchAteMudarStatusFiscal(venda.id, 'REJEITADA')
+          return
+        } catch (error) {
+          console.error('Erro ao tentar reemitir:', error)
+          return
+        } finally {
+          setAcaoFiscalEmAndamento(venda.id, null)
+        }
+      }
+
+      // Barrado antes da SEFAZ (sem documentoId): modelo já salvo → POST emitir-nota sem abrir modal.
+      const modeloEmitir = resolveModeloParaEmitirNota(venda)
+      if (modeloEmitir !== null) {
+        if (modeloEmitir === 55 && !venda.cliente?.id?.trim()) {
           showToast.error(
-            'Série fiscal da rejeição não encontrada. Não foi possível reemitir automaticamente.'
+            'Para emitir NF-e (modelo 55) é obrigatório que a venda tenha um cliente cadastrado. Vincule o cliente na origem do pedido e tente novamente.'
           )
           return
         }
-
-        const payload = {
-          id: venda.id,
-          modelo: modeloInicial,
-          tipoDocumento: venda.tipoDocFiscal,
-          serie: serieReemissao,
+        pinVendaComoPrimeiraEmComNotaSolicitada(venda)
+        setAcaoFiscalEmAndamento(venda.id, 'emitindo')
+        try {
+          if (venda.tabelaOrigem === 'venda_gestor') {
+            await emitirNotaGestor.mutateAsync({ id: venda.id, modelo: modeloEmitir })
+          } else {
+            await emitirNotaPdv.mutateAsync({ id: venda.id, modelo: modeloEmitir })
+          }
+          await refetch()
+          await refetchAteMudarStatusFiscal(venda.id, 'REJEITADA')
+          return
+        } catch (error) {
+          console.error('Erro ao emitir nota (rejeição sem documento fiscal):', error)
+          return
+        } finally {
+          setAcaoFiscalEmAndamento(venda.id, null)
         }
-
-        if (venda.tabelaOrigem === 'venda_gestor') {
-          await reemitirNfeGestor.mutateAsync(payload)
-        } else {
-          await reemitirNfePdv.mutateAsync(payload)
-        }
-        await refetch()
-        await refetchAteMudarStatusFiscal(venda.id, 'REJEITADA')
-        return
-      } catch (error) {
-        console.error('Erro ao tentar reemitir:', error)
-        return
-      } finally {
-        setAcaoFiscalEmAndamento(venda.id, null)
       }
+      // Sem modelo/tipoDoc definido: modal para escolher modelo.
     }
+
+    pinVendaComoPrimeiraEmComNotaSolicitada(venda)
 
     setVendaSelecionadaParaEmissao({
       id: venda.id,
@@ -673,18 +977,12 @@ export function FiscalFlowKanban() {
   }
 
   const handleViewDetails = (venda: Venda) => {
-    setMenuAcoesVendaIdAberto(null)
-
     setPedidoVisualizacaoContext({
       id: venda.id,
       tabelaOrigem: venda.tabelaOrigem,
       statusFiscal: venda.statusFiscal,
     })
     setNovoPedidoModalVisualizacaoOpen(true)
-  }
-
-  const toggleMenuAcoes = (vendaId: string) => {
-    setMenuAcoesVendaIdAberto(prev => (prev === vendaId ? null : vendaId))
   }
 
   const handleClearFilters = useCallback(() => {
@@ -700,18 +998,7 @@ export function FiscalFlowKanban() {
     setStatusFiscalFilter('')
   }, [])
 
-  const handleAbrirSeletorClienteVenda = useCallback((venda: Venda) => {
-    vendaParaVincularClienteRef.current = { id: venda.id, tabelaOrigem: venda.tabelaOrigem }
-    setSeletorClienteVendaOpen(true)
-  }, [])
-
-  const handleFecharSeletorClienteVenda = useCallback(() => {
-    setSeletorClienteVendaOpen(false)
-    vendaParaVincularClienteRef.current = null
-  }, [])
-
   const handleAbrirEdicaoCliente = useCallback((clienteId: string) => {
-    setMenuAcoesVendaIdAberto(null)
     setEditarClienteId(clienteId)
     setEditarClienteModalOpen(true)
   }, [])
@@ -720,30 +1007,6 @@ export function FiscalFlowKanban() {
     setEditarClienteModalOpen(false)
     setEditarClienteId(null)
   }, [])
-
-  /** Seleção confirmada: PATCH clienteId só na venda Gestor. O ref deve ser lido no início — o modal chama onClose em seguida. */
-  const handleClienteSelecionadoParaVenda = useCallback(
-    async (cliente: Cliente) => {
-      const ctx = vendaParaVincularClienteRef.current
-      if (!ctx) {
-        showToast.error('Não foi possível identificar a venda. Tente novamente.')
-        return
-      }
-      if (ctx.tabelaOrigem !== 'venda_gestor') {
-        showToast.error('Vincular cliente só está disponível para vendas do Gestor.')
-        return
-      }
-      try {
-        await vincularClienteNaVenda.mutateAsync({
-          vendaId: ctx.id,
-          clienteId: cliente.getId(),
-        })
-      } catch {
-        // Mensagem de erro exibida pelo hook
-      }
-    },
-    [vincularClienteNaVenda]
-  )
 
   const handleConfirmDatas = useCallback((dataInicial: Date | null, dataFinal: Date | null) => {
     setPeriodoInicial(dataInicial)
@@ -767,51 +1030,18 @@ export function FiscalFlowKanban() {
     let vendas: Venda[] = []
 
     switch (columnId) {
-      case 'FINALIZADAS': {
-        // Vendas finalizadas sem solicitação fiscal e sem NFe emitida
-        vendas = vendasParaFiltrar.filter((v: Venda) => {
-          const etapa = v.getEtapaKanban()
-          return etapa === 'FINALIZADAS'
-        })
-        // Ordem preferida persistida (sobrevive ao refresh da página)
-        const ordemFinalizadas = getOrdemFromStorage()['FINALIZADAS'] ?? []
-        vendas = aplicarOrdemPreferida(vendas, ordemFinalizadas)
-        // Colocar a venda recém solta (drag) no topo até o refetch atualizar (feedback imediato)
-        if (vendaRecemMovidaParaFinalizadasId && vendas.length > 0) {
-          const idx = vendas.findIndex((v: Venda) => v.id === vendaRecemMovidaParaFinalizadasId)
-          if (idx > 0) {
-            const recemMovida = vendas[idx]
-            vendas = [
-              recemMovida,
-              ...vendas.filter((v: Venda) => v.id !== vendaRecemMovidaParaFinalizadasId),
-            ]
-          }
-        }
+      case 'FINALIZADAS':
+        vendas = vendasParaFiltrar.filter(
+          (v: Venda) => getEtapaKanbanParaExibicao(v) === 'FINALIZADAS'
+        )
         break
-      }
-      case 'PENDENTE_EMISSAO': {
-        vendas = vendasParaFiltrar.filter((v: Venda) => {
-          const etapa = v.getEtapaKanban()
-          return etapa === 'PENDENTE_EMISSAO'
-        })
-        // Ordem preferida persistida (sobrevive ao refresh da página)
-        const ordemPendente = getOrdemFromStorage()['PENDENTE_EMISSAO'] ?? []
-        vendas = aplicarOrdemPreferida(vendas, ordemPendente)
-        // Colocar a venda recém solta (drag) no topo até o refetch atualizar (feedback imediato)
-        if (vendaRecemMovidaParaPendenteId && vendas.length > 0) {
-          const idx = vendas.findIndex((v: Venda) => v.id === vendaRecemMovidaParaPendenteId)
-          if (idx > 0) {
-            const recemMovida = vendas[idx]
-            vendas = [
-              recemMovida,
-              ...vendas.filter((v: Venda) => v.id !== vendaRecemMovidaParaPendenteId),
-            ]
-          }
-        }
+      case 'PENDENTE_EMISSAO':
+        vendas = vendasParaFiltrar.filter(
+          (v: Venda) => getEtapaKanbanParaExibicao(v) === 'PENDENTE_EMISSAO'
+        )
         break
-      }
       case 'COM_NFE':
-        vendas = vendasParaFiltrar.filter((v: Venda) => v.getEtapaKanban() === 'COM_NFE')
+        vendas = vendasParaFiltrar.filter((v: Venda) => getEtapaKanbanParaExibicao(v) === 'COM_NFE')
         break
       default:
         return []
@@ -825,13 +1055,33 @@ export function FiscalFlowKanban() {
       }
     })
 
-    return Array.from(vendasUnicas.values())
+    const criterio =
+      criterioOrdenacaoPorColuna[columnId as ColunaId] ?? ('data' as CriterioOrdenacaoKanban)
+    const direcao =
+      direcaoOrdenacaoPorColuna[columnId as ColunaId] ?? ('desc' as DirecaoOrdenacaoKanban)
+    let ordenadas = ordenarVendasKanbanPorCriterio(
+      Array.from(vendasUnicas.values()),
+      criterio,
+      direcao
+    )
+
+    // Último card movido para esta coluna fica primeiro (persistido em localStorage)
+    const pinId = primeiroPorColuna[columnId]
+    if (pinId) {
+      const idx = ordenadas.findIndex(v => v.id === pinId)
+      if (idx > 0) {
+        const [pinned] = ordenadas.splice(idx, 1)
+        ordenadas = [pinned, ...ordenadas]
+      }
+    }
+
+    return ordenadas
   }
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600"></div>
+      <div className="flex h-full items-center justify-center bg-gray-50">
+        <JiffyLoading />
       </div>
     )
   }
@@ -857,22 +1107,22 @@ export function FiscalFlowKanban() {
           className={`flex flex-wrap items-end justify-center gap-x-1 gap-y-4 rounded-t-lg bg-custom-2 px-1 pb-2 pt-1.5 md:justify-start ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
         >
           <div className="flex flex-col gap-1">
-            <label className="font-nunito text-xs text-secondary-text pl-2">Pesquisar</label>
-          
-          <div className="relative w-full max-w-full px-1 lg:max-w-[250px]">
-            <MdSearch
-              className="absolute left-2 top-1/2 -translate-y-1/2 text-secondary-text"
-              size={20}
-            />
-            <input
-              type="text"
-              placeholder="Digite o código ou cliente"
-              value={searchInput}
-              onChange={e => setSearchInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && refetch()}
-              className="font-nunito h-8 w-full rounded-lg border bg-info pl-6 pr-4 text-sm shadow-sm"
-            />
-          </div>
+            <label className="font-nunito pl-2 text-xs text-secondary-text">Pesquisar</label>
+
+            <div className="relative w-full max-w-full px-1 lg:max-w-[250px]">
+              <MdSearch
+                className="absolute left-2 top-1/2 -translate-y-1/2 text-secondary-text"
+                size={20}
+              />
+              <input
+                type="text"
+                placeholder="Digite o código ou cliente"
+                value={searchInput}
+                onChange={e => setSearchInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && refetch()}
+                className="font-nunito h-8 w-full rounded-lg border bg-info pl-6 pr-4 text-sm shadow-sm"
+              />
+            </div>
           </div>
           <div className="flex flex-col gap-1">
             <label className="font-nunito text-xs text-secondary-text">Origem</label>
@@ -1020,7 +1270,7 @@ export function FiscalFlowKanban() {
               return (
                 <div
                   key={column.id}
-                  className="flex w-64 flex-shrink-0 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white sm:w-60 md:w-64 lg:w-96"
+                  className="flex w-64 flex-shrink-0 flex-col overflow-hidden rounded-lg border border-gray-200 bg-gray-50 sm:w-60 md:w-64 lg:w-96"
                   style={{ height: 'calc(100vh - 180px)' }}
                 >
                   {/* Column Header - Apenas o header tem cor */}
@@ -1033,12 +1283,76 @@ export function FiscalFlowKanban() {
                         {column.title} ({count})
                       </h3>
                     </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[11px] font-medium text-gray-700">Ordem</span>
+                      <FormControl size="small" sx={{ minWidth: 80 }}>
+                        <Select
+                          value={criterioOrdenacaoPorColuna[column.id as ColunaId] ?? 'data'}
+                          onChange={e => {
+                            const next = e.target.value as CriterioOrdenacaoKanban
+                            setCriterioOrdenacaoPorColuna(prev => ({
+                              ...prev,
+                              [column.id as ColunaId]: next,
+                            }))
+                          }}
+                          MenuProps={{
+                            PaperProps: {
+                              sx: {
+                                borderRadius: '4px',
+                                border: '1px solid #e5e7eb',
+                                boxShadow:
+                                  '0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.06)',
+                              },
+                            },
+                          }}
+                          sx={{
+                            height: 26,
+                            fontSize: 12,
+                            borderRadius: '8px',
+                            backgroundColor: 'rgba(255,255,255,0.9)',
+                            '& .MuiOutlinedInput-notchedOutline': {
+                              borderColor: '#e5e7eb',
+                            },
+                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                              borderColor: '#d1d5db',
+                            },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                              borderColor: '#d1d5db',
+                              borderWidth: '1px',
+                            },
+                          }}
+                        >
+                          <MenuItem value="data">Data</MenuItem>
+                          <MenuItem value="numero">Nº da venda</MenuItem>
+                          <MenuItem value="cliente">Cliente</MenuItem>
+                        </Select>
+                      </FormControl>
+                      <button
+                        type="button"
+                        className="flex h-6 w-5 items-center justify-center rounded bg-white/70 text-gray-700 hover:bg-white"
+                        onClick={() => {
+                          const colId = column.id as ColunaId
+                          setDirecaoOrdenacaoPorColuna(prev => ({
+                            ...prev,
+                            [colId]: prev[colId] === 'asc' ? 'desc' : 'asc',
+                          }))
+                        }}
+                        aria-label="Alternar direção da ordenação"
+                        title="Alternar: crescente/decrescente"
+                      >
+                        {direcaoOrdenacaoPorColuna[column.id as ColunaId] === 'asc' ? (
+                          <MdArrowUpward className="h-4 w-4" />
+                        ) : (
+                          <MdArrowDownward className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Column Content - Área droppable (Pendente Emissão aceita cards arrastados) */}
+                  {/* Column Content - área droppable (incl. soltar em Com nota = emitir/reemitir) */}
                   <DroppableColumnContent
                     columnId={column.id}
-                    className={`scrollbar-thin min-h-0 flex-1 space-y-2 overflow-y-auto ${column.cardBackgroundClass} p-2.5`}
+                    className="scrollbar-thin min-h-0 flex-1 space-y-2 overflow-y-auto bg-gray-200 p-2.5"
                   >
                     {columnVendas.length === 0 ? (
                       <div className="py-6 text-center">
@@ -1050,97 +1364,57 @@ export function FiscalFlowKanban() {
                         const clienteNome = venda.cliente?.nome?.trim()
                           ? venda.cliente.nome
                           : LABEL_SEM_CLIENTE
-                        const semNomeCliente = vendaSemNomeCliente(venda)
-                        const colunaPermiteClienteGestor =
-                          column.id === 'FINALIZADAS' || column.id === 'PENDENTE_EMISSAO'
-                        // Vincular/editar cliente: só venda Gestor nas colunas Finalizadas e Pendente emissão
-                        const podeGerenciarClienteVendaGestor =
-                          venda.tabelaOrigem === 'venda_gestor' && colunaPermiteClienteGestor
-                        const temClienteComIdParaEditar =
-                          podeGerenciarClienteVendaGestor &&
-                          !semNomeCliente &&
+                        // Durante reemissão ou emissão direta o card vai para Com nota solicitada; mantém lápis como em Pendente emissão
+                        const colunaPermiteEditarCliente =
+                          column.id === 'FINALIZADAS' ||
+                          column.id === 'PENDENTE_EMISSAO' ||
+                          (column.id === 'COM_NFE' &&
+                            (acaoFiscalEmAndamentoPorVenda[venda.id] === 'reemitindo' ||
+                              acaoFiscalEmAndamentoPorVenda[venda.id] === 'emitindo'))
+                        // Editar cliente global (lápis → NovoCliente): PDV e Gestor; mesmas colunas; cliente já vinculado com nome
+                        const podeEditarClienteNaVenda =
+                          colunaPermiteEditarCliente &&
+                          !vendaSemNomeCliente(venda) &&
                           Boolean(venda.cliente?.id?.trim())
-                        // Vendas do Gestor são sempre balcão; exibir "Balcão" quando a API não retorna tipoVenda
+                        // Vendas da origem Gestor usam ícone/rótulo próprios (não confundir com balcão do PDV)
                         const tipoVendaExibicao =
-                          venda.tabelaOrigem === 'venda_gestor'
-                            ? venda.tipoVenda || 'balcao'
-                            : venda.tipoVenda
+                          venda.tabelaOrigem === 'venda_gestor' ? 'gestor' : venda.tipoVenda
+
+                        const { borderClass: cardBorderClass, cardBgClass } =
+                          getCardBorderEFundoKanban(
+                            column.id as ColunaKanbanId,
+                            venda,
+                            acaoFiscalEmAndamentoPorVenda
+                          )
 
                         return (
                           <DraggableVendaCard key={venda.id} venda={venda} column={column}>
                             <div
-                              className={`relative rounded-lg border-l-4 ${column.borderColorClass} bg-white cursor-pointer border border-gray-200/80 p-3 transition-all hover:shadow-md`}
-                              onClick={() => handleViewDetails(venda)}
+                              className={`relative rounded-lg border-l-4 ${cardBorderClass} ${cardBgClass} cursor-pointer border border-gray-200/80 p-3 transition-all hover:shadow-md`}
+                              title="Duplo clique para ver os detalhes do pedido"
+                              onDoubleClick={() => handleViewDetails(venda)}
                             >
-                              {/* Menu de três pontos: apenas quando ainda não há cliente (abre seletor) */}
-                              {podeGerenciarClienteVendaGestor && semNomeCliente && (
-                                <>
-                                  <button
-                                    onClick={e => {
-                                      e.stopPropagation()
-                                      toggleMenuAcoes(venda.id)
-                                    }}
-                                    className="absolute right-2 top-2 rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-                                    title="Mais opções"
-                                  >
-                                    <MdMoreVert className="h-4 w-4" />
-                                  </button>
-
-                                  {menuAcoesVendaIdAberto === venda.id && (
-                                    <div
-                                      className="absolute right-2 top-9 z-20 w-36 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
-                                      onClick={e => e.stopPropagation()}
-                                    >
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setMenuAcoesVendaIdAberto(null)
-                                          handleAbrirSeletorClienteVenda(venda)
-                                        }}
-                                        className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                                      >
-                                        Incluir cliente
-                                      </button>
-                                    </div>
-                                  )}
-                                </>
-                              )}
-
                               {/* Bloco número da venda até valor, com ícone ao lado */}
                               <div
-                                className={`mb-2 flex gap-2 ${podeGerenciarClienteVendaGestor && semNomeCliente ? 'pr-6' : temClienteComIdParaEditar ? 'pr-1' : ''}`}
+                                className={`mb-2 flex gap-2 ${podeEditarClienteNaVenda ? 'pr-1' : ''}`}
                               >
                                 <div className="min-w-0 flex-1 border-b border-gray-100 pb-1.5">
                                   <p className="mb-0.5 text-xs text-gray-500">
-                                    {venda.origem} | 
-                                    Venda {venda.numeroVenda}
+                                    {venda.origem} | Venda {venda.numeroVenda}
                                     {venda.codigoVenda ? ` - #${venda.codigoVenda}` : ''}
                                   </p>
                                   <div className="flex min-w-0 items-start gap-1">
                                     <p className="mb-0 min-w-0 flex-1 truncate text-sm font-semibold uppercase text-primary-text">
                                       {clienteNome}
                                     </p>
-                                    {podeGerenciarClienteVendaGestor && semNomeCliente && (
-                                      <button
-                                        type="button"
-                                        onClick={e => {
-                                          e.stopPropagation()
-                                          handleAbrirSeletorClienteVenda(venda)
-                                        }}
-                                        className="flex-shrink-0 rounded p-0.5 text-primary transition-colors hover:bg-primary/10"
-                                        title="Vincular cliente à venda"
-                                        aria-label="Vincular cliente à venda"
-                                      >
-                                        <MdAdd className="h-4 w-4" />
-                                      </button>
-                                    )}
-                                    {temClienteComIdParaEditar && venda.cliente?.id && (
+                                    {podeEditarClienteNaVenda && venda.cliente?.id && (
                                       <button
                                         type="button"
                                         onClick={e => {
                                           e.stopPropagation()
                                           handleAbrirEdicaoCliente(venda.cliente!.id)
                                         }}
+                                        onDoubleClick={e => e.stopPropagation()}
                                         className="flex-shrink-0 rounded p-0.5 text-primary transition-colors hover:bg-primary/10"
                                         title="Editar dados do cliente"
                                         aria-label="Editar dados do cliente"
@@ -1155,31 +1429,40 @@ export function FiscalFlowKanban() {
                                     </span>
                                   </p>
                                   {venda.statusFiscal && (
-                                    <div className="flex flex-row gap-1 items-center justify-between">
+                                    <>
+                                      <div className="mt-1 flex items-center">
+                                        <StatusFiscalBadge
+                                          status={venda.statusFiscal}
+                                          tone="neutral"
+                                        />
+                                      </div>
                                       {venda.numeroFiscal && venda.statusFiscal === 'EMITIDA' && (
-                                        <div className="mt-1 inline-flex items-center gap-1 text-primary-text">
-                                          <span className="text-xs font-semibold">
+                                        <div className="mt-0.5">
+                                          <span className="text-xs font-semibold text-gray-900">
                                             {venda.tipoDocFiscal || 'NFe'} Nº {venda.numeroFiscal}
                                             {venda.serieFiscal && ` / Série ${venda.serieFiscal}`}
                                           </span>
                                         </div>
                                       )}
-                                      <StatusFiscalBadge status={venda.statusFiscal} />
-                                    </div>
+                                    </>
                                   )}
                                 </div>
                                 {tipoVendaExibicao &&
                                   (tipoVendaExibicao === 'balcao' ||
-                                    tipoVendaExibicao === 'mesa') && (
+                                    tipoVendaExibicao === 'mesa' ||
+                                    tipoVendaExibicao === 'gestor') && (
                                     <div className="flex flex-shrink-0 items-center justify-center">
                                       <TipoVendaIcon
-                                        tipoVenda={tipoVendaExibicao as 'balcao' | 'mesa'}
+                                        tipoVenda={
+                                          tipoVendaExibicao as 'balcao' | 'mesa' | 'gestor'
+                                        }
                                         numeroMesa="M"
                                         size={56}
                                         containerScale={0.9}
                                         corPrincipal="var(--color-primary)"
                                         corTexto="var(--color-info)"
                                         corBalcao="var(--color-primary)"
+                                        corGestor="var(--color-primary)"
                                         corBorda="var(--color-primary)"
                                       />
                                     </div>
@@ -1196,7 +1479,11 @@ export function FiscalFlowKanban() {
                               </div>
 
                               {/* Ações baseadas na coluna */}
-                              <div className="mt-0.5 flex gap-2" onClick={e => e.stopPropagation()}>
+                              <div
+                                className="mt-0.5 flex gap-2"
+                                onClick={e => e.stopPropagation()}
+                                onDoubleClick={e => e.stopPropagation()}
+                              >
                                 {/* Ações para colunas de delivery — COMENTADO: colunas não utilizadas por enquanto */}
                                 {/* {['EM_ANALISE', 'EM_PRODUCAO', 'PRONTOS_ENTREGA', 'COM_ENTREGADOR'].includes(column.id) && (
                               <div className="text-xs text-gray-500 italic w-full text-center py-1">
@@ -1204,27 +1491,29 @@ export function FiscalFlowKanban() {
                               </div>
                             )} */}
 
-                                {/* Botão "Marcar para Emissão" (primary) */}
-                                {column.id === 'PENDENTE_EMISSAO' && (
+                                {/* Emitir / Reemitir: Pendente ou card temporário em Com nota durante reemissão ou emissão direta */}
+                                {(column.id === 'PENDENTE_EMISSAO' ||
+                                  acaoFiscalEmAndamentoPorVenda[venda.id] === 'reemitindo' ||
+                                  acaoFiscalEmAndamentoPorVenda[venda.id] === 'emitindo') && (
                                   <Button
                                     size="sm"
                                     variant="contained"
                                     className="flex-1 !bg-primary hover:!bg-primary/90"
-                                    sx={{ py: 0.375, px: 1, minHeight: 'auto' }}
+                                    sx={{
+                                      py: 0.375,
+                                      px: 1,
+                                      minHeight: 'auto',
+                                      // Só esta venda usa acaoFiscalEmAndamentoPorVenda; não usar isPending global dos hooks (afetava todos os cards)
+                                      '&.MuiButton-contained.Mui-disabled': {
+                                        color: 'rgba(255,255,255,0.96)',
+                                        WebkitTextFillColor: 'rgba(255,255,255,0.96)',
+                                      },
+                                    }}
                                     onClick={() => handleEmitirNfe(venda)}
-                                    disabled={
-                                      !!acaoFiscalEmAndamentoPorVenda[venda.id] ||
-                                      emitirNfePdv.isPending ||
-                                      emitirNfeGestor.isPending ||
-                                      reemitirNfePdv.isPending ||
-                                      reemitirNfeGestor.isPending ||
-                                      venda.statusFiscal === 'PENDENTE' ||
-                                      venda.statusFiscal === 'PENDENTE_EMISSAO' ||
-                                      venda.statusFiscal === 'EMITINDO' ||
-                                      venda.statusFiscal === 'PENDENTE_AUTORIZACAO' ||
-                                      venda.statusFiscal === 'CONTINGENCIA' ||
-                                      venda.statusFiscal === 'EMITIDA'
-                                    }
+                                    disabled={vendaBloqueadaParaEmissaoInterativa(
+                                      venda,
+                                      acaoFiscalEmAndamentoPorVenda
+                                    )}
                                   >
                                     {(() => {
                                       const acaoEmAndamento =
@@ -1233,15 +1522,19 @@ export function FiscalFlowKanban() {
                                       if (acaoEmAndamento === 'emitindo') return 'Emitindo...'
                                       const documentoLabel =
                                         venda.tipoDocFiscal === 'NFE' ? 'NFe' : 'NFCe'
-                                      if (venda.statusFiscal === 'REJEITADA')
-                                        return `Reemitir ${documentoLabel}`
-                                      if (
-                                        venda.statusFiscal === 'PENDENTE' ||
-                                        venda.statusFiscal === 'PENDENTE_EMISSAO' ||
-                                        venda.statusFiscal === 'EMITINDO' ||
-                                        venda.statusFiscal === 'PENDENTE_AUTORIZACAO' ||
-                                        venda.statusFiscal === 'CONTINGENCIA'
-                                      ) {
+                                      if (venda.statusFiscal === 'REJEITADA') {
+                                        if (
+                                          venda.tipoDocFiscal === 'NFE' ||
+                                          venda.tipoDocFiscal === 'NFCE'
+                                        ) {
+                                          return `Reemitir ${documentoLabel}`
+                                        }
+                                        return 'Reemitir nota'
+                                      }
+                                      if (venda.statusFiscal === 'PENDENTE_EMISSAO') {
+                                        return 'Aguardando...'
+                                      }
+                                      if (statusFiscalAguardandoSefaz(venda)) {
                                         return 'Aguardando...'
                                       }
                                       return `Emitir Nota`
@@ -1307,20 +1600,23 @@ export function FiscalFlowKanban() {
           clienteId={vendaSelecionadaParaEmissao.clienteId}
           clienteNome={vendaSelecionadaParaEmissao.clienteNome}
           tabelaOrigem={vendaSelecionadaParaEmissao.tabelaOrigem}
+          onClienteSalvo={() => void refetch()}
         />
       )}
 
       {/* Modal de Novo Pedido */}
-      <NovoPedidoModal
-        open={novoPedidoModalOpen}
-        onClose={() => {
-          setNovoPedidoModalOpen(false)
-        }}
-        onSuccess={() => {
-          setNovoPedidoModalOpen(false)
-          refetch()
-        }}
-      />
+      {novoPedidoModalOpen && (
+        <NovoPedidoModal
+          open={novoPedidoModalOpen}
+          onClose={() => {
+            setNovoPedidoModalOpen(false)
+          }}
+          onSuccess={() => {
+            setNovoPedidoModalOpen(false)
+            refetch()
+          }}
+        />
+      )}
 
       {/* Modal de Novo Pedido em Modo Visualização (Step 4) */}
       {pedidoVisualizacaoContext && (
@@ -1343,67 +1639,64 @@ export function FiscalFlowKanban() {
       )}
 
       {/* Modal de datas personalizadas (período por data de criação) */}
-      <EscolheDatasModal
-        open={isDatasModalOpen}
-        onClose={() => setIsDatasModalOpen(false)}
-        onConfirm={handleConfirmDatas}
-        dataInicial={periodoInicial}
-        dataFinal={periodoFinal}
-      />
+      {isDatasModalOpen && (
+        <EscolheDatasModal
+          open={isDatasModalOpen}
+          onClose={() => setIsDatasModalOpen(false)}
+          onConfirm={handleConfirmDatas}
+          dataInicial={periodoInicial}
+          dataFinal={periodoFinal}
+        />
+      )}
 
-      <SeletorClienteModal
-        open={seletorClienteVendaOpen}
-        onClose={handleFecharSeletorClienteVenda}
-        onSelect={handleClienteSelecionadoParaVenda}
-        title="Vincular cliente à venda"
-      />
-
-      <Dialog
-        open={editarClienteModalOpen && Boolean(editarClienteId)}
-        onOpenChange={open => {
-          if (!open) handleFecharEdicaoCliente()
-        }}
-        fullWidth
-        maxWidth="xl"
-        sx={{
-          '& .MuiDialog-container': {
-            zIndex: 1500,
-            justifyContent: { xs: 'center', md: 'flex-end' },
-            alignItems: 'stretch',
-            margin: 0,
-          },
-          '& .MuiBackdrop-root': { zIndex: 1500 },
-          '& .MuiDialog-paper': { zIndex: 1500 },
-        }}
-        PaperProps={{
-          sx: {
-            height: '100vh',
-            maxHeight: '100vh',
-            width: { xs: '95vw', sm: '90vw', md: 'min(900px, 60vw)' },
-            margin: { xs: 'auto', md: 0 },
-            borderRadius: 0,
-            display: 'flex',
-            flexDirection: 'column',
-          },
-        }}
-      >
-        <DialogContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
-          {editarClienteId && (
-            <div className="h-full overflow-y-auto">
-              <NovoCliente
-                key={editarClienteId}
-                clienteId={editarClienteId}
-                isEmbedded
-                onClose={handleFecharEdicaoCliente}
-                onSaved={() => {
-                  refetch()
-                  handleFecharEdicaoCliente()
-                }}
-              />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {editarClienteModalOpen && Boolean(editarClienteId) && (
+        <Dialog
+          open={editarClienteModalOpen && Boolean(editarClienteId)}
+          onOpenChange={open => {
+            if (!open) handleFecharEdicaoCliente()
+          }}
+          fullWidth
+          maxWidth="xl"
+          sx={{
+            '& .MuiDialog-container': {
+              zIndex: 1500,
+              justifyContent: { xs: 'center', md: 'flex-end' },
+              alignItems: 'stretch',
+              margin: 0,
+            },
+            '& .MuiBackdrop-root': { zIndex: 1500 },
+            '& .MuiDialog-paper': { zIndex: 1500 },
+          }}
+          PaperProps={{
+            sx: {
+              height: '100vh',
+              maxHeight: '100vh',
+              width: { xs: '95vw', sm: '90vw', md: 'min(900px, 60vw)' },
+              margin: { xs: 'auto', md: 0 },
+              borderRadius: 0,
+              display: 'flex',
+              flexDirection: 'column',
+            },
+          }}
+        >
+          <DialogContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
+            {editarClienteId && (
+              <div className="h-full overflow-y-auto">
+                <NovoCliente
+                  key={editarClienteId}
+                  clienteId={editarClienteId}
+                  isEmbedded
+                  onClose={handleFecharEdicaoCliente}
+                  onSaved={() => {
+                    refetch()
+                    handleFecharEdicaoCliente()
+                  }}
+                />
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }
