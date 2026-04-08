@@ -8,6 +8,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useDashboardResumoQuery } from '@/src/presentation/hooks/useDashboardResumoQuery'
 import { useDashboardEvolucaoQuery } from '@/src/presentation/hooks/useDashboardEvolucaoQuery'
+import { useDashboardMetodosPagamentoDetalhadoQuery } from '@/src/presentation/hooks/useDashboardMetodosPagamentoDetalhadoQuery'
+import { useDashboardTopProdutosQuery } from '@/src/presentation/hooks/useDashboardTopProdutosQuery'
 import {
   mergePontosEvolucaoComparacao,
   type MetricaEvolucaoComparativo,
@@ -48,6 +50,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/src/presentation/components/ui/select'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import {
+  GraficoVendasPorUsuarioConteudo,
+  type Venda as VendaGraficoUsuario,
+  type UsuarioPDV as UsuarioPDVGrafico,
+} from '@/src/presentation/components/features/vendas/GraficoVendasPorUsuarioModal'
 import { MdOutlineMonetizationOn, MdReceiptLong, MdRestaurantMenu, MdAdd  } from "react-icons/md";
 import { TbReceiptFilled } from "react-icons/tb";
 import { IoReceipt } from "react-icons/io5";
@@ -61,11 +69,28 @@ const exo2CabecalhoFaturamento = Exo_2({
   display: 'swap',
 })
 
-const FORMAS_PAGAMENTO = [
-  { id: 'dinheiro', label: 'DINHEIRO', principal: '#22C55E', secundaria: '#F472B6', pct: 81 },
-  { id: 'credito', label: 'CRÉDITO', principal: '#1E3A8A', secundaria: '#F472B6', pct: 81 },
-  { id: 'pix', label: 'PIX', principal: '#B4DD2B', secundaria: '#F472B6', pct: 81 },
-  { id: 'debito', label: 'DÉBITO', principal: '#3B82F6', secundaria: '#F472B6', pct: 81 },
+/** Arco “restante” dos mini-donuts de formas de pagamento; cor principal vem da paleta por índice. */
+const COR_ARCO_RESTO_FORMAS_PAGAMENTO = '#EDE9FE'
+
+/** Limite ao expandir “Ver todos os produtos” no card Top produtos V2 (API faz slice após agregar). */
+const LIMITE_TOP_PRODUTOS_V2_COMPLETO = 500
+/** No resumo pedimos 11 itens, exibimos 10; o 11º indica que existe lista maior (habilita o botão). */
+const LIMITE_TOP_PRODUTOS_V2_RESUMO = 10
+const LIMITE_TOP_PRODUTOS_V2_RESUMO_FETCH = LIMITE_TOP_PRODUTOS_V2_RESUMO + 1
+
+/** Paleta cíclica para N métodos distintos (mesma ideia do modal de métodos). */
+const PALETA_PRINCIPAL_FORMAS_PAGAMENTO = [
+  '#00B074',
+  '#003366',
+  '#B4DD2B',
+  '#006699',
+  '#530CA3',
+  '#FF9800',
+  '#9C27B0',
+  '#00BCD4',
+  '#E91E63',
+  '#530CA3',
+  '#14B8A6',
 ]
 
 /** Linha do período atual (filtro) e do período anterior — gráfico comparativo V2 */
@@ -92,15 +117,6 @@ function intervaloMinutosAgregacaoGraficoV2(g: AgregacaoGraficoV2): number | und
   }
 }
 
-/** Mock — integrar API depois */
-const MOCK_TOP_PRODUTOS = [
-  { id: '1', nome: 'COCA COLA 350ML', qtd: 24, pct: 20, valor: 500 },
-  { id: '2', nome: 'ÁGUA MINERAL 500ML', qtd: 18, pct: 16, valor: 180 },
-  { id: '3', nome: 'HAMBÚRGUER ARTESANAL', qtd: 14, pct: 14, valor: 420 },
-  { id: '4', nome: 'BATATA FRITA 400G', qtd: 12, pct: 12, valor: 240 },
-  { id: '5', nome: 'SUCO NATURAL LARANJA', qtd: 10, pct: 10, valor: 150 },
-]
-
 const MOCK_TOP_GARCONS = [
   { id: '1', nome: 'Alberto Barcelos', qtd: 24, mesas: 30, valor: 35000 },
   { id: '2', nome: 'Maria Fernandes', qtd: 20, mesas: 26, valor: 28900 },
@@ -108,6 +124,19 @@ const MOCK_TOP_GARCONS = [
   { id: '4', nome: 'Ana Carolina Souza', qtd: 15, mesas: 19, valor: 19800 },
   { id: '5', nome: 'Lucas Oliveira', qtd: 12, mesas: 15, valor: 15400 },
 ]
+
+/** Teste do gráfico no card Top Garçons — alinhado aos nomes/valores do mock da tabela. */
+const DATA_MOCK_FINALIZACAO_GRAFICO_GARCOM = new Date().toISOString()
+const MOCK_USUARIOS_PDV_GRAFICO_TESTE_GARCOM: UsuarioPDVGrafico[] = MOCK_TOP_GARCONS.map(g => ({
+  id: g.id,
+  nome: g.nome,
+}))
+const MOCK_VENDAS_GRAFICO_USUARIO_TESTE_GARCOM: VendaGraficoUsuario[] = MOCK_TOP_GARCONS.map(g => ({
+  id: `v-garcom-${g.id}`,
+  abertoPorId: g.id,
+  valorFinal: g.valor,
+  dataFinalizacao: DATA_MOCK_FINALIZACAO_GRAFICO_GARCOM,
+}))
 
 /** Trigger do select de empresa (alinhado ao SelectTrigger Radix) */
 const CLASSES_SELECT_EMPRESA =
@@ -261,6 +290,34 @@ function periodoSelectV2ParaOpcaoCalculatePeriodo(periodoData: string): string {
       return 'Últimos 30 Dias'
     default:
       return 'Hoje'
+  }
+}
+
+/** Select local do card Top produtos (V2) → rótulo de `calculatePeriodo` (datas na API). */
+function filtroTopProdutoV2ParaOpcaoCalculatePeriodo(filtro: string): string {
+  switch (filtro) {
+    case 'hoje':
+      return 'Hoje'
+    case 'semana':
+      return 'Últimos 7 Dias'
+    case 'mes':
+      return 'Mês Atual'
+    default:
+      return 'Hoje'
+  }
+}
+
+/** Mesmo contrato de `mapPeriodoToUseCaseFormat` em `TabelaTopProdutos` / API top-produtos. */
+function filtroTopProdutoV2ParaApiPeriodo(filtro: string): string {
+  switch (filtro) {
+    case 'hoje':
+      return 'hoje'
+    case 'semana':
+      return 'semana'
+    case 'mes':
+      return 'mes'
+    default:
+      return 'hoje'
   }
 }
 
@@ -460,7 +517,14 @@ function textoUltimaAtualizacao(ultimaAtualizacaoMs: number): string {
   return `Atualizado em ${d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
 }
 
-/** Mini donut para cada forma de pagamento (layout Figma 2x2) */
+/** Exibe % no centro do mini-donut (inteiro se próximo, senão 1 casa decimal). */
+function formatarPercentualMiniDonut(p: number): string {
+  const x = Math.min(100, Math.max(0, p))
+  if (Math.abs(x - Math.round(x)) < 0.01) return `${Math.round(x)}%`
+  return `${x.toFixed(1)}%`
+}
+
+/** Mini donut para cada forma de pagamento (layout Figma: um gráfico por método) */
 function DonutFormaPagamento({
   principal,
   secundaria,
@@ -472,16 +536,17 @@ function DonutFormaPagamento({
   pct: number
   label: string
 }) {
+  const fatiaPrincipal = Math.min(100, Math.max(0, pct))
   const data = [
-    { name: 'principal', value: pct, fill: principal },
-    { name: 'resto', value: 100 - pct, fill: secundaria },
+    { name: 'principal', value: fatiaPrincipal, fill: principal },
+    { name: 'resto', value: Math.max(0, 100 - fatiaPrincipal), fill: secundaria },
   ]
   return (
     <div className="flex flex-col items-center gap-2">
       <p className="text-center text-[10px] font-semibold uppercase tracking-wide text-primary-text md:text-xs">
         {label}
       </p>
-      <div className="relative h-[100px] w-[100px] md:h-[120px] md:w-[120px]">
+      <div className="relative h-[120px] w-[120px] md:h-[144px] md:w-[144px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -500,8 +565,8 @@ function DonutFormaPagamento({
             </Pie>
           </PieChart>
         </ResponsiveContainer>
-        <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-lg font-semibold text-primary-text md:text-xl">
-          {pct}%
+        <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-sm font-medium text-primary-text md:text-lg">
+          {formatarPercentualMiniDonut(pct)}
         </span>
       </div>
     </div>
@@ -525,6 +590,8 @@ export default function DashboardV2() {
     useState<MetricaEvolucaoComparativo>('FINALIZADA')
   const [modoTopProduto, setModoTopProduto] = useState<'porcentagem' | 'valor'>('porcentagem')
   const [filtroTopProduto, setFiltroTopProduto] = useState('hoje')
+  /** Após clicar em “Ver todos”, busca com limite alto; volta ao resumo ao mudar o filtro de período. */
+  const [topProdutosListaCompleta, setTopProdutosListaCompleta] = useState(false)
   const [filtroTopGarcom, setFiltroTopGarcom] = useState('hoje')
 
   const corComparativoLinhaAtual =
@@ -567,10 +634,80 @@ export default function DashboardV2() {
     }
   }, [permiteGraficoPorHora, periodoData])
 
-  const maxValorProduto = useMemo(
-    () => Math.max(...MOCK_TOP_PRODUTOS.map(p => p.valor), 1),
-    []
+  useEffect(() => {
+    setTopProdutosListaCompleta(false)
+  }, [filtroTopProduto])
+
+  const opcaoPeriodoTopProduto = useMemo(
+    () => filtroTopProdutoV2ParaOpcaoCalculatePeriodo(filtroTopProduto),
+    [filtroTopProduto]
   )
+
+  const { inicio: inicioTopProduto, fim: fimTopProduto } = useMemo(() => {
+    return calculatePeriodo(opcaoPeriodoTopProduto)
+  }, [opcaoPeriodoTopProduto, dadosAtualizadosEm])
+
+  const periodoApiTopProduto = useMemo(
+    () => filtroTopProdutoV2ParaApiPeriodo(filtroTopProduto),
+    [filtroTopProduto]
+  )
+
+  const {
+    data: dadosTopProdutos,
+    isLoading: carregandoTopProdutos,
+    isError: erroTopProdutos,
+  } = useDashboardTopProdutosQuery({
+    periodo: periodoApiTopProduto,
+    limit: topProdutosListaCompleta ? LIMITE_TOP_PRODUTOS_V2_COMPLETO : LIMITE_TOP_PRODUTOS_V2_RESUMO_FETCH,
+    periodoInicial: inicioTopProduto,
+    periodoFinal: fimTopProduto,
+    enabled: inicioTopProduto != null && fimTopProduto != null,
+  })
+
+  const quantidadeTopProdutosRetornada = dadosTopProdutos?.length ?? 0
+  /**
+   * Resumo: API pode trazer até 11 linhas; com ≤10 não há 11º produto → desativa.
+   * Lista completa: botão permanece desativado.
+   */
+  const verTodosProdutosDesabilitado =
+    carregandoTopProdutos ||
+    erroTopProdutos ||
+    topProdutosListaCompleta ||
+    quantidadeTopProdutosRetornada <= LIMITE_TOP_PRODUTOS_V2_RESUMO
+
+  /** Linhas do card: participação em % = fatia do valor total entre os itens exibidos (no resumo, só as 10 primeiras). */
+  const linhasTopProdutosV2 = useMemo(() => {
+    const lista = dadosTopProdutos ?? []
+    const visivel = topProdutosListaCompleta ? lista : lista.slice(0, LIMITE_TOP_PRODUTOS_V2_RESUMO)
+    const somaValor = visivel.reduce((acc, p) => acc + p.getValorTotal(), 0)
+    return visivel.map((p, i) => {
+      const valor = p.getValorTotal()
+      const pct = somaValor > 0 ? Math.round((valor / somaValor) * 100) : 0
+      return {
+        id: `${p.getRank()}-${i}-${p.getProduto()}`,
+        nome: p.getProduto(),
+        qtd: p.getQuantidade(),
+        valor,
+        pct,
+      }
+    })
+  }, [dadosTopProdutos, topProdutosListaCompleta])
+
+  const maxValorProduto = useMemo(
+    () => Math.max(...linhasTopProdutosV2.map(p => p.valor), 1),
+    [linhasTopProdutosV2]
+  )
+
+  /** Soma valor e quantidade só dos itens exibidos (base do modo % na barra). */
+  const totaisListaTopProdutosV2 = useMemo(() => {
+    return linhasTopProdutosV2.reduce(
+      (acc, p) => ({
+        somaValor: acc.somaValor + p.valor,
+        somaQtd: acc.somaQtd + p.qtd,
+      }),
+      { somaValor: 0, somaQtd: 0 }
+    )
+  }, [linhasTopProdutosV2])
 
   const opcaoCalculatePeriodo = useMemo(
     () => periodoSelectV2ParaOpcaoCalculatePeriodo(periodoData),
@@ -641,6 +778,25 @@ export default function DashboardV2() {
     intervaloHora: intervaloHoraEvolucao,
     enabled: inicioAnterior != null && fimAnterior != null,
   })
+
+  const {
+    data: metodosPagamentoDetalhado,
+    isLoading: carregandoMetodosPagamento,
+    isError: erroMetodosPagamento,
+  } = useDashboardMetodosPagamentoDetalhadoQuery({
+    periodo: opcaoCalculatePeriodo,
+    periodoInicial: inicioResumo,
+    periodoFinal: fimResumo,
+    enabled: inicioResumo != null && fimResumo != null,
+  })
+
+  /** Um mini-donut por método com quantidade > 0; ordenado pelo percentual (maior primeiro). */
+  const metodosParaDonutsFormasPagamento = useMemo(() => {
+    const lista = metodosPagamentoDetalhado ?? []
+    return [...lista]
+      .filter(m => m.getQuantidade() > 0)
+      .sort((a, b) => b.getPercentual() - a.getPercentual())
+  }, [metodosPagamentoDetalhado])
 
   const dadosGraficoComparativo = useMemo(() => {
     if (evolucaoAtual == null || evolucaoPeriodoAnterior == null) return []
@@ -870,6 +1026,8 @@ export default function DashboardV2() {
 
   const handleAtualizarDashboard = () => {
     void queryClient.invalidateQueries({ queryKey: ['dashboard', 'evolucao'] })
+    void queryClient.invalidateQueries({ queryKey: ['dashboard', 'metodos-pagamento-detalhado'] })
+    void queryClient.invalidateQueries({ queryKey: ['dashboard', 'top-produtos'] })
     void Promise.all([refetchEmpresa(), refetchResumo(), refetchResumoAnterior()]).then(() => {
       setDadosAtualizadosEm(Date.now())
       setTickRelogio(n => n + 1)
@@ -890,7 +1048,7 @@ export default function DashboardV2() {
   return (
     <div className="min-h-0 w-full bg-gray-50 pb-8 pt-2 font-nunito">
       {/* Cabeçalho + filtros */}
-      <div className="mb-2 flex flex-col px-2 md:flex-row md:items-end md:px-4">
+      <div className="mb-2 flex flex-col px-2 md:flex-row md:items-end justify-start md:px-4">
         <div>
           <h1 className="font-exo text-xl font-semibold text-primary-text md:text-xl">Visão Geral</h1>
           <p className="mt-1 flex flex-wrap items-center font-regular gap-2 text-sm text-primary-text">
@@ -917,11 +1075,11 @@ export default function DashboardV2() {
               type="button"
               onClick={handleAtualizarDashboard}
               disabled={carregandoEmpresa}
-              className="inline-flex h-[42px] w-[42px] items-center justify-center rounded-lg border border-primary/20 bg-white text-primary shadow-sm transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-[22px] w-[22px] items-center justify-center text-primary shadow-sm transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
               aria-label="Atualizar dados do dashboard"
             >
               <RefreshCw
-                className={`h-5 w-5 ${carregandoEmpresa ? 'animate-spin' : ''}`}
+                className={`h-4 w-4 ${carregandoEmpresa ? 'animate-spin' : ''}`}
                 aria-hidden
               />
             </button>
@@ -1025,7 +1183,7 @@ export default function DashboardV2() {
 
       {/* Faixa roxa: altura só do grid de 2 colunas; mascote em absolute (não entra no fluxo) */}
       <div className="relative z-0 mx-2 mb-2 overflow-visible md:mx-4">
-        <div className="relative overflow-visible rounded-2xl bg-gradient-to-br from-secondary via-[#6B21C7] to-[#8338EC] px-3 py-2 pr-24 sm:pr-28 md:px-5 md:py-4 md:pr-32 lg:pr-[min(300px,32vw)]">
+        <div className="relative overflow-visible rounded-2xl bg-gradient-to-br bg-secondary px-3 py-2 pr-24 sm:pr-28 md:px-5 md:py-4 md:pr-32 lg:pr-[min(300px,32vw)]">
           {/* Duas colunas — definem a altura da faixa */}
           <div className="relative z-10 grid grid-cols-1 items-center gap-6 lg:grid-cols-3 lg:gap-8">
             <div>
@@ -1065,7 +1223,7 @@ export default function DashboardV2() {
                         comparacaoPeriodoAnterior.pct > 0
                           ? 'bg-[#00B074]'
                           : comparacaoPeriodoAnterior.pct < 0
-                            ? 'bg-red-600'
+                            ? 'bg-[#D92D20]'
                             : 'bg-white/25'
                       }`}
                     >
@@ -1190,7 +1348,7 @@ export default function DashboardV2() {
             <div className="relative flex h-8 w-8 items-center justify-center">
               <IoReceipt className="text-[#1E3A8A]" size={30} aria-hidden />
               <span
-                className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 ring-2 ring-violet-100"
+                className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#D92D20] ring-2 ring-violet-100"
                 aria-hidden
               >
                 <X className="h-2.5 w-2.5 text-white" strokeWidth={3} />
@@ -1205,7 +1363,7 @@ export default function DashboardV2() {
       </div>
 
       {/* Gráfico + formas de pagamento */}
-      <div className="mx-2 grid grid-cols-1 gap-2 lg:grid-cols-12 md:mx-4">
+      <div className="mx-2 grid grid-cols-1 gap-2 lg:grid-cols-12 lg:items-start md:mx-4">
         <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-6 lg:col-span-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="font-exo min-w-0 text-lg font-semibold text-primary-text md:text-xl">
@@ -1249,8 +1407,8 @@ export default function DashboardV2() {
                 onClick={() => setMetricaGraficoComparativo('CANCELADA')}
                 className={`rounded-md px-3 py-0.5 text-xs font-medium transition md:px-4 md:text-xs ${
                   metricaGraficoComparativo === 'CANCELADA'
-                    ? 'bg-red-600 text-white shadow-sm'
-                    : 'bg-red-100 text-red-800 hover:bg-red-200/90'
+                    ? 'bg-[#D92D20] text-white shadow-sm'
+                    : 'bg-red-100 text-[#D92D20] hover:bg-red-200/90'
                 }`}
               >
                 Canceladas
@@ -1267,7 +1425,7 @@ export default function DashboardV2() {
             </span>
             <span
               className={`inline-flex items-center gap-2 ${
-                metricaGraficoComparativo === 'CANCELADA' ? 'text-red-400' : 'text-secondary-text'
+                metricaGraficoComparativo === 'CANCELADA' ? 'text-[#D92D20]' : 'text-secondary-text'
               }`}
             >
               <span
@@ -1280,7 +1438,7 @@ export default function DashboardV2() {
           <div className="h-[280px] w-full min-w-0 md:h-[320px]">
             {carregandoGraficoComparativo ? (
               <div className="flex h-full min-h-[260px] items-center justify-center">
-                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
+                <JiffyLoading className="!gap-0 !py-0" />
               </div>
             ) : erroGraficoComparativo ? (
               <div className="flex h-full min-h-[260px] flex-col items-center justify-center gap-2 px-4 text-center text-sm text-red-600">
@@ -1362,24 +1520,39 @@ export default function DashboardV2() {
 
         <section className="flex flex-col rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-6 lg:col-span-4">
           <h2 className="font-exo mb-4 text-lg font-semibold text-primary-text md:text-xl">Formas de Pagamento</h2>
-          <div className="grid flex-1 grid-cols-2 gap-4">
-            {FORMAS_PAGAMENTO.map(fp => (
-              <DonutFormaPagamento
-                key={fp.id}
-                label={fp.label}
-                principal={fp.principal}
-                secundaria={fp.secundaria}
-                pct={fp.pct}
-              />
-            ))}
-          </div>
-          <button
-            type="button"
-            className="text-secondary hover:text-secondary/85 mt-6 inline-flex items-center justify-center gap-1 text-sm font-semibold transition"
-          >
-            Ver todos os pagamentos
-            <ChevronRight className="h-4 w-4" />
-          </button>
+          {carregandoMetodosPagamento ? (
+            <div className="flex min-h-[200px] flex-1 items-center justify-center py-8">
+              <JiffyLoading className="!gap-0 !py-0" />
+            </div>
+          ) : erroMetodosPagamento ? (
+            <p className="py-6 text-center text-sm text-[#D92D20]">
+              Não foi possível carregar os métodos de pagamento.
+            </p>
+          ) : metodosParaDonutsFormasPagamento.length === 0 ? (
+            <p className="py-6 text-center text-sm text-secondary-text">
+              Nenhuma forma de pagamento com movimentação no período.
+            </p>
+          ) : (
+            /* Altura ~2 fileiras (4 donuts em grid 2x2); demais métodos rolam dentro do card sem esticar o comparativo */
+            <div className="scrollbar-hide max-h-[300px] min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-contain md:max-h-[380px]">
+              <div className="grid grid-cols-2 gap-10">
+                {metodosParaDonutsFormasPagamento.map((item, index) => (
+                  <DonutFormaPagamento
+                    key={`${item.getMetodo()}-${index}`}
+                    label={item.getMetodo()}
+                    principal={
+                      PALETA_PRINCIPAL_FORMAS_PAGAMENTO[
+                        index % PALETA_PRINCIPAL_FORMAS_PAGAMENTO.length
+                      ]
+                    }
+                    secundaria={COR_ARCO_RESTO_FORMAS_PAGAMENTO}
+                    pct={item.getPercentual()}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+         
         </section>
       </div>
 
@@ -1439,49 +1612,90 @@ export default function DashboardV2() {
           </div>
 
           <div className="flex flex-col">
-            {MOCK_TOP_PRODUTOS.map((p, idx) => {
-              const larguraBarra =
-                modoTopProduto === 'porcentagem'
-                  ? p.pct
-                  : Math.round((p.valor / maxValorProduto) * 100)
-              const rotuloMeio =
-                modoTopProduto === 'porcentagem' ? `${p.pct}%` : formatarMoeda(p.valor)
-              return (
-                <div
-                  key={p.id}
-                  className={`flex items-center gap-2 py-3 text-sm md:gap-3 ${
-                    idx > 0 ? 'border-t border-gray-100' : ''
-                  }`}
-                >
-                  <div className="flex min-w-0 flex-[1.4] items-center gap-2 md:flex-[1.6]">
-                    <span className="text-sm font-regular text-primary-text">{p.nome}</span>
+            {carregandoTopProdutos ? (
+              <div className="flex min-h-[200px] items-center justify-center py-8">
+                <JiffyLoading className="!gap-0 !py-0" />
+              </div>
+            ) : erroTopProdutos ? (
+              <p className="py-6 text-center text-sm text-[#D92D20]">
+                Não foi possível carregar o top produtos.
+              </p>
+            ) : linhasTopProdutosV2.length === 0 ? (
+              <p className="py-6 text-center text-sm text-secondary-text">Nenhum dado disponível</p>
+            ) : (
+              <>
+                {linhasTopProdutosV2.map((p, idx) => {
+                  const larguraBarra =
+                    modoTopProduto === 'porcentagem'
+                      ? p.pct
+                      : Math.round((p.valor / maxValorProduto) * 100)
+                  const rotuloMeio =
+                    modoTopProduto === 'porcentagem' ? `${p.pct}%` : formatarMoeda(p.valor)
+                  return (
+                    <div
+                      key={p.id}
+                      className={`flex items-center gap-2 py-2 text-sm md:gap-3 ${
+                        idx > 0 ? 'border-t border-gray-100' : ''
+                      }`}
+                    >
+                      <div className="flex min-w-0 flex-[1.4] items-center gap-2 md:flex-[1.6]">
+                        <span className="text-sm font-regular text-primary-text">{p.nome}</span>
+                      </div>
+                      <div className="min-w-0 flex-1 text-center text-sm font-regular text-primary-text">
+                        {p.qtd} <span className="text-xs">un</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        {/* Barra em camadas: trilho + preenchimento + rótulo centralizado por cima */}
+                        <div className="relative h-4 min-w-0 overflow-hidden rounded-lg bg-alternate/60">
+                          <div
+                            className="absolute left-0 top-0 z-0 h-full rounded-lg bg-secondary transition-all"
+                            style={{ width: `${Math.min(100, larguraBarra)}%` }}
+                          />
+                          <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-xs font-regular tabular-nums text-white">
+                            {rotuloMeio}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="min-w-0 flex-1 text-right text-sm font-regular text-primary-text">
+                        {formatarMoeda(p.valor)}
+                      </div>
+                    </div>
+                  )
+                })}
+                {/* Total da lista: referência explícita para as porcentagens da barra (soma só do que está no ranking) */}
+                <div className="mt-1 flex items-center gap-2 border-t border-gray-200 py-3 text-sm md:gap-3">
+                  <div className="flex min-w-0 flex-[1.4] flex-col gap-0.5 md:flex-[1.6]">
+                    <span className="text-sm font-semibold text-primary-text">Total</span>
+                    
                   </div>
-                  <div className="min-w-0 flex-1 text-center text-sm font-regular text-primary-text">
-                    {p.qtd} <span className="text-xs">un</span>
+                  <div className="min-w-0 flex-1 text-center text-sm font-semibold text-primary-text">
+                    {totaisListaTopProdutosV2.somaQtd} <span className="text-xs font-regular">un</span>
                   </div>
                   <div className="min-w-0 flex-1">
-                    {/* Barra em camadas: trilho + preenchimento + rótulo centralizado por cima */}
-                    <div className="relative h-7 min-w-0 overflow-hidden rounded-lg bg-gray-200">
-                      <div
-                        className="absolute left-0 top-0 z-0 h-full rounded-lg bg-secondary transition-all"
-                        style={{ width: `${Math.min(100, larguraBarra)}%` }}
-                      />
-                      <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-xs font-regular tabular-nums text-primary-text">
-                        {rotuloMeio}
-                      </span>
-                    </div>
+                    {modoTopProduto === 'porcentagem' ? (
+                      <div className="relative h-4 min-w-0 overflow-hidden rounded-lg bg-gray-200">
+                        <div className="absolute left-0 top-0 z-0 h-full w-full rounded-lg bg-secondary" />
+                        <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-xs font-semibold tabular-nums text-white">
+                          100%
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex h-7 items-center justify-center text-xs text-secondary-text">—</div>
+                    )}
                   </div>
-                  <div className="min-w-0 flex-1 text-right text-sm font-regular text-primary-text">
-                    {formatarMoeda(p.valor)}
+                  <div className="min-w-0 flex-1 text-right text-sm font-semibold text-primary-text">
+                    {formatarMoeda(totaisListaTopProdutosV2.somaValor)}
                   </div>
                 </div>
-              )
-            })}
+              </>
+            )}
           </div>
 
           <button
             type="button"
-            className="text-secondary hover:text-secondary/85 mt-4 inline-flex items-center gap-1 text-sm font-semibold transition"
+            disabled={verTodosProdutosDesabilitado}
+            onClick={() => setTopProdutosListaCompleta(true)}
+            className="text-secondary hover:text-secondary/85 inline-flex items-center gap-1 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-secondary"
           >
             Ver todos os produtos
             <ChevronRight className="h-4 w-4" />
@@ -1505,6 +1719,19 @@ export default function DashboardV2() {
             </div>
           </div>
 
+          {/* TESTE: gráfico “Vendas por usuário” (mesmo núcleo do GraficoVendasPorUsuarioModal). Descomente o bloco da tabela mock abaixo para voltar ao layout anterior. */}
+          <GraficoVendasPorUsuarioConteudo
+            vendas={MOCK_VENDAS_GRAFICO_USUARIO_TESTE_GARCOM}
+            usuariosPDV={MOCK_USUARIOS_PDV_GRAFICO_TESTE_GARCOM}
+            tipo="finalizadas"
+            alturaGraficoPx={340}
+            innerRadius={58}
+            outerRadius={108}
+            className="min-w-0"
+            mostrarLegenda={false}
+          />
+
+          {/*
           <div className="mb-2 flex gap-2 border-b border-gray-200 pb-2 text-[11px] font-medium uppercase tracking-wide text-primary-text md:text-xs">
             <div className="min-w-0 flex-1">Nome</div>
             <div className="min-w-0 flex-1 text-center">Quantidade</div>
@@ -1537,6 +1764,7 @@ export default function DashboardV2() {
             Ver todos os usuários
             <ChevronRight className="h-4 w-4" />
           </button>
+          */}
         </section>
       </div>
     </div>
@@ -1582,7 +1810,7 @@ function MetricCard({
             </span>
             <span
               className={`rounded-md mr-4 px-2 py-0.5 text-sm font-medium text-white ${
-                badgePositivo ? 'bg-[#00B074]' : 'bg-red-500'
+                badgePositivo ? 'bg-[#00B074]' : 'bg-[#D92D20]'
               }`}
             >
               {badge}
