@@ -134,7 +134,7 @@ export function TabelaTopProdutos({
           return (
             <div key={produto.getRank()} className={`flex mb-2 border border-gray-200 ${bgColor} rounded-lg p-2 hover:bg-custom-2/50`}>
               <span className="w-1/12 font-semibold text-primary">{produto.getRank()}</span>
-              <span className="w-6/12 text-primary">{produto.getProduto()}</span>
+              <span className="w-6/12 uppercase text-primary">{produto.getProduto()}</span>
               <span className="w-3/12 text-center text-primary">{produto.getQuantidade()}</span>
               <span className="w-3/12 text-right font-semibold text-primary">
                 {formatCurrency(produto.getValorTotal())}
@@ -163,7 +163,7 @@ export function TabelaTopProdutos({
                   <span className="font-semibold text-primary text-base flex-shrink-0">
                     {produto.getRank()}
                   </span>
-                  <span className="text-primary text-sm truncate min-w-0">
+                  <span className="min-w-0 truncate text-sm uppercase text-primary">
                     {produto.getProduto()}
                   </span>
                 </div>

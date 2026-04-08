@@ -95,14 +95,10 @@ export function ModalMetodosPagamento({
         aria-modal="true"
         aria-labelledby="modal-metodos-pagamento-titulo-erro"
       >
+        <div className="absolute inset-0 bg-black/50" aria-hidden onClick={() => onClose()} />
         <div
-          className="absolute inset-0 bg-black/50"
-          aria-hidden
-          onClick={() => onClose()}
-        />
-        <div
-          className="relative z-10 w-full max-w-7xl max-h-[90vh] overflow-y-auto rounded-lg bg-white p-2 shadow-xl"
-          onClick={(e) => e.stopPropagation()}
+          className="relative z-10 max-h-[90vh] w-full max-w-7xl overflow-y-auto rounded-lg bg-white p-2 shadow-xl"
+          onClick={e => e.stopPropagation()}
         >
           <button
             type="button"
@@ -119,11 +115,11 @@ export function ModalMetodosPagamento({
             >
               Erro
             </h2>
-            <p className="mt-2 font-nunito text-sm text-secondary-text">
+            <p className="font-nunito mt-2 text-sm text-secondary-text">
               Ocorreu um erro ao carregar os dados.
             </p>
           </div>
-          <div className="flex flex-col items-center justify-center h-64 text-red-600">
+          <div className="flex h-64 flex-col items-center justify-center text-red-600">
             <p>{error}</p>
             <button
               type="button"
@@ -145,14 +141,10 @@ export function ModalMetodosPagamento({
       aria-modal="true"
       aria-labelledby="modal-metodos-pagamento-titulo"
     >
+      <div className="absolute inset-0 bg-black/50" aria-hidden onClick={() => onClose()} />
       <div
-        className="absolute inset-0 bg-black/50"
-        aria-hidden
-        onClick={() => onClose()}
-      />
-      <div
-        className="relative z-10 w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg bg-white p-2 pb-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
+        className="relative z-10 max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-lg bg-white p-2 pb-6 shadow-xl"
+        onClick={e => e.stopPropagation()}
       >
         <button
           type="button"
@@ -169,7 +161,7 @@ export function ModalMetodosPagamento({
           >
             Vendas por Método de Pagamento
           </h2>
-          <p className="mt-2 font-nunito text-sm text-secondary-text">
+          <p className="font-nunito mt-2 text-sm text-secondary-text">
             Detalhamento completo de métodos de pagamento
           </p>
         </div>
@@ -178,11 +170,11 @@ export function ModalMetodosPagamento({
           {isLoading ? (
             <JiffyLoading />
           ) : !data || data.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64">
-              <div className="w-16 h-16 rounded-full bg-alternate/20 flex items-center justify-center mb-4">
+            <div className="flex h-64 flex-col items-center justify-center">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-alternate/20">
                 <span className="text-2xl">💳</span>
               </div>
-              <p className="text-primary-text font-nunito">Nenhum dado disponível</p>
+              <p className="font-nunito text-primary-text">Nenhum dado disponível</p>
             </div>
           ) : (
             <>
@@ -208,6 +200,9 @@ export function ModalMetodosPagamento({
                             outerRadius={150}
                             fill="#8884d8"
                             dataKey="value"
+                            /* Alinhado ao card Formas de pagamento (V2): início no topo, avanço horário. */
+                            startAngle={90}
+                            endAngle={-270}
                           >
                             {data.map((_, index) => (
                               <Cell key={`cell-${index}`} fill={cores[index % cores.length]} />
@@ -229,10 +224,10 @@ export function ModalMetodosPagamento({
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
-                    <div className="mt-3 w-full border p-2 border-gray-200">
+                    <div className="mt-3 w-full border border-gray-200 p-2">
                       <h3
                         id="modal-metodos-legenda-titulo"
-                        className="mb-2 font-exo text-sm font-semibold text-primary-text border-b"
+                        className="mb-2 border-b font-exo text-sm font-semibold text-primary-text"
                       >
                         Legenda
                       </h3>
@@ -241,32 +236,32 @@ export function ModalMetodosPagamento({
                         role="list"
                         aria-labelledby="modal-metodos-legenda-titulo"
                       >
-                      {data.map((item, index) => (
-                        <div
-                          key={`${item.getMetodo()}-${index}`}
-                          className="flex min-w-0 items-start gap-2"
-                          role="listitem"
-                        >
-                          <span
-                            className="mt-0.5 h-3 w-3 shrink-0 rounded-sm"
-                            style={{ backgroundColor: cores[index % cores.length] }}
-                            aria-hidden
-                          />
-                          <span className="break-words font-nunito text-[11px] leading-snug text-primary-text sm:text-xs">
-                            {item.getMetodo()}
-                          </span>
-                        </div>
-                      ))}
+                        {data.map((item, index) => (
+                          <div
+                            key={`${item.getMetodo()}-${index}`}
+                            className="flex min-w-0 items-start gap-2"
+                            role="listitem"
+                          >
+                            <span
+                              className="mt-0.5 h-3 w-3 shrink-0 rounded-sm"
+                              style={{ backgroundColor: cores[index % cores.length] }}
+                              aria-hidden
+                            />
+                            <span className="font-nunito break-words text-[11px] leading-snug text-primary-text sm:text-xs">
+                              {item.getMetodo()}
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Coluna direita: lista de métodos + total */}
-                <div className="flex w-full min-w-0 flex-1 flex-col gap-4 lg:max-w-md border">
+                <div className="flex w-full min-w-0 flex-1 flex-col gap-4 border lg:max-w-md">
                   <h3
                     id="modal-metodos-movimentacao-titulo"
-                    className="font-exo text-sm text-center pt-2 font-semibold text-primary-text"
+                    className="pt-2 text-center font-exo text-sm font-semibold text-primary-text"
                   >
                     Movimentação por métodos de pagamento
                   </h3>
@@ -277,7 +272,7 @@ export function ModalMetodosPagamento({
                   >
                     {data.map((item, index) => (
                       <div key={item.getMetodo()} role="listitem">
-                        <div className="px-3 py-2 border-b border-gray-200">
+                        <div className="border-b border-gray-200 px-3 py-2">
                           <div className="flex gap-2">
                             <div
                               className="mt-0.5 h-3 w-3 shrink-0 rounded-full"
@@ -289,13 +284,13 @@ export function ModalMetodosPagamento({
                               <p className="min-w-0 break-words font-exo text-xs font-semibold leading-tight text-primary-text">
                                 {item.getMetodo()}
                               </p>
-                              <p className="text-right font-exo text-xs font-semibold leading-tight tabular-nums text-primary-text">
+                              <p className="text-right font-exo text-xs font-semibold tabular-nums leading-tight text-primary-text">
                                 {formatCurrency(item.getValor())}
                               </p>
-                              <p className="font-nunito text-[10px] leading-tight text-muted-foreground sm:text-[11px]">
+                              <p className="font-nunito text-muted-foreground text-[10px] leading-tight sm:text-[11px]">
                                 {item.getQuantidade()} transações
                               </p>
-                              <p className="text-right font-nunito text-[10px] leading-tight text-muted-foreground sm:text-[11px]">
+                              <p className="font-nunito text-muted-foreground text-right text-[10px] leading-tight sm:text-[11px]">
                                 {item.getPercentual().toFixed(1)}% do total
                               </p>
                             </div>
@@ -322,4 +317,3 @@ export function ModalMetodosPagamento({
     </div>
   )
 }
-

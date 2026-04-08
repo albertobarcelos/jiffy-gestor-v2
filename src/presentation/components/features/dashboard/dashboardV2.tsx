@@ -10,6 +10,7 @@ import { useDashboardResumoQuery } from '@/src/presentation/hooks/useDashboardRe
 import { useDashboardEvolucaoQuery } from '@/src/presentation/hooks/useDashboardEvolucaoQuery'
 import { useDashboardMetodosPagamentoDetalhadoQuery } from '@/src/presentation/hooks/useDashboardMetodosPagamentoDetalhadoQuery'
 import { useDashboardTopProdutosQuery } from '@/src/presentation/hooks/useDashboardTopProdutosQuery'
+import { useDashboardTopGarconsQuery } from '@/src/presentation/hooks/useDashboardTopGarconsQuery'
 import {
   mergePontosEvolucaoComparacao,
   type MetricaEvolucaoComparativo,
@@ -51,16 +52,11 @@ import {
   SelectValue,
 } from '@/src/presentation/components/ui/select'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
-import {
-  GraficoVendasPorUsuarioConteudo,
-  type Venda as VendaGraficoUsuario,
-  type UsuarioPDV as UsuarioPDVGrafico,
-} from '@/src/presentation/components/features/vendas/GraficoVendasPorUsuarioModal'
-import { MdOutlineMonetizationOn, MdReceiptLong, MdRestaurantMenu, MdAdd  } from "react-icons/md";
-import { TbReceiptFilled } from "react-icons/tb";
-import { IoReceipt } from "react-icons/io5";
+import { MdOutlineMonetizationOn, MdReceiptLong, MdRestaurantMenu, MdAdd } from 'react-icons/md'
+import { TbReceiptFilled } from 'react-icons/tb'
+import { IoReceipt } from 'react-icons/io5'
 import { Tooltip as MuiTooltip } from '@mui/material'
-
+import { FaMedal, FaTrophy } from 'react-icons/fa'
 
 /** Exo 2 (Google) — o token Tailwind `font-exo` aponta para General Sans; aqui usamos a família real */
 const exo2CabecalhoFaturamento = Exo_2({
@@ -77,6 +73,8 @@ const LIMITE_TOP_PRODUTOS_V2_COMPLETO = 500
 /** No resumo pedimos 11 itens, exibimos 10; o 11º indica que existe lista maior (habilita o botão). */
 const LIMITE_TOP_PRODUTOS_V2_RESUMO = 10
 const LIMITE_TOP_PRODUTOS_V2_RESUMO_FETCH = LIMITE_TOP_PRODUTOS_V2_RESUMO + 1
+/** Ranking fixo de garçons no card Top Garçons V2 (sempre 10 linhas). */
+const LIMITE_TOP_GARCONS_V2 = 10
 
 /** Paleta cíclica para N métodos distintos (mesma ideia do modal de métodos). */
 const PALETA_PRINCIPAL_FORMAS_PAGAMENTO = [
@@ -117,27 +115,6 @@ function intervaloMinutosAgregacaoGraficoV2(g: AgregacaoGraficoV2): number | und
   }
 }
 
-const MOCK_TOP_GARCONS = [
-  { id: '1', nome: 'Alberto Barcelos', qtd: 24, mesas: 30, valor: 35000 },
-  { id: '2', nome: 'Maria Fernandes', qtd: 20, mesas: 26, valor: 28900 },
-  { id: '3', nome: 'João Pedro Silva', qtd: 18, mesas: 22, valor: 22100 },
-  { id: '4', nome: 'Ana Carolina Souza', qtd: 15, mesas: 19, valor: 19800 },
-  { id: '5', nome: 'Lucas Oliveira', qtd: 12, mesas: 15, valor: 15400 },
-]
-
-/** Teste do gráfico no card Top Garçons — alinhado aos nomes/valores do mock da tabela. */
-const DATA_MOCK_FINALIZACAO_GRAFICO_GARCOM = new Date().toISOString()
-const MOCK_USUARIOS_PDV_GRAFICO_TESTE_GARCOM: UsuarioPDVGrafico[] = MOCK_TOP_GARCONS.map(g => ({
-  id: g.id,
-  nome: g.nome,
-}))
-const MOCK_VENDAS_GRAFICO_USUARIO_TESTE_GARCOM: VendaGraficoUsuario[] = MOCK_TOP_GARCONS.map(g => ({
-  id: `v-garcom-${g.id}`,
-  abertoPorId: g.id,
-  valorFinal: g.valor,
-  dataFinalizacao: DATA_MOCK_FINALIZACAO_GRAFICO_GARCOM,
-}))
-
 /** Trigger do select de empresa (alinhado ao SelectTrigger Radix) */
 const CLASSES_SELECT_EMPRESA =
   'h-auto min-h-[42px] w-full rounded-lg bg-primary/5 py-2 pl-4 pr-3 text-sm font-medium text-primary shadow-none ring-offset-0 focus:outline-none focus:ring-2 focus:ring-primary/35 focus:ring-offset-0 data-[state=open]:border-primary [&>svg]:text-primary'
@@ -171,8 +148,8 @@ function calcularTicksEDominioYComparativo(
   const topoBruto = maxVal > 0 ? maxVal * 1.08 : 100
 
   const PASSOS = [
-    10, 15, 20, 25, 50, 75, 100, 150, 200, 250, 300, 400, 500, 600, 750, 1000, 1250, 1500, 2000, 2500,
-    3000, 4000, 5000, 7500, 10000,
+    10, 15, 20, 25, 50, 75, 100, 150, 200, 250, 300, 400, 500, 600, 750, 1000, 1250, 1500, 2000,
+    2500, 3000, 4000, 5000, 7500, 10000,
   ]
   const MAX_MARCAS = 14
   const MIN_MARCAS = 4
@@ -229,7 +206,10 @@ function badgeVariacaoPercentual(
 /**
  * Badge do card Cancelamentos: % + "Alto" (vermelho) se subiu vs período anterior, senão + "Baixo" (verde).
  */
-function badgeTextoCancelamentos(atual: number, anterior: number): { texto: string; positivo: boolean } {
+function badgeTextoCancelamentos(
+  atual: number,
+  anterior: number
+): { texto: string; positivo: boolean } {
   if (anterior <= 0 && atual <= 0) {
     return { texto: '0% Baixo', positivo: true }
   }
@@ -251,7 +231,10 @@ function ticketMedioResumo(totalFaturado: number, countVendasEfetivadas: number)
 }
 
 /** Itens por pedido = produtos vendidos ÷ vendas efetivadas (0 se não houver vendas). */
-function itensPorPedidoResumo(countProdutosVendidos: number, countVendasEfetivadas: number): number {
+function itensPorPedidoResumo(
+  countProdutosVendidos: number,
+  countVendasEfetivadas: number
+): number {
   if (countVendasEfetivadas <= 0) return 0
   return countProdutosVendidos / countVendasEfetivadas
 }
@@ -524,6 +507,33 @@ function formatarPercentualMiniDonut(p: number): string {
   return `${x.toFixed(1)}%`
 }
 
+/** 1º–3º: troféu/medalhas; 4º em diante: número da posição. */
+function IconeColocacaoTopGarcom({ rank }: { rank: number }) {
+  const tamanho = 'h-[18px] w-[18px] md:h-5 md:w-5'
+  if (rank === 1) {
+    return (
+      <span className="flex items-center justify-center" title="1º lugar">
+        <FaTrophy className={`${tamanho} shrink-0 text-amber-500`} aria-hidden />
+      </span>
+    )
+  }
+  if (rank === 2) {
+    return (
+      <span className="flex items-center justify-center" title="2º lugar">
+        <FaMedal className={`${tamanho} shrink-0 text-slate-400`} aria-hidden />
+      </span>
+    )
+  }
+  if (rank === 3) {
+    return (
+      <span className="flex items-center justify-center" title="3º lugar">
+        <FaMedal className={`${tamanho} shrink-0 text-[#B87333]`} aria-hidden />
+      </span>
+    )
+  }
+  return <span className="tabular-nums text-secondary-text">{rank}</span>
+}
+
 /** Mini donut para cada forma de pagamento (layout Figma: um gráfico por método) */
 function DonutFormaPagamento({
   principal,
@@ -543,9 +553,6 @@ function DonutFormaPagamento({
   ]
   return (
     <div className="flex flex-col items-center gap-2">
-      <p className="text-center text-[10px] font-semibold uppercase tracking-wide text-primary-text md:text-xs">
-        {label}
-      </p>
       <div className="relative h-[120px] w-[120px] md:h-[144px] md:w-[144px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -558,6 +565,9 @@ function DonutFormaPagamento({
               paddingAngle={0}
               dataKey="value"
               stroke="none"
+              /* Padrão Recharts: 0° = direita, ângulos crescem no anti-horário. Topo = 90°; endAngle menor que startAngle percorre o círculo no horário. */
+              startAngle={90}
+              endAngle={-270}
             >
               {data.map((entry, i) => (
                 <Cell key={i} fill={entry.fill} />
@@ -569,6 +579,9 @@ function DonutFormaPagamento({
           {formatarPercentualMiniDonut(pct)}
         </span>
       </div>
+      <p className="text-center text-[10px] font-semibold uppercase tracking-wide text-primary-text md:text-xs">
+        {label}
+      </p>
     </div>
   )
 }
@@ -580,8 +593,12 @@ function DonutFormaPagamento({
 export default function DashboardV2() {
   const router = useRouter()
   const queryClient = useQueryClient()
-  const { empresa: empresaLogada, isLoading: carregandoEmpresa, error: erroEmpresa, refetch: refetchEmpresa } =
-    useEmpresaMe()
+  const {
+    empresa: empresaLogada,
+    isLoading: carregandoEmpresa,
+    error: erroEmpresa,
+    refetch: refetchEmpresa,
+  } = useEmpresaMe()
   const [lojaId, setLojaId] = useState('')
   const [periodoData, setPeriodoData] = useState('hoje')
   const [granularidade, setGranularidade] = useState<AgregacaoGraficoV2>('intervalo_30')
@@ -658,7 +675,9 @@ export default function DashboardV2() {
     isError: erroTopProdutos,
   } = useDashboardTopProdutosQuery({
     periodo: periodoApiTopProduto,
-    limit: topProdutosListaCompleta ? LIMITE_TOP_PRODUTOS_V2_COMPLETO : LIMITE_TOP_PRODUTOS_V2_RESUMO_FETCH,
+    limit: topProdutosListaCompleta
+      ? LIMITE_TOP_PRODUTOS_V2_COMPLETO
+      : LIMITE_TOP_PRODUTOS_V2_RESUMO_FETCH,
     periodoInicial: inicioTopProduto,
     periodoFinal: fimTopProduto,
     enabled: inicioTopProduto != null && fimTopProduto != null,
@@ -708,6 +727,69 @@ export default function DashboardV2() {
       { somaValor: 0, somaQtd: 0 }
     )
   }, [linhasTopProdutosV2])
+
+  const opcaoPeriodoTopGarcom = useMemo(
+    () => filtroTopProdutoV2ParaOpcaoCalculatePeriodo(filtroTopGarcom),
+    [filtroTopGarcom]
+  )
+
+  const { inicio: inicioTopGarcom, fim: fimTopGarcom } = useMemo(() => {
+    return calculatePeriodo(opcaoPeriodoTopGarcom)
+  }, [opcaoPeriodoTopGarcom, dadosAtualizadosEm])
+
+  const periodoApiTopGarcom = useMemo(
+    () => filtroTopProdutoV2ParaApiPeriodo(filtroTopGarcom),
+    [filtroTopGarcom]
+  )
+
+  const {
+    data: dadosTopGarcons,
+    isLoading: carregandoTopGarcons,
+    isError: erroTopGarcons,
+  } = useDashboardTopGarconsQuery({
+    periodo: periodoApiTopGarcom,
+    limit: LIMITE_TOP_GARCONS_V2,
+    periodoInicial: inicioTopGarcom,
+    periodoFinal: fimTopGarcom,
+    enabled: inicioTopGarcom != null && fimTopGarcom != null,
+  })
+
+  /** Sempre 10 posições numeradas; posições sem dado exibem traço. */
+  const linhasTopGarconsV2 = useMemo(() => {
+    const lista = dadosTopGarcons ?? []
+    return Array.from({ length: LIMITE_TOP_GARCONS_V2 }, (_, i) => {
+      const g = lista[i]
+      if (!g) {
+        return {
+          key: `garcom-rank-${i + 1}-vazio`,
+          rank: i + 1,
+          vazio: true as const,
+        }
+      }
+      return {
+        key: `garcom-rank-${i + 1}-${g.getNome()}`,
+        rank: i + 1,
+        vazio: false as const,
+        nome: g.getNome(),
+        qtdProdutos: g.getQtdProdutos(),
+        qtdVendas: g.getQtdVendas(),
+        valorTotal: g.getValorTotal(),
+      }
+    })
+  }, [dadosTopGarcons])
+
+  /** Totais apenas dos garçons presentes no ranking (até 10), no período filtrado. */
+  const totaisTopGarconsV2 = useMemo(() => {
+    const lista = dadosTopGarcons ?? []
+    return lista.reduce(
+      (acc, g) => ({
+        somaQtdProd: acc.somaQtdProd + g.getQtdProdutos(),
+        somaQtdVendas: acc.somaQtdVendas + g.getQtdVendas(),
+        somaValor: acc.somaValor + g.getValorTotal(),
+      }),
+      { somaQtdProd: 0, somaQtdVendas: 0, somaValor: 0 }
+    )
+  }, [dadosTopGarcons])
 
   const opcaoCalculatePeriodo = useMemo(
     () => periodoSelectV2ParaOpcaoCalculatePeriodo(periodoData),
@@ -826,8 +908,7 @@ export default function DashboardV2() {
     [dadosGraficoComparativo]
   )
 
-  const carregandoGraficoComparativo =
-    carregandoEvolucaoAtual || carregandoEvolucaoAnterior
+  const carregandoGraficoComparativo = carregandoEvolucaoAtual || carregandoEvolucaoAnterior
   const erroGraficoComparativo = erroEvolucaoAtual || erroEvolucaoAnterior
 
   const rotuloRodapeCards = rotuloRodapeComparacaoCards(periodoData)
@@ -893,10 +974,7 @@ export default function DashboardV2() {
     }
     const mA = dadosResumo?.metricas?.total
     const mRef = dadosResumoAnterior?.metricas?.total
-    const ticketAtual = ticketMedioResumo(
-      mA?.totalFaturado ?? 0,
-      mA?.countVendasEfetivadas ?? 0
-    )
+    const ticketAtual = ticketMedioResumo(mA?.totalFaturado ?? 0, mA?.countVendasEfetivadas ?? 0)
     const ticketAnterior = ticketMedioResumo(
       mRef?.totalFaturado ?? 0,
       mRef?.countVendasEfetivadas ?? 0
@@ -985,10 +1063,8 @@ export default function DashboardV2() {
         badgePositivo: true,
       }
     }
-    const atual =
-      dadosResumo?.metricas?.canceladas?.countVendasCanceladas ?? 0
-    const anterior =
-      dadosResumoAnterior?.metricas?.canceladas?.countVendasCanceladas ?? 0
+    const atual = dadosResumo?.metricas?.canceladas?.countVendasCanceladas ?? 0
+    const anterior = dadosResumoAnterior?.metricas?.canceladas?.countVendasCanceladas ?? 0
     const { texto, positivo } = badgeTextoCancelamentos(atual, anterior)
     return {
       valor: formatarContagemPedidos(atual),
@@ -1028,6 +1104,7 @@ export default function DashboardV2() {
     void queryClient.invalidateQueries({ queryKey: ['dashboard', 'evolucao'] })
     void queryClient.invalidateQueries({ queryKey: ['dashboard', 'metodos-pagamento-detalhado'] })
     void queryClient.invalidateQueries({ queryKey: ['dashboard', 'top-produtos'] })
+    void queryClient.invalidateQueries({ queryKey: ['dashboard', 'top-garcons'] })
     void Promise.all([refetchEmpresa(), refetchResumo(), refetchResumoAnterior()]).then(() => {
       setDadosAtualizadosEm(Date.now())
       setTickRelogio(n => n + 1)
@@ -1046,12 +1123,14 @@ export default function DashboardV2() {
   }
 
   return (
-    <div className="min-h-0 w-full bg-gray-50 pb-8 pt-2 font-nunito">
+    <div className="font-nunito min-h-0 w-full bg-gray-50 pb-8 pt-2">
       {/* Cabeçalho + filtros */}
-      <div className="mb-2 flex flex-col px-2 md:flex-row md:items-end justify-start md:px-4">
+      <div className="mb-2 flex flex-col justify-start px-2 md:flex-row md:items-end md:px-4">
         <div>
-          <h1 className="font-exo text-xl font-semibold text-primary-text md:text-xl">Visão Geral</h1>
-          <p className="mt-1 flex flex-wrap items-center font-regular gap-2 text-sm text-primary-text">
+          <h1 className="font-exo text-xl font-semibold text-primary-text md:text-xl">
+            Visão Geral
+          </h1>
+          <p className="font-regular mt-1 flex flex-wrap items-center gap-2 text-sm text-primary-text">
             {subtituloAtualizacao}
           </p>
         </div>
@@ -1087,48 +1166,47 @@ export default function DashboardV2() {
         </MuiTooltip>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="flex min-w-0 items-center gap-2">
-           
             <span className="inline-flex h-2 w-2 rounded-full bg-secondary" aria-hidden />
             <div className="relative min-w-[200px] flex-1">
-            <label htmlFor="dashboard-empresa" className="sr-only">
-              Empresa
-            </label>
-            {carregandoEmpresa ? (
-              <div
-                className={`${CLASSES_SELECT_EMPRESA} flex cursor-wait items-center text-primary/70`}
-                aria-busy="true"
-              >
-                Carregando empresa…
-              </div>
-            ) : erroEmpresa || !empresaLogada ? (
-              <div
-                className={`${CLASSES_SELECT_EMPRESA} flex flex-col gap-1 border border-red-200 bg-red-50/80 py-2 text-xs text-red-800`}
-                role="alert"
-              >
-                <span>{erroEmpresa ?? 'Empresa não disponível'}</span>
-                <button
-                  type="button"
-                  onClick={() => void refetchEmpresa()}
-                  className="self-start text-[11px] font-semibold text-primary underline-offset-2 hover:underline"
+              <label htmlFor="dashboard-empresa" className="sr-only">
+                Empresa
+              </label>
+              {carregandoEmpresa ? (
+                <div
+                  className={`${CLASSES_SELECT_EMPRESA} flex cursor-wait items-center text-primary/70`}
+                  aria-busy="true"
                 >
-                  Tentar novamente
-                </button>
-              </div>
-            ) : (
-              <Select value={valorEmpresaSelect} onValueChange={setLojaId}>
-                <SelectTrigger id="dashboard-empresa" className={CLASSES_SELECT_EMPRESA}>
-                  <SelectValue placeholder="Empresa" />
-                </SelectTrigger>
-                <SelectContent className="rounded-lg border-gray-200 bg-white">
-                  <SelectItem
-                    value={empresaLogada.id}
-                    className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:!bg-primary data-[highlighted]:!text-white data-[highlighted]:rounded-lg data-[state=checked]:bg-primary/10 data-[state=checked]:text-primary data-[state=checked]:rounded-lg"
+                  Carregando empresa…
+                </div>
+              ) : erroEmpresa || !empresaLogada ? (
+                <div
+                  className={`${CLASSES_SELECT_EMPRESA} flex flex-col gap-1 border border-red-200 bg-red-50/80 py-2 text-xs text-red-800`}
+                  role="alert"
+                >
+                  <span>{erroEmpresa ?? 'Empresa não disponível'}</span>
+                  <button
+                    type="button"
+                    onClick={() => void refetchEmpresa()}
+                    className="self-start text-[11px] font-semibold text-primary underline-offset-2 hover:underline"
                   >
-                    {empresaLogada.nomeExibicao}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            )}
+                    Tentar novamente
+                  </button>
+                </div>
+              ) : (
+                <Select value={valorEmpresaSelect} onValueChange={setLojaId}>
+                  <SelectTrigger id="dashboard-empresa" className={CLASSES_SELECT_EMPRESA}>
+                    <SelectValue placeholder="Empresa" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-lg border-gray-200 bg-white">
+                    <SelectItem
+                      value={empresaLogada.id}
+                      className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:rounded-lg data-[state=checked]:rounded-lg data-[highlighted]:!bg-primary data-[state=checked]:bg-primary/10 data-[highlighted]:!text-white data-[state=checked]:text-primary"
+                    >
+                      {empresaLogada.nomeExibicao}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </div>
           <span className="inline-flex h-2 w-2 rounded-full bg-secondary" aria-hidden />
@@ -1150,7 +1228,7 @@ export default function DashboardV2() {
               <SelectContent className="rounded-lg border-gray-200 bg-white">
                 <SelectItem
                   value="hoje"
-                  className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:!bg-primary data-[highlighted]:!text-white data-[highlighted]:rounded-lg data-[state=checked]:bg-primary/10 data-[state=checked]:text-primary data-[state=checked]:rounded-lg"
+                  className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:rounded-lg data-[state=checked]:rounded-lg data-[highlighted]:!bg-primary data-[state=checked]:bg-primary/10 data-[highlighted]:!text-white data-[state=checked]:text-primary"
                 >
                   <span className="inline-flex flex-wrap items-baseline gap-x-1">
                     <span className="text-sm font-semibold">Hoje</span>
@@ -1159,19 +1237,19 @@ export default function DashboardV2() {
                 </SelectItem>
                 <SelectItem
                   value="ontem"
-                  className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:!bg-primary data-[highlighted]:!text-white data-[highlighted]:rounded-lg data-[state=checked]:bg-primary/10 data-[state=checked]:text-primary data-[state=checked]:rounded-lg"
+                  className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:rounded-lg data-[state=checked]:rounded-lg data-[highlighted]:!bg-primary data-[state=checked]:bg-primary/10 data-[highlighted]:!text-white data-[state=checked]:text-primary"
                 >
                   Ontem
                 </SelectItem>
                 <SelectItem
                   value="semana"
-                  className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:!bg-primary data-[highlighted]:!text-white data-[highlighted]:rounded-lg data-[state=checked]:bg-primary/10 data-[state=checked]:text-primary data-[state=checked]:rounded-lg"
+                  className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:rounded-lg data-[state=checked]:rounded-lg data-[highlighted]:!bg-primary data-[state=checked]:bg-primary/10 data-[highlighted]:!text-white data-[state=checked]:text-primary"
                 >
                   Últimos 7 dias
                 </SelectItem>
                 <SelectItem
                   value="30dias"
-                  className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:!bg-primary data-[highlighted]:!text-white data-[highlighted]:rounded-lg data-[state=checked]:bg-primary/10 data-[state=checked]:text-primary data-[state=checked]:rounded-lg"
+                  className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:rounded-lg data-[state=checked]:rounded-lg data-[highlighted]:!bg-primary data-[state=checked]:bg-primary/10 data-[highlighted]:!text-white data-[state=checked]:text-primary"
                 >
                   Últimos 30 dias
                 </SelectItem>
@@ -1183,13 +1261,12 @@ export default function DashboardV2() {
 
       {/* Faixa roxa: altura só do grid de 2 colunas; mascote em absolute (não entra no fluxo) */}
       <div className="relative z-0 mx-2 mb-2 overflow-visible md:mx-4">
-        <div className="relative overflow-visible rounded-2xl bg-gradient-to-br bg-secondary px-3 py-2 pr-24 sm:pr-28 md:px-5 md:py-4 md:pr-32 lg:pr-[min(300px,32vw)]">
+        <div className="relative overflow-visible rounded-2xl bg-secondary bg-gradient-to-br px-3 py-2 pr-24 sm:pr-28 md:px-5 md:py-4 md:pr-32 lg:pr-[min(300px,32vw)]">
           {/* Duas colunas — definem a altura da faixa */}
           <div className="relative z-10 grid grid-cols-1 items-center gap-6 lg:grid-cols-3 lg:gap-8">
             <div>
               <div className="mb-2 flex items-center gap-1 text-white/90">
-                <MdOutlineMonetizationOn
-                className="h-8 w-8 text-[#F59E0B]" size={30} />
+                <MdOutlineMonetizationOn className="h-8 w-8 text-[#F59E0B]" size={30} />
                 <span className={`${exo2CabecalhoFaturamento.className} text-lg`}>
                   {tituloFaturamentoBanner(periodoData)}
                 </span>
@@ -1205,7 +1282,7 @@ export default function DashboardV2() {
                     ? '…'
                     : formatarMoeda(totalFaturadoPeriodo)}
               </p>
-              <div className="mt-3 inline-flex flex-wrap items-center gap-1 py-1 text-base font-regular text-white/90">
+              <div className="font-regular mt-3 inline-flex flex-wrap items-center gap-1 py-1 text-base text-white/90">
                 {comparacaoPeriodoAnterior.status === 'carregando' ? (
                   <span className="text-sm opacity-80">Carregando comparação…</span>
                 ) : comparacaoPeriodoAnterior.status === 'erro' ? (
@@ -1213,7 +1290,7 @@ export default function DashboardV2() {
                     Não foi possível carregar o período de comparação
                   </span>
                 ) : comparacaoPeriodoAnterior.status === 'semBase' ? (
-                  <span className="text-base font-regular">
+                  <span className="font-regular text-base">
                     vs. {formatarMoeda(0)} {copyComparacao.sufixoVs}
                   </span>
                 ) : comparacaoPeriodoAnterior.status === 'ok' ? (
@@ -1230,7 +1307,7 @@ export default function DashboardV2() {
                       {comparacaoPeriodoAnterior.pct > 0 ? '+' : ''}
                       {comparacaoPeriodoAnterior.pct}%
                     </span>
-                    <span className="text-base font-regular">
+                    <span className="font-regular text-base">
                       vs. {formatarMoeda(comparacaoPeriodoAnterior.anterior)}{' '}
                       {copyComparacao.sufixoVs}
                     </span>
@@ -1276,7 +1353,7 @@ export default function DashboardV2() {
               <button
                 type="button"
                 onClick={irParaRelatoriosVendas}
-                className="inline-flex items-center text-lg gap-2 rounded-full bg-accent1 px-8 py-2 font-semibold text-white shadow-md transition hover:brightness-95"
+                className="inline-flex items-center gap-2 rounded-full bg-accent1 px-8 py-2 text-lg font-semibold text-white shadow-md transition hover:brightness-95"
               >
                 Veja suas vendas em tempo real
                 <ChevronRight className="h-5 w-5" />
@@ -1294,7 +1371,7 @@ export default function DashboardV2() {
                 src="/images/jiffy-acenando.png"
                 alt=""
                 fill
-                className="object-contain object-bottom-right drop-shadow-xl"
+                className="object-bottom-right object-contain drop-shadow-xl"
                 sizes="(max-width: 768px) 220px, (max-width: 1024px) 260px, 320px"
                 priority
               />
@@ -1304,17 +1381,15 @@ export default function DashboardV2() {
       </div>
 
       {/* 4 cards de métricas */}
-      <div className="mx-2 mb-2 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4 md:mx-4">
+      <div className="mx-2 mb-2 grid grid-cols-1 gap-2 sm:grid-cols-2 md:mx-4 xl:grid-cols-4">
         <MetricCard
           tituloBase="Pedidos"
           tituloPeriodo={rotuloPeriodoTituloCard(periodoData)}
           icon={
             <div className="relative flex h-8 w-8 items-center justify-center">
               <MdReceiptLong className="text-[#1E3A8A]" size={30} aria-hidden />
-              <span
-                className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center"
-              >
-                <MdAdd  className="text-[#00B074] font-bold" size={34} />
+              <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center">
+                <MdAdd className="font-bold text-[#00B074]" size={34} />
               </span>
             </div>
           }
@@ -1363,17 +1438,17 @@ export default function DashboardV2() {
       </div>
 
       {/* Gráfico + formas de pagamento */}
-      <div className="mx-2 grid grid-cols-1 gap-2 lg:grid-cols-12 lg:items-start md:mx-4">
+      <div className="mx-2 grid grid-cols-1 gap-2 md:mx-4 lg:grid-cols-12 lg:items-start">
         <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-6 lg:col-span-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="font-exo min-w-0 text-lg font-semibold text-primary-text md:text-xl">
+            <h2 className="min-w-0 font-exo text-lg font-semibold text-primary-text md:text-xl">
               {tituloGraficoComparativoV2()}
             </h2>
             <div className="relative min-w-[160px] shrink-0">
               <select
                 value={permiteGraficoPorHora ? granularidade : 'dia'}
                 onChange={e => setGranularidade(e.target.value as AgregacaoGraficoV2)}
-                className="focus:border-secondary w-full appearance-none rounded-lg border border-gray-200 bg-gray-50 py-2 pl-3 pr-9 text-sm font-semibold text-primary-text"
+                className="w-full appearance-none rounded-lg border border-gray-200 bg-gray-50 py-2 pl-3 pr-9 text-sm font-semibold text-primary-text focus:border-secondary"
                 aria-label="Agregação temporal do gráfico"
               >
                 {permiteGraficoPorHora ? (
@@ -1416,20 +1491,22 @@ export default function DashboardV2() {
             </div>
           </div>
           <div className="mb-2 flex flex-wrap items-center gap-6 text-sm">
-            <span className="inline-flex items-center gap-2">
+            <span
+              className="inline-flex items-center gap-2 font-medium"
+              style={{ color: corComparativoLinhaAtual }}
+            >
               <span
-                className="h-0.5 w-6 rounded"
+                className="h-0.5 w-6 shrink-0 rounded"
                 style={{ backgroundColor: corComparativoLinhaAtual }}
               />
               {rotuloLinhaGraficoPeriodoAtual(periodoData)}
             </span>
             <span
-              className={`inline-flex items-center gap-2 ${
-                metricaGraficoComparativo === 'CANCELADA' ? 'text-[#D92D20]' : 'text-secondary-text'
-              }`}
+              className="inline-flex items-center gap-2 font-medium"
+              style={{ color: corComparativoLinhaAnterior }}
             >
               <span
-                className="h-0.5 w-6 rounded"
+                className="h-0.5 w-6 shrink-0 rounded"
                 style={{ backgroundColor: corComparativoLinhaAnterior }}
               />
               {rotuloLinhaGraficoPeriodoAnterior(periodoData)}
@@ -1486,7 +1563,10 @@ export default function DashboardV2() {
                             </p>
                           )}
                           {pAnt != null && (
-                            <p className="text-sm font-medium" style={{ color: corComparativoLinhaAnterior }}>
+                            <p
+                              className="text-sm font-medium"
+                              style={{ color: corComparativoLinhaAnterior }}
+                            >
                               {rotuloLinhaGraficoPeriodoAnterior(periodoData)}:{' '}
                               {formatarMoeda(Number(pAnt.value))}
                             </p>
@@ -1519,7 +1599,9 @@ export default function DashboardV2() {
         </section>
 
         <section className="flex flex-col rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-6 lg:col-span-4">
-          <h2 className="font-exo mb-4 text-lg font-semibold text-primary-text md:text-xl">Formas de Pagamento</h2>
+          <h2 className="mb-4 font-exo text-lg font-semibold text-primary-text md:text-xl">
+            Formas de Pagamento
+          </h2>
           {carregandoMetodosPagamento ? (
             <div className="flex min-h-[200px] flex-1 items-center justify-center py-8">
               <JiffyLoading className="!gap-0 !py-0" />
@@ -1552,15 +1634,16 @@ export default function DashboardV2() {
               </div>
             </div>
           )}
-         
         </section>
       </div>
 
       {/* Top produtos + Top garçons — duas colunas; listas com flex (sem tabela) */}
-      <div className="mx-2 mt-2 grid grid-cols-1 gap-2 lg:grid-cols-2 md:mx-4">
+      <div className="mx-2 mt-2 grid grid-cols-1 gap-2 md:mx-4 lg:grid-cols-2">
         <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-5">
           <div className="mb-4 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between xl:gap-3">
-            <h2 className="font-exo shrink-0 text-lg font-semibold text-primary-text md:text-xl">Top produtos</h2>
+            <h2 className="shrink-0 font-exo text-lg font-semibold text-primary-text md:text-xl">
+              Top produtos
+            </h2>
             <div className="flex flex-1 flex-wrap items-center justify-center gap-2 xl:justify-center">
               <div className="inline-flex rounded-lg bg-violet-100/90 p-0.5">
                 <button
@@ -1591,7 +1674,7 @@ export default function DashboardV2() {
               <select
                 value={filtroTopProduto}
                 onChange={e => setFiltroTopProduto(e.target.value)}
-                className="focus:border-secondary w-full appearance-none rounded-lg border border-gray-200 bg-gray-50 py-2 pl-3 pr-9 text-sm font-medium text-primary-text"
+                className="w-full appearance-none rounded-lg border border-gray-200 bg-gray-50 py-2 pl-3 pr-9 text-sm font-medium text-primary-text focus:border-secondary"
               >
                 <option value="hoje">Hoje</option>
                 <option value="semana">Últimos 7 dias</option>
@@ -1639,9 +1722,9 @@ export default function DashboardV2() {
                       }`}
                     >
                       <div className="flex min-w-0 flex-[1.4] items-center gap-2 md:flex-[1.6]">
-                        <span className="text-sm font-regular text-primary-text">{p.nome}</span>
+                        <span className="font-regular text-sm uppercase text-primary-text">{p.nome}</span>
                       </div>
-                      <div className="min-w-0 flex-1 text-center text-sm font-regular text-primary-text">
+                      <div className="font-regular min-w-0 flex-1 text-center text-sm text-primary-text">
                         {p.qtd} <span className="text-xs">un</span>
                       </div>
                       <div className="min-w-0 flex-1">
@@ -1651,12 +1734,12 @@ export default function DashboardV2() {
                             className="absolute left-0 top-0 z-0 h-full rounded-lg bg-secondary transition-all"
                             style={{ width: `${Math.min(100, larguraBarra)}%` }}
                           />
-                          <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-xs font-regular tabular-nums text-white">
+                          <span className="font-regular pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-xs tabular-nums text-white">
                             {rotuloMeio}
                           </span>
                         </div>
                       </div>
-                      <div className="min-w-0 flex-1 text-right text-sm font-regular text-primary-text">
+                      <div className="font-regular min-w-0 flex-1 text-right text-sm text-primary-text">
                         {formatarMoeda(p.valor)}
                       </div>
                     </div>
@@ -1666,10 +1749,10 @@ export default function DashboardV2() {
                 <div className="mt-1 flex items-center gap-2 border-t border-gray-200 py-3 text-sm md:gap-3">
                   <div className="flex min-w-0 flex-[1.4] flex-col gap-0.5 md:flex-[1.6]">
                     <span className="text-sm font-semibold text-primary-text">Total</span>
-                    
                   </div>
                   <div className="min-w-0 flex-1 text-center text-sm font-semibold text-primary-text">
-                    {totaisListaTopProdutosV2.somaQtd} <span className="text-xs font-regular">un</span>
+                    {totaisListaTopProdutosV2.somaQtd}{' '}
+                    <span className="font-regular text-xs">un</span>
                   </div>
                   <div className="min-w-0 flex-1">
                     {modoTopProduto === 'porcentagem' ? (
@@ -1680,7 +1763,9 @@ export default function DashboardV2() {
                         </span>
                       </div>
                     ) : (
-                      <div className="flex h-7 items-center justify-center text-xs text-secondary-text">—</div>
+                      <div className="flex h-7 items-center justify-center text-xs text-secondary-text">
+                        —
+                      </div>
                     )}
                   </div>
                   <div className="min-w-0 flex-1 text-right text-sm font-semibold text-primary-text">
@@ -1695,7 +1780,7 @@ export default function DashboardV2() {
             type="button"
             disabled={verTodosProdutosDesabilitado}
             onClick={() => setTopProdutosListaCompleta(true)}
-            className="text-secondary hover:text-secondary/85 inline-flex items-center gap-1 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-secondary"
+            className="inline-flex items-center gap-1 text-sm font-semibold text-secondary transition hover:text-secondary/85 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-secondary"
           >
             Ver todos os produtos
             <ChevronRight className="h-4 w-4" />
@@ -1704,12 +1789,14 @@ export default function DashboardV2() {
 
         <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-5">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="font-exo text-lg font-semibold text-primary-text md:text-xl">Top Garçons</h2>
+            <h2 className="font-exo text-lg font-semibold text-primary-text md:text-xl">
+              Top Garçons
+            </h2>
             <div className="relative min-w-[120px] self-end sm:self-auto">
               <select
                 value={filtroTopGarcom}
                 onChange={e => setFiltroTopGarcom(e.target.value)}
-                className="focus:border-secondary w-full appearance-none rounded-lg border border-gray-200 bg-gray-50 py-2 pl-3 pr-9 text-sm font-medium text-primary-text"
+                className="w-full appearance-none rounded-lg border border-gray-200 bg-gray-50 py-2 pl-3 pr-9 text-sm font-medium text-primary-text focus:border-secondary"
               >
                 <option value="hoje">Hoje</option>
                 <option value="semana">Últimos 7 dias</option>
@@ -1719,52 +1806,75 @@ export default function DashboardV2() {
             </div>
           </div>
 
-          {/* TESTE: gráfico “Vendas por usuário” (mesmo núcleo do GraficoVendasPorUsuarioModal). Descomente o bloco da tabela mock abaixo para voltar ao layout anterior. */}
-          <GraficoVendasPorUsuarioConteudo
-            vendas={MOCK_VENDAS_GRAFICO_USUARIO_TESTE_GARCOM}
-            usuariosPDV={MOCK_USUARIOS_PDV_GRAFICO_TESTE_GARCOM}
-            tipo="finalizadas"
-            alturaGraficoPx={340}
-            innerRadius={58}
-            outerRadius={108}
-            className="min-w-0"
-            mostrarLegenda={false}
-          />
-
-          {/*
           <div className="mb-2 flex gap-2 border-b border-gray-200 pb-2 text-[11px] font-medium uppercase tracking-wide text-primary-text md:text-xs">
+            <div className="w-7 shrink-0 text-center md:w-8">#</div>
             <div className="min-w-0 flex-1">Nome</div>
-            <div className="min-w-0 flex-1 text-center">Quantidade</div>
-            <div className="min-w-0 flex-1 text-center">Mesas Aten.</div>
+            <div className="min-w-0 flex-1 text-center">QTD. PROD.</div>
+            <div className="min-w-0 flex-1 text-center">QTD. VENDAS</div>
             <div className="min-w-0 flex-1 text-right">Valor Total</div>
           </div>
 
           <div className="flex flex-col">
-            {MOCK_TOP_GARCONS.map((g, idx) => (
-              <div
-                key={g.id}
-                className={`flex items-center gap-2 py-3 text-sm md:gap-3 ${
-                  idx > 0 ? 'border-t border-gray-100' : ''
-                }`}
-              >
-                <div className="min-w-0 flex-1 truncate font-regular text-primary-text">{g.nome}</div>
-                <div className="min-w-0 flex-1 text-center text-sm font-regular text-primary-text">{g.qtd}</div>
-                <div className="min-w-0 flex-1 text-center text-sm font-regular text-primary-text">{g.mesas}</div>
-                <div className="min-w-0 flex-1 text-right text-sm font-regular text-primary-text">
-                  {formatarMoeda(g.valor)}
-                </div>
+            {carregandoTopGarcons ? (
+              <div className="flex min-h-[200px] items-center justify-center py-8">
+                <JiffyLoading className="!gap-0 !py-0" />
               </div>
-            ))}
+            ) : erroTopGarcons ? (
+              <p className="py-6 text-center text-sm text-[#D92D20]">
+                Não foi possível carregar o top garçons.
+              </p>
+            ) : (
+              <>
+                {linhasTopGarconsV2.map((linha, idx) => (
+                  <div
+                    key={linha.key}
+                    className={`flex items-center gap-2 py-2 text-sm md:gap-3 ${
+                      idx > 0 ? 'border-t border-gray-100' : ''
+                    }`}
+                  >
+                    <div className="flex w-7 shrink-0 items-center justify-center md:w-8">
+                      <IconeColocacaoTopGarcom rank={linha.rank} />
+                    </div>
+                    <div className="font-regular min-w-0 flex-1 truncate text-primary-text">
+                      {linha.vazio ? '—' : linha.nome}
+                    </div>
+                    <div className="font-regular min-w-0 flex-1 text-center text-sm tabular-nums text-primary-text">
+                      {linha.vazio ? '—' : formatarContagemPedidos(linha.qtdProdutos)}
+                    </div>
+                    <div className="font-regular min-w-0 flex-1 text-center text-sm tabular-nums text-primary-text">
+                      {linha.vazio ? '—' : formatarContagemPedidos(linha.qtdVendas)}
+                    </div>
+                    <div className="font-regular min-w-0 flex-1 text-right text-sm tabular-nums text-primary-text">
+                      {linha.vazio ? '—' : formatarMoeda(linha.valorTotal)}
+                    </div>
+                  </div>
+                ))}
+                <div className="mt-1 flex items-center gap-2 border-t border-gray-200 py-3 text-sm md:gap-3">
+                  <div className="w-7 shrink-0 md:w-8" />
+                  <div className="min-w-0 flex-1">
+                    <span className="text-sm font-semibold text-primary-text">Total</span>
+                  </div>
+                  <div className="min-w-0 flex-1 text-center text-sm font-semibold tabular-nums text-primary-text">
+                    {formatarContagemPedidos(totaisTopGarconsV2.somaQtdProd)}
+                  </div>
+                  <div className="min-w-0 flex-1 text-center text-sm font-semibold tabular-nums text-primary-text">
+                    {formatarContagemPedidos(totaisTopGarconsV2.somaQtdVendas)}
+                  </div>
+                  <div className="min-w-0 flex-1 text-right text-sm font-semibold tabular-nums text-primary-text">
+                    {formatarMoeda(totaisTopGarconsV2.somaValor)}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           <button
             type="button"
-            className="text-secondary hover:text-secondary/85 mt-4 inline-flex items-center gap-1 text-sm font-semibold transition"
+            className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-secondary transition hover:text-secondary/85"
           >
             Ver todos os usuários
             <ChevronRight className="h-4 w-4" />
           </button>
-          */}
         </section>
       </div>
     </div>
@@ -1809,14 +1919,14 @@ function MetricCard({
               {valor}
             </span>
             <span
-              className={`rounded-md mr-4 px-2 py-0.5 text-sm font-medium text-white ${
+              className={`mr-4 rounded-md px-2 py-0.5 text-sm font-medium text-white ${
                 badgePositivo ? 'bg-[#00B074]' : 'bg-[#D92D20]'
               }`}
             >
               {badge}
             </span>
           </div>
-          <p className="text-xs mt-1 leading-snug text-[#006699] md:text-sm">{rodape}</p>
+          <p className="mt-1 text-xs leading-snug text-[#006699] md:text-sm">{rodape}</p>
         </div>
       </div>
     </div>
