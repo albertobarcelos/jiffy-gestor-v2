@@ -147,6 +147,7 @@ const config: Config = {
         heading: ['var(--font-manrope)', 'sans-serif'],
         exo: ['var(--font-exo2)', 'sans-serif'],
         manrope: ['var(--font-manrope)', 'sans-serif'],
+        poppins: ['var(--font-poppins)', 'sans-serif'],
       },
     },
   },

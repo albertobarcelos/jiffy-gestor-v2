@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Exo_2, Manrope } from 'next/font/google'
+import { Exo_2, Manrope, Poppins } from 'next/font/google'
 import { Toaster } from 'react-hot-toast'
 import { ThemeProvider } from '@/src/presentation/providers/ThemeProvider'
 import { QueryProvider } from '@/src/presentation/providers/QueryProvider'
@@ -22,6 +22,14 @@ const manrope = Manrope({
   display: 'swap',
 })
 
+// Poppins - uso pontual (ex.: título cupom público)
+const poppins = Poppins({
+  subsets: ['latin'],
+  weight: ['600', '700', '800'],
+  variable: '--font-poppins',
+  display: 'swap',
+})
+
 export const metadata: Metadata = {
   title: 'Jiffy Gestor - Sistema de Gestão',
   description: 'Sistema de gestão empresarial Jiffy',
@@ -30,11 +38,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR">
-      {/* suppressHydrationWarning: extensões (ex. ColorZilla) injetam atributos no body e disparam falso positivo de hidratação */}
-      <body
-        className={`${exo2.variable} ${manrope.variable} ${exo2.className}`}
-        suppressHydrationWarning
-      >
+      <body className={`${exo2.variable} ${manrope.variable} ${poppins.variable} ${exo2.className}`}>
         <QueryProvider>
           <ThemeProvider>
             {children}
