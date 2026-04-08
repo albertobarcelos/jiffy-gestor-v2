@@ -3,12 +3,19 @@
 import { Exo_2 } from 'next/font/google'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useDashboardResumoQuery } from '@/src/presentation/hooks/useDashboardResumoQuery'
+import { useDashboardEvolucaoQuery } from '@/src/presentation/hooks/useDashboardEvolucaoQuery'
+import {
+  mergePontosEvolucaoComparacao,
+  type MetricaEvolucaoComparativo,
+} from '@/src/presentation/components/features/dashboard/dashboardV2ComparacaoChart'
 import {
   calculatePeriodo,
   calculatePeriodoAnteriorParaComparacao,
+  permiteOpcoesIntervaloPorHora,
 } from '@/src/shared/utils/dateFilters'
 import {
   Line,
@@ -54,30 +61,36 @@ const exo2CabecalhoFaturamento = Exo_2({
   display: 'swap',
 })
 
-const MOCK_VENDAS_HORA = [
-  { hora: '8h', hoje: 400, ontem: 520 },
-  { hora: '9h', hoje: 890, ontem: 1100 },
-  { hora: '10h', hoje: 1200, ontem: 980 },
-  { hora: '11h', hoje: 2100, ontem: 2400 },
-  { hora: '12h', hoje: 3500, ontem: 3200 },
-  { hora: '13h', hoje: 2480, ontem: 2930 },
-  { hora: '14h', hoje: 2680, ontem: 2100 },
-  { hora: '15h', hoje: 1800, ontem: 1950 },
-  { hora: '16h', hoje: 2200, ontem: 2000 },
-  { hora: '17h', hoje: 2800, ontem: 2600 },
-  { hora: '18h', hoje: 3200, ontem: 3000 },
-  { hora: '19h', hoje: 2900, ontem: 3100 },
-  { hora: '20h', hoje: 2400, ontem: 2500 },
-  { hora: '21h', hoje: 1600, ontem: 1800 },
-  { hora: '22h', hoje: 900, ontem: 1100 },
-]
-
 const FORMAS_PAGAMENTO = [
   { id: 'dinheiro', label: 'DINHEIRO', principal: '#22C55E', secundaria: '#F472B6', pct: 81 },
   { id: 'credito', label: 'CRÉDITO', principal: '#1E3A8A', secundaria: '#F472B6', pct: 81 },
   { id: 'pix', label: 'PIX', principal: '#B4DD2B', secundaria: '#F472B6', pct: 81 },
   { id: 'debito', label: 'DÉBITO', principal: '#3B82F6', secundaria: '#F472B6', pct: 81 },
 ]
+
+/** Linha do período atual (filtro) e do período anterior — gráfico comparativo V2 */
+const LINHA_PERIODO_ATUAL = '#530CA3'
+const LINHA_PERIODO_ANTERIOR = '#E1D8EE'
+/** Mesmas séries em modo canceladas (vermelho) */
+const LINHA_CANCEL_ATUAL = '#DC2626'
+const LINHA_CANCEL_ANTERIOR = '#FCA5A5'
+
+/** Agregação do gráfico: 7/30 dias = por dia; hoje/ontem = buckets horários (minutos). */
+type AgregacaoGraficoV2 = 'dia' | 'intervalo_60' | 'intervalo_30' | 'intervalo_15'
+
+/** Minutos enviados à API `/dashboard/evolucao` conforme a opção do select. */
+function intervaloMinutosAgregacaoGraficoV2(g: AgregacaoGraficoV2): number | undefined {
+  switch (g) {
+    case 'intervalo_60':
+      return 60
+    case 'intervalo_30':
+      return 30
+    case 'intervalo_15':
+      return 15
+    default:
+      return undefined
+  }
+}
 
 /** Mock — integrar API depois */
 const MOCK_TOP_PRODUTOS = [
@@ -96,15 +109,65 @@ const MOCK_TOP_GARCONS = [
   { id: '5', nome: 'Lucas Oliveira', qtd: 12, mesas: 15, valor: 15400 },
 ]
 
-const LINHA_HOJE = '#530CA3'
-const LINHA_ONTEM = '#D1D5DB'
-
 /** Trigger do select de empresa (alinhado ao SelectTrigger Radix) */
 const CLASSES_SELECT_EMPRESA =
   'h-auto min-h-[42px] w-full rounded-lg bg-primary/5 py-2 pl-4 pr-3 text-sm font-medium text-primary shadow-none ring-offset-0 focus:outline-none focus:ring-2 focus:ring-primary/35 focus:ring-offset-0 data-[state=open]:border-primary [&>svg]:text-primary'
 
 function formatarMoeda(n: number) {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+/** Rótulos do eixo Y do comparativo (compacto em k acima de 1000). */
+function formatarTickEixoYReais(v: number): string {
+  const arred = Math.round(v)
+  if (arred >= 1000) {
+    const k = arred / 1000
+    if (Math.abs(k - Math.round(k)) < 1e-6) return `R$ ${Math.round(k)}k`
+    return `R$ ${k.toFixed(2).replace('.', ',')}k`
+  }
+  return `R$ ${arred.toLocaleString('pt-BR')}`
+}
+
+/**
+ * Domínio e ticks do eixo Y com intervalos mais finos (~250–400 em faixas de milhares),
+ * limitando a quantidade de marcas para leitura (evita passos de R$ 750 do padrão).
+ */
+function calcularTicksEDominioYComparativo(
+  pontos: Array<{ periodoAtual: number; periodoAnterior: number }>
+): { domain: [number, number]; ticks: number[] } {
+  let maxVal = 0
+  for (const p of pontos) {
+    maxVal = Math.max(maxVal, Number(p.periodoAtual), Number(p.periodoAnterior))
+  }
+  const topoBruto = maxVal > 0 ? maxVal * 1.08 : 100
+
+  const PASSOS = [
+    10, 15, 20, 25, 50, 75, 100, 150, 200, 250, 300, 400, 500, 600, 750, 1000, 1250, 1500, 2000, 2500,
+    3000, 4000, 5000, 7500, 10000,
+  ]
+  const MAX_MARCAS = 14
+  const MIN_MARCAS = 4
+
+  for (const step of PASSOS) {
+    const topo = Math.ceil(topoBruto / step) * step
+    const nMarcas = Math.floor(topo / step) + 1
+    if (topo + 1e-9 < topoBruto) continue
+    if (nMarcas > MAX_MARCAS) continue
+    if (nMarcas < MIN_MARCAS) continue
+    const ticks: number[] = []
+    for (let x = 0; x <= topo + 1e-9; x += step) {
+      ticks.push(Math.round(x * 100) / 100)
+    }
+    return { domain: [0, topo], ticks }
+  }
+
+  const stepFallback = Math.max(100, Math.ceil(topoBruto / 8 / 100) * 100)
+  const topoFb = Math.ceil(topoBruto / stepFallback) * stepFallback
+  const ticksFb: number[] = []
+  for (let x = 0; x <= topoFb + 1e-9; x += stepFallback) {
+    ticksFb.push(x)
+  }
+  return { domain: [0, topoFb], ticks: ticksFb }
 }
 
 /** Contagem inteira com separador de milhar (pt-BR) */
@@ -215,6 +278,43 @@ function periodoV2ParaQueryRelatorios(periodoData: string): string | null {
       return 'Últimos 30 Dias'
     default:
       return null
+  }
+}
+
+/** Título do bloco do gráfico de linhas comparativo (V2). */
+function tituloGraficoComparativoV2(): string {
+  return 'Comparativo de vendas'
+}
+
+/** Legenda — período do filtro (linha destacada). */
+function rotuloLinhaGraficoPeriodoAtual(periodoData: string): string {
+  switch (periodoData) {
+    case 'hoje':
+      return 'Hoje'
+    case 'ontem':
+      return 'Ontem'
+    case 'semana':
+      return 'Últimos 7 dias'
+    case '30dias':
+      return 'Últimos 30 dias'
+    default:
+      return 'Período atual'
+  }
+}
+
+/** Legenda — período de comparação (bloco anterior equivalente). */
+function rotuloLinhaGraficoPeriodoAnterior(periodoData: string): string {
+  switch (periodoData) {
+    case 'hoje':
+      return 'Ontem'
+    case 'ontem':
+      return 'Ante-ontem'
+    case 'semana':
+      return '7 dias anteriores'
+    case '30dias':
+      return '30 dias anteriores'
+    default:
+      return 'Período anterior'
   }
 }
 
@@ -414,14 +514,23 @@ function DonutFormaPagamento({
  */
 export default function DashboardV2() {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const { empresa: empresaLogada, isLoading: carregandoEmpresa, error: erroEmpresa, refetch: refetchEmpresa } =
     useEmpresaMe()
   const [lojaId, setLojaId] = useState('')
   const [periodoData, setPeriodoData] = useState('hoje')
-  const [granularidade, setGranularidade] = useState('hora')
+  const [granularidade, setGranularidade] = useState<AgregacaoGraficoV2>('intervalo_30')
+  /** Comparativo do gráfico: uma métrica por vez (API busca só o status escolhido). */
+  const [metricaGraficoComparativo, setMetricaGraficoComparativo] =
+    useState<MetricaEvolucaoComparativo>('FINALIZADA')
   const [modoTopProduto, setModoTopProduto] = useState<'porcentagem' | 'valor'>('porcentagem')
   const [filtroTopProduto, setFiltroTopProduto] = useState('hoje')
   const [filtroTopGarcom, setFiltroTopGarcom] = useState('hoje')
+
+  const corComparativoLinhaAtual =
+    metricaGraficoComparativo === 'CANCELADA' ? LINHA_CANCEL_ATUAL : LINHA_PERIODO_ATUAL
+  const corComparativoLinhaAnterior =
+    metricaGraficoComparativo === 'CANCELADA' ? LINHA_CANCEL_ANTERIOR : LINHA_PERIODO_ANTERIOR
 
   /** Momento em que os dados do dashboard foram considerados atualizados (mock: montagem; com API: após fetch bem-sucedido) */
   const [dadosAtualizadosEm, setDadosAtualizadosEm] = useState(() => Date.now())
@@ -439,6 +548,24 @@ export default function DashboardV2() {
     document.addEventListener('visibilitychange', aoVisibilidade)
     return () => document.removeEventListener('visibilitychange', aoVisibilidade)
   }, [])
+
+  /** Por hora só para comparação de dias únicos (hoje / ontem); 7 e 30 dias → sempre por dia */
+  const permiteGraficoPorHora = periodoData === 'hoje' || periodoData === 'ontem'
+
+  /** Detecta retorno de 7/30 dias → hoje/ontem para restaurar agregação de 30 min (evita estado “Por dia” inválido). */
+  const estavaEmPeriodoSoDiarioRef = useRef(false)
+
+  useEffect(() => {
+    if (!permiteGraficoPorHora) {
+      setGranularidade('dia')
+      estavaEmPeriodoSoDiarioRef.current = true
+      return
+    }
+    if (estavaEmPeriodoSoDiarioRef.current) {
+      setGranularidade('intervalo_30')
+      estavaEmPeriodoSoDiarioRef.current = false
+    }
+  }, [permiteGraficoPorHora, periodoData])
 
   const maxValorProduto = useMemo(
     () => Math.max(...MOCK_TOP_PRODUTOS.map(p => p.valor), 1),
@@ -480,6 +607,72 @@ export default function DashboardV2() {
     periodoFinal: fimAnterior,
     enabled: inicioAnterior != null && fimAnterior != null,
   })
+
+  /** Buckets horários (15/30/60 min) só em hoje/ontem e com range ≤2 dias corridos */
+  const intervaloHoraEvolucao =
+    permiteGraficoPorHora &&
+    granularidade !== 'dia' &&
+    inicioResumo &&
+    fimResumo &&
+    permiteOpcoesIntervaloPorHora(inicioResumo, fimResumo)
+      ? intervaloMinutosAgregacaoGraficoV2(granularidade)
+      : undefined
+
+  const {
+    data: evolucaoAtual,
+    isLoading: carregandoEvolucaoAtual,
+    isError: erroEvolucaoAtual,
+  } = useDashboardEvolucaoQuery({
+    periodoInicial: inicioResumo,
+    periodoFinal: fimResumo,
+    selectedStatuses: [metricaGraficoComparativo],
+    intervaloHora: intervaloHoraEvolucao,
+    enabled: inicioResumo != null && fimResumo != null,
+  })
+
+  const {
+    data: evolucaoPeriodoAnterior,
+    isLoading: carregandoEvolucaoAnterior,
+    isError: erroEvolucaoAnterior,
+  } = useDashboardEvolucaoQuery({
+    periodoInicial: inicioAnterior,
+    periodoFinal: fimAnterior,
+    selectedStatuses: [metricaGraficoComparativo],
+    intervaloHora: intervaloHoraEvolucao,
+    enabled: inicioAnterior != null && fimAnterior != null,
+  })
+
+  const dadosGraficoComparativo = useMemo(() => {
+    if (evolucaoAtual == null || evolucaoPeriodoAnterior == null) return []
+    if (!inicioResumo || !fimResumo || !inicioAnterior || !fimAnterior) return []
+    const modo = permiteGraficoPorHora ? 'hora' : 'dia'
+    return mergePontosEvolucaoComparacao(evolucaoAtual, evolucaoPeriodoAnterior, {
+      modo,
+      metrica: metricaGraficoComparativo,
+      inicioAtual: inicioResumo,
+      fimAtual: fimResumo,
+      inicioAnterior,
+      fimAnterior,
+    })
+  }, [
+    evolucaoAtual,
+    evolucaoPeriodoAnterior,
+    permiteGraficoPorHora,
+    metricaGraficoComparativo,
+    inicioResumo,
+    fimResumo,
+    inicioAnterior,
+    fimAnterior,
+  ])
+
+  const { domain: domainYComparativo, ticks: ticksYComparativo } = useMemo(
+    () => calcularTicksEDominioYComparativo(dadosGraficoComparativo),
+    [dadosGraficoComparativo]
+  )
+
+  const carregandoGraficoComparativo =
+    carregandoEvolucaoAtual || carregandoEvolucaoAnterior
+  const erroGraficoComparativo = erroEvolucaoAtual || erroEvolucaoAnterior
 
   const rotuloRodapeCards = rotuloRodapeComparacaoCards(periodoData)
 
@@ -676,6 +869,7 @@ export default function DashboardV2() {
   const valorEmpresaSelect = lojaId || empresaLogada?.id || ''
 
   const handleAtualizarDashboard = () => {
+    void queryClient.invalidateQueries({ queryKey: ['dashboard', 'evolucao'] })
     void Promise.all([refetchEmpresa(), refetchResumo(), refetchResumoAnterior()]).then(() => {
       setDadosAtualizadosEm(Date.now())
       setTickRelogio(n => n + 1)
@@ -1013,82 +1207,156 @@ export default function DashboardV2() {
       {/* Gráfico + formas de pagamento */}
       <div className="mx-2 grid grid-cols-1 gap-2 lg:grid-cols-12 md:mx-4">
         <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-6 lg:col-span-8">
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="font-exo text-lg font-semibold text-primary-text md:text-xl">Vendas hoje vs. ontem</h2>
-            <div className="relative min-w-[140px]">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="font-exo min-w-0 text-lg font-semibold text-primary-text md:text-xl">
+              {tituloGraficoComparativoV2()}
+            </h2>
+            <div className="relative min-w-[160px] shrink-0">
               <select
-                value={granularidade}
-                onChange={e => setGranularidade(e.target.value)}
+                value={permiteGraficoPorHora ? granularidade : 'dia'}
+                onChange={e => setGranularidade(e.target.value as AgregacaoGraficoV2)}
                 className="focus:border-secondary w-full appearance-none rounded-lg border border-gray-200 bg-gray-50 py-2 pl-3 pr-9 text-sm font-semibold text-primary-text"
+                aria-label="Agregação temporal do gráfico"
               >
-                <option value="hora">Por hora</option>
-                <option value="dia">Por dia</option>
+                {permiteGraficoPorHora ? (
+                  <>
+                    <option value="intervalo_60">Por hora</option>
+                    <option value="intervalo_30">30 min</option>
+                    <option value="intervalo_15">15 min</option>
+                  </>
+                ) : (
+                  <option value="dia">Por dia</option>
+                )}
               </select>
               <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-text" />
             </div>
           </div>
+          <div className="mb-3">
+            <div className="inline-flex rounded-lg bg-gray-100/90 p-0.5">
+              <button
+                type="button"
+                onClick={() => setMetricaGraficoComparativo('FINALIZADA')}
+                className={`rounded-md px-3 py-0.5 text-xs font-medium transition md:px-4 md:text-xs ${
+                  metricaGraficoComparativo === 'FINALIZADA'
+                    ? 'bg-secondary text-white shadow-sm'
+                    : 'bg-violet-100 text-violet-900 hover:bg-violet-200/90'
+                }`}
+              >
+                Finalizadas
+              </button>
+              <button
+                type="button"
+                onClick={() => setMetricaGraficoComparativo('CANCELADA')}
+                className={`rounded-md px-3 py-0.5 text-xs font-medium transition md:px-4 md:text-xs ${
+                  metricaGraficoComparativo === 'CANCELADA'
+                    ? 'bg-red-600 text-white shadow-sm'
+                    : 'bg-red-100 text-red-800 hover:bg-red-200/90'
+                }`}
+              >
+                Canceladas
+              </button>
+            </div>
+          </div>
           <div className="mb-2 flex flex-wrap items-center gap-6 text-sm">
             <span className="inline-flex items-center gap-2">
-              <span className="h-0.5 w-6 rounded bg-secondary" />
-              Hoje
+              <span
+                className="h-0.5 w-6 rounded"
+                style={{ backgroundColor: corComparativoLinhaAtual }}
+              />
+              {rotuloLinhaGraficoPeriodoAtual(periodoData)}
             </span>
-            <span className="inline-flex items-center gap-2 text-secondary-text">
-              <span className="h-0.5 w-6 rounded bg-gray-300" />
-              Ontem
+            <span
+              className={`inline-flex items-center gap-2 ${
+                metricaGraficoComparativo === 'CANCELADA' ? 'text-red-400' : 'text-secondary-text'
+              }`}
+            >
+              <span
+                className="h-0.5 w-6 rounded"
+                style={{ backgroundColor: corComparativoLinhaAnterior }}
+              />
+              {rotuloLinhaGraficoPeriodoAnterior(periodoData)}
             </span>
           </div>
-          <div className="h-[280px] w-full md:h-[320px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={MOCK_VENDAS_HORA} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
-                <XAxis dataKey="hora" tick={{ fontSize: 11, fill: '#6B7280' }} axisLine={false} />
-                <YAxis
-                  tickFormatter={v => `R$ ${v >= 1000 ? `${v / 1000}k` : v}`}
-                  tick={{ fontSize: 11, fill: '#6B7280' }}
-                  axisLine={false}
-                  width={48}
-                />
-                <Tooltip
-                  content={({ active, payload, label }) => {
-                    if (!active || !payload?.length) return null
-                    const h = payload.find(p => p.dataKey === 'hoje')
-                    const o = payload.find(p => p.dataKey === 'ontem')
-                    return (
-                      <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-lg">
-                        <p className="mb-1 text-xs font-semibold text-secondary-text">{label}</p>
-                        {h != null && (
-                          <p className="text-sm font-semibold" style={{ color: LINHA_HOJE }}>
-                            Hoje: {formatarMoeda(Number(h.value))}
-                          </p>
-                        )}
-                        {o != null && (
-                          <p className="text-sm text-gray-500">
-                            Ontem: {formatarMoeda(Number(o.value))}
-                          </p>
-                        )}
-                      </div>
-                    )
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="ontem"
-                  stroke={LINHA_ONTEM}
-                  strokeWidth={2}
-                  dot={false}
-                  name="Ontem"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="hoje"
-                  stroke={LINHA_HOJE}
-                  strokeWidth={2.5}
-                  dot={{ r: 4, fill: LINHA_HOJE, strokeWidth: 0 }}
-                  activeDot={{ r: 6 }}
-                  name="Hoje"
-                />
-              </LineChart>
-            </ResponsiveContainer>
+          <div className="h-[280px] w-full min-w-0 md:h-[320px]">
+            {carregandoGraficoComparativo ? (
+              <div className="flex h-full min-h-[260px] items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
+              </div>
+            ) : erroGraficoComparativo ? (
+              <div className="flex h-full min-h-[260px] flex-col items-center justify-center gap-2 px-4 text-center text-sm text-red-600">
+                Não foi possível carregar o comparativo de vendas.
+              </div>
+            ) : dadosGraficoComparativo.length === 0 ? (
+              <div className="flex h-full min-h-[260px] items-center justify-center text-sm text-gray-500">
+                Nenhum dado para o período selecionado
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={dadosGraficoComparativo}
+                  margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
+                  <XAxis
+                    dataKey="labelEixo"
+                    tick={{ fontSize: 11, fill: '#6B7280' }}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    domain={domainYComparativo}
+                    ticks={ticksYComparativo}
+                    tickFormatter={formatarTickEixoYReais}
+                    tick={{ fontSize: 11, fill: '#6B7280' }}
+                    axisLine={false}
+                    width={52}
+                  />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null
+                      const pAtual = payload.find(x => x.dataKey === 'periodoAtual')
+                      const pAnt = payload.find(x => x.dataKey === 'periodoAnterior')
+                      return (
+                        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-lg">
+                          <p className="mb-1 text-xs font-semibold text-secondary-text">{label}</p>
+                          {pAtual != null && (
+                            <p
+                              className="text-sm font-semibold"
+                              style={{ color: corComparativoLinhaAtual }}
+                            >
+                              {rotuloLinhaGraficoPeriodoAtual(periodoData)}:{' '}
+                              {formatarMoeda(Number(pAtual.value))}
+                            </p>
+                          )}
+                          {pAnt != null && (
+                            <p className="text-sm font-medium" style={{ color: corComparativoLinhaAnterior }}>
+                              {rotuloLinhaGraficoPeriodoAnterior(periodoData)}:{' '}
+                              {formatarMoeda(Number(pAnt.value))}
+                            </p>
+                          )}
+                        </div>
+                      )
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="periodoAnterior"
+                    stroke={corComparativoLinhaAnterior}
+                    strokeWidth={2}
+                    dot={false}
+                    name={rotuloLinhaGraficoPeriodoAnterior(periodoData)}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="periodoAtual"
+                    stroke={corComparativoLinhaAtual}
+                    strokeWidth={2.5}
+                    dot={{ r: 4, fill: corComparativoLinhaAtual, strokeWidth: 0 }}
+                    activeDot={{ r: 6 }}
+                    name={rotuloLinhaGraficoPeriodoAtual(periodoData)}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </section>
 

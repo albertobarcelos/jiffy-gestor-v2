@@ -26,6 +26,11 @@ interface GraficoVendasLinhaProps {
   periodoInicial?: Date | null
   periodoFinal?: Date | null
   intervaloHora?: number // Intervalo em minutos (15, 30 ou 60)
+  /**
+   * Se `false`, agrega por dia (não envia `intervaloHora`), inclusive em "Hoje"/"Ontem".
+   * Se omitido, mantém o comportamento legado: hora quando o período permitir.
+   */
+  agregarPorHora?: boolean
 }
 
 type Row = {
@@ -92,6 +97,7 @@ export function GraficoVendasLinha({
   periodoInicial,
   periodoFinal,
   intervaloHora = 30,
+  agregarPorHora,
 }: GraficoVendasLinhaProps) {
   const selectedStatuses = selectedStatusesProp ?? []
 
@@ -107,9 +113,11 @@ export function GraficoVendasLinha({
   }, [periodo, periodoInicial, periodoFinal])
 
   // Só envia intervalo 15/30/60 min para a API em "Hoje" ou em "Por datas" com até 2 dias inclusivos
-  const useIntervaloHora =
+  const useIntervaloHoraAuto =
     periodo === 'Hoje' ||
     !!(periodoInicial && periodoFinal && permiteOpcoesIntervaloPorHora(periodoInicial, periodoFinal))
+
+  const useIntervaloHora = agregarPorHora === false ? false : useIntervaloHoraAuto
 
   const { data, isLoading, error, refetch } = useDashboardEvolucaoQuery({
     periodoInicial: inicio,
