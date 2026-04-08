@@ -28,7 +28,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     }
 
     // Rotas públicas que não precisam de autenticação
-    const publicRoutes = ['/login']
+    const publicRoutes = ['/login', '/notas-fiscais']
     const isPublicRoute = publicRoutes.some((route) => pathname === route || pathname?.startsWith(route))
 
     // Se é rota pública, não faz nada
