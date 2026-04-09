@@ -4,6 +4,8 @@ import { Exo_2 } from 'next/font/google'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { startOfDay } from 'date-fns'
+import type { DateRange } from 'react-day-picker'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useDashboardResumoQuery } from '@/src/presentation/hooks/useDashboardResumoQuery'
@@ -54,7 +56,7 @@ import {
 } from '@/src/presentation/components/ui/select'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
-import { DateTimeRangePicker } from '@/src/presentation/components/ui/DateTimeRangePicker'
+import { FaturamentoRangeCalendar } from '@/src/presentation/components/ui/FaturamentoRangeCalendar'
 import { MdOutlineMonetizationOn, MdReceiptLong, MdRestaurantMenu, MdAdd } from 'react-icons/md'
 import { TbReceiptFilled } from 'react-icons/tb'
 import { IoReceipt } from 'react-icons/io5'
@@ -132,6 +134,62 @@ const CLASSES_SELECT_EMPRESA =
 
 function formatarMoeda(n: number) {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+/** HH:mm a partir de Date (período personalizado). */
+function formatarHoraParaInputCalendar(d: Date | null | undefined): string {
+  if (!d) return '00:00'
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+/**
+ * Junta intervalo do calendário + horas (equivalente ao fluxo do antigo DateTimeRangePicker).
+ */
+function combinarIntervaloCalendarParaDatas(
+  range: DateRange | undefined,
+  horaInicio: string,
+  horaFim: string
+): { dataInicial: Date | null; dataFinal: Date | null } {
+  if (!range?.from || !range?.to) return { dataInicial: null, dataFinal: null }
+  const parseTime = (s: string): { hours: number; minutes: number } | null => {
+    if (!s || !s.trim()) return null
+    const [hRaw, mRaw] = s.split(':')
+    const hours = Number(hRaw)
+    const minutes = Number(mRaw)
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) return null
+    return { hours, minutes }
+  }
+  const dataInicial = new Date(
+    range.from.getFullYear(),
+    range.from.getMonth(),
+    range.from.getDate(),
+    0,
+    0,
+    0,
+    0
+  )
+  const dataFinal = new Date(
+    range.to.getFullYear(),
+    range.to.getMonth(),
+    range.to.getDate(),
+    0,
+    0,
+    0,
+    0
+  )
+  const hi = parseTime(horaInicio)
+  const hf = parseTime(horaFim)
+  if (hi) {
+    dataInicial.setHours(hi.hours, hi.minutes, 0, 0)
+  } else {
+    dataInicial.setHours(0, 0, 0, 0)
+  }
+  if (hf) {
+    dataFinal.setHours(hf.hours, hf.minutes, 0, 0)
+  } else {
+    dataFinal.setHours(23, 59, 59, 999)
+  }
+  return { dataInicial, dataFinal }
 }
 
 /** Rótulos do eixo Y do comparativo (compacto em k acima de 1000). */
@@ -659,6 +717,10 @@ export default function DashboardV2() {
   const [periodoPersonalizadoInicio, setPeriodoPersonalizadoInicio] = useState<Date | null>(null)
   const [periodoPersonalizadoFim, setPeriodoPersonalizadoFim] = useState<Date | null>(null)
   const [modalIntervaloPersonalizadoAberto, setModalIntervaloPersonalizadoAberto] = useState(false)
+  /** Rascunho do modal de intervalo (calendário + horas) antes de aplicar. */
+  const [rascunhoIntervaloRange, setRascunhoIntervaloRange] = useState<DateRange | undefined>(undefined)
+  const [rascunhoHoraInicio, setRascunhoHoraInicio] = useState('00:00')
+  const [rascunhoHoraFim, setRascunhoHoraFim] = useState('23:59')
 
   const corComparativoLinhaAtual =
     metricaGraficoComparativo === 'CANCELADA' ? LINHA_CANCEL_ATUAL : LINHA_PERIODO_ATUAL
@@ -1229,13 +1291,27 @@ export default function DashboardV2() {
 
   const handlePeriodoDataChange = useCallback((v: string) => {
     if (v === 'personalizado') {
+      if (periodoPersonalizadoInicio && periodoPersonalizadoFim) {
+        setRascunhoIntervaloRange({
+          from: startOfDay(periodoPersonalizadoInicio),
+          to: startOfDay(periodoPersonalizadoFim),
+        })
+        setRascunhoHoraInicio(formatarHoraParaInputCalendar(periodoPersonalizadoInicio))
+        setRascunhoHoraFim(formatarHoraParaInputCalendar(periodoPersonalizadoFim))
+      } else {
+        /* Sem período salvo: intervalo de um único dia = hoje; calendário com mês anterior à esquerda e mês atual à direita. */
+        const hoje = startOfDay(new Date())
+        setRascunhoIntervaloRange({ from: hoje, to: hoje })
+        setRascunhoHoraInicio('00:00')
+        setRascunhoHoraFim('23:59')
+      }
       setModalIntervaloPersonalizadoAberto(true)
       return
     }
     setPeriodoData(v)
     setPeriodoPersonalizadoInicio(null)
     setPeriodoPersonalizadoFim(null)
-  }, [])
+  }, [periodoPersonalizadoInicio, periodoPersonalizadoFim])
 
   const handleConfirmarIntervaloPersonalizado = useCallback(
     (v: { dataInicial: Date | null; dataFinal: Date | null }) => {
@@ -1253,6 +1329,30 @@ export default function DashboardV2() {
     },
     []
   )
+
+  /**
+   * Atualiza o intervalo. Se o DayPicker enviar `undefined`, volta ao padrão de um dia (hoje),
+   * para não ficar sem seleção e manter só consulta retroativa.
+   */
+  const handleRascunhoIntervaloRangeChange = useCallback((next: DateRange | undefined) => {
+    if (next != null) {
+      setRascunhoIntervaloRange(next)
+      return
+    }
+    const hoje = startOfDay(new Date())
+    setRascunhoIntervaloRange({ from: hoje, to: hoje })
+  }, [])
+
+  const handleAplicarIntervaloPersonalizadoModal = useCallback(() => {
+    const { dataInicial, dataFinal } = combinarIntervaloCalendarParaDatas(
+      rascunhoIntervaloRange,
+      rascunhoHoraInicio,
+      rascunhoHoraFim
+    )
+    if (!dataInicial || !dataFinal) return
+    handleConfirmarIntervaloPersonalizado({ dataInicial, dataFinal })
+    setModalIntervaloPersonalizadoAberto(false)
+  }, [rascunhoIntervaloRange, rascunhoHoraInicio, rascunhoHoraFim, handleConfirmarIntervaloPersonalizado])
 
   return (
     <div className="font-nunito min-h-0 w-full bg-gray-50 pb-8 pt-2">
@@ -2035,27 +2135,57 @@ export default function DashboardV2() {
         onOpenChange={isOpen => {
           if (!isOpen) setModalIntervaloPersonalizadoAberto(false)
         }}
-        fullWidth
-        maxWidth="sm"
+        fullWidth={false}
+        maxWidth={false}
         PaperProps={{
           sx: {
             borderRadius: '12px',
-            maxWidth: '400px',
+            maxWidth: 'min(960px, calc(100vw - 24px))',
+            width: 'fit-content',
+            margin: '16px',
+            overflow: 'hidden',
+            background: 'linear-gradient(135deg, #530CA3 0%, #451090 100%)',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
           },
         }}
       >
         <DialogContent sx={{ p: 0, overflow: 'hidden' }}>
-          <DateTimeRangePicker
-            open={modalIntervaloPersonalizadoAberto}
-            value={{
-              dataInicial: periodoPersonalizadoInicio ?? undefined,
-              dataFinal: periodoPersonalizadoFim ?? undefined,
-            }}
-            onClose={() => setModalIntervaloPersonalizadoAberto(false)}
-            onConfirm={handleConfirmarIntervaloPersonalizado}
-            title="Escolha o período"
-            confirmText="Aplicar"
-          />
+          <div className="flex w-fit max-w-[min(960px,calc(100vw-24px))] flex-col bg-transparent">
+            <div className="flex items-center justify-between border-b border-white/15 px-4 py-3">
+              <h2 className="text-lg font-semibold text-white">Escolha o período</h2>
+              <button
+                type="button"
+                onClick={() => setModalIntervaloPersonalizadoAberto(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15"
+                aria-label="Fechar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex justify-center overflow-x-auto px-3 pb-2 pt-3">
+              <FaturamentoRangeCalendar
+                embutidoNoModal
+                range={rascunhoIntervaloRange}
+                onRangeChange={handleRascunhoIntervaloRangeChange}
+                horaInicio={rascunhoHoraInicio}
+                horaFim={rascunhoHoraFim}
+                onHorariosChange={(hi, hf) => {
+                  setRascunhoHoraInicio(hi)
+                  setRascunhoHoraFim(hf)
+                }}
+              />
+            </div>
+            <div className="border-t border-white/15 bg-[#F5F3FF] px-4 py-3">
+              <button
+                type="button"
+                disabled={!rascunhoIntervaloRange?.from || !rascunhoIntervaloRange?.to}
+                onClick={handleAplicarIntervaloPersonalizadoModal}
+                className="flex h-10 w-full items-center justify-center rounded-lg bg-secondary font-nunito text-sm text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Aplicar
+              </button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

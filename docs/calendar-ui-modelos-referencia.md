@@ -38,9 +38,15 @@ Documento gerado para apoiar decisões de UI no dashboard e filtros por período
 
 ## Panorama no repositório Jiffy (checklist técnico)
 
-- Existem `Card` e outros primitives em `src/presentation/components/ui/`; **não** há `calendar.tsx` pronto como no shadcn padrão.
+- Existem `Card` e outros primitives em `src/presentation/components/ui/`; o wrapper **`calendar.tsx`** segue o DayPicker oficial + CSS padrão (não é o bundle tailwind completo do shadcn).
 - `react-day-picker` pode precisar estar como dependência **direta** no `package.json` (verificar lock / `npm ls`).
 - Filtro atual do dashboard usa intervalo data+hora (`DateTimeRangePicker`); estes modelos substituem ou complementam a **parte visual** da escolha de datas, mantendo validação e contratos na borda (DTO, timezone).
+
+### Implementação parcial (visual combinado)
+
+- **`src/presentation/components/ui/calendar.tsx`** — `Calendar` + import de `react-day-picker/style.css` (react-day-picker v9).
+- **`src/presentation/components/ui/FaturamentoRangeCalendar.tsx`** — intervalo com `numberOfMonths={2}`, células com faturamento **mock** (ou `faturamentoPorDia` opcional), rodapé com hora início/fim. Pronto para trocar o mock por fetch + mapa vindos da API.
+- **Dashboard V2** (`dashboardV2.tsx`): modal “Por datas” usa este componente no lugar do antigo `DateTimeRangePicker`; rascunho + “Aplicar” combinam intervalo e horas com as mesmas regras de negócio (início/fim do dia quando aplicável).
 
 ---
 
