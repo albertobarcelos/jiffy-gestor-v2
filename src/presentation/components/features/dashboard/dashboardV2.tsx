@@ -3,7 +3,7 @@
 import { Exo_2 } from 'next/font/google'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useDashboardResumoQuery } from '@/src/presentation/hooks/useDashboardResumoQuery'
@@ -19,6 +19,7 @@ import {
   calculatePeriodo,
   calculatePeriodoAnteriorParaComparacao,
   permiteOpcoesIntervaloPorHora,
+  deslocarPeriodoEmDiasCorridos,
 } from '@/src/shared/utils/dateFilters'
 import {
   Line,
@@ -52,6 +53,8 @@ import {
   SelectValue,
 } from '@/src/presentation/components/ui/select'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
+import { DateTimeRangePicker } from '@/src/presentation/components/ui/DateTimeRangePicker'
 import { MdOutlineMonetizationOn, MdReceiptLong, MdRestaurantMenu, MdAdd } from 'react-icons/md'
 import { TbReceiptFilled } from 'react-icons/tb'
 import { IoReceipt } from 'react-icons/io5'
@@ -77,6 +80,12 @@ const LIMITE_TOP_PRODUTOS_V2_RESUMO_FETCH = LIMITE_TOP_PRODUTOS_V2_RESUMO + 1
 const LIMITE_TOP_GARCONS_V2 = 10
 /** Após “Ver todos os usuários”, lista completa (API limita após agregar). */
 const LIMITE_TOP_GARCONS_V2_COMPLETO = 500
+
+/**
+ * Comparativo do período personalizado: mesma janela deslocada N dias corridos para trás
+ * (início e fim, preservando horário).
+ */
+const DIAS_COMPARACAO_PERIODO_PERSONALIZADO = 30
 
 /** Paleta cíclica para N métodos distintos (mesma ideia do modal de métodos). */
 const PALETA_PRINCIPAL_FORMAS_PAGAMENTO = [
@@ -259,6 +268,17 @@ function labelDataHoje() {
   })
 }
 
+/** Resumo curto de data/hora para o item “Por datas” no select. */
+function formatarDataHoraIntervaloCurta(date: Date): string {
+  return date.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 /**
  * Valores do Select de período (V2) → rótulos esperados por `calculatePeriodo`
  * (mesmo contrato do dashboard em `MetricCards` + `page.tsx`).
@@ -273,6 +293,8 @@ function periodoSelectV2ParaOpcaoCalculatePeriodo(periodoData: string): string {
       return 'Últimos 7 Dias'
     case '30dias':
       return 'Últimos 30 Dias'
+    case 'personalizado':
+      return 'Hoje'
     default:
       return 'Hoje'
   }
@@ -339,6 +361,8 @@ function rotuloLinhaGraficoPeriodoAtual(periodoData: string): string {
       return 'Últimos 7 dias'
     case '30dias':
       return 'Últimos 30 dias'
+    case 'personalizado':
+      return 'Período escolhido'
     default:
       return 'Período atual'
   }
@@ -355,6 +379,8 @@ function rotuloLinhaGraficoPeriodoAnterior(periodoData: string): string {
       return '7 dias anteriores'
     case '30dias':
       return '30 dias anteriores'
+    case 'personalizado':
+      return `${DIAS_COMPARACAO_PERIODO_PERSONALIZADO} dias antes (mesmo intervalo)`
     default:
       return 'Período anterior'
   }
@@ -371,6 +397,8 @@ function tituloFaturamentoBanner(periodoData: string): string {
       return 'Nos últimos 7 dias você faturou'
     case '30dias':
       return 'Nos últimos 30 dias você faturou'
+    case 'personalizado':
+      return 'No período escolhido você faturou'
     default:
       return 'Você faturou'
   }
@@ -387,6 +415,8 @@ function rotuloRodapeComparacaoCards(periodoData: string): string {
       return '7 dias anteriores'
     case '30dias':
       return '30 dias anteriores'
+    case 'personalizado':
+      return `${DIAS_COMPARACAO_PERIODO_PERSONALIZADO} dias antes`
     default:
       return 'Período anterior'
   }
@@ -403,6 +433,8 @@ function rotuloPeriodoTituloCard(periodoData: string): string | null {
       return '7 dias'
     case '30dias':
       return '30 dias'
+    case 'personalizado':
+      return 'período escolhido'
     default:
       return null
   }
@@ -451,6 +483,13 @@ function textosComparacaoPeriodoAnterior(periodoData: string): {
         abaixoResto: 'dos 30 dias anteriores',
         alinhadoCom: 'os 30 dias anteriores',
       }
+    case 'personalizado':
+      return {
+        sufixoVs: `na janela ${DIAS_COMPARACAO_PERIODO_PERSONALIZADO} dias antes`,
+        acimaResto: `da janela ${DIAS_COMPARACAO_PERIODO_PERSONALIZADO} dias antes`,
+        abaixoResto: `da janela ${DIAS_COMPARACAO_PERIODO_PERSONALIZADO} dias antes`,
+        alinhadoCom: `a janela ${DIAS_COMPARACAO_PERIODO_PERSONALIZADO} dias antes`,
+      }
     default:
       return {
         sufixoVs: 'no período anterior',
@@ -472,6 +511,8 @@ function prefixoSemFaturamentoNaBase(periodoData: string): string {
       return 'Nos 7 dias anteriores não houve faturamento'
     case '30dias':
       return 'Nos 30 dias anteriores não houve faturamento'
+    case 'personalizado':
+      return `Na janela ${DIAS_COMPARACAO_PERIODO_PERSONALIZADO} dias antes não houve faturamento`
     default:
       return 'No período de comparação não houve faturamento'
   }
@@ -615,6 +656,10 @@ export default function DashboardV2() {
   /** Lista expandida com todos os garçons do ranking (quando > 10 usuários com venda). */
   const [topGarconsListaCompleta, setTopGarconsListaCompleta] = useState(false)
 
+  const [periodoPersonalizadoInicio, setPeriodoPersonalizadoInicio] = useState<Date | null>(null)
+  const [periodoPersonalizadoFim, setPeriodoPersonalizadoFim] = useState<Date | null>(null)
+  const [modalIntervaloPersonalizadoAberto, setModalIntervaloPersonalizadoAberto] = useState(false)
+
   const corComparativoLinhaAtual =
     metricaGraficoComparativo === 'CANCELADA' ? LINHA_CANCEL_ATUAL : LINHA_PERIODO_ATUAL
   const corComparativoLinhaAnterior =
@@ -636,24 +681,6 @@ export default function DashboardV2() {
     document.addEventListener('visibilitychange', aoVisibilidade)
     return () => document.removeEventListener('visibilitychange', aoVisibilidade)
   }, [])
-
-  /** Por hora só para comparação de dias únicos (hoje / ontem); 7 e 30 dias → sempre por dia */
-  const permiteGraficoPorHora = periodoData === 'hoje' || periodoData === 'ontem'
-
-  /** Detecta retorno de 7/30 dias → hoje/ontem para restaurar agregação de 30 min (evita estado “Por dia” inválido). */
-  const estavaEmPeriodoSoDiarioRef = useRef(false)
-
-  useEffect(() => {
-    if (!permiteGraficoPorHora) {
-      setGranularidade('dia')
-      estavaEmPeriodoSoDiarioRef.current = true
-      return
-    }
-    if (estavaEmPeriodoSoDiarioRef.current) {
-      setGranularidade('intervalo_30')
-      estavaEmPeriodoSoDiarioRef.current = false
-    }
-  }, [permiteGraficoPorHora, periodoData])
 
   useEffect(() => {
     setTopProdutosListaCompleta(false)
@@ -828,14 +855,60 @@ export default function DashboardV2() {
   )
 
   const { inicio: inicioResumo, fim: fimResumo } = useMemo(() => {
+    if (
+      periodoData === 'personalizado' &&
+      periodoPersonalizadoInicio &&
+      periodoPersonalizadoFim
+    ) {
+      return { inicio: periodoPersonalizadoInicio, fim: periodoPersonalizadoFim }
+    }
     return calculatePeriodo(opcaoCalculatePeriodo)
-  }, [opcaoCalculatePeriodo, dadosAtualizadosEm])
+  }, [
+    periodoData,
+    periodoPersonalizadoInicio,
+    periodoPersonalizadoFim,
+    opcaoCalculatePeriodo,
+    dadosAtualizadosEm,
+  ])
 
   const { inicio: inicioAnterior, fim: fimAnterior } = useMemo(() => {
+    if (periodoData === 'personalizado' && inicioResumo && fimResumo) {
+      return deslocarPeriodoEmDiasCorridos(
+        inicioResumo,
+        fimResumo,
+        DIAS_COMPARACAO_PERIODO_PERSONALIZADO
+      )
+    }
     const r = calculatePeriodoAnteriorParaComparacao(opcaoCalculatePeriodo)
     if (!r) return { inicio: null, fim: null }
     return r
-  }, [opcaoCalculatePeriodo, dadosAtualizadosEm])
+  }, [periodoData, inicioResumo, fimResumo, opcaoCalculatePeriodo, dadosAtualizadosEm])
+
+  /**
+   * Por hora: hoje/ontem, ou intervalo personalizado com até 2 dias corridos inclusivos
+   * (mesma regra de `permiteOpcoesIntervaloPorHora`).
+   */
+  const permiteGraficoPorHora = useMemo(() => {
+    if (periodoData === 'personalizado' && inicioResumo && fimResumo) {
+      return permiteOpcoesIntervaloPorHora(inicioResumo, fimResumo)
+    }
+    return periodoData === 'hoje' || periodoData === 'ontem'
+  }, [periodoData, inicioResumo, fimResumo])
+
+  /** Detecta retorno de 7/30 dias → hoje/ontem para restaurar agregação de 30 min (evita estado “Por dia” inválido). */
+  const estavaEmPeriodoSoDiarioRef = useRef(false)
+
+  useEffect(() => {
+    if (!permiteGraficoPorHora) {
+      setGranularidade('dia')
+      estavaEmPeriodoSoDiarioRef.current = true
+      return
+    }
+    if (estavaEmPeriodoSoDiarioRef.current) {
+      setGranularidade('intervalo_30')
+      estavaEmPeriodoSoDiarioRef.current = false
+    }
+  }, [permiteGraficoPorHora, periodoData])
 
   const {
     data: dadosResumo,
@@ -897,7 +970,8 @@ export default function DashboardV2() {
     isLoading: carregandoMetodosPagamento,
     isError: erroMetodosPagamento,
   } = useDashboardMetodosPagamentoDetalhadoQuery({
-    periodo: opcaoCalculatePeriodo,
+    periodo:
+      periodoData === 'personalizado' ? 'Últimos 30 Dias' : opcaoCalculatePeriodo,
     periodoInicial: inicioResumo,
     periodoFinal: fimResumo,
     enabled: inicioResumo != null && fimResumo != null,
@@ -1153,6 +1227,33 @@ export default function DashboardV2() {
     }
   }
 
+  const handlePeriodoDataChange = useCallback((v: string) => {
+    if (v === 'personalizado') {
+      setModalIntervaloPersonalizadoAberto(true)
+      return
+    }
+    setPeriodoData(v)
+    setPeriodoPersonalizadoInicio(null)
+    setPeriodoPersonalizadoFim(null)
+  }, [])
+
+  const handleConfirmarIntervaloPersonalizado = useCallback(
+    (v: { dataInicial: Date | null; dataFinal: Date | null }) => {
+      let ini = v.dataInicial
+      let fim = v.dataFinal
+      if (!ini || !fim) return
+      if (ini.getTime() > fim.getTime()) {
+        const t = ini
+        ini = fim
+        fim = t
+      }
+      setPeriodoPersonalizadoInicio(ini)
+      setPeriodoPersonalizadoFim(fim)
+      setPeriodoData('personalizado')
+    },
+    []
+  )
+
   return (
     <div className="font-nunito min-h-0 w-full bg-gray-50 pb-8 pt-2">
       {/* Cabeçalho + filtros */}
@@ -1249,7 +1350,7 @@ export default function DashboardV2() {
               className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-primary"
               aria-hidden
             />
-            <Select value={periodoData} onValueChange={setPeriodoData}>
+            <Select value={periodoData} onValueChange={handlePeriodoDataChange}>
               <SelectTrigger
                 id="dashboard-periodo-data"
                 className="h-auto min-h-[42px] w-full rounded-lg bg-primary/5 py-2 pl-10 pr-3 text-sm font-medium text-primary shadow-none ring-offset-0 focus:outline-none focus:ring-2 focus:ring-primary/35 focus:ring-offset-0 data-[state=open]:border-primary [&>svg]:text-primary"
@@ -1283,6 +1384,14 @@ export default function DashboardV2() {
                   className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:rounded-lg data-[state=checked]:rounded-lg data-[highlighted]:!bg-primary data-[state=checked]:bg-primary/10 data-[highlighted]:!text-white data-[state=checked]:text-primary"
                 >
                   Últimos 30 dias
+                </SelectItem>
+                <SelectItem
+                  value="personalizado"
+                  className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:rounded-lg data-[state=checked]:rounded-lg data-[highlighted]:!bg-primary data-[state=checked]:bg-primary/10 data-[highlighted]:!text-white data-[state=checked]:text-primary"
+                >
+                  {periodoPersonalizadoInicio && periodoPersonalizadoFim
+                    ? `Por datas (${formatarDataHoraIntervaloCurta(periodoPersonalizadoInicio)} — ${formatarDataHoraIntervaloCurta(periodoPersonalizadoFim)})`
+                    : 'Por datas…'}
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -1629,7 +1738,7 @@ export default function DashboardV2() {
           </div>
         </section>
 
-        <section className="flex flex-col rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-6 lg:col-span-4">
+        <section className="flex h-full flex-col rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-6 lg:col-span-4">
           <h2 className="mb-4 font-exo text-lg font-semibold text-primary-text md:text-xl">
             Formas de Pagamento
           </h2>
@@ -1920,6 +2029,35 @@ export default function DashboardV2() {
           </button>
         </section>
       </div>
+
+      <Dialog
+        open={modalIntervaloPersonalizadoAberto}
+        onOpenChange={isOpen => {
+          if (!isOpen) setModalIntervaloPersonalizadoAberto(false)
+        }}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            maxWidth: '400px',
+          },
+        }}
+      >
+        <DialogContent sx={{ p: 0, overflow: 'hidden' }}>
+          <DateTimeRangePicker
+            open={modalIntervaloPersonalizadoAberto}
+            value={{
+              dataInicial: periodoPersonalizadoInicio ?? undefined,
+              dataFinal: periodoPersonalizadoFim ?? undefined,
+            }}
+            onClose={() => setModalIntervaloPersonalizadoAberto(false)}
+            onConfirm={handleConfirmarIntervaloPersonalizado}
+            title="Escolha o período"
+            confirmText="Aplicar"
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

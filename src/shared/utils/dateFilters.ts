@@ -138,3 +138,19 @@ export function permiteOpcoesIntervaloPorHora(inicio: Date, fim: Date): boolean 
   const diasInclusivos = Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1
   return diasInclusivos <= 2
 }
+
+/**
+ * Desloca início e fim pelo mesmo número de dias corridos, preservando hora/minuto/segundo.
+ * Uso típico: período de comparação = mesma janela, N dias antes (ex.: N = 30 no dashboard com filtro personalizado).
+ */
+export function deslocarPeriodoEmDiasCorridos(
+  inicio: Date,
+  fim: Date,
+  diasParaTras: number
+): { inicio: Date; fim: Date } {
+  const i = new Date(inicio.getTime())
+  i.setDate(i.getDate() - diasParaTras)
+  const f = new Date(fim.getTime())
+  f.setDate(f.getDate() - diasParaTras)
+  return { inicio: i, fim: f }
+}
