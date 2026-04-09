@@ -357,7 +357,7 @@ export function ConfiguracoesGeraisStep({
                 <button
                   type="button"
                   onClick={() => onAtivoChange(!ativo)}
-                  className="flex w-full items-center justify-between gap-4 rounded-2xl border border-transparent bg-white px-4 py-2 text-left transition-all hover:border-primary/30 hover:shadow-sm"
+                  className="flex w-full items-center justify-between gap-4 rounded-2xl border border-transparent bg-white px-2 py-2 text-left transition-all hover:border-primary/30 hover:shadow-sm"
                 >
                   <span className="font-nunito text-sm text-primary-text">Ativo</span>
                   <span
