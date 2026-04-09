@@ -17,6 +17,8 @@ const generalSans = localFont({
   display: 'swap',
 })
 
+
+
 export const metadata: Metadata = {
   title: 'Jiffy Gestor - Sistema de Gestão',
   description: 'Sistema de gestão empresarial Jiffy',

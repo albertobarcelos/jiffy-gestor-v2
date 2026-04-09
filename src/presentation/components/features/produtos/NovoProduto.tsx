@@ -47,6 +47,8 @@ function NovoProdutoContent({
   const [permiteDesconto, setPermiteDesconto] = useState(false)
   const [permiteAcrescimo, setPermiteAcrescimo] = useState(false)
   const [abreComplementos, setAbreComplementos] = useState(false)
+  const [permiteAlterarPreco, setPermiteAlterarPreco] = useState(false)
+  const [incideTaxa, setIncideTaxa] = useState(false)
   const [ativo, setAtivo] = useState(true)
   const [grupoComplementosIds, setGrupoComplementosIds] = useState<string[]>([])
   const [impressorasIds, setImpressorasIds] = useState<string[]>([])
@@ -60,7 +62,9 @@ function NovoProdutoContent({
   const [tipoProduto, setTipoProduto] = useState<string | null>('00') // Padrão: 00 - Mercadoria para Revenda
   const [indicadorProducaoEscala, setIndicadorProducaoEscala] = useState<string | null>(null)
   // Status de disponibilidade do microsserviço fiscal (retornado pelo backend)
-  const [fiscalStatus, setFiscalStatus] = useState<'available' | 'unavailable' | undefined>(undefined)
+  const [fiscalStatus, setFiscalStatus] = useState<'available' | 'unavailable' | undefined>(
+    undefined
+  )
 
   // Estado de validação do NCM via API do backend
   const [ncmValidation, setNcmValidation] = useState<{
@@ -136,7 +140,12 @@ function NovoProdutoContent({
     const numericValue =
       typeof value === 'number'
         ? value
-        : Number(value.toString().replace(/[^\d,.-]/g, '').replace(',', '.')) || 0
+        : Number(
+            value
+              .toString()
+              .replace(/[^\d,.-]/g, '')
+              .replace(',', '.')
+          ) || 0
 
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -144,10 +153,7 @@ function NovoProdutoContent({
     }).format(numericValue)
   }, [])
 
-  const {
-    data: grupos = [],
-    isLoading: isLoadingGrupos,
-  } = useGruposProdutos({
+  const { data: grupos = [], isLoading: isLoadingGrupos } = useGruposProdutos({
     limit: 100,
   })
 
@@ -157,7 +163,7 @@ function NovoProdutoContent({
     const currentCopyFromId = searchParams.get('copyFrom')
     const currentEffectiveProdutoId = produtoId || currentCopyFromId
     const currentEffectiveIsCopyMode = isCopyMode || !!currentCopyFromId
-    
+
     // Se não tem produtoId, não carrega
     if (!currentEffectiveProdutoId) {
       // Resetar flags se não há produtoId
@@ -173,7 +179,7 @@ function NovoProdutoContent({
     // Verificar se o produtoId ou modo cópia realmente mudaram
     const produtoIdChanged = lastProdutoIdRef.current !== currentEffectiveProdutoId
     const copyModeChanged = lastIsCopyModeRef.current !== currentEffectiveIsCopyMode
-    
+
     // Se não mudou nada, não recarrega
     if (!produtoIdChanged && !copyModeChanged && hasLoadedProdutoRef.current) {
       return
@@ -217,7 +223,7 @@ function NovoProdutoContent({
 
         if (response.ok) {
           const produto = await response.json()
-          
+
           // Preenche os campos com os dados do produto
           setPrecoVenda(produto.valor ? formatCurrency(produto.valor) : '')
           setUnidadeProduto(produto.unidadeMedida || null)
@@ -226,12 +232,14 @@ function NovoProdutoContent({
           setPermiteDesconto(produto.permiteDesconto || false)
           setPermiteAcrescimo(produto.permiteAcrescimo || false)
           setAbreComplementos(produto.abreComplementos || false)
+          setPermiteAlterarPreco(produto.permiteAlterarPreco ?? false)
+          setIncideTaxa(produto.incideTaxa ?? false)
           setAtivo(produto.ativo ?? true)
           const gruposIds = produto.gruposComplementos?.map((g: any) => g.id) || []
           setGrupoComplementosIds(gruposIds)
           setOriginalGrupoComplementosIds(gruposIds) // Guardar os grupos originais
           setImpressorasIds(produto.impressoras?.map((i: any) => i.id) || [])
-          
+
           // IMPORTANTE: Não preencher campos fiscais imediatamente para evitar chamadas ao microserviço fiscal
           // Os dados fiscais serão carregados apenas quando o usuário chegar no passo 3 (ConfiguracaoFiscalStep)
           // Armazenar dados fiscais em uma ref para uso posterior
@@ -239,15 +247,13 @@ function NovoProdutoContent({
           fiscalDataFromProductRef.current = {
             ncm: dadosFiscais.ncm || produto.ncm || '',
             cest: dadosFiscais.cest || '',
-            origemMercadoria: dadosFiscais.origemMercadoria?.toString() || 
-              produto.origemMercadoria?.toString() || 
+            origemMercadoria:
+              dadosFiscais.origemMercadoria?.toString() ||
+              produto.origemMercadoria?.toString() ||
               '',
-            tipoProduto: dadosFiscais.tipoProduto || 
-              produto.tipoProduto || 
-              '',
-            indicadorProducaoEscala: dadosFiscais.indicadorProducaoEscala || 
-              produto.indicadorProducaoEscala || 
-              null,
+            tipoProduto: dadosFiscais.tipoProduto || produto.tipoProduto || '',
+            indicadorProducaoEscala:
+              dadosFiscais.indicadorProducaoEscala || produto.indicadorProducaoEscala || null,
             fiscalStatus: produto.fiscalStatus || undefined,
           }
           // Resetar flag de carregamento fiscal quando produto muda
@@ -319,19 +325,13 @@ function NovoProdutoContent({
             setNcm(dadosFiscais.ncm || produto.ncm || '')
             setCest(dadosFiscais.cest || '')
             setOrigemMercadoria(
-              dadosFiscais.origemMercadoria?.toString() || 
-              produto.origemMercadoria?.toString() || 
-              '0'
+              dadosFiscais.origemMercadoria?.toString() ||
+                produto.origemMercadoria?.toString() ||
+                '0'
             )
-            setTipoProduto(
-              dadosFiscais.tipoProduto || 
-              produto.tipoProduto || 
-              '00'
-            )
+            setTipoProduto(dadosFiscais.tipoProduto || produto.tipoProduto || '00')
             setIndicadorProducaoEscala(
-              dadosFiscais.indicadorProducaoEscala || 
-              produto.indicadorProducaoEscala || 
-              null
+              dadosFiscais.indicadorProducaoEscala || produto.indicadorProducaoEscala || null
             )
             setFiscalStatus(produto.fiscalStatus || undefined)
             hasLoadedFiscalDataRef.current = true
@@ -406,16 +406,13 @@ function NovoProdutoContent({
       const timeoutId = setTimeout(() => controller.abort(), 5000)
 
       try {
-        const response = await fetch(
-          `/api/v1/fiscal/configuracoes/ncms/validar/${ncmTrimmed}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            signal: controller.signal,
-          }
-        )
+        const response = await fetch(`/api/v1/fiscal/configuracoes/ncms/validar/${ncmTrimmed}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
+        })
 
         clearTimeout(timeoutId)
 
@@ -463,7 +460,12 @@ function NovoProdutoContent({
 
     // Se NCM não está validado como válido, limpar lista de CESTs
     // IMPORTANTE: Verificar se o código do NCM validado corresponde ao NCM atual
-    if (!ncmValidation || !ncmValidation.valido || ncmTrimmed.length !== 8 || ncmValidation.codigo !== ncmTrimmed) {
+    if (
+      !ncmValidation ||
+      !ncmValidation.valido ||
+      ncmTrimmed.length !== 8 ||
+      ncmValidation.codigo !== ncmTrimmed
+    ) {
       setCestsDisponiveis([])
       setCestValidation(null)
       lastFetchedNcmForCestsRef.current = ''
@@ -485,16 +487,13 @@ function NovoProdutoContent({
       const timeoutId = setTimeout(() => controller.abort(), 5000)
 
       try {
-        const response = await fetch(
-          `/api/v1/fiscal/configuracoes/cests/por-ncm/${ncmTrimmed}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            signal: controller.signal,
-          }
-        )
+        const response = await fetch(`/api/v1/fiscal/configuracoes/cests/por-ncm/${ncmTrimmed}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
+        })
 
         clearTimeout(timeoutId)
 
@@ -608,9 +607,11 @@ function NovoProdutoContent({
               codigo: result.cestCodigo || cestTrimmed,
               valido: result.compativel ?? false,
               descricao: result.descricaoCest,
-              mensagem: result.mensagem || (result.compativel
-                ? 'CEST compatível com o NCM informado'
-                : 'CEST não é compatível com o NCM informado'),
+              mensagem:
+                result.mensagem ||
+                (result.compativel
+                  ? 'CEST compatível com o NCM informado'
+                  : 'CEST não é compatível com o NCM informado'),
             })
           } else {
             // Resposta de validação simples: { codigo, valido, descricao, segmento, mensagem }
@@ -674,26 +675,18 @@ function NovoProdutoContent({
         'Content-Type': 'application/json',
       },
     })
-      .then(async (response) => {
+      .then(async response => {
         if (response.ok) {
           const produto = await response.json()
           const dadosFiscais = produto.fiscal || {}
           setNcm(dadosFiscais.ncm || produto.ncm || '')
           setCest(dadosFiscais.cest || '')
           setOrigemMercadoria(
-            dadosFiscais.origemMercadoria?.toString() ||
-            produto.origemMercadoria?.toString() ||
-            ''
+            dadosFiscais.origemMercadoria?.toString() || produto.origemMercadoria?.toString() || ''
           )
-          setTipoProduto(
-            dadosFiscais.tipoProduto ||
-            produto.tipoProduto ||
-            ''
-          )
+          setTipoProduto(dadosFiscais.tipoProduto || produto.tipoProduto || '')
           setIndicadorProducaoEscala(
-            dadosFiscais.indicadorProducaoEscala ||
-            produto.indicadorProducaoEscala ||
-            null
+            dadosFiscais.indicadorProducaoEscala || produto.indicadorProducaoEscala || null
           )
           setFiscalStatus(produto.fiscalStatus || undefined)
 
@@ -702,7 +695,7 @@ function NovoProdutoContent({
           loadedProdutoIdRef.current = `${currentEffectiveProdutoId}-${currentEffectiveIsCopyMode}`
         }
       })
-      .catch((error) => {
+      .catch(error => {
         console.error('Erro ao recarregar dados fiscais:', error)
       })
       .finally(() => {
@@ -738,7 +731,24 @@ function NovoProdutoContent({
     router.push('/produtos')
   }
 
-  const handleSave = async () => {
+  const handleSave = async (opcoes?: { salvarSomenteDadosGerais?: boolean }) => {
+    const salvarSomenteDadosGerais = opcoes?.salvarSomenteDadosGerais === true
+
+    if (salvarSomenteDadosGerais) {
+      if (!nomeProduto?.trim()) {
+        showToast.error('Informe o nome do produto.')
+        return
+      }
+      if (!grupoProduto) {
+        showToast.error('Selecione o grupo do produto.')
+        return
+      }
+      if (!unidadeProduto) {
+        showToast.error('Selecione a unidade de medida.')
+        return
+      }
+    }
+
     // Validação do Preço de Venda
     const precoVendaNum = parseFloat(precoVenda.replace(/[^\d,]/g, '').replace(',', '.'))
     if (!precoVenda || precoVendaNum === 0) {
@@ -747,7 +757,7 @@ function NovoProdutoContent({
     }
 
     // Validação do NCM: deve ter exatamente 8 dígitos numéricos quando preenchido
-    if (ncm && ncm.trim() !== '') {
+    if (!salvarSomenteDadosGerais && ncm && ncm.trim() !== '') {
       const ncmTrimmed = ncm.trim()
       if (!/^\d{8}$/.test(ncmTrimmed)) {
         showToast.error('O código NCM deve conter exatamente 8 dígitos numéricos.')
@@ -766,7 +776,7 @@ function NovoProdutoContent({
     }
 
     // Validação do CEST: deve ter exatamente 7 dígitos numéricos quando preenchido
-    if (cest && cest.trim() !== '') {
+    if (!salvarSomenteDadosGerais && cest && cest.trim() !== '') {
       const cestTrimmed = cest.trim()
       if (!/^\d{7}$/.test(cestTrimmed)) {
         showToast.error('O código CEST deve conter exatamente 7 dígitos numéricos.')
@@ -785,8 +795,10 @@ function NovoProdutoContent({
     }
 
     // Validação: Se o Indicador de Produção em Escala Relevante estiver preenchido, o CEST deve estar preenchido
-    if (indicadorProducaoEscala && (!cest || cest.trim() === '')) {
-      showToast.error('A informação sobre a "Produção em Escala Relevante" foi preenchida sem preencher o código CEST')
+    if (!salvarSomenteDadosGerais && indicadorProducaoEscala && (!cest || cest.trim() === '')) {
+      showToast.error(
+        'A informação sobre a "Produção em Escala Relevante" foi preenchida sem preencher o código CEST'
+      )
       return
     }
 
@@ -805,11 +817,36 @@ function NovoProdutoContent({
 
       // Montar objeto de dados fiscais (só inclui se houver pelo menos um campo preenchido)
       const fiscalData: any = {}
-      if (ncm && ncm.trim() !== '') fiscalData.ncm = ncm.trim()
-      if (cest && cest.trim() !== '') fiscalData.cest = cest.trim()
-      if (origemMercadoria) fiscalData.origemMercadoria = parseInt(origemMercadoria)
-      if (tipoProduto) fiscalData.tipoProduto = tipoProduto
-      if (indicadorProducaoEscala) fiscalData.indicadorProducaoEscala = indicadorProducaoEscala
+      let ncmCompatBody: string | undefined
+
+      if (salvarSomenteDadosGerais && !hasLoadedFiscalDataRef.current) {
+        // Edição sem abrir o passo fiscal: preserva fiscal carregado na ref
+        const ref = fiscalDataFromProductRef.current
+        if (ref?.ncm) fiscalData.ncm = String(ref.ncm).trim()
+        if (ref?.cest) fiscalData.cest = String(ref.cest).trim()
+        if (
+          ref?.origemMercadoria !== undefined &&
+          ref?.origemMercadoria !== null &&
+          String(ref.origemMercadoria) !== ''
+        ) {
+          fiscalData.origemMercadoria =
+            typeof ref.origemMercadoria === 'number'
+              ? ref.origemMercadoria
+              : parseInt(String(ref.origemMercadoria), 10)
+        }
+        if (ref?.tipoProduto) fiscalData.tipoProduto = ref.tipoProduto
+        if (ref?.indicadorProducaoEscala) {
+          fiscalData.indicadorProducaoEscala = ref.indicadorProducaoEscala
+        }
+        ncmCompatBody = ref?.ncm ? String(ref.ncm).trim() : undefined
+      } else {
+        if (ncm && ncm.trim() !== '') fiscalData.ncm = ncm.trim()
+        if (cest && cest.trim() !== '') fiscalData.cest = cest.trim()
+        if (origemMercadoria) fiscalData.origemMercadoria = parseInt(origemMercadoria)
+        if (tipoProduto) fiscalData.tipoProduto = tipoProduto
+        if (indicadorProducaoEscala) fiscalData.indicadorProducaoEscala = indicadorProducaoEscala
+        ncmCompatBody = ncm || undefined
+      }
 
       const body: any = {
         nome: nomeProduto,
@@ -821,10 +858,12 @@ function NovoProdutoContent({
         abreComplementos,
         permiteAcrescimo,
         permiteDesconto,
+        permiteAlterarPreco,
+        incideTaxa,
         gruposComplementosIds: grupoComplementosIds,
         impressorasIds,
         // Manter ncm no body para compatibilidade (backend ainda aceita)
-        ncm: ncm || undefined,
+        ncm: ncmCompatBody,
         ...(effectiveProdutoId ? { ativo } : {}),
       }
 
@@ -833,18 +872,20 @@ function NovoProdutoContent({
         body.fiscal = fiscalData
       }
 
-      const url = effectiveProdutoId && !effectiveIsCopyMode
-        ? `/api/produtos/${effectiveProdutoId}`
-        : '/api/produtos'
+      const url =
+        effectiveProdutoId && !effectiveIsCopyMode
+          ? `/api/produtos/${effectiveProdutoId}`
+          : '/api/produtos'
 
       const method = effectiveProdutoId && !effectiveIsCopyMode ? 'PATCH' : 'POST'
 
       const isEditMode = effectiveProdutoId && !effectiveIsCopyMode
-      
+
       // Se for edição e gruposComplementosIds estiver vazio, precisamos remover
       // os grupos individualmente usando DELETE, pois a API externa não processa array vazio
-      const shouldRemoveGruposIndividually = isEditMode && 
-        Array.isArray(grupoComplementosIds) && 
+      const shouldRemoveGruposIndividually =
+        isEditMode &&
+        Array.isArray(grupoComplementosIds) &&
         grupoComplementosIds.length === 0 &&
         originalGrupoComplementosIds.length > 0
 
@@ -873,7 +914,7 @@ function NovoProdutoContent({
       if (shouldRemoveGruposIndividually) {
         try {
           // Remover cada grupo individualmente usando DELETE
-          const deletePromises = originalGrupoComplementosIds.map((grupoId) =>
+          const deletePromises = originalGrupoComplementosIds.map(grupoId =>
             fetch(`/api/produtos/${effectiveProdutoId}/grupos-complementos/${grupoId}`, {
               method: 'DELETE',
               headers: {
@@ -883,11 +924,11 @@ function NovoProdutoContent({
           )
 
           const deleteResults = await Promise.allSettled(deletePromises)
-          
+
           // Verificar se alguma remoção falhou
           const failedDeletes = deleteResults.filter(
-            (result) => result.status === 'rejected' || 
-            (result.status === 'fulfilled' && !result.value.ok)
+            result =>
+              result.status === 'rejected' || (result.status === 'fulfilled' && !result.value.ok)
           )
 
           if (failedDeletes.length > 0) {
@@ -927,7 +968,11 @@ function NovoProdutoContent({
       )
       if (onSuccess) {
         // Passar dados do produto para atualização otimista do cache
-        onSuccess(isEditMode && produtoAtualizado ? { produtoId: effectiveProdutoId, produtoData: produtoAtualizado } : undefined)
+        onSuccess(
+          isEditMode && produtoAtualizado
+            ? { produtoId: effectiveProdutoId, produtoData: produtoAtualizado }
+            : undefined
+        )
       } else {
         setTimeout(() => {
           router.push('/produtos')
@@ -956,10 +1001,10 @@ function NovoProdutoContent({
   const canManageAtivo = Boolean(effectiveProdutoId)
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col">
       {/* Header fixo com título e botões */}
-      <div className="sticky top-0 z-10 bg-primary-bg/90 backdrop-blur-sm rounded-tl-lg shadow-md">
-        <div className="md:px-[30px] px-1 py-[4px]">
+      <div className="sticky top-0 z-10 rounded-tl-lg bg-primary-bg/90 shadow-md backdrop-blur-sm">
+        <div className="px-1 py-[4px] md:px-[30px]">
           <div className="rounded-lg border border-[#E0E4F3] bg-gradient-to-br from-[#F6F7FF] to-[#EEF1FB] px-6 py-3 shadow-[0_15px_45px_rgba(15,23,42,0.08)]">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-start gap-4">
@@ -967,13 +1012,13 @@ function NovoProdutoContent({
                   <MdImage className="text-2xl" />
                 </div>*/}
                 <div>
-                  <p className="text-sm font-semibold text-primary font-exo uppercase tracking-wide">
+                  <p className="font-exo text-sm font-semibold uppercase tracking-wide text-primary">
                     {getPageTitle()}
                   </p>
-                  <h2 className="md:text-xl text-lg font-semibold text-primary font-exo leading-tight">
+                  <h2 className="font-exo text-lg font-bold leading-tight text-primary md:text-xl">
                     {displayNome}
                   </h2>
-                  <p className="md:text-sm text-xs text-secondary-text font-nunito">
+                  <p className="font-nunito text-xs text-secondary-text md:text-sm">
                     {displayDescricao}
                   </p>
                 </div>
@@ -983,10 +1028,10 @@ function NovoProdutoContent({
                 {canToggleAtivo && (
                   <button
                     type="button"
-                    onClick={() => setAtivo((prev) => !prev)}
-                    className="flex h-8 items-center gap-1 rounded-lg border border-[#D4D8EB] bg-info md:px-3 px-1.5 py-1 shadow-sm hover:border-primary/40 transition-colors"
+                    onClick={() => setAtivo(prev => !prev)}
+                    className="flex h-8 items-center gap-1 rounded-lg border border-[#D4D8EB] bg-info px-1.5 py-1 shadow-sm transition-colors hover:border-primary/40 md:px-3"
                   >
-                    <span className="md:text-sm text-xs font-semibold text-secondary-text">
+                    <span className="text-xs font-semibold text-secondary-text md:text-sm">
                       Visível no PDV
                     </span>
                     <span
@@ -1004,7 +1049,7 @@ function NovoProdutoContent({
                 )}
                 <button
                   onClick={handleCancel}
-                  className="h-8 md:px-8 px-4 rounded-lg bg-white text-primary font-semibold font-exo md:text-sm text-xs border border-[#D7DBEC] shadow-sm hover:bg-[#f4f6ff] transition-colors"
+                  className="h-8 rounded-lg border border-[#D7DBEC] bg-white px-4 font-exo text-xs font-semibold text-primary shadow-sm transition-colors hover:bg-[#f4f6ff] md:px-8 md:text-sm"
                 >
                   Cancelar
                 </button>
@@ -1018,7 +1063,7 @@ function NovoProdutoContent({
       <div className="px-5 py-1">
         <div className="flex items-center justify-center gap-4">
           <div
-            className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-semibold font-exo transition-colors ${
+            className={`flex h-9 w-9 items-center justify-center rounded-full font-exo text-base font-bold transition-colors ${
               selectedPage >= 0 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-primary'
             }`}
           >
@@ -1030,7 +1075,7 @@ function NovoProdutoContent({
             }`}
           />
           <div
-            className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-semibold font-exo transition-colors ${
+            className={`flex h-9 w-9 items-center justify-center rounded-full font-exo text-base font-bold transition-colors ${
               selectedPage >= 1 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-[#1D3B53]'
             }`}
           >
@@ -1042,7 +1087,7 @@ function NovoProdutoContent({
             }`}
           />
           <div
-            className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-semibold font-exo transition-colors ${
+            className={`flex h-9 w-9 items-center justify-center rounded-full font-exo text-base font-bold transition-colors ${
               selectedPage >= 2 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-[#1D3B53]'
             }`}
           >
@@ -1052,7 +1097,7 @@ function NovoProdutoContent({
       </div>
 
       {/* Conteúdo das etapas */}
-      <div className="flex-1 overflow-y-auto md:px-5 px-1 pb-5">
+      <div className="flex-1 overflow-y-auto px-1 pb-5 md:px-5">
         {selectedPage === 0 ? (
           <InformacoesProdutoStep
             nomeProduto={nomeProduto}
@@ -1068,6 +1113,7 @@ function NovoProdutoContent({
             grupos={grupos}
             isLoadingGrupos={isLoadingGrupos}
             onNext={handleNext}
+            onSaveAndClose={() => void handleSave({ salvarSomenteDadosGerais: true })}
           />
         ) : selectedPage === 1 ? (
           <ConfiguracoesGeraisStep
@@ -1079,6 +1125,10 @@ function NovoProdutoContent({
             onPermiteAcrescimoChange={setPermiteAcrescimo}
             abreComplementos={abreComplementos}
             onAbreComplementosChange={setAbreComplementos}
+            permiteAlterarPreco={permiteAlterarPreco}
+            onPermiteAlterarPrecoChange={setPermiteAlterarPreco}
+            incideTaxa={incideTaxa}
+            onIncideTaxaChange={setIncideTaxa}
             grupoComplementosIds={grupoComplementosIds}
             onGrupoComplementosIdsChange={setGrupoComplementosIds}
             impressorasIds={impressorasIds}
@@ -1089,6 +1139,7 @@ function NovoProdutoContent({
             canManageAtivo={canManageAtivo}
             onBack={handleBack}
             onSave={handleNext}
+            onSaveAndClose={() => void handleSave({ salvarSomenteDadosGerais: true })}
             saveButtonText="Próximo"
           />
         ) : (
@@ -1134,7 +1185,9 @@ export function NovoProduto({
   onSuccess,
 }: NovoProdutoProps) {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center h-full">Carregando...</div>}>
+    <Suspense
+      fallback={<div className="flex h-full items-center justify-center">Carregando...</div>}
+    >
       <NovoProdutoContent
         produtoId={produtoId}
         isCopyMode={isCopyMode}
@@ -1146,4 +1199,3 @@ export function NovoProduto({
     </Suspense>
   )
 }
-

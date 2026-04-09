@@ -34,6 +34,8 @@ export class Produto {
     private readonly abreComplementos?: boolean,
     private readonly permiteAcrescimo?: boolean,
     private readonly permiteDesconto?: boolean,
+    private readonly permiteAlterarPreco?: boolean,
+    private readonly incideTaxa?: boolean,
     private readonly gruposComplementos?: ProdutoGrupoComplementoResumo[],
     private readonly impressoras?: ProdutoImpressoraResumo[]
   ) {}
@@ -51,6 +53,8 @@ export class Produto {
     abreComplementos?: boolean,
     permiteAcrescimo?: boolean,
     permiteDesconto?: boolean,
+    permiteAlterarPreco?: boolean,
+    incideTaxa?: boolean,
     gruposComplementos?: ProdutoGrupoComplementoResumo[],
     impressoras?: ProdutoImpressoraResumo[]
   ): Produto {
@@ -71,6 +75,8 @@ export class Produto {
       abreComplementos,
       permiteAcrescimo,
       permiteDesconto,
+      permiteAlterarPreco,
+      incideTaxa,
       gruposComplementos,
       impressoras
     )
@@ -100,6 +106,8 @@ export class Produto {
       data.abreComplementos === true || data.abreComplementos === 'true',
       data.permiteAcrescimo === true || data.permiteAcrescimo === 'true',
       data.permiteDesconto === true || data.permiteDesconto === 'true',
+      data.permiteAlterarPreco === true || data.permiteAlterarPreco === 'true',
+      data.incideTaxa === true || data.incideTaxa === 'true',
       Array.isArray(data.gruposComplementos)
         ? data.gruposComplementos.map((grupo: any) => ({
             id: grupo.id?.toString() || '',
@@ -172,6 +180,14 @@ export class Produto {
     return this.permiteDesconto === true
   }
 
+  permiteAlterarPrecoAtivo(): boolean {
+    return this.permiteAlterarPreco === true
+  }
+
+  incideTaxaAtivo(): boolean {
+    return this.incideTaxa === true
+  }
+
   getGruposComplementos(): ProdutoGrupoComplementoResumo[] {
     return this.gruposComplementos || []
   }
@@ -194,6 +210,8 @@ export class Produto {
       abreComplementos: this.abreComplementos,
       permiteAcrescimo: this.permiteAcrescimo,
       permiteDesconto: this.permiteDesconto,
+      permiteAlterarPreco: this.permiteAlterarPreco,
+      incideTaxa: this.incideTaxa,
       gruposComplementos: this.gruposComplementos,
       impressoras: this.impressoras,
     }

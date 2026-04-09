@@ -26,6 +26,8 @@ import {
   MdAddCircleOutline,
   MdRemoveCircleOutline,
   MdLaunch,
+  MdAttachMoney,
+  MdPercent,
 } from 'react-icons/md'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 
@@ -34,7 +36,13 @@ interface ProdutosListProps {
   onReload?: () => void
 }
 
-type ToggleField = 'favorito' | 'permiteAcrescimo' | 'permiteDesconto' | 'abreComplementos'
+type ToggleField =
+  | 'favorito'
+  | 'permiteAcrescimo'
+  | 'permiteDesconto'
+  | 'abreComplementos'
+  | 'permiteAlterarPreco'
+  | 'incideTaxa'
 const toggleFieldConfig: Record<
   ToggleField,
   { bodyKey: string; successTrue: string; successFalse: string }
@@ -59,6 +67,16 @@ const toggleFieldConfig: Record<
     successTrue: 'Complementos habilitados!',
     successFalse: 'Complementos desabilitados!',
   },
+  permiteAlterarPreco: {
+    bodyKey: 'permiteAlterarPreco',
+    successTrue: 'Alteração de preço no PDV habilitada!',
+    successFalse: 'Alteração de preço no PDV desabilitada!',
+  },
+  incideTaxa: {
+    bodyKey: 'incideTaxa',
+    successTrue: 'Incidência de taxa habilitada!',
+    successFalse: 'Incidência de taxa desabilitada!',
+  },
 }
 
 const buildToggleChange = (field: ToggleField, value: boolean) => {
@@ -71,6 +89,10 @@ const buildToggleChange = (field: ToggleField, value: boolean) => {
       return { permiteDesconto: value }
     case 'abreComplementos':
       return { abreComplementos: value }
+    case 'permiteAlterarPreco':
+      return { permiteAlterarPreco: value }
+    case 'incideTaxa':
+      return { incideTaxa: value }
     default:
       return {}
   }
@@ -85,6 +107,8 @@ const cloneProdutoWithChanges = (
     permiteAcrescimo?: boolean
     permiteDesconto?: boolean
     abreComplementos?: boolean
+    permiteAlterarPreco?: boolean
+    incideTaxa?: boolean
   }
 ) => {
   return Produto.create(
@@ -100,7 +124,10 @@ const cloneProdutoWithChanges = (
     changes.abreComplementos ?? produto.abreComplementosAtivo(),
     changes.permiteAcrescimo ?? produto.permiteAcrescimoAtivo(),
     changes.permiteDesconto ?? produto.permiteDescontoAtivo(),
-    produto.getGruposComplementos()
+    changes.permiteAlterarPreco ?? produto.permiteAlterarPrecoAtivo(),
+    changes.incideTaxa ?? produto.incideTaxaAtivo(),
+    produto.getGruposComplementos(),
+    produto.getImpressoras()
   )
 }
 
@@ -161,6 +188,8 @@ const ProdutoListItem = function ProdutoListItem({
       permiteAcrescimo: produto.permiteAcrescimoAtivo(),
       permiteDesconto: produto.permiteDescontoAtivo(),
       abreComplementos: produto.abreComplementosAtivo(),
+      permiteAlterarPreco: produto.permiteAlterarPrecoAtivo(),
+      incideTaxa: produto.incideTaxaAtivo(),
     }),
     [produto]
   )
@@ -253,6 +282,18 @@ const ProdutoListItem = function ProdutoListItem({
         Icon: MdLaunch,
         field: 'abreComplementos' as ToggleField,
       },
+      {
+        key: 'alterar-preco',
+        label: 'Permitir alterar preço no PDV',
+        Icon: MdAttachMoney,
+        field: 'permiteAlterarPreco' as ToggleField,
+      },
+      {
+        key: 'incide-taxa',
+        label: 'Incide taxa',
+        Icon: MdPercent,
+        field: 'incideTaxa' as ToggleField,
+      },
     ],
     []
   )
@@ -268,7 +309,7 @@ const ProdutoListItem = function ProdutoListItem({
   return (
     <div 
       onClick={handleRowClick}
-      className="bg-white border border-gray-100 hover:bg-secondary-text/10 rounded-2xl md:px-4 px-2 md:py-2 py-1 mb-2 shadow-sm shadow-primary-text/50 flex items-center gap-4 cursor-pointer"
+      className="bg-white border border-gray-200 hover:bg-secondary-text/10 md:px-4 px-2 md:py-2 py-1 flex items-center cursor-pointer"
     >
       {/*<div className="w-14 h-14 rounded-xl bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-2xl">
         <MdImage />
@@ -276,15 +317,15 @@ const ProdutoListItem = function ProdutoListItem({
 
       <div className="flex-1">
         <div className="flex items-center gap-3 flex-wrap">
-          <p className="text-primary-text font-semibold font-nunito md:text-base text-sm flex flex-col-reverse md:flex-row md:items-center items-start md:gap-2">
-            {produto.getNome()}
+          <p className="text-primary-text font-semibold md:text-base text-sm flex flex-col-reverse md:flex-row md:items-center items-start md:gap-2">
+            <span className="uppercase">{produto.getNome()}</span>
             <span className="text-sm text-secondary-text md:ml-2 inline-flex items-center gap-1">
               <span className="text-xs">Cód. </span>
               <span className="font-semibold">{produto.getCodigoProduto()}</span>
             </span>
           </p>
         </div>
-        {/* Mobile: 3 ícones na primeira linha, 4 na segunda */}
+        {/* Mobile: 3 ícones na primeira linha; segunda linha em grade 3 colunas (6 itens) */}
         <div
           className="mt-2 inline-grid grid-cols-3 gap-2 w-fit md:hidden"
         >
@@ -371,7 +412,7 @@ const ProdutoListItem = function ProdutoListItem({
           })}
         </div>
         <div
-          className="mt-2 inline-grid grid-cols-4 gap-2 w-fit md:hidden"
+          className="mt-2 inline-grid grid-cols-3 gap-2 w-fit md:hidden"
         >
           {secondRowActions.map(({ key, label, Icon, field, modal }) => {
             if (field) {
@@ -480,7 +521,7 @@ const ProdutoListItem = function ProdutoListItem({
                     e.stopPropagation()
                     onToggleBoolean?.(field, !isActive)
                   }}
-                  className={`w-5 h-5 rounded-full flex items-center justify-center text-sm transition-all ${bgColor} ${iconColor} ${
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-lg transition-all ${bgColor} ${iconColor} ${
                     isLoading
                       ? 'opacity-60 cursor-not-allowed'
                       : 'hover:bg-primary/80 hover:text-white  focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/80'
@@ -509,7 +550,7 @@ const ProdutoListItem = function ProdutoListItem({
                     e.stopPropagation()
                     handleModalClick?.()
                   }}
-                  className={`w-5 h-5 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                  className={`w-8 h-8 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                     !handleModalClick ? 'opacity-60 cursor-not-allowed' : 'hover:bg-primary/10'
                   }`}
                 >
@@ -528,7 +569,7 @@ const ProdutoListItem = function ProdutoListItem({
                     e.stopPropagation()
                     onCopyProduto?.(produto.getId())
                   }}
-                  className="w-5 h-5 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-sm hover:bg-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="w-8 h-8 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-lg hover:bg-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <Icon />
                 </button>
@@ -669,6 +710,8 @@ const ProdutoListItem = function ProdutoListItem({
         permiteAcrescimo?: boolean
         permiteDesconto?: boolean
         abreComplementos?: boolean
+        permiteAlterarPreco?: boolean
+        incideTaxa?: boolean
       }
     >
   >(new Map())
@@ -878,6 +921,8 @@ const ProdutoListItem = function ProdutoListItem({
         permiteAcrescimo?: boolean
         permiteDesconto?: boolean
         abreComplementos?: boolean
+        permiteAlterarPreco?: boolean
+        incideTaxa?: boolean
       }
     ) => {
       const current = pendingUpdatesRef.current.get(produtoId) || {}
@@ -895,6 +940,8 @@ const ProdutoListItem = function ProdutoListItem({
         | 'permiteAcrescimo'
         | 'permiteDesconto'
         | 'abreComplementos'
+        | 'permiteAlterarPreco'
+        | 'incideTaxa'
     ) => {
       const current = pendingUpdatesRef.current.get(produtoId)
       if (!current) return
@@ -1082,8 +1129,22 @@ const ProdutoListItem = function ProdutoListItem({
       const abreComplementosOk =
         pending.abreComplementos === undefined ||
         produto.abreComplementosAtivo() === pending.abreComplementos
+      const permiteAlterarPrecoOk =
+        pending.permiteAlterarPreco === undefined ||
+        produto.permiteAlterarPrecoAtivo() === pending.permiteAlterarPreco
+      const incideTaxaOk =
+        pending.incideTaxa === undefined || produto.incideTaxaAtivo() === pending.incideTaxa
 
-      if (valorOk && ativoOk && favoritoOk && acrescimoOk && descontoOk && abreComplementosOk) {
+      if (
+        valorOk &&
+        ativoOk &&
+        favoritoOk &&
+        acrescimoOk &&
+        descontoOk &&
+        abreComplementosOk &&
+        permiteAlterarPrecoOk &&
+        incideTaxaOk
+      ) {
         pendingUpdatesRef.current.delete(produto.getId())
       }
     })
@@ -1493,9 +1554,10 @@ const ProdutoListItem = function ProdutoListItem({
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
       <div className="md:px-[30px] px-1 flex-shrink-0">
-        <div className="flex flex-col gap-4">
-          <div className="flex items-start justify-between flex-wrap gap-4">
-            <div className="md:pl-5 mb-2">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-end justify-between flex-wrap gap-4">
+          
+            <div className="mb-1">
               <p className="text-primary text-sm font-semibold font-nunito">
                 Produtos Cadastrados
               </p>
@@ -1503,6 +1565,19 @@ const ProdutoListItem = function ProdutoListItem({
                 Total {localProdutos.length} de {totalProdutos}
               </p>
             </div>
+            <div className="flex flex-row max-w-[350px] mb-1 ml-6 gap-1 items-center">
+            <div className="relative h-8 w-full">
+              <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text" size={18} />
+              <input
+                id="produtos-search"
+                type="text"
+                placeholder="Pesquisar produto..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              />
+            </div>
+          </div>
             <div className="flex flex-col md:flex-row mb-2 items-center justify-end flex-1 md:gap-4 gap-1">
             <Link
               href="/produtos/atualizar-produtos-lote"
@@ -1529,22 +1604,7 @@ const ProdutoListItem = function ProdutoListItem({
       </div>
       <div className="h-[4px] border-t-2 border-primary/50 flex-shrink-0"></div>
       <div className="bg-white md:px-[20px] px-1 md:py-2 border-b border-gray-100 flex-shrink-0">
-          <div className="flex-1 min-w-[180px]">
-            <label htmlFor="produtos-search" className="text-xs font-semibold text-secondary-text mb-1 block">
-               Buscar produto...
-            </label>
-            <div className="relative h-8">
-              <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text" size={18} />
-              <input
-                id="produtos-search"
-                type="text"
-                placeholder="Pesquisar produto..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
-              />
-            </div>
-          </div>
+          
         {/* Toggle de filtros apenas no mobile */}
         <div className="flex w-full sm:hidden justify-end items-center mt-2">
           <button
@@ -1653,8 +1713,8 @@ const ProdutoListItem = function ProdutoListItem({
       {/* Lista de produtos com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto md:px-[30px] px-1 md:mt-4 mt-2 space-y-6 scrollbar-hide"
-        style={{ maxHeight: 'calc(100vh - 300px)' }}
+        className="flex-1 overflow-y-auto md:px-[30px] px-1 mt-2 space-y-6 scrollbar-hide"
+        style={{ maxHeight: 'calc(100vh - 230px)' }}
       >
         {/* Mostrar loading quando está carregando e não há produtos ainda */}
         {(isLoading || isFetching || isFetchingNextPage || (localProdutos.length === 0 && !data)) && (
@@ -1678,26 +1738,26 @@ const ProdutoListItem = function ProdutoListItem({
           const grupoId = primeiroProduto?.getGrupoId()
           const grupoVisual = grupoId ? grupoProdutoMap.get(grupoId) : undefined
           return (
-            <div key={grupo} className="space-y-3">
+            <div key={grupo} className="space-y-1">
               <div className="flex items-center justify-between gap-5">
                 <div className="flex items-center gap-3">
                   {grupoVisual ? (
                     <span
-                      className="w-9 h-9 rounded-[10px] border-2 flex items-center justify-center bg-white text-[var(--grupo-color)] transition-colors hover:bg-[var(--grupo-color)] hover:text-white"
+                      className="w-12 h-12 rounded-[10px] border-2 flex items-center justify-center bg-white text-[var(--grupo-color)] transition-colors hover:bg-[var(--grupo-color)] hover:text-white"
                       style={{
                         borderColor: grupoVisual.corHex,
                         ['--grupo-color' as any]: grupoVisual.corHex,
                       }}
                     >
-                      <DinamicIcon iconName={grupoVisual.iconName} color="currentColor" size={18} />
+                      <DinamicIcon iconName={grupoVisual.iconName} color="currentColor" size={22} />
                     </span>
                   ) : (
                     <span className="w-9 h-9 rounded-full bg-gray-200 border border-gray-300" />
                   )}
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-primary-text uppercase tracking-wide">
-                        {grupo}
+                      <p className="text-sm md:text-base font-semibold text-primary-text tracking-wide">
+                        <span className="uppercase">{grupo}</span>
                       </p>
                       <button
                         type="button"
@@ -1756,7 +1816,7 @@ const ProdutoListItem = function ProdutoListItem({
                   Produtos ocultos. Clique em "Exibir" para visualizar.
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="">
                   {items.map((produto) => (
                     <ProdutoListItem
                       key={produto.getId()}
