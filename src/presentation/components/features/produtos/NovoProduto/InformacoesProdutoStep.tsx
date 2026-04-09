@@ -17,6 +17,8 @@ interface InformacoesProdutoStepProps {
   grupos: any[]
   isLoadingGrupos: boolean
   onNext: () => void
+  /** Salva com dados preenchidos até aqui e encerra o fluxo (sem passos seguintes) */
+  onSaveAndClose: () => void
 }
 
 /**
@@ -37,6 +39,7 @@ export function InformacoesProdutoStep({
   grupos,
   isLoadingGrupos,
   onNext,
+  onSaveAndClose,
 }: InformacoesProdutoStepProps) {
   const formatCurrency = (value: string) => {
     // Remove tudo que não é número
@@ -76,17 +79,16 @@ export function InformacoesProdutoStep({
   }
 
   return (
-    <div className="rounded-[24px] border border-[#E5E7F2] bg-white md:p-4 p-1 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
+    <div className="rounded-[24px] border border-[#E5E7F2] bg-white p-1 shadow-[0_20px_45px_rgba(15,23,42,0.08)] md:p-4">
       {/* Título */}
-      <div className="flex flex-col gap-2 mb-1">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <h3 className="text-primary text-xl font-semibold font-exo">
-            Informações
-          </h3>
-          <div className="flex-1 h-[2px] bg-primary/50" />
+      <div className="mb-1 flex flex-col gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-exo text-xl font-semibold text-primary">Informações</h3>
+          <div className="h-[2px] flex-1 bg-primary/50" />
         </div>
-        <p className="text-sm text-secondary-text font-nunito">
-          Preencha os dados principais do produto. Essas informações serão usadas para identificação e exibição no PDV.
+        <p className="font-nunito text-sm text-secondary-text">
+          Preencha os dados principais do produto. Essas informações serão usadas para identificação
+          e exibição no PDV.
         </p>
       </div>
 
@@ -94,14 +96,14 @@ export function InformacoesProdutoStep({
       <div className="space-y-2">
         {/* Nome do Produto */}
         <div className="flex-1">
-          <label className="block text-sm font-semibold font-nunito mb-2 text-primary-text">
+          <label className="font-nunito mb-2 block text-sm font-semibold text-primary-text">
             Nome do Produto
           </label>
           <Input
             type="text"
             size="small"
             value={nomeProduto}
-            onChange={(e) => onNomeProdutoChange(e.target.value)}
+            onChange={e => onNomeProdutoChange(e.target.value)}
             placeholder="Digite o nome que aparecerá no PDV"
             className="w-full rounded-lg"
           />
@@ -111,13 +113,13 @@ export function InformacoesProdutoStep({
         <div className="grid gap-4 md:grid-cols-2">
           {/* Unidade */}
           <div className="flex-1">
-            <label className="block text-sm font-semibold font-nunito mb-2 text-primary-text">
+            <label className="font-nunito mb-2 block text-sm font-semibold text-primary-text">
               Unidade
             </label>
             <select
               value={unidadeProduto || ''}
-              onChange={(e) => onUnidadeProdutoChange(e.target.value || null)}
-              className="w-full h-14 md:px-4 px-1.5 rounded-lg border border-[#CBD0E3] bg-white text-primary-text focus:outline-none focus:border-primary-text hover:border-primary-text focus:border-2 font-nunito md:text-sm text-xs"
+              onChange={e => onUnidadeProdutoChange(e.target.value || null)}
+              className="font-nunito h-14 w-full rounded-lg border border-[#CBD0E3] bg-white px-1.5 text-xs text-primary-text hover:border-primary-text focus:border-2 focus:border-primary-text focus:outline-none md:px-4 md:text-sm"
             >
               <option value="">Escolha a unidade do Produto</option>
               <option value="UN">Unitário</option>
@@ -127,22 +129,22 @@ export function InformacoesProdutoStep({
           </div>
 
           {/* Grupo */}
-          <div className="flex-1 min-w-full">
-            <label className="block text-sm font-semibold font-nunito mb-2 text-primary-text">
+          <div className="min-w-full flex-1">
+            <label className="font-nunito mb-2 block text-sm font-semibold text-primary-text">
               Grupo
             </label>
             {isLoadingGrupos ? (
-              <div className="w-full h-12 flex items-center justify-center rounded-[14px] border border-dashed border-[#CBD0E3]">
-                <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <div className="flex h-12 w-full items-center justify-center rounded-[14px] border border-dashed border-[#CBD0E3]">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               </div>
             ) : (
               <select
                 value={grupoProduto || ''}
-                onChange={(e) => onGrupoProdutoChange(e.target.value || null)}
-                className="w-full h-14 md:px-4 px-1.5 rounded-lg border border-[#CBD0E3] bg-white text-primary-text focus:outline-none focus:border-primary-text hover:border-primary-text focus:border-2 font-nunito md:text-sm text-xs"
+                onChange={e => onGrupoProdutoChange(e.target.value || null)}
+                className="font-nunito h-14 w-full rounded-lg border border-[#CBD0E3] bg-white px-1.5 text-xs text-primary-text hover:border-primary-text focus:border-2 focus:border-primary-text focus:outline-none md:px-4 md:text-sm"
               >
                 <option value="">Selecione o grupo</option>
-                {grupos.map((grupo) => {
+                {grupos.map(grupo => {
                   const id = getGrupoId(grupo)
                   const nome = getGrupoNome(grupo)
                   const ativo = isGrupoAtivo(grupo)
@@ -166,13 +168,13 @@ export function InformacoesProdutoStep({
         <div className="grid gap-4 md:grid-cols-2">
           {/* Preço de Venda */}
           <div className="flex-1">
-            <label className="block text-sm font-semibold font-nunito mb-2 text-primary-text">
+            <label className="font-nunito mb-2 block text-sm font-semibold text-primary-text">
               Preço de Venda
             </label>
             <Input
               type="text"
               value={precoVenda}
-              onChange={(e) => handlePrecoChange(e.target.value)}
+              onChange={e => handlePrecoChange(e.target.value)}
               placeholder="Digite o preço de venda do Produto"
               className="w-full"
             />
@@ -180,34 +182,47 @@ export function InformacoesProdutoStep({
 
           {/* Descrição */}
           <div className="flex-1">
-            <label className="block text-sm font-semibold font-nunito mb-2 text-primary-text">
+            <label className="font-nunito mb-2 block text-sm font-semibold text-primary-text">
               Descrição
             </label>
             <textarea
               value={descricaoProduto}
-              onChange={(e) => onDescricaoProdutoChange(e.target.value)}
+              onChange={e => onDescricaoProdutoChange(e.target.value)}
               placeholder="Descreva o Produto"
               rows={4}
-              className="w-full px-4 py-3 rounded-[14px] border border-[#CBD0E3] bg-white text-primary-text focus:outline-none hover:border-primary-text focus:border-primary-text focus:border-2 font-nunito text-sm resize-none"
+              className="font-nunito w-full resize-none rounded-[14px] border border-[#CBD0E3] bg-white px-4 py-3 text-sm text-primary-text hover:border-primary-text focus:border-2 focus:border-primary-text focus:outline-none"
             />
           </div>
         </div>
       </div>
 
-      {/* Botão Próximo */}
-      <div className="flex justify-end pt-6 border-t border-dashed border-[#E4E7F4] mt-4">
-        <Button
-          onClick={onNext}
-          className="h-8 px-10 rounded-lg text-white font-semibold font-exo text-sm hover:bg-primary/90"
-          sx={{
-            backgroundColor: 'var(--color-primary)',
-            
-          }}
-        >
-          Próximo
-        </Button>
+      {/* Salvar e fechar + Próximo */}
+      <div className="mt-4 flex flex-col gap-3 border-t border-dashed border-[#E4E7F4] pt-6 sm:flex-row sm:items-center sm:justify-end">
+        <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-end">
+          <Button
+            type="button"
+            onClick={onSaveAndClose}
+            className="h-8 rounded-lg border-2 px-6 font-exo text-sm font-semibold hover:bg-primary/10 sm:px-8"
+            sx={{
+              backgroundColor: 'var(--color-info)',
+              color: 'var(--color-primary)',
+              borderColor: 'var(--color-primary)',
+              border: '1px solid',
+            }}
+          >
+            Salvar e fechar
+          </Button>
+          <Button
+            onClick={onNext}
+            className="h-8 rounded-lg px-10 font-exo text-sm font-semibold text-white hover:bg-primary/90"
+            sx={{
+              backgroundColor: 'var(--color-primary)',
+            }}
+          >
+            Próximo
+          </Button>
+        </div>
       </div>
     </div>
   )
 }
-

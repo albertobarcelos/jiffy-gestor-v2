@@ -167,6 +167,7 @@ export function TopNav() {
       path: '#',
       icon: MdPointOfSale,
       children: [
+        { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: MdReceipt },
         {
           name: 'Mesas Abertas',
           path: '/vendas/abertas',
@@ -184,10 +185,10 @@ export function TopNav() {
             />
           ),
         },
-        { name: 'Hist. Fechamentos', path: '/historico-fechamento', icon: MdHistory },
         { name: 'Relatórios', path: '/relatorios', icon: MdAssessment },
+        { name: 'Hist. Fechamentos', path: '/historico-fechamento', icon: MdHistory },
         { name: 'Meios de Pagamentos', path: '/cadastros/meios-pagamentos', icon: MdPayment },
-        { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: MdReceipt },
+        
       ],
     },
     { name: 'Painel do Contador', path: '/painel-contador', icon: MdAccountBalance },
