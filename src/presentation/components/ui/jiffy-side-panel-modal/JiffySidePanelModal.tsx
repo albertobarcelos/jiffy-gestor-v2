@@ -362,7 +362,7 @@ export function JiffySidePanelModal({
             <div className="min-w-0 flex-1 pr-2">
               <h2
                 id="jiffy-side-panel-title"
-                className="font-['Exo',sans-serif] text-lg font-semibold uppercase tracking-wide text-primary-text md:text-xl"
+                className="text-lg font-semibold tracking-wide text-primary-text md:text-2xl"
               >
                 {title}
               </h2>
@@ -403,7 +403,7 @@ export function JiffySidePanelModal({
               className={
                 footerVariant === 'bar'
                   ? 'shrink-0 border-t border-gray-200 bg-white'
-                  : 'shrink-0 border-t border-gray-200 bg-[#fafafa] px-4 py-3 md:px-6'
+                  : 'shrink-0 border-t border-gray-200 bg-[#fafafa] h-14'
               }
             >
               {footerSlot ? (

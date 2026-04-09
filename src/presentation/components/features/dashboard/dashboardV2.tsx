@@ -9,6 +9,10 @@ import {
   primeiroMesQuadroDuploCalendario,
   periodoFetchFaturamentoCalendarioDoisMeses,
 } from '@/src/shared/utils/calendarioIntervaloFaturamento'
+import {
+  combinarIntervaloCalendarParaDatas,
+  formatarDataHoraIntervaloCurta,
+} from '@/src/shared/utils/intervaloCalendarioComHoras'
 import type { DateRange } from 'react-day-picker'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
@@ -44,6 +48,7 @@ import {
   CalendarDays,
   ChevronDown,
   ChevronRight,
+  FilterX,
   RefreshCw,
   DollarSign,
   CreditCard,
@@ -60,7 +65,7 @@ import {
   SelectValue,
 } from '@/src/presentation/components/ui/select'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
-import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
+import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { FaturamentoRangeCalendar } from '@/src/presentation/components/ui/FaturamentoRangeCalendar'
 import { MdOutlineMonetizationOn, MdReceiptLong, MdRestaurantMenu, MdAdd } from 'react-icons/md'
 import { TbReceiptFilled } from 'react-icons/tb'
@@ -145,56 +150,6 @@ function formatarMoeda(n: number) {
 function formatarHoraParaInputCalendar(d: Date | null | undefined): string {
   if (!d) return '00:00'
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-
-/**
- * Junta intervalo do calendário + horas (equivalente ao fluxo do antigo DateTimeRangePicker).
- */
-function combinarIntervaloCalendarParaDatas(
-  range: DateRange | undefined,
-  horaInicio: string,
-  horaFim: string
-): { dataInicial: Date | null; dataFinal: Date | null } {
-  if (!range?.from || !range?.to) return { dataInicial: null, dataFinal: null }
-  const parseTime = (s: string): { hours: number; minutes: number } | null => {
-    if (!s || !s.trim()) return null
-    const [hRaw, mRaw] = s.split(':')
-    const hours = Number(hRaw)
-    const minutes = Number(mRaw)
-    if (Number.isNaN(hours) || Number.isNaN(minutes)) return null
-    return { hours, minutes }
-  }
-  const dataInicial = new Date(
-    range.from.getFullYear(),
-    range.from.getMonth(),
-    range.from.getDate(),
-    0,
-    0,
-    0,
-    0
-  )
-  const dataFinal = new Date(
-    range.to.getFullYear(),
-    range.to.getMonth(),
-    range.to.getDate(),
-    0,
-    0,
-    0,
-    0
-  )
-  const hi = parseTime(horaInicio)
-  const hf = parseTime(horaFim)
-  if (hi) {
-    dataInicial.setHours(hi.hours, hi.minutes, 0, 0)
-  } else {
-    dataInicial.setHours(0, 0, 0, 0)
-  }
-  if (hf) {
-    dataFinal.setHours(hf.hours, hf.minutes, 0, 0)
-  } else {
-    dataFinal.setHours(23, 59, 59, 999)
-  }
-  return { dataInicial, dataFinal }
 }
 
 /** Rótulos do eixo Y do comparativo (compacto em k acima de 1000). */
@@ -328,17 +283,6 @@ function labelDataHoje() {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
-  })
-}
-
-/** Resumo curto de data/hora para o item “Por datas” no select. */
-function formatarDataHoraIntervaloCurta(date: Date): string {
-  return date.toLocaleString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
   })
 }
 
@@ -1302,6 +1246,20 @@ export default function DashboardV2() {
     })
   }
 
+  /** Restaura o filtro global de período para Hoje (como ao carregar a página). */
+  const handleLimparFiltroPeriodo = useCallback(() => {
+    const hoje = startOfDay(new Date())
+    setPeriodoData('hoje')
+    setPeriodoPersonalizadoInicio(null)
+    setPeriodoPersonalizadoFim(null)
+    setModalIntervaloPersonalizadoAberto(false)
+    setRascunhoIntervaloRange({ from: hoje, to: hoje })
+    setMesCalendarioIntervalo(primeiroMesQuadroDuploCalendario(hoje))
+    setRascunhoHoraInicio('00:00')
+    setRascunhoHoraFim('23:59')
+    setGranularidade('intervalo_30')
+  }, [])
+
   const copyComparacao = textosComparacaoPeriodoAnterior(periodoData)
 
   const irParaRelatoriosVendas = () => {
@@ -1393,36 +1351,39 @@ export default function DashboardV2() {
             {subtituloAtualizacao}
           </p>
         </div>
-        <MuiTooltip
-          title="Atualizar dados"
-          placement="bottom"
-          slotProps={{
-            tooltip: {
-              sx: {
-                bgcolor: '#ffffff',
-                color: '#111827',
-                border: '1px solid #e5e7eb',
-                boxShadow: 2,
-                fontSize: '0.8125rem',
+        <span className="ml-2 mr-8 inline-flex shrink-0 items-center gap-1">
+          
+          <MuiTooltip
+            title="Atualizar dados"
+            placement="bottom"
+            slotProps={{
+              tooltip: {
+                sx: {
+                  bgcolor: '#ffffff',
+                  color: '#111827',
+                  border: '1px solid #e5e7eb',
+                  boxShadow: 2,
+                  fontSize: '0.8125rem',
+                },
               },
-            },
-          }}
-        >
-          <span className="ml-2 mr-8 inline-flex shrink-0">
-            <button
-              type="button"
-              onClick={handleAtualizarDashboard}
-              disabled={carregandoEmpresa}
-              className="inline-flex h-[22px] w-[22px] items-center justify-center text-primary shadow-sm transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
-              aria-label="Atualizar dados do dashboard"
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${carregandoEmpresa ? 'animate-spin' : ''}`}
-                aria-hidden
-              />
-            </button>
-          </span>
-        </MuiTooltip>
+            }}
+          >
+            <span>
+              <button
+                type="button"
+                onClick={handleAtualizarDashboard}
+                disabled={carregandoEmpresa}
+                className="inline-flex h-[22px] w-[22px] items-center justify-center text-primary shadow-sm transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Atualizar dados do dashboard"
+              >
+                <RefreshCw
+                  className={`h-4 w-4 ${carregandoEmpresa ? 'animate-spin' : ''}`}
+                  aria-hidden
+                />
+              </button>
+            </span>
+          </MuiTooltip>
+        </span>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="flex min-w-0 items-center gap-2">
             <span className="inline-flex h-2 w-2 rounded-full bg-secondary" aria-hidden />
@@ -1480,7 +1441,7 @@ export default function DashboardV2() {
             <Select value={periodoData} onValueChange={handlePeriodoDataChange}>
               <SelectTrigger
                 id="dashboard-periodo-data"
-                className="h-auto min-h-[42px] w-full rounded-lg bg-primary/5 py-2 pl-10 pr-3 text-sm font-medium text-primary shadow-none ring-offset-0 focus:outline-none focus:ring-2 focus:ring-primary/35 focus:ring-offset-0 data-[state=open]:border-primary [&>svg]:text-primary"
+                className="h-auto min-h-[42px] w-full items-start rounded-lg bg-primary/5 py-2 pl-10 pr-3 text-left text-sm font-medium text-primary shadow-none ring-offset-0 focus:outline-none focus:ring-2 focus:ring-primary/35 focus:ring-offset-0 data-[state=open]:border-primary [&>span]:line-clamp-none [&>span]:min-w-0 [&>span]:whitespace-normal [&>svg]:text-primary"
               >
                 <SelectValue placeholder="Período" />
               </SelectTrigger>
@@ -1516,13 +1477,51 @@ export default function DashboardV2() {
                   value="personalizado"
                   className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:rounded-lg data-[state=checked]:rounded-lg data-[highlighted]:!bg-primary data-[state=checked]:bg-primary/10 data-[highlighted]:!text-white data-[state=checked]:text-primary"
                 >
-                  {periodoPersonalizadoInicio && periodoPersonalizadoFim
-                    ? `Por datas (${formatarDataHoraIntervaloCurta(periodoPersonalizadoInicio)} — ${formatarDataHoraIntervaloCurta(periodoPersonalizadoFim)})`
-                    : 'Por datas…'}
+                  {periodoPersonalizadoInicio && periodoPersonalizadoFim ? (
+                    <span className="inline-flex min-w-0 flex-wrap items-baseline gap-x-1">
+                      <span className="text-sm font-semibold">Por datas</span>
+                      <span className="break-words text-[10px] font-normal opacity-90">
+                        · {formatarDataHoraIntervaloCurta(periodoPersonalizadoInicio)} —{' '}
+                        {formatarDataHoraIntervaloCurta(periodoPersonalizadoFim)}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex flex-wrap items-baseline gap-x-1">
+                      <span className="text-sm font-semibold">Por datas</span>
+                      <span className="text-[10px] font-normal opacity-90">…</span>
+                    </span>
+                  )}
                 </SelectItem>
               </SelectContent>
             </Select>
           </div>
+          <MuiTooltip
+            title="Limpar filtro e voltar para Hoje"
+            placement="bottom"
+            slotProps={{
+              tooltip: {
+                sx: {
+                  bgcolor: '#ffffff',
+                  color: '#111827',
+                  border: '1px solid #e5e7eb',
+                  boxShadow: 2,
+                  fontSize: '0.8125rem',
+                },
+              },
+            }}
+          >
+            <span>
+              <button
+                type="button"
+                onClick={handleLimparFiltroPeriodo}
+                disabled={periodoData === 'hoje'}
+                className="inline-flex h-[22px] w-[22px] items-center justify-center text-primary shadow-sm transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="Limpar filtro de período e usar Hoje"
+              >
+                <FilterX className="h-4 w-4" aria-hidden />
+              </button>
+            </span>
+          </MuiTooltip>
         </div>
       </div>
 
@@ -2157,68 +2156,42 @@ export default function DashboardV2() {
         </section>
       </div>
 
-      <Dialog
+      <JiffySidePanelModal
         open={modalIntervaloPersonalizadoAberto}
-        onOpenChange={isOpen => {
-          if (!isOpen) setModalIntervaloPersonalizadoAberto(false)
-        }}
-        fullWidth={false}
-        maxWidth={false}
-        PaperProps={{
-          sx: {
-            borderRadius: '12px',
-            maxWidth: 'min(960px, calc(100vw - 24px))',
-            width: 'fit-content',
-            margin: '16px',
-            overflow: 'hidden',
-            background: 'linear-gradient(135deg, #530CA3 0%, #451090 100%)',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
-          },
-        }}
+        onClose={() => setModalIntervaloPersonalizadoAberto(false)}
+        title="Escolha o período"
+        panelClassName="!bg-[#f9fafb] w-[45vw] min-w-[260px] max-w-[min(100vw-1rem,95vw)] sm:min-w-[280px]"
+        scrollableBody={false}
+        footerSlot={
+          <button
+            type="button"
+            disabled={!rascunhoIntervaloRange?.from || !rascunhoIntervaloRange?.to}
+            onClick={handleAplicarIntervaloPersonalizadoModal}
+            className="flex h-full w-full items-center justify-center rounded-b-l-lg bg-primary font-nunito text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Aplicar
+          </button>
+        }
       >
-        <DialogContent sx={{ p: 0, overflow: 'hidden' }}>
-          <div className="flex w-fit max-w-[min(960px,calc(100vw-24px))] flex-col bg-transparent">
-            <div className="flex items-center justify-between border-b border-white/15 px-4 py-3">
-              <h2 className="text-lg font-semibold text-white">Escolha o período</h2>
-              <button
-                type="button"
-                onClick={() => setModalIntervaloPersonalizadoAberto(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15"
-                aria-label="Fechar"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="flex justify-center overflow-x-auto px-3 pb-2 pt-3">
-              <FaturamentoRangeCalendar
-                embutidoNoModal
-                range={rascunhoIntervaloRange}
-                onRangeChange={handleRascunhoIntervaloRangeChange}
-                month={mesCalendarioIntervalo}
-                onMonthChange={setMesCalendarioIntervalo}
-                faturamentoPorDia={faturamentoPorDiaCalendario ?? {}}
-                faturamentoCarregando={faturamentoCalendarioPending || faturamentoCalendarioFetching}
-                horaInicio={rascunhoHoraInicio}
-                horaFim={rascunhoHoraFim}
-                onHorariosChange={(hi, hf) => {
-                  setRascunhoHoraInicio(hi)
-                  setRascunhoHoraFim(hf)
-                }}
-              />
-            </div>
-            <div className="border-t border-white/15 bg-[#F5F3FF] px-4 py-3">
-              <button
-                type="button"
-                disabled={!rascunhoIntervaloRange?.from || !rascunhoIntervaloRange?.to}
-                onClick={handleAplicarIntervaloPersonalizadoModal}
-                className="flex h-10 w-full items-center justify-center rounded-lg bg-secondary font-nunito text-sm text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Aplicar
-              </button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+        <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center overflow-x-auto overflow-y-auto py-2">
+          <FaturamentoRangeCalendar
+            embutidoNoModal
+            embutidoFundoClaro
+            range={rascunhoIntervaloRange}
+            onRangeChange={handleRascunhoIntervaloRangeChange}
+            month={mesCalendarioIntervalo}
+            onMonthChange={setMesCalendarioIntervalo}
+            faturamentoPorDia={faturamentoPorDiaCalendario ?? {}}
+            faturamentoCarregando={faturamentoCalendarioPending || faturamentoCalendarioFetching}
+            horaInicio={rascunhoHoraInicio}
+            horaFim={rascunhoHoraFim}
+            onHorariosChange={(hi, hf) => {
+              setRascunhoHoraInicio(hi)
+              setRascunhoHoraFim(hf)
+            }}
+          />
+        </div>
+      </JiffySidePanelModal>
     </div>
   )
 }
