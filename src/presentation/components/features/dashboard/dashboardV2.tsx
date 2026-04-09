@@ -5,6 +5,10 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { startOfDay } from 'date-fns'
+import {
+  primeiroMesQuadroDuploCalendario,
+  periodoFetchFaturamentoCalendarioDoisMeses,
+} from '@/src/shared/utils/calendarioIntervaloFaturamento'
 import type { DateRange } from 'react-day-picker'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
@@ -13,6 +17,7 @@ import { useDashboardEvolucaoQuery } from '@/src/presentation/hooks/useDashboard
 import { useDashboardMetodosPagamentoDetalhadoQuery } from '@/src/presentation/hooks/useDashboardMetodosPagamentoDetalhadoQuery'
 import { useDashboardTopProdutosQuery } from '@/src/presentation/hooks/useDashboardTopProdutosQuery'
 import { useDashboardTopGarconsQuery } from '@/src/presentation/hooks/useDashboardTopGarconsQuery'
+import { useDashboardFaturamentoPorDiaQuery } from '@/src/presentation/hooks/useDashboardFaturamentoPorDiaQuery'
 import {
   mergePontosEvolucaoComparacao,
   type MetricaEvolucaoComparativo,
@@ -719,8 +724,27 @@ export default function DashboardV2() {
   const [modalIntervaloPersonalizadoAberto, setModalIntervaloPersonalizadoAberto] = useState(false)
   /** Rascunho do modal de intervalo (calendário + horas) antes de aplicar. */
   const [rascunhoIntervaloRange, setRascunhoIntervaloRange] = useState<DateRange | undefined>(undefined)
+  /** Primeiro mês visível no DayPicker (painel esquerdo), alinhado ao fetch de faturamento por dia. */
+  const [mesCalendarioIntervalo, setMesCalendarioIntervalo] = useState(() =>
+    primeiroMesQuadroDuploCalendario(startOfDay(new Date()))
+  )
   const [rascunhoHoraInicio, setRascunhoHoraInicio] = useState('00:00')
   const [rascunhoHoraFim, setRascunhoHoraFim] = useState('23:59')
+
+  const periodoFaturamentoCalendarioModal = useMemo(
+    () => periodoFetchFaturamentoCalendarioDoisMeses(mesCalendarioIntervalo),
+    [mesCalendarioIntervalo]
+  )
+
+  const {
+    data: faturamentoPorDiaCalendario,
+    isPending: faturamentoCalendarioPending,
+    isFetching: faturamentoCalendarioFetching,
+  } = useDashboardFaturamentoPorDiaQuery({
+    periodoInicial: periodoFaturamentoCalendarioModal.inicio,
+    periodoFinal: periodoFaturamentoCalendarioModal.fim,
+    enabled: modalIntervaloPersonalizadoAberto,
+  })
 
   const corComparativoLinhaAtual =
     metricaGraficoComparativo === 'CANCELADA' ? LINHA_CANCEL_ATUAL : LINHA_PERIODO_ATUAL
@@ -1292,16 +1316,19 @@ export default function DashboardV2() {
   const handlePeriodoDataChange = useCallback((v: string) => {
     if (v === 'personalizado') {
       if (periodoPersonalizadoInicio && periodoPersonalizadoFim) {
+        const fim = startOfDay(periodoPersonalizadoFim)
         setRascunhoIntervaloRange({
           from: startOfDay(periodoPersonalizadoInicio),
-          to: startOfDay(periodoPersonalizadoFim),
+          to: fim,
         })
+        setMesCalendarioIntervalo(primeiroMesQuadroDuploCalendario(fim))
         setRascunhoHoraInicio(formatarHoraParaInputCalendar(periodoPersonalizadoInicio))
         setRascunhoHoraFim(formatarHoraParaInputCalendar(periodoPersonalizadoFim))
       } else {
         /* Sem período salvo: intervalo de um único dia = hoje; calendário com mês anterior à esquerda e mês atual à direita. */
         const hoje = startOfDay(new Date())
         setRascunhoIntervaloRange({ from: hoje, to: hoje })
+        setMesCalendarioIntervalo(primeiroMesQuadroDuploCalendario(hoje))
         setRascunhoHoraInicio('00:00')
         setRascunhoHoraFim('23:59')
       }
@@ -2167,6 +2194,10 @@ export default function DashboardV2() {
                 embutidoNoModal
                 range={rascunhoIntervaloRange}
                 onRangeChange={handleRascunhoIntervaloRangeChange}
+                month={mesCalendarioIntervalo}
+                onMonthChange={setMesCalendarioIntervalo}
+                faturamentoPorDia={faturamentoPorDiaCalendario ?? {}}
+                faturamentoCarregando={faturamentoCalendarioPending || faturamentoCalendarioFetching}
                 horaInicio={rascunhoHoraInicio}
                 horaFim={rascunhoHoraFim}
                 onHorariosChange={(hi, hf) => {

@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import type { ComponentProps } from 'react'
-import { startOfDay, startOfMonth, subMonths } from 'date-fns'
+import { startOfDay, startOfMonth } from 'date-fns'
 import { Clock } from 'lucide-react'
 import { DayButton, type DateRange } from 'react-day-picker'
 import { ptBR } from 'react-day-picker/locale'
@@ -11,25 +11,7 @@ import { cn } from '@/src/shared/utils/cn'
 import { colors } from '@/src/shared/theme/colors'
 
 import { Calendar } from '@/src/presentation/components/ui/calendar'
-
-/**
- * Primeiro mês exibido no modo 2 colunas: mês anterior ao da data de referência,
- * para que à esquerda fique o mês anterior e à direita o mês da referência (ex.: hoje).
- */
-function primeiroMesQuadroDuploMesAnteriorEDireitaAtual(dataRef: Date): Date {
-  return startOfMonth(subMonths(dataRef, 1))
-}
-
-/** Valor mock determinístico por ISO yyyy-MM-dd (substituível por API depois). */
-function mockValorFaturadoPorDia(isoDate: string): number {
-  let h = 2_166_136_261
-  for (let i = 0; i < isoDate.length; i++) {
-    h ^= isoDate.charCodeAt(i)
-    h = Math.imul(h, 16_777_619)
-  }
-  const centavos = Math.abs(h) % 400_000
-  return centavos / 100
-}
+import { primeiroMesQuadroDuploCalendario } from '@/src/shared/utils/calendarioIntervaloFaturamento'
 
 /** Valor na célula sem símbolo R$ (só número formatado pt-BR). */
 const formatarNumeroValorCelula = (valor: number) =>
@@ -44,7 +26,7 @@ type FaturamentoDayButtonProps = DayButtonProps & {
 }
 
 /**
- * Botão do dia com número + linha de faturamento (mock ou mapa futuro).
+ * Botão do dia com número + linha de faturamento.
  */
 function FaturamentoDayButton({ day, modifiers, className, children, resolverValor, ...rest }: FaturamentoDayButtonProps) {
   const ref = React.useRef<HTMLButtonElement>(null)
@@ -92,11 +74,13 @@ export type FaturamentoRangeCalendarProps = {
   horaInicio?: string
   horaFim?: string
   onHorariosChange?: (horaInicio: string, horaFim: string) => void
-  /**
-   * Mapa ISO yyyy-MM-dd → valor faturado.
-   * Quando ausente ou sem chave, usa {@link mockValorFaturadoPorDia}.
-   */
+  /** Mapa ISO yyyy-MM-dd → faturamento (vendas finalizadas). Ausente enquanto carrega. */
   faturamentoPorDia?: Record<string, number>
+  /** Enquanto true, não exibe o valor na célula (evita número errado durante o fetch). */
+  faturamentoCarregando?: boolean
+  /** Mês do primeiro painel (esquerda), controlado pelo pai para alinhar fetch aos dois meses visíveis. */
+  month?: Date
+  onMonthChange?: (month: Date) => void
   /**
    * Quando true, remove o cartão roxo externo (uso dentro de modal já roxo).
    */
@@ -105,7 +89,6 @@ export type FaturamentoRangeCalendarProps = {
 
 /**
  * Calendário de intervalo (dois meses), valor por célula e rodapé com hora início/fim.
- * Visual alinhado aos modelos shadcn discutidos; dados de faturamento ainda mock.
  */
 export function FaturamentoRangeCalendar({
   className,
@@ -118,6 +101,9 @@ export function FaturamentoRangeCalendar({
   horaFim: horaFimControlled,
   onHorariosChange,
   faturamentoPorDia,
+  faturamentoCarregando = false,
+  month: monthControlled,
+  onMonthChange,
   embutidoNoModal = false,
 }: FaturamentoRangeCalendarProps) {
   const [rangeUncontrolled, setRangeUncontrolled] = React.useState<DateRange | undefined>(() => {
@@ -144,11 +130,11 @@ export function FaturamentoRangeCalendar({
   const resolverValor = React.useCallback(
     (isoDate: string, foraDoMes: boolean): number | null => {
       if (foraDoMes) return null
-      const mapa = faturamentoPorDia
-      if (mapa && mapa[isoDate] !== undefined) return mapa[isoDate]
-      return mockValorFaturadoPorDia(isoDate)
+      if (faturamentoCarregando) return null
+      if (faturamentoPorDia === undefined) return null
+      return faturamentoPorDia[isoDate] ?? 0
     },
-    [faturamentoPorDia]
+    [faturamentoCarregando, faturamentoPorDia]
   )
 
   const dayButtonRenderer = React.useCallback(
@@ -158,7 +144,22 @@ export function FaturamentoRangeCalendar({
 
   /** Referência para qual mês fica à direita: fim do intervalo ou início (período só retroativo). */
   const dataRefQuadro = range?.to ?? range?.from ?? new Date()
-  const defaultMonthDuplo = primeiroMesQuadroDuploMesAnteriorEDireitaAtual(dataRefQuadro)
+  const defaultMonthDuplo = primeiroMesQuadroDuploCalendario(dataRefQuadro)
+
+  const isMonthControlled = monthControlled !== undefined
+  const [monthLocal, setMonthLocal] = React.useState(defaultMonthDuplo)
+  React.useEffect(() => {
+    if (!isMonthControlled) setMonthLocal(defaultMonthDuplo)
+  }, [defaultMonthDuplo, isMonthControlled])
+
+  const monthPicker = isMonthControlled ? monthControlled : monthLocal
+  const handleMonthChange = React.useCallback(
+    (next: Date) => {
+      if (!isMonthControlled) setMonthLocal(next)
+      onMonthChange?.(next)
+    },
+    [isMonthControlled, onMonthChange]
+  )
 
   /** Só permite escolher até o dia de hoje (nada no futuro). */
   const desabilitarDiasFuturos = React.useCallback((date: Date) => {
@@ -244,7 +245,8 @@ export function FaturamentoRangeCalendar({
         mode="range"
         locale={ptBR}
         numberOfMonths={2}
-        defaultMonth={defaultMonthDuplo}
+        month={monthPicker}
+        onMonthChange={handleMonthChange}
         endMonth={limiteMesNavegacao}
         disabled={desabilitarDiasFuturos}
         selected={range}
