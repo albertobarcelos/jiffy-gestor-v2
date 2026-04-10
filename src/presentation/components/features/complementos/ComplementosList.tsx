@@ -571,7 +571,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         <div className="flex flex-row items-center justify-between">
           <div className="flex flex-col md:pl-5">
             <p className="text-primary text-sm font-semibold">Complementos Cadastrados</p>
-            <p className="text-tertiary md:text-[22px] text-sm font-medium">
+            <p className="text-tertiary md:text-[22px] text-sm font-normal">
               Total {complementos.length} de {totalComplementos}
             </p>
           </div>
@@ -595,12 +595,6 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
 
       <div className="flex flex-shrink-0 gap-3 md:px-[20px] px-2 py-2">
         <div className="max-w-[360px] min-w-[180px] flex-1">
-          <label
-            htmlFor="complementos-search"
-            className="text-secondary-text mb-1 block text-xs font-semibold"
-          >
-            Buscar complemento...
-          </label>
           <div className="relative h-8">
             <MdSearch
               className="text-secondary-text absolute left-4 top-1/2 -translate-y-1/2"
@@ -617,7 +611,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
           </div>
         </div>
 
-        <div className="w-full sm:w-[160px]">
+        <div className="w-full flex gap-1 items-center sm:w-[160px]">
           <label className="text-secondary-text mb-1 block text-xs font-semibold">Status</label>
           <select
             value={filterStatus}
