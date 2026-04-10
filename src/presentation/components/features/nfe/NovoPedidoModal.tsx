@@ -1,6 +1,19 @@
 'use client'
 
-import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
+import {
+  useState,
+  useMemo,
+  useRef,
+  useCallback,
+  useEffect,
+  forwardRef,
+  type ReactElement,
+  type Ref,
+} from 'react'
+import Box from '@mui/material/Box'
+import Slide from '@mui/material/Slide'
+import type { BackdropProps } from '@mui/material/Backdrop'
+import type { TransitionProps } from '@mui/material/transitions'
 import {
   Dialog,
   DialogContent,
@@ -74,6 +87,8 @@ interface NovoPedidoModalProps {
   open: boolean
   onClose: () => void
   onSuccess: () => void
+  /** Chamado após o painel terminar a transição de saída (permite desmontar o pai sem cortar o slide) */
+  onAfterClose?: () => void
   // Props opcionais para visualizar venda existente
   vendaId?: string // ID da venda para carregar e visualizar
   modoVisualizacao?: boolean // Se true, abre direto na step 4 em modo apenas visualização
@@ -145,6 +160,90 @@ interface PagamentoSelecionado {
   codigoAutorizacao?: string
   tipoIntegracao?: string
   bandeiraCartao?: string
+}
+
+/**
+ * Mesma regra de DetalhesVendas: cancelado pela flag ou por dataCancelamento preenchida.
+ */
+function pagamentoEstaCancelado(p: PagamentoSelecionado): boolean {
+  return (
+    p.cancelado === true ||
+    (p.dataCancelamento !== null && p.dataCancelamento !== undefined)
+  )
+}
+
+/**
+ * Pagamentos que entram no total pago e no troco (equivale a `trocoCalculado` / pagamentos válidos em DetalhesVendas).
+ * Exclui cancelados; se usa TEF, exige isTefConfirmed === true.
+ */
+function pagamentoContaComoEfetivo(p: PagamentoSelecionado): boolean {
+  if (pagamentoEstaCancelado(p)) return false
+
+  const usaTef = p.isTefUsed === true
+  if (usaTef) {
+    const tefConfirmado = p.isTefConfirmed === true
+    if (!tefConfirmado) return false
+  }
+  return true
+}
+
+/**
+ * Lista exibida no passo 4: oculta TEF não confirmado apenas em pagamento ainda ativo (cancelados seguem visíveis).
+ * Igual ao `.filter` de Pagamentos Realizados em DetalhesVendas.
+ */
+function pagamentoDeveAparecerNosDetalhesPedido(p: PagamentoSelecionado): boolean {
+  const isCancelado = pagamentoEstaCancelado(p)
+  const usaTef = p.isTefUsed === true
+  if (usaTef && !isCancelado) {
+    if (p.isTefConfirmed !== true) return false
+  }
+  return true
+}
+
+/** Destaque vermelho: somente pagamentos cancelados (TEF pendente ativo não é renderizado na lista). */
+function pagamentoComDestaqueCanceladoDetalhes(p: PagamentoSelecionado): boolean {
+  return pagamentoEstaCancelado(p)
+}
+
+/**
+ * Mapeia item de pagamento do GET venda (PDV ou Gestor) para o estado do modal.
+ * Garante as mesmas regras de DetalhesVendas: cancelado explícito ou com dataCancelamento; TEF só quando isTefUsed.
+ */
+function mapearPagamentoDetalheVenda(pag: Record<string, unknown>): PagamentoSelecionado {
+  const p = pag as Record<string, any>
+  const dataCancelamentoRaw = p.dataCancelamento ?? p.data_cancelamento
+  const temDataCancelamento =
+    dataCancelamentoRaw != null &&
+    dataCancelamentoRaw !== undefined &&
+    String(dataCancelamentoRaw).trim() !== ''
+  const canceladoExplicito =
+    p.cancelado === true || p.cancelado === 'true' || p.cancelado === 1 || p.cancelado === '1'
+  const cancelado = canceladoExplicito || temDataCancelamento
+
+  const isTefUsed = p.isTefUsed === true || p.is_tef_used === true
+  let isTefConfirmed: boolean | undefined
+  if (isTefUsed) {
+    if (p.isTefConfirmed === true || p.is_tef_confirmed === true) isTefConfirmed = true
+    else if (p.isTefConfirmed === false || p.is_tef_confirmed === false) isTefConfirmed = false
+  }
+
+  return {
+    meioPagamentoId: String(p.meioPagamentoId ?? p.id ?? ''),
+    valor: typeof p.valor === 'number' ? p.valor : Number(p.valor) || 0,
+    realizadoPorId: p.realizadoPorId ?? p.realizado_por_id ?? undefined,
+    cancelado,
+    canceladoPorId: p.canceladoPorId ?? p.cancelado_por_id ?? undefined,
+    dataCriacao: p.dataCriacao ?? p.data_criacao ?? undefined,
+    dataCancelamento: temDataCancelamento ? String(dataCancelamentoRaw) : undefined,
+    isTefUsed,
+    isTefConfirmed,
+    tefIdentifier: p.tefIdentifier ?? p.tef_identifier ?? undefined,
+    tefAdquirente: p.tefAdquirente ?? p.tef_adquirente ?? undefined,
+    cnpjAdquirente: p.cnpjAdquirente ?? p.cnpj_adquirente ?? undefined,
+    codigoAutorizacao: p.codigoAutorizacao ?? p.codigo_autorizacao ?? undefined,
+    tipoIntegracao: p.tipoIntegracao ?? p.tipo_integracao ?? undefined,
+    bandeiraCartao: p.bandeiraCartao ?? p.bandeira_cartao ?? undefined,
+  }
 }
 
 type OrigemVenda = 'GESTOR' | 'IFOOD' | 'RAPPI' | 'OUTROS'
@@ -225,6 +324,53 @@ function statusFiscalEhEmitida(
   return s === 'EMITIDA'
 }
 
+/** Painel alinhado à direita: entra deslizando da direita e, ao fechar, volta para a direita */
+const PedidoPainelSlide = forwardRef(function PedidoPainelSlide(
+  props: TransitionProps & { children: ReactElement },
+  ref: Ref<unknown>
+) {
+  return <Slide ref={ref} direction="left" {...props} />
+})
+PedidoPainelSlide.displayName = 'PedidoPainelSlide'
+
+/**
+ * Backdrop sem Fade interno do MUI — o Dialog repassa a mesma duração do papel ao Backdrop padrão,
+ * o que esmaece o fundo na entrada; aqui o overlay aparece no mesmo frame, só o painel desliza.
+ */
+const PainelPedidoBackdrop = forwardRef<HTMLDivElement, BackdropProps>(
+  function PainelPedidoBackdrop(
+    { open, invisible, className, sx, style, onClick, ...other },
+    ref
+  ) {
+    return (
+      <Box
+        ref={ref}
+        aria-hidden
+        className={['MuiBackdrop-root', className].filter(Boolean).join(' ')}
+        onClick={onClick}
+        {...other}
+        sx={[
+          {
+            position: 'fixed',
+            right: 0,
+            bottom: 0,
+            top: 0,
+            left: 0,
+            zIndex: -1,
+            display: open ? 'block' : 'none',
+            WebkitTapHighlightColor: 'transparent',
+            bgcolor: invisible ? 'transparent' : 'rgba(0, 0, 0, 0.5)',
+            transition: 'none',
+          },
+          ...(Array.isArray(sx) ? sx : sx != null ? [sx] : []),
+        ]}
+        style={style}
+      />
+    )
+  }
+)
+PainelPedidoBackdrop.displayName = 'PainelPedidoBackdrop'
+
 function statusFiscalPermiteCancelarNota(
   resumoStatus: string | null | undefined,
   statusUnificado: string | null | undefined,
@@ -242,6 +388,7 @@ export function NovoPedidoModal({
   open,
   onClose,
   onSuccess,
+  onAfterClose,
   vendaId,
   modoVisualizacao,
   tabelaOrigemVenda = 'venda_gestor',
@@ -807,7 +954,9 @@ export function NovoPedidoModal({
   }, [produtos, valorFinalVenda])
 
   const totalPagamentos = useMemo(() => {
-    return pagamentos.reduce((sum, p) => sum + p.valor, 0)
+    return pagamentos.reduce((sum, p) => {
+      return sum + (pagamentoContaComoEfetivo(p) ? p.valor : 0)
+    }, 0)
   }, [pagamentos])
 
   // Calcular valor a pagar (restante)
@@ -815,35 +964,40 @@ export function NovoPedidoModal({
     return Math.max(0, totalProdutos - totalPagamentos)
   }, [totalProdutos, totalPagamentos])
 
-  // Calcular troco (apenas se o último pagamento foi em dinheiro e ultrapassou o valor a pagar)
+  // Troco: só pagamentos efetivos entram; procura o último dinheiro efetivo na ordem original
   const troco = useMemo(() => {
     if (pagamentos.length === 0) return 0
 
-    // Verificar o último pagamento
-    const ultimoPagamento = pagamentos[pagamentos.length - 1]
-    const meioUltimoPagamento = meiosPagamento.find(
-      m => m.getId() === ultimoPagamento.meioPagamentoId
-    )
+    for (let i = pagamentos.length - 1; i >= 0; i--) {
+      const p = pagamentos[i]
+      if (!pagamentoContaComoEfetivo(p)) continue
 
-    if (!meioUltimoPagamento) return 0
+      const meioUltimoPagamento = meiosPagamento.find(m => m.getId() === p.meioPagamentoId)
+      if (!meioUltimoPagamento) continue
 
-    const nomeMeio = meioUltimoPagamento.getNome().toLowerCase()
-    const isDinheiro = nomeMeio.includes('dinheiro') || nomeMeio.includes('cash')
+      const nomeMeio = meioUltimoPagamento.getNome().toLowerCase()
+      const isDinheiro = nomeMeio.includes('dinheiro') || nomeMeio.includes('cash')
+      if (!isDinheiro) continue
 
-    // Se o último pagamento foi em dinheiro e ultrapassou o valor que faltava pagar
-    if (isDinheiro) {
-      // Calcular quanto faltava pagar antes deste último pagamento
-      const totalAntesUltimoPagamento = pagamentos.slice(0, -1).reduce((sum, p) => sum + p.valor, 0)
-      const valorFaltavaPagar = totalProdutos - totalAntesUltimoPagamento
+      const totalAntes = pagamentos.slice(0, i).reduce((acc, x) => {
+        return acc + (pagamentoContaComoEfetivo(x) ? x.valor : 0)
+      }, 0)
+      const valorFaltavaPagar = totalProdutos - totalAntes
 
-      // Se o valor recebido em dinheiro foi maior que o que faltava, há troco
-      if (ultimoPagamento.valor > valorFaltavaPagar) {
-        return ultimoPagamento.valor - valorFaltavaPagar
+      if (p.valor > valorFaltavaPagar) {
+        return p.valor - valorFaltavaPagar
       }
+      return 0
     }
 
     return 0
   }, [totalProdutos, pagamentos, meiosPagamento])
+
+  /** Lista do passo 4 (aba Pagamentos): igual ao filtro de exibição em DetalhesVendas */
+  const pagamentosVisiveisNaAbaDetalhes = useMemo(
+    () => pagamentos.filter(pagamentoDeveAparecerNosDetalhesPedido),
+    [pagamentos]
+  )
 
   // Passo 4: exibir cancelamento só para venda gestor carregada, finalizada e não cancelada
   const podeExibirCancelarVendaGestor = useMemo(
@@ -1030,7 +1184,7 @@ export function NovoPedidoModal({
     const abreComplementos = produto.abreComplementosAtivo()
     const temComplementos = produtoTemComplementos(produto)
 
-    // Se o produto tem complementos e abreComplementos é true, abrir modal antes de adicionar
+    // Só abre o modal ao escolher no grupo quando abreComplementos está true; na lista o usuário abre pelo botão
     if (abreComplementos && temComplementos) {
       setProdutoSelecionadoParaComplementos(produto)
       setProdutoIndexEdicaoComplementos(null) // Novo produto, não está editando
@@ -1153,11 +1307,7 @@ export function NovoPedidoModal({
 
     if (!produto) return
 
-    const abreComplementos = produto.abreComplementosAtivo()
-    const temComplementos = produtoTemComplementos(produto)
-
-    if (!abreComplementos || !temComplementos) return
-
+    // Na lista o modal abre sempre (permite vincular complementos mesmo sem grupos ainda); abreComplementos só controla abertura automática ao adicionar no grid
     setProdutoSelecionadoParaComplementos(produto)
     setProdutoIndexEdicaoComplementos(index)
 
@@ -1542,6 +1692,9 @@ export function NovoPedidoModal({
     setNomesMeiosPagamentoPedido({})
     setResumoFinanceiroDetalhes(null)
     setVendaIdCriada(null)
+    setDataVenda('')
+    setNomeUsuario('')
+    nomeUsuarioCarregadoNoCicloRef.current = false
 
     // Limpar timeouts de long press de complementos
     if (longPressComplementoTimeoutRef.current) {
@@ -1549,7 +1702,17 @@ export function NovoPedidoModal({
       longPressComplementoTimeoutRef.current = null
     }
     longPressComplementoIndexRef.current = null
+    setIsLoadingVenda(false)
   }
+
+  const resetFormRef = useRef(resetForm)
+  resetFormRef.current = resetForm
+
+  /** Após o Slide de saída: evita reset síncrono que quebra a animação e notifica o pai (ex.: desmontar com contexto) */
+  const handlePedidoPainelExited = useCallback(() => {
+    resetFormRef.current()
+    onAfterClose?.()
+  }, [onAfterClose])
 
   // Cleanup de timeouts quando o componente for desmontado
   useEffect(() => {
@@ -1575,7 +1738,6 @@ export function NovoPedidoModal({
   const handleClose = () => {
     // Em modo visualização, fechar diretamente sem confirmação
     if (vendaId && modoVisualizacao) {
-      resetForm()
       onClose()
       return
     }
@@ -1583,13 +1745,11 @@ export function NovoPedidoModal({
     if (temDadosVenda()) {
       setModalConfirmacaoSaidaOpen(true)
     } else {
-      resetForm()
       onClose()
     }
   }
 
   const handleConfirmarSaida = () => {
-    resetForm()
     setModalConfirmacaoSaidaOpen(false)
     setInternalDialogOpen(false)
     onClose()
@@ -1668,7 +1828,6 @@ export function NovoPedidoModal({
       setModalCancelarVendaOpen(false)
       setJustificativaCancelamento('')
       setTipoCancelamentoSelecionado('venda')
-      resetForm()
       setInternalDialogOpen(false)
       onSuccess()
       onClose()
@@ -2024,26 +2183,10 @@ export function NovoPedidoModal({
           setResumoFinanceiroDetalhes(null)
         }
 
-        // Pagamentos
+        // Pagamentos (PDV e Gestor: mesmo contrato visual; Gestor pode usar snake_case no payload)
         if (vendaData.pagamentos && Array.isArray(vendaData.pagamentos)) {
           const pagamentosMapeados: PagamentoSelecionado[] = vendaData.pagamentos.map(
-            (pag: any) => ({
-              meioPagamentoId: pag.meioPagamentoId || pag.id || '',
-              valor: pag.valor || 0,
-              realizadoPorId: pag.realizadoPorId || null,
-              cancelado: Boolean(pag.cancelado),
-              canceladoPorId: pag.canceladoPorId || null,
-              dataCriacao: pag.dataCriacao || null,
-              dataCancelamento: pag.dataCancelamento || null,
-              isTefUsed: pag.isTefUsed === true,
-              isTefConfirmed: pag.isTefConfirmed === true,
-              tefIdentifier: pag.tefIdentifier || null,
-              tefAdquirente: pag.tefAdquirente || null,
-              cnpjAdquirente: pag.cnpjAdquirente || null,
-              codigoAutorizacao: pag.codigoAutorizacao || null,
-              tipoIntegracao: pag.tipoIntegracao || null,
-              bandeiraCartao: pag.bandeiraCartao || null,
-            })
+            (pag: Record<string, unknown>) => mapearPagamentoDetalheVenda(pag)
           )
           setPagamentos(pagamentosMapeados)
         }
@@ -2161,34 +2304,17 @@ export function NovoPedidoModal({
         setCurrentStep(1)
       }
       carregarVendaExistente()
-    } else if (!open) {
-      // Limpar dados quando modal fechar
-      setDataVenda('')
-      setValorFinalVenda(null) // Limpar valor final quando modal fechar
-      setDataFinalizacaoCarregada(null)
-      setVendaGestorJaCancelada(false)
-      setModalCancelarVendaOpen(false)
-      setJustificativaCancelamento('')
-      // Resetar step apenas se não estiver em modo visualização
-      if (!modoVisualizacao) {
-        setCurrentStep(1)
-      }
-      setAbaDetalhesPedido('infoPedido')
-      setResumoFiscal(null)
-      setOrigemTextoApiDetalhe(null)
-      setStatusVendaTextoApiDetalhe(null)
-      setDetalhesPedidoMeta(null)
-      setNomesUsuariosPedido({})
-      setNomesMeiosPagamentoPedido({})
-      setResumoFinanceiroDetalhes(null)
-      setVendaIdCriada(null)
     }
+    // Limpeza ao fechar fica em resetForm via Transition onExited (evita sumir o conteúdo no meio do slide)
   }, [open, vendaId, modoVisualizacao, carregarVendaExistente])
 
   // Buscar nome do usuário gestor quando o modal abrir
   useEffect(() => {
     const fetchNomeUsuario = async () => {
-      if (!open || !auth) {
+      if (!open) {
+        return
+      }
+      if (!auth) {
         setNomeUsuario('')
         nomeUsuarioCarregadoNoCicloRef.current = false
         setIsLoadingUsuario(false)
@@ -2281,9 +2407,8 @@ export function NovoPedidoModal({
         setInternalDialogOpen(true)
         setModalConfirmacaoSaidaOpen(true)
       } else {
-        // Permite o fechamento se não houver dados
+        // Permite o fechamento se não houver dados (reset após Slide — onExited)
         setInternalDialogOpen(false)
-        resetForm()
         onClose()
       }
     } else {
@@ -2369,6 +2494,10 @@ export function NovoPedidoModal({
         open={internalDialogOpen}
         onOpenChange={handleDialogOpenChange}
         maxWidth={false}
+        TransitionComponent={PedidoPainelSlide}
+        transitionDuration={{ enter: 420, exit: 380 }}
+        TransitionProps={{ onExited: handlePedidoPainelExited }}
+        slots={{ backdrop: PainelPedidoBackdrop }}
         sx={{
           '& .MuiDialog-container': {
             zIndex: 1300,
@@ -2376,7 +2505,11 @@ export function NovoPedidoModal({
             alignItems: 'stretch',
             justifyContent: 'flex-end',
           },
-          '& .MuiBackdrop-root': { zIndex: 1300, backgroundColor: 'rgba(0, 0, 0, 0.5)' },
+          '& .MuiBackdrop-root': {
+            zIndex: 1300,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            transition: 'none',
+          },
           '& .MuiDialog-paper': {
             zIndex: 1300,
             backgroundColor: '#ffffff',
@@ -2405,7 +2538,7 @@ export function NovoPedidoModal({
         >
           <div className="px-4 py-2">
             <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold">
+              <h1 className="text-2xl font-semibold">
                 {modoVisualizacao ? 'Detalhes do Pedido' : 'Novo Pedido'}
               </h1>
               {nomeUsuario && (
@@ -2744,6 +2877,11 @@ export function NovoPedidoModal({
                         {produtos.map((produto, index) => {
                           // calcularTotalProduto já inclui complementos e desconto/acréscimo
                           const totalProdutoComComplementos = calcularTotalProduto(produto)
+                          const produtoEntityAcoes = produtosList.find(
+                            p => p.getId() === produto.produtoId
+                          )
+                          // Botão sempre que o produto estiver na lista do grupo (modal permite vincular complementos ao produto)
+                          const exibirBotaoComplementos = !!produtoEntityAcoes
 
                           return (
                             <div key={index} className="space-y-0">
@@ -2924,48 +3062,48 @@ export function NovoPedidoModal({
                                     R$ {formatarNumeroComMilhar(totalProdutoComComplementos)}
                                   </span>
                                 </div>
-                                {/* Ações (Editar, Complementos e Remover) */}
-                                <div className="flex flex-1 justify-end gap-1">
-                                  <button
-                                    onClick={() => abrirModalEdicaoProduto(index)}
-                                    type="button"
-                                    title="Editar produto"
-                                    className="flex h-7 min-h-[28px] w-7 min-w-[28px] items-center justify-center rounded border-0 p-0 transition-colors hover:bg-gray-200"
-                                  >
-                                    <MdEdit className="h-4 w-4 text-primary" />
-                                  </button>
-                                  {(() => {
-                                    const produtoEntity = produtosList.find(
-                                      p => p.getId() === produto.produtoId
-                                    )
-                                    if (!produtoEntity) return null
-
-                                    const abreComplementos = produtoEntity.abreComplementosAtivo()
-                                    const temComplementos = produtoTemComplementos(produtoEntity)
-
-                                    if (!abreComplementos || !temComplementos) return null
-
-                                    return (
+                                {/* Ações: colunas fixas (editar | complementos | excluir) */}
+                                <div
+                                  className="flex w-[76px] flex-shrink-0 items-center justify-end gap-0"
+                                  role="group"
+                                  aria-label="Ações do produto"
+                                >
+                                  <div className="flex h-6 w-6 shrink-0 items-center justify-center">
+                                    <button
+                                      onClick={() => abrirModalEdicaoProduto(index)}
+                                      type="button"
+                                      title="Editar produto"
+                                      className="flex h-5 w-5 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-gray-200"
+                                    >
+                                      <MdEdit className="h-4 w-4 text-primary" />
+                                    </button>
+                                  </div>
+                                  <div className="flex h-6 w-6 shrink-0 items-center justify-center">
+                                    {exibirBotaoComplementos ? (
                                       <button
                                         onClick={() =>
                                           abrirModalComplementosProdutoExistente(index)
                                         }
                                         type="button"
-                                        className="flex h-7 min-h-[28px] w-7 min-w-[28px] items-center justify-center rounded border-0 p-0 transition-colors hover:bg-gray-200"
-                                        title="Editar complementos"
+                                        className="flex h-5 w-5 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-gray-200"
+                                        title="Complementos (editar ou vincular)"
                                       >
                                         <MdLaunch className="h-4 w-4 text-primary" />
                                       </button>
-                                    )
-                                  })()}
-                                  <button
-                                    onClick={() => removerProduto(index)}
-                                    type="button"
-                                    title="Remover produto"
-                                    className="flex h-7 min-h-[28px] w-7 min-w-[28px] items-center justify-center rounded border-0 p-0 transition-colors hover:bg-red-100"
-                                  >
-                                    <MdDelete className="h-4 w-4 text-red-500" />
-                                  </button>
+                                    ) : (
+                                      <span className="block h-6 w-6 shrink-0" aria-hidden />
+                                    )}
+                                  </div>
+                                  <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+                                    <button
+                                      onClick={() => removerProduto(index)}
+                                      type="button"
+                                      title="Remover produto"
+                                      className="flex h-6 w-6 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-red-100"
+                                    >
+                                      <MdDelete className="h-4 w-4 text-red-500" />
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
 
@@ -2998,11 +3136,6 @@ export function NovoPedidoModal({
                                         p => p.getId() === produto.produtoId
                                       )
                                       if (!produtoEntity) return
-
-                                      const abreComplementos = produtoEntity.abreComplementosAtivo()
-                                      const temComplementos = produtoTemComplementos(produtoEntity)
-
-                                      if (!abreComplementos || !temComplementos) return
 
                                       longPressComplementoIndexRef.current = index
                                       longPressComplementoTimeoutRef.current = setTimeout(() => {
@@ -3070,16 +3203,20 @@ export function NovoPedidoModal({
                                     </div>
                                     {/* Espaço vazio onde seria o Total (complementos não têm total próprio) */}
                                     <div className="flex-1"></div>
-                                    {/* Botão Remover Complemento */}
-                                    <div className="flex flex-1 justify-end">
-                                      <button
-                                        onClick={() => removerComplemento(index, compIndex)}
-                                        type="button"
-                                        title="Remover complemento"
-                                        className="flex h-5 min-h-[20px] w-5 min-w-[20px] items-center justify-center border-0 p-0"
-                                      >
-                                        <MdClear className="h-3 w-3 text-red-500" />
-                                      </button>
+                                    {/* Mesma grade de ações da linha do produto: remove alinhado à coluna Exc. */}
+                                    <div className="flex w-[76px] flex-shrink-0 items-center justify-end gap-0.5">
+                                      <span className="block h-6 w-6 shrink-0" aria-hidden />
+                                      <span className="block h-6 w-6 shrink-0" aria-hidden />
+                                      <div className="flex h-6 w-6 shrink-0 items-center justify-center">
+                                        <button
+                                          onClick={() => removerComplemento(index, compIndex)}
+                                          type="button"
+                                          title="Remover complemento"
+                                          className="flex h-6 w-6 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-red-50"
+                                        >
+                                          <MdClear className="h-3.5 w-3.5 text-red-500" />
+                                        </button>
+                                      </div>
                                     </div>
                                   </div>
                                 )
@@ -3099,7 +3236,7 @@ export function NovoPedidoModal({
                 {/* Total do Pedido */}
                 <div className="flex flex-shrink-0 items-center justify-end gap-2">
                   <span className="text-sm font-semibold text-gray-700">Total do Pedido:</span>
-                  <span className="text-lg font-bold text-primary">
+                  <span className="text-lg font-semibold text-primary">
                     {transformarParaReal(totalProdutos)}
                   </span>
                 </div>
@@ -3373,14 +3510,14 @@ export function NovoPedidoModal({
                       <div className="mb-2 space-y-2 text-sm">
                         <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
                           <span className="font-medium text-gray-700">Total do Pedido:</span>
-                          <span className="text-base font-bold text-primary">
+                          <span className="text-base font-semibold text-primary">
                             {transformarParaReal(totalProdutos)}
                           </span>
                         </div>
                         <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
                           <span className="font-medium text-gray-700">A pagar:</span>
                           <span
-                            className={`text-base font-bold ${
+                            className={`text-base font-semibold ${
                               valorAPagar > 0 ? 'text-red-600' : 'text-green-600'
                             }`}
                           >
@@ -3459,14 +3596,14 @@ export function NovoPedidoModal({
                       <div className="border-t pt-2 text-sm">
                         <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
                           <span className="font-semibold text-gray-700">Total Pago:</span>
-                          <span className="text-base font-bold text-gray-900">
+                          <span className="text-base font-semibold text-gray-900">
                             {transformarParaReal(totalPagamentos)}
                           </span>
                         </div>
                         {troco > 0 && (
                           <div className="flex items-center justify-between">
                             <span className="font-semibold text-gray-700">Troco:</span>
-                            <span className="text-base font-bold text-green-600">
+                            <span className="text-base font-semibold text-green-600">
                               {transformarParaReal(troco)}
                             </span>
                           </div>
@@ -3496,7 +3633,7 @@ export function NovoPedidoModal({
                                     <span className="text-xs font-medium text-green-900">
                                       {meio?.getNome() || 'Meio de pagamento'}
                                     </span>
-                                    <span className="text-xs font-bold text-green-900">
+                                    <span className="text-xs font-semibold text-green-900">
                                       {transformarParaReal(pagamento.valor)}
                                     </span>
                                   </div>
@@ -3943,7 +4080,7 @@ export function NovoPedidoModal({
                         <span className="text-sm font-semibold text-gray-700">
                           Total do Pedido:
                         </span>
-                        <span className="text-lg font-bold text-primary">
+                        <span className="text-lg font-semibold text-primary">
                           {transformarParaReal(totalProdutos)}
                         </span>
                       </div>
@@ -4008,20 +4145,20 @@ export function NovoPedidoModal({
                             <span className="text-sm font-semibold text-gray-700">
                               Total do Pedido:
                             </span>
-                            <span className="text-lg font-bold text-primary">
+                            <span className="text-lg font-semibold text-primary">
                               {transformarParaReal(totalProdutos)}
                             </span>
                           </div>
                           <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
                             <span className="font-semibold text-gray-700">Total Pago:</span>
-                            <span className="text-base font-bold text-gray-900">
+                            <span className="text-base font-semibold text-gray-900">
                               {transformarParaReal(totalPagamentos)}
                             </span>
                           </div>
                           {troco > 0 && (
                             <div className="mt-2 flex items-center justify-between">
                               <span className="font-semibold text-gray-700">Troco:</span>
-                              <span className="text-base font-bold text-green-600">
+                              <span className="text-base font-semibold text-green-600">
                                 {transformarParaReal(troco)}
                               </span>
                             </div>
@@ -4034,7 +4171,7 @@ export function NovoPedidoModal({
                             Formas de Pagamento Utilizadas
                           </Label>
                           <div className="flex flex-wrap gap-3">
-                            {pagamentos.map((pagamento, index) => {
+                            {pagamentosVisiveisNaAbaDetalhes.map((pagamento, index) => {
                               const meio = meiosPagamento.find(
                                 m => m.getId() === pagamento.meioPagamentoId
                               )
@@ -4045,30 +4182,57 @@ export function NovoPedidoModal({
                               const Icone = meio
                                 ? obterIconeMeioPagamento(meio.getNome())
                                 : MdCreditCard
+                              const emCancelado = pagamentoComDestaqueCanceladoDetalhes(pagamento)
 
                               return (
                                 <div
                                   key={index}
-                                  className="flex min-w-[120px] flex-col items-center justify-center gap-1 rounded-lg border-2 border-primary bg-white p-3"
+                                  className={`flex min-w-[120px] flex-col items-center justify-center gap-1 rounded-lg border-2 p-3 ${
+                                    emCancelado
+                                      ? 'border-red-400 bg-red-50'
+                                      : 'border-primary bg-white'
+                                  }`}
                                 >
-                                  <Icone className="h-8 w-8 text-primary" />
-                                  <span className="text-center text-xs font-medium">
+                                  <Icone
+                                    className={`h-8 w-8 ${emCancelado ? 'text-red-600' : 'text-primary'}`}
+                                  />
+                                  <span
+                                    className={`text-center text-xs font-medium ${emCancelado ? 'text-red-900' : ''}`}
+                                  >
                                     {nomeMeio}
                                   </span>
-                                  <span className="text-sm font-bold text-primary">
+                                  <span
+                                    className={`text-sm font-semibold ${emCancelado ? 'text-red-700' : 'text-primary'}`}
+                                  >
                                     {transformarParaReal(pagamento.valor)}
                                   </span>
-                                  <span className="text-center text-[11px] text-gray-500">
+                                  {emCancelado && (
+                                    <span className="text-center text-[11px] font-semibold text-red-600">
+                                      Pagamento Cancelado
+                                    </span>
+                                  )}
+                                  <span
+                                    className={`text-center text-[11px] ${emCancelado ? 'text-red-800/80' : 'text-gray-500'}`}
+                                  >
                                     Por: {formatarUsuarioPorId(pagamento.realizadoPorId)}
                                   </span>
                                   {pagamento.dataCriacao && (
-                                    <span className="text-center text-[11px] text-gray-500">
+                                    <span
+                                      className={`text-center text-[11px] ${emCancelado ? 'text-red-800/80' : 'text-gray-500'}`}
+                                    >
                                       {formatarDataDetalhePedido(pagamento.dataCriacao)}
                                     </span>
                                   )}
                                   {pagamento.isTefUsed && (
-                                    <span className="text-center text-[11px] text-gray-500">
-                                      TEF: {pagamento.isTefConfirmed ? 'Confirmado' : 'Pendente'}
+                                    <span
+                                      className={`text-center text-[11px] ${emCancelado ? 'text-red-700' : 'text-gray-500'}`}
+                                    >
+                                      TEF:{' '}
+                                      {pagamento.isTefConfirmed === true
+                                        ? 'Confirmado'
+                                        : pagamento.isTefConfirmed === false
+                                          ? 'Não confirmado'
+                                          : '—'}
                                     </span>
                                   )}
                                 </div>
@@ -4078,6 +4242,12 @@ export function NovoPedidoModal({
                           {pagamentos.length === 0 && (
                             <p className="py-4 text-sm text-gray-500">
                               Nenhum pagamento registrado.
+                            </p>
+                          )}
+                          {pagamentos.length > 0 && pagamentosVisiveisNaAbaDetalhes.length === 0 && (
+                            <p className="py-4 text-sm text-gray-500">
+                              Nenhum pagamento efetivo para exibir (ex.: tentativas TEF pendentes de
+                              confirmação).
                             </p>
                           )}
                         </div>
@@ -4135,7 +4305,6 @@ export function NovoPedidoModal({
                 <Button
                   size="large"
                   onClick={() => {
-                    resetForm()
                     onSuccess()
                     onClose()
                   }}
@@ -4654,7 +4823,7 @@ export function NovoPedidoModal({
                     ? 'Esta ação cancelará a nota fiscal vinculada à venda do Gestor na SEFAZ.'
                     : 'Esta ação cancelará a nota fiscal vinculada à venda PDV na SEFAZ.'}
               </p>
-              <p className="text-sm font-bold text-red-600">Esta ação não pode ser desfeita!</p>
+              <p className="text-sm font-semibold text-red-600">Esta ação não pode ser desfeita!</p>
               <Textarea
                 label="Justificativa do Cancelamento"
                 placeholder="Digite o motivo do cancelamento (mínimo 15 caracteres)"
