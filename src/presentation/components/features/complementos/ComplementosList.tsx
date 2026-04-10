@@ -59,10 +59,10 @@ const ComplementoRow = memo(function ComplementoRow({
       onClick={() => onRowClick(complemento)}
       className={`${bgClass} rounded-lg md:px-4 px-1 py-3 flex items-center md:gap-[10px] gap-1 hover:bg-secondary-bg/15 cursor-pointer`}
     >
-      <div className="md:flex-[3] flex-[2] font-nunito font-semibold md:text-sm text-[10px] text-primary-text flex items-center gap-1">
+      <div className="md:flex-[3] flex-[2] font-medium md:text-sm text-[10px] text-primary-text flex items-center gap-1">
         <span># {complemento.getNome()}</span>
       </div>
-      <div className="flex-[3] font-nunito text-sm text-secondary-text hidden md:flex">
+      <div className="flex-[3] text-sm text-secondary-text hidden md:flex">
         {complemento.getDescricao() || 'Nenhuma'}
       </div>
 
@@ -78,7 +78,7 @@ const ComplementoRow = memo(function ComplementoRow({
               onKeyDown={e => onValorKeyDown(complemento.getId(), e)}
               onClick={e => e.stopPropagation()}
               disabled={savingValor}
-              className={`w-full bg-transparent text-left md:text-sm text-[10px] font-semibold text-primary-text focus:outline-none ${
+              className={`w-full bg-transparent text-left md:text-sm text-[10px] font-medium text-primary-text focus:outline-none ${
                 savingValor ? 'opacity-70 cursor-not-allowed' : ''
               }`}
             />
@@ -87,7 +87,7 @@ const ComplementoRow = memo(function ComplementoRow({
       </div>
 
       <div
-        className="flex-1 font-nunito md:text-sm text-[10px] text-secondary-text text-center"
+        className="flex-1 md:text-sm text-[10px] text-secondary-text text-center"
         onClick={e => e.stopPropagation()}
       >
         <select
@@ -97,7 +97,7 @@ const ComplementoRow = memo(function ComplementoRow({
           }
           onClick={e => e.stopPropagation()}
           disabled={savingTipo}
-          className={`w-full px-0 py-1 rounded-lg border border-gray-300 bg-white md:text-sm text-[10px] font-semibold text-primary-text focus:outline-none focus:border-primary text-center ${
+          className={`w-full px-0 py-1 rounded-lg border border-gray-300 bg-white md:text-sm text-[10px] font-medium text-primary-text focus:outline-none focus:border-primary text-center ${
             savingTipo ? 'opacity-70 cursor-not-allowed' : ''
           }`}
         >
@@ -570,8 +570,8 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
       <div className="md:px-[30px] flex-shrink-0 px-2 py-[4px]">
         <div className="flex flex-row items-center justify-between">
           <div className="flex flex-col md:pl-5">
-            <p className="text-primary text-sm font-semibold font-nunito">Complementos Cadastrados</p>
-            <p className="text-tertiary md:text-[22px] text-sm font-medium font-nunito">
+            <p className="text-primary text-sm font-semibold">Complementos Cadastrados</p>
+            <p className="text-tertiary md:text-[22px] text-sm font-medium">
               Total {complementos.length} de {totalComplementos}
             </p>
           </div>
@@ -612,7 +612,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
               placeholder="Pesquisar complemento..."
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
-              className="font-nunito focus:border-primary h-full w-full rounded-lg border border-gray-200 bg-info pl-12 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:outline-none"
+              className="focus:border-primary h-full w-full rounded-lg border border-gray-200 bg-info pl-12 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:outline-none"
             />
           </div>
         </div>
@@ -622,7 +622,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
           <select
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')}
-            className="font-nunito focus:border-primary h-8 w-full rounded-lg border border-gray-200 bg-info px-5 text-sm text-primary-text focus:outline-none"
+            className="focus:border-primary h-8 w-full rounded-lg border border-gray-200 bg-info px-5 text-sm text-primary-text focus:outline-none"
           >
             <option value="Todos">Todos</option>
             <option value="Ativo">Ativo</option>
@@ -633,19 +633,19 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
 
       <div className="md:px-[30px] mt-0 flex-shrink-0 px-1">
         <div className="bg-custom-2 flex h-10 items-center gap-[10px] rounded-lg px-1 md:px-4">
-          <div className="md:flex-[3] flex-[2] font-nunito font-semibold text-xs text-primary-text md:text-sm">
+          <div className="md:flex-[3] flex-[2] font-semibold text-xs text-primary-text md:text-sm">
             Nome
           </div>
-          <div className="hidden flex-[3] font-nunito font-semibold text-xs text-primary-text md:flex md:text-sm">
+          <div className="hidden flex-[3] font-semibold text-xs text-primary-text md:flex md:text-sm">
             Descrição
           </div>
-          <div className="flex-[2] font-nunito font-semibold text-xs text-primary-text md:text-sm">
+          <div className="flex-[2] font-semibold text-xs text-primary-text md:text-sm">
             Valor
           </div>
-          <div className="flex-[1] text-center font-nunito font-semibold text-xs text-primary-text md:text-sm">
+          <div className="flex-[1] text-center font-semibold text-xs text-primary-text md:text-sm">
             Impacto
           </div>
-          <div className="md:flex-[2] flex-[1] text-right font-nunito font-semibold text-xs text-primary-text md:mt-0 md:text-center md:text-sm">
+          <div className="md:flex-[2] flex-[1] text-right font-semibold text-xs text-primary-text md:mt-0 md:text-center md:text-sm">
             Status
           </div>
         </div>

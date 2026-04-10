@@ -88,7 +88,7 @@ const GrupoItem = memo(function GrupoItem({
         </div>
         <div className="md:flex-[3] flex-[2] min-w-0 flex items-start gap-3 pl-1 md:pl-3">
           <div className="flex flex-col md:flex-row gap-1">
-            <span className="flex items-center gap-2 truncate font-nunito font-semibold md:text-sm text-xs text-primary-text">
+            <span className="flex items-center gap-2 truncate font-normal uppercase md:text-sm text-xs text-primary-text">
               {grupo.getNome()}
             </span>
               <button
@@ -131,7 +131,7 @@ const GrupoItem = memo(function GrupoItem({
               >
                 <div className="flex flex-col items-center text-center text-xs text-secondary-text min-w-[70px]">
                   <span className="uppercase tracking-wide">{item.label}</span>
-                  <span className="text-sm font-semibold text-primary-text">{item.valor}</span>
+                  <span className="text-sm font-normal text-primary-text">{item.valor}</span>
                 </div>
                 <div className="flex flex-col gap-1">
                   <button
@@ -160,10 +160,10 @@ const GrupoItem = memo(function GrupoItem({
         
         <div className="flex-[2] flex items-center justify-start" onClick={(e) => e.stopPropagation()}>
           {complementos.length === 0 ? (
-            <span className="text-sm font-nunito text-secondary-text">Nenhum complemento</span>
+            <span className="text-sm font-normal text-secondary-text">Nenhum complemento</span>
           ) : (
             <select
-              className="w-full md:px-3 py-1.5 rounded-xl border border-gray-300 bg-white md:text-sm text-xs font-semibold text-primary-text focus:outline-none focus:border-primary"
+              className="w-full md:px-3 py-1.5 rounded-xl border border-gray-300 bg-white md:text-sm text-xs font-normal text-primary-text focus:outline-none focus:border-primary"
               defaultValue=""
               onChange={(event) => {
                 event.target.value = ''
@@ -517,10 +517,10 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
       <div className="md:px-[30px] px-2 py-[4px] flex-shrink-0">
         <div className="flex flex-row items-center justify-between">
           <div className="flex flex-col md:pl-5">
-            <p className="text-primary text-sm font-semibold font-nunito">
+            <p className="text-primary text-sm font-semibold">
               Grupos de Complementos Cadastrados
             </p>
-            <p className="text-tertiary md:text-[22px] text-sm font-medium font-nunito">
+            <p className="text-tertiary md:text-[22px] text-sm font-normal">
               Total {grupos.length} de {filteredTotal}
             </p>
           </div>
@@ -555,7 +555,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
                 placeholder="Pesquisar grupo..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full px-5 pl-12 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+                className="w-full h-full px-5 pl-12 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm"
               />
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
                 <MdSearch size={18} />
@@ -572,7 +572,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
               onChange={(e) =>
                 setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
               }
-              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm"
             >
               <option value="Todos">Todos</option>
               <option value="Ativo">Ativo</option>
@@ -584,19 +584,19 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
       {/* Cabeçalho da tabela */}
       <div className="md:px-[30px] px-1 flex-shrink-0">
         <div className="h-10 bg-custom-2 rounded-lg md:px-4 px-1 flex items-center gap-[10px]">
-          <div className="w-16 font-nunito font-semibold text-sm text-primary-text justify-start hidden md:flex">
+          <div className="w-16 font-semibold text-sm text-primary-text justify-start hidden md:flex">
             Ordem
           </div>
-          <div className="md:flex-[3] flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="md:flex-[3] flex-[2] font-semibold md:text-sm text-xs text-primary-text">
             Nome
           </div>
-          <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text justify-center hidden md:flex">
+          <div className="flex-[3] font-semibold text-sm text-primary-text justify-center hidden md:flex">
             Qtd de Complementos
           </div>
-          <div className="flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="flex-[2] font-semibold md:text-sm text-xs text-primary-text">
             Complementos
           </div>
-          <div className="md:flex-[2] md:text-center text-right font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="md:flex-[2] md:text-center text-right font-semibold md:text-sm text-xs text-primary-text">
             Status
           </div>
         </div>
