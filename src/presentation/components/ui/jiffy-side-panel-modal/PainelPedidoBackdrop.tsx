@@ -7,9 +7,14 @@ import type { BackdropProps } from '@mui/material/Backdrop'
 /**
  * Backdrop do Modal sem Fade interno — overlay aparece sem esmaecer (mesmo critério do Novo Pedido).
  */
-export const PainelPedidoBackdrop = forwardRef<HTMLDivElement, BackdropProps>(
+type PainelPedidoBackdropProps = BackdropProps & {
+  /** Prop interna do MUI (styled/slots); não pode ir para o DOM */
+  ownerState?: unknown
+}
+
+export const PainelPedidoBackdrop = forwardRef<HTMLDivElement, PainelPedidoBackdropProps>(
   function PainelPedidoBackdrop(
-    { open, invisible, className, sx, style, onClick, ...other },
+    { open, invisible, className, sx, style, onClick, ownerState: _ownerState, ...other },
     ref
   ) {
     return (

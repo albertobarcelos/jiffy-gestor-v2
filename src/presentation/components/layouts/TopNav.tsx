@@ -135,7 +135,7 @@ export function TopNav() {
   const menuItems: MenuItem[] = [
     { 
       name: 'Dashboard', 
-      path: '/dashboard', 
+      path: '/dashboard/v2', 
       icon: MdDashboard 
     },
     {
