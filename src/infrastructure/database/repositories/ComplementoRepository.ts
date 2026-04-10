@@ -25,34 +25,81 @@ export class ComplementoRepository implements IComplementoRepository {
   }> {
     try {
       const { limit, offset, q = '', ativo } = params
+      /** A API upstream só aceita limit <= 100; acima disso agregamos páginas. */
+      const UPSTREAM_MAX = 100
+      const safeLimit = Math.max(0, Number.isFinite(limit) ? limit : 0)
+      const safeOffset = Math.max(0, Number.isFinite(offset) ? offset : 0)
 
-      let url = `/api/v1/cardapio/complementos-produto?limit=${limit}&offset=${offset}`
-      if (q) {
-        url += `&q=${encodeURIComponent(q)}`
+      const fetchPage = async (chunkLimit: number, chunkOffset: number) => {
+        const capped = Math.min(chunkLimit, UPSTREAM_MAX)
+        let url = `/api/v1/cardapio/complementos-produto?limit=${capped}&offset=${chunkOffset}`
+        if (q) {
+          url += `&q=${encodeURIComponent(q)}`
+        }
+        if (ativo !== null && ativo !== undefined) {
+          url += `&ativo=${ativo}`
+        }
+
+        const response = await this.apiClient.request<{
+          items: any[]
+          count: number
+        }>(url, {
+          method: 'GET',
+          headers: this.token
+            ? {
+                Authorization: `Bearer ${this.token}`,
+              }
+            : {},
+        })
+
+        const complementos = (response.data.items || []).map((item) =>
+          Complemento.fromJSON(item)
+        )
+        return {
+          complementos,
+          count: response.data.count || 0,
+        }
       }
-      if (ativo !== null && ativo !== undefined) {
-        url += `&ativo=${ativo}`
+
+      if (safeLimit === 0) {
+        return { complementos: [], total: 0 }
       }
 
-      const response = await this.apiClient.request<{
-        items: any[]
-        count: number
-      }>(url, {
-        method: 'GET',
-        headers: this.token
-          ? {
-              Authorization: `Bearer ${this.token}`,
-            }
-          : {},
-      })
+      // Uma requisição: janela cabe no máximo permitido pela API externa
+      if (safeLimit <= UPSTREAM_MAX) {
+        const { complementos, count } = await fetchPage(safeLimit, safeOffset)
+        return { complementos, total: count }
+      }
 
-      const complementos = (response.data.items || []).map((item) =>
-        Complemento.fromJSON(item)
-      )
+      // Várias requisições de até 100 itens, depois recorta o intervalo [offset, offset+limit)
+      const collected: Complemento[] = []
+      let totalCount = 0
+      const endIndex = safeOffset + safeLimit
+      let apiOffset = 0
+
+      while (collected.length < safeLimit && apiOffset < endIndex) {
+        const { complementos: items, count } = await fetchPage(UPSTREAM_MAX, apiOffset)
+        if (totalCount === 0) {
+          totalCount = count
+        }
+
+        const globalStart = apiOffset
+        const startInPage = Math.max(0, safeOffset - globalStart)
+        const endInPage = Math.min(items.length, endIndex - globalStart)
+
+        for (let i = startInPage; i < endInPage; i++) {
+          collected.push(items[i])
+        }
+
+        if (items.length < UPSTREAM_MAX) {
+          break
+        }
+        apiOffset += items.length
+      }
 
       return {
-        complementos,
-        total: response.data.count || 0,
+        complementos: collected,
+        total: totalCount,
       }
     } catch (error) {
       if (error instanceof ApiError) {

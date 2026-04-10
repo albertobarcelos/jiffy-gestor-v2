@@ -1,10 +1,12 @@
 'use client'
 
-import { useMemo } from 'react'
-import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
+import { useMemo, useState } from 'react'
+import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { NovoGrupoComplemento } from './NovoGrupoComplemento'
 import { GrupoComplementoComplementosModal } from './GrupoComplementoComplementosModal'
+
+const GRUPO_TABS_FORM_ID = 'grupos-complemento-tabs-modal-form'
 
 type TabKey = 'grupo' | 'complementos'
 
@@ -30,96 +32,120 @@ export function GruposComplementosTabsModal({
 }: GruposComplementosTabsModalProps) {
   const grupoId = state.grupo?.getId()
 
+  const title = useMemo(() => {
+    return state.mode === 'create'
+      ? 'Novo Grupo de Complementos'
+      : 'Editar Grupo de Complementos'
+  }, [state.mode])
+
+  const [embedFormState, setEmbedFormState] = useState({
+    isSubmitting: false,
+    canSubmit: false,
+  })
+
+  const footerActions =
+    state.tab === 'grupo'
+      ? {
+          showSave: true,
+          saveLabel: state.mode === 'edit' ? 'Atualizar' : 'Salvar',
+          saveFormId: GRUPO_TABS_FORM_ID,
+          saveLoading: embedFormState.isSubmitting,
+          saveDisabled:
+            !embedFormState.canSubmit || embedFormState.isSubmitting,
+        }
+      : state.tab === 'complementos'
+        ? {
+            showSave: true,
+            saveLabel: 'Fechar',
+            onSave: onClose,
+          }
+        : undefined
 
   return (
-    <Dialog
+    <JiffySidePanelModal
       open={state.open}
-      onOpenChange={(open) => {
-        if (!open) {
-          onClose()
-        }
-      }}
-      fullWidth
-      maxWidth="xl"
-      sx={{
-        '& .MuiDialog-container': {
-          justifyContent: 'flex-end',
-          alignItems: 'stretch',
-          margin: 0,
-        },
-      }}
-      PaperProps={{
-        sx: {
-          m: 0,
-          height: '100vh',
-          maxHeight: '100vh',
-          width: { xs: '95vw', md: 'min(900px, 58vw)' },
-          maxWidth: { xs: '95vw', md: 'min(900px, 58vw)' },
-          borderRadius: 0,
-          display: 'flex',
-          flexDirection: 'column',
-        },
-      }}
-    >
-      <DialogContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <div className="px-6 pt-2 flex gap-1 border-b border-gray-100 bg-white">
+      onClose={onClose}
+      title={title}
+      scrollableBody={false}
+      footerVariant="bar"
+      panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,60vw)]"
+      footerActions={footerActions}
+      tabsSlot={
+        <div className="flex flex-wrap gap-1 px-2 pb-0">
           {(
             [
-              { key: 'grupo', label: 'Grupo', disabled: false },
-              { key: 'complementos', label: 'Complementos', disabled: !grupoId },
-            ] as Array<{ key: TabKey; label: string; disabled: boolean }>
+              { key: 'grupo' as const, label: 'Grupo', disabled: false },
+              {
+                key: 'complementos' as const,
+                label: 'Complementos',
+                disabled: !grupoId,
+              },
+            ] as const
           ).map((tab) => (
             <button
               key={tab.key}
               type="button"
               disabled={tab.disabled}
               onClick={() => !tab.disabled && onTabChange(tab.key)}
-              className={`px-4 py-2 rounded-t-lg text-sm font-semibold transition-colors ${
+              className={`rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors ${
                 state.tab === tab.key
                   ? 'bg-primary text-white'
                   : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
-              } ${tab.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+              } ${tab.disabled ? 'cursor-not-allowed opacity-50' : ''}`}
             >
               {tab.label}
             </button>
           ))}
         </div>
+      }
+    >
+      <div className="flex min-h-0 flex-1 flex-col">
+        {/* Mantém montado ao trocar de aba — evita remount e novo GET em NovoGrupoComplemento */}
+        <div
+          className={
+            state.tab === 'grupo'
+              ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
+              : 'hidden'
+          }
+          aria-hidden={state.tab !== 'grupo'}
+        >
+          <NovoGrupoComplemento
+            grupoId={state.mode === 'create' ? undefined : grupoId}
+            isEmbedded
+            embeddedFormId={GRUPO_TABS_FORM_ID}
+            hideEmbeddedFormActions
+            onEmbedFormStateChange={setEmbedFormState}
+            onClose={onClose}
+            onGoToComplementosTab={() => onTabChange('complementos')}
+            onSaved={() => {
+              onReload?.()
+              onClose()
+            }}
+          />
+        </div>
 
-        <div className="flex-1 overflow-hidden">
-          {state.tab === 'grupo' && (
-            <div className="h-full overflow-y-auto">
-              <NovoGrupoComplemento
-                grupoId={state.mode === 'create' ? undefined : grupoId}
-                isEmbedded
-                onClose={onClose}
-                onSaved={() => {
-                  onReload?.()
-                  onClose()
-                }}
-              />
-            </div>
-          )}
-
-          {state.tab === 'complementos' && (
-            <div className="h-full overflow-hidden">
-              {grupoId && state.grupo ? (
-                <GrupoComplementoComplementosModal
-                  isEmbedded
-                  grupo={state.grupo}
-                  onClose={onClose}
-                  onUpdated={onReload}
-                />
-              ) : (
-                <div className="h-full flex items-center justify-center text-secondary-text text-sm">
-                  Selecione um grupo válido para gerenciar complementos.
-                </div>
-              )}
+        <div
+          className={
+            state.tab === 'complementos'
+              ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
+              : 'hidden'
+          }
+          aria-hidden={state.tab !== 'complementos'}
+        >
+          {grupoId && state.grupo ? (
+            <GrupoComplementoComplementosModal
+              isEmbedded
+              grupo={state.grupo}
+              onClose={onClose}
+              onUpdated={onReload}
+            />
+          ) : (
+            <div className="flex h-full flex-1 items-center justify-center text-sm text-secondary-text">
+              Selecione um grupo válido para gerenciar complementos.
             </div>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </JiffySidePanelModal>
   )
 }
-
-

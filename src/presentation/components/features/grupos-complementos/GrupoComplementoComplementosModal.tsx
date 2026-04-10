@@ -2,17 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { MdSearch, MdDelete, MdAdd } from 'react-icons/md'
+import { MdSearch, MdAdd } from 'react-icons/md'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { Complemento } from '@/src/domain/entities/Complemento'
 import { useComplementos } from '@/src/presentation/hooks/useComplementos'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import {
   ComplementosTabsModal,
   ComplementosTabsModalState,
 } from '@/src/presentation/components/features/complementos/ComplementosTabsModal'
-import { ComplementosSelectModal } from '@/src/presentation/components/features/complementos/ComplementosSelectModal'
 
 interface GrupoComplementoComplementosModalProps {
   open?: boolean
@@ -22,39 +22,23 @@ interface GrupoComplementoComplementosModalProps {
   isEmbedded?: boolean
 }
 
-interface GrupoComplementoItemResumo {
-  id: string
-  nome: string
-  descricao?: string | null
-  valor?: number | null
-  tipoImpactoPreco?: string | null
-  ativo?: boolean
-}
-
-const parseComplementosFromGrupo = (items: any[] | undefined): GrupoComplementoItemResumo[] => {
-  if (!Array.isArray(items)) {
-    return []
+/** IDs dos complementos vinculados ao grupo (a partir da entidade ou do GET do grupo) */
+function getLinkedIdsFromGrupo(g: GrupoComplemento): string[] {
+  const rawIds = g.getComplementosIds()
+  if (rawIds && rawIds.length > 0) {
+    return rawIds.map((id) => String(id))
   }
-  return items
-    .map((item) => ({
-      id: item.id?.toString() || '',
-      nome: item.nome?.toString() || 'Complemento sem nome',
-      descricao: item.descricao ?? null,
-      valor:
-        typeof item.valor === 'number'
-          ? item.valor
-          : item.valor
-            ? Number(item.valor)
-            : null,
-      tipoImpactoPreco: item.tipoImpactoPreco?.toString() || null,
-      ativo: item.ativo === true || item.ativo === 'true' || item.ativo === undefined ? true : false,
-    }))
-    .filter((item) => item.id)
+  const comps = g.getComplementos()
+  if (Array.isArray(comps) && comps.length > 0) {
+    return comps
+      .map((item: { id?: unknown }) => item?.id?.toString())
+      .filter((id): id is string => Boolean(id))
+  }
+  return []
 }
 
 /**
- * Modal para visualizar os complementos vinculados a um grupo.
- * Exibe apenas os complementos relacionados ao grupo selecionado.
+ * Aba Complementos do grupo: lista o catálogo de complementos com switch para vincular/desvincular.
  */
 export function GrupoComplementoComplementosModal({
   open = false,
@@ -66,11 +50,9 @@ export function GrupoComplementoComplementosModal({
   const { auth } = useAuthStore()
   const queryClient = useQueryClient()
   const [searchTerm, setSearchTerm] = useState('')
-  const [isLoadingComplementos, setIsLoadingComplementos] = useState(false)
-  const [complementosGrupo, setComplementosGrupo] = useState<GrupoComplementoItemResumo[]>([])
-  const [removingId, setRemovingId] = useState<string | null>(null)
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
-  const [selectedAddIds, setSelectedAddIds] = useState<string[]>([])
+  const [isLoadingGrupoComplementos, setIsLoadingGrupoComplementos] = useState(false)
+  const [linkedIds, setLinkedIds] = useState<string[]>([])
+  const [vinculoLoadingId, setVinculoLoadingId] = useState<string | null>(null)
 
   // Estados para edição inline
   const [valorInputs, setValorInputs] = useState<Record<string, string>>({})
@@ -82,7 +64,7 @@ export function GrupoComplementoComplementosModal({
     data: todosComplementos = [],
     isLoading: isLoadingTodosComplementos,
     refetch: refetchComplementos,
-  } = useComplementos({ ativo: true, limit: 100 })
+  } = useComplementos({ limit: 2000 })
   const [complementosTabsState, setComplementosTabsState] = useState<ComplementosTabsModalState>({
     open: false,
     tab: 'complemento',
@@ -97,7 +79,7 @@ export function GrupoComplementoComplementosModal({
         showToast.error('Token não encontrado. Faça login novamente.')
         return
       }
-      setIsLoadingComplementos(true)
+      setIsLoadingGrupoComplementos(true)
       try {
         const response = await fetch(`/api/grupos-complementos/${grupoId}`, {
           headers: {
@@ -115,13 +97,13 @@ export function GrupoComplementoComplementosModal({
 
         const data = await response.json()
         const parsedGrupo = GrupoComplemento.fromJSON(data)
-        setComplementosGrupo(parseComplementosFromGrupo(parsedGrupo.getComplementos()))
+        setLinkedIds(getLinkedIdsFromGrupo(parsedGrupo))
       } catch (error) {
         console.error('Erro ao carregar complementos do grupo:', error)
         const message = handleApiError(error)
         showToast.error(message)
       } finally {
-        setIsLoadingComplementos(false)
+        setIsLoadingGrupoComplementos(false)
       }
     },
     [auth]
@@ -135,30 +117,41 @@ export function GrupoComplementoComplementosModal({
     }
 
     setSearchTerm('')
-    const complementosDoGrupo = parseComplementosFromGrupo(grupo.getComplementos())
-    if (complementosDoGrupo.length > 0) {
-      setComplementosGrupo(complementosDoGrupo)
+    const idsDoProps = getLinkedIdsFromGrupo(grupo)
+    if (idsDoProps.length > 0) {
+      setLinkedIds(idsDoProps)
     } else {
       carregarComplementos(grupo.getId())
     }
   }, [isVisible, grupo, carregarComplementos])
 
+  const catalogo = useMemo(() => (todosComplementos ?? []) as Complemento[], [todosComplementos])
+
   const filteredComplementos = useMemo(() => {
     const term = searchTerm.trim().toLowerCase()
     if (!term) {
-      return complementosGrupo
+      return catalogo
     }
-    return complementosGrupo.filter((item) => {
-      const nome = item.nome?.toLowerCase() || ''
-      const descricao = item.descricao?.toLowerCase() || ''
+    return catalogo.filter((c) => {
+      const nome = c.getNome()?.toLowerCase() || ''
+      const descricao = c.getDescricao()?.toLowerCase() || ''
       return nome.includes(term) || descricao.includes(term)
     })
-  }, [complementosGrupo, searchTerm])
+  }, [catalogo, searchTerm])
 
-  const availableComplementos = useMemo(() => {
-    // Inclui todos os complementos para exibir os já selecionados marcados
-    return todosComplementos as Complemento[]
-  }, [todosComplementos])
+  /** Vinculados ao grupo primeiro; não vinculados abaixo (ordem dentro de cada bloco = filtro atual) */
+  const complementosOrdenados = useMemo(() => {
+    const vinculados: Complemento[] = []
+    const naoVinculados: Complemento[] = []
+    for (const c of filteredComplementos) {
+      if (linkedIds.includes(c.getId())) {
+        vinculados.push(c)
+      } else {
+        naoVinculados.push(c)
+      }
+    }
+    return [...vinculados, ...naoVinculados]
+  }, [filteredComplementos, linkedIds])
 
   const updateGrupoComplementos = useCallback(
     async (novosIds: string[], successMessage: string) => {
@@ -186,7 +179,7 @@ export function GrupoComplementoComplementosModal({
 
         const data = await response.json()
         const parsedGrupo = GrupoComplemento.fromJSON(data)
-        setComplementosGrupo(parseComplementosFromGrupo(parsedGrupo.getComplementos()))
+        setLinkedIds(getLinkedIdsFromGrupo(parsedGrupo))
         showToast.successLoading(toastId, successMessage)
         onUpdated?.()
       } catch (error) {
@@ -198,42 +191,28 @@ export function GrupoComplementoComplementosModal({
     [auth, grupo, onUpdated]
   )
 
-  const handleRemoveComplemento = useCallback(
-    async (complementoId: string) => {
+  const handleToggleVinculo = useCallback(
+    async (complementoId: string, vincular: boolean) => {
       if (!grupo) return
-      const token = auth?.getAccessToken()
-      if (!token) {
-        showToast.error('Token não encontrado. Faça login novamente.')
-        return
+      const next = new Set(linkedIds)
+      if (vincular) {
+        next.add(complementoId)
+      } else {
+        next.delete(complementoId)
       }
-      setRemovingId(complementoId)
+      const novosIds = Array.from(next)
+      setVinculoLoadingId(complementoId)
       try {
         await updateGrupoComplementos(
-          complementosGrupo.filter((item) => item.id !== complementoId).map((item) => item.id),
-          'Complemento removido com sucesso!'
+          novosIds,
+          vincular ? 'Complemento vinculado ao grupo!' : 'Complemento removido do grupo.'
         )
       } finally {
-        setRemovingId(null)
+        setVinculoLoadingId(null)
       }
     },
-    [complementosGrupo, updateGrupoComplementos]
+    [grupo, linkedIds, updateGrupoComplementos]
   )
-
-  const toggleAddSelection = useCallback((id: string) => {
-    setSelectedAddIds((prev) => {
-      if (prev.includes(id)) {
-        return prev.filter((item) => item !== id)
-      }
-      return [...prev, id]
-    })
-  }, [])
-
-  const handleConfirmAdd = useCallback(async () => {
-    const novosIds = Array.from(new Set(selectedAddIds))
-    await updateGrupoComplementos(novosIds, 'Complementos atualizados com sucesso!')
-    setIsAddModalOpen(false)
-    setSelectedAddIds([])
-  }, [selectedAddIds, updateGrupoComplementos])
 
   const openComplementoCreateModal = useCallback(() => {
     setComplementosTabsState((prev) => ({
@@ -317,13 +296,14 @@ export function GrupoComplementoComplementosModal({
         return
       }
 
-      const complementoAtual = complementosGrupo.find((item) => item.id === complementoId)
+      const lista = (todosComplementos ?? []) as Complemento[]
+      const complementoAtual = lista.find((c) => c.getId() === complementoId)
       if (!complementoAtual) {
         showToast.error('Complemento não encontrado.')
         return
       }
 
-      const valorAtual = complementoAtual.valor ?? 0
+      const valorAtual = complementoAtual.getValor() ?? 0
       if (novoValor === valorAtual) {
         return
       }
@@ -346,13 +326,6 @@ export function GrupoComplementoComplementosModal({
         }
 
         showToast.success('Valor atualizado com sucesso!')
-        setComplementosGrupo((prev) =>
-          prev.map((item) =>
-            item.id === complementoId
-              ? { ...item, valor: novoValor }
-              : item
-          )
-        )
         // Invalida cache do React Query para refletir mudanças em outras telas
         queryClient.invalidateQueries({ queryKey: ['complementos'], exact: false })
         queryClient.invalidateQueries({ queryKey: ['complemento', complementoId] })
@@ -363,7 +336,7 @@ export function GrupoComplementoComplementosModal({
         // Restaura valor anterior
         setValorInputs((prev) => ({
           ...prev,
-          [complementoId]: formatValorFromNumber(complementoAtual.valor),
+          [complementoId]: formatValorFromNumber(complementoAtual.getValor()),
         }))
       } finally {
         setSavingMap((prev) => {
@@ -373,7 +346,7 @@ export function GrupoComplementoComplementosModal({
         })
       }
     },
-    [auth, valorInputs, parseValorToNumber, complementosGrupo, formatValorFromNumber, queryClient]
+    [auth, valorInputs, parseValorToNumber, todosComplementos, formatValorFromNumber, queryClient]
   )
 
   // Handler para atualizar descrição
@@ -387,13 +360,14 @@ export function GrupoComplementoComplementosModal({
 
       const novaDescricao = descricaoInputs[complementoId] ?? ''
 
-      const complementoAtual = complementosGrupo.find((item) => item.id === complementoId)
+      const lista = (todosComplementos ?? []) as Complemento[]
+      const complementoAtual = lista.find((c) => c.getId() === complementoId)
       if (!complementoAtual) {
         showToast.error('Complemento não encontrado.')
         return
       }
 
-      const descricaoAtual = complementoAtual.descricao || ''
+      const descricaoAtual = complementoAtual.getDescricao() || ''
       if (novaDescricao === descricaoAtual) {
         return
       }
@@ -416,13 +390,6 @@ export function GrupoComplementoComplementosModal({
         }
 
         showToast.success('Descrição atualizada com sucesso!')
-        setComplementosGrupo((prev) =>
-          prev.map((item) =>
-            item.id === complementoId
-              ? { ...item, descricao: novaDescricao || null }
-              : item
-          )
-        )
         // Invalida cache do React Query para refletir mudanças em outras telas
         queryClient.invalidateQueries({ queryKey: ['complementos'], exact: false })
         queryClient.invalidateQueries({ queryKey: ['complemento', complementoId] })
@@ -433,7 +400,7 @@ export function GrupoComplementoComplementosModal({
         // Restaura descrição anterior
         setDescricaoInputs((prev) => ({
           ...prev,
-          [complementoId]: complementoAtual.descricao || '',
+          [complementoId]: complementoAtual.getDescricao() || '',
         }))
       } finally {
         setSavingMap((prev) => {
@@ -443,7 +410,7 @@ export function GrupoComplementoComplementosModal({
         })
       }
     },
-    [auth, descricaoInputs, complementosGrupo, queryClient]
+    [auth, descricaoInputs, todosComplementos, queryClient]
   )
 
   // Handler para atualizar status ativo
@@ -455,26 +422,18 @@ export function GrupoComplementoComplementosModal({
         return
       }
 
-      const complementoAtual = complementosGrupo.find((item) => item.id === complementoId)
+      const lista = (todosComplementos ?? []) as Complemento[]
+      const complementoAtual = lista.find((c) => c.getId() === complementoId)
       if (!complementoAtual) {
         showToast.error('Complemento não encontrado.')
         return
       }
 
-      if (complementoAtual.ativo === novoStatus) {
+      if (complementoAtual.isAtivo() === novoStatus) {
         return
       }
 
       setTogglingStatus((prev) => ({ ...prev, [complementoId]: true }))
-
-      // Atualização otimista
-      setComplementosGrupo((prev) =>
-        prev.map((item) =>
-          item.id === complementoId
-            ? { ...item, ativo: novoStatus }
-            : item
-        )
-      )
 
       try {
         const response = await fetch(`/api/complementos/${complementoId}`, {
@@ -501,14 +460,6 @@ export function GrupoComplementoComplementosModal({
         console.error('Erro ao atualizar status do complemento:', error)
         const message = handleApiError(error)
         showToast.error(message)
-        // Reverte atualização otimista
-        setComplementosGrupo((prev) =>
-          prev.map((item) =>
-            item.id === complementoId
-              ? { ...item, ativo: complementoAtual.ativo ?? true }
-              : item
-          )
-        )
       } finally {
         setTogglingStatus((prev) => {
           const { [complementoId]: _, ...rest } = prev
@@ -516,7 +467,7 @@ export function GrupoComplementoComplementosModal({
         })
       }
     },
-    [auth, complementosGrupo, queryClient]
+    [auth, todosComplementos, queryClient]
   )
 
   // Handler para atualizar tipoImpactoPreco
@@ -528,13 +479,14 @@ export function GrupoComplementoComplementosModal({
         return
       }
 
-      const complementoAtual = complementosGrupo.find((item) => item.id === complementoId)
+      const lista = (todosComplementos ?? []) as Complemento[]
+      const complementoAtual = lista.find((c) => c.getId() === complementoId)
       if (!complementoAtual) {
         showToast.error('Complemento não encontrado.')
         return
       }
 
-      const tipoAtual = normalizeTipoImpacto(complementoAtual.tipoImpactoPreco)
+      const tipoAtual = normalizeTipoImpacto(complementoAtual.getTipoImpactoPreco())
       if (tipoAtual === novoTipo) {
         return
       }
@@ -558,13 +510,6 @@ export function GrupoComplementoComplementosModal({
         }
 
         showToast.success('Tipo de impacto atualizado com sucesso!')
-        setComplementosGrupo((prev) =>
-          prev.map((item) =>
-            item.id === complementoId
-              ? { ...item, tipoImpactoPreco: payloadTipo }
-              : item
-          )
-        )
         // Invalida cache do React Query para refletir mudanças em outras telas
         queryClient.invalidateQueries({ queryKey: ['complementos'], exact: false })
         queryClient.invalidateQueries({ queryKey: ['complemento', complementoId] })
@@ -580,229 +525,248 @@ export function GrupoComplementoComplementosModal({
         })
       }
     },
-    [auth, complementosGrupo, normalizeTipoImpacto, queryClient]
+    [auth, todosComplementos, normalizeTipoImpacto, queryClient]
   )
 
-  // Inicializar valores dos inputs quando complementosGrupo mudar
+  // Sincroniza inputs com o catálogo (React Query)
   useEffect(() => {
     const novosValorInputs: Record<string, string> = {}
     const novasDescricaoInputs: Record<string, string> = {}
-    
-    complementosGrupo.forEach((complemento) => {
-      novosValorInputs[complemento.id] = formatValorFromNumber(complemento.valor)
-      novasDescricaoInputs[complemento.id] = complemento.descricao || ''
+    ;(todosComplementos ?? []).forEach((c) => {
+      const comp = c as Complemento
+      const id = comp.getId()
+      novosValorInputs[id] = formatValorFromNumber(comp.getValor())
+      novasDescricaoInputs[id] = comp.getDescricao() || ''
     })
-    
     setValorInputs((prev) => ({ ...prev, ...novosValorInputs }))
     setDescricaoInputs((prev) => ({ ...prev, ...novasDescricaoInputs }))
-  }, [complementosGrupo, formatValorFromNumber])
+  }, [todosComplementos, formatValorFromNumber])
 
   if (!isVisible || !grupo) {
     return null
   }
 
   const content = (
-    <div className="w-full h-full bg-info flex flex-col rounded-2xl">
-      <div className="md:px-6 px-2 md:py-4 py-2 border-b-[2px] border-primary/70 flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase text-primary-text">Complementos do grupo:</p>
-          <h2 className="md:text-lg text-sm font-semibold text-secondary-text">{grupo.getNome()}</h2>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedAddIds(complementosGrupo.map((item) => item.id))
-              setIsAddModalOpen(true)
-            }}
-            className="md:h-8 md:px-4 px-1 py-1 rounded-lg bg-primary text-white md:text-sm text-xs font-semibold flex items-center md:gap-2 hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-            disabled={isLoadingComplementos}
-          >
-            <MdAdd />
-            Vincular complementos
-          </button>
-        </div>
-      </div>
-
-      <div className="md:px-6 px-2 md:py-1 py-1 ">
-        <label className="text-xs font-semibold text-secondary-text mb-1 block">
-          Buscar complemento do grupo
-        </label>
-        <div className="flex items-center gap-2">
-        <div className="relative">
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="Digite para filtrar..."
-            className="w-full md:min-w-[350px] min-w-[280px] h-8 rounded-lg border border-gray-200 bg-primary-bg pl-11 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary"
-          />
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
-            <MdSearch size={18} />
-          </span>
-        </div>
-       
+    <div
+      className={`flex w-full flex-col ${isEmbedded ? 'h-full min-h-0 flex-1' : 'max-h-[85vh] rounded-2xl'}`}
+    >
+      <div
+        className={`flex min-h-0 flex-1 flex-col ${isEmbedded ? 'overflow-hidden' : ''}`}
+      >
+        <div className="flex min-h-0 flex-1 flex-col rounded-[12px] bg-info md:p-5 p-3">
+          {/* Mesmo padrão visual da aba Grupo: título primary + linha + ação */}
+          <div className="mb-2 flex flex-wrap items-center gap-3 md:gap-5">
+            <h2 className="shrink-0 text-primary md:text-xl text-sm font-semibold font-exo">
+              Complementos do Grupo
+            </h2>
+            <div className="h-px min-h-0 min-w-[2rem] flex-1 bg-primary/70" aria-hidden />
+            <button
+              type="button"
+              onClick={openComplementoCreateModal}
+              className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-info shadow hover:bg-primary/90 transition-colors disabled:cursor-not-allowed disabled:opacity-60 md:h-8 md:px-5 md:text-sm"
+              disabled={isLoadingTodosComplementos}
+            >
+              <MdAdd className="md:text-lg text-sm" />
+              Novo complemento
+            </button>
           </div>
-      </div>
+          <p className="mb-2 text-xs font-semibold text-primary-text md:text-lg">{grupo.getNome()}</p>
 
-      <div className="flex-1 overflow-y-auto md:px-6 px-2 md:py-2 py-1 space-y-2">
-        {isLoadingComplementos ? (
+          <div className="mb-2">
+            <label className="mb-1 block text-xs font-semibold text-secondary-text">
+              Buscar complemento
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Digite para filtrar..."
+                className="h-8 w-full min-w-0 rounded-lg border border-gray-200 pl-11 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none md:min-w-[350px]"
+              />
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
+                <MdSearch size={18} />
+              </span>
+            </div>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto pr-0.5">
+        {isLoadingTodosComplementos || isLoadingGrupoComplementos ? (
           <div className="flex justify-center py-10">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
+        ) : catalogo.length === 0 ? (
+          <p className="text-center text-secondary-text text-sm">
+            Nenhum complemento cadastrado no sistema.
+          </p>
         ) : filteredComplementos.length === 0 ? (
           <p className="text-center text-secondary-text text-sm">
-            Nenhum complemento vinculado ao grupo foi encontrado.
+            Nenhum complemento encontrado com esse filtro.
           </p>
         ) : (
-          filteredComplementos.map((complemento) => (
+          <>
             <div
-              key={complemento.id}
-              className="p-2 rounded-lg border border-gray-200 bg-primary-bg/60 flex items-start gap-3 transition-colors hover:bg-primary-bg"
+              className="sticky top-0 z-[1] grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-gray-200 bg-info px-2 py-2"
+              role="row"
             >
-              <button
-                type="button"
-                onClick={() => handleRemoveComplemento(complemento.id)}
-                disabled={removingId === complemento.id}
-                className="mt-1 w-6 h-6 flex items-center justify-center rounded-full border border-error/40 text-error hover:bg-error/10 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                title="Remover complemento do grupo"
+              <span className="text-left text-sm font-semibold tracking-wide text-primary-text">
+                Componente
+              </span>
+              <span className="text-right text-sm font-semibold tracking-wide text-primary-text">
+                Vínculo
+              </span>
+            </div>
+            {complementosOrdenados.map((item) => {
+            const comp = item as Complemento
+            const id = comp.getId()
+            const isLinked = linkedIds.includes(id)
+            return (
+              <div
+                key={id}
+                className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-gray-200 p-2 transition-colors hover:bg-primary-bg/60"
               >
-                <MdDelete />
-              </button>
-              <div className="flex-1">
-                <div className="flex items-start justify-between gap-3">
-                
-                  <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-primary-text mr-4">{complemento.nome}</p>
-                    <label
-                      className={`relative inline-flex h-5 w-12 items-center ${
-                        togglingStatus[complemento.id]
-                          ? 'cursor-not-allowed opacity-60'
-                          : 'cursor-pointer'
-                      }`}
-                      title={complemento.ativo ? 'Complemento Ativo' : 'Complemento Desativado'}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <input
-                        type="checkbox"
-                        className="sr-only peer"
-                        checked={complemento.ativo ?? true}
-                        onChange={(event) => {
-                          event.stopPropagation()
-                          handleToggleAtivo(complemento.id, event.target.checked)
-                        }}
-                        disabled={!!togglingStatus[complemento.id]}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                      <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                      <span className="absolute left-1 top-1/2 block h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-6" />
-                    </label>
-                    
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={valorInputs[complemento.id] ?? formatValorFromNumber(complemento.valor)}
-                      onChange={(e) => {
-                        setValorInputs((prev) => ({
-                          ...prev,
-                          [complemento.id]: formatValorInput(e.target.value),
-                        }))
-                      }}
-                      onFocus={(e) => e.target.select()}
-                      onBlur={() => handleUpdateValor(complemento.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.currentTarget.blur()
-                        }
-                      }}
-                      disabled={!!savingMap[complemento.id]?.valor}
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-xs font-semibold text-primary-text px-2 py-1 rounded border border-gray-200 bg-primary-bg focus:outline-none focus:border-primary disabled:opacity-60 disabled:cursor-not-allowed min-w-[100px]"
-                    />
-                  </div>
+                <div className="min-w-0">
+                  {isLinked ? (
+                    <>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <p className="text-sm font-normal text-primary-text">{comp.getNome()}</p>
+                          <JiffyIconSwitch
+                            size="sm"
+                            checked={comp.isAtivo()}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              handleToggleAtivo(id, e.target.checked)
+                            }}
+                            disabled={!!togglingStatus[id]}
+                            label={comp.isAtivo() ? 'Ativo' : 'Inativo'}
+                            labelPosition="end"
+                            bordered={false}
+                            className="shrink-0"
+                            inputProps={{
+                              'aria-label': comp.isAtivo()
+                                ? 'Desativar complemento'
+                                : 'Ativar complemento',
+                            }}
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={valorInputs[id] ?? formatValorFromNumber(comp.getValor())}
+                            onChange={(e) => {
+                              setValorInputs((prev) => ({
+                                ...prev,
+                                [id]: formatValorInput(e.target.value),
+                              }))
+                            }}
+                            onFocus={(e) => e.target.select()}
+                            onBlur={() => handleUpdateValor(id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.currentTarget.blur()
+                              }
+                            }}
+                            disabled={!!savingMap[id]?.valor}
+                            onClick={(e) => e.stopPropagation()}
+                            className="min-w-[100px] rounded border border-gray-200 px-2 py-1 text-xs font-normal text-primary-text focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
+                        <input
+                          type="text"
+                          value={descricaoInputs[id] ?? comp.getDescricao() ?? ''}
+                          onChange={(e) => {
+                            setDescricaoInputs((prev) => ({
+                              ...prev,
+                              [id]: e.target.value,
+                            }))
+                          }}
+                          onFocus={(e) => e.target.select()}
+                          onBlur={() => handleUpdateDescricao(id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.currentTarget.blur()
+                            }
+                          }}
+                          disabled={!!savingMap[id]?.descricao}
+                          onClick={(e) => e.stopPropagation()}
+                          placeholder="Sem descrição"
+                          className="max-w-[200px] min-w-0 flex-1 rounded border border-gray-200 px-2 py-1 text-xs text-secondary-text focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                        />
+                        <select
+                          value={normalizeTipoImpacto(comp.getTipoImpactoPreco())}
+                          onChange={(e) => {
+                            const novoValor = e.target.value as 'nenhum' | 'aumenta' | 'diminui'
+                            handleUpdateTipoImpacto(id, novoValor)
+                          }}
+                          disabled={!!savingMap[id]?.tipo}
+                          onClick={(e) => e.stopPropagation()}
+                          className="rounded border border-gray-200 px-2 py-1 text-[11px] font-normal uppercase tracking-wide text-primary-text focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <option value="nenhum">Nenhum</option>
+                          <option value="aumenta">Aumenta</option>
+                          <option value="diminui">Diminui</option>
+                        </select>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="pr-1">
+                      <p className="text-sm font-normal text-primary-text">{comp.getNome()}</p>
+                      <p className="mt-0.5 line-clamp-2 text-xs text-secondary-text">
+                        {comp.getDescricao()?.trim() ? comp.getDescricao() : 'Sem descrição'}
+                      </p>
+                    </div>
+                  )}
                 </div>
-                <div className="mt-1 flex items-center justify-between gap-3">
-                  <input
-                    type="text"
-                    value={descricaoInputs[complemento.id] ?? complemento.descricao ?? ''}
+                <div className="flex min-w-0 justify-end self-start pt-0.5">
+                  <JiffyIconSwitch
+                    checked={isLinked}
                     onChange={(e) => {
-                      setDescricaoInputs((prev) => ({
-                        ...prev,
-                        [complemento.id]: e.target.value,
-                      }))
+                      e.stopPropagation()
+                      void handleToggleVinculo(id, e.target.checked)
                     }}
-                    onFocus={(e) => e.target.select()}
-                    onBlur={() => handleUpdateDescricao(complemento.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.currentTarget.blur()
-                      }
+                    disabled={vinculoLoadingId === id}
+                    bordered={false}
+                    className="shrink-0"
+                    inputProps={{
+                      'aria-label': isLinked ? 'Desvincular do grupo' : 'Vincular ao grupo',
                     }}
-                    disabled={!!savingMap[complemento.id]?.descricao}
-                    onClick={(e) => e.stopPropagation()}
-                    placeholder="Sem descrição"
-                    className="text-xs text-secondary-text px-2 py-1 rounded border border-gray-200 bg-primary-bg focus:outline-none focus:border-primary disabled:opacity-60 disabled:cursor-not-allowed flex-1 max-w-[200px]"
                   />
-                  <select
-                    value={normalizeTipoImpacto(complemento.tipoImpactoPreco)}
-                    onChange={(e) => {
-                      const novoValor = e.target.value as 'nenhum' | 'aumenta' | 'diminui'
-                      handleUpdateTipoImpacto(complemento.id, novoValor)
-                    }}
-                    disabled={!!savingMap[complemento.id]?.tipo}
-                    onClick={(e) => e.stopPropagation()}
-                    className="text-[11px] font-semibold text-primary uppercase tracking-wide px-2 py-1 rounded border border-gray-200 bg-primary-bg focus:outline-none focus:border-primary disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    <option value="nenhum">Nenhum</option>
-                    <option value="aumenta">Aumenta</option>
-                    <option value="diminui">Diminui</option>
-                  </select>
                 </div>
               </div>
-            </div>
-          ))
+            )
+          })}
+          </>
         )}
+          </div>
+        </div>
       </div>
 
-      {onClose && (
-        <div className="px-6 pb-16 pt-6 border-t-[2px] border-primary/70 flex justify-end">
+      {/* No modal com abas o rodapé é o `JiffySidePanelModal` (mesmo formato do Atualizar) */}
+      {onClose && !isEmbedded ? (
+        <div className="shrink-0 border-t border-gray-200 bg-white">
           <button
             type="button"
             onClick={onClose}
-            className="h-8 px-6 rounded-lg border border-gray-300 text-primary-text hover:border-primary transition-colors"
+            className="h-12 w-full font-semibold text-white shadow-none"
+            style={{
+              borderRadius: 0,
+              backgroundColor: 'var(--color-primary)',
+            }}
           >
             Fechar
           </button>
         </div>
-      )}
+      ) : null}
     </div>
-  )
-
-  const addModal = (
-    <ComplementosSelectModal
-      open={isAddModalOpen}
-      title="Vincular complementos"
-      complementos={availableComplementos}
-      selectedIds={selectedAddIds}
-      isLoading={isLoadingTodosComplementos}
-      onToggle={toggleAddSelection}
-      onConfirm={handleConfirmAdd}
-      onClose={() => {
-        setIsAddModalOpen(false)
-        setSelectedAddIds([])
-      }}
-      onCreateComplemento={openComplementoCreateModal}
-      confirmLabel="Vincular selecionados"
-      emptyMessage="Nenhum complemento disponível para adicionar."
-    />
   )
 
   if (isEmbedded) {
     return (
       <>
         <div className="h-full flex flex-col">{content}</div>
-        {addModal}
         <ComplementosTabsModal
           state={complementosTabsState}
           onClose={closeComplementosTabsModal}
@@ -818,7 +782,6 @@ export function GrupoComplementoComplementosModal({
       <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 px-4">
         <div className="w-full max-w-3xl max-h-[85vh]">{content}</div>
       </div>
-      {addModal}
       <ComplementosTabsModal
         state={complementosTabsState}
         onClose={closeComplementosTabsModal}

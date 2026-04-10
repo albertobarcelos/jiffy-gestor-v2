@@ -1,15 +1,15 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { MdAdd, MdPlaylistAdd } from 'react-icons/md'
+import { MdAdd } from 'react-icons/md'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
-import { Complemento } from '@/src/domain/entities/Complemento'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { useComplementos } from '@/src/presentation/hooks/useComplementos'
 import {
   ComplementosTabsModal,
@@ -17,11 +17,53 @@ import {
 } from '@/src/presentation/components/features/complementos/ComplementosTabsModal'
 import { ComplementosSelectModal } from '@/src/presentation/components/features/complementos/ComplementosSelectModal'
 
+/** Labels outlined em preto (MUI usa cinza por padrão) — igual NovoComplemento */
+const sxOutlinedLabelTextoEscuro = {
+  '& .MuiInputLabel-root': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiInputLabel-root.Mui-focused': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiInputLabel-root.MuiInputLabel-shrink': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiFormLabel-asterisk': {
+    color: 'var(--color-error)',
+  },
+} as const
+
+/** Padding interno reduzido — base TextField (igual NovoComplemento) */
+const entradaCompactaInput = {
+  padding: '10px',
+  fontSize: '0.875rem',
+} as const
+
+const sxEntradaCompactaGrupo = {
+  ...sxOutlinedLabelTextoEscuro,
+  '& .MuiOutlinedInput-input': entradaCompactaInput,
+} as const
+
 interface NovoGrupoComplementoProps {
   grupoId?: string
+  /** Dentro de modal com abas: layout full-height, título da seção fixo e callbacks no salvar/fechar */
   isEmbedded?: boolean
+  /** `id` do `<form>` para o rodapé do painel usar `form="..."` no botão Salvar */
+  embeddedFormId?: string
+  /** Omite Cancelar/Salvar no formulário (ações no rodapé do `JiffySidePanelModal`) */
+  hideEmbeddedFormActions?: boolean
+  /** Sincroniza estado com o rodapé do modal (loading / pode submeter) */
+  onEmbedFormStateChange?: (state: {
+    isSubmitting: boolean
+    canSubmit: boolean
+  }) => void
   onClose?: () => void
   onSaved?: () => void
+  /**
+   * No `GruposComplementosTabsModal`: o botão "Vincular complementos" só troca para a aba Complementos
+   * (a lista e o vínculo ficam lá). Nas páginas `/cadastros/...` não é passado — mantém o modal seletor.
+   */
+  onGoToComplementosTab?: () => void
 }
 
 /**
@@ -31,8 +73,12 @@ interface NovoGrupoComplementoProps {
 export function NovoGrupoComplemento({
   grupoId,
   isEmbedded = false,
+  embeddedFormId,
+  hideEmbeddedFormActions,
+  onEmbedFormStateChange,
   onClose,
   onSaved,
+  onGoToComplementosTab,
 }: NovoGrupoComplementoProps) {
   const router = useRouter()
   const { auth } = useAuthStore()
@@ -66,6 +112,17 @@ export function NovoGrupoComplemento({
     ativo: true,
     limit: 1000,
   })
+
+  const emitEmbedFormState = useCallback(() => {
+    onEmbedFormStateChange?.({
+      isSubmitting: isLoading,
+      canSubmit: nome.trim().length > 0,
+    })
+  }, [isLoading, nome, onEmbedFormStateChange])
+
+  useEffect(() => {
+    emitEmbedFormState()
+  }, [emitEmbedFormState])
 
   // Carregar dados do grupo se estiver editando
   useEffect(() => {
@@ -250,191 +307,164 @@ export function NovoGrupoComplemento({
     )
   }
 
-  const selectedComplementos = (Array.isArray(complementos) ? complementos : []).filter((c: any) =>
-    selectedComplementosIds.includes(c.getId())
-  )
+  const podeIrParaAbaComplementos = Boolean(onGoToComplementosTab && grupoId)
 
   return (
-    <div className={`flex flex-col ${isEmbedded ? 'h-full' : 'h-full'}`}>
-      {!isEmbedded && (
-        <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[30px] shadow-md px-[30px] py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-primary/25 text-primary flex items-center justify-center">
-                <span className="text-2xl">👤</span>
-              </div>
-              <h1 className="text-primary text-lg font-semibold font-exo">
-                {isEditing ? 'Editar Grupo de Complementos' : 'Novo Grupo de Complementos'}
-              </h1>
-            </div>
-            
-          </div>
-        </div>
-      )}
-
-      {/* Formulário com scroll */}
+    <div
+      className={`flex flex-col ${isEmbedded ? 'h-full min-h-0 flex-1' : 'h-full'}`}
+    >
+      {/* Formulário com scroll — título da tela fica no layout/página ou no modal pai */}
       <div
-        className={`flex-1 overflow-y-auto ${isEmbedded ? 'md:px-6 px-2 md:py-6 py-2 bg-info' : 'md:px-[30px] px-2 md:py-[30px] py-2'}`}
+        className={`flex-1 min-h-0 overflow-y-auto ${isEmbedded ? 'md:px-0 px-2 md:py-0 py-2 bg-info' : 'md:px-6 px-2 md:py-4 py-2 bg-info'}`}
       >
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form
+          id={embeddedFormId}
+          onSubmit={handleSubmit}
+          className="space-y-6"
+        >
           {/* Informações */}
             <div className="bg-info rounded-[12px] md:p-5">
-              <h2 className="text-primary md:text-xl text-sm font-semibold font-exo md:mb-4 mb-2">
-                {nome?.trim().length
-                  ? `Grupo de Complementos: ${nome.trim()}`
-                  : isEditing
-                    ? 'Grupo de Complementos “Grupo”'
-                    : 'Grupo de Complementos'}
-              </h2>
-            <div className="h-[2px] bg-primary/70 mb-4"></div>
-            <div className="flex items-center gap-6 justify-end mb-6">
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full">
-                <label className="text-primary-text font-medium text-sm">Ativo</label>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={ativo}
-                    onChange={(e) => setAtivo(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[16px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
-                </label>
+              <div className="mb-2 flex items-center gap-5">
+                <h2 className="shrink-0 text-primary md:text-xl text-sm font-semibold font-exo">
+                  {isEmbedded
+                    ? 'Dados do Grupo de Complementos'
+                    : nome?.trim().length
+                      ? `Grupo de Complementos: ${nome.trim()}`
+                      : isEditing
+                        ? 'Grupo de Complementos “Grupo”'
+                        : 'Grupo de Complementos'}
+                </h2>
+                <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
               </div>
-            </div>
-            <div className="space-y-4">
+            <JiffyIconSwitch
+              checked={ativo}
+              onChange={e => setAtivo(e.target.checked)}
+              label="Ativo"
+              bordered={false}
+              className="mb-6 justify-end"
+            />
+            <div className="space-y-8">
               <Input
                 label="Nome do Grupo"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
                 required
+                size="small"
                 placeholder="Digite o nome do grupo de complementos"
                 className="bg-info"
+                sx={sxEntradaCompactaGrupo}
               />
 
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block md:text-sm text-xs font-medium text-gray-700 mb-2">
-                    Quantidade Mínima *
-                  </label>
-                  <input
-                    type="number"
-                    value={qtdMinima}
-                    onChange={(e) => setQtdMinima(e.target.value)}
-                    required
-                    min="0"
-                    placeholder="0"
-                    className="w-full px-4 py-3 rounded-lg border border-gray-400 bg-info text-gray-900 placeholder:text-gray-500 focus:outline-none focus:border-2 focus:border-primary"
-                  />
-                </div>
-
-                <div>
-                  <label className="block md:text-sm text-xs font-medium text-gray-700 mb-2">
-                    Quantidade Máxima *
-                  </label>
-                  <input
-                    type="number"
-                    value={qtdMaxima}
-                    onChange={(e) => setQtdMaxima(e.target.value)}
-                    required
-                    min="0"
-                    placeholder="0"
-                    className="w-full px-4 py-3 rounded-lg border border-gray-400 bg-info text-gray-900 placeholder:text-gray-500 focus:outline-none focus:border-2 focus:border-primary"
-                  />
-                </div>
+                <Input
+                  label="Quantidade Mínima"
+                  type="number"
+                  value={qtdMinima}
+                  onChange={(e) => setQtdMinima(e.target.value)}
+                  required
+                  size="small"
+                  min={0}
+                  placeholder="0"
+                  className="bg-info"
+                  sx={sxEntradaCompactaGrupo}
+                />
+                <Input
+                  label="Quantidade Máxima"
+                  type="number"
+                  value={qtdMaxima}
+                  onChange={(e) => setQtdMaxima(e.target.value)}
+                  required
+                  size="small"
+                  min={0}
+                  placeholder="0"
+                  className="bg-info"
+                  sx={sxEntradaCompactaGrupo}
+                />
               </div>
 
-              {/* Seleção de Complementos */}
+              {/* Complementos: no modal com abas só o atalho para a aba Complementos; em página cheia mantém o seletor */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Complementos
                 </label>
-                <div className="flex flex-wrap items-center gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowComplementosModal(true)}
-                    className="inline-flex items-center h-8 text-sm md:text-lg gap-2 px-5 py-2 rounded-lg bg-primary text-info font-semibold shadow hover:bg-primary/90 transition-colors"
-                  >
-                    <MdPlaylistAdd className="md:text-lg text-sm" />
-                    Vincular complementos
-                  </button>
-                  
-                </div>
-                <div className="mt-3 border border-gray-300 rounded-lg px-4 py-3 bg-white text-sm text-primary-text min-h-[52px]">
-                  {selectedComplementos.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {selectedComplementos.map((comp: Complemento) => (
-                        <span
-                          key={comp.getId()}
-                          className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary font-semibold"
-                        >
-                          {comp.getNome()}
-                          <button
-                            type="button"
-                            onClick={() => toggleComplemento(comp.getId())}
-                            className="text-primary hover:text-primary/70"
-                            aria-label={`Remover ${comp.getNome()}`}
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-secondary-text">Nenhum complemento selecionado</span>
-                  )}
-                </div>
+                <button
+                  type="button"
+                  title={
+                    onGoToComplementosTab && !grupoId
+                      ? 'Salve o grupo para depois gerenciar complementos na aba Complementos'
+                      : undefined
+                  }
+                  disabled={onGoToComplementosTab ? !podeIrParaAbaComplementos : false}
+                  onClick={() => {
+                    if (onGoToComplementosTab) {
+                      if (grupoId) {
+                        onGoToComplementosTab()
+                      }
+                      return
+                    }
+                    setShowComplementosModal(true)
+                  }}
+                  className="inline-flex items-center h-8 text-sm md:text-lg gap-2 px-5 py-2 rounded-lg bg-primary text-info font-medium shadow hover:bg-primary/90 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <MdAdd className="md:text-lg text-sm" />
+                  Vincular complementos
+                </button>
               </div>
 
             </div>
           </div>
 
-          {/* Botões de ação */}
-          <div className="flex justify-end gap-4 pt-4">
-            <Button
-              type="button"
-              onClick={handleCancel}
-              variant="outlined"
-              className="px-8 h-8"
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              disabled={isLoading || !nome}
-              className="h-8"
-              sx={{
-                backgroundColor: 'var(--color-primary)',
-                color: 'var(--color-info)',
-                '&:hover': {
+          {/* Botões de ação — omitidos no painel lateral (rodapé do modal) */}
+          {hideEmbeddedFormActions ? null : (
+            <div className="flex justify-end gap-4 pt-4">
+              <Button
+                type="button"
+                onClick={handleCancel}
+                variant="outlined"
+                className="px-8 h-8"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={isLoading || !nome.trim()}
+                className="h-8"
+                sx={{
                   backgroundColor: 'var(--color-primary)',
-                  opacity: 0.9,
-                },
-                '&.Mui-disabled': {
-                  backgroundColor: 'var(--color-primary)',
-                  opacity: 0.4,
                   color: 'var(--color-info)',
-                },
-              }}
-            >
-              {isLoading ? 'Salvando...' : isEditing ? 'Atualizar' : 'Salvar'}
-            </Button>
-          </div>
+                  '&:hover': {
+                    backgroundColor: 'var(--color-primary)',
+                    opacity: 0.9,
+                  },
+                  '&.Mui-disabled': {
+                    backgroundColor: 'var(--color-primary)',
+                    opacity: 0.4,
+                    color: 'var(--color-info)',
+                  },
+                }}
+              >
+                {isLoading ? 'Salvando...' : isEditing ? 'Atualizar' : 'Salvar'}
+              </Button>
+            </div>
+          )}
         </form>
       </div>
 
-      <ComplementosSelectModal
-        open={showComplementosModal}
-        title="Vincular Complementos"
-        complementos={Array.isArray(complementos) ? complementos : []}
-        selectedIds={selectedComplementosIds}
-        isLoading={isLoadingComplementos}
-        onToggle={toggleComplemento}
-        onConfirm={() => setShowComplementosModal(false)}
-        onClose={() => setShowComplementosModal(false)}
-        onCreateComplemento={openComplementoCreateModal}
-        confirmLabel="Vincular selecionados"
-        emptyMessage="Nenhum complemento disponível."
-      />
+      {!onGoToComplementosTab ? (
+        <ComplementosSelectModal
+          open={showComplementosModal}
+          title="Vincular Complementos"
+          complementos={Array.isArray(complementos) ? complementos : []}
+          selectedIds={selectedComplementosIds}
+          isLoading={isLoadingComplementos}
+          onToggle={toggleComplemento}
+          onConfirm={() => setShowComplementosModal(false)}
+          onClose={() => setShowComplementosModal(false)}
+          onCreateComplemento={openComplementoCreateModal}
+          confirmLabel="Vincular selecionados"
+          emptyMessage="Nenhum complemento disponível."
+        />
+      ) : null}
       <ComplementosTabsModal
         state={complementosTabsState}
         onClose={closeComplementosTabsModal}
