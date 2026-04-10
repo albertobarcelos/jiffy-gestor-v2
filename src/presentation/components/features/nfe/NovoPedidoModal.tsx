@@ -162,6 +162,90 @@ interface PagamentoSelecionado {
   bandeiraCartao?: string
 }
 
+/**
+ * Mesma regra de DetalhesVendas: cancelado pela flag ou por dataCancelamento preenchida.
+ */
+function pagamentoEstaCancelado(p: PagamentoSelecionado): boolean {
+  return (
+    p.cancelado === true ||
+    (p.dataCancelamento !== null && p.dataCancelamento !== undefined)
+  )
+}
+
+/**
+ * Pagamentos que entram no total pago e no troco (equivale a `trocoCalculado` / pagamentos válidos em DetalhesVendas).
+ * Exclui cancelados; se usa TEF, exige isTefConfirmed === true.
+ */
+function pagamentoContaComoEfetivo(p: PagamentoSelecionado): boolean {
+  if (pagamentoEstaCancelado(p)) return false
+
+  const usaTef = p.isTefUsed === true
+  if (usaTef) {
+    const tefConfirmado = p.isTefConfirmed === true
+    if (!tefConfirmado) return false
+  }
+  return true
+}
+
+/**
+ * Lista exibida no passo 4: oculta TEF não confirmado apenas em pagamento ainda ativo (cancelados seguem visíveis).
+ * Igual ao `.filter` de Pagamentos Realizados em DetalhesVendas.
+ */
+function pagamentoDeveAparecerNosDetalhesPedido(p: PagamentoSelecionado): boolean {
+  const isCancelado = pagamentoEstaCancelado(p)
+  const usaTef = p.isTefUsed === true
+  if (usaTef && !isCancelado) {
+    if (p.isTefConfirmed !== true) return false
+  }
+  return true
+}
+
+/** Destaque vermelho: somente pagamentos cancelados (TEF pendente ativo não é renderizado na lista). */
+function pagamentoComDestaqueCanceladoDetalhes(p: PagamentoSelecionado): boolean {
+  return pagamentoEstaCancelado(p)
+}
+
+/**
+ * Mapeia item de pagamento do GET venda (PDV ou Gestor) para o estado do modal.
+ * Garante as mesmas regras de DetalhesVendas: cancelado explícito ou com dataCancelamento; TEF só quando isTefUsed.
+ */
+function mapearPagamentoDetalheVenda(pag: Record<string, unknown>): PagamentoSelecionado {
+  const p = pag as Record<string, any>
+  const dataCancelamentoRaw = p.dataCancelamento ?? p.data_cancelamento
+  const temDataCancelamento =
+    dataCancelamentoRaw != null &&
+    dataCancelamentoRaw !== undefined &&
+    String(dataCancelamentoRaw).trim() !== ''
+  const canceladoExplicito =
+    p.cancelado === true || p.cancelado === 'true' || p.cancelado === 1 || p.cancelado === '1'
+  const cancelado = canceladoExplicito || temDataCancelamento
+
+  const isTefUsed = p.isTefUsed === true || p.is_tef_used === true
+  let isTefConfirmed: boolean | undefined
+  if (isTefUsed) {
+    if (p.isTefConfirmed === true || p.is_tef_confirmed === true) isTefConfirmed = true
+    else if (p.isTefConfirmed === false || p.is_tef_confirmed === false) isTefConfirmed = false
+  }
+
+  return {
+    meioPagamentoId: String(p.meioPagamentoId ?? p.id ?? ''),
+    valor: typeof p.valor === 'number' ? p.valor : Number(p.valor) || 0,
+    realizadoPorId: p.realizadoPorId ?? p.realizado_por_id ?? undefined,
+    cancelado,
+    canceladoPorId: p.canceladoPorId ?? p.cancelado_por_id ?? undefined,
+    dataCriacao: p.dataCriacao ?? p.data_criacao ?? undefined,
+    dataCancelamento: temDataCancelamento ? String(dataCancelamentoRaw) : undefined,
+    isTefUsed,
+    isTefConfirmed,
+    tefIdentifier: p.tefIdentifier ?? p.tef_identifier ?? undefined,
+    tefAdquirente: p.tefAdquirente ?? p.tef_adquirente ?? undefined,
+    cnpjAdquirente: p.cnpjAdquirente ?? p.cnpj_adquirente ?? undefined,
+    codigoAutorizacao: p.codigoAutorizacao ?? p.codigo_autorizacao ?? undefined,
+    tipoIntegracao: p.tipoIntegracao ?? p.tipo_integracao ?? undefined,
+    bandeiraCartao: p.bandeiraCartao ?? p.bandeira_cartao ?? undefined,
+  }
+}
+
 type OrigemVenda = 'GESTOR' | 'IFOOD' | 'RAPPI' | 'OUTROS'
 type StatusVenda = 'ABERTA' | 'FINALIZADA' | 'PENDENTE_EMISSAO'
 
@@ -870,7 +954,9 @@ export function NovoPedidoModal({
   }, [produtos, valorFinalVenda])
 
   const totalPagamentos = useMemo(() => {
-    return pagamentos.reduce((sum, p) => sum + p.valor, 0)
+    return pagamentos.reduce((sum, p) => {
+      return sum + (pagamentoContaComoEfetivo(p) ? p.valor : 0)
+    }, 0)
   }, [pagamentos])
 
   // Calcular valor a pagar (restante)
@@ -878,35 +964,40 @@ export function NovoPedidoModal({
     return Math.max(0, totalProdutos - totalPagamentos)
   }, [totalProdutos, totalPagamentos])
 
-  // Calcular troco (apenas se o último pagamento foi em dinheiro e ultrapassou o valor a pagar)
+  // Troco: só pagamentos efetivos entram; procura o último dinheiro efetivo na ordem original
   const troco = useMemo(() => {
     if (pagamentos.length === 0) return 0
 
-    // Verificar o último pagamento
-    const ultimoPagamento = pagamentos[pagamentos.length - 1]
-    const meioUltimoPagamento = meiosPagamento.find(
-      m => m.getId() === ultimoPagamento.meioPagamentoId
-    )
+    for (let i = pagamentos.length - 1; i >= 0; i--) {
+      const p = pagamentos[i]
+      if (!pagamentoContaComoEfetivo(p)) continue
 
-    if (!meioUltimoPagamento) return 0
+      const meioUltimoPagamento = meiosPagamento.find(m => m.getId() === p.meioPagamentoId)
+      if (!meioUltimoPagamento) continue
 
-    const nomeMeio = meioUltimoPagamento.getNome().toLowerCase()
-    const isDinheiro = nomeMeio.includes('dinheiro') || nomeMeio.includes('cash')
+      const nomeMeio = meioUltimoPagamento.getNome().toLowerCase()
+      const isDinheiro = nomeMeio.includes('dinheiro') || nomeMeio.includes('cash')
+      if (!isDinheiro) continue
 
-    // Se o último pagamento foi em dinheiro e ultrapassou o valor que faltava pagar
-    if (isDinheiro) {
-      // Calcular quanto faltava pagar antes deste último pagamento
-      const totalAntesUltimoPagamento = pagamentos.slice(0, -1).reduce((sum, p) => sum + p.valor, 0)
-      const valorFaltavaPagar = totalProdutos - totalAntesUltimoPagamento
+      const totalAntes = pagamentos.slice(0, i).reduce((acc, x) => {
+        return acc + (pagamentoContaComoEfetivo(x) ? x.valor : 0)
+      }, 0)
+      const valorFaltavaPagar = totalProdutos - totalAntes
 
-      // Se o valor recebido em dinheiro foi maior que o que faltava, há troco
-      if (ultimoPagamento.valor > valorFaltavaPagar) {
-        return ultimoPagamento.valor - valorFaltavaPagar
+      if (p.valor > valorFaltavaPagar) {
+        return p.valor - valorFaltavaPagar
       }
+      return 0
     }
 
     return 0
   }, [totalProdutos, pagamentos, meiosPagamento])
+
+  /** Lista do passo 4 (aba Pagamentos): igual ao filtro de exibição em DetalhesVendas */
+  const pagamentosVisiveisNaAbaDetalhes = useMemo(
+    () => pagamentos.filter(pagamentoDeveAparecerNosDetalhesPedido),
+    [pagamentos]
+  )
 
   // Passo 4: exibir cancelamento só para venda gestor carregada, finalizada e não cancelada
   const podeExibirCancelarVendaGestor = useMemo(
@@ -2092,26 +2183,10 @@ export function NovoPedidoModal({
           setResumoFinanceiroDetalhes(null)
         }
 
-        // Pagamentos
+        // Pagamentos (PDV e Gestor: mesmo contrato visual; Gestor pode usar snake_case no payload)
         if (vendaData.pagamentos && Array.isArray(vendaData.pagamentos)) {
           const pagamentosMapeados: PagamentoSelecionado[] = vendaData.pagamentos.map(
-            (pag: any) => ({
-              meioPagamentoId: pag.meioPagamentoId || pag.id || '',
-              valor: pag.valor || 0,
-              realizadoPorId: pag.realizadoPorId || null,
-              cancelado: Boolean(pag.cancelado),
-              canceladoPorId: pag.canceladoPorId || null,
-              dataCriacao: pag.dataCriacao || null,
-              dataCancelamento: pag.dataCancelamento || null,
-              isTefUsed: pag.isTefUsed === true,
-              isTefConfirmed: pag.isTefConfirmed === true,
-              tefIdentifier: pag.tefIdentifier || null,
-              tefAdquirente: pag.tefAdquirente || null,
-              cnpjAdquirente: pag.cnpjAdquirente || null,
-              codigoAutorizacao: pag.codigoAutorizacao || null,
-              tipoIntegracao: pag.tipoIntegracao || null,
-              bandeiraCartao: pag.bandeiraCartao || null,
-            })
+            (pag: Record<string, unknown>) => mapearPagamentoDetalheVenda(pag)
           )
           setPagamentos(pagamentosMapeados)
         }
@@ -4096,7 +4171,7 @@ export function NovoPedidoModal({
                             Formas de Pagamento Utilizadas
                           </Label>
                           <div className="flex flex-wrap gap-3">
-                            {pagamentos.map((pagamento, index) => {
+                            {pagamentosVisiveisNaAbaDetalhes.map((pagamento, index) => {
                               const meio = meiosPagamento.find(
                                 m => m.getId() === pagamento.meioPagamentoId
                               )
@@ -4107,30 +4182,57 @@ export function NovoPedidoModal({
                               const Icone = meio
                                 ? obterIconeMeioPagamento(meio.getNome())
                                 : MdCreditCard
+                              const emCancelado = pagamentoComDestaqueCanceladoDetalhes(pagamento)
 
                               return (
                                 <div
                                   key={index}
-                                  className="flex min-w-[120px] flex-col items-center justify-center gap-1 rounded-lg border-2 border-primary bg-white p-3"
+                                  className={`flex min-w-[120px] flex-col items-center justify-center gap-1 rounded-lg border-2 p-3 ${
+                                    emCancelado
+                                      ? 'border-red-400 bg-red-50'
+                                      : 'border-primary bg-white'
+                                  }`}
                                 >
-                                  <Icone className="h-8 w-8 text-primary" />
-                                  <span className="text-center text-xs font-medium">
+                                  <Icone
+                                    className={`h-8 w-8 ${emCancelado ? 'text-red-600' : 'text-primary'}`}
+                                  />
+                                  <span
+                                    className={`text-center text-xs font-medium ${emCancelado ? 'text-red-900' : ''}`}
+                                  >
                                     {nomeMeio}
                                   </span>
-                                  <span className="text-sm font-semibold text-primary">
+                                  <span
+                                    className={`text-sm font-semibold ${emCancelado ? 'text-red-700' : 'text-primary'}`}
+                                  >
                                     {transformarParaReal(pagamento.valor)}
                                   </span>
-                                  <span className="text-center text-[11px] text-gray-500">
+                                  {emCancelado && (
+                                    <span className="text-center text-[11px] font-semibold text-red-600">
+                                      Pagamento Cancelado
+                                    </span>
+                                  )}
+                                  <span
+                                    className={`text-center text-[11px] ${emCancelado ? 'text-red-800/80' : 'text-gray-500'}`}
+                                  >
                                     Por: {formatarUsuarioPorId(pagamento.realizadoPorId)}
                                   </span>
                                   {pagamento.dataCriacao && (
-                                    <span className="text-center text-[11px] text-gray-500">
+                                    <span
+                                      className={`text-center text-[11px] ${emCancelado ? 'text-red-800/80' : 'text-gray-500'}`}
+                                    >
                                       {formatarDataDetalhePedido(pagamento.dataCriacao)}
                                     </span>
                                   )}
                                   {pagamento.isTefUsed && (
-                                    <span className="text-center text-[11px] text-gray-500">
-                                      TEF: {pagamento.isTefConfirmed ? 'Confirmado' : 'Pendente'}
+                                    <span
+                                      className={`text-center text-[11px] ${emCancelado ? 'text-red-700' : 'text-gray-500'}`}
+                                    >
+                                      TEF:{' '}
+                                      {pagamento.isTefConfirmed === true
+                                        ? 'Confirmado'
+                                        : pagamento.isTefConfirmed === false
+                                          ? 'Não confirmado'
+                                          : '—'}
                                     </span>
                                   )}
                                 </div>
@@ -4140,6 +4242,12 @@ export function NovoPedidoModal({
                           {pagamentos.length === 0 && (
                             <p className="py-4 text-sm text-gray-500">
                               Nenhum pagamento registrado.
+                            </p>
+                          )}
+                          {pagamentos.length > 0 && pagamentosVisiveisNaAbaDetalhes.length === 0 && (
+                            <p className="py-4 text-sm text-gray-500">
+                              Nenhum pagamento efetivo para exibir (ex.: tentativas TEF pendentes de
+                              confirmação).
                             </p>
                           )}
                         </div>
