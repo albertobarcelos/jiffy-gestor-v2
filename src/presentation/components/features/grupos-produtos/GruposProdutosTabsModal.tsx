@@ -1,9 +1,9 @@
 'use client'
 
-import { Suspense } from 'react'
-import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
+import { useEffect, useMemo, useState } from 'react'
+import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { NovoGrupo } from './NovoGrupo'
-import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { GRUPO_PRODUTOS_MODAL_FORM_ID } from './grupoProdutosModalConstants'
 
 type TabKey = 'grupo'
 
@@ -19,100 +19,77 @@ interface GruposProdutosTabsModalProps {
   state: GruposProdutosTabsModalState
   onClose: () => void
   onReload?: () => void
-  onTabChange: (tab: TabKey) => void
+  onTabChange?: (tab: TabKey) => void
 }
 
 export function GruposProdutosTabsModal({
   state,
   onClose,
   onReload,
-  onTabChange,
 }: GruposProdutosTabsModalProps) {
   const grupoId = state.grupoId
 
-  return (
-    <Dialog
-      open={state.open}
-      onOpenChange={(open) => {
-        if (!open) {
-          onClose()
-        }
-      }}
-      fullWidth
-      maxWidth="xl"
-      sx={{
-        '& .MuiDialog-container': {
-          justifyContent: 'flex-end',
-          alignItems: 'stretch',
-          margin: 0,
-        },
-      }}
-      PaperProps={{
-        sx: {
-          m: 0,
-          height: '100vh',
-          maxHeight: '100vh',
-          width: { xs: '95vw', md: 'min(900px, 60vw)' },
-          maxWidth: { xs: '95vw', md: 'min(900px, 60vw)' },
-          borderRadius: 0,
-          display: 'flex',
-          flexDirection: 'column',
-        },
-      }}
-    >
-      <DialogContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <div className="px-6 pt-4 flex gap-1 border-b border-gray-200">
-          {(
-            [{ key: 'grupo', label: 'Grupo', disabled: false }] as Array<{
-              key: TabKey
-              label: string
-              disabled: boolean
-            }>
-          ).map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              disabled={tab.disabled}
-              onClick={() => !tab.disabled && onTabChange(tab.key)}
-              className={`px-4 py-2 rounded-t-lg text-sm font-semibold transition-colors ${
-                state.tab === tab.key
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
-              } ${tab.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+  const title = useMemo(() => {
+    return state.mode === 'create'
+      ? 'Novo Grupo de Produtos'
+      : 'Editar Grupo de Produtos'
+  }, [state.mode])
 
-        <div className="flex-1 overflow-hidden">
-          {state.tab === 'grupo' && (
-            <div className="h-full overflow-y-auto">
-              <Suspense
-                fallback={
-                  <div className="flex flex-col items-center justify-center py-12 gap-2">
-                    <JiffyLoading />
-                  </div>
-                }
-              >
-                <NovoGrupo
-                  key={`grupo-${grupoId || 'new'}-tab-${state.initialTab ?? 0}`}
-                  grupoId={state.mode === 'create' ? undefined : grupoId}
-                  isEmbedded
-                  onClose={onClose}
-                  onSaved={() => {
-                    onReload?.()
-                    onClose()
-                  }}
-                  initialTab={state.initialTab}
-                />
-              </Suspense>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+  const [embedFormState, setEmbedFormState] = useState({
+    isSubmitting: false,
+    canSubmit: false,
+  })
+
+  const [embedSubTab, setEmbedSubTab] = useState(state.initialTab ?? 0)
+
+  useEffect(() => {
+    if (!state.open) return
+    setEmbedSubTab(state.initialTab ?? 0)
+  }, [state.open, state.initialTab])
+
+  const footerActions =
+    embedSubTab === 0
+      ? {
+          showSave: true,
+          saveLabel: state.mode === 'edit' ? 'Atualizar' : 'Salvar',
+          saveFormId: GRUPO_PRODUTOS_MODAL_FORM_ID,
+          saveLoading: embedFormState.isSubmitting,
+          saveDisabled:
+            !embedFormState.canSubmit || embedFormState.isSubmitting,
+        }
+      : {
+          showSave: true,
+          saveLabel: 'Fechar',
+          onSave: onClose,
+        }
+
+  return (
+    <JiffySidePanelModal
+      open={state.open}
+      onClose={onClose}
+      title={title}
+      scrollableBody={false}
+      footerVariant="bar"
+      panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,60vw)]"
+      footerActions={footerActions}
+    >
+      <div className="flex min-h-0 flex-1 flex-col">
+        <NovoGrupo
+          key={`grupo-${grupoId || 'new'}-tab-${state.initialTab ?? 0}`}
+          grupoId={state.mode === 'create' ? undefined : grupoId}
+          isEmbedded
+          embeddedFormId={GRUPO_PRODUTOS_MODAL_FORM_ID}
+          hideEmbeddedFormActions
+          onEmbedFormStateChange={setEmbedFormState}
+          onEmbeddedTabChange={setEmbedSubTab}
+          onClose={onClose}
+          onSaved={() => {
+            onReload?.()
+            onClose()
+          }}
+          initialTab={state.initialTab}
+        />
+      </div>
+    </JiffySidePanelModal>
   )
 }
-
-

@@ -325,14 +325,8 @@ export function NovoGrupoComplemento({
           {/* Informações */}
             <div className="bg-info rounded-[12px] md:p-5">
               <div className="mb-2 flex items-center gap-5">
-                <h2 className="shrink-0 text-primary md:text-xl text-sm font-semibold font-exo">
-                  {isEmbedded
-                    ? 'Dados do Grupo de Complementos'
-                    : nome?.trim().length
-                      ? `Grupo de Complementos: ${nome.trim()}`
-                      : isEditing
-                        ? 'Grupo de Complementos “Grupo”'
-                        : 'Grupo de Complementos'}
+                <h2 className="shrink-0 text-primary md:text-xl text-sm font-semibold">
+                  Dados do Grupo de Complementos
                 </h2>
                 <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
               </div>

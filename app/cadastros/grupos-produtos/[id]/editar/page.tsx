@@ -1,4 +1,4 @@
-import { NovoGrupo } from '@/src/presentation/components/features/grupos-produtos/NovoGrupo'
+import { NovoGrupoModalShell } from '@/src/presentation/components/features/grupos-produtos/NovoGrupoModalShell'
 
 export default async function EditarGrupoPage({
   params,
@@ -6,6 +6,5 @@ export default async function EditarGrupoPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  return <NovoGrupo grupoId={id} />
+  return <NovoGrupoModalShell grupoId={id} />
 }
-

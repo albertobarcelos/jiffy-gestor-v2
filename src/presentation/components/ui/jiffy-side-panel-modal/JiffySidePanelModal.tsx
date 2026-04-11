@@ -391,7 +391,7 @@ export function JiffySidePanelModal({
           ) : null}
 
           <div
-            className={`min-h-0 flex-1 px-4 py-3 md:px-6 ${
+            className={`min-h-0 flex-1 px-4 py-2 md:px-0 ${
               scrollableBody ? 'overflow-y-auto' : 'flex min-h-0 flex-col overflow-hidden'
             }`}
           >

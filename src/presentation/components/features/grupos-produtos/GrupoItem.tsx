@@ -5,7 +5,8 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
-import { MdModeEdit, MdAddCircle, MdLink } from 'react-icons/md'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
+import { MdAddCircle, MdLink } from 'react-icons/md'
 
 interface GrupoItemProps {
   grupo: GrupoProduto
@@ -90,7 +91,7 @@ export const GrupoItem = memo(function GrupoItem({
       <div
         {...attributes}
         {...listeners}
-        className="flex-[1] font-nunito font-semibold text-sm text-primary-text flex items-center gap-2 cursor-grab active:cursor-grabbing select-none hover:bg-primary-bg/30 active:bg-primary-bg/50 rounded-lg md:px-2 px-2 py-2 min-h-[44px] touch-manipulation"
+        className="flex-[1] font-nunito font-normal text-sm text-primary-text flex items-center gap-2 cursor-grab active:cursor-grabbing select-none hover:bg-primary-bg/30 active:bg-primary-bg/50 rounded-lg md:px-2 px-2 py-2 min-h-[44px] touch-manipulation"
         title="Arraste para reordenar"
         style={{ touchAction: 'none' }}
       >
@@ -109,7 +110,7 @@ export const GrupoItem = memo(function GrupoItem({
       {/* Nome - área clicável */}
       <div 
         onClick={handleRowClick}
-        className="flex-[4] font-nunito font-semibold text-xs md:text-sm text-primary-text cursor-pointer flex flex-col md:flex-row items-start md:items-center justify-start gap-2"
+        className="flex-[4] font-nunito font-normal uppercase text-xs md:text-sm text-primary-text cursor-pointer flex flex-col md:flex-row items-start md:items-center justify-start gap-2"
       >
         <span>{nome}</span>
         <div className="flex items-center gap-1">
@@ -119,7 +120,7 @@ export const GrupoItem = memo(function GrupoItem({
             e.stopPropagation()
             onEditProdutos?.(grupo)
           }}
-          className="w-5 h-5 rounded-full border border-primary/50 flex items-center justify-center text-primary hover:bg-primary/10 transition-colors"
+          className="w-7 h-7 rounded-full border border-primary/50 flex items-center justify-center text-primary hover:bg-primary/10 transition-colors"
           title="Ver produtos vinculados"
         >
           <MdLink />
@@ -130,7 +131,7 @@ export const GrupoItem = memo(function GrupoItem({
             e.stopPropagation()
             onCreateProduto?.(grupo.getId())
           }}
-          className="w-5 h-5 rounded-full border border-primary/50 flex items-center justify-center text-primary hover:bg-primary/10 transition-colors"
+          className="w-7 h-7 rounded-full border border-primary/50 flex items-center justify-center text-primary hover:bg-primary/10 transition-colors"
           title="criar um novo produto"
         >
           <MdAddCircle />
@@ -138,28 +139,32 @@ export const GrupoItem = memo(function GrupoItem({
         </div>
       </div>
 
-      {/* Status - área clicável */}
-      <div 
+      {/* Status: switch padrão; cliques no switch não abrem a edição da linha */}
+      <div
         onClick={handleRowClick}
-        className="flex-[2] flex justify-center cursor-pointer"
+        className="flex-[2] flex cursor-pointer items-center justify-center"
       >
-        <label
-          className="relative inline-flex items-center h-4 w-8 md:h-5 md:w-12 cursor-pointer"
-          onMouseDown={(event) => event.stopPropagation()}
-          onTouchStart={(event) => event.stopPropagation()}
+        <div
           onClick={(e) => e.stopPropagation()}
-          title={isAtivo ? 'Ativo' : 'Desativado'}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
         >
-          <input
-            type="checkbox"
-            className="sr-only peer"
+          <JiffyIconSwitch
             checked={isAtivo}
-            onChange={() => onToggleStatus?.(grupo.getId(), !isAtivo)}
-            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => {
+              e.stopPropagation()
+              onToggleStatus?.(grupo.getId(), e.target.checked)
+            }}
+            label={isAtivo ? 'Ativo' : undefined}
+            labelPosition="end"
+            bordered={false}
+            size="sm"
+            className="shrink-0"
+            inputProps={{
+              'aria-label': isAtivo ? 'Desativar grupo de produtos' : 'Ativar grupo de produtos',
+            }}
           />
-          <div className="w-full h-full rounded-full bg-gray-300 peer-checked:bg-primary transition-colors" />
-          <span className="absolute left-[2px] top-1/2 -translate-y-1/2 h-[12px] w-[12px] md:h-3 md:w-3 rounded-full bg-white shadow peer-checked:translate-x-[12px] md:peer-checked:translate-x-6 transition-transform" />
-        </label>
+        </div>
       </div>
     </div>
   )
