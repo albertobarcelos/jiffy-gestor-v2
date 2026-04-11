@@ -20,6 +20,14 @@ function getPeriodoDates(periodo: string): PeriodoDates {
       fim = new Date(now.getFullYear(), now.getMonth(), now.getDate())
       fim.setHours(23, 59, 59, 999)
       break
+    case 'ontem': {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+      inicio = new Date(d)
+      inicio.setHours(0, 0, 0, 0)
+      fim = new Date(d)
+      fim.setHours(23, 59, 59, 999)
+      break
+    }
     case 'semana':
       inicio = new Date(now)
       inicio.setDate(now.getDate() - 6)

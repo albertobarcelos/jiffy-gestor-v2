@@ -307,15 +307,48 @@ function periodoSelectV2ParaOpcaoCalculatePeriodo(periodoData: string): string {
   }
 }
 
+/** Valores do `<select>` de período em Top produtos / Top garçons (espelham o filtro global quando sincronizados). */
+type FiltroPeriodoTopTabelasV2 =
+  | 'hoje'
+  | 'ontem'
+  | 'semana'
+  | '30dias'
+  | 'mes'
+  | 'personalizado'
+
+/** Filtro global do topo → valor inicial/alinhado dos selects das tabelas inferiores. */
+function periodoTopoV2ParaFiltroTabelas(periodoData: string): FiltroPeriodoTopTabelasV2 {
+  switch (periodoData) {
+    case 'hoje':
+      return 'hoje'
+    case 'ontem':
+      return 'ontem'
+    case 'semana':
+      return 'semana'
+    case '30dias':
+      return '30dias'
+    case 'personalizado':
+      return 'personalizado'
+    default:
+      return 'hoje'
+  }
+}
+
 /** Select local do card Top produtos (V2) → rótulo de `calculatePeriodo` (datas na API). */
 function filtroTopProdutoV2ParaOpcaoCalculatePeriodo(filtro: string): string {
   switch (filtro) {
     case 'hoje':
       return 'Hoje'
+    case 'ontem':
+      return 'Ontem'
     case 'semana':
       return 'Últimos 7 Dias'
+    case '30dias':
+      return 'Últimos 30 Dias'
     case 'mes':
       return 'Mês Atual'
+    case 'personalizado':
+      return 'Hoje'
     default:
       return 'Hoje'
   }
@@ -326,10 +359,16 @@ function filtroTopProdutoV2ParaApiPeriodo(filtro: string): string {
   switch (filtro) {
     case 'hoje':
       return 'hoje'
+    case 'ontem':
+      return 'ontem'
     case 'semana':
       return 'semana'
+    case '30dias':
+      return '30dias'
     case 'mes':
       return 'mes'
+    case 'personalizado':
+      return 'personalizado'
     default:
       return 'hoje'
   }
@@ -656,10 +695,10 @@ export default function DashboardV2() {
   const [metricaGraficoComparativo, setMetricaGraficoComparativo] =
     useState<MetricaEvolucaoComparativo>('FINALIZADA')
   const [modoTopProduto, setModoTopProduto] = useState<'porcentagem' | 'valor'>('porcentagem')
-  const [filtroTopProduto, setFiltroTopProduto] = useState('hoje')
+  const [filtroTopProduto, setFiltroTopProduto] = useState<FiltroPeriodoTopTabelasV2>('hoje')
   /** Após clicar em “Ver todos”, busca com limite alto; volta ao resumo ao mudar o filtro de período. */
   const [topProdutosListaCompleta, setTopProdutosListaCompleta] = useState(false)
-  const [filtroTopGarcom, setFiltroTopGarcom] = useState('hoje')
+  const [filtroTopGarcom, setFiltroTopGarcom] = useState<FiltroPeriodoTopTabelasV2>('hoje')
   /** Lista expandida com todos os garçons do ranking (quando > 10 usuários com venda). */
   const [topGarconsListaCompleta, setTopGarconsListaCompleta] = useState(false)
 
@@ -720,14 +759,34 @@ export default function DashboardV2() {
     setTopGarconsListaCompleta(false)
   }, [filtroTopGarcom])
 
+  // Espelha o período do topo nas duas tabelas; cada uma mantém o próprio `<select>` para ajuste fino.
+  useEffect(() => {
+    const alvo = periodoTopoV2ParaFiltroTabelas(periodoData)
+    setFiltroTopProduto(alvo)
+    setFiltroTopGarcom(alvo)
+  }, [periodoData, periodoPersonalizadoInicio, periodoPersonalizadoFim])
+
   const opcaoPeriodoTopProduto = useMemo(
     () => filtroTopProdutoV2ParaOpcaoCalculatePeriodo(filtroTopProduto),
     [filtroTopProduto]
   )
 
   const { inicio: inicioTopProduto, fim: fimTopProduto } = useMemo(() => {
+    if (
+      filtroTopProduto === 'personalizado' &&
+      periodoPersonalizadoInicio &&
+      periodoPersonalizadoFim
+    ) {
+      return { inicio: periodoPersonalizadoInicio, fim: periodoPersonalizadoFim }
+    }
     return calculatePeriodo(opcaoPeriodoTopProduto)
-  }, [opcaoPeriodoTopProduto, dadosAtualizadosEm])
+  }, [
+    filtroTopProduto,
+    opcaoPeriodoTopProduto,
+    periodoPersonalizadoInicio,
+    periodoPersonalizadoFim,
+    dadosAtualizadosEm,
+  ])
 
   const periodoApiTopProduto = useMemo(
     () => filtroTopProdutoV2ParaApiPeriodo(filtroTopProduto),
@@ -799,8 +858,21 @@ export default function DashboardV2() {
   )
 
   const { inicio: inicioTopGarcom, fim: fimTopGarcom } = useMemo(() => {
+    if (
+      filtroTopGarcom === 'personalizado' &&
+      periodoPersonalizadoInicio &&
+      periodoPersonalizadoFim
+    ) {
+      return { inicio: periodoPersonalizadoInicio, fim: periodoPersonalizadoFim }
+    }
     return calculatePeriodo(opcaoPeriodoTopGarcom)
-  }, [opcaoPeriodoTopGarcom, dadosAtualizadosEm])
+  }, [
+    filtroTopGarcom,
+    opcaoPeriodoTopGarcom,
+    periodoPersonalizadoInicio,
+    periodoPersonalizadoFim,
+    dadosAtualizadosEm,
+  ])
 
   const periodoApiTopGarcom = useMemo(
     () => filtroTopProdutoV2ParaApiPeriodo(filtroTopGarcom),
@@ -1939,12 +2011,20 @@ export default function DashboardV2() {
             <div className="relative min-w-[120px] shrink-0 self-end xl:self-auto">
               <select
                 value={filtroTopProduto}
-                onChange={e => setFiltroTopProduto(e.target.value)}
+                onChange={e =>
+                  setFiltroTopProduto(e.target.value as FiltroPeriodoTopTabelasV2)
+                }
                 className="w-full appearance-none rounded-lg border border-gray-200 bg-gray-50 py-2 pl-3 pr-9 text-sm font-medium text-primary-text focus:border-secondary"
+                aria-label="Período do ranking de produtos"
               >
                 <option value="hoje">Hoje</option>
+                <option value="ontem">Ontem</option>
                 <option value="semana">Últimos 7 dias</option>
+                <option value="30dias">Últimos 30 dias</option>
                 <option value="mes">Mês</option>
+                <option value="personalizado" disabled={periodoData !== 'personalizado'}>
+                  Por datas (filtro global)
+                </option>
               </select>
               <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-text" />
             </div>
@@ -2063,12 +2143,20 @@ export default function DashboardV2() {
             <div className="relative min-w-[120px] self-end sm:self-auto">
               <select
                 value={filtroTopGarcom}
-                onChange={e => setFiltroTopGarcom(e.target.value)}
+                onChange={e =>
+                  setFiltroTopGarcom(e.target.value as FiltroPeriodoTopTabelasV2)
+                }
                 className="w-full appearance-none rounded-lg border border-gray-200 bg-gray-50 py-2 pl-3 pr-9 text-sm font-medium text-primary-text focus:border-secondary"
+                aria-label="Período do ranking de garçons"
               >
                 <option value="hoje">Hoje</option>
+                <option value="ontem">Ontem</option>
                 <option value="semana">Últimos 7 dias</option>
+                <option value="30dias">Últimos 30 dias</option>
                 <option value="mes">Mês</option>
+                <option value="personalizado" disabled={periodoData !== 'personalizado'}>
+                  Por datas (filtro global)
+                </option>
               </select>
               <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-text" />
             </div>
