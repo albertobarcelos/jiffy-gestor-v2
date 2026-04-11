@@ -44,7 +44,7 @@ export function ComplementosTabsModal({
       title={title}
       scrollableBody={false}
       footerVariant="bar"
-      panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,60vw)]"
+      panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]"
       footerActions={{
         showSave: true,
         saveLabel: state.mode === 'edit' ? 'Atualizar' : 'Salvar',

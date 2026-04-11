@@ -70,7 +70,7 @@ export function GruposProdutosTabsModal({
       title={title}
       scrollableBody={false}
       footerVariant="bar"
-      panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,60vw)]"
+      panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]"
       footerActions={footerActions}
     >
       <div className="flex min-h-0 flex-1 flex-col">

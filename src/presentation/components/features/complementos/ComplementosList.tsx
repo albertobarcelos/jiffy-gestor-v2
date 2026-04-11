@@ -59,7 +59,7 @@ const ComplementoRow = memo(function ComplementoRow({
       onClick={() => onRowClick(complemento)}
       className={`${bgClass} rounded-lg md:px-4 px-1 py-3 flex items-center md:gap-[10px] gap-1 hover:bg-secondary-bg/15 cursor-pointer`}
     >
-      <div className="md:flex-[3] flex-[2] font-medium md:text-sm text-[10px] text-primary-text flex items-center gap-1">
+      <div className="md:flex-[3] flex-[2] font-normal md:text-sm text-[10px] text-primary-text flex items-center gap-1">
         <span># {complemento.getNome()}</span>
       </div>
       <div className="flex-[3] text-sm text-secondary-text hidden md:flex">
@@ -78,7 +78,7 @@ const ComplementoRow = memo(function ComplementoRow({
               onKeyDown={e => onValorKeyDown(complemento.getId(), e)}
               onClick={e => e.stopPropagation()}
               disabled={savingValor}
-              className={`w-full bg-transparent text-left md:text-sm text-[10px] font-medium text-primary-text focus:outline-none ${
+              className={`w-full bg-transparent text-left md:text-sm text-[10px] font-normal text-primary-text focus:outline-none ${
                 savingValor ? 'opacity-70 cursor-not-allowed' : ''
               }`}
             />
@@ -97,7 +97,7 @@ const ComplementoRow = memo(function ComplementoRow({
           }
           onClick={e => e.stopPropagation()}
           disabled={savingTipo}
-          className={`w-full px-0 py-1 rounded-lg border border-gray-300 bg-white md:text-sm text-[10px] font-medium text-primary-text focus:outline-none focus:border-primary text-center ${
+          className={`w-full px-0 py-1 rounded-lg border border-gray-300 bg-white md:text-sm text-[10px] font-normal text-primary-text focus:outline-none focus:border-primary text-center ${
             savingTipo ? 'opacity-70 cursor-not-allowed' : ''
           }`}
         >

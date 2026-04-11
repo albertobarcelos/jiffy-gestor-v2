@@ -68,7 +68,7 @@ export function GruposComplementosTabsModal({
       title={title}
       scrollableBody={false}
       footerVariant="bar"
-      panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,60vw)]"
+      panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]"
       footerActions={footerActions}
       tabsSlot={
         <div className="flex flex-wrap gap-1 px-2 pb-0">
