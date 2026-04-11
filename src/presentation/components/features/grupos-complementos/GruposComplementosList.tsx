@@ -213,7 +213,7 @@ const GrupoItem = memo(function GrupoItem({
 export function GruposComplementosList({ onReload }: GruposComplementosListProps) {
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Todos')
+  const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Inativo'>('Todos')
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -238,7 +238,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
 
   // Determina o filtro ativo (memoizado)
   const ativoFilter = useMemo<boolean | null>(() => {
-    return filterStatus === 'Ativo' ? true : filterStatus === 'Desativado' ? false : null
+    return filterStatus === 'Ativo' ? true : filterStatus === 'Inativo' ? false : null
   }, [filterStatus])
 
   // Hook otimizado com React Query
@@ -567,13 +567,13 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
             <select
               value={filterStatus}
               onChange={(e) =>
-                setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
+                setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Inativo')
               }
               className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm"
             >
               <option value="Todos">Todos</option>
               <option value="Ativo">Ativo</option>
-              <option value="Desativado">Desativado</option>
+              <option value="Inativo">Inativo</option>
             </select>
           </div>
           </div>

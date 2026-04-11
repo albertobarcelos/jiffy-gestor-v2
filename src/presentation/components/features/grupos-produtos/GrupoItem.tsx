@@ -142,9 +142,9 @@ export const GrupoItem = memo(function GrupoItem({
       {/* Status: switch padrão; cliques no switch não abrem a edição da linha */}
       <div
         onClick={handleRowClick}
-        className="flex-[2] flex cursor-pointer items-center justify-center"
+        className="flex-[2] flex cursor-pointer items-end justify-end"
       >
-        <div
+        <div className="flex items-end justify-center"
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
@@ -155,8 +155,8 @@ export const GrupoItem = memo(function GrupoItem({
               e.stopPropagation()
               onToggleStatus?.(grupo.getId(), e.target.checked)
             }}
-            label={isAtivo ? 'Ativo' : undefined}
-            labelPosition="end"
+            label={isAtivo ? 'Ativo' : 'Inativo'}
+            labelPosition="start"
             bordered={false}
             size="sm"
             className="shrink-0"

@@ -107,7 +107,7 @@ const ComplementoRow = memo(function ComplementoRow({
         </select>
       </div>
       <div
-        className="md:flex-[2] flex-[1] flex md:justify-center justify-end"
+        className="md:flex-[2] flex-[1] flex justify-end"
         onClick={e => e.stopPropagation()}
         onMouseDown={e => e.stopPropagation()}
         onTouchStart={e => e.stopPropagation()}
@@ -120,8 +120,11 @@ const ComplementoRow = memo(function ComplementoRow({
             onToggleStatus(complemento, event.target.checked)
           }}
           disabled={togglingStatus}
+           label={complemento.isAtivo() ? 'Ativo' : 'Inativo'}
+            labelPosition="start"
           bordered={false}
-          className="gap-0 rounded-none px-0 py-0"
+          size="sm"
+          className="shrink-0"
           inputProps={{
             'aria-label': complemento.isAtivo() ? 'Desativar complemento' : 'Ativar complemento',
             onClick: e => e.stopPropagation(),
@@ -135,7 +138,7 @@ const ComplementoRow = memo(function ComplementoRow({
 export function ComplementosList({ onReload }: ComplementosListProps) {
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Todos')
+  const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Inativo'>('Todos')
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
   const [togglingStatus, setTogglingStatus] = useState<Record<string, boolean>>({})
   const [valorInputs, setValorInputs] = useState<Record<string, string>>({})
@@ -161,7 +164,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   const queryClient = useQueryClient()
 
   const ativoFilter = useMemo<boolean | null>(() => {
-    return filterStatus === 'Ativo' ? true : filterStatus === 'Desativado' ? false : null
+    return filterStatus === 'Ativo' ? true : filterStatus === 'Inativo' ? false : null
   }, [filterStatus])
 
   const {
@@ -615,12 +618,12 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
           <label className="text-secondary-text mb-1 block text-xs font-semibold">Status</label>
           <select
             value={filterStatus}
-            onChange={e => setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')}
+            onChange={e => setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Inativo')}
             className="focus:border-primary h-8 w-full rounded-lg border border-gray-200 bg-info px-5 text-sm text-primary-text focus:outline-none"
           >
             <option value="Todos">Todos</option>
             <option value="Ativo">Ativo</option>
-            <option value="Desativado">Desativado</option>
+            <option value="Inativo">Inativo</option>
           </select>
         </div>
       </div>
@@ -639,7 +642,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
           <div className="flex-[1] text-center font-semibold text-xs text-primary-text md:text-sm">
             Impacto
           </div>
-          <div className="md:flex-[2] flex-[1] text-right font-semibold text-xs text-primary-text md:mt-0 md:text-center md:text-sm">
+          <div className="md:flex-[2] flex-[1] text-end font-semibold text-xs text-primary-text md:mt-0 md:text-end md:text-sm">
             Status
           </div>
         </div>

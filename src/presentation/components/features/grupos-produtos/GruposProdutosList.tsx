@@ -44,7 +44,7 @@ interface GruposProdutosListProps {
 export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
+  const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Inativo'>('Ativo')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const loadMoreRef = useRef<HTMLDivElement>(null)
@@ -108,7 +108,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
 
   // Determina o filtro ativo (memoizado)
   const ativoFilter = useMemo<boolean | null>(() => {
-    return filterStatus === 'Ativo' ? true : filterStatus === 'Desativado' ? false : null
+    return filterStatus === 'Ativo' ? true : filterStatus === 'Inativo' ? false : null
   }, [filterStatus])
 
   // Hook otimizado com React Query
@@ -487,13 +487,13 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
             <select
               value={filterStatus}
               onChange={(e) =>
-                setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
+                setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Inativo')
               }
               className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
             >
               <option value="Todos">Todos</option>
               <option value="Ativo">Ativo</option>
-              <option value="Desativado">Desativado</option>
+              <option value="Inativo">Inativo</option>
             </select>
           </div>
       </div>
@@ -510,7 +510,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
           <div className="flex-[4] font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
             Nome
           </div>
-          <div className="flex-[2] md:text-center text-right font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
+          <div className="flex-[2] md:text-end text-right font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
             Status
           </div>
         </div>
