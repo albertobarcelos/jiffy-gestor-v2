@@ -76,7 +76,7 @@ export function Sidebar() {
   )
 
   const menuItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: '🏠' },
+    { name: 'Dashboard', path: '/dashboard/v2', icon: '🏠' },
     {
       name: 'Cadastros',
       path: '#',
