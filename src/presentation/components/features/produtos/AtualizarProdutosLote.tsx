@@ -1301,7 +1301,6 @@ export function AtualizarPrecoLote() {
                             {impressorasDoProduto.map((impressora) => (
                               <option key={impressora.id} value={impressora.id}>
                                 {impressora.nome}
-                                {impressora.ativo === false ? ' (Inativa)' : ''}
                               </option>
                             ))}
                           </select>
@@ -1373,7 +1372,6 @@ export function AtualizarPrecoLote() {
                                 {impressorasDoProduto.map((impressora) => (
                                   <option key={impressora.id} value={impressora.id}>
                                     {impressora.nome}
-                                    {impressora.ativo === false ? ' (Inativa)' : ''}
                                   </option>
                                 ))}
                               </select>
