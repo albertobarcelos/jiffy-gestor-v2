@@ -58,6 +58,8 @@ interface ConfiguracaoFiscalStepProps {
   onIndicadorProducaoEscalaChange: (value: string | null) => void
   onBack: () => void
   onNext: () => void
+  /** Quando true, botões ficam no rodapé do painel lateral */
+  hideStepFooter?: boolean
 }
 
 /**
@@ -87,6 +89,7 @@ export function ConfiguracaoFiscalStep({
   onIndicadorProducaoEscalaChange,
   onBack,
   onNext,
+  hideStepFooter = false,
 }: ConfiguracaoFiscalStepProps) {
   // Determina se o NCM é inválido (bloqueia o botão Salvar)
   const isNcmInvalid = ncmValidation !== undefined && ncmValidation !== null && !ncmValidation.valido
@@ -201,15 +204,10 @@ export function ConfiguracaoFiscalStep({
   // Se o microsserviço fiscal está indisponível, mostra banner em vez do formulário
   if (fiscalStatus === 'unavailable') {
     return (
-      <div className="rounded-[24px] border border-[#E5E7F2] bg-white p-4 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
-        {/* Título */}
-        <div className="flex flex-col gap-2 mb-1">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <h3 className="text-primary text-xl font-semibold font-exo">
-              Configuração Fiscal
-            </h3>
-            <div className="flex-1 h-[2px] bg-primary/50" />
-          </div>
+      <div className="rounded-[10px] bg-info p-2 md:p-4">
+        <div className="mb-2 flex items-center gap-5">
+          <h2 className="font-exo text-xl font-semibold text-primary">Configuração Fiscal</h2>
+          <div className="h-px flex-1 bg-primary/70" />
         </div>
 
         {/* Banner de indisponibilidade */}
@@ -280,36 +278,34 @@ export function ConfiguracaoFiscalStep({
           )}
         </div>
 
-        {/* Apenas botão Voltar — sem Salvar quando fiscal está indisponível */}
-        <div className="flex justify-start pt-6 border-t border-dashed border-[#E4E7F4] mt-4">
-          <Button
-            onClick={onBack}
-            className="h-8 px-10 border-2 rounded-lg font-semibold font-exo text-sm hover:bg-primary/20"
-            sx={{
-              backgroundColor: 'var(--color-info)',
-              color: 'var(--color-primary)',
-              borderColor: 'var(--color-primary)',
-              border: '1px solid',
-            }}
-          >
-            Voltar
-          </Button>
-        </div>
+        {!hideStepFooter ? (
+          <div className="mt-4 flex justify-start border-t border-dashed border-[#E4E7F4] pt-6">
+            <Button
+              onClick={onBack}
+              className="h-8 rounded-lg border-2 px-10 font-exo text-sm font-semibold hover:bg-primary/20"
+              sx={{
+                backgroundColor: 'var(--color-info)',
+                color: 'var(--color-primary)',
+                borderColor: 'var(--color-primary)',
+                border: '1px solid',
+              }}
+            >
+              Voltar
+            </Button>
+          </div>
+        ) : null}
       </div>
     )
   }
 
   return (
-    <div className="rounded-[24px] border border-[#E5E7F2] bg-white p-4 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
-      {/* Título */}
-      <div className="flex flex-col gap-2 mb-1">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <h3 className="text-primary text-xl font-semibold font-exo">
-            Configuração Fiscal
-          </h3>
-          <div className="flex-1 h-[2px] bg-primary/50" />
+    <div className="rounded-[10px] bg-info p-2 md:p-4">
+      <div className="mb-2 flex flex-col gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-exo text-xl font-semibold text-primary">Configuração Fiscal</h2>
+          <div className="h-px flex-1 bg-primary/70" />
         </div>
-        <p className="text-sm text-secondary-text font-nunito">
+        <p className="font-nunito text-sm text-secondary-text">
           Preencha as informações fiscais do produto. Essas informações serão usadas para emissão de notas fiscais.
         </p>
       </div>
@@ -548,35 +544,36 @@ export function ConfiguracaoFiscalStep({
         </div>
       </div>
 
-      {/* Botões de ação */}
-      <div className="flex justify-between pt-6 border-t border-dashed border-[#E4E7F4] mt-4">
-        <Button
-          onClick={onBack}
-          className="h-8 px-10 border-2 rounded-lg font-semibold font-exo text-sm hover:bg-primary/20"
-          sx={{
-            backgroundColor: 'var(--color-info)',
-            color: 'var(--color-primary)',
-            borderColor: 'var(--color-primary)',
-            border: '1px solid',
-          }}
-        >
-          Voltar
-        </Button>
-        <Button
-          onClick={onNext}
-          disabled={isNcmInvalid || isValidatingNcm || isCestInvalid || isValidatingCest}
-          className={`h-8 px-10 rounded-lg text-white font-semibold font-exo text-sm ${
-            isNcmInvalid || isValidatingNcm || isCestInvalid || isValidatingCest
-              ? 'opacity-50 cursor-not-allowed'
-              : 'hover:bg-primary/90'
-          }`}
-          sx={{
-            backgroundColor: 'var(--color-primary)',
-          }}
-        >
-          {isValidatingNcm || isValidatingCest ? 'Validando...' : 'Salvar'}
-        </Button>
-      </div>
+      {!hideStepFooter ? (
+        <div className="mt-4 flex justify-between border-t border-dashed border-[#E4E7F4] pt-6">
+          <Button
+            onClick={onBack}
+            className="h-8 rounded-lg border-2 px-10 font-exo text-sm font-semibold hover:bg-primary/20"
+            sx={{
+              backgroundColor: 'var(--color-info)',
+              color: 'var(--color-primary)',
+              borderColor: 'var(--color-primary)',
+              border: '1px solid',
+            }}
+          >
+            Voltar
+          </Button>
+          <Button
+            onClick={onNext}
+            disabled={isNcmInvalid || isValidatingNcm || isCestInvalid || isValidatingCest}
+            className={`h-8 rounded-lg px-10 font-exo text-sm font-semibold text-white ${
+              isNcmInvalid || isValidatingNcm || isCestInvalid || isValidatingCest
+                ? 'cursor-not-allowed opacity-50'
+                : 'hover:bg-primary/90'
+            }`}
+            sx={{
+              backgroundColor: 'var(--color-primary)',
+            }}
+          >
+            {isValidatingNcm || isValidatingCest ? 'Validando...' : 'Salvar'}
+          </Button>
+        </div>
+      ) : null}
     </div>
   )
 }

@@ -1,6 +1,15 @@
 'use client'
 
-import { useState, useEffect, useMemo, Suspense, useRef, useCallback } from 'react'
+import {
+  useState,
+  useEffect,
+  useMemo,
+  Suspense,
+  useRef,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+} from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { InformacoesProdutoStep } from './NovoProduto/InformacoesProdutoStep'
 import { ConfiguracoesGeraisStep } from './NovoProduto/ConfiguracoesGeraisStep'
@@ -10,26 +19,54 @@ import { showToast, handleApiError } from '@/src/shared/utils/toast'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { MdImage } from 'react-icons/md'
 
-interface NovoProdutoProps {
+/** API imperativa para o rodapé do `JiffySidePanelModal` (wizard 3 passos). */
+export interface NovoProdutoHandle {
+  goNext: () => void
+  goBack: () => void
+  /** Mesmo fluxo que “Salvar e fechar” nos passos 1–2 */
+  savePartialAndClose: () => void
+  /** Salvar completo (passo fiscal ou cadastro inteiro) */
+  saveFinal: () => void
+}
+
+export interface NovoProdutoProps {
   produtoId?: string
   isCopyMode?: boolean
   defaultGrupoProdutoId?: string
   initialStep?: 0 | 1 | 2
   onClose?: () => void
   onSuccess?: (produtoData?: { produtoId: string; produtoData: any }) => void
+  /** Modo painel lateral: sem cabeçalho interno duplicado; ações no rodapé externo */
+  isEmbedded?: boolean
+  hideEmbeddedHeader?: boolean
+  /** Omite botões inferiores dos passos (Anterior / Próximo / Salvar e fechar) */
+  hideEmbeddedFormActions?: boolean
+  onWizardStepChange?: (step: 0 | 1 | 2) => void
+  onWizardSavingChange?: (saving: boolean) => void
+  /** Passo 2 com fiscal indisponível: só “Voltar” no fluxo interno */
+  onFiscalUnavailableChange?: (onlyBack: boolean) => void
 }
 
 /**
  * Componente interno que usa useSearchParams
  */
-function NovoProdutoContent({
-  produtoId,
-  isCopyMode = false,
-  defaultGrupoProdutoId,
-  initialStep = 0,
-  onClose,
-  onSuccess,
-}: NovoProdutoProps) {
+const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(function NovoProdutoContent(
+  {
+    produtoId,
+    isCopyMode = false,
+    defaultGrupoProdutoId,
+    initialStep = 0,
+    onClose,
+    onSuccess,
+    isEmbedded = false,
+    hideEmbeddedHeader = false,
+    hideEmbeddedFormActions = false,
+    onWizardStepChange,
+    onWizardSavingChange,
+    onFiscalUnavailableChange,
+  },
+  ref
+) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { auth } = useAuthStore()
@@ -808,6 +845,8 @@ function NovoProdutoContent({
         : 'Cadastrando produto...'
     )
 
+    onWizardSavingChange?.(true)
+
     try {
       const token = auth?.getAccessToken()
       if (!token) {
@@ -982,8 +1021,41 @@ function NovoProdutoContent({
       console.error('Erro ao salvar produto:', error)
       const errorMessage = handleApiError(error)
       showToast.errorLoading(toastId, errorMessage)
+    } finally {
+      onWizardSavingChange?.(false)
     }
   }
+
+  const handleSaveRef = useRef(handleSave)
+  handleSaveRef.current = handleSave
+
+  useImperativeHandle(ref, () => ({
+    goNext: () => {
+      setSelectedPage(p => (p < 2 ? ((p + 1) as 0 | 1 | 2) : p))
+    },
+    goBack: () => {
+      setSelectedPage(p => {
+        if (p === 2) return 1
+        if (p === 1) return 0
+        return p
+      })
+    },
+    savePartialAndClose: () => {
+      void handleSaveRef.current({ salvarSomenteDadosGerais: true })
+    },
+    saveFinal: () => {
+      void handleSaveRef.current()
+    },
+  }))
+
+  useEffect(() => {
+    onWizardStepChange?.(selectedPage)
+  }, [selectedPage, onWizardStepChange])
+
+  useEffect(() => {
+    const onlyBack = fiscalStatus === 'unavailable' && selectedPage === 2
+    onFiscalUnavailableChange?.(onlyBack)
+  }, [fiscalStatus, selectedPage, onFiscalUnavailableChange])
 
   const getPageTitle = () => {
     if (effectiveIsCopyMode) {
@@ -1000,9 +1072,17 @@ function NovoProdutoContent({
   const canToggleAtivo = Boolean(effectiveProdutoId)
   const canManageAtivo = Boolean(effectiveProdutoId)
 
+  const hideLocalStepFooter = Boolean(isEmbedded && hideEmbeddedFormActions)
+  const showInnerProdutoHeader = !(isEmbedded && hideEmbeddedHeader)
+
   return (
-    <div className="flex h-full flex-col">
-      {/* Header fixo com título e botões */}
+    <div
+      className={
+        isEmbedded ? 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden' : 'flex h-full flex-col'
+      }
+    >
+      {/* Cabeçalho interno — omitido no painel lateral (título no shell do modal) */}
+      {showInnerProdutoHeader ? (
       <div className="sticky top-0 z-10 rounded-tl-lg bg-primary-bg/90 shadow-md backdrop-blur-sm">
         <div className="px-1 py-[4px] md:px-[30px]">
           <div className="rounded-lg border border-[#E0E4F3] bg-gradient-to-br from-[#F6F7FF] to-[#EEF1FB] px-6 py-3 shadow-[0_15px_45px_rgba(15,23,42,0.08)]">
@@ -1058,9 +1138,10 @@ function NovoProdutoContent({
           </div>
         </div>
       </div>
+      ) : null}
 
       {/* Indicador de steps */}
-      <div className="px-5 py-1">
+      <div className={`py-1 ${showInnerProdutoHeader ? 'px-5' : 'px-2'}`}>
         <div className="flex items-center justify-center gap-4">
           <div
             className={`flex h-9 w-9 items-center justify-center rounded-full font-exo text-base font-bold transition-colors ${
@@ -1097,7 +1178,11 @@ function NovoProdutoContent({
       </div>
 
       {/* Conteúdo das etapas */}
-      <div className="flex-1 overflow-y-auto px-1 pb-5 md:px-5">
+      <div
+        className={`min-h-0 flex flex-1 flex-col overflow-y-auto pb-4 ${
+          isEmbedded ? 'px-2 md:px-4' : 'px-1 pb-5 md:px-5'
+        }`}
+      >
         {selectedPage === 0 ? (
           <InformacoesProdutoStep
             nomeProduto={nomeProduto}
@@ -1114,6 +1199,7 @@ function NovoProdutoContent({
             isLoadingGrupos={isLoadingGrupos}
             onNext={handleNext}
             onSaveAndClose={() => void handleSave({ salvarSomenteDadosGerais: true })}
+            hideStepFooter={hideLocalStepFooter}
           />
         ) : selectedPage === 1 ? (
           <ConfiguracoesGeraisStep
@@ -1141,6 +1227,7 @@ function NovoProdutoContent({
             onSave={handleNext}
             onSaveAndClose={() => void handleSave({ salvarSomenteDadosGerais: true })}
             saveButtonText="Próximo"
+            hideStepFooter={hideLocalStepFooter}
           />
         ) : (
           <ConfiguracaoFiscalStep
@@ -1165,37 +1252,31 @@ function NovoProdutoContent({
             onIndicadorProducaoEscalaChange={setIndicadorProducaoEscala}
             onBack={handleBackFromFiscal}
             onNext={handleNextFromFiscal}
+            hideStepFooter={hideLocalStepFooter}
           />
         )}
       </div>
     </div>
   )
-}
+})
+
+NovoProdutoContent.displayName = 'NovoProdutoContent'
 
 /**
  * Componente principal para criação/edição de produtos
  * Replica exatamente o design e lógica do Flutter NovoProdutoWidget
  */
-export function NovoProduto({
-  produtoId,
-  isCopyMode = false,
-  defaultGrupoProdutoId,
-  initialStep = 0,
-  onClose,
-  onSuccess,
-}: NovoProdutoProps) {
+export const NovoProduto = forwardRef<NovoProdutoHandle, NovoProdutoProps>(function NovoProduto(
+  props,
+  ref
+) {
   return (
     <Suspense
       fallback={<div className="flex h-full items-center justify-center">Carregando...</div>}
     >
-      <NovoProdutoContent
-        produtoId={produtoId}
-        isCopyMode={isCopyMode}
-        defaultGrupoProdutoId={defaultGrupoProdutoId}
-        initialStep={initialStep}
-        onClose={onClose}
-        onSuccess={onSuccess}
-      />
+      <NovoProdutoContent {...props} ref={ref} />
     </Suspense>
   )
-}
+})
+
+NovoProduto.displayName = 'NovoProduto'
