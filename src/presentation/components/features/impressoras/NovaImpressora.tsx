@@ -1226,7 +1226,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
             {/* Nome — label na borda (outlined), sem título externo */}
             <Input
               label="Nome da Impressora"
-              value={nome}
+              value={nome.toUpperCase()}
               onChange={e => setNome(e.target.value)}
               required
               size="small"
@@ -1247,7 +1247,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                 {/* Barra de ações em lote — sempre visível; aplica só com terminais selecionados */}
                 <div className="border-b border-primary px-2 py-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-nunito text-sm font-semibold text-primary-text">
+                    <span className="font-nunito text-sm font-medium text-primary-text">
                       {selectedTerminalIds.size === 0 ?
                         'Nenhum terminal selecionado'
                       : `${selectedTerminalIds.size} terminal(is) selecionado(s)`}

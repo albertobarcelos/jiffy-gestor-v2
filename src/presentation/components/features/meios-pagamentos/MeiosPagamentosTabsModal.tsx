@@ -1,8 +1,9 @@
 'use client'
 
-import { useMemo } from 'react'
-import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
+import { useMemo, useState } from 'react'
+import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { NovoMeioPagamento } from './NovoMeioPagamento'
+import { MEIO_PAGAMENTO_TABS_MODAL_FORM_ID } from './meioPagamentoModalConstants'
 
 type TabKey = 'meio-pagamento'
 
@@ -30,67 +31,63 @@ export function MeiosPagamentosTabsModal({
     return state.mode === 'create' ? 'Novo Meio de Pagamento' : 'Editar Meio de Pagamento'
   }, [state.mode])
 
+  const [embedFormState, setEmbedFormState] = useState({
+    isSubmitting: false,
+    canSubmit: false,
+  })
+
+  const meioPagamentoId = state.meioPagamentoId
+
+  const tabsSlot = (
+    <div className="-mx-2 -mt-2 bg-info px-4 md:-mx-4 md:px-6">
+      <div className="flex flex-wrap gap-1 pt-2">
+        <button
+          type="button"
+          onClick={() => onTabChange('meio-pagamento')}
+          className="font-nunito rounded-t-lg bg-primary px-4 py-2 text-xs font-semibold text-white md:text-sm"
+          aria-current="page"
+        >
+          Meio de Pagamento
+        </button>
+      </div>
+    </div>
+  )
+
   return (
-    <Dialog
+    <JiffySidePanelModal
       open={state.open}
-      onOpenChange={(open) => {
-        if (!open) {
-          onClose()
-        }
-      }}
-      fullWidth
-      maxWidth="xl"
-      sx={{
-        '& .MuiDialog-container': {
-          justifyContent: 'flex-end',
-          alignItems: 'stretch',
-          margin: 0,
-        },
-      }}
-      PaperProps={{
-        sx: {
-          m: 0,
-          height: '100vh',
-          maxHeight: '100vh',
-          width: { xs: '95vw', md: 'min(900px, 60vw)' },
-          borderRadius: 0,
-          display: 'flex',
-          flexDirection: 'column',
-        },
+      onClose={onClose}
+      title={title}
+      scrollableBody={false}
+      footerVariant="bar"
+      panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]"
+      tabsSlot={tabsSlot}
+      footerActions={{
+        showSave: true,
+        saveLabel: 'Salvar',
+        saveFormId: MEIO_PAGAMENTO_TABS_MODAL_FORM_ID,
+        saveLoading: embedFormState.isSubmitting,
+        saveDisabled: !embedFormState.canSubmit || embedFormState.isSubmitting,
       }}
     >
-      <DialogContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <div className="px-6 pt-6 flex gap-1 border-b border-gray-100 bg-white">
-          <button
-            type="button"
-            onClick={() => onTabChange('meio-pagamento')}
-            className={`px-4 py-2 rounded-t-lg text-sm font-semibold transition-colors ${
-              state.tab === 'meio-pagamento'
-                ? 'bg-primary text-white'
-                : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
-            }`}
-          >
-            Meio de Pagamento
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-hidden">
-          {state.tab === 'meio-pagamento' && (
-            <div className="h-full overflow-y-auto">
-              <NovoMeioPagamento
-                meioPagamentoId={state.mode === 'edit' ? state.meioPagamentoId : undefined}
-                isEmbedded
-                onSaved={() => {
-                  onReload?.()
-                  onClose()
-                }}
-                onCancel={onClose}
-              />
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+      <div className="flex min-h-0 flex-1 flex-col">
+        {state.tab === 'meio-pagamento' ? (
+          <NovoMeioPagamento
+            key={`meio-${meioPagamentoId ?? 'new'}-${state.mode}`}
+            meioPagamentoId={state.mode === 'edit' ? meioPagamentoId : undefined}
+            isEmbedded
+            hideEmbeddedHeader
+            embeddedFormId={MEIO_PAGAMENTO_TABS_MODAL_FORM_ID}
+            hideEmbeddedFormActions
+            onEmbedFormStateChange={setEmbedFormState}
+            onSaved={() => {
+              onReload?.()
+              onClose()
+            }}
+            onCancel={onClose}
+          />
+        ) : null}
+      </div>
+    </JiffySidePanelModal>
   )
 }
-

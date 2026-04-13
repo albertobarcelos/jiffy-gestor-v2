@@ -272,10 +272,10 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="md:px-[30px] px-1 pt-2 pb-1 flex-shrink-0">
+      <div className="md:px-6 px-1 pt-1 pb-1 flex-shrink-0">
         <div className="flex items-start justify-between">
-          <div className=" md:pl-5">
-            <p className="text-primary md:text-lg text-sm font-semibold font-nunito">
+          <div className="">
+            <p className="text-primary md:text-xl text-sm font-semibold font-nunito">
               Impressoras Cadastradas
             </p>
             <p className="text-tertiary md:text-[22px] text-sm font-medium font-nunito">
@@ -291,24 +291,17 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
         </div>
       </div>
 
-      {/* Divisor amarelo */}
-        <div className="h-[4px] border-t-2 border-primary/70 flex-shrink-0"></div>
           {/* Barra de pesquisa */}
-          <div className="flex gap-3 md:px-[20px] px-1 py-1 flex-shrink-0">
-        <div className="flex-1 min-w-[180px] max-w-[360px]">
-            <label
-              className="text-xs font-semibold text-secondary-text mb-1 block"
-            >
-              Buscar complemento...
-            </label>
-            <div className="relative h-8">
+          <div className="flex gap-3 md:px-[20px] px-1 py-1 flex-shrink-0 ">
+        <div className="flex-1 border-t-2 border-primary/70">
+            <div className="relative h-8  min-w-[180px] max-w-[360px] mt-2">
               <MdSearch
                 className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
                 size={18}
               />
               <input
                 type="text"
-                placeholder="Pesquisar complemento..."
+                placeholder="Pesquisar impressoras..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
                 className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
@@ -370,12 +363,12 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
               </div>
               
               {/* Código */}
-              <div className="flex-[2] justify-start font-nunito font-semibold md:text-sm text-xs text-primary-text">
+              <div className="flex-[2] justify-start font-normal md:text-sm text-xs text-primary-text">
                 #{getCodigo(impressora.getId())}
               </div>
               
               {/* Impressora (Nome) */}
-              <div className="flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text">
+              <div className="flex-[2] font-normal uppercase md:text-sm text-xs text-primary-text">
                 {impressora.getNome()}
               </div>
               

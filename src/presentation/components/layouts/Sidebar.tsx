@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePrefetch } from '@/src/presentation/hooks/usePrefetch'
@@ -16,6 +16,7 @@ export function Sidebar() {
   const [isCompact, setIsCompact] = useState(false)
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set())
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const router = useRouter()
   const { logout } = useAuthStore()
   const queryClient = useQueryClient()
@@ -90,7 +91,11 @@ export function Sidebar() {
         { name: 'Perfis de Usuários', path: '/cadastros/perfis-usuarios', icon: '👥' },
         { name: 'Clientes', path: '/cadastros/clientes', icon: '👥' },
         { name: 'Impressoras', path: '/cadastros/impressoras', icon: '🖨️' },
-        { name: 'Meios de Pagamentos', path: '/cadastros/meios-pagamentos', icon: '💳' },
+        {
+          name: 'Meios de Pagamentos',
+          path: '/configuracoes?tab=meios-pagamentos',
+          icon: '💳',
+        },
       ],
     },
     { name: 'Estoque', path: '/estoque', icon: '📦' },
@@ -112,7 +117,17 @@ export function Sidebar() {
     return false
   }
 
+  /** Considera query string (ex.: /configuracoes?tab=meios-pagamentos) para marcar item ativo */
   const isChildActive = (childPath: string) => {
+    if (childPath.includes('?')) {
+      const [base, qs] = childPath.split('?')
+      if (pathname !== base) return false
+      const required = new URLSearchParams(qs)
+      for (const [key, value] of required.entries()) {
+        if (searchParams.get(key) !== value) return false
+      }
+      return true
+    }
     return pathname === childPath || pathname?.startsWith(childPath + '/')
   }
 
@@ -184,7 +199,7 @@ export function Sidebar() {
                       {!isCompact && isExpanded && (
                         <ul className="pl-4 mt-1 space-y-1">
                           {item.children.map((child) => {
-                            const isChildActive = pathname === child.path || pathname?.startsWith(child.path + '/')
+                            const childActive = isChildActive(child.path)
                             return (
                               <li key={child.path}>
                                 <Link
@@ -192,7 +207,7 @@ export function Sidebar() {
                                   onMouseEnter={() => handleLinkHover(child.path)}
                                   prefetch={true}
                                   className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
-                                    isChildActive
+                                    childActive
                                       ? 'bg-info/20 text-info font-semibold'
                                       : 'text-info/60 hover:bg-info/10'
                                   }`}

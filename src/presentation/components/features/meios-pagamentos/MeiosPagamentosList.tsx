@@ -7,6 +7,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { MdSearch, MdDelete } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import {
   MeiosPagamentosTabsModal,
   MeiosPagamentosTabsModalState,
@@ -27,14 +28,14 @@ interface MeiosPagamentosListProps {
  * Mapeamento entre valores da API e labels para exibição
  */
 const formasPagamentoFiscalMap: Record<string, string> = {
-  dinheiro: 'Dinheiro',
+  dinheiro: 'DINHEIRO',
   pix: 'PIX',
-  cartao_credito: 'Cartão de Crédito',
-  cartao_debito: 'Cartão de Débito',
-  vale_alimentacao: 'Vale Alimentação',
-  vale_refeicao: 'Vale Refeição',
-  vale_presente: 'Vale Presente',
-  vale_combustivel: 'Vale Combustível',
+  cartao_credito: 'CARTÃO DE CRÉDITO',
+  cartao_debito: 'CARTÃO DE DÉBITO',
+  vale_alimentacao: 'VALE ALIMENTAÇÃO',
+  vale_refeicao: 'VALE REFEIÇÃO',
+  vale_presente: 'VALE PRESENTE',
+  vale_combustivel: 'VALE COMBUSTÍVEL',
 }
 
 /**
@@ -463,13 +464,13 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="md:px-[30px] px-1 pt-2 flex-shrink-0">
+      <div className="md:px-6 px-1 pt-1 flex-shrink-0">
         <div className="flex items-start justify-between">
-          <div className="w-1/2 md:pl-5">
-            <p className="text-primary text-sm font-semibold font-nunito">
+          <div className="w-1/2">
+            <p className="text-primary text-xl font-semibold font-nunito">
               Meios de Pagamento Cadastrados
             </p>
-            <p className="text-tertiary md:text-[22px] text-sm font-medium font-nunito">
+            <p className="text-tertiary md:text-[22px] text-sm font-medium">
               Total {meiosPagamento.length} de {totalMeiosPagamento}
             </p>
           </div>
@@ -483,14 +484,10 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
         </div>
       </div>
 
-      <div className="h-[4px] border-t-2 border-primary/70 flex-shrink-0"></div>
-      <div className="bg-white md:px-[20px] px-1 py-2 border-b border-gray-100 flex-shrink-0">
-        <div className="flex flex-row items-start gap-2">
+      <div className="bg-white md:px-6 px-1 py-2 flex-shrink-0 ">
+        <div className="flex flex-row items-start gap-2 border-t-2 border-primary/70">
           {/* Barra de pesquisa */}
-          <div className="flex-1 min-w-[180px] max-w-[360px]">
-            <label htmlFor="meios-pagamentos-search" className="text-xs font-semibold text-secondary-text mb-1 block">
-              Buscar meio de pagamento...
-            </label>
+          <div className="flex-1 mt-2 min-w-[180px] max-w-[360px]">
             <div className="relative h-8">
               <MdSearch className="absolute md:left-4 left-1 top-1/2 -translate-y-1/2 text-secondary-text" size={18} />
               <input
@@ -505,7 +502,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
           </div>
 
           {/* Filtro de status */}
-          <div className="w-full sm:w-[160px]">
+          <div className="flex gap-2 items-center w-full sm:w-[160px] mt-2">
             <label className="text-xs font-semibold text-secondary-text mb-1 block">Status</label>
             <select
               value={filterStatus}
@@ -570,66 +567,56 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
           <div
             key={meioPagamento.getId()}
             onClick={handleRowClick}
-            className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} rounded-lg mb-2 hover:bg-secondary-bg/15 transition-colors cursor-pointer`}
+            className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} rounded-lg hover:bg-secondary-bg/15 transition-colors cursor-pointer`}
           >
-            <div className="h-[50px] md:px-4 px-1 flex items-center gap-[10px]">
-              <div className="flex-[3] font-nunito font-semibold md:text-sm text-xs text-primary-text flex items-center gap-2">
-                # <span>{meioPagamento.getNome()}</span>
+            <div className="md:px-4 px-1 py-1 flex items-center">
+              <div className="flex-[3] font-normal md:text-sm text-xs text-primary-text flex items-center gap-2">
+                # <span className="uppercase">{meioPagamento.getNome()}</span>
               </div>
-              <div className="flex-[2] font-nunito text-sm text-secondary-text hidden md:flex">
+              <div className="flex-[2] font-normal text-sm text-secondary-text hidden md:flex">
                 {formatarFormaPagamentoFiscal(meioPagamento.getFormaPagamentoFiscal())}
               </div>
-              <div className="md:flex-[2] flex-[1] flex justify-center" onClick={(e) => e.stopPropagation()}>
-                <label
-                  className={`relative inline-flex h-4 w-8 md:h-5 md:w-12 items-center ${
-                    updatingTefAtivo[meioPagamento.getId()]
-                      ? 'cursor-not-allowed opacity-60'
-                      : 'cursor-pointer'
-                  }`}
-                  title={meioPagamento.isTefAtivo() ? 'TEF Ativo' : 'TEF Inativo'}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onTouchStart={(e) => e.stopPropagation()}
-                >
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={meioPagamento.isTefAtivo()}
-                    onChange={(event) => {
-                      event.stopPropagation()
-                      handleToggleTefAtivo(meioPagamento, event.target.checked)
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    disabled={!!updatingTefAtivo[meioPagamento.getId()]}
-                  />
-                  <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                  <span className="absolute left-1 top-1/2 block h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 md:h-3 md:w-3 peer-checked:translate-x-4 md:peer-checked:translate-x-6" />
-                </label>
+              <div
+                className="md:flex-[2] flex-[1] flex justify-center"
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+              >
+                <JiffyIconSwitch
+                  checked={meioPagamento.isTefAtivo()}
+                  onChange={(e) => {
+                    e.stopPropagation()
+                    handleToggleTefAtivo(meioPagamento, e.target.checked)
+                  }}
+                  disabled={!!updatingTefAtivo[meioPagamento.getId()]}
+                  size="sm"
+                  className="justify-center gap-0 px-0 py-0"
+                  inputProps={{
+                    'aria-label': `TEF — ${meioPagamento.getNome()}`,
+                    title: meioPagamento.isTefAtivo() ? 'TEF Ativo' : 'TEF Inativo',
+                  }}
+                />
               </div>
-              <div className="md:flex-[2] flex-[1] flex justify-center" onClick={(e) => e.stopPropagation()}>
-                <label
-                  className={`relative inline-flex h-4 w-8 md:h-5 md:w-12 items-center ${
-                    updatingAtivo[meioPagamento.getId()]
-                      ? 'cursor-not-allowed opacity-60'
-                      : 'cursor-pointer'
-                  }`}
-                  title={meioPagamento.isAtivo() ? 'Ativo' : 'Desativado'}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onTouchStart={(e) => e.stopPropagation()}
-                >
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={meioPagamento.isAtivo()}
-                    onChange={(event) => {
-                      event.stopPropagation()
-                      handleToggleAtivo(meioPagamento, event.target.checked)
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    disabled={!!updatingAtivo[meioPagamento.getId()]}
-                  />
-                  <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                  <span className="absolute left-1 top-1/2 block h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 md:h-3 md:w-3 peer-checked:translate-x-4 md:peer-checked:translate-x-6" />
-                </label>
+              <div
+                className="md:flex-[2] flex-[1] flex justify-center"
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+              >
+                <JiffyIconSwitch
+                  checked={meioPagamento.isAtivo()}
+                  onChange={(e) => {
+                    e.stopPropagation()
+                    handleToggleAtivo(meioPagamento, e.target.checked)
+                  }}
+                  disabled={!!updatingAtivo[meioPagamento.getId()]}
+                  size="sm"
+                  className="justify-center gap-0 px-0 py-0"
+                  inputProps={{
+                    'aria-label': `Ativo — ${meioPagamento.getNome()}`,
+                    title: meioPagamento.isAtivo() ? 'Ativo' : 'Desativado',
+                  }}
+                />
               </div>
               <div className="md:flex-[2] flex-[1] flex justify-end" onClick={(e) => e.stopPropagation()}>
                 <button

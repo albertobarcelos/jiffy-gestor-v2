@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Terminal } from '@/src/domain/entities/Terminal'
-import { MdPhone, MdPowerSettingsNew, MdSearch } from 'react-icons/md'
+import { MdPhone, MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { TerminaisTabsModal, TerminaisTabsModalState } from './TerminaisTabsModal'
 
 /** Tamanho de página alinhado ao backend (Swagger): menos round-trips na listagem */
@@ -699,9 +700,9 @@ export function TerminaisTab() {
   }, [])
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden py-1">
       {/* Header fixo */}
-      <div className="md:px-4 px-1 flex-shrink-0">
+      <div className="md:px-6 px-1 flex-shrink-0">
         <div className="flex items-center justify-between border-b-2 border-primary/70 pb-2">
           <div className="flex flex-col">
             <span className="text-primary text-lg md:text-xl font-semibold font-exo">
@@ -718,12 +719,6 @@ export function TerminaisTab() {
       {/* Busca fixa */}
       <div className="flex gap-3 md:px-[20px] px-1 pb-2 flex-shrink-0">
         <div className="flex-1 min-w-[180px] max-w-[360px]">
-          <label
-            htmlFor="terminais-search"
-            className="text-xs font-semibold text-secondary-text mb-1 block"
-          >
-            Buscar Terminal...
-          </label>
           <div className="relative h-8">
             <MdSearch
               className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
@@ -785,7 +780,7 @@ export function TerminaisTab() {
           </div>
         )}
 
-        {terminais.map(({ terminal, rawData }) => {
+        {terminais.map(({ terminal, rawData }, index) => {
           // Extrai campos dos dados brutos conforme documentação da API
           const codigo = rawData?.codigoInterno || rawData?.codigo || rawData?.code || terminal.getName() || 'N/A'
           const nome = rawData?.nome || terminal.getName() || codigo
@@ -809,11 +804,13 @@ export function TerminaisTab() {
                   terminalId: terminal.getId(),
                 })
               }
-              className=" px-4 py-2 flex items-center gap-[10px] bg-info rounded-lg my-2 shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-colors cursor-pointer"
+              className={`px-4 py-2 flex items-center gap-[10px] rounded-lg hover:bg-primary/10 transition-colors cursor-pointer ${
+                index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+              }`}
             >
               <div className="flex-[2] hidden md:flex items-center gap-3">
                 
-                <span className="text-sm font-medium text-primary-text font-nunito">
+                <span className="text-sm font-normal text-primary-text">
                  # {codigo}
                 </span>
               </div>
@@ -849,76 +846,67 @@ export function TerminaisTab() {
                   <div className="md:text-xs text-[10px] text-secondary-text">Carregando...</div>
                 )}
               </div>
-              <div className="flex-[1.5] flex justify-center" onClick={(e) => e.stopPropagation()}>
-                <label
-                  className={`relative inline-flex h-4 w-10 md:h-5 md:w-12 items-center ${
-                    updatingShare[terminal.getId()] ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
-                  }`}
-                  title={compartilhamentoAtivo ? 'Compartilhamento habilitado' : 'Compartilhamento desabilitado'}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={compartilhamentoAtivo}
-                    onChange={(event) => {
-                      event.stopPropagation();
-                      handleToggleCompartilhar(terminal.getId(), event.target.checked)
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    disabled={!!updatingShare[terminal.getId()]}
-                  />
-                  <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                  <span className="absolute left-[2px] top-1/2 block h-[14px] w-[14px] md:h-4 md:w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[18px] md:peer-checked:translate-x-[28px]" />
-                </label>
+              <div
+                className="flex-[1.5] flex justify-center"
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <JiffyIconSwitch
+                  checked={compartilhamentoAtivo}
+                  onChange={(e) => {
+                    e.stopPropagation()
+                    handleToggleCompartilhar(terminal.getId(), e.target.checked)
+                  }}
+                  disabled={!!updatingShare[terminal.getId()]}
+                  size="sm"
+                  className="justify-center gap-0 px-0 py-0"
+                  inputProps={{
+                    'aria-label': `Compartilhar mesas — ${nome}`,
+                    title: compartilhamentoAtivo
+                      ? 'Compartilhamento habilitado'
+                      : 'Compartilhamento desabilitado',
+                  }}
+                />
               </div>
-              <div className="flex-[1.5] flex justify-center" onClick={(e) => e.stopPropagation()}>
-                <label
-                  className={`relative inline-flex h-4 w-10 md:h-5 md:w-12 items-center ${
-                    updatingFiscal[terminal.getId()] ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
-                  }`}
-                  title={fiscalAtivo ? 'Fiscal ativo' : 'Fiscal inativo'}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={fiscalAtivo}
-                    onChange={(event) => {
-                      event.stopPropagation()
-                      handleToggleFiscalAtivo(terminal.getId(), event.target.checked)
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    disabled={!!updatingFiscal[terminal.getId()]}
-                  />
-                  <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                  <span className="absolute left-[2px] top-1/2 block h-[14px] w-[14px] md:h-4 md:w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[18px] md:peer-checked:translate-x-[28px]" />
-                </label>
+              <div
+                className="flex-[1.5] flex justify-center"
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <JiffyIconSwitch
+                  checked={fiscalAtivo}
+                  onChange={(e) => {
+                    e.stopPropagation()
+                    handleToggleFiscalAtivo(terminal.getId(), e.target.checked)
+                  }}
+                  disabled={!!updatingFiscal[terminal.getId()]}
+                  size="sm"
+                  className="justify-center gap-0 px-0 py-0"
+                  inputProps={{
+                    'aria-label': `Fiscal ativo — ${nome}`,
+                    title: fiscalAtivo ? 'Fiscal ativo' : 'Fiscal inativo',
+                  }}
+                />
               </div>
-              <div className="md:flex-[1.5] flex-[1] flex justify-center" onClick={(e) => e.stopPropagation()}>
-                <label
-                  className={`relative inline-flex h-4 w-10 md:h-5 md:w-12 items-center ${
-                    togglingStatus[terminal.getId()]
-                      ? 'cursor-not-allowed opacity-60'
-                      : 'cursor-pointer'
-                  }`}
-                  title={ativo ? 'Terminal Ativo' : 'Terminal Bloqueado'}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={ativo}
-                    onChange={(event) => {
-                      event.stopPropagation();
-                      handleToggleTerminalStatus(terminal.getId(), !event.target.checked)
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    disabled={!!togglingStatus[terminal.getId()]}
-                  />
-                  <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                  <span className="absolute left-[2px] top-1/2 block h-[14px] w-[14px] md:h-4 md:w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[18px] md:peer-checked:translate-x-[28px]" />
-                </label>
+              <div
+                className="md:flex-[1.5] flex-[1] flex justify-center"
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <JiffyIconSwitch
+                  checked={ativo}
+                  onChange={(e) => {
+                    e.stopPropagation()
+                    handleToggleTerminalStatus(terminal.getId(), !e.target.checked)
+                  }}
+                  disabled={!!togglingStatus[terminal.getId()]}
+                  size="sm"
+                  className="justify-center gap-0 px-0 py-0"
+                  inputProps={{
+                    'aria-label': `Status do terminal — ${nome}`,
+                    title: ativo ? 'Terminal ativo' : 'Terminal bloqueado',
+                  }}
+                />
               </div>
             </div>
           )

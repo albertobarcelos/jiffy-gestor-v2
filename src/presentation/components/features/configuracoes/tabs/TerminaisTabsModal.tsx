@@ -1,8 +1,9 @@
 'use client'
 
-import { useMemo } from 'react'
-import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
+import { useState } from 'react'
+import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { EditarTerminais } from './EditarTerminais'
+import { TERMINAIS_TABS_MODAL_FORM_ID } from './terminaisTabsModalConstants'
 
 type TabKey = 'terminal'
 
@@ -26,72 +27,66 @@ export function TerminaisTabsModal({
   onTabChange,
   onReload,
 }: TerminaisTabsModalProps) {
-  const title = useMemo(() => {
-    return 'Editar Terminal'
-  }, [])
+  const [embedFormState, setEmbedFormState] = useState({
+    isSubmitting: false,
+    canSubmit: false,
+  })
+
+  const terminalId = state.terminalId
+
+  const tabsSlot = (
+    <div className="-mx-2 -mt-2 bg-info px-4 md:-mx-4 md:px-6">
+      <div className="flex flex-wrap gap-1 pt-2">
+        <button
+          type="button"
+          onClick={() => onTabChange('terminal')}
+          className={`font-nunito rounded-t-lg px-4 py-2 text-xs font-semibold md:text-sm ${
+            state.tab === 'terminal'
+              ? 'bg-primary text-white'
+              : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
+          }`}
+          aria-current={state.tab === 'terminal' ? 'page' : undefined}
+        >
+          Terminal
+        </button>
+      </div>
+    </div>
+  )
 
   return (
-    <Dialog
+    <JiffySidePanelModal
       open={state.open}
-      onOpenChange={(open) => {
-        if (!open) {
-          onClose()
-        }
-      }}
-      fullWidth
-      maxWidth="xl"
-      sx={{
-        '& .MuiDialog-container': {
-          justifyContent: 'flex-end',
-          alignItems: 'stretch',
-          margin: 0,
-        },
-      }}
-      PaperProps={{
-        sx: {
-          m: 0,
-          height: '100vh',
-          maxHeight: '100vh',
-          width: { xs: '95vw', md: 'min(900px, 60vw)' },
-          maxWidth: { xs: '95vw', md: 'min(900px, 60vw)' },
-          borderRadius: 0,
-          display: 'flex',
-          flexDirection: 'column',
-        },
+      onClose={onClose}
+      title="Editar Terminal"
+      scrollableBody={false}
+      footerVariant="bar"
+      panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]"
+      tabsSlot={tabsSlot}
+      footerActions={{
+        showSave: true,
+        saveLabel: 'Salvar',
+        saveFormId: TERMINAIS_TABS_MODAL_FORM_ID,
+        saveLoading: embedFormState.isSubmitting,
+        saveDisabled: !embedFormState.canSubmit || embedFormState.isSubmitting,
       }}
     >
-      <DialogContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <div className="px-6 pt-2 flex gap-1 border-b border-gray-100 bg-white">
-          <button
-            type="button"
-            onClick={() => onTabChange('terminal')}
-            className={`px-4 py-2 rounded-t-lg text-sm font-semibold transition-colors ${
-              state.tab === 'terminal'
-                ? 'bg-primary text-white'
-                : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
-            }`}
-          >
-            Terminal
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-hidden">
-          {state.tab === 'terminal' && state.terminalId && (
-            <div className="h-full overflow-y-auto">
-              <EditarTerminais
-                terminalId={state.terminalId}
-                isEmbedded
-                onSaved={() => {
-                  onReload?.()
-                  onClose()
-                }}
-                onCancel={onClose}
-              />
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+      <div className="flex min-h-0 flex-1 flex-col">
+        {state.tab === 'terminal' && terminalId ? (
+          <EditarTerminais
+            key={`terminal-${terminalId}`}
+            terminalId={terminalId}
+            isEmbedded
+            embeddedFormId={TERMINAIS_TABS_MODAL_FORM_ID}
+            hideEmbeddedFormActions
+            onEmbedFormStateChange={setEmbedFormState}
+            onSaved={() => {
+              onReload?.()
+              onClose()
+            }}
+            onCancel={onClose}
+          />
+        ) : null}
+      </div>
+    </JiffySidePanelModal>
   )
 }
-

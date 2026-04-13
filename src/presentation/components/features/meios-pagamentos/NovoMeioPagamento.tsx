@@ -1,16 +1,62 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { MenuItem } from '@mui/material'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { MeioPagamento } from '@/src/domain/entities/MeioPagamento'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
+
+/** Labels outlined em preto — alinhado a NovoComplemento / NovoGrupo */
+const sxOutlinedLabelTextoEscuro = {
+  '& .MuiInputLabel-root': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiInputLabel-root.Mui-focused': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiInputLabel-root.MuiInputLabel-shrink': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiFormLabel-asterisk': {
+    color: 'var(--color-error)',
+  },
+} as const
+
+/** Padding interno reduzido (menor que o padrão do MUI small) */
+const entradaCompactaInput = {
+  padding: '12px 10px',
+  fontSize: '0.875rem',
+} as const
+
+const entradaCompactaSelect = {
+  padding: '12px 10px',
+  fontSize: '0.875rem',
+  minHeight: '1.5em',
+  lineHeight: 1.4,
+  display: 'flex',
+  alignItems: 'center',
+} as const
+
+const sxEntradaCompactaMeioPagamento = {
+  ...sxOutlinedLabelTextoEscuro,
+  '& .MuiOutlinedInput-input': entradaCompactaInput,
+  '& .MuiSelect-select': entradaCompactaSelect,
+} as const
 
 interface NovoMeioPagamentoProps {
   meioPagamentoId?: string
   isEmbedded?: boolean
+  /** Com `isEmbedded`, omite o título duplicado dentro do card — o shell do painel já exibe o título */
+  hideEmbeddedHeader?: boolean
+  /** `id` do `<form>` para o rodapé do painel usar `form="..."` no Salvar */
+  embeddedFormId?: string
+  /** Omite Cancelar/Salvar no formulário — ações ficam no rodapé do `JiffySidePanelModal` */
+  hideEmbeddedFormActions?: boolean
+  onEmbedFormStateChange?: (state: { isSubmitting: boolean; canSubmit: boolean }) => void
   onSaved?: () => void
   onCancel?: () => void
 }
@@ -22,6 +68,10 @@ interface NovoMeioPagamentoProps {
 export function NovoMeioPagamento({
   meioPagamentoId,
   isEmbedded = false,
+  hideEmbeddedHeader = false,
+  embeddedFormId,
+  hideEmbeddedFormActions = false,
+  onEmbedFormStateChange,
   onSaved,
   onCancel,
 }: NovoMeioPagamentoProps) {
@@ -40,16 +90,27 @@ export function NovoMeioPagamento({
   const [isLoadingMeioPagamento, setIsLoadingMeioPagamento] = useState(false)
   const hasLoadedMeioPagamentoRef = useRef(false)
 
-  // Mapeamento entre valores da API (lowercase) e labels para exibição
+  const emitEmbedFormState = useCallback(() => {
+    onEmbedFormStateChange?.({
+      isSubmitting: isLoading,
+      canSubmit: nome.trim().length > 0,
+    })
+  }, [isLoading, nome, onEmbedFormStateChange])
+
+  useEffect(() => {
+    emitEmbedFormState()
+  }, [emitEmbedFormState])
+
+  // Mapeamento entre valores da API (lowercase) e labels para exibição (maiúsculas)
   const formasPagamentoFiscalMap: Record<string, string> = {
-    dinheiro: 'Dinheiro',
+    dinheiro: 'DINHEIRO',
     pix: 'PIX',
-    cartao_credito: 'Cartão de Crédito',
-    cartao_debito: 'Cartão de Débito',
-    vale_alimentacao: 'Vale Alimentação',
-    vale_refeicao: 'Vale Refeição',
-    vale_presente: 'Vale Presente',
-    vale_combustivel: 'Vale Combustível',
+    cartao_credito: 'CARTÃO DE CRÉDITO',
+    cartao_debito: 'CARTÃO DE DÉBITO',
+    vale_alimentacao: 'VALE ALIMENTAÇÃO',
+    vale_refeicao: 'VALE REFEIÇÃO',
+    vale_presente: 'VALE PRESENTE',
+    vale_combustivel: 'VALE COMBUSTÍVEL',
   }
 
   // Opções de forma de pagamento fiscal (apenas as aceitas pela API)
@@ -117,7 +178,7 @@ export function NovoMeioPagamento({
     setIsLoading(true)
 
     try {
-      const body: any = {
+      const body: Record<string, unknown> = {
         nome,
         tefAtivo,
         // Garantir que o valor está em lowercase antes de enviar
@@ -148,7 +209,7 @@ export function NovoMeioPagamento({
         onSaved()
       } else {
         alert(isEditing ? 'Meio de pagamento atualizado com sucesso!' : 'Meio de pagamento criado com sucesso!')
-        router.push('/cadastros/meios-pagamentos')
+        router.push('/configuracoes?tab=meios-pagamentos')
       }
     } catch (error) {
       console.error('Erro ao salvar meio de pagamento:', error)
@@ -162,115 +223,136 @@ export function NovoMeioPagamento({
     if (isEmbedded && onCancel) {
       onCancel()
     } else {
-      router.push('/cadastros/meios-pagamentos')
+      router.push('/configuracoes?tab=meios-pagamentos')
     }
   }
 
   if (isLoadingMeioPagamento) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div
+        className={
+          isEmbedded
+            ? 'flex min-h-0 flex-1 flex-col items-center justify-center'
+            : 'flex h-full min-h-[40vh] flex-col items-center justify-center'
+        }
+      >
         <JiffyLoading />
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-full">
-
+    <div
+      className={
+        isEmbedded && hideEmbeddedHeader
+          ? 'flex min-h-0 flex-1 flex-col'
+          : 'flex h-full flex-col'
+      }
+    >
       {/* Formulário com scroll */}
       <div className="flex-1 overflow-y-auto md:px-[30px] px-1 md:py-4 py-2">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Dados */}
-          <div className="bg-info rounded-lg md:p-5 p-2">
-            <h2 className="text-primary text-xl font-semibold font-exo mb-4">
-              {isEditing && nome ? `Editar meio de pagamento: ${nome}` : `Novo meio de pagamento: ${nome}`}
-            </h2>
-            <div className="h-[2px] bg-primary/70 mb-4"></div>
+        <form
+          id={embeddedFormId}
+          onSubmit={handleSubmit}
+          className="space-y-6"
+        >
+          {/* Dados — mesmo padrão de “Dados do Grupo de Complementos” */}
+          <div className="rounded-[12px] bg-info md:p-5 p-2">
+            <div className="flex items-center gap-5 mb-8">
+              <h2 className="shrink-0 text-sm font-semibold text-primary md:text-xl">
+                Dados do Meio de Pagamento
+              </h2>
+              <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
+            </div>
 
-            <div className="space-y-4">
+            <div className="space-y-8">
               <Input
                 label="Nome do Meio de Pagamento"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
                 required
+                size="small"
                 placeholder="Digite o nome do meio de pagamento"
                 className="bg-info"
+                sx={sxEntradaCompactaMeioPagamento}
+                InputLabelProps={{ required: true }}
               />
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Forma de Pagamento Fiscal *
-                </label>
-                <select
-                  value={formaPagamentoFiscal}
-                  onChange={(e) => setFormaPagamentoFiscal(e.target.value)}
-                  required
-                  className="w-full px-4 py-3 rounded-lg border border-gray-400 bg-info text-gray-900 focus:outline-none focus:border-2 focus:border-primary"
-                >
-                  {formasPagamentoFiscal.map((forma) => (
-                    <option key={forma} value={forma}>
-                      {formasPagamentoFiscalMap[forma]}
-                    </option>
-                  ))}
-                </select>
+              <Input
+                select
+                label="Forma de pagamento fiscal"
+                value={formaPagamentoFiscal}
+                onChange={(e) => setFormaPagamentoFiscal(e.target.value)}
+                required
+                size="small"
+                className="bg-info"
+                sx={sxEntradaCompactaMeioPagamento}
+                InputLabelProps={{ required: true }}
+                SelectProps={{ displayEmpty: false }}
+              >
+                {formasPagamentoFiscal.map((forma) => (
+                  <MenuItem key={forma} value={forma}>
+                    {formasPagamentoFiscalMap[forma]}
+                  </MenuItem>
+                ))}
+              </Input>
+
+              {/* TEF Ativo */}
+              <div className="flex items-center justify-between gap-3 rounded-lg p-2">
+                <JiffyIconSwitch
+                  checked={tefAtivo}
+                  onChange={(e) => setTefAtivo(e.target.checked)}
+                  label="TEF Ativo"
+                  size="sm"
+                  className="w-full justify-end gap-3"
+                  inputProps={{ 'aria-label': 'TEF Ativo' }}
+                />
               </div>
 
-              {/* Toggle TEF Ativo */}
-              <div className="flex items-center justify-end p-4 rounded-lg gap-2">
-                <span className="text-primary-text font-medium">TEF Ativo</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={tefAtivo}
-                    onChange={(e) => setTefAtivo(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[20px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[5px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-                </label>
-              </div>
-
-              {/* Toggle Ativo */}
-              <div className="flex items-center justify-end p-4 rounded-lg gap-2">
-                <span className="text-primary-text font-medium">Ativo</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={ativo}
-                    onChange={(e) => setAtivo(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                    <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[20px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[5px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-                </label>
+              {/* Ativo */}
+              <div className="flex items-center justify-between gap-3 rounded-lg p-2">
+                <JiffyIconSwitch
+                  checked={ativo}
+                  onChange={(e) => setAtivo(e.target.checked)}
+                  label="Ativo"
+                  size="sm"
+                  className="w-full justify-end gap-3"
+                  inputProps={{ 'aria-label': 'Meio de pagamento ativo' }}
+                />
               </div>
             </div>
           </div>
 
-          {/* Botões de ação */}
-          <div className="flex justify-end gap-4 pt-4 pr-2">
-            <Button
-              type="button"
-              onClick={handleCancel}
-              variant="outlined"
-              className="h-8 px-8 rounded-lg"
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isLoading || !nome}
-                  sx={{
+          {/* Botões — fluxo em página cheia */}
+          {!(isEmbedded && hideEmbeddedFormActions) ? (
+            <div className="flex justify-end gap-4 pr-2 pt-4">
+              <Button
+                type="button"
+                onClick={handleCancel}
+                variant="outlined"
+                className="h-8 rounded-lg px-8"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={isLoading || !nome}
+                sx={{
+                  backgroundColor: 'var(--color-primary)',
+                  color: 'var(--color-info)',
+                  '&:hover': {
                     backgroundColor: 'var(--color-primary)',
-                    color: 'var(--color-info)',
-                    '&:hover': {
-                      backgroundColor: 'var(--color-primary)',
-                      opacity: 0.9,
-                    },
-                  }}
-            className=" text-white hover:bg-primary/90 h-8 px-8 rounded-lg">
-              {isLoading ? 'Salvando...' : isEditing ? 'Atualizar' : 'Salvar'}
-            </Button>
-          </div>
+                    opacity: 0.9,
+                  },
+                }}
+                className="h-8 rounded-lg px-8 text-white hover:bg-primary/90"
+              >
+                {isLoading ? 'Salvando...' : 'Salvar'}
+              </Button>
+            </div>
+          ) : null}
         </form>
       </div>
     </div>
   )
 }
-

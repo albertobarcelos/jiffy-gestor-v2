@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { Input, type InputProps } from './input'
-import { Label } from './label'
 
 interface Municipio {
   codigoCidadeIbge: string
@@ -545,12 +544,7 @@ export function CidadeAutocomplete({
           {label}
           {required && <span className="text-red-500 ml-1">*</span>}
         </label>
-      ) : (
-        <Label htmlFor="cidade">
-          {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
-        </Label>
-      )}
+      ) : null}
 
       <div ref={inputWrapperRef} className="relative">
         {useNativeInput ? (
@@ -570,23 +564,34 @@ export function CidadeAutocomplete({
         ) : (
           <Input
             id="cidade"
+            label={label}
+            required={required}
+            InputLabelProps={required ? { required: true } : undefined}
             value={value}
             onChange={handleInputChange}
             onFocus={handleFocus}
             onBlur={handleBlur}
             placeholder={isLoadingMunicipios ? 'Carregando cidades...' : placeholder}
-            required={required}
             disabled={disabled || !estado || isLoadingMunicipios}
             autoComplete="off"
             size={size}
-            sx={sx}
-            className={
-              isValid === false
-                ? 'border-red-500 focus:border-red-500'
-                : isValid === true
-                  ? 'border-green-500 focus:border-green-500'
-                  : ''
-            }
+            sx={{
+              ...(sx && typeof sx === 'object' ? sx : {}),
+              ...(isValid === false
+                ? {
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#ef4444',
+                    },
+                  }
+                : {}),
+              ...(isValid === true
+                ? {
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#22c55e',
+                    },
+                  }
+                : {}),
+            }}
           />
         )}
 

@@ -14,7 +14,6 @@ import {
   MdPeople, 
   MdPerson, 
   MdGroup, 
-  MdPayment,
   MdCategory,
   MdAddCircle,
   MdReceipt,
@@ -186,8 +185,6 @@ export function TopNav() {
         },
         { name: 'Relatórios', path: '/relatorios', icon: MdAssessment },
         { name: 'Hist. Fechamentos', path: '/historico-fechamento', icon: MdHistory },
-        { name: 'Meios de Pagamentos', path: '/cadastros/meios-pagamentos', icon: MdPayment },
-        
       ],
     },
     { name: 'Painel do Contador', path: '/painel-contador', icon: MdAccountBalance },

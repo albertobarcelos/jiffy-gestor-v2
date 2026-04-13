@@ -6,6 +6,52 @@ import { Cliente } from '@/src/domain/entities/Cliente'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
+import { Input } from '@/src/presentation/components/ui/input'
+import { MenuItem } from '@mui/material'
+
+/** Labels outlined — alinhado a NovoMeioPagamento / EditarTerminais */
+const sxOutlinedLabelTextoEscuro = {
+  '& .MuiInputLabel-root': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiInputLabel-root.Mui-focused': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiInputLabel-root.MuiInputLabel-shrink': {
+    color: 'var(--color-primary-text)',
+  },
+} as const
+
+const entradaCompactaInput = {
+  padding: '12px 10px',
+  fontSize: '0.875rem',
+} as const
+
+const entradaCompactaSelect = {
+  padding: '12px 10px',
+  fontSize: '0.875rem',
+  minHeight: '1.5em',
+  lineHeight: 1.4,
+  display: 'flex',
+  alignItems: 'center',
+} as const
+
+const sxEntradaEmpresa = {
+  ...sxOutlinedLabelTextoEscuro,
+  '& .MuiOutlinedInput-root': {
+    backgroundColor: 'transparent',
+    borderRadius: '8px',
+  },
+  '& .MuiOutlinedInput-notchedOutline': {
+    borderColor: 'rgba(0, 0, 0, 0.23)',
+  },
+  '& .MuiOutlinedInput-input': entradaCompactaInput,
+  '& .MuiOutlinedInput-input.Mui-disabled': {
+    WebkitTextFillColor: 'var(--color-primary-text)',
+    opacity: 0.85,
+  },
+  '& .MuiSelect-select': entradaCompactaSelect,
+} as const
 
 // Siglas dos estados brasileiros em ordem alfabética
 const ESTADOS_BRASILEIROS = [
@@ -334,14 +380,14 @@ export function EmpresaTab() {
   }
 
   return (
-    <div className="h-full overflow-y-auto md:px-6 px-1 py-2 scrollbar-hide">
+    <div className="h-full overflow-y-auto md:px-6 px-1 py-1 scrollbar-hide">
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between border-b-2 border-primary/70 pb-2">
         <div>
-          <h3 className="text-primary text-lg md:text-xl font-semibold font-exo mb-1">
+          <h3 className="text-primary text-lg md:text-xl font-semibold">
             Dados da Empresa
           </h3>
-          <p className="text-secondary-text text-xs md:text-sm font-nunito">
+          <p className="text-secondary-text text-xs md:text-sm">
             Gerencie as informações da sua empresa
           </p>
         </div>
@@ -381,67 +427,48 @@ export function EmpresaTab() {
           <h4 className="text-primary text-lg font-semibold font-nunito mb-2">
             Dados Básicos
           </h4>
-          <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-primary-text">
-                CNPJ
-              </label>
-              <input
-                type="text"
-                value={cnpj}
-                onChange={(e) => setCnpj(e.target.value)}
-                disabled={!isEditing}
-                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-primary-text">
-                Razão Social
-              </label>
-              <input
-                type="text"
-                value={razaoSocial}
-                onChange={(e) => setRazaoSocial(e.target.value)}
-                disabled={!isEditing}
-                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-primary-text">
-                Nome Fantasia
-              </label>
-              <input
-                type="text"
-                value={nomeFantasia}
-                onChange={(e) => setNomeFantasia(e.target.value)}
-                disabled={!isEditing}
-                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-primary-text">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={!isEditing}
-                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-primary-text">
-                Telefone
-              </label>
-              <input
-                type="text"
-                value={telefone}
-                onChange={(e) => setTelefone(e.target.value)}
-                disabled={!isEditing}
-                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
-              />
-            </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Input
+              label="CNPJ"
+              value={cnpj}
+              onChange={e => setCnpj(e.target.value)}
+              disabled={!isEditing}
+              size="small"
+              sx={sxEntradaEmpresa}
+            />
+            <Input
+              label="Razão Social"
+              value={razaoSocial}
+              onChange={e => setRazaoSocial(e.target.value)}
+              disabled={!isEditing}
+              size="small"
+              sx={sxEntradaEmpresa}
+            />
+            <Input
+              label="Nome Fantasia"
+              value={nomeFantasia}
+              onChange={e => setNomeFantasia(e.target.value)}
+              disabled={!isEditing}
+              size="small"
+              sx={sxEntradaEmpresa}
+            />
+            <Input
+              type="email"
+              label="Email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              disabled={!isEditing}
+              size="small"
+              sx={sxEntradaEmpresa}
+            />
+            <Input
+              label="Telefone"
+              value={telefone}
+              onChange={e => setTelefone(e.target.value)}
+              disabled={!isEditing}
+              size="small"
+              sx={sxEntradaEmpresa}
+            />
           </div>
         </div>
 
@@ -450,75 +477,105 @@ export function EmpresaTab() {
           <h4 className="text-primary text-lg font-semibold font-nunito mb-2">
             Endereço
           </h4>
-          <div className="grid md:grid-cols-3 grid-cols-1 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-primary-text">
-                CEP
-              </label>
-              <input
-                type="text"
+          <div className="space-y-4">
+            {/* Linha 1: CEP + Rua */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <Input
+                label="CEP"
                 value={cep}
-                onChange={(e) => setCep(e.target.value)}
+                onChange={e => setCep(e.target.value)}
                 disabled={!isEditing}
-                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                size="small"
+                sx={sxEntradaEmpresa}
               />
+              <div className="md:col-span-2">
+                <Input
+                  label="Rua"
+                  value={rua}
+                  onChange={e => setRua(e.target.value)}
+                  disabled={!isEditing}
+                  size="small"
+                  sx={sxEntradaEmpresa}
+                />
+              </div>
             </div>
-            <div className="md:col-span-2 col-span-1">
-              <label className="block text-sm font-medium text-primary-text">
-                Rua
-              </label>
-              <input
-                type="text"
-                value={rua}
-                onChange={(e) => setRua(e.target.value)}
-                disabled={!isEditing}
-                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-primary-text">
-                Número
-              </label>
-              <input
-                type="text"
+
+            {/* Linha 2: Número, Complemento e Bairro */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <Input
+                label="Número"
                 value={numero}
-                onChange={(e) => setNumero(e.target.value)}
+                onChange={e => setNumero(e.target.value)}
                 disabled={!isEditing}
-                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                size="small"
+                sx={sxEntradaEmpresa}
               />
-            </div>
-            <div className="md:col-span-2 col-span-1">
-              <label className="block text-sm font-medium text-primary-text">
-                Complemento
-              </label>
-              <input
-                type="text"
+              <Input
+                label="Complemento"
                 value={complemento}
-                onChange={(e) => setComplemento(e.target.value)}
+                onChange={e => setComplemento(e.target.value)}
                 disabled={!isEditing}
-                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                size="small"
+                sx={sxEntradaEmpresa}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-primary-text">
-                Bairro
-              </label>
-              <input
-                type="text"
+              <Input
+                label="Bairro"
                 value={bairro}
-                onChange={(e) => setBairro(e.target.value)}
+                onChange={e => setBairro(e.target.value)}
                 disabled={!isEditing}
-                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                size="small"
+                sx={sxEntradaEmpresa}
               />
             </div>
-            <div>
+
+            {/* Linha 3: Estado + Cidade */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Input
+                select
+                label="Estado"
+                value={estado}
+                onChange={async e => {
+                  const novoEstado = e.target.value
+                  const cidadeAnterior = cidade
+
+                  setCodigoCidadeIbge(null)
+                  ultimaCidadeBuscada.current = ''
+                  setCidadeValida(null)
+
+                  if (cidadeAnterior && cidadeAnterior.trim() && novoEstado) {
+                    await new Promise(resolve => setTimeout(resolve, 100))
+                    const encontrou = await buscarCodigoIbge(cidadeAnterior.trim(), novoEstado)
+                    if (encontrou) {
+                      setEstado(novoEstado)
+                      setCidadeValida(true)
+                    } else {
+                      setEstado(novoEstado)
+                      setCidade('')
+                    }
+                  } else {
+                    setEstado(novoEstado)
+                    setCidade('')
+                  }
+                }}
+                disabled={!isEditing}
+                size="small"
+                sx={sxEntradaEmpresa}
+                InputLabelProps={{ shrink: true }}
+                SelectProps={{ displayEmpty: true }}
+              >
+                <MenuItem value="">
+                  <em>Selecione o estado</em>
+                </MenuItem>
+                {ESTADOS_BRASILEIROS.map(estadoOption => (
+                  <MenuItem key={estadoOption.sigla} value={estadoOption.sigla}>
+                    {estadoOption.sigla} - {estadoOption.nome}
+                  </MenuItem>
+                ))}
+              </Input>
               <CidadeAutocomplete
                 value={cidade}
-                onChange={(novaCidade) => {
-                  // Atualizar estado quando cidade é alterada (digitada ou selecionada)
+                onChange={novaCidade => {
                   setCidade(novaCidade)
-                  // Se a cidade foi apenas digitada (não selecionada da lista),
-                  // limpar código IBGE para forçar busca quando for validada/selecionada
                   if (!novaCidade) {
                     setCodigoCidadeIbge(null)
                     ultimaCidadeBuscada.current = ''
@@ -529,75 +586,21 @@ export function EmpresaTab() {
                 placeholder="Digite o nome da cidade"
                 required={false}
                 disabled={!isEditing || !estado}
-                useNativeInput={true}
-                inputClassName="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                useNativeInput={false}
+                sx={sxEntradaEmpresa}
                 onCidadeSelecionada={(nomeCidade, codigoIbge) => {
-                  // Quando uma cidade é selecionada da lista, armazenar código IBGE imediatamente
-                  // e garantir que o estado do formulário seja atualizado com o nome oficial
                   setCodigoCidadeIbge(codigoIbge)
                   ultimaCidadeBuscada.current = nomeCidade
                   setCidadeValida(true)
-                  // Atualizar o estado do formulário com o nome oficial da cidade selecionada
-                  // Isso garante que a variável cidade tenha o valor correto
                   setCidade(nomeCidade)
                 }}
-                onValidationChange={async (isValid) => {
+                onValidationChange={async isValid => {
                   setCidadeValida(isValid)
-                  // Se validou como true e não tem código IBGE ainda, buscar
-                  // Isso cobre o caso de validação via API (quando usuário digita e perde foco)
                   if (isValid && cidade && estado && !codigoCidadeIbge) {
                     await buscarCodigoIbge(cidade.trim(), estado)
                   }
                 }}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-primary-text">
-                Estado
-              </label>
-              <select
-                value={estado}
-                onChange={async (e) => {
-                  const novoEstado = e.target.value
-                  const cidadeAnterior = cidade
-                  
-                  // Limpa código IBGE ao trocar o estado
-                  setCodigoCidadeIbge(null)
-                  ultimaCidadeBuscada.current = ''
-                  setCidadeValida(null)
-                  
-                  // Se havia uma cidade preenchida antes, tentar buscar código IBGE para o novo estado
-                  // Se encontrar, manter a cidade; se não encontrar, limpar
-                  if (cidadeAnterior && cidadeAnterior.trim() && novoEstado) {
-                    // Aguardar um pouco para garantir que o estado foi atualizado
-                    await new Promise(resolve => setTimeout(resolve, 100))
-                    // Tentar buscar código IBGE da cidade no novo estado
-                    const encontrou = await buscarCodigoIbge(cidadeAnterior.trim(), novoEstado)
-                    if (encontrou) {
-                      // Cidade existe no novo estado, manter ela
-                      setEstado(novoEstado)
-                      setCidadeValida(true)
-                    } else {
-                      // Cidade não existe no novo estado, limpar
-                      setEstado(novoEstado)
-                      setCidade('')
-                    }
-                  } else {
-                    // Não havia cidade, apenas atualizar estado
-                    setEstado(novoEstado)
-                    setCidade('')
-                  }
-                }}
-                disabled={!isEditing}
-                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
-              >
-                <option value="">Selecione o estado</option>
-                {ESTADOS_BRASILEIROS.map((estadoOption) => (
-                  <option key={estadoOption.sigla} value={estadoOption.sigla}>
-                    {estadoOption.sigla} - {estadoOption.nome}
-                  </option>
-                ))}
-              </select>
             </div>
           </div>
         </div>

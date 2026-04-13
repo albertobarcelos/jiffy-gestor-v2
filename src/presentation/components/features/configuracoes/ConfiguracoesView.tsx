@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { EmpresaTab } from './tabs/EmpresaTab'
 import { TerminaisTab } from './tabs/TerminaisTab'
 import { ImpressorasList } from '@/src/presentation/components/features/impressoras/ImpressorasList'
+import { MeiosPagamentosList } from '@/src/presentation/components/features/meios-pagamentos/MeiosPagamentosList'
 import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
 import { cn } from '@/src/shared/utils/cn'
 
@@ -17,9 +18,15 @@ const CadastroPorPlanilha = dynamic(
   { ssr: false, loading: () => <PageLoading /> }
 )
 
-type ConfigTab = 'empresa' | 'terminais' | 'impressoras' | 'planilha'
+type ConfigTab = 'empresa' | 'terminais' | 'impressoras' | 'planilha' | 'meios-pagamentos'
 
-const TAB_QUERY_VALUES: readonly ConfigTab[] = ['empresa', 'terminais', 'impressoras', 'planilha']
+const TAB_QUERY_VALUES: readonly ConfigTab[] = [
+  'empresa',
+  'terminais',
+  'impressoras',
+  'planilha',
+  'meios-pagamentos',
+]
 
 function parseTabParam(value: string | null): ConfigTab {
   if (value && TAB_QUERY_VALUES.includes(value as ConfigTab)) {
@@ -77,6 +84,7 @@ export function ConfiguracoesView() {
           {tabBtn('empresa', 'Empresa')}
           {tabBtn('terminais', 'Terminais')}
           {tabBtn('impressoras', 'Impressoras')}
+          {tabBtn('meios-pagamentos', 'Meios de pagamento')}
           {tabBtn('planilha', 'Importar Dados')}
         </div>
       </div>
@@ -87,6 +95,11 @@ export function ConfiguracoesView() {
           {activeTab === 'empresa' && <EmpresaTab />}
           {activeTab === 'terminais' && <TerminaisTab />}
           {activeTab === 'impressoras' && <ImpressorasList />}
+          {activeTab === 'meios-pagamentos' && (
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <MeiosPagamentosList />
+            </div>
+          )}
           {activeTab === 'planilha' && (
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
               <CadastroPorPlanilha />

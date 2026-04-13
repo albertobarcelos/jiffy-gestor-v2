@@ -1,14 +1,7 @@
-import { Suspense } from 'react'
-import { MeiosPagamentosList } from '@/src/presentation/components/features/meios-pagamentos/MeiosPagamentosList'
-import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
+import { redirect } from 'next/navigation'
 
-export default function MeiosPagamentosPage() {
-  return (
-    <div className="h-full">
-      <Suspense fallback={<PageLoading />}>
-        <MeiosPagamentosList />
-      </Suspense>
-    </div>
-  )
+/** Rota antiga: lista de meios de pagamento em Configurações → Meios de pagamento. */
+export default function MeiosPagamentosLegacyPage() {
+  redirect('/configuracoes?tab=meios-pagamentos')
 }
 
