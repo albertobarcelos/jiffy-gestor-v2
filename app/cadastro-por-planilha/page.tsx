@@ -1,11 +1,6 @@
-'use client'
+import { redirect } from 'next/navigation'
 
-import { CadastroPorPlanilha } from '@/src/presentation/components/features/cadastro-por-planilha/cadastro-por-planilha'
-
-export default function CadastroPorPlanilhaPage() {
-  return (
-    <div className="h-full">
-      <CadastroPorPlanilha />
-    </div>
-  )
+/** Rota antiga: importação em massa passou para Configurações → Cadastro por planilha. */
+export default function CadastroPorPlanilhaLegacyPage() {
+  redirect('/configuracoes?tab=planilha')
 }

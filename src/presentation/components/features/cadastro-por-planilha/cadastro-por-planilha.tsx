@@ -358,21 +358,18 @@ export function CadastroPorPlanilha() {
   return (
     <div className="flex flex-col h-full">
       {/* Header fixo com título */}
-      <div className="sticky top-0 z-10 bg-primary-bg/90 backdrop-blur-sm rounded-tl-lg shadow-md">
-        <div className="md:px-[30px] px-2 py-[4px]">
-          <div className="rounded-lg border border-[#E0E4F3] bg-gradient-to-br from-[#F6F7FF] to-[#EEF1FB] md:px-6 px-3 md:py-3 py-2 shadow-[0_15px_45px_rgba(15,23,42,0.08)]">
+      <div className="sticky top-0 z-10 backdrop-blur-sm">
+        <div className="px-2 py-[4px]">
+          <div className="rounded-lg md:px-6 px-3 md:py-3 py-2">
             <div className="flex items-start gap-2 md:gap-4">
-              <div className="h-10 w-10 md:h-14 md:w-14 rounded-lg bg-white flex items-center justify-center shadow-inner text-primary flex-shrink-0">
+              <div className="h-10 w-10 md:h-14 md:w-14 rounded-lg bg-primary/10 flex items-center justify-center shadow-inner text-primary-text flex-shrink-0">
                 <MdUpload className="text-lg md:text-2xl" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-xs md:text-sm font-semibold text-primary font-exo uppercase tracking-wide">
-                  Cadastro em Massa
-                </p>
-                <h2 className="text-base md:text-xl font-semibold text-primary font-exo leading-tight">
+                <h2 className="text-base md:text-xl font-semibold text-primary-text leading-tight">
                   Importar por Planilha
                 </h2>
-                <p className="text-xs md:text-sm text-secondary-text font-nunito">
+                <p className="text-xs md:text-sm text-secondary-text">
                   {selectedStep === 0 && 'Baixe a planilha modelo e preencha os dados'}
                   {selectedStep === 1 && 'Faça upload da planilha preenchida'}
                   {selectedStep === 2 && 'Revise os resultados da importação'}
@@ -465,14 +462,14 @@ function Step1Download({
   onNext: () => void
 }) {
   return (
-    <div className="rounded-[24px] border border-[#E5E7F2] bg-white md:p-4 p-3 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
+    <div className="rounded-lg border border-[#E5E7F2] bg-white md:p-4 p-3">
       {/* Título */}
-      <div className="flex flex-col gap-2 mb-4">
+      <div className="flex flex-col mb-2">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <h3 className="text-primary text-base md:text-xl font-semibold font-exo">
+          <h3 className="text-primary text-base md:text-lg font-semibold">
             Download da Planilha Modelo
           </h3>
-          <div className="hidden md:flex flex-1 h-[2px] bg-primary/50" />
+          <div className="hidden md:flex flex-1 h-[1px] bg-primary/50" />
         </div>
         <p className="text-xs md:text-sm text-secondary-text font-nunito">
           Baixe a planilha modelo e a planilha de descrição para entender o formato dos dados
@@ -480,10 +477,10 @@ function Step1Download({
       </div>
 
       {/* Botões de download */}
-      <div className="grid gap-3 md:gap-4 md:grid-cols-2 mb-6">
+      <div className="grid gap-3 md:gap-4 md:grid-cols-2 mb-4">
         <button
           onClick={onDownloadModelo}
-          className="flex items-center justify-center gap-2 md:gap-3 h-12 md:h-14 px-4 md:px-6 rounded-lg bg-primary text-white font-semibold font-nunito text-xs md:text-sm shadow-[0_8px_20px_rgba(10,57,122,0.35)] transition-all hover:bg-primary/90"
+          className="flex items-center justify-center gap-2 md:gap-3 h-12 md:h-14 px-4 md:px-6 rounded-lg bg-primary text-white font-semibold text-xs md:text-sm transition-all hover:bg-primary/90"
         >
           <MdDownload size={18} className="md:w-5 md:h-5" />
           <span className="truncate">Download Planilha Modelo</span>
@@ -498,37 +495,37 @@ function Step1Download({
       </div>
 
       {/* Área de texto explicativo */}
-      <div className="rounded-lg border border-[#E6E9F4] bg-gradient-to-br from-[#F9FAFF] to-white md:p-6 p-4 mb-6">
-        <h4 className="text-primary-text font-semibold font-exo text-sm md:text-base mb-3">
+      <div className="rounded-lg p-4">
+        <h4 className="text-primary-text font-medium text-sm md:text-base mb-3">
           Como funciona o sistema de importação
         </h4>
         <div className="space-y-2 text-xs md:text-sm text-secondary-text font-nunito">
           <p>
-            <strong className="text-primary-text">1. Download:</strong> Baixe a planilha modelo e a
+            <span className="text-primary-text text-medium">1. Download:</span> Baixe a planilha modelo e a
             planilha de descrição para entender o formato dos dados.
           </p>
           <p>
-            <strong className="text-primary-text">2. Preenchimento:</strong> Preencha a planilha
+            <span className="text-primary-text text-medium">2. Preenchimento:</span> Preencha a planilha
             modelo com os dados que deseja cadastrar em massa.
           </p>
           <p>
-            <strong className="text-primary-text">3. Upload:</strong> Faça upload da planilha
+            <span className="text-primary-text text-medium">3. Upload:</span> Faça upload da planilha
             preenchida no próximo passo.
           </p>
           <p>
-            <strong className="text-primary-text">4. Análise:</strong> O sistema irá analisar os
+            <span className="text-primary-text text-medium">4. Análise:</span> O sistema irá analisar os
             dados da planilha. Os dados só serão cadastrados no banco se não houver nenhum erro.
             Caso exista erro, será exibido um log e não será cadastrado nenhuma informação no banco.
           </p>
           <p>
-            <strong className="text-primary-text">5. Finalização:</strong> Revise os resultados e
+            <span className="text-primary-text text-medium">5. Finalização:</span> Revise os resultados e
             finalize o processo.
           </p>
         </div>
       </div>
 
       {/* Botão Próximo */}
-      <div className="flex justify-end pt-4 md:pt-6 border-t border-dashed border-[#E4E7F4] mt-4">
+      <div className="flex justify-end pt-4 md:pt-6">
         <button
           onClick={onNext}
           className="h-8 px-6 md:px-10 rounded-lg bg-primary text-white font-semibold font-exo text-xs md:text-sm hover:bg-primary/90 transition-colors flex items-center gap-2"
