@@ -11,6 +11,7 @@ import { ComplementosMultiSelectDialog } from './ComplementosMultiSelectDialog'
 import { ProdutoImpressorasDialog } from './ProdutoImpressorasDialog'
 import { NovoGrupo } from '../grupos-produtos/NovoGrupo'
 import { GRUPO_PRODUTOS_MODAL_FORM_ID } from '../grupos-produtos/grupoProdutosModalConstants'
+import { cn } from '@/src/shared/utils/cn'
 
 type TabKey = 'produto' | 'complementos' | 'impressoras' | 'grupo'
 
@@ -33,7 +34,12 @@ interface ProdutosTabsModalProps {
   onTabChange: (tab: TabKey) => void
 }
 
-export function ProdutosTabsModal({ state, onClose, onReload, onTabChange }: ProdutosTabsModalProps) {
+export function ProdutosTabsModal({
+  state,
+  onClose,
+  onReload,
+  onTabChange,
+}: ProdutosTabsModalProps) {
   const produtoId = state.produto?.getId()
   const npRef = useRef<NovoProdutoHandle>(null)
 
@@ -46,6 +52,37 @@ export function ProdutosTabsModal({ state, onClose, onReload, onTabChange }: Pro
     isSubmitting: false,
     canSubmit: false,
   })
+
+  /**
+   * Mantém cada aba montada após a primeira visita enquanto o painel estiver aberto,
+   * evitando remount e novas requisições ao alternar abas.
+   * Reseta ao fechar o modal ou ao trocar de produto/modo (via key do painel).
+   */
+  const [mountedProduto, setMountedProduto] = useState(false)
+  const [mountedComplementos, setMountedComplementos] = useState(false)
+  const [mountedImpressoras, setMountedImpressoras] = useState(false)
+  const [mountedGrupo, setMountedGrupo] = useState(false)
+
+  useEffect(() => {
+    if (!state.open) {
+      setMountedProduto(false)
+      setMountedComplementos(false)
+      setMountedImpressoras(false)
+      setMountedGrupo(false)
+      return
+    }
+    if (state.tab === 'produto') setMountedProduto(true)
+    if (state.tab === 'complementos' && produtoId) setMountedComplementos(true)
+    if (state.tab === 'impressoras' && produtoId) setMountedImpressoras(true)
+    if (state.tab === 'grupo' && state.grupoId) setMountedGrupo(true)
+  }, [state.open, state.tab, produtoId, state.grupoId])
+
+  const showProdutoPanel = state.open && (mountedProduto || state.tab === 'produto')
+  const showComplementosPanel =
+    state.open && !!produtoId && (mountedComplementos || state.tab === 'complementos')
+  const showImpressorasPanel =
+    state.open && !!produtoId && (mountedImpressoras || state.tab === 'impressoras')
+  const showGrupoPanel = state.open && !!state.grupoId && (mountedGrupo || state.tab === 'grupo')
 
   useEffect(() => {
     if (!state.open) return
@@ -78,20 +115,18 @@ export function ProdutosTabsModal({ state, onClose, onReload, onTabChange }: Pro
       }
     }
     if (state.tab === 'complementos') {
-      return state.produto ? `Complementos — ${state.produto.getNome()}` : 'Complementos'
+      return 'Complementos'
     }
     if (state.tab === 'impressoras') {
-      return state.produto ? `Impressoras — ${state.produto.getNome()}` : 'Impressoras'
+      return 'Impressoras'
     }
     return state.grupoId ? 'Grupo de Produtos' : 'Grupo de Produtos'
   }, [state])
 
+  /** Mesmo subtítulo do `JiffySidePanelModal` em todas as abas quando há produto no estado */
   const subtitle = useMemo(() => {
-    if (state.tab === 'produto' && state.produto) {
-      return state.produto.getNome()
-    }
-    return undefined
-  }, [state.tab, state.produto])
+    return state.produto?.getNome()
+  }, [state.produto])
 
   const footerProduto = useMemo((): JiffySidePanelFooterActions | undefined => {
     if (state.tab !== 'produto') return undefined
@@ -110,9 +145,7 @@ export function ProdutosTabsModal({ state, onClose, onReload, onTabChange }: Pro
     if (wizardStep < 2) {
       // Step 0: Salvar e fechar | Próximo. Step 1 (Configurações): Anterior | Salvar e fechar | Próximo
       const barActionOrder =
-        wizardStep === 0 ?
-          (['cancel', 'next'] as const)
-        : (['prev', 'cancel', 'next'] as const)
+        wizardStep === 0 ? (['cancel', 'next'] as const) : (['prev', 'cancel', 'next'] as const)
 
       return {
         barSecondaryTone: 'primaryMuted',
@@ -175,19 +208,14 @@ export function ProdutosTabsModal({ state, onClose, onReload, onTabChange }: Pro
 
   const footerActions = useMemo(() => {
     if (state.tab === 'produto') return footerProduto
-    if (state.tab === 'complementos' || state.tab === 'impressoras') return footerComplementosOuImpressoras
+    if (state.tab === 'complementos' || state.tab === 'impressoras')
+      return footerComplementosOuImpressoras
     if (state.tab === 'grupo' && !state.grupoId) {
       return footerComplementosOuImpressoras
     }
     if (state.tab === 'grupo') return footerGrupo
     return undefined
-  }, [
-    state.tab,
-    state.grupoId,
-    footerProduto,
-    footerComplementosOuImpressoras,
-    footerGrupo,
-  ])
+  }, [state.tab, state.grupoId, footerProduto, footerComplementosOuImpressoras, footerGrupo])
 
   return (
     <JiffySidePanelModal
@@ -228,86 +256,108 @@ export function ProdutosTabsModal({ state, onClose, onReload, onTabChange }: Pro
       }
     >
       <div className="flex min-h-0 flex-1 flex-col">
-        {state.tab === 'produto' ? (
-          <NovoProduto
-            ref={npRef}
-            produtoId={state.mode === 'create' ? undefined : produtoId}
-            isCopyMode={state.mode === 'copy'}
-            defaultGrupoProdutoId={state.mode === 'create' ? state.prefillGrupoProdutoId : undefined}
-            initialStep={state.initialStepProduto ?? 0}
-            isEmbedded
-            hideEmbeddedHeader
-            hideEmbeddedFormActions
-            onWizardStepChange={setWizardStep}
-            onWizardSavingChange={setWizardSaving}
-            onFiscalUnavailableChange={setFiscalOnlyBack}
-            onClose={onClose}
-            onSuccess={produtoData => {
-              onReload?.(produtoData?.produtoId, produtoData?.produtoData)
-              onClose()
-            }}
-          />
-        ) : null}
-
-        {state.tab === 'complementos' ? (
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            {produtoId ? (
-              <ComplementosMultiSelectDialog
-                open
-                produtoId={produtoId}
-                produtoNome={state.produto?.getNome()}
-                onClose={onClose}
-                isEmbedded
-              />
-            ) : (
-              <div className="flex h-full flex-1 items-center justify-center text-sm text-secondary-text">
-                Selecione um produto para gerenciar complementos.
-              </div>
+        {showProdutoPanel ? (
+          <div
+            className={cn(
+              'flex min-h-0 flex-1 flex-col overflow-hidden',
+              state.tab !== 'produto' && 'hidden'
             )}
+            aria-hidden={state.tab !== 'produto'}
+          >
+            <NovoProduto
+              ref={npRef}
+              produtoId={state.mode === 'create' ? undefined : produtoId}
+              isCopyMode={state.mode === 'copy'}
+              defaultGrupoProdutoId={
+                state.mode === 'create' ? state.prefillGrupoProdutoId : undefined
+              }
+              initialStep={state.initialStepProduto ?? 0}
+              isEmbedded
+              hideEmbeddedHeader
+              hideEmbeddedFormActions
+              onWizardStepChange={setWizardStep}
+              onWizardSavingChange={setWizardSaving}
+              onFiscalUnavailableChange={setFiscalOnlyBack}
+              onClose={onClose}
+              onSuccess={produtoData => {
+                onReload?.(produtoData?.produtoId, produtoData?.produtoData)
+                onClose()
+              }}
+            />
           </div>
         ) : null}
 
-        {state.tab === 'impressoras' ? (
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            {produtoId ? (
-              <ProdutoImpressorasDialog
-                open
-                produtoId={produtoId}
-                produtoNome={state.produto?.getNome()}
-                onClose={onClose}
-                isEmbedded
-              />
-            ) : (
-              <div className="flex h-full flex-1 items-center justify-center text-sm text-secondary-text">
-                Selecione um produto para gerenciar impressoras.
-              </div>
+        {showComplementosPanel ? (
+          <div
+            className={cn(
+              'flex min-h-0 flex-1 flex-col overflow-hidden',
+              state.tab !== 'complementos' && 'hidden'
             )}
+            aria-hidden={state.tab !== 'complementos'}
+          >
+            <ComplementosMultiSelectDialog
+              open={state.open}
+              produtoId={produtoId}
+              produtoNome={state.produto?.getNome()}
+              onClose={onClose}
+              isEmbedded
+            />
+          </div>
+        ) : state.open && state.tab === 'complementos' && !produtoId ? (
+          <div className="flex h-full min-h-0 flex-1 items-center justify-center text-sm text-secondary-text">
+            Selecione um produto para gerenciar complementos.
           </div>
         ) : null}
 
-        {state.tab === 'grupo' ? (
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            {state.grupoId ? (
-              <NovoGrupo
-                key={`${state.grupoId}-${embedGrupoTab}`}
-                grupoId={state.grupoId}
-                isEmbedded
-                embeddedFormId={GRUPO_PRODUTOS_MODAL_FORM_ID}
-                hideEmbeddedFormActions
-                onEmbedFormStateChange={setEmbedGrupoForm}
-                onEmbeddedTabChange={setEmbedGrupoTab}
-                onClose={onClose}
-                onSaved={() => {
-                  onReload?.()
-                  onClose()
-                }}
-                initialTab={state.initialTabGrupo ?? 0}
-              />
-            ) : (
-              <div className="flex h-full flex-1 items-center justify-center text-sm text-secondary-text">
-                Selecione um grupo válido para editar.
-              </div>
+        {showImpressorasPanel ? (
+          <div
+            className={cn(
+              'flex min-h-0 flex-1 flex-col overflow-hidden',
+              state.tab !== 'impressoras' && 'hidden'
             )}
+            aria-hidden={state.tab !== 'impressoras'}
+          >
+            <ProdutoImpressorasDialog
+              open={state.open}
+              produtoId={produtoId}
+              produtoNome={state.produto?.getNome()}
+              onClose={onClose}
+              isEmbedded
+            />
+          </div>
+        ) : state.open && state.tab === 'impressoras' && !produtoId ? (
+          <div className="flex h-full min-h-0 flex-1 items-center justify-center text-sm text-secondary-text">
+            Selecione um produto para gerenciar impressoras.
+          </div>
+        ) : null}
+
+        {showGrupoPanel ? (
+          <div
+            className={cn(
+              'flex min-h-0 flex-1 flex-col overflow-hidden',
+              state.tab !== 'grupo' && 'hidden'
+            )}
+            aria-hidden={state.tab !== 'grupo'}
+          >
+            <NovoGrupo
+              key={`${state.grupoId}-${embedGrupoTab}`}
+              grupoId={state.grupoId!}
+              isEmbedded
+              embeddedFormId={GRUPO_PRODUTOS_MODAL_FORM_ID}
+              hideEmbeddedFormActions
+              onEmbedFormStateChange={setEmbedGrupoForm}
+              onEmbeddedTabChange={setEmbedGrupoTab}
+              onClose={onClose}
+              onSaved={() => {
+                onReload?.()
+                onClose()
+              }}
+              initialTab={state.initialTabGrupo ?? 0}
+            />
+          </div>
+        ) : state.open && state.tab === 'grupo' && !state.grupoId ? (
+          <div className="flex h-full min-h-0 flex-1 items-center justify-center text-sm text-secondary-text">
+            Selecione um grupo válido para editar.
           </div>
         ) : null}
       </div>
