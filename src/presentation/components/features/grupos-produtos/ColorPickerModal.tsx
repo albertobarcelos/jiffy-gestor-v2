@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 
 interface ColorPickerModalProps {
   open: boolean
@@ -16,12 +17,12 @@ const normalizeHexColor = (value: string): string => {
   if (hex.length === 3) {
     hex = hex
       .split('')
-      .map((char) => char + char)
+      .map(char => char + char)
       .join('')
   }
 
   if (hex.length === 8) {
-    hex = hex.slice(2) // remove alpha
+    hex = hex.slice(2)
   }
 
   if (hex.length !== 6) {
@@ -52,8 +53,7 @@ export function ColorPickerModal({ open, onClose, onSelect }: ColorPickerModalPr
       }
 
       const data = await response.json()
-      const lista =
-        Array.isArray(data) ? data : Array.isArray(data?.cores) ? data.cores : []
+      const lista = Array.isArray(data) ? data : Array.isArray(data?.cores) ? data.cores : []
 
       setColors(
         lista
@@ -71,30 +71,8 @@ export function ColorPickerModal({ open, onClose, onSelect }: ColorPickerModalPr
   useEffect(() => {
     if (open) {
       fetchColors()
-      document.body.style.overflow = 'hidden'
-    }
-
-    return () => {
-      document.body.style.overflow = ''
     }
   }, [open, fetchColors])
-
-  useEffect(() => {
-    if (!open) return
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [open, onClose])
-
-  if (!open) {
-    return null
-  }
 
   const handleSelect = (color: string) => {
     onSelect(color)
@@ -102,74 +80,61 @@ export function ColorPickerModal({ open, onClose, onSelect }: ColorPickerModalPr
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
-        onClick={onClose}
-      />
+    <JiffySidePanelModal
+      open={open}
+      onClose={onClose}
+      title="Selecione uma cor"
+      panelClassName="w-[min(32rem,100vw)] max-w-[100vw] sm:w-[min(38rem,90vw)]"
+      scrollableBody
+      footerVariant="bar"
+      footerActions={{
+        showCancel: true,
+        cancelLabel: 'Fechar',
+        onCancel: onClose,
+        cancelVariant: 'primary',
+      }}
+    >
+      <div className="space-y-4 px-2 pb-2 md:px-4">
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-sm text-secondary-text">
+            Clique em uma cor para aplicar imediatamente
+          </p>
+        </div>
 
-      <div className="relative bg-white rounded-2xl md:w-[600px] md:h-[600px] w-[300px] h-[500px] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.2)] flex flex-col">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h2 className="md:text-lg text-sm font-semibold text-primary-text">Selecione uma cor</h2>
-            <p className="md:text-sm text-xs text-secondary-text">
-              Clique em uma cor para aplicar imediatamente
-            </p>
+        {isLoading ? (
+          <div className="flex min-h-[40vh] flex-col items-center justify-center gap-2 py-8">
+            <JiffyLoading />
           </div>
-          <button
-            type="button"
-            onClick={fetchColors}
-            className="md:text-sm text-xs text-primary underline hover:opacity-80 transition-opacity"
-          >
-            Recarregar
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto">
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center h-full gap-2">
-              <JiffyLoading />
-            </div>
-          ) : error ? (
-            <div className="flex flex-col items-center justify-center h-full gap-2">
-              <p className="text-error text-sm text-center">{error}</p>
+        ) : error ? (
+          <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 py-8">
+            <p className="text-center text-sm text-error">{error}</p>
+            <button
+              type="button"
+              onClick={() => void fetchColors()}
+              className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-info transition-colors hover:bg-primary/90"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        ) : colors.length === 0 ? (
+          <div className="flex min-h-[30vh] items-center justify-center text-secondary-text">
+            Nenhuma cor disponível no momento.
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-[10px] pb-4">
+            {colors.map(color => (
               <button
+                key={color}
                 type="button"
-                onClick={fetchColors}
-                className="px-4 py-2 bg-primary text-info rounded-full text-sm font-semibold hover:bg-primary/90 transition-colors"
-              >
-                Tentar novamente
-              </button>
-            </div>
-          ) : colors.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-secondary-text">
-              Nenhuma cor disponível no momento.
-            </div>
-          ) : (
-            <div className="flex flex-wrap gap-[10px]">
-              {colors.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  onClick={() => handleSelect(color)}
-                  className="md:w-[100px] md:h-[100px] w-[50px] h-[50px] rounded-lg border-2 border-transparent hover:border-primary transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                  style={{ backgroundColor: color }}
-                  aria-label={`Selecionar a cor ${color}`}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-4 self-end px-6 py-2 rounded-lg border border-secondary-text text-secondary-text hover:bg-secondary-text/10 transition-colors text-sm font-semibold"
-        >
-          Fechar
-        </button>
+                onClick={() => handleSelect(color)}
+                className="h-[50px] w-[50px] rounded-lg border-2 border-transparent transition-all duration-200 hover:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:h-[100px] md:w-[100px]"
+                style={{ backgroundColor: color }}
+                aria-label={`Selecionar a cor ${color}`}
+              />
+            ))}
+          </div>
+        )}
       </div>
-    </div>
+    </JiffySidePanelModal>
   )
 }
-
