@@ -12,7 +12,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react'
-import { MdClose } from 'react-icons/md'
+import { MdArrowBack, MdArrowForward, MdClose } from 'react-icons/md'
 import { Button } from '@/src/presentation/components/ui/button'
 import { PainelPedidoBackdrop } from './PainelPedidoBackdrop'
 
@@ -28,6 +28,9 @@ const PainelSlide = forwardRef(function PainelSlide(
   return <Slide ref={ref} direction="left" {...props} />
 })
 PainelSlide.displayName = 'PainelSlide'
+
+/** Chaves dos botões do rodapé em modo `bar` — usado em `barActionOrder` */
+export type JiffyFooterBarKey = 'prev' | 'next' | 'cancel' | 'save'
 
 export interface JiffySidePanelFooterActions {
   showPrevious?: boolean
@@ -49,6 +52,23 @@ export interface JiffySidePanelFooterActions {
   saveDisabled?: boolean
   /** Quando definido, o botão Salvar vira `type="submit"` associado ao `<form id="...">` do conteúdo */
   saveFormId?: string
+  /**
+   * Rodapé `footerVariant="bar"`: estilo de Anterior / Próximo.
+   * `primaryMuted` = fundo primary ~15% (alinhado a `bg-primary/15`) e texto na cor primária.
+   */
+  barSecondaryTone?: 'gray' | 'primaryMuted'
+  /**
+   * Rodapé `footerVariant="bar"`: estilo do botão de cancelar (ex.: "Salvar e fechar").
+   * `primary` = mesmo visual do Salvar (fundo primário, texto branco).
+   */
+  cancelVariant?: 'secondary' | 'primary'
+  /**
+   * Rodapé `footerVariant="bar"`: ordem dos botões visíveis.
+   * Padrão: Anterior → Próximo → Cancelar → Salvar (apenas os habilitados entram na grade).
+   */
+  barActionOrder?: JiffyFooterBarKey[]
+  /** Rodapé `footerVariant="bar"`: exibe seta em Anterior (voltar) e Próximo (avançar) */
+  barShowPrevNextIcons?: boolean
 }
 
 function hasFooterActions(fa?: JiffySidePanelFooterActions): boolean {
@@ -141,8 +161,74 @@ function footerBarSecondarySx(isFirstColumn: boolean) {
   }
 }
 
+/** Anterior / Próximo com tom primary/15 (equivalente visual a `bg-primary/15`) */
+function footerBarPrimaryMutedSx(isFirstColumn: boolean) {
+  const bl =
+    isFirstColumn ?
+      ({ borderBottomLeftRadius: PANEL_RADIUS_LEFT } as const)
+    : {}
+  return {
+    borderRadius: 0,
+    ...bl,
+    boxShadow: 'none',
+    borderWidth: 0,
+    backgroundColor: 'color-mix(in srgb, var(--color-primary) 15%, transparent)',
+    color: 'var(--color-primary)',
+    fontWeight: 600,
+    '&:hover': {
+      backgroundColor: 'color-mix(in srgb, var(--color-primary) 22%, transparent)',
+      boxShadow: 'none',
+      ...bl,
+    },
+  }
+}
+
+function footerBarPrevNextSx(
+  isFirstColumn: boolean,
+  tone: 'gray' | 'primaryMuted' | undefined
+) {
+  return tone === 'primaryMuted' ?
+      footerBarPrimaryMutedSx(isFirstColumn)
+    : footerBarSecondarySx(isFirstColumn)
+}
+
+function footerBarCancelSx(
+  isFirstColumn: boolean,
+  variant: 'secondary' | 'primary' | undefined
+) {
+  return variant === 'primary' ?
+      footerSavePrimaryBarSx(isFirstColumn)
+    : footerBarSecondarySx(isFirstColumn)
+}
+
+const DEFAULT_BAR_ACTION_ORDER: readonly JiffyFooterBarKey[] = [
+  'prev',
+  'next',
+  'cancel',
+  'save',
+]
+
+/** Monta a sequência de colunas respeitando `barActionOrder` e os flags visíveis */
+function buildFooterBarKeys(fa: JiffySidePanelFooterActions): JiffyFooterBarKey[] {
+  const visible = new Set<JiffyFooterBarKey>()
+  if (fa.showPrevious) visible.add('prev')
+  if (fa.showNext) visible.add('next')
+  if (fa.showCancel) visible.add('cancel')
+  if (fa.showSave) visible.add('save')
+
+  const order = fa.barActionOrder ?? [...DEFAULT_BAR_ACTION_ORDER]
+  const keys: JiffyFooterBarKey[] = []
+  for (const k of order) {
+    if (visible.has(k)) keys.push(k)
+  }
+  for (const k of DEFAULT_BAR_ACTION_ORDER) {
+    if (visible.has(k) && !keys.includes(k)) keys.push(k)
+  }
+  return keys
+}
+
 /**
- * Rodapé em faixa: N colunas iguais, ordem Anterior → Próximo → Cancelar → Salvar (Salvar sempre à direita).
+ * Rodapé em faixa: N colunas iguais; ordem padrão Anterior → Próximo → Cancelar → Salvar (customizável).
  * Em cadastros costuma omitir Cancelar (fechar pelo X) — um único Salvar ocupa 100% da largura.
  * Só a primeira coluna recebe canto inferior esquerdo arredondado (igual ao painel).
  */
@@ -153,17 +239,14 @@ function JiffyPanelFooterBar({
   fa: JiffySidePanelFooterActions
   requestClose: () => void
 }) {
-  type BarKey = 'prev' | 'next' | 'cancel' | 'save'
-  const keys: BarKey[] = []
-  if (fa.showPrevious) keys.push('prev')
-  if (fa.showNext) keys.push('next')
-  if (fa.showCancel) keys.push('cancel')
-  if (fa.showSave) keys.push('save')
+  const keys = buildFooterBarKeys(fa)
 
   const n = keys.length
   if (n === 0) return null
 
-  function cell(key: BarKey, isFirstColumn: boolean): ReactNode {
+  function cell(key: JiffyFooterBarKey, isFirstColumn: boolean): ReactNode {
+    const prevNextSx = footerBarPrevNextSx(isFirstColumn, fa.barSecondaryTone)
+    const icons = fa.barShowPrevNextIcons
     switch (key) {
       case 'prev':
         return (
@@ -174,9 +257,14 @@ function JiffyPanelFooterBar({
             disabled={fa.previousDisabled}
             onClick={fa.onPrevious}
             className="h-12 min-h-12 w-full font-semibold shadow-none"
-            sx={footerBarSecondarySx(isFirstColumn)}
+            sx={prevNextSx}
           >
-            {fa.previousLabel ?? 'Anterior'}
+            <span className="inline-flex w-full items-center justify-center gap-1.5">
+              {icons ? (
+                <MdArrowBack className="h-5 w-5 shrink-0" aria-hidden />
+              ) : null}
+              {fa.previousLabel ?? 'Anterior'}
+            </span>
           </Button>
         )
       case 'next':
@@ -188,25 +276,32 @@ function JiffyPanelFooterBar({
             disabled={fa.nextDisabled}
             onClick={fa.onNext}
             className="h-12 min-h-12 w-full font-semibold shadow-none"
-            sx={footerBarSecondarySx(isFirstColumn)}
+            sx={prevNextSx}
           >
-            {fa.nextLabel ?? 'Próximo'}
+            <span className="inline-flex w-full items-center justify-center gap-1.5">
+              {fa.nextLabel ?? 'Próximo'}
+              {icons ? (
+                <MdArrowForward className="h-5 w-5 shrink-0" aria-hidden />
+              ) : null}
+            </span>
           </Button>
         )
-      case 'cancel':
+      case 'cancel': {
+        const cancelPrimary = fa.cancelVariant === 'primary'
         return (
           <Button
             type="button"
-            variant="outlined"
-            color="inherit"
+            variant={cancelPrimary ? 'contained' : 'outlined'}
+            color={cancelPrimary ? 'primary' : 'inherit'}
             disabled={fa.cancelDisabled}
             onClick={fa.onCancel ?? requestClose}
             className="h-12 min-h-12 w-full font-semibold shadow-none"
-            sx={footerBarSecondarySx(isFirstColumn)}
+            sx={footerBarCancelSx(isFirstColumn, fa.cancelVariant)}
           >
             {fa.cancelLabel ?? 'Cancelar'}
           </Button>
         )
+      }
       case 'save':
         return (
           <Button
