@@ -345,6 +345,8 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
       tab: config.tab ?? 'perfil',
       mode: config.mode ?? 'create',
       perfilId: config.perfilId,
+      initialPerfilPdvId: config.initialPerfilPdvId,
+      usuarioId: config.usuarioId,
     }))
 
     // Adicionar um parâmetro na URL para forçar o recarregamento ao fechar o modal
@@ -375,6 +377,25 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
   const handleTabChange = useCallback((tab: PerfisUsuariosTabKey) => {
     setTabsModalState((prev) => ({ ...prev, tab }))
   }, [])
+
+  /** Perfil embutido: após criar mantém o modal aberto e libera a aba Usuário */
+  const handlePerfilEmbeddedSaved = useCallback(
+    (payload?: { perfilIdCriado?: string }) => {
+      if (payload?.perfilIdCriado) {
+        handleStatusChange()
+        setTabsModalState((prev) => ({
+          ...prev,
+          mode: 'edit',
+          perfilId: payload.perfilIdCriado,
+          initialPerfilPdvId: payload.perfilIdCriado,
+        }))
+        showToast.success('Perfil criado com sucesso!')
+        return
+      }
+      closeTabsModal()
+    },
+    [closeTabsModal, handleStatusChange]
+  )
 
   const openUsuariosTabsModal = useCallback((config: Partial<UsuariosTabsModalState> = {}) => {
     setUsuariosTabsModalState(() => ({
@@ -547,7 +568,12 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
-                      openUsuariosTabsModal({ mode: 'create', initialPerfilPdvId: perfil.getId() })
+                      openTabsModal({
+                        mode: 'edit',
+                        perfilId: perfil.getId(),
+                        tab: 'usuario',
+                        initialPerfilPdvId: perfil.getId(),
+                      })
                     }}
                     className="w-5 h-5 flex items-center justify-center border border-primary/70 text-primary hover:bg-primary/20 rounded-full transition-colors"
                     title="Adicionar novo usuário ao perfil"
@@ -636,6 +662,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
         onClose={closeTabsModal}
         onTabChange={handleTabChange}
         onReload={handleStatusChange}
+        onPerfilEmbeddedSaved={handlePerfilEmbeddedSaved}
       />
 
       <UsuariosTabsModal

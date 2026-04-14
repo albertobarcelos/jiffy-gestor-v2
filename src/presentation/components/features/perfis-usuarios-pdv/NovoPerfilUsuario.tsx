@@ -24,7 +24,8 @@ interface NovoPerfilUsuarioProps {
   embeddedFormId?: string
   hideEmbeddedFormActions?: boolean
   onEmbedFormStateChange?: (s: { isSubmitting: boolean; canSubmit: boolean }) => void
-  onSaved?: () => void
+  /** Embutido: após POST com sucesso envia `perfilIdCriado` para o pai manter o modal aberto */
+  onSaved?: (payload?: { perfilIdCriado?: string }) => void
   onCancel?: () => void
 }
 
@@ -336,7 +337,26 @@ export function NovoPerfilUsuario({
       }
 
       if (isEmbedded) {
-        onSaved?.()
+        // Criação embutida: devolve o id para o modal trocar para modo edição sem fechar
+        if (!isEditing) {
+          const criado = PerfilUsuario.fromJSON(responseData)
+          const novoId = criado.getId()
+          if (!novoId) {
+            showToast.error('Perfil salvo, mas não foi possível obter o ID. Recarregue a página.')
+            return
+          }
+          // Sincroniza ref dos nomes para o efeito de meios não limpar a seleção ao virar edição
+          perfilMeiosPagamentoNomesRef.current = selectedMeiosPagamento.map(
+            (mp) => mp.nome
+          )
+          // Evita GET redundante quando o pai passar `perfilId` e virar edição
+          hasLoadedPerfilRef.current = true
+          setPerfilLoaded(true)
+          onSaved?.({ perfilIdCriado: novoId })
+        } else {
+          showToast.success('Perfil atualizado com sucesso!')
+          onSaved?.()
+        }
       } else {
         showToast.success(isEditing ? 'Perfil atualizado com sucesso!' : 'Perfil criado com sucesso!')
         router.push('/cadastros/perfis-usuarios-pdv')

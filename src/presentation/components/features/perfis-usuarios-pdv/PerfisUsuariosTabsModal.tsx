@@ -7,6 +7,7 @@ import {
 } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { NovoUsuario } from '@/src/presentation/components/features/usuarios/NovoUsuario'
 import { NovoPerfilUsuario } from './NovoPerfilUsuario'
+import { showToast } from '@/src/shared/utils/toast'
 
 const PERFIL_TAB_FORM_ID = 'perfil-usuario-tabs-modal-form'
 const USUARIO_TAB_FORM_ID = 'usuario-perfis-tabs-modal-form'
@@ -29,6 +30,8 @@ interface PerfisUsuariosTabsModalProps {
   onClose: () => void
   onTabChange: (tab: PerfisUsuariosTabKey) => void
   onReload?: () => void
+  /** Salvar perfil embutido: criação devolve id e mantém o modal aberto (tratado no pai) */
+  onPerfilEmbeddedSaved?: (payload?: { perfilIdCriado?: string }) => void
 }
 
 export function PerfisUsuariosTabsModal({
@@ -36,6 +39,7 @@ export function PerfisUsuariosTabsModal({
   onClose,
   onTabChange,
   onReload,
+  onPerfilEmbeddedSaved,
 }: PerfisUsuariosTabsModalProps) {
   const [embedPerfilState, setEmbedPerfilState] = useState({
     isSubmitting: false,
@@ -92,6 +96,17 @@ export function PerfisUsuariosTabsModal({
   const initialPerfilPdvFromContext =
     state.initialPerfilPdvId ?? state.perfilId
 
+  // Novo perfil ainda não persistido: bloqueia aba Usuário até o primeiro salvamento
+  const usuarioTabBlocked = state.mode === 'create' && !state.perfilId
+
+  const handleTabClick = (tab: PerfisUsuariosTabKey) => {
+    if (tab === 'usuario' && usuarioTabBlocked) {
+      showToast.warning('Salve o perfil antes de acessar a aba Usuário.')
+      return
+    }
+    onTabChange(tab)
+  }
+
   return (
     <JiffySidePanelModal
       open={state.open}
@@ -105,7 +120,7 @@ export function PerfisUsuariosTabsModal({
         <div className="flex flex-wrap gap-1 px-2 pb-0">
           <button
             type="button"
-            onClick={() => onTabChange('perfil')}
+            onClick={() => handleTabClick('perfil')}
             className={`rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors ${
               state.tab === 'perfil'
                 ? 'bg-primary text-white'
@@ -116,12 +131,18 @@ export function PerfisUsuariosTabsModal({
           </button>
           <button
             type="button"
-            onClick={() => onTabChange('usuario')}
+            aria-disabled={usuarioTabBlocked}
+            title={
+              usuarioTabBlocked
+                ? 'Salve o perfil para acessar a aba Usuário'
+                : undefined
+            }
+            onClick={() => handleTabClick('usuario')}
             className={`rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors ${
               state.tab === 'usuario'
                 ? 'bg-primary text-white'
                 : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
-            }`}
+            } ${usuarioTabBlocked ? 'cursor-not-allowed opacity-50' : ''}`}
           >
             Usuário
           </button>
@@ -137,9 +158,15 @@ export function PerfisUsuariosTabsModal({
             embeddedFormId={PERFIL_TAB_FORM_ID}
             hideEmbeddedFormActions
             onEmbedFormStateChange={setEmbedPerfilState}
-            onSaved={() => {
+            onSaved={(payload) => {
+              if (onPerfilEmbeddedSaved) {
+                onPerfilEmbeddedSaved(payload)
+                return
+              }
               onReload?.()
-              onClose()
+              if (!payload?.perfilIdCriado) {
+                onClose()
+              }
             }}
             onCancel={onClose}
           />
