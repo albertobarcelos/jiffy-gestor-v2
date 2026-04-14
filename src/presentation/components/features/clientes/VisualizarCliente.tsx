@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { Button } from '@/src/presentation/components/ui/button'
-import { MdEdit, MdPerson, MdReceiptLong } from 'react-icons/md'
+import { Input } from '@/src/presentation/components/ui/input'
+import { MdEdit, MdPerson, MdReceiptLong, MdLocationOn } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 
 // Funções de formatação
@@ -60,6 +61,7 @@ function textoIndicadorIe(valor: string | undefined): string {
 interface VisualizarClienteProps {
   clienteId: string
   isEmbedded?: boolean
+  hideEmbeddedHeader?: boolean
   onClose?: () => void
   onEdit?: () => void
 }
@@ -71,6 +73,7 @@ interface VisualizarClienteProps {
 export function VisualizarCliente({
   clienteId,
   isEmbedded = false,
+  hideEmbeddedHeader = false,
   onClose,
   onEdit,
 }: VisualizarClienteProps) {
@@ -79,6 +82,17 @@ export function VisualizarCliente({
   const [cliente, setCliente] = useState<Cliente | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const INPUT_LABEL_PROPS = { shrink: true } as const
+  const inputSx = {
+    '& .MuiOutlinedInput-root': {
+      height: '38px',
+      borderRadius: '8px',
+    },
+    '& .MuiInputBase-input': {
+      padding: '8px 14px',
+      fontSize: '14px',
+    },
+  } as const
 
   // Carregar dados do cliente
   useEffect(() => {
@@ -142,168 +156,188 @@ export function VisualizarCliente({
   const endereco = cliente.getEndereco()
 
   return (
-    <div className="flex flex-col h-full bg-primary-bg">
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-primary-bg md:px-[30px] px-1 py-2 border-b-2 border-primary/70">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-          <div
-              className='w-12 h-12 rounded-full flex items-center bg-primary/25 text-primary justify-center'>
-              <span className="text-2xl"><MdPerson/></span>
-            </div>
-            <div className="flex flex-col items-start">
-            
-              <div className="flex items-center gap-2">
-                <h1 className="text-primary text-lg font-semibold font-exo">
-                  {cliente.getNome()}
-                </h1>
-                <button
-                  onClick={() => onEdit?.()}
-                  title="Editar cliente"
-                  className="flex items-center justify-center w-6 h-6 rounded-full hover:bg-primary/10 transition-colors"
-                  aria-label={`Editar ${cliente.getNome()}`}
-                >
-                  <MdEdit className="text-primary text-base" />
-                </button>
+      {!isEmbedded || !hideEmbeddedHeader ? (
+        <div className="sticky top-0 z-10 bg-primary-bg md:px-[30px] px-1 py-2 border-b-2 border-primary/70">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full flex items-center bg-primary/25 text-primary justify-center">
+                <span className="text-2xl">
+                  <MdPerson />
+                </span>
               </div>
-              <span className="text-secondary-text text-sm">{cliente.getRazaoSocial()}</span>
+              <div className="flex flex-col items-start">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-primary text-lg font-semibold font-exo">
+                    {cliente.getNome()}
+                  </h1>
+                  <button
+                    onClick={() => onEdit?.()}
+                    title="Editar cliente"
+                    className="flex items-center justify-center w-6 h-6 rounded-full hover:bg-primary/10 transition-colors"
+                    aria-label={`Editar ${cliente.getNome()}`}
+                  >
+                    <MdEdit className="text-primary text-base" />
+                  </button>
+                </div>
+                <span className="text-secondary-text text-sm">{cliente.getRazaoSocial()}</span>
+              </div>
             </div>
+            <Button
+              onClick={() => {
+                if (onClose) {
+                  onClose()
+                } else {
+                  router.push('/cadastros/clientes')
+                }
+              }}
+              variant="outlined"
+              className="px-6 h-8 rounded-lg border-primary hover:bg-primary/10"
+              sx={{
+                color: 'var(--color-primary)',
+                borderColor: 'var(--color-primary)',
+              }}
+            >
+              Voltar
+            </Button>
           </div>
-          <Button
-            onClick={() => {
-              if (onClose) {
-                onClose()
-              } else {
-                router.push('/cadastros/clientes')
-              }
-            }}
-            variant="outlined"
-            className="px-6 h-8 rounded-lg border-primary hover:bg-primary/10"
-            sx={{
-              color: 'var(--color-primary)',
-              borderColor: 'var(--color-primary)',
-            }}
-          >
-            Voltar
-          </Button>
         </div>
-      </div>
+      ) : null}
 
       {/* Conteúdo */}
-      <div className="flex-1 overflow-y-auto md:px-[30px] px-1 py-2">
+      <div className="flex-1 overflow-y-auto px-1">
         {/* Grid com duas colunas: Dados e Endereço */}
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:mb-4 mb-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 mb-2">
           {/* Seção Dados (Esquerda) */}
-          <div className="rounded-lg bg-white px-2 py-2 shadow-sm md:px-6">
-            <h2 className="text-primary text-lg font-semibold font-nunito mb-3 pb-2 border-b-2 border-primary">
+          <div className="bg-white px-3 py-2">
+            <h2 className="flex items-center gap-1 text-primary text-lg font-semibold mb-3 pb-2 border-b-2 border-primary">
+            <MdPerson className="text-primary text-2xl" />
               Dados Pessoais
             </h2>
-            <div className="space-y-2">
-              {/* Nome */}
-              <div>
-                <p className="text-secondary-text text-sm mb-1 font-medium">Nome</p>
-                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">{cliente.getNome()}</p>
-              </div>
-
-              {/* CPF */}
-              <div>
-                <p className="text-secondary-text text-sm mb-1 font-medium">CPF</p>
-                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">
-                  {cliente.getCpf() ? formatCPF(cliente.getCpf()!) : '-'}
-                </p>
-              </div>
-
-              {/* CNPJ */}
-              <div>
-                <p className="text-secondary-text text-sm mb-1 font-medium">CNPJ</p>
-                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">
-                  {cliente.getCnpj() ? formatCNPJ(cliente.getCnpj()!) : '-'}
-                </p>
-              </div>
-
-              {/* Telefone */}
-              <div>
-                <p className="text-secondary-text text-sm mb-1 font-medium">Telefone</p>
-                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">
-                  {cliente.getTelefone() ? formatTelefone(cliente.getTelefone()!) : '-'}
-                </p>
-              </div>
-
-              {/* Nome Fantasia */}
-              <div>
-                <p className="text-secondary-text text-sm mb-1 font-medium">Nome Fantasia</p>
-                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">
-                  {cliente.getNomeFantasia() || '-'}
-                </p>
-              </div>
-
-              {/* Razão Social */}
-              <div>
-                <p className="text-secondary-text text-sm mb-1 font-medium">Razão Social</p>
-                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">
-                  {cliente.getRazaoSocial() || '-'}
-                </p>
-              </div>
-
-              {/* E-mail */}
-              <div>
-                <p className="text-secondary-text text-sm mb-1 font-medium">E-mail</p>
-                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">{cliente.getEmail() || '-'}</p>
-              </div>
+            <div className="grid grid-cols-1 gap-2 space-y-2">
+              <Input
+                label="Nome"
+                value={cliente.getNome() || '-'}
+                size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
+                InputProps={{ readOnly: true }}
+                sx={inputSx}
+              />
+              <Input
+                label="CPF"
+                value={cliente.getCpf() ? formatCPF(cliente.getCpf()!) : '-'}
+                size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
+                InputProps={{ readOnly: true }}
+                sx={inputSx}
+              />
+              <Input
+                label="CNPJ"
+                value={cliente.getCnpj() ? formatCNPJ(cliente.getCnpj()!) : '-'}
+                size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
+                InputProps={{ readOnly: true }}
+                sx={inputSx}
+              />
+              <Input
+                label="Telefone"
+                value={cliente.getTelefone() ? formatTelefone(cliente.getTelefone()!) : '-'}
+                size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
+                InputProps={{ readOnly: true }}
+                sx={inputSx}
+              />
+              <Input
+                label="Nome Fantasia"
+                value={cliente.getNomeFantasia() || '-'}
+                size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
+                InputProps={{ readOnly: true }}
+                sx={inputSx}
+              />
+              <Input
+                label="Razão Social"
+                value={cliente.getRazaoSocial() || '-'}
+                size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
+                InputProps={{ readOnly: true }}
+                sx={inputSx}
+              />
+              <Input
+                label="E-mail"
+                value={cliente.getEmail() || '-'}
+                size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
+                InputProps={{ readOnly: true }}
+                sx={inputSx}
+              />
             </div>
           </div>
 
           {/* Seção Endereço (Direita) */}
-          <div className="rounded-lg bg-white px-2 py-2 shadow-sm md:px-6">
-            <h2 className="text-primary text-lg font-semibold font-nunito mb-3 pb-2 border-b-2 border-primary">
+          <div className="bg-white px-3 py-2">
+            <h2 className="flex items-center gap-1 text-primary text-lg font-semibold mb-3 pb-2 border-b-2 border-primary">
+            <MdLocationOn className="text-primary text-2xl" />
               Endereço
             </h2>
-            <div className="space-y-2">
-              {/* CEP */}
-              <div>
-                <p className="text-secondary-text text-sm mb-1 font-medium">CEP</p>
-                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">
-                  {endereco?.cep ? formatCEP(endereco.cep) : '-'}
-                </p>
-              </div>
-
-              {/* Bairro */}
-              <div>
-                <p className="text-secondary-text text-sm mb-1 font-medium">Bairro</p>
-                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">{endereco?.bairro || '-'}</p>  
-              </div>
-
-              {/* Logradouro */}
-              <div>
-                <p className="text-secondary-text text-sm mb-1 font-medium">Logradouro</p>
-                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">{endereco?.rua || '-'}</p>
-              </div>
-
-              {/* Complemento */}
-              <div>
-                <p className="text-secondary-text text-sm mb-1 font-medium">Complemento</p>
-                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">
-                  {endereco?.complemento || '-'}
-                </p>
-              </div>
-
-              {/* Número */}
-              <div>
-                <p className="text-secondary-text text-sm mb-1 font-medium">Número</p>
-                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">{endereco?.numero || '-'}</p>
-              </div>
-
-              {/* Estado */}
-              <div>
-                <p className="text-secondary-text text-sm mb-1 font-medium">Estado</p>
-                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">{endereco?.estado || '-'}</p>
-              </div>
-
-              {/* Cidade */}
-              <div>
-                <p className="text-secondary-text text-sm mb-1 font-medium">Cidade</p>
-                <p className="text-primary-text text-base border border-primary/30 bg-primary-bg px-2 py-2 rounded-lg">{endereco?.cidade || '-'}</p>
-              </div>
+            <div className="grid grid-cols-1 gap-2 space-y-2">
+              <Input
+                label="CEP"
+                value={endereco?.cep ? formatCEP(endereco.cep) : '-'}
+                size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
+                InputProps={{ readOnly: true }}
+                sx={inputSx}
+              />
+              <Input
+                label="Bairro"
+                value={endereco?.bairro || '-'}
+                size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
+                InputProps={{ readOnly: true }}
+                sx={inputSx}
+              />
+              <Input
+                label="Logradouro"
+                value={endereco?.rua || '-'}
+                size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
+                InputProps={{ readOnly: true }}
+                sx={inputSx}
+              />
+              <Input
+                label="Complemento"
+                value={endereco?.complemento || '-'}
+                size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
+                InputProps={{ readOnly: true }}
+                sx={inputSx}
+              />
+              <Input
+                label="Número"
+                value={endereco?.numero || '-'}
+                size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
+                InputProps={{ readOnly: true }}
+                sx={inputSx}
+              />
+              <Input
+                label="Estado"
+                value={endereco?.estado || '-'}
+                size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
+                InputProps={{ readOnly: true }}
+                sx={inputSx}
+              />
+              <Input
+                label="Cidade"
+                value={endereco?.cidade || '-'}
+                size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
+                InputProps={{ readOnly: true }}
+                sx={inputSx}
+              />
             </div>
           </div>
         </div>
@@ -317,22 +351,22 @@ export function VisualizarCliente({
             Fiscal
           </h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
-            <div className="flex min-h-0 flex-col">
-              <p className="mb-1 text-sm font-medium leading-none text-secondary-text">
-                Indicador da inscrição estadual
-              </p>
-              <p className="min-h-[42px] rounded-lg border border-primary/30 bg-primary-bg px-2 py-2 text-base text-primary-text">
-                {textoIndicadorIe(cliente.getIndicadorInscricaoEstadual())}
-              </p>
-            </div>
-            <div className="flex min-h-0 flex-col">
-              <p className="mb-1 text-sm font-medium leading-none text-secondary-text">
-                Inscrição estadual
-              </p>
-              <p className="min-h-[42px] rounded-lg border border-primary/30 bg-primary-bg px-2 py-2 text-base text-primary-text">
-                {cliente.getInscricaoEstadual()?.trim() || '-'}
-              </p>
-            </div>
+            <Input
+              label="Indicador da inscrição estadual"
+              value={textoIndicadorIe(cliente.getIndicadorInscricaoEstadual())}
+              size="small"
+              InputLabelProps={INPUT_LABEL_PROPS}
+              InputProps={{ readOnly: true }}
+              sx={inputSx}
+            />
+            <Input
+              label="Inscrição estadual"
+              value={cliente.getInscricaoEstadual()?.trim() || '-'}
+              size="small"
+              InputLabelProps={INPUT_LABEL_PROPS}
+              InputProps={{ readOnly: true }}
+              sx={inputSx}
+            />
           </div>
         </div>
       </div>

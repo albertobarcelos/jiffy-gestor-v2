@@ -6,21 +6,20 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/src/presentation/components/ui/select'
 import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { MdSearch, MdClear, MdPerson, MdLocationOn, MdReceiptLong } from 'react-icons/md'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
+import { MenuItem } from '@mui/material'
 
 interface NovoClienteProps {
   clienteId?: string
   isEmbedded?: boolean
+  hideEmbeddedHeader?: boolean
+  embeddedFormId?: string
+  hideEmbeddedFormActions?: boolean
+  onEmbedFormStateChange?: (s: { isSubmitting: boolean; canSubmit: boolean }) => void
   onClose?: () => void
   onSaved?: () => void
 }
@@ -73,6 +72,10 @@ const INDICADOR_IE_NAO_INFORMADO = '__none__'
 export function NovoCliente({
   clienteId,
   isEmbedded = false,
+  hideEmbeddedHeader = false,
+  embeddedFormId,
+  hideEmbeddedFormActions = false,
+  onEmbedFormStateChange,
   onClose,
   onSaved,
 }: NovoClienteProps) {
@@ -111,6 +114,25 @@ export function NovoCliente({
   const [isLoadingCNPJ, setIsLoadingCNPJ] = useState(false)
   const [isLoadingCEP, setIsLoadingCEP] = useState(false)
   const hasLoadedClienteRef = useRef(false)
+  const canSubmit = Boolean(nome && nome.trim())
+
+  const INPUT_LABEL_PROPS = { shrink: true } as const
+  const formId = embeddedFormId ?? 'novo-cliente-form'
+  const inputSx = {
+    '& .MuiOutlinedInput-root': {
+      height: '38px',
+      backgroundColor: 'var(--color-primary-bg)',
+      borderRadius: '8px',
+    },
+    '& .MuiInputBase-input': {
+      padding: '8px 14px',
+      fontSize: '14px',
+    },
+  } as const
+
+  useEffect(() => {
+    onEmbedFormStateChange?.({ isSubmitting: isLoading, canSubmit })
+  }, [onEmbedFormStateChange, isLoading, canSubmit])
 
   // Carregar dados do cliente se estiver editando
   useEffect(() => {
@@ -537,6 +559,7 @@ export function NovoCliente({
     }
 
     setIsLoading(true)
+    onEmbedFormStateChange?.({ isSubmitting: true, canSubmit })
 
     try {
       const cepLimpo = cep.replace(/\D/g, '')
@@ -665,6 +688,7 @@ export function NovoCliente({
       showToast.error(textoToast || mensagem)
     } finally {
       setIsLoading(false)
+      onEmbedFormStateChange?.({ isSubmitting: false, canSubmit })
     }
   }
 
@@ -695,69 +719,76 @@ export function NovoCliente({
   return (
     <div className="flex flex-col h-full">
       {/* Header fixo */}
-      <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[30px] shadow-md md:px-[30px] px-1 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div
-              className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                nome
-                  ? 'bg-primary/25 text-primary'
-                  : 'bg-secondary-text/10 text-secondary-text'
-              }`}
-            >
-              <span className="text-2xl"><MdPerson/></span>
+      {!isEmbedded || !hideEmbeddedHeader ? (
+        <div className="sticky top-0 z-10 bg-primary-bg px-1 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div
+                className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                  nome ? 'bg-primary/25 text-primary' : 'bg-secondary-text/10 text-secondary-text'
+                }`}
+              >
+                <span className="text-2xl">
+                  <MdPerson />
+                </span>
+              </div>
+              <h1 className="text-primary text-lg font-semibold font-exo">
+                {isEditing ? 'Editar Cliente' : 'Novo Cliente'}
+              </h1>
             </div>
-            <h1 className="text-primary text-lg font-semibold font-exo">
-              {isEditing ? 'Editar Cliente' : 'Novo Cliente'}
-            </h1>
+            <Button
+              onClick={handleCancel}
+              variant="outlined"
+              className="px-6 h-8 rounded-lg border-primary hover:bg-primary/10"
+              sx={{
+                color: 'var(--color-primary)',
+                borderColor: 'var(--color-primary)',
+                '&:hover': {
+                  backgroundColor: 'primary.100',
+                },
+              }}
+            >
+              Cancelar
+            </Button>
           </div>
-          <Button
-            onClick={handleCancel}
-            variant="outlined"
-            className="px-6 h-8 rounded-lg border-primary hover:bg-primary/10"
-            sx={{
-              color: 'var(--color-primary)',
-              borderColor: 'var(--color-primary)',
-              
-              '&:hover': {
-                backgroundColor: 'primary.100',
-                
-              },
-            }}          >
-            Cancelar
-          </Button>
         </div>
-      </div>
+      ) : null}
 
       {/* Formulário com scroll */}
-      <div className="flex-1 overflow-y-auto md:px-[30px] px-1">
-        <form onSubmit={handleSubmit} className="">
+      <div className="flex-1 overflow-y-auto px-1">
+        <form id={formId} onSubmit={handleSubmit} className="">
           {/* Toggle Pessoa Física/Jurídica */}
-          <div className="flex items-center border-b border-primary/70 justify-between md:px-5 px-1 py-3 bg-info">
-            <div className="flex flex-col items-start">
-                <p className="text-lg font-medium text-primary-text">
-                  {nome || 'Nome do Cliente'}
-                </p>
-                <p className="text-sm text-secondary-text">
-                  {razaoSocial || 'Razão Social'}
-                </p>
+          <div className="md:px-5 px-1 py-3 bg-info">
+            <div className="flex items-center gap-3">
+              <h2 className="text-primary text-xl font-semibold">
+                Dados do Cliente
+              </h2>
+              <div className="flex-1 border-t border-primary/40" aria-hidden />
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={ativo}
-                onChange={(e) => setAtivo(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[28px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-            </label>
           </div>
 
           {/* Dados Pessoais */}
           <div className="bg-info rounded-lg md:px-5 py-2 space-y-4">
-            <h2 className="text-primary text-base font-semibold font-nunito mb-2">
-              Dados Pessoais
-            </h2>
+            <div className="flex items-center gap-1">
+              <MdPerson className="text-primary text-2xl" />
+              <h2 className="text-primary text-base font-semibold font-nunito">
+                Dados Pessoais
+              </h2>
+              <div className="flex-1" aria-hidden />
+              <div className="shrink-0">
+                <JiffyIconSwitch
+                  checked={ativo}
+                  onChange={e => setAtivo(e.target.checked)}
+                  disabled={isLoading}
+                  label="Ativo"
+                  labelPosition="start"
+                  bordered={false}
+                  size="sm"
+                  className="shrink-0"
+                  inputProps={{ 'aria-label': ativo ? 'Desativar cliente' : 'Ativar cliente' }}
+                />
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 md:gap-2 gap-1">
               <Input
@@ -767,6 +798,7 @@ export function NovoCliente({
                 required
                 placeholder="Nome completo"
                 size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -785,6 +817,7 @@ export function NovoCliente({
                 onChange={(e) => setRazaoSocial(e.target.value)}
                 placeholder="Razão social"
                 size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -807,6 +840,7 @@ export function NovoCliente({
                 placeholder="000.000.000-00"
                 inputProps={{ maxLength: 14 }}
                 size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -827,6 +861,7 @@ export function NovoCliente({
                   placeholder="00.000.000/0000-00"
                   inputProps={{ maxLength: 18 }}
                   size="small"
+                  InputLabelProps={INPUT_LABEL_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -889,6 +924,7 @@ export function NovoCliente({
                 placeholder="(00) 00000-0000"
                 inputProps={{ maxLength: 15 }}
                 size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -908,6 +944,7 @@ export function NovoCliente({
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="email@exemplo.com"
                 size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -928,6 +965,7 @@ export function NovoCliente({
               onChange={(e) => setNomeFantasia(e.target.value)}
               placeholder="Nome fantasia"
               size="small"
+              InputLabelProps={INPUT_LABEL_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -944,60 +982,50 @@ export function NovoCliente({
 
           {/* Fiscal (antes do endereço — mesmo nível do payload da API) */}
           <div className="mt-2 rounded-lg bg-info md:px-5 px-1 py-2 space-y-4">
-            <h2 className="text-primary text-base font-semibold font-nunito mb-2 flex items-center gap-2">
-              <span className="text-xl text-primary">
-                <MdReceiptLong />
-              </span>
-              Fiscal
-            </h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-primary text-base font-semibold font-nunito flex items-center gap-2">
+                <span className="text-xl text-primary">
+                  <MdReceiptLong />
+                </span>
+                Fiscal
+              </h2>
+              <div className="flex-1 border-t border-primary/40" aria-hidden />
+            </div>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:items-start">
               <div className="flex min-h-0 flex-col">
-                <label
-                  htmlFor="cliente-indicador-ie"
-                  className="mb-2 text-sm font-medium leading-none text-primary-text"
-                >
-                  Indicador da inscrição estadual
-                </label>
-                <Select
+                <Input
+                  select
+                  id="cliente-indicador-ie"
+                  label="Indicador da inscrição estadual"
                   value={indicadorInscricaoEstadual || INDICADOR_IE_NAO_INFORMADO}
-                  onValueChange={(v) =>
-                    setIndicadorInscricaoEstadual(v === INDICADOR_IE_NAO_INFORMADO ? '' : v)
+                  onChange={(e) =>
+                    setIndicadorInscricaoEstadual(
+                      e.target.value === INDICADOR_IE_NAO_INFORMADO ? '' : e.target.value
+                    )
                   }
+                  size="small"
+                  InputLabelProps={INPUT_LABEL_PROPS}
+                  sx={inputSx}
                 >
-                  <SelectTrigger id="cliente-indicador-ie" className="h-[38px] bg-primary-bg">
-                    <SelectValue placeholder="Selecione um indicador" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={INDICADOR_IE_NAO_INFORMADO}>Não informado</SelectItem>
-                    {INDICADOR_IE_OPCOES.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <MenuItem value={INDICADOR_IE_NAO_INFORMADO}>Não informado</MenuItem>
+                  {INDICADOR_IE_OPCOES.map((opt) => (
+                    <MenuItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </MenuItem>
+                  ))}
+                </Input>
               </div>
               <div className="flex min-h-0 flex-col">
-                <label htmlFor="cliente-inscricao-estadual" className="mb-2 text-sm font-medium leading-none text-primary-text">
-                  Inscrição estadual
-                </label>
                 <Input
                   id="cliente-inscricao-estadual"
+                  label="Inscrição estadual"
                   value={inscricaoEstadual}
                   onChange={(e) => setInscricaoEstadual(e.target.value)}
                   placeholder="Número da IE ou ISENTO"
                   size="small"
-                  hiddenLabel
+                  InputLabelProps={INPUT_LABEL_PROPS}
                   sx={{
-                    '& .MuiOutlinedInput-root': {
-                      height: '38px',
-                      backgroundColor: 'var(--color-primary-bg)',
-                      borderRadius: '8px',
-                    },
-                    '& .MuiInputBase-input': {
-                      padding: '8px 14px',
-                      fontSize: '14px',
-                    },
+                    ...inputSx,
                     '& .MuiInputBase-root': {
                       marginTop: 0,
                     },
@@ -1008,30 +1036,32 @@ export function NovoCliente({
           </div>
 
           {/* Toggle Endereço */}
-          <div className="flex items-center justify-between px-5 pt-4 bg-info">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl text-primary"><MdLocationOn/></span>
-              <span className="text-primary-text font-medium">
-                Incluir Endereço
-              </span>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={incluirEndereco}
-                onChange={(e) => handleToggleEndereco(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[28px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-            </label>
+          <div className="flex items-center justify-end gap-2 px-5 pt-4 bg-info">
+            <JiffyIconSwitch
+              checked={incluirEndereco}
+              onChange={e => handleToggleEndereco(e.target.checked)}
+              disabled={isLoading}
+              label="Incluir Endereço"
+              labelPosition="start"
+              bordered={false}
+              size="sm"
+              className="shrink-0"
+              inputProps={{
+                'aria-label': incluirEndereco ? 'Remover endereço do cliente' : 'Incluir endereço no cliente',
+              }}
+            />
           </div>
 
           {/* Endereço */}
           {incluirEndereco && (
             <div className="bg-info md:px-5 py-1 space-y-4">
-              <h2 className="text-primary text-base font-semibold font-nunito mb-4">
-                Endereço
-              </h2>
+              <div className="flex items-center gap-1">
+              <MdLocationOn className="text-primary text-2xl" />
+                <h2 className="text-primary text-base font-semibold font-nunito">
+                  Endereço
+                </h2>
+                <div className="flex-1 border-t border-primary/40" aria-hidden />
+              </div>
 
               <div className="grid md:grid-cols-2 grid-cols-1 gap-3">
                 <div className="relative">
@@ -1042,6 +1072,7 @@ export function NovoCliente({
                     placeholder="00000-000"
                     inputProps={{ maxLength: 9 }}
                     size="small"
+                    InputLabelProps={INPUT_LABEL_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -1090,6 +1121,7 @@ export function NovoCliente({
                   onChange={(e) => setRua(e.target.value)}
                   placeholder="Nome da rua"
                   size="small"
+                  InputLabelProps={INPUT_LABEL_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -1111,6 +1143,7 @@ export function NovoCliente({
                   onChange={(e) => setNumero(e.target.value)}
                   placeholder="Número"
                   size="small"
+                  InputLabelProps={INPUT_LABEL_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -1130,6 +1163,7 @@ export function NovoCliente({
                   placeholder="Bairro"
                   size="small"
                   className="col-span-2"
+                  InputLabelProps={INPUT_LABEL_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -1148,6 +1182,7 @@ export function NovoCliente({
                   onChange={(e) => setComplemento(e.target.value)}
                   placeholder="Complemento"
                   size="small"
+                  InputLabelProps={INPUT_LABEL_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -1164,24 +1199,22 @@ export function NovoCliente({
 
               <div className="grid md:grid-cols-2 grid-cols-1 gap-3">
                 <div className="flex flex-col">
-                  <label className="text-sm font-medium text-primary-text mb-2">
-                    Estado
-                  </label>
-                  <Select
+                  <Input
+                    select
+                    label="Estado"
                     value={estado}
-                    onValueChange={handleEstadoChange}
+                    onChange={(e) => handleEstadoChange(e.target.value)}
+                    size="small"
+                    InputLabelProps={INPUT_LABEL_PROPS}
+                    sx={inputSx}
                   >
-                    <SelectTrigger className="h-[38px] bg-primary-bg">
-                      <SelectValue placeholder="Selecione o estado" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ESTADOS_BRASILEIROS.map((estadoOption) => (
-                        <SelectItem key={estadoOption.sigla} value={estadoOption.sigla}>
-                          {estadoOption.sigla} - {estadoOption.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <MenuItem value="">Selecione o estado</MenuItem>
+                    {ESTADOS_BRASILEIROS.map((estadoOption) => (
+                      <MenuItem key={estadoOption.sigla} value={estadoOption.sigla}>
+                        {estadoOption.sigla} - {estadoOption.nome}
+                      </MenuItem>
+                    ))}
+                  </Input>
                 </div>
                 <div className="flex flex-col">
                   <CidadeAutocomplete
@@ -1214,34 +1247,37 @@ export function NovoCliente({
           )}
 
           {/* Botões de ação */}
-          <div className="flex justify-end gap-4 py-4">
-            <Button
-              type="button"
-              onClick={handleCancel}
-              variant="outlined"
-              className="px-6 h-8 rounded-lg border-primary hover:bg-primary/10"
-              sx={{
-                color: 'var(--color-primary)',
-                borderColor: 'var(--color-primary)',
-                
-                '&:hover': {
-                  backgroundColor: 'primary.100',
-                  
-                },
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isLoading || !nome}
-             className="px-6 h-8 rounded-lg border-primary hover:bg-primary/90"
-             sx={{
-               color: 'var(--color-info)',
-               borderColor: 'var(--color-primary)',
-               backgroundColor: 'var(--color-primary)',
-             }}>
-              {isLoading ? 'Salvando...' : isEditing ? 'Atualizar' : 'Salvar'}
-            </Button>
-          </div>
+          {!isEmbedded || !hideEmbeddedFormActions ? (
+            <div className="flex justify-end gap-4 py-4">
+              <Button
+                type="button"
+                onClick={handleCancel}
+                variant="outlined"
+                className="px-6 h-8 rounded-lg border-primary hover:bg-primary/10"
+                sx={{
+                  color: 'var(--color-primary)',
+                  borderColor: 'var(--color-primary)',
+                  '&:hover': {
+                    backgroundColor: 'primary.100',
+                  },
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={isLoading || !nome}
+                className="px-6 h-8 rounded-lg border-primary hover:bg-primary/90"
+                sx={{
+                  color: 'var(--color-info)',
+                  borderColor: 'var(--color-primary)',
+                  backgroundColor: 'var(--color-primary)',
+                }}
+              >
+                {isLoading ? 'Salvando...' : isEditing ? 'Atualizar' : 'Salvar'}
+              </Button>
+            </div>
+          ) : null}
         </form>
       </div>
     </div>

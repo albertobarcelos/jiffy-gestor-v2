@@ -1,10 +1,16 @@
 'use client'
 
-import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
+import { useMemo, useState } from 'react'
+import {
+  JiffySidePanelModal,
+  type JiffySidePanelFooterActions,
+} from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { NovoCliente } from './NovoCliente'
 import { VisualizarCliente } from './VisualizarCliente'
 
 type TabKey = 'cliente' | 'visualizar'
+
+const CLIENTE_TABS_FORM_ID = 'cliente-tabs-modal-form'
 
 export interface ClientesTabsModalState {
   open: boolean
@@ -32,107 +38,106 @@ export function ClientesTabsModal({
     onTabChange('cliente')
   }
 
+  const title = useMemo(() => {
+    if (state.tab === 'visualizar') return 'Visualizar Cliente'
+    if (state.mode === 'create') return 'Novo Cliente'
+    return 'Editar Cliente'
+  }, [state.tab, state.mode])
+
+  const [embedFormState, setEmbedFormState] = useState({
+    isSubmitting: false,
+    canSubmit: false,
+  })
+
+  const footerActions = useMemo((): JiffySidePanelFooterActions => {
+    if (state.tab === 'visualizar') {
+      return {
+        barActionOrder: ['cancel', 'save'],
+        showCancel: true,
+        cancelLabel: 'Fechar',
+        onCancel: onClose,
+        showSave: true,
+        saveLabel: 'Editar',
+        onSave: handleEdit,
+      }
+    }
+
+    return {
+      barActionOrder: ['cancel', 'save'],
+      showCancel: true,
+      cancelLabel: 'Fechar',
+      onCancel: onClose,
+      showSave: true,
+      saveLabel: state.mode === 'edit' ? 'Atualizar' : 'Salvar',
+      saveFormId: CLIENTE_TABS_FORM_ID,
+      saveLoading: embedFormState.isSubmitting,
+      saveDisabled: !embedFormState.canSubmit || embedFormState.isSubmitting,
+    }
+  }, [state.tab, state.mode, embedFormState, onClose, handleEdit])
+
   return (
-    <Dialog
+    <JiffySidePanelModal
       open={state.open}
-      onOpenChange={(open) => {
-        if (!open) {
-          onClose()
-        }
-      }}
-      fullWidth
-      maxWidth="xl"
-      sx={{
-        '& .MuiDialog-container': {
-          zIndex: 1500,
-          justifyContent: {
-            xs: 'center', // Centraliza em mobile
-            md: 'flex-end', // Alinha à direita em desktop
-          },
-          alignItems: 'stretch',
-          margin: 0,
-        },
-        '& .MuiBackdrop-root': { zIndex: 1500 },
-        '& .MuiDialog-paper': { zIndex: 1500 },
-      }}
-      PaperProps={{
-        sx: {
-          height: '100vh',
-          maxHeight: '100vh',
-          width: {
-            xs: '95vw', // Em telas muito pequenas (mobile), ocupa 95% da largura
-            sm: '90vw', // Em telas pequenas, ocupa 90% da largura
-            md: 'min(900px, 60vw)', // Em telas médias e maiores, mantém o comportamento original
-          },
-          margin: {
-            xs: 'auto', // Centraliza em mobile (com width 95vw, deixa 2.5% de cada lado)
-            md: 0, // Sem margin em desktop
-          },
-          borderRadius: 0,
-          display: 'flex',
-          flexDirection: 'column',
-        },
-      }}
-    >
-      <DialogContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <div className="px-6 pt-4 flex gap-1 border-b border-gray-200">
-          {(
-            [
-              { key: 'cliente' as TabKey, label: 'Cliente', disabled: false },
-              {
-                key: 'visualizar' as TabKey,
-                label: 'Visualizar',
-                disabled: state.mode === 'create' || !clienteId,
-              },
-            ] as Array<{
-              key: TabKey
-              label: string
-              disabled: boolean
-            }>
-          ).map((tab) => (
+      onClose={onClose}
+      title={title}
+      scrollableBody={false}
+      footerVariant="bar"
+      panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]"
+      footerActions={footerActions}
+      tabsSlot={
+        <div className="flex flex-wrap gap-1 px-2 pb-0">
+          {[
+            { key: 'cliente' as TabKey, label: 'Cliente', disabled: false },
+            {
+              key: 'visualizar' as TabKey,
+              label: 'Visualizar',
+              disabled: state.mode === 'create' || !clienteId,
+            },
+          ].map(tab => (
             <button
               key={tab.key}
               type="button"
               disabled={tab.disabled}
               onClick={() => !tab.disabled && onTabChange(tab.key)}
-              className={`px-4 py-2 rounded-t-lg text-sm font-semibold transition-colors ${
+              className={`rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors ${
                 state.tab === tab.key
                   ? 'bg-primary text-white'
                   : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
-              } ${tab.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+              } ${tab.disabled ? 'cursor-not-allowed opacity-50' : ''}`}
             >
               {tab.label}
             </button>
           ))}
         </div>
-
-        <div className="flex-1 overflow-hidden">
-          {state.tab === 'cliente' && (
-            <div className="h-full overflow-y-auto">
-              <NovoCliente
-                clienteId={state.mode === 'create' ? undefined : clienteId}
-                isEmbedded
-                onClose={onClose}
-                onSaved={() => {
-                  onReload?.()
-                  onClose()
-                }}
-              />
-            </div>
-          )}
-          {state.tab === 'visualizar' && clienteId && (
-            <div className="h-full overflow-y-auto">
-              <VisualizarCliente
-                clienteId={clienteId}
-                isEmbedded
-                onClose={onClose}
-                onEdit={handleEdit}
-              />
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+      }
+    >
+      <div className="flex min-h-0 flex-1 flex-col">
+        {state.tab === 'cliente' ? (
+          <NovoCliente
+            clienteId={state.mode === 'create' ? undefined : clienteId}
+            isEmbedded
+            hideEmbeddedHeader
+            embeddedFormId={CLIENTE_TABS_FORM_ID}
+            hideEmbeddedFormActions
+            onEmbedFormStateChange={setEmbedFormState}
+            onClose={onClose}
+            onSaved={() => {
+              onReload?.()
+              onClose()
+            }}
+          />
+        ) : null}
+        {state.tab === 'visualizar' && clienteId ? (
+          <VisualizarCliente
+            clienteId={clienteId}
+            isEmbedded
+            hideEmbeddedHeader
+            onClose={onClose}
+            onEdit={handleEdit}
+          />
+        ) : null}
+      </div>
+    </JiffySidePanelModal>
   )
 }
 

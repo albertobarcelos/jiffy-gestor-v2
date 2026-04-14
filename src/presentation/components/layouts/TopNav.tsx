@@ -393,7 +393,7 @@ export function TopNav() {
   )
 
   return (
-    <nav className="h-16 bg-white border-b border-gray-200 shadow-sm relative">
+    <nav className="relative z-40 h-16 shrink-0 bg-white border-b border-gray-200 shadow-sm">
       <div className="h-full flex items-center justify-between xl:px-4">
         {/* Logo */}
         <div className="flex items-center">
