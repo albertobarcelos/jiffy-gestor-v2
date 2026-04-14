@@ -141,7 +141,7 @@ export function NovoPerfilUsuario({
           const data = await response.json()
           const perfil = PerfilUsuario.fromJSON(data)
 
-          setRole(perfil.getRole())
+          setRole((perfil.getRole() || '').toUpperCase())
           setCancelarVenda(perfil.canCancelarVenda())
           setCancelarProduto(perfil.canCancelarProduto())
           setAplicarDescontoProduto(perfil.canAplicarDescontoProduto())
@@ -501,7 +501,7 @@ export function NovoPerfilUsuario({
               <Input
                 label="Nome do Perfil"
                 value={role}
-                onChange={(e) => setRole(e.target.value)}
+                onChange={(e) => setRole(e.target.value.toUpperCase())}
                 required
                 placeholder="Digite o nome do perfil"
                 className="bg-info"

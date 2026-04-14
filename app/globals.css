@@ -67,6 +67,47 @@
     transform: translate(-50%, -50%);
   }
 
+  /* Tooltip abaixo do gatilho (ex.: switch em listas) */
+  .tooltip-hover-below {
+    position: relative;
+  }
+  .tooltip-hover-below::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: max-content;
+    max-width: 220px;
+    background: #ffffff;
+    color: #000000;
+    padding: 6px 10px;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    white-space: pre-line;
+    font-size: 10px;
+    line-height: 1.3;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease-out, transform 120ms ease-out;
+    z-index: 20;
+  }
+  .tooltip-hover-below:hover::after {
+    opacity: 1;
+    transform: translateX(-50%);
+  }
+
+  /*
+   * Tooltip abaixo, âncora deslocada à direita (centro do balão ~eixo do ícone da seta em botão estreito)
+   */
+  .tooltip-hover-below.tooltip-hover-below-icon::after {
+    left: 58%;
+    transform: translateX(-50%);
+  }
+  .tooltip-hover-below.tooltip-hover-below-icon:hover::after {
+    transform: translateX(-50%);
+  }
+
   /* Preview do card no Kanban ao arrastar: leve inclinação fixa (sem animação — evita tremor visual) */
   .drag-preview-card {
     transform: rotate(-4deg) scale(1.04);

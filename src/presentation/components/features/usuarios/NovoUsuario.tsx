@@ -231,7 +231,7 @@ export function NovoUsuario({
           const data = await response.json()
           const usuario = Usuario.fromJSON(data)
 
-          setNome(usuario.getNome())
+          setNome((usuario.getNome() || '').toUpperCase())
           setTelefone(usuario.getTelefone() || '')
           
           // Carrega o perfilPdvId diretamente dos dados da API (garantido pela rota)
@@ -415,7 +415,7 @@ export function NovoUsuario({
               <Input
                 label="Nome"
                 value={nome || ''}
-                onChange={(e) => setNome(e.target.value)}
+                onChange={(e) => setNome(e.target.value.toUpperCase())}
                 required
                 size="small"
                 placeholder="Digite o nome do usuário"

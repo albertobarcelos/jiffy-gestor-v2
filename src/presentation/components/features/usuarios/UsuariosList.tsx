@@ -5,6 +5,7 @@ import { Usuario } from '@/src/domain/entities/Usuario'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { MdSearch, MdDelete } from 'react-icons/md'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import {
@@ -635,7 +636,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
       <div
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto px-1 mt-2 scrollbar-hide"
-        style={{ maxHeight: 'calc(100vh - 300px)' }}
+        style={{ maxHeight: 'calc(100vh - 250px)' }}
       >
         {/* Mostrar loading quando está carregando ou ainda não houve tentativa de carregamento */}
         {(isLoading || !hasLoadedInitialRef.current) && usuarios.length === 0 && (
@@ -668,7 +669,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
             className={`${bgClass} rounded-lg mb-2 hover:bg-primary/10 transition-colors cursor-pointer`}
           >
             <div className="h-[50px] md:px-4 flex items-center md:gap-[10px] gap-1">
-              <div className="md:flex-[3] flex-[2] font-nunito font-semibold md:text-sm text-[10px] text-primary-text flex items-center gap-2">
+              <div className="md:flex-[3] flex-[2] font-normal md:text-sm text-[10px] text-primary-text flex items-center gap-2 uppercase">
                 {usuario.getNome()}
               </div>
               <div className="md:flex-[2] flex-[1] font-nunito md:text-sm text-[10px] text-secondary-text hidden md:flex">
@@ -684,7 +685,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
                     disabled={!!updatingPerfil[usuario.getId()]}
                   >
                     <SelectTrigger
-                      className={`w-full px-2 md:py-1 h-auto rounded-lg border border-gray-300 bg-info md:text-sm text-[10px] text-primary-text focus:outline-none focus:border-primary ${
+                      className={`w-full px-2 md:py-1 h-auto rounded-lg border border-gray-300 bg-info md:text-sm text-[10px] text-primary-text uppercase focus:outline-none focus:border-primary ${
                         updatingPerfil[usuario.getId()]
                           ? 'opacity-60 cursor-not-allowed'
                           : 'cursor-pointer hover:border-primary'
@@ -711,7 +712,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
                               <SelectItem
                                 key={perfilAtual.id}
                                 value={perfilAtual.id}
-                                className="md:min-h-[32px] min-h-[28px] md:max-h-[40px] max-h-[36px] data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary transition-colors"
+                                className="uppercase md:min-h-[32px] min-h-[28px] md:max-h-[40px] max-h-[36px] data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary transition-colors"
                               >
                                 {perfilAtual.role}
                               </SelectItem>
@@ -720,13 +721,13 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
                               <SelectItem
                                 key={perfil.id}
                                 value={perfil.id}
-                                className="md:min-h-[32px] min-h-[28px] md:max-h-[40px] max-h-[36px] data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary transition-colors"
+                                className="uppercase md:min-h-[32px] min-h-[28px] md:max-h-[40px] max-h-[36px] data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary transition-colors"
                               >
                                 {perfil.role}
                               </SelectItem>
                             ))}
                             {!perfilAtual && allPerfisPDV.length === 0 && (
-                              <div className="px-2 py-1.5 md:text-sm text-[10px] text-secondary-text">
+                              <div className="px-2 py-1.5 md:text-sm text-[10px] text-secondary-text uppercase">
                                 Nenhum perfil disponível
                               </div>
                             )}
@@ -737,31 +738,32 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
                   </Select>
                 )}
               </div>
-              <div className="md:flex-[2] flex-[1] flex md:justify-center justify-end" onClick={(e) => e.stopPropagation()}>
-                <label
-                  className={`relative inline-flex md:h-5 h-4 md:w-12 w-8 items-center ${
-                    togglingStatus[usuario.getId()]
-                      ? 'cursor-not-allowed opacity-60'
-                      : 'cursor-pointer'
-                  }`}
-                  title={usuario.isAtivo() ? 'Usuário Ativo' : 'Usuário Desativado'}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onTouchStart={(e) => e.stopPropagation()}
-                >
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={usuario.isAtivo()}
-                    onChange={(event) => {
-                      event.stopPropagation()
-                      handleToggleUsuarioStatus(usuario, event.target.checked)
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    disabled={!!togglingStatus[usuario.getId()]}
-                  />
-                  <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                  <span className="absolute md:left-[2px] left-0.5 top-1/2 block md:h-4 h-2.5 md:w-4 w-2.5 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 md:peer-checked:translate-x-[28px] peer-checked:translate-x-[18px]" />
-                </label>
+              <div
+                className="tooltip-hover-below md:flex-[2] flex-[1] flex md:justify-center justify-end"
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                data-tooltip={
+                  usuario.isAtivo() ? 'Usuário ativo' : 'Usuário desativado'
+                }
+              >
+                <JiffyIconSwitch
+                  checked={usuario.isAtivo()}
+                  onChange={(e) => {
+                    e.stopPropagation()
+                    handleToggleUsuarioStatus(usuario, e.target.checked)
+                  }}
+                  disabled={!!togglingStatus[usuario.getId()]}
+                  bordered={false}
+                  size="sm"
+                  className="shrink-0 px-0 py-0"
+                  inputProps={{
+                    'aria-label': usuario.isAtivo()
+                      ? 'Desativar usuário'
+                      : 'Ativar usuário',
+                    onClick: (e) => e.stopPropagation(),
+                  }}
+                />
               </div>
               <div className="md:flex-[2] flex-[1] flex md:justify-center justify-end" onClick={(e) => e.stopPropagation()}>
                 <button

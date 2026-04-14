@@ -5,6 +5,7 @@ import { PerfilUsuario } from '@/src/domain/entities/PerfilUsuario'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { MdSearch, MdKeyboardArrowRight, MdPerson, MdEdit, MdAdd } from 'react-icons/md'
 import {
@@ -546,20 +547,26 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
                 className="h-[50px] px-1 flex items-center md:gap-[10px] gap-1 relative overflow-visible cursor-pointer"
               >
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation()
                     toggleExpand(perfil.getId())
                   }}
-                  className="md:w-8 w-6 md:h-8 h-6 flex items-center justify-center text-primary-text hover:bg-secondary-bg/20 rounded transition-colors"
+                  className="tooltip-hover-below tooltip-hover-below-icon flex h-6 w-6 shrink-0 items-center justify-center rounded text-primary-text transition-colors hover:bg-secondary-bg/20 md:h-8 md:w-8"
+                  data-tooltip="Exibir usuários do perfil"
+                  aria-label="Exibir usuários do perfil"
+                  aria-expanded={isExpanded}
                 >
-                  <span title="Exibir usuários do perfil" 
-                  className={`text-lg transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
+                  <span
+                    className={`text-lg transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                  >
                     <MdKeyboardArrowRight size={18} />
                   </span>
                 </button>
-                <div className="md:flex-[3] flex-[2] font-nunito font-semibold text-left md:text-sm text-xs text-primary-text flex items-center gap-2">
+                <div className="md:flex-[3] flex-[2] uppercase font-normal text-left md:text-sm text-xs text-primary-text flex items-center gap-2">
                   {perfil.getRole()}
                   <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation()
                       openTabsModal({
@@ -569,8 +576,9 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
                         initialPerfilPdvId: perfil.getId(),
                       })
                     }}
-                    className="w-5 h-5 flex items-center justify-center border border-primary/70 text-primary hover:bg-primary/20 rounded-full transition-colors"
-                    title="Adicionar novo usuário ao perfil"
+                    className="tooltip-hover-below flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-primary/70 text-primary transition-colors hover:bg-primary/20"
+                    data-tooltip="Adicionar novo usuário ao perfil"
+                    aria-label="Adicionar novo usuário ao perfil"
                   >
                     <MdAdd />
                   </button>
@@ -599,13 +607,21 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
-                              <p className="font-nunito font-semibold text-sm text-primary-text">
+                              <p className="uppercase font-normal text-sm text-primary-text">
                                 {usuario.nome}
                               </p>
                               <button
-                                onClick={() => openUsuariosTabsModal({ mode: 'edit', usuarioId: usuario.id })}
-                                className="w-5 h-5 flex items-center justify-center text-primary hover:bg-primary/20 rounded-full transition-colors"
-                                title="Editar usuário"
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  openUsuariosTabsModal({
+                                    mode: 'edit',
+                                    usuarioId: usuario.id,
+                                  })
+                                }}
+                                className="tooltip-hover-below tooltip-hover-below-icon flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/20"
+                                data-tooltip="Editar usuário"
+                                aria-label="Editar usuário"
                               >
                                 <MdEdit size={14} />
                               </button>
@@ -614,31 +630,36 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
                               {usuario.telefone || 'Sem telefone'}
                             </p>
                           </div>
-                          <div className="flex items-center">
-                            <label
-                              className={`relative inline-flex h-5 w-12 items-center ${
-                                togglingStatus[usuario.id]
-                                  ? 'cursor-not-allowed opacity-60'
-                                  : 'cursor-pointer'
-                              }`}
-                              title={usuario.ativo ? 'Usuário Ativo' : 'Usuário Desativado'}
-                            >
-                              <input
-                                type="checkbox"
-                                className="sr-only peer"
-                                checked={usuario.ativo}
-                                onChange={(event) =>
-                                  handleToggleUsuarioStatus(
-                                    usuario.id,
-                                    event.target.checked,
-                                    perfil.getId()
-                                  )
-                                }
-                                disabled={!!togglingStatus[usuario.id]}
-                              />
-                              <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                              <span className="absolute left-[2px] top-1/2 block h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[28px]" />
-                            </label>
+                          <div
+                            className="tooltip-hover-below flex items-center"
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            data-tooltip={
+                              usuario.ativo ? 'Usuário ativo' : 'Usuário desativado'
+                            }
+                          >
+                            <JiffyIconSwitch
+                              checked={usuario.ativo}
+                              onChange={(e) => {
+                                e.stopPropagation()
+                                handleToggleUsuarioStatus(
+                                  usuario.id,
+                                  e.target.checked,
+                                  perfil.getId()
+                                )
+                              }}
+                              disabled={!!togglingStatus[usuario.id]}
+                              bordered={false}
+                              size="sm"
+                              className="shrink-0 px-0 py-0"
+                              inputProps={{
+                                'aria-label': usuario.ativo
+                                  ? 'Desativar usuário'
+                                  : 'Ativar usuário',
+                                onClick: (e) => e.stopPropagation(),
+                              }}
+                            />
                           </div>
                         </div>
                       ))}
