@@ -447,12 +447,12 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
       <div className="md:px-[30px] px-1 pt-1 flex-shrink-0">
-        <div className="flex items-start justify-between">
+        <div className="flex items-center justify-between">
           <div className="flex flex-col w-1/2 md:pl-5">
             <span className="text-primary md:text-lg text-sm font-semibold font-nunito">
               Perfis Cadastrados
             </span>
-            <span className="text-tertiary md:text-[22px] text-sm font-medium font-nunito">
+            <span className="text-tertiary md:text-[22px] text-sm font-normal font-nunito">
               Total {perfis.length} de {totalPerfis}
             </span>
           </div>
@@ -466,15 +466,9 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
         </div>
       </div>
 
-      <div className="h-[4px] border-t-2 border-primary/70 flex-shrink-0"></div>
-      <div className="flex gap-3 md:px-[20px] px-1 pb-2 flex-shrink-0">
+      <div className="h-[1px] border-t-2 border-primary/70 flex-shrink-0" aria-hidden />
+      <div className="flex gap-3 px-2 flex-shrink-0 py-1">
         <div className="flex-1 min-w-[180px] max-w-[360px]">
-            <label
-              htmlFor="complementos-search"
-              className="text-xs font-semibold text-secondary-text mb-1 block"
-            >
-              Buscar Perfil de Usuário...
-            </label>
             <div className="relative h-8">
               <MdSearch
                 className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
@@ -494,8 +488,8 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
 
       {/* Cabeçalho da tabela */}
       {perfis.length > 0 && (
-        <div className="md:px-[30px] px-1 flex-shrink-0">
-          <div className="h-10 bg-custom-2 rounded-lg md:px-4 pr-1 flex items-center gap-2">
+        <div className="px-1 flex-shrink-0">
+          <div className="h-10 bg-custom-2 rounded-lg pr-1 flex items-center gap-2">
             <div className="w-8"></div>
             <div className="md:flex-[3] flex-[2] font-nunito font-semibold text-left md:text-sm text-xs text-primary-text uppercase">
               Perfil
@@ -510,7 +504,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
       {/* Lista de perfis com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto md:px-[30px] px-1 scrollbar-hide"
+        className="flex-1 overflow-y-auto px-1 scrollbar-hide"
         style={{ maxHeight: 'calc(100vh - 250px)' }}
       >
         {/* Mostrar loading quando está carregando ou ainda não houve tentativa de carregamento */}
@@ -549,7 +543,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
               {/* Cabeçalho do perfil */}
               <div 
                 onClick={handlePerfilRowClick}
-                className="h-[50px] md:px-4 px-1 flex items-center md:gap-[10px] gap-1 relative overflow-visible cursor-pointer"
+                className="h-[50px] px-1 flex items-center md:gap-[10px] gap-1 relative overflow-visible cursor-pointer"
               >
                 <button
                   onClick={(e) => {
