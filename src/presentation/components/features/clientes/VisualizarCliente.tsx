@@ -93,6 +93,7 @@ export function VisualizarCliente({
       fontSize: '14px',
     },
   } as const
+  const UPPERCASE_INPUT_PROPS = { style: { textTransform: 'uppercase' } } as const
 
   // Carregar dados do cliente
   useEffect(() => {
@@ -222,6 +223,7 @@ export function VisualizarCliente({
                 size="small"
                 InputLabelProps={INPUT_LABEL_PROPS}
                 InputProps={{ readOnly: true }}
+                inputProps={UPPERCASE_INPUT_PROPS}
                 sx={inputSx}
               />
               <Input
@@ -254,6 +256,7 @@ export function VisualizarCliente({
                 size="small"
                 InputLabelProps={INPUT_LABEL_PROPS}
                 InputProps={{ readOnly: true }}
+                inputProps={UPPERCASE_INPUT_PROPS}
                 sx={inputSx}
               />
               <Input
@@ -262,6 +265,7 @@ export function VisualizarCliente({
                 size="small"
                 InputLabelProps={INPUT_LABEL_PROPS}
                 InputProps={{ readOnly: true }}
+                inputProps={UPPERCASE_INPUT_PROPS}
                 sx={inputSx}
               />
               <Input
@@ -296,6 +300,7 @@ export function VisualizarCliente({
                 size="small"
                 InputLabelProps={INPUT_LABEL_PROPS}
                 InputProps={{ readOnly: true }}
+                inputProps={UPPERCASE_INPUT_PROPS}
                 sx={inputSx}
               />
               <Input
@@ -304,6 +309,7 @@ export function VisualizarCliente({
                 size="small"
                 InputLabelProps={INPUT_LABEL_PROPS}
                 InputProps={{ readOnly: true }}
+                inputProps={UPPERCASE_INPUT_PROPS}
                 sx={inputSx}
               />
               <Input
@@ -312,6 +318,7 @@ export function VisualizarCliente({
                 size="small"
                 InputLabelProps={INPUT_LABEL_PROPS}
                 InputProps={{ readOnly: true }}
+                inputProps={UPPERCASE_INPUT_PROPS}
                 sx={inputSx}
               />
               <Input
@@ -328,6 +335,7 @@ export function VisualizarCliente({
                 size="small"
                 InputLabelProps={INPUT_LABEL_PROPS}
                 InputProps={{ readOnly: true }}
+                inputProps={UPPERCASE_INPUT_PROPS}
                 sx={inputSx}
               />
               <Input
@@ -336,6 +344,7 @@ export function VisualizarCliente({
                 size="small"
                 InputLabelProps={INPUT_LABEL_PROPS}
                 InputProps={{ readOnly: true }}
+                inputProps={UPPERCASE_INPUT_PROPS}
                 sx={inputSx}
               />
             </div>

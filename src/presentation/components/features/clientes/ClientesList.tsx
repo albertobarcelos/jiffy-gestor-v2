@@ -313,7 +313,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
       <div className="md:px-[30px] px-1 py-1 flex-shrink-0">
-        <div className="flex items-start justify-between">
+        <div className="flex items-center justify-between">
           <div className="w-1/2 md:pl-5">
             <p className="text-primary md:text-lg text-sm font-semibold">
               Clientes Cadastrados

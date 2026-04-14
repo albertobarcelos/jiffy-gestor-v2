@@ -129,6 +129,7 @@ export function NovoCliente({
       fontSize: '14px',
     },
   } as const
+  const UPPERCASE_INPUT_PROPS = { style: { textTransform: 'uppercase' } } as const
 
   useEffect(() => {
     onEmbedFormStateChange?.({ isSubmitting: isLoading, canSubmit })
@@ -799,6 +800,7 @@ export function NovoCliente({
                 placeholder="Nome completo"
                 size="small"
                 InputLabelProps={INPUT_LABEL_PROPS}
+                inputProps={UPPERCASE_INPUT_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -818,6 +820,7 @@ export function NovoCliente({
                 placeholder="Razão social"
                 size="small"
                 InputLabelProps={INPUT_LABEL_PROPS}
+                inputProps={UPPERCASE_INPUT_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -966,6 +969,7 @@ export function NovoCliente({
               placeholder="Nome fantasia"
               size="small"
               InputLabelProps={INPUT_LABEL_PROPS}
+              inputProps={UPPERCASE_INPUT_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -1122,6 +1126,7 @@ export function NovoCliente({
                   placeholder="Nome da rua"
                   size="small"
                   InputLabelProps={INPUT_LABEL_PROPS}
+                  inputProps={UPPERCASE_INPUT_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -1164,6 +1169,7 @@ export function NovoCliente({
                   size="small"
                   className="col-span-2"
                   InputLabelProps={INPUT_LABEL_PROPS}
+                  inputProps={UPPERCASE_INPUT_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -1183,6 +1189,7 @@ export function NovoCliente({
                   placeholder="Complemento"
                   size="small"
                   InputLabelProps={INPUT_LABEL_PROPS}
+                  inputProps={UPPERCASE_INPUT_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -1206,6 +1213,7 @@ export function NovoCliente({
                     onChange={(e) => handleEstadoChange(e.target.value)}
                     size="small"
                     InputLabelProps={INPUT_LABEL_PROPS}
+                    inputProps={UPPERCASE_INPUT_PROPS}
                     sx={inputSx}
                   >
                     <MenuItem value="">Selecione o estado</MenuItem>
@@ -1238,6 +1246,7 @@ export function NovoCliente({
                       '& .MuiInputBase-input': {
                         padding: '8px 14px',
                         fontSize: '14px',
+                        textTransform: 'uppercase',
                       },
                     }}
                   />

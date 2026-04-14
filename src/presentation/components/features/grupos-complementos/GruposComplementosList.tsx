@@ -520,7 +520,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
       <div className="md:px-[30px] px-2 py-[4px] flex-shrink-0">
         <div className="flex flex-row items-center justify-between">
           <div className="flex flex-col md:pl-5">
-            <p className="text-primary text-sm font-semibold">
+            <p className="text-primary text-lg font-semibold">
               Grupos de Complementos Cadastrados
             </p>
             <p className="text-tertiary md:text-[22px] text-sm font-normal">
@@ -543,7 +543,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
         </div>
       </div>
       <div className="h-[2px] border-t-2 border-primary/70 flex-shrink-0"></div>
-      <div className="flex gap-3 md:px-[20px] px-2 py-2 flex-shrink-0">
+      <div className="flex gap-3 px-2 py-1 flex-shrink-0">
       <div className="flex-1 min-w-[180px] max-w-[360px]">
             <div className="relative h-8">
               <input
@@ -579,8 +579,8 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
           </div>
 
       {/* Cabeçalho da tabela */}
-      <div className="md:px-[30px] px-1 flex-shrink-0">
-        <div className="h-10 bg-custom-2 rounded-lg md:px-3 px-1 flex items-center gap-[10px]">
+      <div className="flex-shrink-0">
+        <div className="h-10 bg-custom-2 rounded-lg px-2 flex items-center gap-[10px]">
           <div className="font-semibold text-sm text-primary-text md:flex-1">
             Ordem
           </div>
@@ -602,7 +602,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
       {/* Lista de grupos com scroll */}
       <div
         ref={scrollContainerRef}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-2 pb-2 pt-2 scrollbar-hide md:px-[30px]"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-1 pb-2 pt-2 scrollbar-hide"
         style={{ maxHeight: 'calc(100vh - 250px)' }}
       >
         {/* Skeleton loaders para carregamento inicial - sempre mostra durante loading */}
