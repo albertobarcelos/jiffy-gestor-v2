@@ -234,6 +234,17 @@ export function TopNav() {
     [handleMobileNavigate]
   )
 
+  const handleLogout = useCallback(async () => {
+    try {
+      queryClient.clear()
+      await logout()
+      window.location.href = '/login'
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error)
+      window.location.href = '/login'
+    }
+  }, [queryClient, logout])
+
   useEffect(() => {
     if (isMobileMenuOpen) {
       document.body.style.overflow = 'hidden'
@@ -363,7 +374,7 @@ export function TopNav() {
                 'U'
               : 'U'}
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-gray-900">
               {isHydrated ? user?.getName() || user?.getEmail() || 'Usuário' : 'Usuário'}
             </p>
@@ -371,6 +382,15 @@ export function TopNav() {
               {isHydrated && user?.getEmail() ? user.getEmail() : 'Admin'}
             </p>
           </div>
+          {/* Logout no mobile: ações do usuário ficam em `hidden sm:flex` na barra superior */}
+          <button
+            type="button"
+            onClick={() => void handleLogout()}
+            className="shrink-0 p-2.5 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+            aria-label="Sair da conta"
+          >
+            <MdLogout className="w-6 h-6" />
+          </button>
         </div>
       </div>
     </div>
@@ -538,24 +558,11 @@ export function TopNav() {
 
           {/* Logout */}
           <button
-            onClick={async () => {
-              try {
-                // Limpar cache do React Query
-                queryClient.clear()
-                
-                // Fazer logout (limpa store, localStorage e chama API para remover cookie)
-                await logout()
-                
-                // Forçar redirecionamento com reload completo para garantir limpeza
-                window.location.href = '/login'
-              } catch (error) {
-                console.error('Erro ao fazer logout:', error)
-                // Mesmo com erro, força redirecionamento
-                window.location.href = '/login'
-              }
-            }}
+            type="button"
+            onClick={() => void handleLogout()}
             className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             title="Logout"
+            aria-label="Sair da conta"
           >
             <MdLogout className="w-5 h-5" />
           </button>
