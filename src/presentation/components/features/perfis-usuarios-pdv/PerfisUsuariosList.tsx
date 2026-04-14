@@ -9,6 +9,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { MdSearch, MdKeyboardArrowRight, MdPerson, MdEdit, MdAdd } from 'react-icons/md'
 import {
   PerfisUsuariosTabsModal,
+  PerfisUsuariosTabKey,
   PerfisUsuariosTabsModalState,
 } from './PerfisUsuariosTabsModal'
 import {
@@ -356,7 +357,10 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
     setTabsModalState((prev) => ({
       ...prev,
       open: false,
+      tab: 'perfil',
       perfilId: undefined,
+      usuarioId: undefined,
+      initialPerfilPdvId: undefined,
     }))
 
     // Remover o parâmetro da URL para forçar o recarregamento da rota
@@ -368,7 +372,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
     onReload?.()
   }, [router, searchParams, pathname, loadAllPerfis, onReload])
 
-  const handleTabChange = useCallback((tab: 'perfil') => {
+  const handleTabChange = useCallback((tab: PerfisUsuariosTabKey) => {
     setTabsModalState((prev) => ({ ...prev, tab }))
   }, [])
 

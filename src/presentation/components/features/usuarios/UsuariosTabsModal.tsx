@@ -1,10 +1,16 @@
 'use client'
 
-import { useMemo } from 'react'
-import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
+import { useMemo, useState } from 'react'
+import {
+  JiffySidePanelModal,
+  type JiffySidePanelFooterActions,
+} from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { NovoUsuario } from './NovoUsuario'
 
 type TabKey = 'usuario'
+
+/** ID do form embarcado — deve coincidir com `embeddedFormId` passado ao `NovoUsuario` */
+export const USUARIOS_TABS_MODAL_FORM_ID = 'usuarios-tabs-modal-form'
 
 export interface UsuariosTabsModalState {
   open: boolean
@@ -27,55 +33,44 @@ export function UsuariosTabsModal({
   onTabChange,
   onReload,
 }: UsuariosTabsModalProps) {
+  const [embedFormState, setEmbedFormState] = useState({
+    isSubmitting: false,
+    canSubmit: false,
+  })
+
   const title = useMemo(() => {
-    return state.mode === 'create' ? 'Novo Usuário' : 'Editar Usuário'
+    return state.mode === 'edit' ? 'Editar Usuário' : 'Novo Usuário'
   }, [state.mode])
 
+  const footerActions = useMemo((): JiffySidePanelFooterActions => {
+    return {
+      barActionOrder: ['cancel', 'save'],
+      showCancel: true,
+      cancelLabel: 'Fechar',
+      onCancel: onClose,
+      showSave: true,
+      saveLabel: state.mode === 'edit' ? 'Atualizar' : 'Salvar',
+      saveFormId: USUARIOS_TABS_MODAL_FORM_ID,
+      saveLoading: embedFormState.isSubmitting,
+      saveDisabled: !embedFormState.canSubmit || embedFormState.isSubmitting,
+    }
+  }, [state.mode, embedFormState, onClose])
+
   return (
-    <Dialog
+    <JiffySidePanelModal
       open={state.open}
-      onOpenChange={(open) => {
-        if (!open) {
-          onClose()
-        }
-      }}
-      fullWidth
-      maxWidth="xl"
-      sx={{
-        '& .MuiDialog-container': {
-          justifyContent: {
-            xs: 'center', // Centraliza em mobile
-            md: 'flex-end', // Alinha à direita em desktop
-          },
-          alignItems: 'stretch',
-          margin: 0,
-        },
-      }}
-      PaperProps={{
-        sx: {
-          height: '100vh',
-          maxHeight: '100vh',
-          width: {
-            xs: '95vw', // Em telas muito pequenas (mobile), ocupa 95% da largura
-            sm: '90vw', // Em telas pequenas, ocupa 90% da largura
-            md: 'min(900px, 60vw)', // Em telas médias e maiores, mantém o comportamento original
-          },
-          margin: {
-            xs: 'auto', // Centraliza em mobile (com width 95vw, deixa 2.5% de cada lado)
-            md: 0, // Sem margin em desktop
-          },
-          borderRadius: 0,
-          display: 'flex',
-          flexDirection: 'column',
-        },
-      }}
-    >
-      <DialogContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <div className="px-6 pt-2 flex gap-1 border-b border-gray-100 bg-white">
+      onClose={onClose}
+      title={title}
+      scrollableBody={false}
+      footerVariant="bar"
+      panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]"
+      footerActions={footerActions}
+      tabsSlot={
+        <div className="flex flex-wrap gap-1 px-2 pb-0">
           <button
             type="button"
             onClick={() => onTabChange('usuario')}
-            className={`px-4 py-2 rounded-t-lg text-sm font-semibold transition-colors ${
+            className={`rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors ${
               state.tab === 'usuario'
                 ? 'bg-primary text-white'
                 : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
@@ -84,25 +79,26 @@ export function UsuariosTabsModal({
             Usuário
           </button>
         </div>
-
-        <div className="flex-1 overflow-hidden">
-          {state.tab === 'usuario' && (
-            <div className="h-full overflow-y-auto">
-              <NovoUsuario
-                usuarioId={state.mode === 'edit' ? state.usuarioId : undefined}
-                initialPerfilPdvId={state.initialPerfilPdvId}
-                isEmbedded
-                onSaved={() => {
-                  onReload?.()
-                  onClose()
-                }}
-                onCancel={onClose}
-              />
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+      }
+    >
+      <div className="flex min-h-0 flex-1 flex-col">
+        {state.tab === 'usuario' ? (
+          <NovoUsuario
+            usuarioId={state.mode === 'edit' ? state.usuarioId : undefined}
+            initialPerfilPdvId={state.initialPerfilPdvId}
+            isEmbedded
+            hideEmbeddedHeader
+            embeddedFormId={USUARIOS_TABS_MODAL_FORM_ID}
+            hideEmbeddedFormActions
+            onEmbedFormStateChange={setEmbedFormState}
+            onSaved={() => {
+              onReload?.()
+              onClose()
+            }}
+            onCancel={onClose}
+          />
+        ) : null}
+      </div>
+    </JiffySidePanelModal>
   )
 }
-

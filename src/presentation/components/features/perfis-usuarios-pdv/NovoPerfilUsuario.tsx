@@ -10,7 +10,8 @@ import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPaga
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import toast from 'react-hot-toast'
-import { MdPerson, MdClose, MdSearch } from 'react-icons/md'
+import { MdPerson, MdSearch } from 'react-icons/md'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import {
   MeiosPagamentosTabsModal,
   MeiosPagamentosTabsModalState,
@@ -19,6 +20,10 @@ import {
 interface NovoPerfilUsuarioProps {
   perfilId?: string
   isEmbedded?: boolean
+  hideEmbeddedHeader?: boolean
+  embeddedFormId?: string
+  hideEmbeddedFormActions?: boolean
+  onEmbedFormStateChange?: (s: { isSubmitting: boolean; canSubmit: boolean }) => void
   onSaved?: () => void
   onCancel?: () => void
 }
@@ -35,6 +40,10 @@ interface MeioPagamento {
 export function NovoPerfilUsuario({
   perfilId,
   isEmbedded = false,
+  hideEmbeddedHeader = false,
+  embeddedFormId,
+  hideEmbeddedFormActions = false,
+  onEmbedFormStateChange,
   onSaved,
   onCancel,
 }: NovoPerfilUsuarioProps) {
@@ -55,7 +64,6 @@ export function NovoPerfilUsuario({
   // Estados de loading e dados
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingPerfil, setIsLoadingPerfil] = useState(false)
-  const [showMeiosPagamentoModal, setShowMeiosPagamentoModal] = useState(false)
   const [searchMeioPagamento, setSearchMeioPagamento] = useState('')
   const [meiosPagamentosTabsModalState, setMeiosPagamentosTabsModalState] =
     useState<MeiosPagamentosTabsModalState>({
@@ -68,15 +76,27 @@ export function NovoPerfilUsuario({
   const lastMeioPagamentoErrorToastRef = useRef<string | null>(null)
   const perfilMeiosPagamentoNomesRef = useRef<string[]>([])
   const [perfilLoaded, setPerfilLoaded] = useState(false)
+  const canSubmit = Boolean(role && role.trim() && selectedMeiosPagamento.length > 0)
+  const formId = embeddedFormId ?? 'novo-perfil-usuario-form'
 
   // Carregar lista de meios de pagamento usando React Query (com cache)
   const {
     data,
     isLoading: isLoadingMeiosPagamento,
     refetch: refetchMeiosPagamento,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
   } = useMeiosPagamentoInfinite({
     limit: 100,
   })
+
+  // Carrega todas as páginas para exibir a lista completa no formulário
+  useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      void fetchNextPage()
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
   // Achatando todas as páginas em uma única lista
   const meiosPagamento: MeioPagamento[] = data?.pages.flatMap((page) =>
@@ -90,6 +110,12 @@ export function NovoPerfilUsuario({
   const meiosPagamentoIds = useMemo(() => {
     return meiosPagamento.map((mp) => mp.id).sort().join(',')
   }, [meiosPagamento])
+
+  const meiosPagamentoFiltrados = useMemo(() => {
+    const q = searchMeioPagamento.trim().toLowerCase()
+    if (!q) return meiosPagamento
+    return meiosPagamento.filter((m) => m.nome.toLowerCase().includes(q))
+  }, [meiosPagamento, searchMeioPagamento])
 
   // Carregar dados do perfil se estiver editando
   useEffect(() => {
@@ -192,6 +218,10 @@ export function NovoPerfilUsuario({
     }
   }, [])
 
+  useEffect(() => {
+    onEmbedFormStateChange?.({ isSubmitting: isLoading, canSubmit })
+  }, [onEmbedFormStateChange, isLoading, canSubmit])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const token = auth?.getAccessToken()
@@ -212,6 +242,7 @@ export function NovoPerfilUsuario({
     }
 
     setIsLoading(true)
+    onEmbedFormStateChange?.({ isSubmitting: true, canSubmit })
 
     try {
       // Garante que sempre enviamos um array, mesmo que vazio
@@ -315,6 +346,7 @@ export function NovoPerfilUsuario({
       showToast.error(error instanceof Error ? error.message : 'Erro ao salvar perfil')
     } finally {
       setIsLoading(false)
+      onEmbedFormStateChange?.({ isSubmitting: false, canSubmit })
     }
   }
 
@@ -404,40 +436,46 @@ export function NovoPerfilUsuario({
   return (
     <div className="flex flex-col h-full">
       {/* Header fixo */}
-      <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[30px] shadow-md md:px-[30px] px-2 py-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="md:w-12 w-10 md:h-12 h-10 rounded-full bg-primary/25 text-primary flex items-center justify-center">
-              <span className="md:text-2xl text-xl"><MdPerson /></span>
+      {!isEmbedded || !hideEmbeddedHeader ? (
+        <div className="sticky top-0 z-10 bg-white shadow-sm md:px-[30px] px-2 py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="md:w-12 w-10 md:h-12 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                <span className="md:text-2xl text-xl">
+                  <MdPerson />
+                </span>
+              </div>
+              <h1 className="text-primary md:text-lg text-sm font-semibold font-exo">
+                {isEditing ? 'Editar Perfil de Usuário' : 'Novo Perfil de Usuário'}
+              </h1>
             </div>
-            <h1 className="text-primary md:text-lg text-sm font-semibold font-exo">
-              {isEditing ? 'Editar Perfil de Usuário' : 'Novo Perfil de Usuário'}
-            </h1>
+            <Button
+              onClick={handleCancel}
+              variant="outlined"
+              className="h-8 px-8 rounded-lg hover:bg-primary/15 transition-colors"
+              sx={{
+                backgroundColor: 'var(--color-info)',
+                color: 'var(--color-primary)',
+                borderColor: 'var(--color-primary)',
+              }}
+            >
+              Cancelar
+            </Button>
           </div>
-          <Button
-            onClick={handleCancel}
-            variant="outlined"
-            className="h-8 px-8 rounded-lg hover:bg-primary/15 transition-colors"
-            sx={{
-              backgroundColor: 'var(--color-info)',
-              color: 'var(--color-primary)',
-              borderColor: 'var(--color-primary)',
-            }}
-          >
-            Cancelar
-          </Button>
         </div>
-      </div>
+      ) : null}
 
       {/* Formulário com scroll */}
-      <div className="flex-1 overflow-y-auto md:px-[30px] px-1 py-2">
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="flex-1 overflow-y-auto px-5 py-4 scrollbar-hide">
+        <form id={formId} onSubmit={handleSubmit} className="space-y-4">
           {/* Dados */}
-          <div className="bg-info">
-            <h2 className="text-primary md:text-xl text-sm font-semibold font-exo mb-1">
-              Dados do Perfil
-            </h2>
-            <div className="h-[2px] bg-primary/70 mb-4"></div>
+          <div className="bg-white">
+          <div className="mb-4 flex items-center gap-5">
+                <h2 className="shrink-0 text-primary md:text-xl text-sm font-semibold">
+                  Dados do Perfil
+                </h2>
+                <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
+              </div>
 
             <div className="space-y-2">
               <Input
@@ -447,175 +485,196 @@ export function NovoPerfilUsuario({
                 required
                 placeholder="Digite o nome do perfil"
                 className="bg-info"
+                size="small"
+                sx={{
+                  '& .MuiOutlinedInput-input': {
+                    padding: '6px 10px',
+                  },
+                }}
               />
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Meios de Pagamento *
-                </label>
-                <div className="flex md:flex-row flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowMeiosPagamentoModal(true)}
-                    className="flex-1 md:px-4 px-2 md:py-3 py-2 rounded-lg border border-gray-400 bg-info text-left text-gray-900 focus:outline-none focus:border-2 focus:border-primary"
-                  >
-                    {isLoadingMeiosPagamento ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                        <span>Carregando...</span>
-                      </div>
-                    ) : selectedMeiosPagamento.length === 0 ? (
-                      'Clique para Selecionar Meios de Pagamento'
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {selectedMeiosPagamento.map((mp) => (
-                          <span
-                            key={mp.id}
-                            className="md:px-3 px-2 py-1 bg-primary-bg rounded-full md:text-sm text-xs border border-primary flex items-center gap-2"
-                          >
-                            {mp.nome}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setSelectedMeiosPagamento((prev) => {
-                                  // Validação: não permite remover se for o último meio de pagamento
-                                  if (prev.length === 1) {
-                                    // Sempre exibe o toast quando tenta remover o último item
-                                    // O ID garante que substitui o toast anterior se ainda estiver visível
-                                    const toastId = 'meio-pagamento-error'
-                                    toast.error('É necessário manter pelo menos um meio de pagamento selecionado', {
-                                      id: toastId,
-                                      duration: 5000,
-                                    })
-                                    lastMeioPagamentoErrorToastRef.current = toastId
-                                    return prev
-                                  }
-                                  // Limpa o toast de erro se a remoção for bem-sucedida
-                                  if (lastMeioPagamentoErrorToastRef.current) {
-                                    toast.dismiss(lastMeioPagamentoErrorToastRef.current)
-                                    lastMeioPagamentoErrorToastRef.current = null
-                                  }
-                                  return prev.filter((p) => p.id !== mp.id)
-                                })
-                              }}
-                              className="text-secondary-text hover:text-primary md:text-sm text-xs"
-                            >
-                              <MdClose />
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowMeiosPagamentoModal(true)}
-                    className="h-8 px-4 rounded-lg bg-primary text-info font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
-                  >
-                    Vincular Pagamentos
-                  </button>
-                </div>
-              </div>
             </div>
+
+              <div className="mt-4 space-y-2">
+                <div className="mb-2 flex items-center gap-5">
+                  <h2 className="shrink-0 text-primary md:text-base text-sm font-semibold font-exo">
+                    Meios de Pagamento *
+                  </h2>
+                  <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
+                </div>
+
+                <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div className="relative min-w-0 flex-1">
+                    <MdSearch
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text"
+                      size={18}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Buscar meio de pagamento..."
+                      value={searchMeioPagamento}
+                      onChange={(e) => setSearchMeioPagamento(e.target.value)}
+                      className="font-nunito h-8 w-full rounded-lg border border-gray-300 bg-info pl-10 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={openMeiosPagamentosTabsModal}
+                    className="h-8 w-full shrink-0 rounded-lg bg-primary px-4 text-info hover:bg-primary/90 sm:w-auto"
+                    sx={{
+                      backgroundColor: 'var(--color-primary)',
+                      color: 'var(--color-info)',
+                      borderColor: 'var(--color-primary)',
+                    }}
+                  >
+                    Adicionar Meios de Pagamento
+                  </Button>
+                </div>
+
+                {isLoadingMeiosPagamento && meiosPagamento.length === 0 ? (
+                  <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-info px-4 py-6 text-primary-text">
+                    <div className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    <span>Carregando meios de pagamento...</span>
+                  </div>
+                ) : meiosPagamento.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-gray-300 bg-info px-4 py-6 text-center text-sm text-secondary-text">
+                    Nenhum meio de pagamento cadastrado. Use o botão acima para cadastrar.
+                  </div>
+                ) : meiosPagamentoFiltrados.length === 0 ? (
+                  <div className="rounded-lg border border-gray-200 bg-info px-4 py-4 text-center text-sm text-secondary-text">
+                    Nenhum resultado para a busca.
+                  </div>
+                ) : (
+                  <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-info scrollbar-hide">
+                    {meiosPagamentoFiltrados.map((meio) => {
+                      const isVinculado = selectedMeiosPagamento.some((mp) => mp.id === meio.id)
+                      return (
+                        <div
+                          key={meio.id}
+                          className="flex items-center justify-between gap-3 border-b border-gray-200 px-3 py-1.5 last:border-b-0"
+                        >
+                          <span className="min-w-0 flex-1 text-xs font-medium text-primary-text">
+                            {meio.nome}
+                          </span>
+                          <JiffyIconSwitch
+                            checked={isVinculado}
+                            onChange={() => toggleMeioPagamento(meio)}
+                            disabled={isLoading || isLoadingMeiosPagamento}
+                            bordered={false}
+                            size="sm"
+                            className="shrink-0 justify-center gap-0 px-0 py-0"
+                            inputProps={{
+                              'aria-label': `Vincular ${meio.nome} ao perfil`,
+                            }}
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                {isFetchingNextPage ? (
+                  <p className="mt-1 text-xs text-secondary-text">Carregando mais meios de pagamento...</p>
+                ) : null}
+              </div>
           </div>
 
           {/* Permissões */}
-          <div className="bg-info">
-            <h2 className="text-primary md:text-xl text-sm font-semibold font-exo mb-1">
-              Permissões
-            </h2>
-            <div className="h-[2px] bg-primary/70 mb-2"></div>
-
-            <div className="space-y-2">
+          <div className="bg-white">
+              <div className="mb-2 flex items-center gap-5">
+                <h2 className="shrink-0 text-primary md:text-base text-sm font-semibold">
+                  Permissões
+                </h2>
+                <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
+              </div>
+            <div className="">
               {/* Toggle Cancelar Venda */}
-              <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
-                <span className="text-primary-text font-medium text-sm md:text-base">Pode Cancelar Venda?</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={cancelarVenda}
-                    onChange={(e) => setCancelarVenda(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-                </label>
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Cancelar Venda?</span>
+                <JiffyIconSwitch
+                  checked={cancelarVenda}
+                  onChange={e => setCancelarVenda(e.target.checked)}
+                  disabled={isLoading}
+                  bordered={false}
+                  size="sm"
+                  className="shrink-0"
+                  inputProps={{ 'aria-label': 'Permitir cancelar venda' }}
+                />
               </div>
 
               {/* Toggle Cancelar Produto */}
-              <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
-                <span className="text-primary-text font-medium text-sm md:text-base">Pode Cancelar Produto?</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={cancelarProduto}
-                    onChange={(e) => setCancelarProduto(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-                </label>
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Cancelar Produto?</span>
+                <JiffyIconSwitch
+                  checked={cancelarProduto}
+                  onChange={e => setCancelarProduto(e.target.checked)}
+                  disabled={isLoading}
+                  bordered={false}
+                  size="sm"
+                  className="shrink-0"
+                  inputProps={{ 'aria-label': 'Permitir cancelar produto' }}
+                />
               </div>
 
               {/* Toggle Aplicar Desconto Produto */}
-              <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
-                <span className="text-primary-text font-medium text-sm md:text-base">Pode Aplicar Desconto no Produto?</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={aplicarDescontoProduto}
-                    onChange={(e) => setAplicarDescontoProduto(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-                </label>
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Aplicar Desconto no Produto?</span>
+                <JiffyIconSwitch
+                  checked={aplicarDescontoProduto}
+                  onChange={e => setAplicarDescontoProduto(e.target.checked)}
+                  disabled={isLoading}
+                  bordered={false}
+                  size="sm"
+                  className="shrink-0"
+                  inputProps={{ 'aria-label': 'Permitir aplicar desconto no produto' }}
+                />
               </div>
 
               {/* Toggle Aplicar Desconto Venda */}
-              <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
-                <span className="text-primary-text font-medium text-sm md:text-base">Pode Aplicar Desconto na Venda?</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={aplicarDescontoVenda}
-                    onChange={(e) => setAplicarDescontoVenda(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-                </label>
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Aplicar Desconto na Venda?</span>
+                <JiffyIconSwitch
+                  checked={aplicarDescontoVenda}
+                  onChange={e => setAplicarDescontoVenda(e.target.checked)}
+                  disabled={isLoading}
+                  bordered={false}
+                  size="sm"
+                  className="shrink-0"
+                  inputProps={{ 'aria-label': 'Permitir aplicar desconto na venda' }}
+                />
               </div>
 
               {/* Toggle Aplicar Acréscimo Produto */}
-              <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
-                <span className="text-primary-text font-medium text-sm md:text-base">Pode Aplicar Acréscimo no Produto?</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={aplicarAcrescimoProduto}
-                    onChange={(e) => setAplicarAcrescimoProduto(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-                </label>
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Aplicar Acréscimo no Produto?</span>
+                <JiffyIconSwitch
+                  checked={aplicarAcrescimoProduto}
+                  onChange={e => setAplicarAcrescimoProduto(e.target.checked)}
+                  disabled={isLoading}
+                  bordered={false}
+                  size="sm"
+                  className="shrink-0"
+                  inputProps={{ 'aria-label': 'Permitir aplicar acréscimo no produto' }}
+                />
               </div>
 
               {/* Toggle Aplicar Acréscimo Venda */}
-              <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
-                <span className="text-primary-text font-medium text-sm md:text-base">Pode Aplicar Acréscimo na Venda?</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={aplicarAcrescimoVenda}
-                    onChange={(e) => setAplicarAcrescimoVenda(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-                </label>
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Aplicar Acréscimo na Venda?</span>
+                <JiffyIconSwitch
+                  checked={aplicarAcrescimoVenda}
+                  onChange={e => setAplicarAcrescimoVenda(e.target.checked)}
+                  disabled={isLoading}
+                  bordered={false}
+                  size="sm"
+                  className="shrink-0"
+                  inputProps={{ 'aria-label': 'Permitir aplicar acréscimo na venda' }}
+                />
               </div>
             </div>
           </div>
 
           {/* Botões de ação */}
-          <div className="flex justify-end gap-4 pt-2">
+          {!isEmbedded || !hideEmbeddedFormActions ? (
+            <div className="flex justify-end gap-4 pt-2">
             <Button
               type="button"
               onClick={handleCancel}
@@ -640,88 +699,9 @@ export function NovoPerfilUsuario({
               {isLoading ? 'Salvando...' : isEditing ? 'Atualizar' : 'Salvar'}
             </Button>
           </div>
+          ) : null}
         </form>
       </div>
-
-      {/* Modal de seleção de meios de pagamento */}
-      {showMeiosPagamentoModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-info rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold text-primary">Vincular Meios de Pagamento</h3>
-              <button
-                type="button"
-                onClick={() => setShowMeiosPagamentoModal(false)}
-                className="text-secondary-text hover:text-primary-text"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="mb-4 flex gap-2 items-center">
-              <div className="flex-1 relative">
-                <MdSearch
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text"
-                  size={18}
-                />
-                <input
-                  type="text"
-                  placeholder="Buscar meio de pagamento..."
-                  value={searchMeioPagamento}
-                  onChange={(e) => setSearchMeioPagamento(e.target.value)}
-                  className="w-full h-8 pl-10 pr-4 rounded-lg border border-gray-300 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={openMeiosPagamentosTabsModal}
-                className="h-8 px-4 rounded-lg bg-primary text-info font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
-              >
-                Adicionar Meios de Pagamento
-              </button>
-            </div>
-            <div className="space-y-2">
-              {meiosPagamento
-                .filter((meio) =>
-                  meio.nome.toLowerCase().includes(searchMeioPagamento.toLowerCase())
-                )
-                .map((meio) => {
-                const isSelected = selectedMeiosPagamento.some((mp) => mp.id === meio.id)
-                return (
-                  <button
-                    key={meio.id}
-                    type="button"
-                    onClick={() => toggleMeioPagamento(meio)}
-                    className={`w-full py-2 px-4 rounded-lg border-2 text-left transition-colors ${
-                      isSelected
-                        ? 'border-primary bg-primary/10'
-                        : 'border-gray-300 bg-info hover:bg-primary-bg'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-primary-text">{meio.nome}</span>
-                      {isSelected && <span className="text-primary">✓</span>}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-            <div className="mt-4 flex justify-end">
-              <Button
-                type="button"
-                onClick={() => setShowMeiosPagamentoModal(false)}
-                className="h-8 px-4 rounded-lg bg-primary text-info font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
-                sx={{
-                  backgroundColor: 'var(--color-primary)',
-                  color: 'var(--color-info)',
-                  borderColor: 'var(--color-primary)',
-                }}
-              >
-                Confirmar
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <MeiosPagamentosTabsModal
         state={meiosPagamentosTabsModalState}
