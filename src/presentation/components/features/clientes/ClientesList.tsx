@@ -8,6 +8,8 @@ import { ClientesTabsModal, ClientesTabsModalState } from './ClientesTabsModal'
 import { MdSearch, MdVisibility } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
+import { Tooltip as MuiTooltip } from '@mui/material'
 
 interface ClientesListProps {
   onReload?: () => void
@@ -18,6 +20,18 @@ const INDICADOR_IE_LABELS: Record<string, string> = {
   '2': 'Contribuinte isento de IE',
   '9': 'Não contribuinte',
 }
+
+const TOOLTIP_SLOT_PROPS = {
+  tooltip: {
+    sx: {
+      bgcolor: '#ffffff',
+      color: '#111827',
+      border: '1px solid #e5e7eb',
+      boxShadow: 2,
+      fontSize: '0.8125rem',
+    },
+  },
+} as const
 
 function textoIndicadorIeLista(valor: string | undefined): string {
   if (valor == null || String(valor).trim() === '') return '-'
@@ -43,6 +57,8 @@ export function ClientesList({ onReload }: ClientesListProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
+  const isLoadingRef = useRef(false)
+  const lastLoadKeyRef = useRef<string | null>(null)
   const { auth, isAuthenticated } = useAuthStore()
 
   const searchTextRef = useRef('')
@@ -82,7 +98,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
 
   /**
    * Carrega todos os clientes fazendo requisições sequenciais
-   * Continua carregando páginas de 10 em 10 até não haver mais itens
+   * Continua carregando páginas de 25 em 25 até não haver mais itens
    */
   const loadAllClientes = useCallback(
     async () => {
@@ -90,6 +106,23 @@ export function ClientesList({ onReload }: ClientesListProps) {
       if (!token) {
         return
       }
+
+      // Evita requisições duplicadas (ex.: StrictMode/dev + efeitos concorrentes)
+      const ativoFilter =
+        filterStatusRef.current === 'Ativo'
+          ? true
+          : filterStatusRef.current === 'Desativado'
+            ? false
+            : null
+      const loadKey = JSON.stringify({
+        q: searchTextRef.current || '',
+        ativo: ativoFilter,
+      })
+      if (isLoadingRef.current && lastLoadKeyRef.current === loadKey) {
+        return
+      }
+      isLoadingRef.current = true
+      lastLoadKeyRef.current = loadKey
 
       setIsLoading(true)
 
@@ -99,18 +132,12 @@ export function ClientesList({ onReload }: ClientesListProps) {
         let hasMore = true
         let totalCount = 0
 
-        // Determina o filtro ativo
-        const ativoFilter =
-          filterStatusRef.current === 'Ativo'
-            ? true
-            : filterStatusRef.current === 'Desativado'
-              ? false
-              : null
+        const PAGE_SIZE = 25
 
         // Loop para carregar todas as páginas
         while (hasMore) {
           const params = new URLSearchParams({
-            limit: '10',
+            limit: PAGE_SIZE.toString(),
             offset: currentOffset.toString(),
           })
 
@@ -147,8 +174,8 @@ export function ClientesList({ onReload }: ClientesListProps) {
           }
 
           // Verifica se há mais páginas
-          // Se retornou menos de 10 itens, não há mais páginas
-          hasMore = newClientes.length === 10
+          // Se retornou menos de PAGE_SIZE itens, não há mais páginas
+          hasMore = newClientes.length === PAGE_SIZE
           currentOffset += newClientes.length
         }
 
@@ -161,30 +188,20 @@ export function ClientesList({ onReload }: ClientesListProps) {
         setTotalClientes(0)
       } finally {
         setIsLoading(false)
+        isLoadingRef.current = false
       }
     },
     [auth]
   )
 
-  // Carrega clientes quando busca ou filtro mudam
+  // Carrega clientes quando autenticar e quando busca/filtro mudam (fonte única de verdade)
   useEffect(() => {
+    if (!isAuthenticated) return
     const token = auth?.getAccessToken()
     if (!token) return
 
     loadAllClientes()
-  }, [debouncedSearch, filterStatus, auth, loadAllClientes])
-
-  // Carrega clientes iniciais apenas quando o token estiver disponível
-  useEffect(() => {
-    if (!isAuthenticated || hasLoadedInitialRef.current) return
-
-    const token = auth?.getAccessToken()
-    if (!token) return
-
-    hasLoadedInitialRef.current = true
-    loadAllClientes()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated])
+  }, [isAuthenticated, debouncedSearch, filterStatus, auth, loadAllClientes])
 
   const handleStatusChange = () => {
     loadAllClientes()
@@ -298,10 +315,10 @@ export function ClientesList({ onReload }: ClientesListProps) {
       <div className="md:px-[30px] px-1 py-1 flex-shrink-0">
         <div className="flex items-start justify-between">
           <div className="w-1/2 md:pl-5">
-            <p className="text-primary md:text-lg text-sm font-semibold font-nunito">
+            <p className="text-primary md:text-lg text-sm font-semibold">
               Clientes Cadastrados
             </p>
-            <p className="text-tertiary md:text-[22px] text-sm font-medium font-nunito">
+            <p className="text-tertiary md:text-[22px] text-sm font-normal">
               Total {clientes.length} de {totalClientes}
             </p>
           </div>
@@ -318,15 +335,9 @@ export function ClientesList({ onReload }: ClientesListProps) {
       </div>
 
       <div className="h-[4px] border-t-2 border-primary/70 flex-shrink-0"></div>
-      <div className="flex gap-3 md:px-[0px] px-1 pb-2 flex-shrink-0">
-        <div className="flex-1 min-w-[180px] max-w-[360px]">
-            <label
-              htmlFor="clientes-search"
-              className="text-xs font-semibold text-secondary-text mb-1 block"
-            >
-              Buscar cliente...
-            </label>
-            <div className="relative h-8">
+      <div className="flex gap-3 p-1 items-start justify-start">
+        <div className="flex flex-row justify-start items-start gap-2">
+            <div className="relative flex-col h-8 min-w-[300px] max-w-[360px]">
               <MdSearch
                 className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
                 size={18}
@@ -342,7 +353,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
             </div>
           </div>
 
-          <div className="w-full sm:w-[160px]">
+          <div className="w-full sm:w-[160px] flex flex-row justify-start items-center gap-2">
             <label className="text-xs font-semibold text-secondary-text mb-1 block">
               Status
             </label>
@@ -358,12 +369,12 @@ export function ClientesList({ onReload }: ClientesListProps) {
               <option value="Desativado">Desativado</option>
             </select>
           </div>
-          </div>
+        </div>
 
       {/* Cabeçalho da tabela */}
       <div className="md:px-[0px] mt-0 flex-shrink-0">
         <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-2">
-          <div className="flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="flex-[2.5] font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Nome
           </div>
           <div className="flex-[1.5] font-nunito font-semibold text-sm text-primary-text hidden md:flex">
@@ -384,7 +395,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
           <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text hidden md:flex">
             Email
           </div>
-          <div className="md:flex-[2] flex-[1] md:text-center text-end font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="flex-[1] md:text-center text-end font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Status
           </div>
         </div>
@@ -424,19 +435,8 @@ export function ClientesList({ onReload }: ClientesListProps) {
             onClick={handleRowClick}
             className={`${bgClass} rounded-lg md:px-4 py-2 mb-1 flex items-center hover:bg-secondary-bg/15 cursor-pointer`}
           >
-            <div className="flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text flex items-center">
+            <div className="flex-[2.5] font-nunito font-normal uppercase md:text-sm text-xs text-primary-text flex items-center">
               <span>{cliente.getNome()}</span>
-               <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleView(cliente.getId())
-                }}
-                title="Visualizar cliente"
-                className="flex items-center justify-center w-6 h-6 rounded-full hover:bg-primary/10 transition-colors"
-                aria-label={`Visualizar ${cliente.getNome()}`}
-              >
-                <MdVisibility className="text-primary text-base" />
-              </button>
             </div>
             <div className="flex-[1.5] font-nunito text-sm text-secondary-text hidden md:flex">
               {cliente.getCpf() || '-'}
@@ -444,50 +444,60 @@ export function ClientesList({ onReload }: ClientesListProps) {
             <div className="flex-[1.5] font-nunito text-sm text-secondary-text hidden md:flex">
               {cliente.getCnpj() || '-'}
             </div>
-            <div
-              className="flex-[1.5] font-nunito text-sm text-secondary-text hidden md:flex min-w-0 items-center"
+            <MuiTooltip
               title={textoIndicadorIeLista(cliente.getIndicadorInscricaoEstadual())}
+              placement="bottom"
+              slotProps={TOOLTIP_SLOT_PROPS}
             >
-              <span className="truncate">{textoIndicadorIeLista(cliente.getIndicadorInscricaoEstadual())}</span>
-            </div>
-            <div
-              className="flex-[1.5] font-nunito text-sm text-secondary-text hidden md:flex min-w-0 items-center"
+              <div className="flex-[1.5] font-nunito text-sm text-secondary-text hidden md:flex min-w-0 items-center">
+                <span className="truncate">
+                  {textoIndicadorIeLista(cliente.getIndicadorInscricaoEstadual())}
+                </span>
+              </div>
+            </MuiTooltip>
+            <MuiTooltip
               title={cliente.getInscricaoEstadual()?.trim() || '-'}
+              placement="bottom"
+              slotProps={TOOLTIP_SLOT_PROPS}
             >
-              <span className="truncate">{cliente.getInscricaoEstadual()?.trim() || '-'}</span>
-            </div>
+              <div className="flex-[1.5] font-nunito text-sm text-secondary-text hidden md:flex min-w-0 items-center">
+                <span className="truncate">{cliente.getInscricaoEstadual()?.trim() || '-'}</span>
+              </div>
+            </MuiTooltip>
             <div className="md:flex-[2] flex-[1.5] font-nunito md:text-sm text-xs text-center md:text-start text-secondary-text">
               {cliente.getTelefone() || '-'}
             </div>
             <div className="flex-[2] font-nunito text-sm text-secondary-text hidden md:flex">
               {cliente.getEmail() || '-'}
             </div>
-            <div className="md:flex-[2] flex-[1] flex md:justify-center justify-end" onClick={(e) => e.stopPropagation()}>
-              <label
-                className={`relative inline-flex md:h-5 h-4 md:w-12 w-8 items-center ${
-                  togglingStatus[cliente.getId()]
-                    ? 'cursor-not-allowed opacity-60'
-                    : 'cursor-pointer'
-                }`}
-                title={cliente.isAtivo() ? 'Cliente Ativo' : 'Cliente Desativado'}
-                onMouseDown={(e) => e.stopPropagation()}
-                onTouchStart={(e) => e.stopPropagation()}
+            <MuiTooltip
+              title={cliente.isAtivo() ? 'Cliente Ativo' : 'Cliente Desativado'}
+              placement="bottom"
+              slotProps={TOOLTIP_SLOT_PROPS}
+            >
+              <div
+                className="flex-[1] flex md:justify-center justify-end"
+                onClick={e => e.stopPropagation()}
+                onMouseDown={e => e.stopPropagation()}
+                onTouchStart={e => e.stopPropagation()}
               >
-                <input
-                  type="checkbox"
-                  className="sr-only peer"
+                <JiffyIconSwitch
                   checked={cliente.isAtivo()}
-                  onChange={(event) => {
+                  onChange={event => {
                     event.stopPropagation()
                     handleToggleClienteStatus(cliente, event.target.checked)
                   }}
-                  onClick={(e) => e.stopPropagation()}
                   disabled={!!togglingStatus[cliente.getId()]}
+                  bordered={false}
+                  size="sm"
+                  className="shrink-0"
+                  inputProps={{
+                    'aria-label': cliente.isAtivo() ? 'Desativar cliente' : 'Ativar cliente',
+                    onClick: e => e.stopPropagation(),
+                  }}
                 />
-                <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                <span className="absolute md:left-1 left-0.5 top-1/2 block md:h-3 h-2.5 md:w-3 w-2.5 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 md:peer-checked:translate-x-6 peer-checked:translate-x-[18px]" />
-              </label>
-            </div>
+              </div>
+            </MuiTooltip>
           </div>
           )
         })}

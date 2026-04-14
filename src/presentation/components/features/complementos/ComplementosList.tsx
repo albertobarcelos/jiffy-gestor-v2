@@ -570,10 +570,10 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="md:px-[30px] flex-shrink-0 px-2 py-[4px]">
+      <div className="md:px-[30px] flex-shrink-0 py-[4px]">
         <div className="flex flex-row items-center justify-between">
           <div className="flex flex-col md:pl-5">
-            <p className="text-primary text-sm font-semibold">Complementos Cadastrados</p>
+            <p className="text-primary text-lg font-semibold">Complementos Cadastrados</p>
             <p className="text-tertiary md:text-[22px] text-sm font-normal">
               Total {complementos.length} de {totalComplementos}
             </p>
