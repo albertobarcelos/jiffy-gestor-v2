@@ -269,6 +269,8 @@ interface GraficoVendasPorUsuarioModalProps {
   vendas: Venda[]
   usuariosPDV: UsuarioPDV[]
   tipo?: 'finalizadas' | 'canceladas'
+  /** Texto opcional quando a lista na tela ainda não carregou todos os registros (gráfico parcial). */
+  avisoListaParcial?: string
 }
 
 /**
@@ -280,6 +282,7 @@ export function GraficoVendasPorUsuarioModal({
   vendas,
   usuariosPDV,
   tipo = 'finalizadas',
+  avisoListaParcial,
 }: GraficoVendasPorUsuarioModalProps) {
   return (
     <Dialog
@@ -301,6 +304,14 @@ export function GraficoVendasPorUsuarioModal({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <DialogTitle sx={{ fontSize: '1rem', fontWeight: 700 }}>
               {tipo === 'canceladas' ? 'Vendas Canceladas por Usuário' : 'Vendas por Usuário'}
+              {avisoListaParcial ? (
+                <span
+                  className="mt-1 block font-nunito text-xs font-normal text-amber-800"
+                  style={{ fontWeight: 400 }}
+                >
+                  {avisoListaParcial}
+                </span>
+              ) : null}
             </DialogTitle>
             <button
               type="button"

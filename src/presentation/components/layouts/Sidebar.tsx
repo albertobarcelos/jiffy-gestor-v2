@@ -102,7 +102,7 @@ export function Sidebar() {
     { name: 'Meu Caixa', path: '/meu-caixa', icon: '💼' },
     { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: '📄' },
     { name: 'Painel do Contador', path: '/painel-contador', icon: '📊' },
-    { name: 'Relatórios', path: '/relatorios', icon: '📊' },
+    { name: 'Relatórios', path: '/relatorios-vendas', icon: '📊' },
     { name: 'Configurações', path: '/configuracoes', icon: '⚙️' },
   ]
 

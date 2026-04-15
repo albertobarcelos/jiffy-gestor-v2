@@ -183,7 +183,7 @@ export function TopNav() {
             />
           ),
         },
-        { name: 'Relatórios', path: '/relatorios', icon: MdAssessment },
+        { name: 'Relatórios Vendas', path: '/relatorios-vendas', icon: MdAssessment },
         { name: 'Hist. Fechamentos', path: '/historico-fechamento', icon: MdHistory },
       ],
     },

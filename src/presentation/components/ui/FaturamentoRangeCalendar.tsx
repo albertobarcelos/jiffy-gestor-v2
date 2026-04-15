@@ -362,7 +362,7 @@ export function FaturamentoRangeCalendar({
       className={cn(
         'faturamento-rdp-scope max-w-full overflow-x-auto',
         fundoModalClaro ? 'faturamento-rdp-modal w-full text-gray-900' : 'w-fit text-white',
-        embutidoNoModal ? 'p-0' : 'rounded-xl border border-white/20 bg-secondary bg-gradient-to-br from-secondary to-[#451090] p-4 shadow-lg',
+        embutidoNoModal ? 'px-2' : 'rounded-xl border border-white/20 bg-secondary bg-gradient-to-br from-secondary to-[#451090] p-4 shadow-lg',
         className
       )}
       style={temaRdp}
@@ -402,7 +402,7 @@ export function FaturamentoRangeCalendar({
       />
 
       <div className={cn('mt-4 border-t pt-4', fundoModalClaro ? 'border-gray-200' : 'border-white/20')}>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="mx-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
             <label htmlFor="faturamento-range-hora-inicio" className="text-sm font-medium text-primary-text">
               Hora de início

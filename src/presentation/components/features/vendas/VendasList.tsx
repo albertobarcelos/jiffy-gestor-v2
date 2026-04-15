@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter, usePathname } from 'next/navigation' // Importar useRouter e usePathname
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import {
@@ -16,11 +16,28 @@ import {
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { DetalhesVendas } from './DetalhesVendas'
-import { EscolheDatasModal } from './EscolheDatasModal'
 import { GraficoVendasPorUsuarioModal } from './GraficoVendasPorUsuarioModal'
-import { FormControl, InputLabel, Select, MenuItem, CircularProgress } from '@mui/material'
+import {
+  FormControl,
+  InputAdornment,
+  InputLabel,
+  MenuItem,
+  Select,
+  TextField,
+} from '@mui/material'
+import { sxEntradaCompactaProdutoSelect } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { TipoVendaIcon } from './TipoVendaIcon'
 import { calculatePeriodo } from '@/src/shared/utils/dateFilters' // Importar calculatePeriodo
+import { startOfDay } from 'date-fns'
+import type { DateRange } from 'react-day-picker'
+import {
+  primeiroMesQuadroDuploCalendario,
+  periodoFetchFaturamentoCalendarioDoisMeses,
+} from '@/src/shared/utils/calendarioIntervaloFaturamento'
+import { combinarIntervaloCalendarParaDatas } from '@/src/shared/utils/intervaloCalendarioComHoras'
+import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
+import { FaturamentoRangeCalendar } from '@/src/presentation/components/ui/FaturamentoRangeCalendar'
+import { useDashboardFaturamentoPorDiaQuery } from '@/src/presentation/hooks/useDashboardFaturamentoPorDiaQuery'
 // Tipos
 interface Venda {
   id: string
@@ -97,6 +114,269 @@ function formatarDataHoraFiltroCurta(date: Date): string {
   return `${dia}-${mes} ${h}:${min}`
 }
 
+/** HH:mm a partir de Date — mesmo contrato do dashboardV2 (intervalo personalizado). */
+function formatarHoraParaInputCalendar(d: Date | null | undefined): string {
+  if (!d) return '00:00'
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+/** Snapshot dos filtros para montar a query da listagem (GET /api/vendas). */
+interface VendasFiltrosQuerySnapshot {
+  searchQuery: string
+  valorMinimo: string
+  valorMaximo: string
+  periodo: string
+  statusFilter: string | null
+  tipoVendaFilter: string | null
+  meioPagamentoFilter: string
+  usuarioAbertoPorFilter: string
+  terminalFilter: string
+  usuarioCancelouFilter: string
+  periodoInicial: Date | null
+  periodoFinal: Date | null
+}
+
+/** Normaliza string de moeda do filtro para número (mesma regra do input de valor). */
+function normalizarMoedaFiltroVLista(value: string): number | null {
+  if (!value || value.trim() === '') return null
+
+  let clean = value.replace(/[^\d,.]/g, '').trim()
+
+  if (!clean) return null
+
+  if (clean.includes(',')) {
+    clean = clean.replace(/\./g, '').replace(',', '.')
+  } else if (clean.includes('.')) {
+    if ((clean.match(/\./g) || []).length > 1) {
+      clean = clean.replace(/\./g, '')
+    }
+    const parts = clean.split('.')
+    if (parts.length === 2 && parts[1].length === 3) {
+      clean = clean.replace('.', '')
+    }
+  }
+
+  const num = parseFloat(clean)
+  return isNaN(num) ? null : num
+}
+
+/** Monta query string da listagem (sem limit/offset). */
+function buildVendasListQueryParams(filters: VendasFiltrosQuerySnapshot): URLSearchParams {
+  const baseParams = new URLSearchParams()
+
+  if (filters.searchQuery) {
+    baseParams.append('q', filters.searchQuery)
+  }
+
+  if (filters.tipoVendaFilter) {
+    baseParams.append('tipoVenda', filters.tipoVendaFilter.toLowerCase())
+  }
+
+  const normalizedStatus = filters.statusFilter?.toUpperCase()
+  if (normalizedStatus && normalizedStatus !== 'ABERTA') {
+    baseParams.append('status', normalizedStatus)
+  } else {
+    baseParams.append('status', 'FINALIZADA')
+    baseParams.append('status', 'CANCELADA')
+  }
+
+  if (filters.usuarioAbertoPorFilter) {
+    baseParams.append('abertoPorId', filters.usuarioAbertoPorFilter)
+  }
+
+  if (filters.usuarioCancelouFilter) {
+    baseParams.append('canceladoPorId', filters.usuarioCancelouFilter)
+  }
+
+  const valorMin = normalizarMoedaFiltroVLista(filters.valorMinimo)
+  if (valorMin !== null && valorMin > 0) {
+    baseParams.append('valorFinalMinimo', valorMin.toString())
+  }
+
+  const valorMax = normalizarMoedaFiltroVLista(filters.valorMaximo)
+  if (valorMax !== null && valorMax > 0) {
+    baseParams.append('valorFinalMaximo', valorMax.toString())
+  }
+
+  if (filters.meioPagamentoFilter) {
+    baseParams.append('meioPagamentoId', filters.meioPagamentoFilter)
+  }
+
+  if (filters.terminalFilter) {
+    baseParams.append('terminalId', filters.terminalFilter)
+  }
+
+  let inicioFiltro: Date | null = null
+  let fimFiltro: Date | null = null
+  if (filters.periodoInicial && filters.periodoFinal) {
+    inicioFiltro = filters.periodoInicial
+    fimFiltro = filters.periodoFinal
+  } else if (filters.periodo !== 'Todos') {
+    const { inicio, fim } = calculatePeriodo(filters.periodo)
+    inicioFiltro = inicio
+    fimFiltro = fim
+  }
+  if (inicioFiltro) {
+    baseParams.append('periodoInicial', inicioFiltro.toISOString())
+  }
+  if (fimFiltro) {
+    baseParams.append('periodoFinal', fimFiltro.toISOString())
+  }
+
+  return baseParams
+}
+
+/** Mapeia linha da API para o tipo usado na lista. */
+function mapearVendaApiRow(item: any): Venda {
+  return {
+    ...item,
+    totalValorProdutosRemovidos:
+      item.totalValorProdutosRemovidos ||
+      item.totalValorProdutosRemovido ||
+      item.valorProdutosRemovidos ||
+      item.valorProdutosRemovido ||
+      0,
+  }
+}
+
+/**
+ * Refina por status usando datas (quando a API retorna mistura ou caso "Aberta").
+ */
+function filtrarVendasPorStatusCliente(itens: Venda[], statusFilter: string | null): Venda[] {
+  return itens.filter((v: Venda) => {
+    const normalizedStatus = statusFilter?.toUpperCase()
+
+    if (!normalizedStatus || normalizedStatus === 'ABERTA') {
+      if (normalizedStatus === 'ABERTA') {
+        return !v.dataCancelamento && !v.dataFinalizacao
+      }
+      return !!(v.dataCancelamento || v.dataFinalizacao)
+    }
+
+    if (normalizedStatus === 'CANCELADA') {
+      return !!v.dataCancelamento
+    }
+
+    if (normalizedStatus === 'FINALIZADA') {
+      return !!v.dataFinalizacao && !v.dataCancelamento
+    }
+
+    return !!(v.dataCancelamento || v.dataFinalizacao)
+  })
+}
+
+/** Borda do `Select` outlined sempre visível (o MUI deixa o repouso tão claro que parece sumir). */
+const sxVendasFiltroOutlinedInputRoot = {
+  backgroundColor: '#fff',
+  '& .MuiOutlinedInput-notchedOutline': {
+    borderColor: 'rgba(0, 0, 0, 0.23)',
+    borderWidth: 1,
+  },
+  '&:hover .MuiOutlinedInput-notchedOutline': {
+    borderColor: 'rgba(0, 0, 0, 0.23)',
+  },
+  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+    borderWidth: 1,
+    borderColor: 'var(--color-primary)',
+  },
+} as const
+
+/**
+ * Selects de filtro: label na borda (outlined), alinhado a NovoProduto / NovoComplemento.
+ * Classes Tailwind no `InputLabel` não vencem o `color`/`fontWeight` injetados pelo `sx` herdado
+ * de `sxEntradaCompactaProdutoSelect` — tipografia do label fica aqui no `sx` do `FormControl`.
+ */
+const sxVendasFiltroSelectBase = {
+  ...sxEntradaCompactaProdutoSelect,
+  minWidth: 180,
+  '& .MuiOutlinedInput-root': {
+    ...sxVendasFiltroOutlinedInputRoot,
+    height: 35,
+    minHeight: 35,
+    padding: '4px 2px 4px 0',
+  },
+  '& .MuiInputLabel-root': {
+    color: 'var(--color-secondary-text)',
+    fontWeight: 300,
+    fontSize: '0.975rem',
+    fontFamily: '"Nunito", sans-serif',
+  },
+  '& .MuiInputLabel-root.Mui-focused': {
+    color: 'var(--color-secondary-text)',
+    fontWeight: 300,
+  },
+  '& .MuiInputLabel-root.MuiInputLabel-shrink': {
+    color: 'var(--color-secondary-text)',
+    fontWeight: 300,
+  },
+} as const
+
+const sxVendasFiltroSelectStatus = {
+  ...sxVendasFiltroSelectBase,
+  '& .MuiOutlinedInput-root': {
+    ...sxVendasFiltroOutlinedInputRoot,
+    backgroundColor: 'var(--color-info)',
+    height: 35,
+    minHeight: 35,
+    padding: '4px 2px 4px 0',
+  },
+} as const
+
+const menuPropsVendasFiltroListaLonga = {
+  PaperProps: {
+    sx: {
+      maxHeight: '400px',
+    },
+  },
+} as const
+
+/**
+ * TextField de valor (moeda): label/borda/fundo iguais aos filtros outlined.
+ * Altura alinhada ao `Select size="small"` (~40px) — sem “caixa” alta com área vazia.
+ */
+const sxVendasFiltroTextFieldMoeda = {
+  width: '8.5rem',
+  marginTop: 0,
+  marginBottom: 0,
+  '& .MuiOutlinedInput-root': {
+    ...sxVendasFiltroOutlinedInputRoot,
+    backgroundColor: 'var(--color-info)',
+    fontFamily: '"Nunito", sans-serif',
+    height: 30,
+    minHeight: 30,
+    paddingLeft: 2,
+    paddingRight: 2,
+    alignItems: 'center',
+    boxSizing: 'border-box',
+  },
+  '& .MuiInputLabel-root': {
+    color: 'var(--color-secondary-text)',
+    fontWeight: 300,
+    fontSize: '0.975rem',
+    fontFamily: '"Nunito", sans-serif',
+  },
+  '& .MuiInputLabel-root.Mui-focused': {
+    color: 'var(--color-secondary-text)',
+    fontWeight: 300,
+  },
+  '& .MuiInputLabel-root.MuiInputLabel-shrink': {
+    color: 'var(--color-secondary-text)',
+    fontWeight: 300,
+  },
+  '& .MuiInputBase-input': {
+    fontSize: '0.875rem',
+    lineHeight: 1,
+    padding: '4px 2px 4px 0',
+    height: 30,
+    minHeight: 30,
+  },
+  '& .MuiInputAdornment-root': {
+    height: 30,
+    maxHeight: 30,
+    marginRight: 0,
+  },
+} as const
+
 /**
  * Componente de listagem de vendas
  * Implementa scroll infinito, filtros avançados e cards de métricas
@@ -136,14 +416,35 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   const [isLoadingMeiosPagamento, setIsLoadingMeiosPagamento] = useState(false)
   const [isLoadingTerminais, setIsLoadingTerminais] = useState(false)
   const [isDatasModalOpen, setIsDatasModalOpen] = useState(false)
+  /** Rascunho do painel lateral (calendário duplo + horas) — alinhado ao dashboardV2. */
+  const [rascunhoIntervaloRange, setRascunhoIntervaloRange] = useState<DateRange | undefined>(undefined)
+  const [mesCalendarioIntervalo, setMesCalendarioIntervalo] = useState(() =>
+    primeiroMesQuadroDuploCalendario(startOfDay(new Date()))
+  )
+  const [rascunhoHoraInicio, setRascunhoHoraInicio] = useState('00:00')
+  const [rascunhoHoraFim, setRascunhoHoraFim] = useState('23:59')
   const [filtrosVisiveisMobile, setFiltrosVisiveisMobile] = useState(false)
   const [isMobileViewport, setIsMobileViewport] = useState(false)
   const [isGraficoVendasPorUsuarioOpen, setIsGraficoVendasPorUsuarioOpen] = useState(false)
   const [isGraficoVendasCanceladasOpen, setIsGraficoVendasCanceladasOpen] = useState(false)
+  /** Há mais páginas na API para os filtros atuais (scroll / “Carregar mais”). */
+  const [hasMoreVendas, setHasMoreVendas] = useState(false)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  /** Total de registros no backend para os filtros atuais (quando a API envia `count`). */
+  const [totalListaCount, setTotalListaCount] = useState<number | null>(null)
 
-  const pageSize = 100 // Aumentado para buscar mais itens por página
+  const pageSize = 100 // Itens por requisição (paginação na API)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
+  /** Próximo `offset` da API (sempre múltiplos do tamanho bruto da última página retornada). */
+  const nextApiOffsetRef = useRef(0)
+  /** Incrementado a cada reset de lista — descarta respostas atrasadas após troca de filtro. */
+  const vendasFetchSeqRef = useRef(0)
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const hasMoreVendasRef = useRef(false)
+  const isLoadingMoreRef = useRef(false)
+  const isLoadingRef = useRef(false)
+  const primeiraMontagemListaRef = useRef(true)
   const filtersRef = useRef({
     searchQuery,
     valorMinimo,
@@ -190,6 +491,16 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     periodoFinal,
   ])
 
+  useEffect(() => {
+    hasMoreVendasRef.current = hasMoreVendas
+  }, [hasMoreVendas])
+  useEffect(() => {
+    isLoadingMoreRef.current = isLoadingMore
+  }, [isLoadingMore])
+  useEffect(() => {
+    isLoadingRef.current = isLoading
+  }, [isLoading])
+
   // Detecta viewport mobile para ajustes responsivos (ex: tamanho do ícone)
   useEffect(() => {
     const updateViewport = () => {
@@ -202,6 +513,41 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     return () => window.removeEventListener('resize', updateViewport)
   }, [])
 
+  const periodoFaturamentoCalendarioModal = useMemo(
+    () => periodoFetchFaturamentoCalendarioDoisMeses(mesCalendarioIntervalo),
+    [mesCalendarioIntervalo]
+  )
+
+  const {
+    data: faturamentoPorDiaCalendario,
+    isPending: faturamentoCalendarioPending,
+    isFetching: faturamentoCalendarioFetching,
+  } = useDashboardFaturamentoPorDiaQuery({
+    periodoInicial: periodoFaturamentoCalendarioModal.inicio,
+    periodoFinal: periodoFaturamentoCalendarioModal.fim,
+    enabled: isDatasModalOpen,
+  })
+
+  // Ao abrir o painel lateral, sincroniza rascunho com o filtro "Por datas" ou padrão (hoje)
+  useEffect(() => {
+    if (!isDatasModalOpen) return
+    if (periodoInicial && periodoFinal) {
+      setRascunhoIntervaloRange({
+        from: startOfDay(periodoInicial),
+        to: startOfDay(periodoFinal),
+      })
+      setMesCalendarioIntervalo(primeiroMesQuadroDuploCalendario(startOfDay(periodoFinal)))
+      setRascunhoHoraInicio(formatarHoraParaInputCalendar(periodoInicial))
+      setRascunhoHoraFim(formatarHoraParaInputCalendar(periodoFinal))
+    } else {
+      const hoje = startOfDay(new Date())
+      setRascunhoIntervaloRange({ from: hoje, to: hoje })
+      setMesCalendarioIntervalo(primeiroMesQuadroDuploCalendario(hoje))
+      setRascunhoHoraInicio('00:00')
+      setRascunhoHoraFim('23:59')
+    }
+  }, [isDatasModalOpen, periodoInicial, periodoFinal])
+
   /**
    * Formata valor como moeda brasileira
    */
@@ -210,42 +556,6 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       style: 'currency',
       currency: 'BRL',
     }).format(value)
-  }
-
-  /**
-   * Normaliza valor de moeda para número
-   */
-  const normalizeCurrency = (value: string): number | null => {
-    if (!value || value.trim() === '') return null
-
-    // Remove todos os caracteres não numéricos exceto vírgula e ponto
-    let clean = value.replace(/[^\d,.]/g, '').trim()
-
-    if (!clean) return null
-
-    // Se tem vírgula, assume formato brasileiro (50,00)
-    if (clean.includes(',')) {
-      // Remove pontos (separadores de milhar) e substitui vírgula por ponto
-      clean = clean.replace(/\./g, '').replace(',', '.')
-    }
-    // Se só tem ponto, pode ser formato internacional (50.00) ou separador de milhar
-    else if (clean.includes('.')) {
-      // Se tem mais de um ponto, é separador de milhar, remove todos
-      if ((clean.match(/\./g) || []).length > 1) {
-        clean = clean.replace(/\./g, '')
-      }
-      // Se tem só um ponto, pode ser decimal ou milhar
-      // Se tem 3 dígitos após o ponto, é milhar, senão é decimal
-      const parts = clean.split('.')
-      if (parts.length === 2 && parts[1].length === 3) {
-        // É milhar, remove o ponto
-        clean = clean.replace('.', '')
-      }
-      // Senão mantém como está (formato internacional)
-    }
-
-    const num = parseFloat(clean)
-    return isNaN(num) ? null : num
   }
 
   /**
@@ -423,209 +733,181 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   }, [auth])
 
   /**
-   * Busca TODAS as vendas com filtros (carrega todas as páginas automaticamente)
+   * Indica se a API provavelmente tem próxima página (com base em count/totalPages ou página cheia).
+   */
+  const inferirHasMoreApi = useCallback(
+    (
+      rawLength: number,
+      offset: number,
+      data: {
+        count?: number
+        totalPages?: number
+        limit?: number
+      }
+    ): boolean => {
+      if (rawLength === 0) return false
+      if (rawLength < pageSize) return false
+      const lim = typeof data.limit === 'number' && data.limit > 0 ? data.limit : pageSize
+      if (typeof data.count === 'number' && data.count >= 0) {
+        return offset + rawLength < data.count
+      }
+      if (typeof data.totalPages === 'number' && data.totalPages > 0) {
+        const idx = Math.floor(offset / lim)
+        return idx + 1 < data.totalPages
+      }
+      return rawLength === pageSize
+    },
+    [pageSize]
+  )
+
+  /**
+   * Busca uma página na API (filtros atuais em `filtersRef`).
+   */
+  const buscarPaginaVendas = useCallback(
+    async (offset: number, filters: VendasFiltrosQuerySnapshot, token: string) => {
+      const baseParams = buildVendasListQueryParams(filters)
+      const params = new URLSearchParams(baseParams.toString())
+      params.append('limit', String(pageSize))
+      params.append('offset', String(offset))
+
+      const response = await fetch(`/api/vendas?${params.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error((errorData as { error?: string }).error || 'Erro ao buscar vendas')
+      }
+
+      const data = await response.json()
+      const rawItems: unknown[] = data.items || []
+      const mappedItems = rawItems.map((item: any) => mapearVendaApiRow(item))
+      const filteredItems = filtrarVendasPorStatusCliente(mappedItems, filters.statusFilter)
+
+      return {
+        filteredItems,
+        rawLength: rawItems.length,
+        metricas: (data.metricas || null) as MetricasVendas | null,
+        count: typeof data.count === 'number' ? data.count : undefined,
+        totalPages: typeof data.totalPages === 'number' ? data.totalPages : undefined,
+        limit: typeof data.limit === 'number' ? data.limit : undefined,
+      }
+    },
+    [pageSize]
+  )
+
+  /**
+   * Primeira página: reseta lista, métricas e offset; filtros vão na query (backend).
    */
   const fetchVendas = useCallback(async () => {
     const token = auth?.getAccessToken()
     if (!token) return
 
+    const seq = ++vendasFetchSeqRef.current
     setIsLoading(true)
-    setVendas([]) // Limpa a lista antes de buscar
+    setIsLoadingMore(false)
+    setVendas([])
+    setHasMoreVendas(false)
+    setTotalListaCount(null)
+    nextApiOffsetRef.current = 0
 
     try {
-      const filters = filtersRef.current
+      const filters = filtersRef.current as VendasFiltrosQuerySnapshot
+      const offset = 0
+      const page = await buscarPaginaVendas(offset, filters, token)
 
-      // Monta os parâmetros base (sem paginação inicial)
-      const baseParams = new URLSearchParams()
+      if (vendasFetchSeqRef.current !== seq) return
 
-      if (filters.searchQuery) {
-        baseParams.append('q', filters.searchQuery)
-      }
-
-      if (filters.tipoVendaFilter) {
-        baseParams.append('tipoVenda', filters.tipoVendaFilter.toLowerCase())
-      }
-
-      // Status: se null, envia FINALIZADA e CANCELADA
-      const normalizedStatus = filters.statusFilter?.toUpperCase()
-      if (normalizedStatus && normalizedStatus !== 'ABERTA') {
-        baseParams.append('status', normalizedStatus)
+      setVendas(page.filteredItems)
+      setMetricas(page.metricas)
+      if (page.count !== undefined) {
+        setTotalListaCount(page.count)
       } else {
-        baseParams.append('status', 'FINALIZADA')
-        baseParams.append('status', 'CANCELADA')
+        setTotalListaCount(null)
       }
 
-      if (filters.usuarioAbertoPorFilter) {
-        baseParams.append('abertoPorId', filters.usuarioAbertoPorFilter)
-      }
-
-      if (filters.usuarioCancelouFilter) {
-        baseParams.append('canceladoPorId', filters.usuarioCancelouFilter)
-      }
-
-      const valorMin = normalizeCurrency(filters.valorMinimo)
-      if (valorMin !== null && valorMin > 0) {
-        baseParams.append('valorFinalMinimo', valorMin.toString())
-      }
-
-      const valorMax = normalizeCurrency(filters.valorMaximo)
-      if (valorMax !== null && valorMax > 0) {
-        baseParams.append('valorFinalMaximo', valorMax.toString())
-      }
-
-      if (filters.meioPagamentoFilter) {
-        baseParams.append('meioPagamentoId', filters.meioPagamentoFilter)
-      }
-
-      if (filters.terminalFilter) {
-        baseParams.append('terminalId', filters.terminalFilter)
-      }
-
-      // Período na API: intervalo de "Por datas" tem prioridade; senão preset do Select; "Todos" sem datas
-      let inicioFiltro: Date | null = null
-      let fimFiltro: Date | null = null
-      if (filters.periodoInicial && filters.periodoFinal) {
-        inicioFiltro = filters.periodoInicial
-        fimFiltro = filters.periodoFinal
-      } else if (filters.periodo !== 'Todos') {
-        const { inicio, fim } = calculatePeriodo(filters.periodo)
-        inicioFiltro = inicio
-        fimFiltro = fim
-      }
-      if (inicioFiltro) {
-        baseParams.append('periodoInicial', inicioFiltro.toISOString())
-      }
-      if (fimFiltro) {
-        baseParams.append('periodoFinal', fimFiltro.toISOString())
-      }
-
-      // Busca todas as páginas automaticamente
-      let allItems: Venda[] = []
-      let currentPage = 0
-      let totalPages = 1
-      let metricasData: MetricasVendas | null = null
-
-      while (currentPage < totalPages) {
-        const params = new URLSearchParams(baseParams.toString())
-        params.append('limit', pageSize.toString())
-        params.append('offset', (currentPage * pageSize).toString())
-
-        const response = await fetch(`/api/vendas?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.error || 'Erro ao buscar vendas')
-        }
-
-        const data = await response.json()
-
-        // Salva as métricas apenas da primeira página
-        if (currentPage === 0) {
-          metricasData = data.metricas || null
-          // Calcula total de páginas
-          if (data.totalPages) {
-            totalPages = data.totalPages
-          } else if (data.count && data.limit) {
-            totalPages = Math.ceil(data.count / data.limit)
-          } else if ((data.items || []).length < pageSize) {
-            totalPages = 1
-          }
-        }
-
-        // Mapeia os itens garantindo que totalValorProdutosRemovidos seja capturado corretamente
-        const mappedItems = (data.items || []).map((item: any) => ({
-          ...item,
-          totalValorProdutosRemovidos:
-            item.totalValorProdutosRemovidos ||
-            item.totalValorProdutosRemovido ||
-            item.valorProdutosRemovidos ||
-            item.valorProdutosRemovido ||
-            0,
-        }))
-
-        // Filtra os itens respeitando o status selecionado
-        const filteredItems = mappedItems.filter((v: Venda) => {
-          const normalizedStatus = filters.statusFilter?.toUpperCase()
-
-          // Se não há filtro de status ou é "Aberta", mostra todas (finalizadas e canceladas)
-          if (!normalizedStatus || normalizedStatus === 'ABERTA') {
-            // Se for "Aberta", mostra apenas vendas sem finalização e sem cancelamento
-            if (normalizedStatus === 'ABERTA') {
-              return !v.dataCancelamento && !v.dataFinalizacao
-            }
-            // Se não há filtro, mostra finalizadas e canceladas
-            return v.dataCancelamento || v.dataFinalizacao
-          }
-
-          // Se filtro é "CANCELADA", mostra apenas vendas canceladas
-          if (normalizedStatus === 'CANCELADA') {
-            return !!v.dataCancelamento
-          }
-
-          // Se filtro é "FINALIZADA", mostra apenas vendas finalizadas
-          if (normalizedStatus === 'FINALIZADA') {
-            return !!v.dataFinalizacao && !v.dataCancelamento
-          }
-
-          // Fallback: mostra todas
-          return v.dataCancelamento || v.dataFinalizacao
-        })
-
-        allItems = [...allItems, ...filteredItems]
-        currentPage++
-
-        console.log(
-          `📄 [VendasList] Página ${currentPage}/${totalPages} carregada - ${filteredItems.length} itens filtrados (Total acumulado: ${allItems.length})`
-        )
-      }
-
-      // Log detalhado dos filtros e contagem final
-      console.log('📊 [VendasList] Filtros aplicados:', {
-        periodo: filters.periodo,
-        statusFilter: filters.statusFilter || 'Todos (FINALIZADA + CANCELADA)',
-        periodoInicial: filters.periodoInicial?.toISOString() || 'Não definido',
-        periodoFinal: filters.periodoFinal?.toISOString() || 'Não definido',
-        tipoVenda: filters.tipoVendaFilter || 'Todos',
-        meioPagamento: filters.meioPagamentoFilter || 'Todos',
-        terminal: filters.terminalFilter || 'Todos',
-        usuarioAbertoPor: filters.usuarioAbertoPorFilter || 'Todos',
-        usuarioCancelou: filters.usuarioCancelouFilter || 'Todos',
-        valorMinimo: filters.valorMinimo || 'Não definido',
-        valorMaximo: filters.valorMaximo || 'Não definido',
-        searchQuery: filters.searchQuery || 'Não definido',
-      })
-      console.log('📦 [VendasList] Dados recebidos da API:', {
-        totalPages: totalPages,
-        metricas: metricasData,
-      })
-      console.log('✅ [VendasList] Total de itens carregados na lista:', {
-        totalItemsFiltrados: allItems.length,
-        totalPagesCarregadas: currentPage,
-      })
-
-      setVendas(allItems)
-      setMetricas(metricasData)
+      nextApiOffsetRef.current = offset + page.rawLength
+      setHasMoreVendas(inferirHasMoreApi(page.rawLength, offset, page))
     } catch (error) {
       console.error('Erro ao buscar vendas:', error)
       showToast.error('Erro ao buscar vendas')
     } finally {
-      setIsLoading(false)
+      if (vendasFetchSeqRef.current === seq) {
+        setIsLoading(false)
+      }
     }
-  }, [auth, pageSize])
+  }, [auth, buscarPaginaVendas, inferirHasMoreApi])
 
-  // Debounce para busca
+  /**
+   * Próximas páginas (scroll infinito / botão).
+   */
+  const loadMoreVendas = useCallback(async () => {
+    const token = auth?.getAccessToken()
+    if (!token) return
+    if (!hasMoreVendasRef.current || isLoadingRef.current || isLoadingMoreRef.current) return
+
+    const seq = vendasFetchSeqRef.current
+    setIsLoadingMore(true)
+
+    try {
+      const filters = filtersRef.current as VendasFiltrosQuerySnapshot
+      const offset = nextApiOffsetRef.current
+      const page = await buscarPaginaVendas(offset, filters, token)
+
+      if (vendasFetchSeqRef.current !== seq) return
+
+      setVendas(prev => [...prev, ...page.filteredItems])
+      nextApiOffsetRef.current = offset + page.rawLength
+      setHasMoreVendas(inferirHasMoreApi(page.rawLength, offset, page))
+    } catch (error) {
+      console.error('Erro ao carregar mais vendas:', error)
+      showToast.error('Erro ao carregar mais vendas')
+    } finally {
+      // Sempre encerra: um reset de filtros pode invalidar `seq` e outra busca já zerou o estado
+      setIsLoadingMore(false)
+    }
+  }, [auth, buscarPaginaVendas, inferirHasMoreApi])
+
+  /** Soma “Total cancelado” apenas sobre as vendas já carregadas na lista (métricas globais vêm de `metricas`). */
+  const totalCanceladoSomenteLista = useMemo(() => {
+    return vendas.reduce((total, v) => {
+      const totalRemovidos = Number(v.totalValorProdutosRemovidos) || 0
+      const valorFinal = Number(v.valorFinal) || 0
+
+      if (v.dataCancelamento) {
+        return total + totalRemovidos + valorFinal
+      }
+
+      if (v.dataFinalizacao && !v.dataCancelamento && totalRemovidos > 0) {
+        return total + totalRemovidos
+      }
+
+      return total
+    }, 0)
+  }, [vendas])
+
+  const avisoGraficoListaParcial =
+    hasMoreVendas && totalListaCount != null && vendas.length < totalListaCount
+      ? 'Gráfico baseado apenas nas vendas já carregadas na lista. Role a lista ou use “Carregar mais” para aproximar o total.'
+      : hasMoreVendas && totalListaCount == null
+        ? 'Podem existir mais vendas: carregue o restante da lista para o gráfico refletir todos os registros.'
+        : undefined
+
+  // Debounce para busca / troca de filtros (primeira execução sem espera)
   useEffect(() => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current)
     }
 
-    // Ao confirmar "Por datas", refetch mais rápido (igual ideia do fluxo antigo)
-    const delay = periodoInicial && periodoFinal ? 100 : 1000
+    const delay = primeiraMontagemListaRef.current
+      ? 0
+      : periodoInicial && periodoFinal
+        ? 100
+        : 500
+    primeiraMontagemListaRef.current = false
 
     debounceTimerRef.current = setTimeout(() => {
       fetchVendas()
@@ -652,14 +934,46 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     fetchVendas,
   ])
 
-  // Efeito para carregar dados auxiliares e iniciar a busca de vendas
+  // Dados auxiliares (usuários, meios, terminais) — sem duplicar fetch da lista aqui
   useEffect(() => {
     loadAllUsuariosPDV()
     loadAllMeiosPagamento()
     loadAllTerminais()
-    // Aciona a busca inicial de vendas com os filtros já configurados
-    fetchVendas()
-  }, [fetchVendas]) // Dependência apenas do fetchVendas
+  }, [loadAllUsuariosPDV, loadAllMeiosPagamento, loadAllTerminais])
+
+  // Scroll infinito: próxima página ao chegar perto do fim da lista
+  const handleScrollListaVendas = useCallback(() => {
+    if (scrollTimeoutRef.current) return
+
+    scrollTimeoutRef.current = setTimeout(() => {
+      const container = scrollContainerRef.current
+      if (!container) {
+        scrollTimeoutRef.current = null
+        return
+      }
+      const { scrollTop, scrollHeight, clientHeight } = container
+      const distanceFromBottom = scrollHeight - (scrollTop + clientHeight)
+      if (distanceFromBottom < 400) {
+        if (hasMoreVendasRef.current && !isLoadingMoreRef.current && !isLoadingRef.current) {
+          void loadMoreVendas()
+        }
+      }
+      scrollTimeoutRef.current = null
+    }, 100)
+  }, [loadMoreVendas])
+
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    container.addEventListener('scroll', handleScrollListaVendas, { passive: true })
+    return () => {
+      container.removeEventListener('scroll', handleScrollListaVendas)
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current)
+        scrollTimeoutRef.current = null
+      }
+    }
+  }, [handleScrollListaVendas])
 
   /**
    * Limpa todos os filtros
@@ -714,14 +1028,35 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
 
   /**
    * Confirma seleção de datas e aplica filtro
+   * O valor do Select (Período) não muda — igual ao dashboard
    */
-  const handleConfirmDatas = (dataInicial: Date | null, dataFinal: Date | null) => {
+  const handleConfirmDatas = useCallback((dataInicial: Date | null, dataFinal: Date | null) => {
     filtersRef.current.periodoInicial = dataInicial
     filtersRef.current.periodoFinal = dataFinal
     setPeriodoInicial(dataInicial)
     setPeriodoFinal(dataFinal)
-    // O valor do Select (Período) não muda — igual ao dashboard
-  }
+  }, [])
+
+  /** Se o DayPicker enviar intervalo vazio, volta ao padrão de um dia (hoje). */
+  const handleRascunhoIntervaloRangeChange = useCallback((next: DateRange | undefined) => {
+    if (next != null) {
+      setRascunhoIntervaloRange(next)
+      return
+    }
+    const hoje = startOfDay(new Date())
+    setRascunhoIntervaloRange({ from: hoje, to: hoje })
+  }, [])
+
+  const handleAplicarIntervaloDatasVendas = useCallback(() => {
+    const { dataInicial, dataFinal } = combinarIntervaloCalendarParaDatas(
+      rascunhoIntervaloRange,
+      rascunhoHoraInicio,
+      rascunhoHoraFim
+    )
+    if (!dataInicial || !dataFinal) return
+    handleConfirmDatas(dataInicial, dataFinal)
+    setIsDatasModalOpen(false)
+  }, [rascunhoIntervaloRange, rascunhoHoraInicio, rascunhoHoraFim, handleConfirmDatas])
 
   /** Ao trocar o preset, remove o intervalo definido em "Por datas". */
   const handlePeriodoSelectChange = (novoPeriodo: string) => {
@@ -735,8 +1070,15 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
 
   return (
     <div className="flex h-full flex-col">
+      <div className="flex w-full  pl-5 py-1 flex-col">
+            <p className="text-primary text-lg px-[30px] font-semibold">
+              Todas as Vendas do PDV
+            </p>
+            
+      </div>
+      <div className="h-[1px] border-t-2 border-primary/70 flex-shrink-0"></div>
       {/* Container principal */}
-      <div className="bg-primary-background rounded-b-lg rounded-t-lg md:px-2">
+      <div className="bg-primary-background rounded-b-lg rounded-t-lg">
         {/* Toggle de filtros no mobile */}
         <div className="flex justify-end py-2 sm:hidden">
           <button
@@ -755,9 +1097,9 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           className={`flex flex-col items-center gap-3 py-2 sm:flex-row ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
         >
           {/* Campo de Pesquisa */}
-          <div className="relative w-full flex-[2] px-4">
+          <div className="relative w-full flex-[2]">
             <MdSearch
-              className="absolute left-8 top-1/2 -translate-y-1/2 text-secondary-text"
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
               size={20}
             />
             <input
@@ -774,44 +1116,40 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             />
           </div>
 
-          {/* Valor Mínimo */}
-          <div className="flex flex-row items-center gap-3">
-            <div className="relative">
-              <MdAttachMoney
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text"
-                size={20}
-              />
-              <input
-                type="text"
-                placeholder="Valor Mínimo"
-                value={valorMinimo}
-                onChange={e => {
-                  const formatted = formatCurrencyInput(e.target.value)
-                  setValorMinimo(formatted)
-                }}
-                onKeyPress={e => handleValorKeyPress(e, 'min')}
-                className="font-nunito h-8 w-32 rounded-lg border bg-info pl-10 pr-4 text-sm shadow-sm"
-              />
-            </div>
-
-            {/* Valor Máximo */}
-            <div className="relative">
-              <MdAttachMoney
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text"
-                size={20}
-              />
-              <input
-                type="text"
-                placeholder="Valor Máximo"
-                value={valorMaximo}
-                onChange={e => {
-                  const formatted = formatCurrencyInput(e.target.value)
-                  setValorMaximo(formatted)
-                }}
-                onKeyPress={e => handleValorKeyPress(e, 'max')}
-                className="font-nunito h-8 w-32 rounded-lg border bg-info pl-10 pr-4 text-sm shadow-sm"
-              />
-            </div>
+          {/* Valor Mínimo / Máximo — label na borda (igual aos filtros avançados) */}
+          <div className="flex flex-row items-end gap-3">
+            <TextField
+              size="small"
+              variant="outlined"
+              margin="none"
+              label="Valor Mínimo"
+              value={valorMinimo}
+              onChange={e => {
+                const formatted = formatCurrencyInput(e.target.value)
+                setValorMinimo(formatted)
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleValorKeyPress(e, 'min')
+              }}
+              sx={sxVendasFiltroTextFieldMoeda}
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              size="small"
+              variant="outlined"
+              margin="none"
+              label="Valor Máximo"
+              value={valorMaximo}
+              onChange={e => {
+                const formatted = formatCurrencyInput(e.target.value)
+                setValorMaximo(formatted)
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleValorKeyPress(e, 'max')
+              }}
+              sx={sxVendasFiltroTextFieldMoeda}
+              InputLabelProps={{ shrink: true }}
+            />
           </div>
 
           {/* Label Período */}
@@ -868,189 +1206,147 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         </div>
         {/* Filtros Avançados */}
         <div
-          className={`flex flex-wrap items-end justify-center gap-x-2 gap-y-4 rounded-t-lg bg-custom-2 px-2 pb-2 pt-1.5 md:justify-start ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
+          className={`flex flex-wrap items-end justify-center gap-x-2 gap-y-3 rounded-t-lg bg-primary/10 px-2 pb-2 pt-3 md:justify-start ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
         >
-          {/* Status da Venda */}
-          <div className="flex flex-col gap-1">
-            <label className="font-nunito text-xs text-secondary-text">Status da Venda</label>
-            <FormControl size="small" sx={{ minWidth: 180 }}>
-              <Select
-                value={statusFilter || ''}
-                onChange={e => setStatusFilter(e.target.value || null)}
-                displayEmpty
-                sx={{
-                  height: '32px',
-                  borderRadius: '8px',
-                  backgroundColor: 'var(--color-info)',
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'transparent',
-                  },
-                }}
-              >
-                <MenuItem value="">Selecione...</MenuItem>
-                <MenuItem value="Finalizada">Finalizada</MenuItem>
-                <MenuItem value="Cancelada">Cancelada</MenuItem>
-              </Select>
-            </FormControl>
-          </div>
+          {/* Status da Venda — label na borda (outlined) */}
+          <FormControl size="small" variant="outlined" sx={sxVendasFiltroSelectStatus}>
+            <InputLabel id="vl-filtro-status-label" shrink>
+              Status da Venda
+            </InputLabel>
+            <Select
+              labelId="vl-filtro-status-label"
+              label="Status da Venda"
+              value={statusFilter || ''}
+              onChange={e => setStatusFilter(e.target.value || null)}
+              displayEmpty
+              className="font-nunito"
+            >
+              <MenuItem value="">
+                <span className="text-secondary-text">Selecione...</span>
+              </MenuItem>
+              <MenuItem value="Finalizada">Finalizada</MenuItem>
+              <MenuItem value="Cancelada">Cancelada</MenuItem>
+            </Select>
+          </FormControl>
 
-          {/* Tipo de Venda */}
-          <div className="flex flex-col gap-1">
-            <label className="font-nunito text-xs text-secondary-text">Tipo de Venda</label>
-            <FormControl size="small" sx={{ minWidth: 180 }}>
-              <Select
-                value={tipoVendaFilter || ''}
-                onChange={e => setTipoVendaFilter(e.target.value || null)}
-                displayEmpty
-                sx={{
-                  height: '32px',
-                  backgroundColor: '#FFFFFF',
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'transparent',
-                  },
-                }}
-              >
-                <MenuItem value="">Selecione...</MenuItem>
-                <MenuItem value="balcao">Balcão</MenuItem>
-                <MenuItem value="mesa">Mesa</MenuItem>
-                <MenuItem value="gestor">Gestor</MenuItem>
-              </Select>
-            </FormControl>
-          </div>
+          <FormControl size="small" variant="outlined" sx={sxVendasFiltroSelectBase}>
+            <InputLabel id="vl-filtro-tipo-venda-label" shrink>
+              Tipo de Venda
+            </InputLabel>
+            <Select
+              labelId="vl-filtro-tipo-venda-label"
+              label="Tipo de Venda"
+              value={tipoVendaFilter || ''}
+              onChange={e => setTipoVendaFilter(e.target.value || null)}
+              displayEmpty
+              className="font-nunito"
+            >
+              <MenuItem value="">
+                <span className="text-secondary-text">Selecione...</span>
+              </MenuItem>
+              <MenuItem value="balcao">Balcão</MenuItem>
+              <MenuItem value="mesa">Mesa</MenuItem>
+              <MenuItem value="gestor">Gestor</MenuItem>
+            </Select>
+          </FormControl>
 
-          {/* Meio de Pagamento */}
-          <div className="flex flex-col gap-1">
-            <label className="font-nunito text-xs text-secondary-text">Meio de Pagamento</label>
-            <FormControl size="small" sx={{ minWidth: 180 }}>
-              <Select
-                value={meioPagamentoFilter}
-                onChange={e => setMeioPagamentoFilter(e.target.value)}
-                disabled={isLoadingMeiosPagamento}
-                displayEmpty
-                MenuProps={{
-                  PaperProps: {
-                    sx: {
-                      maxHeight: '400px',
-                    },
-                  },
-                }}
-                sx={{
-                  height: '32px',
-                  backgroundColor: '#FFFFFF',
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'transparent',
-                  },
-                }}
-              >
-                <MenuItem value="">Selecione...</MenuItem>
-                {meiosPagamento.map(meio => (
-                  <MenuItem key={meio.id} value={meio.id}>
-                    {meio.nome}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </div>
+          <FormControl size="small" variant="outlined" sx={sxVendasFiltroSelectBase}>
+            <InputLabel id="vl-filtro-meio-pagamento-label" shrink>
+              Meio de Pagamento
+            </InputLabel>
+            <Select
+              labelId="vl-filtro-meio-pagamento-label"
+              label="Meio de Pagamento"
+              value={meioPagamentoFilter}
+              onChange={e => setMeioPagamentoFilter(e.target.value)}
+              disabled={isLoadingMeiosPagamento}
+              displayEmpty
+              MenuProps={menuPropsVendasFiltroListaLonga}
+              className="font-nunito"
+            >
+              <MenuItem value="">
+                <span className="text-secondary-text">Selecione...</span>
+              </MenuItem>
+              {meiosPagamento.map(meio => (
+                <MenuItem key={meio.id} value={meio.id}>
+                  {meio.nome}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
-          {/* Vendas por Usuário */}
-          <div className="flex flex-col gap-1">
-            <label className="font-nunito text-xs text-secondary-text">Vendas por Usuário</label>
-            <FormControl size="small" sx={{ minWidth: 180 }}>
-              <Select
-                value={usuarioAbertoPorFilter}
-                onChange={e => setUsuarioAbertoPorFilter(e.target.value)}
-                displayEmpty
-                MenuProps={{
-                  PaperProps: {
-                    sx: {
-                      maxHeight: '400px',
-                    },
-                  },
-                }}
-                sx={{
-                  height: '32px',
-                  backgroundColor: '#FFFFFF',
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'transparent',
-                  },
-                }}
-              >
-                <MenuItem value="">Selecione...</MenuItem>
-                {usuariosPDV.map(usuario => (
-                  <MenuItem key={usuario.id} value={usuario.id}>
-                    {usuario.nome}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </div>
+          <FormControl size="small" variant="outlined" sx={sxVendasFiltroSelectBase}>
+            <InputLabel id="vl-filtro-usuario-aberto-label" shrink>
+              Vendas por Usuário
+            </InputLabel>
+            <Select
+              labelId="vl-filtro-usuario-aberto-label"
+              label="Vendas por Usuário"
+              value={usuarioAbertoPorFilter}
+              onChange={e => setUsuarioAbertoPorFilter(e.target.value)}
+              displayEmpty
+              MenuProps={menuPropsVendasFiltroListaLonga}
+              className="font-nunito"
+            >
+              <MenuItem value="">
+                <span className="text-secondary-text">Selecione...</span>
+              </MenuItem>
+              {usuariosPDV.map(usuario => (
+                <MenuItem key={usuario.id} value={usuario.id}>
+                  {usuario.nome}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
-          {/* Terminal */}
-          <div className="flex flex-col gap-1">
-            <label className="font-nunito text-xs text-secondary-text">Terminal</label>
-            <FormControl size="small" sx={{ minWidth: 180 }}>
-              <Select
-                value={terminalFilter}
-                onChange={e => setTerminalFilter(e.target.value)}
-                disabled={isLoadingTerminais}
-                displayEmpty
-                MenuProps={{
-                  PaperProps: {
-                    sx: {
-                      maxHeight: '400px',
-                    },
-                  },
-                }}
-                sx={{
-                  height: '32px',
-                  backgroundColor: '#FFFFFF',
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'transparent',
-                  },
-                }}
-              >
-                <MenuItem value="">Selecione...</MenuItem>
-                {terminais.map(terminal => (
-                  <MenuItem key={terminal.id} value={terminal.id}>
-                    {terminal.nome}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </div>
+          <FormControl size="small" variant="outlined" sx={sxVendasFiltroSelectBase}>
+            <InputLabel id="vl-filtro-terminal-label" shrink>
+              Terminal
+            </InputLabel>
+            <Select
+              labelId="vl-filtro-terminal-label"
+              label="Terminal"
+              value={terminalFilter}
+              onChange={e => setTerminalFilter(e.target.value)}
+              disabled={isLoadingTerminais}
+              displayEmpty
+              MenuProps={menuPropsVendasFiltroListaLonga}
+              className="font-nunito"
+            >
+              <MenuItem value="">
+                <span className="text-secondary-text">Selecione...</span>
+              </MenuItem>
+              {terminais.map(terminal => (
+                <MenuItem key={terminal.id} value={terminal.id}>
+                  {terminal.nome}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
-          {/* Usuário Cancelou */}
-          <div className="flex flex-col gap-1">
-            <label className="font-nunito text-xs text-secondary-text">Usuário Cancelou</label>
-            <FormControl size="small" sx={{ minWidth: 180 }}>
-              <Select
-                value={usuarioCancelouFilter}
-                onChange={e => setUsuarioCancelouFilter(e.target.value)}
-                displayEmpty
-                MenuProps={{
-                  PaperProps: {
-                    sx: {
-                      maxHeight: '400px',
-                    },
-                  },
-                }}
-                sx={{
-                  height: '32px',
-                  backgroundColor: '#FFFFFF',
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'transparent',
-                  },
-                }}
-              >
-                <MenuItem value="">Selecione...</MenuItem>
-                {usuariosPDV.map(usuario => (
-                  <MenuItem key={usuario.id} value={usuario.id}>
-                    {usuario.nome}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </div>
+          <FormControl size="small" variant="outlined" sx={sxVendasFiltroSelectBase}>
+            <InputLabel id="vl-filtro-usuario-cancelou-label" shrink>
+              Usuário Cancelou
+            </InputLabel>
+            <Select
+              labelId="vl-filtro-usuario-cancelou-label"
+              label="Usuário Cancelou"
+              value={usuarioCancelouFilter}
+              onChange={e => setUsuarioCancelouFilter(e.target.value)}
+              displayEmpty
+              MenuProps={menuPropsVendasFiltroListaLonga}
+              className="font-nunito"
+            >
+              <MenuItem value="">
+                <span className="text-secondary-text">Selecione...</span>
+              </MenuItem>
+              {usuariosPDV.map(usuario => (
+                <MenuItem key={usuario.id} value={usuario.id}>
+                  {usuario.nome}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
           {/* Botão Limpar Filtros */}
           <button
@@ -1125,26 +1421,13 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             <div className="flex flex-1 flex-col items-end">
               <span className="font-nunito text-xs text-secondary-text">Total Cancelado</span>
               <span className="font-exo text-[22px] text-primary">
-                {formatCurrency(
-                  vendas.reduce((total, v) => {
-                    const totalRemovidos = Number(v.totalValorProdutosRemovidos) || 0
-                    const valorFinal = Number(v.valorFinal) || 0
-
-                    // Se venda está CANCELADA: soma totalValorProdutosRemovidos + valorFinal
-                    if (v.dataCancelamento) {
-                      return total + totalRemovidos + valorFinal
-                    }
-
-                    // Se venda está FINALIZADA com produtos removidos: soma apenas totalValorProdutosRemovidos
-                    if (v.dataFinalizacao && !v.dataCancelamento && totalRemovidos > 0) {
-                      return total + totalRemovidos
-                    }
-
-                    // Caso contrário: não adiciona nada ao total
-                    return total
-                  }, 0)
-                )}
+                {formatCurrency(totalCanceladoSomenteLista)}
               </span>
+              {hasMoreVendas ? (
+                <span className="font-nunito max-w-[10rem] text-right text-[10px] leading-tight text-secondary-text">
+                  Parcial: Vendas carregadas na lista.
+                </span>
+              ) : null}
             </div>
           </div>
 
@@ -1168,19 +1451,19 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         <div className="overflow-hidden rounded-lg bg-info">
           {/* Cabeçalho */}
           <div className="font-nunito flex items-center gap-2 rounded-t-lg bg-custom-2 py-2 text-sm font-semibold text-primary-text md:px-3">
-            <div className="hidden flex-1 uppercase md:flex">Código Venda</div>
-            <div className="flex-1 text-center text-xs uppercase md:text-sm">Data Abertura</div>
-            <div className="hidden flex-1 text-center text-xs uppercase md:flex md:text-sm">
+            <div className="hidden flex-1  md:flex">Código Venda</div>
+            <div className="flex-1 text-center text-xs  md:text-sm">Data Abertura</div>
+            <div className="hidden flex-1 text-center text-xs  md:flex md:text-sm">
               Data Finalização
             </div>
-            <div className="flex-1 text-center text-xs uppercase md:text-sm">Tipo Venda</div>
-            <div className="hidden flex-1 justify-center uppercase md:flex">Cód. Terminal</div>
-            <div className="flex-[2] text-center text-xs uppercase md:text-sm">Usuário PDV</div>
-            <div className="hidden flex-1 justify-end text-xs uppercase md:flex md:text-sm">
+            <div className="flex-1 text-center text-xs  md:text-sm">Tipo Venda</div>
+            <div className="hidden flex-1 justify-center  md:flex">Cód. Terminal</div>
+            <div className="flex-[2] text-center text-xs  md:text-sm">Usuário PDV</div>
+            <div className="hidden flex-1 justify-end text-xs  md:flex md:text-sm">
               VL. Cancelado
             </div>
-            <div className="flex-1 text-right text-xs uppercase md:text-sm">VL. Faturado</div>
-            <div className="hidden flex-1 justify-end uppercase md:flex">Comprovante</div>
+            <div className="flex-1 text-right text-xs  md:text-sm">VL. Faturado</div>
+            <div className="hidden flex-1 justify-end  md:flex">Comprovante</div>
           </div>
 
           {/* Lista com scroll */}
@@ -1235,23 +1518,23 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                   })()}`}
                 >
                   <div className="hidden flex-1 md:block">
-                    <span className="font-nunito text-sm font-semibold text-primary-text">
+                    <span className="text-sm font-normal text-primary-text">
                       #{venda.codigoVenda}
                     </span>
                   </div>
                   <div className="flex flex-1 flex-col items-center">
-                    <span className="font-nunito text-xs text-primary-text md:text-sm">
+                    <span className="text-xs text-primary-text md:text-sm">
                       {dateAbertura}
                     </span>
-                    <span className="font-nunito text-xs text-primary-text md:text-sm">
+                    <span className="text-xs text-primary-text md:text-sm">
                       {timeAbertura}
                     </span>
                   </div>
                   <div className="hidden flex-1 flex-col items-center justify-center md:flex">
-                    <span className="font-nunito text-xs text-primary-text md:text-sm">
+                    <span className="text-xs text-primary-text md:text-sm">
                       {dateFinalizacao}
                     </span>
-                    <span className="font-nunito text-xs text-primary-text md:text-sm">
+                    <span className="text-xs text-primary-text md:text-sm">
                       {timeFinalizacao}
                     </span>
                   </div>
@@ -1265,17 +1548,17 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                     />
                   </div>
                   <div className="hidden flex-1 text-center md:block">
-                    <span className="font-nunito text-sm text-primary-text">
+                    <span className="text-sm text-primary-text">
                       #{venda.codigoTerminal}
                     </span>
                   </div>
                   <div className="flex-[2] text-center">
-                    <span className="font-nunito text-xs text-primary-text md:text-sm">
+                    <span className="text-xs text-primary-text md:text-sm">
                       {usuarioNome}
                     </span>
                   </div>
                   <div className="hidden flex-1 text-right md:block">
-                    <span className="font-nunito text-xs text-primary-text md:text-sm">
+                    <span className="text-xs text-primary-text md:text-sm">
                       {(() => {
                         // Se venda está CANCELADA: soma totalValorProdutosRemovidos + valorFinal
                         if (venda.dataCancelamento) {
@@ -1293,7 +1576,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                     </span>
                   </div>
                   <div className="flex-1 text-end">
-                    <span className="font-nunito text-xs text-primary-text md:text-sm">
+                    <span className="text-xs text-primary-text md:text-sm">
                       {venda.dataCancelamento ? '-' : formatCurrency(venda.valorFinal)}
                     </span>
                   </div>
@@ -1312,6 +1595,12 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                 </div>
               )
             })}
+
+            {isLoadingMore ? (
+              <div className="flex justify-center py-3" aria-busy="true">
+                <JiffyLoading />
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -1325,14 +1614,43 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         />
       )}
 
-      {/* Modal de Seleção de Datas */}
-      <EscolheDatasModal
+      {/* Painel lateral: mesmo calendário de intervalo + horas do dashboardV2 */}
+      <JiffySidePanelModal
         open={isDatasModalOpen}
         onClose={() => setIsDatasModalOpen(false)}
-        onConfirm={handleConfirmDatas}
-        dataInicial={periodoInicial}
-        dataFinal={periodoFinal}
-      />
+        title="Escolha o período"
+        panelClassName="!bg-[#f9fafb] w-[45vw] min-w-[260px] max-w-[min(100vw-1rem,95vw)] sm:min-w-[280px]"
+        scrollableBody={false}
+        footerSlot={
+          <button
+            type="button"
+            disabled={!rascunhoIntervaloRange?.from || !rascunhoIntervaloRange?.to}
+            onClick={handleAplicarIntervaloDatasVendas}
+            className="flex h-full w-full items-center justify-center rounded-b-l-lg bg-primary font-nunito text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Aplicar
+          </button>
+        }
+      >
+        <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center overflow-x-auto overflow-y-auto py-2">
+          <FaturamentoRangeCalendar
+            embutidoNoModal
+            embutidoFundoClaro
+            range={rascunhoIntervaloRange}
+            onRangeChange={handleRascunhoIntervaloRangeChange}
+            month={mesCalendarioIntervalo}
+            onMonthChange={setMesCalendarioIntervalo}
+            faturamentoPorDia={faturamentoPorDiaCalendario ?? {}}
+            faturamentoCarregando={faturamentoCalendarioPending || faturamentoCalendarioFetching}
+            horaInicio={rascunhoHoraInicio}
+            horaFim={rascunhoHoraFim}
+            onHorariosChange={(hi, hf) => {
+              setRascunhoHoraInicio(hi)
+              setRascunhoHoraFim(hf)
+            }}
+          />
+        </div>
+      </JiffySidePanelModal>
 
       {/* Modal de Gráfico de Vendas por Usuário */}
       <GraficoVendasPorUsuarioModal
@@ -1341,6 +1659,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         vendas={vendas}
         usuariosPDV={usuariosPDV}
         tipo="finalizadas"
+        avisoListaParcial={avisoGraficoListaParcial}
       />
 
       {/* Modal de Gráfico de Vendas Canceladas por Usuário */}
@@ -1350,6 +1669,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         vendas={vendas}
         usuariosPDV={usuariosPDV}
         tipo="canceladas"
+        avisoListaParcial={avisoGraficoListaParcial}
       />
     </div>
   )

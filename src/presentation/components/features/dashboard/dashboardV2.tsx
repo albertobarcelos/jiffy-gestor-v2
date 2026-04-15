@@ -1337,9 +1337,9 @@ export default function DashboardV2() {
   const irParaRelatoriosVendas = () => {
     const preset = periodoV2ParaQueryRelatorios(periodoData)
     if (preset) {
-      router.push(`/relatorios?${new URLSearchParams({ periodo: preset }).toString()}`)
+      router.push(`/relatorios-vendas?${new URLSearchParams({ periodo: preset }).toString()}`)
     } else {
-      router.push('/relatorios')
+      router.push('/relatorios-vendas')
     }
   }
 

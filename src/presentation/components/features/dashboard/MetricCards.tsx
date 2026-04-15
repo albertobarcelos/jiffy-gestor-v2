@@ -126,7 +126,7 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
           iconColorClass="text-info"
           isPositive={true}
           onClick={() => {
-            router.push(`/relatorios?periodo=${periodo}&status=Finalizada`)
+            router.push(`/relatorios-vendas?periodo=${periodo}&status=Finalizada`)
           }}
         />
 
@@ -139,7 +139,7 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
           iconColorClass="text-primary"
           isPositive={false}
           onClick={() => {
-            router.push(`/relatorios?periodo=${periodo}&status=Cancelada`)
+            router.push(`/relatorios-vendas?periodo=${periodo}&status=Cancelada`)
           }}
         />
 
@@ -152,7 +152,7 @@ export function MetricCards({ periodo, periodoInicial, periodoFinal }: MetricCar
           iconColorClass="text-info"
           isPositive={false}
           onClick={() => {
-            router.push(`/relatorios?periodo=${periodo}&status=Cancelada`)
+            router.push(`/relatorios-vendas?periodo=${periodo}&status=Cancelada`)
           }}
         />
 
