@@ -412,6 +412,7 @@ export function NovoGrupo({
                         label={ativo ? 'Grupo ativo' : 'Grupo inativo'}
                         labelPosition="end"
                         bordered={false}
+                        size="sm"
                         className="justify-end"
                       />
                     </div>

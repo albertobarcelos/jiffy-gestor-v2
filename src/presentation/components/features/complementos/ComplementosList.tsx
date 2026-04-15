@@ -120,8 +120,6 @@ const ComplementoRow = memo(function ComplementoRow({
             onToggleStatus(complemento, event.target.checked)
           }}
           disabled={togglingStatus}
-           label={complemento.isAtivo() ? 'Ativo' : 'Inativo'}
-            labelPosition="start"
           bordered={false}
           size="sm"
           className="shrink-0"

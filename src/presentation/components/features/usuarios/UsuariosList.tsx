@@ -626,7 +626,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
           <div className="md:flex-[2] flex-[1] md:text-center text-right font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Status
           </div>
-          <div className="md:flex-[2] flex-[1] md:text-center text-right font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="flex-[1] text-right font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Ações
           </div>
         </div>
@@ -765,7 +765,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
                   }}
                 />
               </div>
-              <div className="md:flex-[2] flex-[1] flex md:justify-center justify-end" onClick={(e) => e.stopPropagation()}>
+              <div className="flex-[1] flex justify-end" onClick={(e) => e.stopPropagation()}>
                 <button
                   type="button"
                   onClick={(e) => {

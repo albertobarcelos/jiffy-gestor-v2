@@ -547,7 +547,7 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
             <div className="md:flex-[1.5] font-nunito font-semibold text-left md:text-sm text-primary-text ">
               Perfil
             </div>
-            <div className="md:flex-[1] font-nunito font-semibold text-center md:text-sm text-primary-text ">
+            <div className="md:flex-[1] font-nunito font-semibold text-right md:text-sm text-primary-text ">
               Status
             </div>
           </div>
@@ -664,7 +664,7 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
                     </Select>
                   </FormControl>
                 </div>
-                <div className="md:flex-[1] flex justify-center" onClick={(e) => e.stopPropagation()}>
+                <div className="md:flex-[1] flex justify-end" onClick={(e) => e.stopPropagation()}>
                   <div
                     className="tooltip-hover-below flex items-center justify-center"
                     onClick={(e) => e.stopPropagation()}

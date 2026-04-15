@@ -328,8 +328,9 @@ export function NovoComplemento({
               <JiffyIconSwitch
                 checked={ativo}
                 onChange={e => setAtivo(e.target.checked)}
-                label="Ativo"
+                label={ativo ? 'Ativo' : 'Inativo'}
                 bordered={false}
+                size="sm"
                 className="justify-end"
               />
 

@@ -335,6 +335,7 @@ export function NovoGrupoComplemento({
               onChange={e => setAtivo(e.target.checked)}
               label="Ativo"
               bordered={false}
+              size="sm"
               className="mb-6 justify-end"
             />
             <div className="space-y-8">

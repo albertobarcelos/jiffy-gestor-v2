@@ -155,8 +155,6 @@ export const GrupoItem = memo(function GrupoItem({
               e.stopPropagation()
               onToggleStatus?.(grupo.getId(), e.target.checked)
             }}
-            label={isAtivo ? 'Ativo' : 'Inativo'}
-            labelPosition="start"
             bordered={false}
             size="sm"
             className="shrink-0"

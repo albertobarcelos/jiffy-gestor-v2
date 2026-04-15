@@ -463,7 +463,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       </div>
       <div className="h-[2px] border-t-2 border-primary/70"></div>
 
-      <div className="flex gap-3 md:px-[20px] px-1 py-2">
+      <div className="flex gap-3 px-1 py-2">
         <div className="flex-1 min-w-[180px] max-w-[360px]">
             <div className="relative h-8">
               <input
@@ -499,7 +499,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       </div>
 
       {/* Cabeçalho da tabela */}
-      <div className="md:px-[30px] px-1 mt-1">
+      <div className="px-1">
         <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px]">
           <div className="flex-[1] font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
             Ordem
@@ -519,7 +519,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       {/* Lista de grupos com scroll e drag and drop */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto md:px-[30px] px-1 mt-2 scrollbar-hide"
+        className="flex-1 overflow-y-auto px-1 mt-1 scrollbar-hide"
         style={{ maxHeight: 'calc(100vh - 250px)' }}
       >
         {/* Skeleton loaders para carregamento inicial - sempre mostra durante loading */}

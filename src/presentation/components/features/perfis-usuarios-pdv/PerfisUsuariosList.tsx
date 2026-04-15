@@ -7,7 +7,7 @@ import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { MdSearch, MdKeyboardArrowRight, MdPerson, MdEdit, MdAdd } from 'react-icons/md'
+import { MdSearch, MdKeyboardArrowRight, MdPerson, MdEdit, MdAdd, MdPersonAdd } from 'react-icons/md'
 import {
   PerfisUsuariosTabsModal,
   PerfisUsuariosTabKey,
@@ -576,11 +576,11 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
                         initialPerfilPdvId: perfil.getId(),
                       })
                     }}
-                    className="tooltip-hover-below flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-primary/70 text-primary transition-colors hover:bg-primary/20"
+                    className="tooltip-hover-below flex h-5 w-5 shrink-0 items-center justify-center text-primary transition-colors hover:bg-primary/20 hover:rounded-full"
                     data-tooltip="Adicionar novo usuário ao perfil"
                     aria-label="Adicionar novo usuário ao perfil"
                   >
-                    <MdAdd />
+                    <MdPersonAdd size={16} />
                   </button>
                 </div>
                 <div className="md:flex-[2] flex-[1] mr-3 md:text-center text-right font-nunito md:text-sm text-xs text-secondary-text">

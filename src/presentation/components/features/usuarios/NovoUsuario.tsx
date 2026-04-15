@@ -410,7 +410,23 @@ export function NovoUsuario({
               </h2>
               <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
             </div>
-
+            <div className="flex mb-4 w-full items-center justify-end">
+                <JiffyIconSwitch
+                  checked={ativo}
+                  onChange={(e) => setAtivo(e.target.checked)}
+                  disabled={isLoading}
+                  label={ativo ? 'Ativo' : 'Inativo'}
+                  labelPosition="start"
+                  bordered={false}
+                  size="sm"
+                  className="justify-end"
+                  inputProps={{
+                    'aria-label': ativo
+                      ? 'Desativar usuário (está ativo)'
+                      : 'Ativar usuário (está inativo)',
+                  }}
+                />
+              </div>
             <div className="space-y-6">
               <Input
                 label="Nome"
@@ -586,22 +602,7 @@ export function NovoUsuario({
                 </div>
               )}
 
-              <div className="flex w-full items-center justify-end">
-                <JiffyIconSwitch
-                  checked={ativo}
-                  onChange={(e) => setAtivo(e.target.checked)}
-                  disabled={isLoading}
-                  label={ativo ? 'Ativo' : 'Inativo'}
-                  labelPosition="start"
-                  bordered={false}
-                  className="justify-end"
-                  inputProps={{
-                    'aria-label': ativo
-                      ? 'Desativar usuário (está ativo)'
-                      : 'Ativar usuário (está inativo)',
-                  }}
-                />
-              </div>
+              
             </div>
           </div>
 

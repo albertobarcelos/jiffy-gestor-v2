@@ -610,7 +610,7 @@ export function GrupoComplementoComplementosModal({
               role="row"
             >
               <span className="text-left text-sm font-semibold tracking-wide text-primary-text">
-                Componente
+                Complementos
               </span>
               <span className="text-right text-sm font-semibold tracking-wide text-primary-text">
                 Vínculo
@@ -632,7 +632,7 @@ export function GrupoComplementoComplementosModal({
                         <div className="flex min-w-0 flex-wrap items-center gap-2">
                           <p className="text-sm font-normal text-primary-text">{comp.getNome()}</p>
                           <JiffyIconSwitch
-                            size="sm"
+                            size="xs"
                             checked={comp.isAtivo()}
                             onChange={(e) => {
                               e.stopPropagation()
@@ -729,6 +729,7 @@ export function GrupoComplementoComplementosModal({
                     }}
                     disabled={vinculoLoadingId === id}
                     bordered={false}
+                    size="sm"
                     className="shrink-0"
                     inputProps={{
                       'aria-label': isLinked ? 'Desvincular do grupo' : 'Vincular ao grupo',
