@@ -1,23 +1,35 @@
 'use client'
 
-import { useMemo } from 'react'
-import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
+import { useMemo, useState } from 'react'
+import {
+  JiffySidePanelModal,
+  type JiffySidePanelFooterActions,
+} from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { NovoPerfilGestor } from './NovoPerfilGestor'
+import { NovoUsuarioGestor } from '@/src/presentation/components/features/usuarios-gestor/NovoUsuarioGestor'
+import { showToast } from '@/src/shared/utils/toast'
 
-type TabKey = 'perfil'
+const PERFIL_TAB_FORM_ID = 'perfis-gestor-tabs-modal-form'
+const USUARIO_TAB_FORM_ID = 'usuario-perfis-gestor-tabs-modal-form'
+
+export type PerfisGestorTabKey = 'perfil' | 'usuario'
 
 export interface PerfisGestorTabsModalState {
   open: boolean
-  tab: TabKey
+  tab: PerfisGestorTabKey
   mode: 'create' | 'edit'
   perfilId?: string
+  /** Aba Usuário: edição de usuário gestor existente */
+  usuarioId?: string
 }
 
 interface PerfisGestorTabsModalProps {
   state: PerfisGestorTabsModalState
   onClose: () => void
-  onTabChange: (tab: TabKey) => void
+  onTabChange: (tab: PerfisGestorTabKey) => void
   onReload?: () => void
+  /** Após criar perfil embutido: atualiza estado no pai com o id persistido (ativa aba Usuário) */
+  onPerfilGestorCreated?: (perfilId: string) => void
 }
 
 export function PerfisGestorTabsModal({
@@ -25,56 +37,87 @@ export function PerfisGestorTabsModal({
   onClose,
   onTabChange,
   onReload,
+  onPerfilGestorCreated,
 }: PerfisGestorTabsModalProps) {
+  const [embedPerfilState, setEmbedPerfilState] = useState({
+    isSubmitting: false,
+    canSubmit: false,
+  })
+  const [embedUsuarioState, setEmbedUsuarioState] = useState({
+    isSubmitting: false,
+    canSubmit: false,
+  })
+
   const title = useMemo(() => {
+    if (state.tab === 'usuario') {
+      return state.usuarioId ? 'Editar Usuário Gestor' : 'Novo Usuário Gestor'
+    }
     return state.mode === 'create' ? 'Novo Perfil Gestor' : 'Editar Perfil Gestor'
-  }, [state.mode])
+  }, [state.tab, state.mode, state.usuarioId])
+
+  const footerActions = useMemo((): JiffySidePanelFooterActions => {
+    if (state.tab === 'usuario') {
+      return {
+        barActionOrder: ['cancel', 'save'],
+        showCancel: true,
+        cancelLabel: 'Fechar',
+        onCancel: onClose,
+        showSave: true,
+        saveLabel: state.usuarioId ? 'Atualizar' : 'Salvar',
+        saveFormId: USUARIO_TAB_FORM_ID,
+        saveLoading: embedUsuarioState.isSubmitting,
+        saveDisabled:
+          !embedUsuarioState.canSubmit || embedUsuarioState.isSubmitting,
+      }
+    }
+    return {
+      barActionOrder: ['cancel', 'save'],
+      showCancel: true,
+      cancelLabel: 'Cancelar',
+      onCancel: onClose,
+      showSave: true,
+      saveLabel: state.mode === 'edit' ? 'Atualizar' : 'Salvar',
+      saveFormId: PERFIL_TAB_FORM_ID,
+      saveLoading: embedPerfilState.isSubmitting,
+      saveDisabled:
+        !embedPerfilState.canSubmit || embedPerfilState.isSubmitting,
+    }
+  }, [
+    state.tab,
+    state.mode,
+    state.usuarioId,
+    embedPerfilState,
+    embedUsuarioState,
+    onClose,
+  ])
+
+  const initialPerfilGestorFromContext = state.perfilId
+
+  const usuarioTabBlocked = state.mode === 'create' && !state.perfilId
+
+  const handleTabClick = (tab: PerfisGestorTabKey) => {
+    if (tab === 'usuario' && usuarioTabBlocked) {
+      showToast.warning('Salve o perfil antes de acessar a aba Usuário.')
+      return
+    }
+    onTabChange(tab)
+  }
 
   return (
-    <Dialog
+    <JiffySidePanelModal
       open={state.open}
-      onOpenChange={(open) => {
-        if (!open) {
-          onClose()
-        }
-      }}
-      fullWidth
-      maxWidth="xl"
-      sx={{
-        '& .MuiDialog-container': {
-          justifyContent: {
-            xs: 'center', // Centraliza em mobile
-            md: 'flex-end', // Alinha à direita em desktop
-          },
-          alignItems: 'stretch',
-          margin: 0,
-        },
-      }}
-      PaperProps={{
-        sx: {
-          height: '100vh',
-          maxHeight: '100vh',
-          width: {
-            xs: '95vw', // Em telas muito pequenas (mobile), ocupa 95% da largura
-            sm: '90vw', // Em telas pequenas, ocupa 90% da largura
-            md: 'min(900px, 60vw)', // Em telas médias e maiores, mantém o comportamento original
-          },
-          margin: {
-            xs: 'auto', // Centraliza em mobile (com width 95vw, deixa 2.5% de cada lado)
-            md: 0, // Sem margin em desktop
-          },
-          borderRadius: 0,
-          display: 'flex',
-          flexDirection: 'column',
-        },
-      }}
-    >
-      <DialogContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <div className="px-6 pt-2 flex gap-1 border-b border-gray-100 bg-white">
+      onClose={onClose}
+      title={title}
+      scrollableBody={false}
+      footerVariant="bar"
+      panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]"
+      footerActions={footerActions}
+      tabsSlot={
+        <div className="flex flex-wrap gap-1 px-2 pb-0">
           <button
             type="button"
-            onClick={() => onTabChange('perfil')}
-            className={`px-4 py-2 rounded-t-lg text-sm font-semibold transition-colors ${
+            onClick={() => handleTabClick('perfil')}
+            className={`rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors ${
               state.tab === 'perfil'
                 ? 'bg-primary text-white'
                 : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
@@ -82,24 +125,69 @@ export function PerfisGestorTabsModal({
           >
             Perfil
           </button>
+          <button
+            type="button"
+            aria-disabled={usuarioTabBlocked}
+            title={
+              usuarioTabBlocked
+                ? 'Salve o perfil para acessar a aba Usuário'
+                : undefined
+            }
+            onClick={() => handleTabClick('usuario')}
+            className={`rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors ${
+              state.tab === 'usuario'
+                ? 'bg-primary text-white'
+                : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
+            } ${usuarioTabBlocked ? 'cursor-not-allowed opacity-50' : ''}`}
+          >
+            Usuário
+          </button>
         </div>
-
-        <div className="flex-1 overflow-hidden">
-          {state.tab === 'perfil' && (
-            <div className="h-full overflow-y-auto">
-              <NovoPerfilGestor
-                perfilId={state.mode === 'edit' ? state.perfilId : undefined}
-                isEmbedded
-                onSaved={() => {
+      }
+    >
+      <div className="flex min-h-0 flex-1 flex-col">
+        {state.tab === 'perfil' ? (
+          <NovoPerfilGestor
+            perfilId={state.mode === 'edit' ? state.perfilId : undefined}
+            isEmbedded
+            hideEmbeddedHeader
+            embeddedFormId={PERFIL_TAB_FORM_ID}
+            hideEmbeddedFormActions
+            onEmbedFormStateChange={setEmbedPerfilState}
+            onSaved={(payload) => {
+              if (payload?.perfilIdCriado) {
+                if (onPerfilGestorCreated) {
+                  onPerfilGestorCreated(payload.perfilIdCriado)
+                } else {
                   onReload?.()
                   onClose()
-                }}
-                onCancel={onClose}
-              />
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+                }
+                return
+              }
+              onReload?.()
+              onClose()
+            }}
+            onCancel={onClose}
+          />
+        ) : null}
+        {state.tab === 'usuario' ? (
+          <NovoUsuarioGestor
+            key={`${state.perfilId ?? ''}-${state.usuarioId ?? 'novo'}`}
+            usuarioId={state.usuarioId}
+            initialPerfilGestorId={initialPerfilGestorFromContext}
+            isEmbedded
+            hideEmbeddedHeader
+            embeddedFormId={USUARIO_TAB_FORM_ID}
+            hideEmbeddedFormActions
+            onEmbedFormStateChange={setEmbedUsuarioState}
+            onSaved={() => {
+              onReload?.()
+              onClose()
+            }}
+            onCancel={onClose}
+          />
+        ) : null}
+      </div>
+    </JiffySidePanelModal>
   )
 }

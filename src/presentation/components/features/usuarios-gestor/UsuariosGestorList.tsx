@@ -5,6 +5,7 @@ import { UsuarioGestor } from '@/src/domain/entities/UsuarioGestor'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { MdSearch } from 'react-icons/md'
 import { Select, MenuItem, FormControl } from '@mui/material'
@@ -494,7 +495,7 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
       <div className="md:px-[30px] px-1 pt-1 flex-shrink-0">
-        <div className="flex items-start justify-between">
+        <div className="flex items-center justify-between">
           <div className="flex flex-col w-1/2 md:pl-5">
             <span className="text-primary md:text-lg text-sm font-semibold font-nunito">
               Usuários Gestor Cadastrados
@@ -514,14 +515,8 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
       </div>
 
       <div className="h-[4px] border-t-2 border-primary/70 flex-shrink-0"></div>
-      <div className="flex gap-3 md:px-[20px] px-1 pb-2 flex-shrink-0">
+      <div className="flex gap-3 px-1 pb-2 flex-shrink-0">
         <div className="flex-1 min-w-[180px] max-w-[360px]">
-          <label
-            htmlFor="usuarios-gestor-search"
-            className="text-xs font-semibold text-secondary-text mb-1 block"
-          >
-            Buscar Usuário Gestor...
-          </label>
           <div className="relative h-8">
             <MdSearch
               className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
@@ -541,18 +536,18 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
 
       {/* Cabeçalho da tabela - Apenas Desktop */}
       {usuarios.length > 0 && (
-        <div className="hidden md:block md:px-[30px] px-1 flex-shrink-0">
+        <div className="hidden md:block px-1 flex-shrink-0">
           <div className="h-10 bg-custom-2 rounded-lg md:px-4 pr-1 flex items-center gap-2">
-            <div className="md:flex-[2] font-nunito font-semibold text-left md:text-sm text-primary-text uppercase">
+            <div className="md:flex-[2] font-nunito font-semibold text-left md:text-sm text-primary-text ">
               Nome
             </div>
-            <div className="md:flex-[1.5] font-nunito font-semibold text-left md:text-sm text-primary-text uppercase">
+            <div className="md:flex-[1.5] font-nunito font-semibold text-left md:text-sm text-primary-text ">
               E-mail
             </div>
-            <div className="md:flex-[1.5] font-nunito font-semibold text-left md:text-sm text-primary-text uppercase">
+            <div className="md:flex-[1.5] font-nunito font-semibold text-left md:text-sm text-primary-text ">
               Perfil
             </div>
-            <div className="md:flex-[1] font-nunito font-semibold text-center md:text-sm text-primary-text uppercase">
+            <div className="md:flex-[1] font-nunito font-semibold text-center md:text-sm text-primary-text ">
               Status
             </div>
           </div>
@@ -562,7 +557,7 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
       {/* Lista de usuários com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto md:px-[30px] px-1 scrollbar-hide"
+        className="flex-1 overflow-y-auto px-1 scrollbar-hide"
         style={{ maxHeight: 'calc(100vh - 250px)' }}
       >
         {/* Mostrar loading quando está carregando ou ainda não houve tentativa de carregamento */}
@@ -592,35 +587,6 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
               ? perfisMap[usuario.getPerfilGestorId()!] || usuario.getPerfilGestor()?.role || '-'
               : '-'
 
-          // Componente reutilizável para switch de status
-          const StatusSwitch = () => (
-            <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
-              <label
-                className={`relative inline-flex h-4 w-10 md:h-5 md:w-12 items-center ${
-                  togglingStatus[usuario.getId()]
-                    ? 'cursor-not-allowed opacity-60'
-                    : 'cursor-pointer'
-                }`}
-                title={usuario.isAtivo() ? 'Usuário Ativo' : 'Usuário Desativado'}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <input
-                  type="checkbox"
-                  className="sr-only peer"
-                  checked={usuario.isAtivo()}
-                  onChange={(event) => {
-                    event.stopPropagation()
-                    handleToggleUsuarioStatus(usuario.getId(), event.target.checked)
-                  }}
-                  disabled={!!togglingStatus[usuario.getId()]}
-                  onClick={(e) => e.stopPropagation()}
-                />
-                <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                <span className="absolute left-[2px] top-1/2 block h-[14px] w-[14px] md:h-4 md:w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[18px] md:peer-checked:translate-x-[28px]" />
-              </label>
-            </div>
-          )
-
           return (
             <div
               key={usuario.getId()}
@@ -631,7 +597,7 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
                 onClick={handleUsuarioRowClick}
                 className="hidden md:flex h-[50px] md:px-4 items-center md:gap-[10px] relative overflow-visible cursor-pointer"
               >
-                <div className="md:flex-[2] font-nunito font-semibold text-left md:text-sm text-primary-text">
+                <div className="md:flex-[2] font-normal uppercase text-left md:text-sm text-primary-text">
                   {usuario.getNome()}
                 </div>
                 <div className="md:flex-[1.5] font-nunito md:text-sm text-secondary-text">
@@ -660,7 +626,10 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
                           borderColor: 'var(--color-primary)',
                         },
                         '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                          borderColor: 'var(--color-primary)',
+                          borderColor: 'transparent',
+                        },
+                        '&.Mui-focused': {
+                          boxShadow: 'none',
                         },
                       }}
                       onClick={(e) => e.stopPropagation()}
@@ -669,7 +638,12 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
                           return <span className="text-secondary-text">-</span>
                         }
                         const perfil = allPerfis.find((p) => p.id === selected)
-                        return perfil ? perfil.role : perfilNome
+                        const texto = perfil ? perfil.role : perfilNome
+                        return (
+                          <span className="uppercase font-nunito">
+                            {typeof texto === 'string' ? texto : String(texto)}
+                          </span>
+                        )
                       }}
                     >
                       {allPerfis.length === 0 ? (
@@ -678,7 +652,11 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
                         </MenuItem>
                       ) : (
                         allPerfis.map((perfil) => (
-                          <MenuItem key={perfil.id} value={perfil.id}>
+                          <MenuItem
+                            key={perfil.id}
+                            value={perfil.id}
+                            sx={{ textTransform: 'uppercase' }}
+                          >
                             {perfil.role}
                           </MenuItem>
                         ))
@@ -687,7 +665,35 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
                   </FormControl>
                 </div>
                 <div className="md:flex-[1] flex justify-center" onClick={(e) => e.stopPropagation()}>
-                  <StatusSwitch />
+                  <div
+                    className="tooltip-hover-below flex items-center justify-center"
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    data-tooltip={
+                      usuario.isAtivo()
+                        ? 'Usuário gestor ativo'
+                        : 'Usuário gestor desativado'
+                    }
+                  >
+                    <JiffyIconSwitch
+                      checked={usuario.isAtivo()}
+                      onChange={(e) => {
+                        e.stopPropagation()
+                        handleToggleUsuarioStatus(usuario.getId(), e.target.checked)
+                      }}
+                      disabled={!!togglingStatus[usuario.getId()]}
+                      bordered={false}
+                      size="sm"
+                      className="shrink-0 px-0 py-0"
+                      inputProps={{
+                        'aria-label': usuario.isAtivo()
+                          ? 'Desativar usuário gestor'
+                          : 'Ativar usuário gestor',
+                        onClick: (e) => e.stopPropagation(),
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -741,7 +747,10 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
                             borderColor: 'var(--color-primary)',
                           },
                           '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                            borderColor: 'var(--color-primary)',
+                            borderColor: 'transparent',
+                          },
+                          '&.Mui-focused': {
+                            boxShadow: 'none',
                           },
                         }}
                         onClick={(e) => e.stopPropagation()}
@@ -750,7 +759,12 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
                             return <span className="text-secondary-text text-xs">-</span>
                           }
                           const perfil = allPerfis.find((p) => p.id === selected)
-                          return <span className="text-xs">{perfil ? perfil.role : perfilNome}</span>
+                          const texto = perfil ? perfil.role : perfilNome
+                          return (
+                            <span className="text-xs uppercase">
+                              {typeof texto === 'string' ? texto : String(texto)}
+                            </span>
+                          )
                         }}
                       >
                         {allPerfis.length === 0 ? (
@@ -759,7 +773,11 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
                           </MenuItem>
                         ) : (
                           allPerfis.map((perfil) => (
-                            <MenuItem key={perfil.id} value={perfil.id}>
+                            <MenuItem
+                              key={perfil.id}
+                              value={perfil.id}
+                              sx={{ textTransform: 'uppercase' }}
+                            >
                               {perfil.role}
                             </MenuItem>
                           ))
@@ -768,7 +786,35 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
                     </FormControl>
                   </div>
                   <div className="w-12 flex flex-1 justify-end flex-shrink-0">
-                    <StatusSwitch />
+                    <div
+                      className="tooltip-hover-below flex items-center justify-center"
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      data-tooltip={
+                        usuario.isAtivo()
+                          ? 'Usuário gestor ativo'
+                          : 'Usuário gestor desativado'
+                      }
+                    >
+                      <JiffyIconSwitch
+                        checked={usuario.isAtivo()}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          handleToggleUsuarioStatus(usuario.getId(), e.target.checked)
+                        }}
+                        disabled={!!togglingStatus[usuario.getId()]}
+                        bordered={false}
+                        size="sm"
+                        className="shrink-0 px-0 py-0"
+                        inputProps={{
+                          'aria-label': usuario.isAtivo()
+                            ? 'Desativar usuário gestor'
+                            : 'Ativar usuário gestor',
+                          onClick: (e) => e.stopPropagation(),
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

@@ -1,19 +1,16 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { UsuarioGestor } from '@/src/domain/entities/UsuarioGestor'
 import { PerfilGestor as PerfilGestorEntity } from '@/src/domain/entities/PerfilGestor'
+import { MenuItem } from '@mui/material'
+import IconButton from '@mui/material/IconButton'
+import InputAdornment from '@mui/material/InputAdornment'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/src/presentation/components/ui/select'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { MdPerson, MdVisibility, MdVisibilityOff } from 'react-icons/md'
@@ -22,6 +19,13 @@ interface NovoUsuarioGestorProps {
   usuarioId?: string
   initialPerfilGestorId?: string
   isEmbedded?: boolean
+  hideEmbeddedHeader?: boolean
+  embeddedFormId?: string
+  hideEmbeddedFormActions?: boolean
+  onEmbedFormStateChange?: (s: {
+    isSubmitting: boolean
+    canSubmit: boolean
+  }) => void
   onSaved?: () => void
   onCancel?: () => void
 }
@@ -31,7 +35,7 @@ interface PerfilGestor {
   role: string
 }
 
-const MODULOS_ACESSO = ['FISCAL', 'FINANCEIRO', 'ESTOQUE', 'DASHBOARD'] as const
+const MODULOS_ACESSO = ['Fiscal', 'Financeiro', 'Estoque', 'Dashboard'] as const
 
 /**
  * Componente para criar/editar usuário gestor
@@ -41,12 +45,23 @@ export function NovoUsuarioGestor({
   usuarioId,
   initialPerfilGestorId,
   isEmbedded,
+  hideEmbeddedHeader = false,
+  embeddedFormId,
+  hideEmbeddedFormActions = false,
+  onEmbedFormStateChange,
   onSaved,
   onCancel,
 }: NovoUsuarioGestorProps) {
   const router = useRouter()
   const { auth } = useAuthStore()
   const isEditing = !!usuarioId
+  const formId = embeddedFormId ?? 'novo-usuario-gestor-form'
+  const INPUT_LABEL_PROPS = { shrink: true } as const
+  const inputCompactSx = {
+    '& .MuiOutlinedInput-input': {
+      padding: '10px 12px',
+    },
+  } as const
 
   // Estados do formulário
   const [nome, setNome] = useState('')
@@ -57,7 +72,6 @@ export function NovoUsuarioGestor({
   const [ativo, setAtivo] = useState(true)
   const [modulosAcesso, setModulosAcesso] = useState<string[]>([])
   const [perfilGestorCompleto, setPerfilGestorCompleto] = useState<PerfilGestorEntity | null>(null)
-  const [perfilGestorSelecionado, setPerfilGestorSelecionado] = useState<PerfilGestor | null>(null)
 
   // Estados de loading e dados
   const [isLoading, setIsLoading] = useState(false)
@@ -67,6 +81,30 @@ export function NovoUsuarioGestor({
   // Estados para perfis gestor
   const [perfisGestor, setPerfisGestor] = useState<PerfilGestor[]>([])
   const [isLoadingPerfis, setIsLoadingPerfis] = useState(false)
+
+  const emailValido = useMemo(() => {
+    const t = username.trim()
+    if (!t) return false
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)
+  }, [username])
+
+  const canSubmitEmbed = useMemo(
+    () =>
+      Boolean(
+        nome?.trim() &&
+          emailValido &&
+          perfilGestorId &&
+          (isEditing || Boolean(password?.trim()))
+      ),
+    [nome, emailValido, perfilGestorId, isEditing, password]
+  )
+
+  useEffect(() => {
+    onEmbedFormStateChange?.({
+      isSubmitting: isLoading,
+      canSubmit: canSubmitEmbed,
+    })
+  }, [onEmbedFormStateChange, isLoading, canSubmitEmbed])
 
   // Carregar todos os perfis gestor fazendo requisições sequenciais
   const loadPerfisGestor = useCallback(async () => {
@@ -141,6 +179,10 @@ export function NovoUsuarioGestor({
   useEffect(() => {
     loadPerfisGestor()
   }, [loadPerfisGestor])
+
+  useEffect(() => {
+    hasLoadedUsuarioRef.current = false
+  }, [usuarioId])
 
   // Carregar dados completos do perfil gestor quando selecionado
   const loadPerfilGestorCompleto = useCallback(async (perfilId: string) => {
@@ -340,71 +382,93 @@ export function NovoUsuarioGestor({
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header fixo */}
-      <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[30px] shadow-md md:px-[30px] px-2 py-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="md:w-12 w-10 md:h-12 h-10 rounded-full bg-primary/25 text-primary flex items-center justify-center">
-              <span className="md:text-2xl text-xl"><MdPerson /></span>
+    <div className="flex h-full min-h-0 flex-col">
+      {!isEmbedded || !hideEmbeddedHeader ? (
+        <div className="sticky top-0 z-10 bg-white shadow-sm md:px-[30px] px-2 py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary md:h-12 md:w-12">
+                <span className="text-xl md:text-2xl">
+                  <MdPerson />
+                </span>
+              </div>
+              <h1 className="font-exo text-sm font-semibold text-primary md:text-lg">
+                {isEditing ? 'Editar Usuário Gestor' : 'Novo Usuário Gestor'}
+              </h1>
             </div>
-            <h1 className="text-primary md:text-lg text-sm font-semibold font-exo">
-              {isEditing ? 'Editar Usuário Gestor' : 'Novo Usuário Gestor'}
-            </h1>
+            <Button
+              type="button"
+              onClick={handleCancel}
+              variant="outlined"
+              className="h-8 rounded-lg px-8 transition-colors hover:bg-primary/15"
+              sx={{
+                backgroundColor: 'var(--color-info)',
+                color: 'var(--color-primary)',
+                borderColor: 'var(--color-primary)',
+              }}
+            >
+              Cancelar
+            </Button>
           </div>
-          <Button
-            onClick={handleCancel}
-            variant="outlined"
-            className="h-8 px-8 rounded-lg hover:bg-primary/15 transition-colors"
-            sx={{
-              backgroundColor: 'var(--color-info)',
-              color: 'var(--color-primary)',
-              borderColor: 'var(--color-primary)',
-            }}
-          >
-            Cancelar
-          </Button>
         </div>
-      </div>
+      ) : null}
 
-      {/* Formulário com scroll */}
-      <div className="flex-1 overflow-y-auto md:px-[30px] px-1 py-2">
-        <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
-          {/* Dados */}
-          <div className="bg-info">
-            <div className="flex items-center justify-between mb-1">
-              <h2 className="text-primary md:text-xl text-sm font-semibold font-exo">
+      <div className="flex-1 overflow-y-auto px-5 py-4 scrollbar-hide md:px-6">
+        <form
+          id={formId}
+          onSubmit={handleSubmit}
+          className="space-y-4"
+          autoComplete="off"
+        >
+          <div className="bg-white">
+            <div className="flex items-center gap-5">
+              <h2 className="shrink-0 text-sm font-semibold text-primary md:text-xl">
                 Dados do Usuário
               </h2>
-              {/* Toggle Status - Na mesma linha do título */}
-              <div className="flex items-center gap-2">
-                <span className="text-primary-text font-medium text-sm md:text-base">Usuário Ativo?</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={ativo}
-                    onChange={(e) => setAtivo(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-                </label>
+              <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
+            </div>
+
+            <div className="flex items-center justify-end py-2">
+              <div
+                className="tooltip-hover-below tooltip-hover-below-align-end flex items-center justify-center"
+                data-tooltip={
+                  ativo
+                    ? 'Usuário gestor ativo'
+                    : 'Usuário gestor inativo'
+                }
+              >
+                <JiffyIconSwitch
+                  checked={ativo}
+                  onChange={(e) => setAtivo(e.target.checked)}
+                  disabled={isLoading}
+                  label={ativo ? 'Ativo' : 'Inativo'}
+                  bordered={false}
+                  size="sm"
+                  className="shrink-0 px-0 py-0"
+                  inputProps={{
+                    'aria-label': ativo
+                      ? 'Desativar usuário gestor'
+                      : 'Ativar usuário gestor',
+                  }}
+                />
               </div>
             </div>
-            <div className="h-[2px] bg-primary/70 mb-4"></div>
 
-            <div className="space-y-2">
+            <div className="space-y-5">
               <Input
                 label="Nome"
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
+                value={nome.toUpperCase()}
+                onChange={(e) => setNome(e.target.value.toUpperCase())}
                 required
+                size="small"
                 placeholder="Digite o nome do usuário"
-                className="bg-info"
+                className="bg-white"
                 autoComplete="off"
-                sx={{
-                  '& .MuiInputBase-input': {
-                    padding: '8px 12px',
-                  },
+                InputLabelProps={INPUT_LABEL_PROPS}
+                sx={inputCompactSx}
+                inputProps={{
+                  'aria-label': 'Nome do usuário gestor',
+                  autoComplete: 'off',
                 }}
               />
 
@@ -414,214 +478,267 @@ export function NovoUsuarioGestor({
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
+                size="small"
                 placeholder="Digite o e-mail"
-                className="bg-info"
+                className="bg-white"
                 autoComplete="email"
-                sx={{
-                  '& .MuiInputBase-input': {
-                    padding: '8px 12px',
-                  },
+                InputLabelProps={INPUT_LABEL_PROPS}
+                sx={inputCompactSx}
+                inputProps={{
+                  'aria-label': 'E-mail do usuário gestor',
+                  autoComplete: 'email',
                 }}
               />
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Perfil Gestor *
-                </label>
-                {isLoadingPerfis ? (
-                  <div className="w-full px-4 py-3 rounded-lg border border-gray-400 bg-info flex items-center justify-center">
-                    <JiffyLoading className="!gap-0 !py-0" size={24} />
-                  </div>
-                ) : (
-                  <Select
-                    value={perfilGestorId || undefined}
-                    onValueChange={(value) => {
-                      setPerfilGestorId(value)
-                      // O perfil completo será carregado pelo useEffect
-                    }}
-                  >
-                    <SelectTrigger className="w-full h-10 px-4 rounded-lg border border-gray-400 bg-info hover:border-primary-text focus:outline-none focus:border-2 focus:border-primary-text">
-                      <SelectValue placeholder="Selecione um perfil gestor..." />
-                    </SelectTrigger>
-                    <SelectContent 
-                      className="max-h-[200px] z-[9999] overflow-y-auto !bg-info border border-gray-300 shadow-lg" 
-                      style={{ backgroundColor: '#FFFFFF' }}
+              {isLoadingPerfis ? (
+                <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-primary-text">
+                  <div className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  Carregando perfis gestor...
+                </div>
+              ) : perfisGestor.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-gray-300 bg-white px-3 py-2 text-sm text-secondary-text">
+                  Nenhum perfil gestor disponível
+                </div>
+              ) : (
+                <Input
+                  select
+                  label="Perfil Gestor"
+                  required
+                  value={perfilGestorId}
+                  onChange={(e) => setPerfilGestorId(e.target.value)}
+                  size="small"
+                  className="bg-white"
+                  InputLabelProps={INPUT_LABEL_PROPS}
+                  sx={inputCompactSx}
+                  SelectProps={{
+                    displayEmpty: true,
+                    MenuProps: {
+                      PaperProps: {
+                        sx: { maxHeight: 280 },
+                      },
+                    },
+                    renderValue: (selected: unknown) => {
+                      if (selected === '' || selected == null) {
+                        return (
+                          <span className="font-nunito text-sm font-normal text-secondary-text">
+                            Selecione um perfil gestor...
+                          </span>
+                        )
+                      }
+                      const id = String(selected)
+                      const p = perfisGestor.find((x) => x.id === id)
+                      return (
+                        <span className="font-nunito uppercase">
+                          {p ? p.role : id}
+                        </span>
+                      )
+                    },
+                  }}
+                  inputProps={{
+                    'aria-label': 'Perfil gestor do usuário',
+                  }}
+                >
+                  <MenuItem value="">
+                    <em>Selecione um perfil gestor...</em>
+                  </MenuItem>
+                  {perfisGestor.map((perfil) => (
+                    <MenuItem
+                      key={perfil.id}
+                      value={perfil.id}
+                      sx={{ textTransform: 'uppercase' }}
                     >
-                      {perfisGestor.length === 0 ? (
-                        <div className="px-2 py-1.5 text-sm text-secondary-text">
-                          Nenhum perfil gestor disponível
-                        </div>
-                      ) : (
-                        perfisGestor.map((perfil: PerfilGestor) => (
-                          <SelectItem
-                            key={perfil.id}
-                            value={perfil.id}
-                            className="min-h-[32px] max-h-[40px] data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary transition-colors"
-                          >
-                            {perfil.role}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
+                      {perfil.role}
+                    </MenuItem>
+                  ))}
+                </Input>
+              )}
 
               {!isEditing && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Senha *
-                  </label>
-                  <div className="relative">
-                    <Input
-                      label=""
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      placeholder="Digite a senha"
-                      className="bg-info pr-10"
-                      autoComplete="new-password"
-                      sx={{
-                        '& .MuiInputBase-input': {
-                          padding: '8px 12px',
-                        },
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors z-10"
-                    >
-                      {showPassword ? <MdVisibilityOff size={20} /> : <MdVisibility size={20} />}
-                    </button>
-                  </div>
-                </div>
+                <Input
+                  label="Senha"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  size="small"
+                  placeholder="Digite a senha"
+                  className="bg-white"
+                  autoComplete="new-password"
+                  InputLabelProps={INPUT_LABEL_PROPS}
+                  sx={inputCompactSx}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          edge="end"
+                          size="small"
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          aria-label={
+                            showPassword ? 'Ocultar senha' : 'Mostrar senha'
+                          }
+                          className="text-gray-500 hover:text-gray-700"
+                        >
+                          {showPassword ? (
+                            <MdVisibilityOff className="h-5 w-5" />
+                          ) : (
+                            <MdVisibility className="h-5 w-5" />
+                          )}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                  inputProps={{
+                    'aria-label': 'Senha do usuário gestor',
+                    autoComplete: 'new-password',
+                  }}
+                />
               )}
 
               {isEditing && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Senha (deixe em branco para manter a atual)
-                  </label>
-                  <div className="relative">
-                    <Input
-                      label=""
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Digite a nova senha"
-                      className="bg-info pr-10"
-                      autoComplete="new-password"
-                      sx={{
-                        '& .MuiInputBase-input': {
-                          padding: '8px 12px',
-                        },
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors z-10"
-                    >
-                      {showPassword ? <MdVisibilityOff size={20} /> : <MdVisibility size={20} />}
-                    </button>
-                  </div>
+                <Input
+                  label="Nova senha (opcional)"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  size="small"
+                  placeholder="Deixe em branco para manter a atual"
+                  className="bg-white"
+                  autoComplete="new-password"
+                  InputLabelProps={INPUT_LABEL_PROPS}
+                  sx={inputCompactSx}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          edge="end"
+                          size="small"
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          aria-label={
+                            showPassword ? 'Ocultar senha' : 'Mostrar senha'
+                          }
+                          className="text-gray-500 hover:text-gray-700"
+                        >
+                          {showPassword ? (
+                            <MdVisibilityOff className="h-5 w-5" />
+                          ) : (
+                            <MdVisibility className="h-5 w-5" />
+                          )}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                  inputProps={{
+                    'aria-label': 'Nova senha do usuário gestor',
+                    autoComplete: 'new-password',
+                  }}
+                />
+              )}
+            </div>
+
+            <div className="mt-4">
+              <div className="mb-2 flex items-center gap-5">
+                <h2 className="shrink-0 text-sm font-semibold text-primary md:text-base">
+                  Módulos de Acesso
+                </h2>
+                <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
+              </div>
+              <p className="mb-3 text-xs text-secondary-text">
+                Definidos pelo Perfil Gestor selecionado.
+              </p>
+              {!perfilGestorId ? (
+                <div className="rounded-lg border border-dashed border-gray-200 bg-white px-3 text-center text-sm text-secondary-text">
+                  Selecione um perfil gestor para visualizar os módulos
+                </div>
+              ) : !perfilGestorCompleto ? (
+                <div className="flex items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-6">
+                  <JiffyLoading className="!gap-0 !py-0" size={24} />
+                </div>
+              ) : (
+                <div className="space-y-0">
+                  {MODULOS_ACESSO.map((modulo) => {
+                    let isActive = false
+                    switch (modulo) {
+                      case 'Financeiro':
+                        isActive = perfilGestorCompleto.hasAcessoFinanceiro()
+                        break
+                      case 'Estoque':
+                        isActive = perfilGestorCompleto.hasAcessoEstoque()
+                        break
+                      case 'Fiscal':
+                        isActive = perfilGestorCompleto.hasAcessoFiscal()
+                        break
+                      case 'Dashboard':
+                        isActive = perfilGestorCompleto.hasAcessoDashboard()
+                        break
+                    }
+
+                    return (
+                      <div
+                        key={modulo}
+                        className="flex items-center justify-between py-1 last:border-b-0"
+                      >
+                        <span className="text-sm font-medium text-primary-text md:text-sm">
+                          {modulo}
+                        </span>
+                        <span
+                          className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${
+                            isActive
+                              ? 'bg-accent1 text-white'
+                              : 'bg-gray-100 text-gray-600'
+                          }`}
+                        >
+                          {isActive ? 'Ativo' : 'Inativo'}
+                        </span>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
-
-              {/* Módulos de Acesso - Exibição baseada no Perfil Gestor selecionado */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Módulos de Acesso
-                  <span className="text-xs text-secondary-text ml-2">
-                    (Definidos pelo Perfil Gestor)
-                  </span>
-                </label>
-                {!perfilGestorId ? (
-                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <p className="text-sm text-secondary-text text-center">
-                      Selecione um Perfil Gestor para visualizar os módulos de acesso
-                    </p>
-                  </div>
-                ) : !perfilGestorCompleto ? (
-                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center">
-                    <JiffyLoading className="!gap-0 !py-0" size={24} />
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {MODULOS_ACESSO.map((modulo) => {
-                      let isActive = false
-                      switch (modulo) {
-                        case 'FINANCEIRO':
-                          isActive = perfilGestorCompleto.hasAcessoFinanceiro()
-                          break
-                        case 'ESTOQUE':
-                          isActive = perfilGestorCompleto.hasAcessoEstoque()
-                          break
-                        case 'FISCAL':
-                          isActive = perfilGestorCompleto.hasAcessoFiscal()
-                          break
-                        case 'DASHBOARD':
-                          isActive = perfilGestorCompleto.hasAcessoDashboard()
-                          break
-                      }
-                      
-                      return (
-                        <div key={modulo} className="flex items-center justify-between p-2 bg-gray-100 rounded-lg">
-                          <span className="text-primary-text font-medium text-sm md:text-base">{modulo}</span>
-                          <div className="flex items-center gap-2">
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                              isActive 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-gray-200 text-gray-600'
-                            }`}>
-                              {isActive ? 'Ativo' : 'Inativo'}
-                            </span>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-                {perfilGestorCompleto && (
-                  <p className="text-xs text-secondary-text mt-2">
-                    Os módulos de acesso são definidos pelo Perfil Gestor selecionado. Para alterá-los, edite o Perfil Gestor.
-                  </p>
-                )}
-              </div>
-
+              {perfilGestorCompleto ? (
+                <p className="mt-2 text-xs text-secondary-text">
+                  Para alterar permissões, edite o Perfil Gestor.
+                </p>
+              ) : null}
             </div>
           </div>
 
-          {/* Botões de ação */}
-          <div className="flex justify-end gap-4 pt-2">
-            <Button
-              type="button"
-              onClick={handleCancel}
-              variant="outlined"
-              className="h-8 px-8 rounded-lg hover:bg-primary/15 transition-colors"
-              sx={{
-                backgroundColor: 'var(--color-info)',
-                color: 'var(--color-primary)',
-                borderColor: 'var(--color-primary)',
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button 
-              type="submit" 
-              disabled={isLoading || !nome || !username || !perfilGestorId} 
-              className="h-8 rounded-lg text-white hover:bg-primary/90"
-              sx={{
-                backgroundColor: 'var(--color-primary)',
-                color: 'var(--color-info)',
-                borderColor: 'var(--color-primary)',
-              }}
-            >
-              {isLoading ? 'Salvando...' : isEditing ? 'Atualizar' : 'Salvar'}
-            </Button>
-          </div>
+          {!isEmbedded || !hideEmbeddedFormActions ? (
+            <div className="flex justify-end gap-4 pt-2">
+              <Button
+                type="button"
+                onClick={handleCancel}
+                variant="outlined"
+                className="h-8 rounded-lg px-8 transition-colors hover:bg-primary/15"
+                sx={{
+                  backgroundColor: 'var(--color-info)',
+                  color: 'var(--color-primary)',
+                  borderColor: 'var(--color-primary)',
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={
+                  isLoading ||
+                  !nome ||
+                  !username ||
+                  !perfilGestorId ||
+                  (!isEditing && !password?.trim())
+                }
+                className="h-8 rounded-lg text-white hover:bg-primary/90"
+                sx={{
+                  backgroundColor: 'var(--color-primary)',
+                  color: 'var(--color-info)',
+                  borderColor: 'var(--color-primary)',
+                }}
+              >
+                {isLoading ? 'Salvando...' : isEditing ? 'Atualizar' : 'Salvar'}
+              </Button>
+            </div>
+          ) : null}
         </form>
       </div>
     </div>

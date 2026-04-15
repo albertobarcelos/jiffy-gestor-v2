@@ -108,6 +108,27 @@
     transform: translateX(-50%);
   }
 
+  /*
+   * Tooltip abaixo: borda direita do balão alinhada à borda direita do gatilho (ex.: switch em linha).
+   */
+  .tooltip-hover-below.tooltip-hover-below-align-end::after {
+    left: auto;
+    right: 0;
+    transform: none;
+  }
+  .tooltip-hover-below.tooltip-hover-below-align-end:hover::after {
+    opacity: 1;
+    transform: none;
+  }
+  .tooltip-hover-below.tooltip-hover-below-icon.tooltip-hover-below-align-end::after {
+    left: auto;
+    right: 0;
+    transform: none;
+  }
+  .tooltip-hover-below.tooltip-hover-below-icon.tooltip-hover-below-align-end:hover::after {
+    transform: none;
+  }
+
   /* Preview do card no Kanban ao arrastar: leve inclinação fixa (sem animação — evita tremor visual) */
   .drag-preview-card {
     transform: rotate(-4deg) scale(1.04);

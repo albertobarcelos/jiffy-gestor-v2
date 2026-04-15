@@ -470,21 +470,21 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
       <div className="h-[1px] border-t-2 border-primary/70 flex-shrink-0" aria-hidden />
       <div className="flex gap-3 px-2 flex-shrink-0 py-1">
         <div className="flex-1 min-w-[180px] max-w-[360px]">
-            <div className="relative h-8">
-              <MdSearch
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
-                size={18}
-              />
-              <input
-                id="complementos-search"
-                type="text"
-                placeholder="Pesquisar perfil de usuário..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
-              />
-            </div>
+          <div className="relative h-8">
+            <MdSearch
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
+              size={18}
+            />
+            <input
+              id="complementos-search"
+              type="text"
+              placeholder="Pesquisar perfil de usuário..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+            />
           </div>
+        </div>
       </div>
 
       {/* Cabeçalho da tabela */}
@@ -492,10 +492,10 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
         <div className="px-1 flex-shrink-0">
           <div className="h-10 bg-custom-2 rounded-lg pr-1 flex items-center gap-2">
             <div className="w-8"></div>
-            <div className="md:flex-[3] flex-[2] font-nunito font-semibold text-left md:text-sm text-xs text-primary-text uppercase">
+            <div className="md:flex-[3] flex-[2] font-nunito font-semibold text-left md:text-sm text-xs text-primary-text ">
               Perfil
             </div>
-            <div className="md:flex-[2] flex-[1] md:text-center mr-3 text-right font-nunito font-semibold md:text-sm text-xs text-primary-text uppercase">
+            <div className="md:flex-[2] flex-[1] md:text-center mr-3 text-right font-nunito font-semibold md:text-sm text-xs text-primary-text ">
               Qtd Usuários
             </div>
           </div>
@@ -542,7 +542,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
               className={`${bgClass} rounded-lg my-2 overflow-visible hover:bg-primary/10 transition-colors`}
             >
               {/* Cabeçalho do perfil */}
-              <div 
+              <div
                 onClick={handlePerfilRowClick}
                 className="h-[50px] px-1 flex items-center md:gap-[10px] gap-1 relative overflow-visible cursor-pointer"
               >
@@ -602,10 +602,12 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
                           key={usuario.id}
                           className="flex items-center gap-4 p-3 bg-primary-bg rounded-lg"
                         >
+                        
                           <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
                             <span className="text-primary"><MdPerson size={22} /></span>
                           </div>
-                          <div className="flex-1">
+                        <div className="flex items-center justify-start gap-2 w-full">
+                          <div className="flex flex-col">
                             <div className="flex items-center gap-2">
                               <p className="uppercase font-normal text-sm text-primary-text">
                                 {usuario.nome}
@@ -660,6 +662,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
                                 onClick: (e) => e.stopPropagation(),
                               }}
                             />
+                          </div>
                           </div>
                         </div>
                       ))}

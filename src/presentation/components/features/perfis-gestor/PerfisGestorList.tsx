@@ -5,10 +5,12 @@ import { PerfilGestor } from '@/src/domain/entities/PerfilGestor'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { MdSearch, MdPersonAdd, MdKeyboardArrowRight, MdPerson, MdEdit } from 'react-icons/md'
 import {
   PerfisGestorTabsModal,
+  PerfisGestorTabKey,
   PerfisGestorTabsModalState,
 } from './PerfisGestorTabsModal'
 import {
@@ -486,6 +488,7 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
       tab: config.tab ?? 'perfil',
       mode: config.mode ?? 'create',
       perfilId: config.perfilId,
+      usuarioId: config.usuarioId,
     }))
 
     // Adicionar um parâmetro na URL para forçar o recarregamento ao fechar o modal
@@ -494,11 +497,21 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
     router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
   }, [router, searchParams, pathname])
 
+  const handlePerfilGestorCreated = useCallback((perfilIdCriado: string) => {
+    setTabsModalState((prev) => ({
+      ...prev,
+      mode: 'edit',
+      perfilId: perfilIdCriado,
+    }))
+  }, [])
+
   const closeTabsModal = useCallback(() => {
     setTabsModalState((prev) => ({
       ...prev,
       open: false,
       perfilId: undefined,
+      tab: 'perfil',
+      usuarioId: undefined,
     }))
 
     // Remover o parâmetro da URL para forçar o recarregamento da rota
@@ -510,24 +523,9 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
     onReload?.()
   }, [router, searchParams, pathname, loadAllPerfis, onReload])
 
-  const handleTabChange = useCallback((tab: 'perfil') => {
+  const handleTabChange = useCallback((tab: PerfisGestorTabKey) => {
     setTabsModalState((prev) => ({ ...prev, tab }))
   }, [])
-
-  const openUsuariosTabsModal = useCallback((perfilId: string) => {
-    setUsuariosTabsModalState({
-      open: true,
-      tab: 'usuario',
-      mode: 'create',
-      usuarioId: undefined,
-      initialPerfilGestorId: perfilId,
-    })
-
-    // Adicionar um parâmetro na URL para forçar o recarregamento ao fechar o modal
-    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
-    currentSearchParams.set('modalUsuarioGestorOpen', 'true')
-    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
-  }, [router, searchParams, pathname])
 
   const closeUsuariosTabsModal = useCallback(() => {
     setUsuariosTabsModalState((prev: UsuariosGestorTabsModalState) => ({
@@ -559,7 +557,7 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
             <span className="text-primary md:text-lg text-sm font-semibold font-nunito">
               Perfis Gestor Cadastrados
             </span>
-            <span className="text-tertiary md:text-[22px] text-sm font-medium font-nunito">
+            <span className="text-tertiary md:text-[22px] text-sm font-normal">
               Total {perfis.length} de {totalPerfis}
             </span>
           </div>
@@ -574,14 +572,8 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
       </div>
 
       <div className="h-[4px] border-t-2 border-primary/70 flex-shrink-0"></div>
-      <div className="flex gap-3 md:px-[20px] px-1 pb-2 flex-shrink-0">
+      <div className="flex gap-3 px-1 pb-2 flex-shrink-0">
         <div className="flex-1 min-w-[180px] max-w-[360px]">
-          <label
-            htmlFor="perfis-gestor-search"
-            className="text-xs font-semibold text-secondary-text mb-1 block"
-          >
-            Buscar Perfil Gestor...
-          </label>
           <div className="relative h-8">
             <MdSearch
               className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
@@ -601,22 +593,25 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
 
       {/* Cabeçalho da tabela - Apenas Desktop */}
       {perfis.length > 0 && (
-        <div className="hidden md:block md:px-[30px] px-1 flex-shrink-0">
+        <div className="hidden md:block px-1 flex-shrink-0">
           <div className="h-10 bg-custom-2 rounded-lg md:px-4 pr-1 flex items-center gap-2">
             <div className="w-8"></div>
-            <div className="md:flex-[3] font-nunito font-semibold text-left md:text-sm text-primary-text uppercase">
+            <div className="md:flex-[3] font-nunito font-semibold text-left md:text-sm text-primary-text ">
               Perfil
             </div>
-            <div className="md:flex-[1] font-nunito font-semibold text-center md:text-sm text-primary-text uppercase">
+            <div className="md:flex-[1] font-nunito font-semibold text-center md:text-sm text-primary-text">
+              Qtd. Usuario
+            </div>
+            <div className="md:flex-[1] font-nunito font-semibold text-center md:text-sm text-primary-text ">
               Financeiro
             </div>
-            <div className="md:flex-[1] font-nunito font-semibold text-center md:text-sm text-primary-text uppercase">
+            <div className="md:flex-[1] font-nunito font-semibold text-center md:text-sm text-primary-text ">
               Estoque
             </div>
-            <div className="md:flex-[1] font-nunito font-semibold text-center md:text-sm text-primary-text uppercase">
+            <div className="md:flex-[1] font-nunito font-semibold text-center md:text-sm text-primary-text ">
               Fiscal
             </div>
-            <div className="md:flex-[1] font-nunito font-semibold text-center md:text-sm text-primary-text uppercase">
+            <div className="md:flex-[1] font-nunito font-semibold text-center md:text-sm text-primary-text ">
               Dashboard
             </div>
           </div>
@@ -626,7 +621,7 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
       {/* Lista de perfis com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto md:px-[30px] px-1 scrollbar-hide"
+        className="flex-1 overflow-y-auto px-1 scrollbar-hide"
         style={{ maxHeight: 'calc(100vh - 250px)' }}
       >
         {/* Mostrar loading quando está carregando ou ainda não houve tentativa de carregamento */}
@@ -658,40 +653,43 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
           const bgClass = isZebraEven ? 'bg-gray-50' : 'bg-white'
 
           // Componente reutilizável para switch de permissão
-          const PermissionSwitch = ({ 
-            permission, 
-            checked, 
-            disabled, 
-            title 
-          }: { 
-            permission: 'acessoFinanceiro' | 'acessoEstoque' | 'acessoFiscal' | 'acessoDashboard'
+          const PermissionSwitch = ({
+            permission,
+            checked,
+            disabled,
+            title,
+          }: {
+            permission:
+              | 'acessoFinanceiro'
+              | 'acessoEstoque'
+              | 'acessoFiscal'
+              | 'acessoDashboard'
             checked: boolean
             disabled: boolean
             title: string
           }) => (
-            <label
-              className={`relative inline-flex h-4 w-10 md:h-5 md:w-12 items-center ${
-                disabled
-                  ? 'cursor-not-allowed opacity-60'
-                  : 'cursor-pointer'
-              }`}
-              title={title}
+            <div
+              className="tooltip-hover-below flex items-center justify-center"
+              data-tooltip={title}
               onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
             >
-              <input
-                type="checkbox"
-                className="sr-only peer"
+              <JiffyIconSwitch
                 checked={checked}
-                onChange={(event) => {
-                  event.stopPropagation()
-                  handleTogglePermission(perfil.getId(), permission, event.target.checked)
+                onChange={(e) => {
+                  e.stopPropagation()
+                  handleTogglePermission(perfil.getId(), permission, e.target.checked)
                 }}
                 disabled={disabled}
-                onClick={(e) => e.stopPropagation()}
+                bordered={false}
+                size="sm"
+                className="shrink-0 px-0 py-0"
+                inputProps={{
+                  'aria-label': title,
+                  onClick: (e) => e.stopPropagation(),
+                }}
               />
-              <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-              <span className="absolute left-[2px] top-1/2 block h-[14px] w-[14px] md:h-4 md:w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[18px] md:peer-checked:translate-x-[28px]" />
-            </label>
+            </div>
           )
 
           return (
@@ -716,18 +714,30 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
                     <MdKeyboardArrowRight size={18} />
                   </span>
                 </button>
-                <div className="md:flex-[3] font-nunito font-semibold text-left md:text-sm text-primary-text flex items-center gap-2">
-                  {perfil.getRole()}
+                <div className="md:flex-[3] font-nunito text-left md:text-sm text-primary-text flex items-center gap-2">
+                  <span className="uppercase font-normal">{perfil.getRole()}</span>
                   <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation()
-                      openUsuariosTabsModal(perfil.getId())
+                      openTabsModal({
+                        tab: 'usuario',
+                        mode: 'edit',
+                        perfilId: perfil.getId(),
+                      })
                     }}
-                    className="w-5 h-5 flex items-center justify-center text-primary hover:bg-primary/20 rounded-full transition-colors"
-                    title="Criar novo usuário para este perfil"
+                    className="tooltip-hover-below tooltip-hover-below-icon flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/20"
+                    data-tooltip="Criar novo usuário para este perfil"
+                    aria-label="Criar novo usuário para este perfil"
                   >
                     <MdPersonAdd size={16} />
                   </button>
+                </div>
+                <div
+                  className="md:flex-[1] flex items-center justify-center font-nunito md:text-sm text-xs text-secondary-text tabular-nums"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {contagemUsuarios} usuário(s)
                 </div>
                 <div className="md:flex-[1] flex justify-center" onClick={(e) => e.stopPropagation()}>
                   <PermissionSwitch
@@ -784,17 +794,23 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
                       </span>
                     </button>
                     <span className="text-base font-semibold text-secondary-text">Perfil:</span>
-                    <span className="font-nunito font-semibold text-base text-primary-text">
+                    <span className="font-nunito font-normal text-base text-primary-text uppercase max-w-[55%] truncate">
                       {perfil.getRole()}
                     </span>
                   </div>
                   <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation()
-                      openUsuariosTabsModal(perfil.getId())
+                      openTabsModal({
+                        tab: 'usuario',
+                        mode: 'edit',
+                        perfilId: perfil.getId(),
+                      })
                     }}
-                    className="w-6 h-6 flex items-center justify-center text-primary hover:bg-primary/20 rounded-full transition-colors"
-                    title="Criar novo usuário para este perfil"
+                    className="tooltip-hover-below tooltip-hover-below-icon flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/20"
+                    data-tooltip="Criar novo usuário para este perfil"
+                    aria-label="Criar novo usuário para este perfil"
                   >
                     <MdPersonAdd size={18} />
                   </button>
@@ -836,8 +852,8 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
                   />
                 </div>
                 <div className="text-center mt-2">
-                  <span className="font-nunito text-xs text-secondary-text">
-                    {contagemUsuarios} usuário(s)
+                  <span className="font-nunito text-xs text-secondary-text tabular-nums">
+                    Qtd. User: {contagemUsuarios}
                   </span>
                 </div>
               </div>
@@ -865,7 +881,9 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
                                 {usuario.nome}
                               </p>
                               <button
-                                onClick={() => {
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
                                   setUsuariosTabsModalState({
                                     open: true,
                                     tab: 'usuario',
@@ -877,36 +895,44 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
                                   currentSearchParams.set('modalUsuarioGestorOpen', 'true')
                                   router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
                                 }}
-                                className="w-5 h-5 flex items-center justify-center text-primary hover:bg-primary/20 rounded-full transition-colors flex-shrink-0"
-                                title="Editar usuário gestor"
+                                className="tooltip-hover-below tooltip-hover-below-icon flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/20"
+                                data-tooltip="Editar usuário gestor"
+                                aria-label="Editar usuário gestor"
                               >
                                 <MdEdit size={14} />
                               </button>
-                              <div className="flex items-center">
-                                <label
-                                  className={`relative inline-flex h-5 w-12 items-center ${
-                                    togglingStatus[usuario.id]
-                                      ? 'cursor-not-allowed opacity-60'
-                                      : 'cursor-pointer'
-                                  }`}
-                                  title={usuario.ativo ? 'Usuário Gestor Ativo' : 'Usuário Gestor Desativado'}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    className="sr-only peer"
-                                    checked={usuario.ativo}
-                                    onChange={(event) =>
-                                      handleToggleUsuarioStatus(
-                                        usuario.id,
-                                        event.target.checked,
-                                        perfil.getId()
-                                      )
-                                    }
-                                    disabled={!!togglingStatus[usuario.id]}
-                                  />
-                                  <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                                  <span className="absolute left-[2px] top-1/2 block h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[28px]" />
-                                </label>
+                              <div
+                                className="tooltip-hover-below flex items-center"
+                                onClick={(e) => e.stopPropagation()}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onTouchStart={(e) => e.stopPropagation()}
+                                data-tooltip={
+                                  usuario.ativo
+                                    ? 'Usuário gestor ativo'
+                                    : 'Usuário gestor desativado'
+                                }
+                              >
+                                <JiffyIconSwitch
+                                  checked={usuario.ativo}
+                                  onChange={(e) => {
+                                    e.stopPropagation()
+                                    handleToggleUsuarioStatus(
+                                      usuario.id,
+                                      e.target.checked,
+                                      perfil.getId()
+                                    )
+                                  }}
+                                  disabled={!!togglingStatus[usuario.id]}
+                                  bordered={false}
+                                  size="sm"
+                                  className="shrink-0 px-0 py-0"
+                                  inputProps={{
+                                    'aria-label': usuario.ativo
+                                      ? 'Desativar usuário gestor'
+                                      : 'Ativar usuário gestor',
+                                    onClick: (e) => e.stopPropagation(),
+                                  }}
+                                />
                               </div>
                             </div>
                             <p className="font-nunito text-xs text-secondary-text mt-1">
@@ -943,7 +969,9 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
                                 {usuario.nome}
                               </p>
                               <button
-                                onClick={() => {
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
                                   setUsuariosTabsModalState({
                                     open: true,
                                     tab: 'usuario',
@@ -955,36 +983,44 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
                                   currentSearchParams.set('modalUsuarioGestorOpen', 'true')
                                   router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
                                 }}
-                                className="w-5 h-5 flex items-center justify-center text-primary hover:bg-primary/20 rounded-full transition-colors flex-shrink-0"
-                                title="Editar usuário gestor"
+                                className="tooltip-hover-below tooltip-hover-below-icon flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/20"
+                                data-tooltip="Editar usuário gestor"
+                                aria-label="Editar usuário gestor"
                               >
                                 <MdEdit size={14} />
                               </button>
-                              <div className="flex items-center">
-                                <label
-                                  className={`relative inline-flex h-5 w-12 items-center ${
-                                    togglingStatus[usuario.id]
-                                      ? 'cursor-not-allowed opacity-60'
-                                      : 'cursor-pointer'
-                                  }`}
-                                  title={usuario.ativo ? 'Usuário Gestor Ativo' : 'Usuário Gestor Desativado'}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    className="sr-only peer"
-                                    checked={usuario.ativo}
-                                    onChange={(event) =>
-                                      handleToggleUsuarioStatus(
-                                        usuario.id,
-                                        event.target.checked,
-                                        perfil.getId()
-                                      )
-                                    }
-                                    disabled={!!togglingStatus[usuario.id]}
-                                  />
-                                  <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                                  <span className="absolute left-[2px] top-1/2 block h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[28px]" />
-                                </label>
+                              <div
+                                className="tooltip-hover-below flex items-center"
+                                onClick={(e) => e.stopPropagation()}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onTouchStart={(e) => e.stopPropagation()}
+                                data-tooltip={
+                                  usuario.ativo
+                                    ? 'Usuário gestor ativo'
+                                    : 'Usuário gestor desativado'
+                                }
+                              >
+                                <JiffyIconSwitch
+                                  checked={usuario.ativo}
+                                  onChange={(e) => {
+                                    e.stopPropagation()
+                                    handleToggleUsuarioStatus(
+                                      usuario.id,
+                                      e.target.checked,
+                                      perfil.getId()
+                                    )
+                                  }}
+                                  disabled={!!togglingStatus[usuario.id]}
+                                  bordered={false}
+                                  size="sm"
+                                  className="shrink-0 px-0 py-0"
+                                  inputProps={{
+                                    'aria-label': usuario.ativo
+                                      ? 'Desativar usuário gestor'
+                                      : 'Ativar usuário gestor',
+                                    onClick: (e) => e.stopPropagation(),
+                                  }}
+                                />
                               </div>
                             </div>
                             <p className="font-nunito text-xs text-secondary-text mt-1">
@@ -1007,6 +1043,7 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
         onClose={closeTabsModal}
         onTabChange={handleTabChange}
         onReload={handleStatusChange}
+        onPerfilGestorCreated={handlePerfilGestorCreated}
       />
 
       <UsuariosGestorTabsModal
