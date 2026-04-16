@@ -16,17 +16,23 @@ const VendasList = dynamic(
   }
 )
 
-export default function RelatoriosVendasPage() {
+function RelatoriosVendasPageContent() {
   const searchParams = useSearchParams()
   const initialPeriodo = searchParams.get('periodo') || undefined
   const initialStatus = searchParams.get('status') || null
 
   return (
     <div className="h-full">
-      <Suspense fallback={<PageLoading />}>
-        <VendasList initialPeriodo={initialPeriodo} initialStatus={initialStatus} />
-      </Suspense>
+      <VendasList initialPeriodo={initialPeriodo} initialStatus={initialStatus} />
     </div>
+  )
+}
+
+export default function RelatoriosVendasPage() {
+  return (
+    <Suspense fallback={<PageLoading />}>
+      <RelatoriosVendasPageContent />
+    </Suspense>
   )
 }
 
