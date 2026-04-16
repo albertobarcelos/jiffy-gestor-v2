@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   JiffySidePanelModal,
   type JiffySidePanelFooterActions,
@@ -52,6 +52,40 @@ export function ProdutosTabsModal({
     isSubmitting: false,
     canSubmit: false,
   })
+
+  /** Confirmação ao fechar o painel com produto em edição e alterações não salvas */
+  const [confirmExitOpen, setConfirmExitOpen] = useState(false)
+
+  /**
+   * Incrementa a cada abertura do painel (open: false → true) para remontar o `NovoProduto`.
+   * Evita herdar baseline/alterações não salvas da sessão anterior após "Sair sem salvar".
+   */
+  const [produtoFormSession, setProdutoFormSession] = useState(0)
+  const prevPainelAbertoRef = useRef(false)
+
+  useEffect(() => {
+    if (state.open && !prevPainelAbertoRef.current) {
+      setProdutoFormSession(s => s + 1)
+    }
+    prevPainelAbertoRef.current = state.open
+  }, [state.open])
+
+  const handleRequestClose = useCallback(() => {
+    if (state.tab === 'produto' && npRef.current?.isDirty?.()) {
+      setConfirmExitOpen(true)
+      return
+    }
+    onClose()
+  }, [state.tab, onClose])
+
+  const handleConfirmDiscardExit = useCallback(() => {
+    setConfirmExitOpen(false)
+    onClose()
+  }, [onClose])
+
+  const handleCancelDiscardExit = useCallback(() => {
+    setConfirmExitOpen(false)
+  }, [])
 
   /**
    * Mantém cada aba montada após a primeira visita enquanto o painel estiver aberto,
@@ -115,12 +149,12 @@ export function ProdutosTabsModal({
       }
     }
     if (state.tab === 'complementos') {
-      return 'Complementos'
+      return 'Complementos de'
     }
     if (state.tab === 'impressoras') {
-      return 'Impressoras'
+      return 'Impressoras de'
     }
-    return state.grupoId ? 'Grupo de Produtos' : 'Grupo de Produtos'
+    return state.grupoId ? 'Grupo Produtos de' : 'Grupo Produtos'
   }, [state])
 
   /** Mesmo subtítulo do `JiffySidePanelModal` em todas as abas quando há produto no estado */
@@ -184,9 +218,9 @@ export function ProdutosTabsModal({
     (): JiffySidePanelFooterActions => ({
       showSave: true,
       saveLabel: 'Fechar',
-      onSave: onClose,
+      onSave: handleRequestClose,
     }),
-    [onClose]
+    [handleRequestClose]
   )
 
   const footerGrupo = useMemo((): JiffySidePanelFooterActions => {
@@ -202,9 +236,9 @@ export function ProdutosTabsModal({
     return {
       showSave: true,
       saveLabel: 'Fechar',
-      onSave: onClose,
+      onSave: handleRequestClose,
     }
-  }, [embedGrupoTab, embedGrupoForm, onClose])
+  }, [embedGrupoTab, embedGrupoForm, handleRequestClose])
 
   const footerActions = useMemo(() => {
     if (state.tab === 'produto') return footerProduto
@@ -218,10 +252,11 @@ export function ProdutosTabsModal({
   }, [state.tab, state.grupoId, footerProduto, footerComplementosOuImpressoras, footerGrupo])
 
   return (
+    <>
     <JiffySidePanelModal
       key={dialogKey}
       open={state.open}
-      onClose={onClose}
+      onClose={handleRequestClose}
       title={title}
       subtitle={subtitle}
       scrollableBody={false}
@@ -265,6 +300,7 @@ export function ProdutosTabsModal({
             aria-hidden={state.tab !== 'produto'}
           >
             <NovoProduto
+              key={`${produtoId ?? 'new'}-${state.mode}-${produtoFormSession}`}
               ref={npRef}
               produtoId={state.mode === 'create' ? undefined : produtoId}
               isCopyMode={state.mode === 'copy'}
@@ -278,7 +314,7 @@ export function ProdutosTabsModal({
               onWizardStepChange={setWizardStep}
               onWizardSavingChange={setWizardSaving}
               onFiscalUnavailableChange={setFiscalOnlyBack}
-              onClose={onClose}
+              onClose={handleRequestClose}
               onSuccess={produtoData => {
                 onReload?.(produtoData?.produtoId, produtoData?.produtoData)
                 onClose()
@@ -299,7 +335,7 @@ export function ProdutosTabsModal({
               open={state.open}
               produtoId={produtoId}
               produtoNome={state.produto?.getNome()}
-              onClose={onClose}
+              onClose={handleRequestClose}
               isEmbedded
             />
           </div>
@@ -321,7 +357,7 @@ export function ProdutosTabsModal({
               open={state.open}
               produtoId={produtoId}
               produtoNome={state.produto?.getNome()}
-              onClose={onClose}
+              onClose={handleRequestClose}
               isEmbedded
             />
           </div>
@@ -339,15 +375,16 @@ export function ProdutosTabsModal({
             )}
             aria-hidden={state.tab !== 'grupo'}
           >
+            {/* key só pelo grupoId: incluir a aba interna remontava o form e voltava para initialTab 0 */}
             <NovoGrupo
-              key={`${state.grupoId}-${embedGrupoTab}`}
+              key={state.grupoId}
               grupoId={state.grupoId!}
               isEmbedded
               embeddedFormId={GRUPO_PRODUTOS_MODAL_FORM_ID}
               hideEmbeddedFormActions
               onEmbedFormStateChange={setEmbedGrupoForm}
               onEmbeddedTabChange={setEmbedGrupoTab}
-              onClose={onClose}
+              onClose={handleRequestClose}
               onSaved={() => {
                 onReload?.()
                 onClose()
@@ -362,5 +399,46 @@ export function ProdutosTabsModal({
         ) : null}
       </div>
     </JiffySidePanelModal>
+
+    {confirmExitOpen ? (
+      <div
+        className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/50 md:p-4"
+        role="presentation"
+      >
+        <div
+          className="w-[85vw] max-w-[85vw] rounded-lg bg-white p-6 shadow-lg md:w-auto md:max-w-md"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="produtos-tabs-exit-title"
+        >
+          <h3
+            id="produtos-tabs-exit-title"
+            className="mb-4 text-lg font-semibold text-primary-text"
+          >
+            Alterações não salvas
+          </h3>
+          <p className="mb-6 text-sm text-secondary-text">
+            Deseja sair sem salvar? As alterações serão perdidas.
+          </p>
+          <div className="flex flex-col justify-end gap-3 md:flex-row md:justify-end">
+            <button
+              type="button"
+              onClick={handleCancelDiscardExit}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-primary-text transition-colors hover:bg-gray-50"
+            >
+              Continuar editando
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmDiscardExit}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
+            >
+              Sair sem salvar
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : null}
+    </>
   )
 }

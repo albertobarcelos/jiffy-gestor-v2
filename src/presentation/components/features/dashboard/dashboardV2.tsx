@@ -246,11 +246,12 @@ function badgeTextoCancelamentos(
     return { texto: 'Novo +Alto', positivo: false }
   }
   const pct = Math.round(((atual - anterior) / anterior) * 100)
-  const pctStr = `${pct > 0 ? '+' : ''}${pct}%`
   if (atual > anterior) {
+    const pctStr = `${pct > 0 ? '+' : ''}${pct}%`
     return { texto: `${pctStr} +Alto`, positivo: false }
   }
-  return { texto: `${pctStr} +Baixo`, positivo: true }
+  const pctAbs = Math.abs(pct)
+  return { texto: `${pctAbs}% +Baixo`, positivo: true }
 }
 
 /** Ticket médio = faturamento ÷ vendas efetivadas (0 se não houver vendas). */

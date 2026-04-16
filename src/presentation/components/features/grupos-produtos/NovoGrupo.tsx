@@ -47,6 +47,8 @@ interface NovoGrupoProps {
   embeddedFormId?: string
   /** Omite o cabeçalho Cancelar/Salvar (ações no rodapé do painel) */
   hideEmbeddedFormActions?: boolean
+  /** Permite o modal compor o título com o nome atual do grupo */
+  onGrupoNomeChange?: (nome: string) => void
   /** Sincroniza estado com o rodapé do modal (loading / pode submeter) */
   onEmbedFormStateChange?: (state: {
     isSubmitting: boolean
@@ -88,6 +90,7 @@ export function NovoGrupo({
   isEmbedded = false,
   embeddedFormId,
   hideEmbeddedFormActions,
+  onGrupoNomeChange,
   onEmbedFormStateChange,
   onEmbeddedTabChange,
   onClose,
@@ -113,6 +116,10 @@ export function NovoGrupo({
 
   const hasLoadedGrupoRef = useRef(false)
   const loadedGrupoIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    onGrupoNomeChange?.(nome)
+  }, [nome, onGrupoNomeChange])
 
   // Determina se está editando ou criando
   const effectiveGrupoId = grupoId || searchParams.get('id') || null
@@ -274,8 +281,14 @@ export function NovoGrupo({
         throw new Error(error.message || 'Erro ao salvar grupo')
       }
 
-      // Sucesso - redireciona para a lista
+      // Sucesso — mesmo cache que na página avulsa (lista de produtos depende dos dois)
       if (isEmbedded) {
+        void queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false })
+        void queryClient.invalidateQueries({
+          queryKey: ['produtos', 'infinite'],
+          exact: false,
+          refetchType: 'active',
+        })
         onSaved?.()
         onClose?.()
       } else {
@@ -331,7 +344,7 @@ export function NovoGrupo({
       {/* Conteúdo principal */}
       <div
         className={cn(
-          'flex flex-col bg-info rounded-tl-lg overflow-y-auto',
+          'flex flex-col bg-info rounded-tl-lg overflow-hidden',
           isEmbedded && 'min-h-0'
         )}
       >
@@ -366,9 +379,9 @@ export function NovoGrupo({
         </div>
 
         {/* Conteúdo das tabs */}
-        <div className="p-6">
+        <div className="flex min-h-0 flex-1 flex-col px-6 overflow-hidden">
           {activeTab === 0 && (
-            <div className="max-w-4xl mx-5 pt-1">
+            <div className="min-h-0 flex-1 overflow-y-auto max-w-4xl mx-5 py-6">
               <GrupoDetalhesFormShell
                 formId={embeddedFormId}
                 onSubmit={handleFormSubmit}
@@ -579,7 +592,7 @@ export function NovoGrupo({
           )}
 
           {activeTab === 1 && (
-            <div className="py-6">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden py-6">
               {isEditMode && effectiveGrupoId ? (
                 <ProdutosPorGrupoList grupoProdutoId={effectiveGrupoId} />
               ) : (

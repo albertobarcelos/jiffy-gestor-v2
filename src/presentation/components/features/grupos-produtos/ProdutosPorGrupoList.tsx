@@ -141,11 +141,11 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
     if (previousLocalProdutosRef.current.length > 0 && serverProdutos.length > 0) {
       // Criar um mapa de produtos do servidor por ID para acesso rápido
       const serverProdutosMap = new Map(serverProdutos.map((p) => [p.id, p]))
-      
+
       // Manter produtos existentes na mesma ordem, atualizando seus dados
       const preservedOrder: ProdutoGrupo[] = []
       const processedIds = new Set<string>()
-      
+
       // Primeiro, manter produtos que já existem na lista local na mesma ordem
       previousLocalProdutosRef.current.forEach((localProduto) => {
         const serverProduto = serverProdutosMap.get(localProduto.id)
@@ -155,14 +155,14 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
           processedIds.add(localProduto.id)
         }
       })
-      
+
       // Depois, adicionar novos produtos que não estavam na lista local
       serverProdutos.forEach((serverProduto) => {
         if (!processedIds.has(serverProduto.id)) {
           preservedOrder.push(serverProduto)
         }
       })
-      
+
       setLocalProdutos(preservedOrder)
       previousLocalProdutosRef.current = preservedOrder
     } else {
@@ -355,81 +355,78 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
 
   return (
     <>
-      <div className="flex flex-col md:mx-2 mx-1 h-full border border-primary/20 rounded-lg bg-white shadow-sm">
-      <div className="md:px-6 px-2 pt-2 pb-4">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <h3 className="md:text-lg text-sm font-semibold text-primary-text">
-              Produtos vinculados ao grupo
-            </h3>
-            <p className="md:text-sm text-xs text-secondary-text">
-              Arraste para reordenar a posição dos produtos
-            </p>
+      <div className="flex min-h-0 flex-1 flex-col mx-1 bg-white overflow-hidden">
+        <div className="mb-1 flex flex-row items-center justify-between">
+          <div className="flex flex-col items-start">
+          <h2 className="shrink-0 text-primary md:text-xl text-sm font-semibold">
+            Produtos vinculados ao grupo
+          </h2>
+          <p className="md:text-sm text-xs text-secondary-text">
+            Arraste para reordenar a posição dos produtos
+          </p>
           </div>
-          <div className="flex flex-col md:flex-row items-center gap-2">
-          <button
-            type="button"
-            onClick={handleOpenNovoProdutoModal}
-            className="md:h-8 md:px-[10px] px-2 py-1 md:py-0 bg-primary text-info rounded-lg font-semibold font-exo md:text-sm text-xs flex items-center gap-2 hover:bg-primary/90 transition-colors"
-            >
-            Novo produto
-          </button>
-          <button
-            type="button"
-            onClick={() => refetch()}
-            className="text-sm text-primary underline-offset-4 hover:underline"
-          >
-            Atualizar
-          </button>
-          </div>
+              <button
+                type="button"
+                onClick={handleOpenNovoProdutoModal}
+                className="md:h-8 md:px-[10px] px-2 py-1 md:py-0 bg-primary text-info rounded-lg font-semibold font-exo md:text-sm text-xs flex items-center gap-2 hover:bg-primary/90 transition-colors"
+              >
+                Novo produto
+              </button>
         </div>
-      </div>
+        <div className="h-[1px] border-t border-primary/70"></div>
 
-      <div className="md:mx-2 mx-1 px-2 md:px-6 py-3 bg-custom-2 rounded-lg grid grid-cols-12 text-xs font-semibold text-primary-text">
-        <div className="col-span-1">#</div>
-        <div className="col-span-6">Produto</div>
-        <div className="col-span-3">Valor</div>
-        <div className="col-span-2 text-right pr-5">Ordenar</div>
-      </div>
-
-      <div ref={listRef} className="flex-1 overflow-y-auto md:px-6 px-1 py-4 space-y-2">
-      {isLoading && localProdutos.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-8 gap-2">
-          <JiffyLoading />
+        <div className="mt-1 px-2 py-3 bg-custom-2 rounded-lg grid grid-cols-12 text-sm font-semibold text-primary-text">
+          <div className="col-span-1">#</div>
+          <div className="col-span-6">Produto</div>
+          <div className="col-span-3">Valor</div>
+          <div className="col-span-2 text-right pr-5">Ordenar</div>
         </div>
-      )}
 
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
+        <div
+          ref={listRef}
+          className="min-h-0 flex-1 overflow-y-auto md:px-6 px-1 py-2 space-y-2 [&::-webkit-scrollbar]:hidden"
+          style={{
+            scrollbarWidth: 'none', // Firefox
+            msOverflowStyle: 'none', // Edge legado
+          }}
         >
-          <SortableContext
-            items={localProdutos.map((produto) => produto.id)}
-            strategy={verticalListSortingStrategy}
-          >
-            {localProdutos.map((produto, index) => (
-              <ProdutoItem
-                key={produto.id}
-                produto={produto}
-                index={index}
-                formatCurrency={formatCurrency}
-                onEdit={handleEditProduto}
-              />
-            ))}
-          </SortableContext>
-        </DndContext>
+          {isLoading && localProdutos.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-8 gap-2">
+              <JiffyLoading />
+            </div>
+          )}
 
-        {hasNextPage && (
-          <div ref={loadMoreRef} className="py-4">
-            {isFetchingNextPage && (
-              <div className="flex justify-center">
-                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={localProdutos.map((produto) => produto.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {localProdutos.map((produto, index) => (
+                <ProdutoItem
+                  key={produto.id}
+                  produto={produto}
+                  index={index}
+                  formatCurrency={formatCurrency}
+                  onEdit={handleEditProduto}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
+
+          {hasNextPage && (
+            <div ref={loadMoreRef} className="py-4">
+              {isFetchingNextPage && (
+                <div className="flex justify-center">
+                  <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <ProdutosTabsModal
@@ -477,13 +474,12 @@ function ProdutoItem({
     <div
       ref={setNodeRef}
       style={style}
-      className={`grid grid-cols-12 gap-3 items-center rounded-lg md:px-4 px-1 py-2 transition ${
-        index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
-      } ${isDragging ? 'opacity-50 ring-2 ring-primary/40' : ''}`}
+      className={`grid grid-cols-12 gap-3 items-center rounded-lg py-2 transition ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+        } ${isDragging ? 'opacity-50 ring-2 ring-primary/40' : ''}`}
     >
       <div className="col-span-1 md:text-sm text-xs font-semibold text-primary-text">{index + 1}</div>
       <div className="col-span-6 md:text-sm text-xs text-primary-text whitespace-normal break-words">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center uppercase gap-2">
           <span>{produto.nome}</span>
           <button
             type="button"

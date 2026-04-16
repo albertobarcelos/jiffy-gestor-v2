@@ -18,14 +18,19 @@ export function NovoGrupoModalShell({ grupoId }: NovoGrupoModalShellProps) {
   const router = useRouter()
   const queryClient = useQueryClient()
   const mode = grupoId ? 'edit' : 'create'
+  const [grupoNome, setGrupoNome] = useState('')
 
   const title = useMemo(
-    () =>
-      mode === 'create'
-        ? 'Novo Grupo de Produtos'
-        : 'Editar Grupo de Produtos',
+    () => (mode === 'create' ? 'Novo Grupo de Produtos' : 'Editar Grupo de Produtos'),
     [mode]
   )
+
+  const subtitle = useMemo(() => {
+    if (mode !== 'edit') return null
+    const nome = grupoNome.trim()
+    if (!nome) return null
+    return <span className="text-sm font-medium normal-case">{nome}</span>
+  }, [mode, grupoNome])
 
   const [embedFormState, setEmbedFormState] = useState({
     isSubmitting: false,
@@ -61,6 +66,7 @@ export function NovoGrupoModalShell({ grupoId }: NovoGrupoModalShellProps) {
       open
       onClose={handleClose}
       title={title}
+      subtitle={subtitle}
       scrollableBody={false}
       footerVariant="bar"
       panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,60vw)]"
@@ -72,6 +78,7 @@ export function NovoGrupoModalShell({ grupoId }: NovoGrupoModalShellProps) {
           isEmbedded
           embeddedFormId={GRUPO_PRODUTOS_MODAL_FORM_ID}
           hideEmbeddedFormActions
+          onGrupoNomeChange={setGrupoNome}
           onEmbedFormStateChange={setEmbedFormState}
           onEmbeddedTabChange={setEmbedSubTab}
           onClose={handleClose}

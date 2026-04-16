@@ -28,12 +28,20 @@ export function GruposProdutosTabsModal({
   onReload,
 }: GruposProdutosTabsModalProps) {
   const grupoId = state.grupoId
+  const [grupoNome, setGrupoNome] = useState('')
 
   const title = useMemo(() => {
     return state.mode === 'create'
       ? 'Novo Grupo de Produtos'
       : 'Editar Grupo de Produtos'
   }, [state.mode])
+
+  const subtitle = useMemo(() => {
+    if (state.mode !== 'edit') return null
+    const nome = grupoNome.trim()
+    if (!nome) return null
+    return <span className="text-base font-medium normal-case"># {nome}</span>
+  }, [state.mode, grupoNome])
 
   const [embedFormState, setEmbedFormState] = useState({
     isSubmitting: false,
@@ -68,6 +76,7 @@ export function GruposProdutosTabsModal({
       open={state.open}
       onClose={onClose}
       title={title}
+      subtitle={subtitle}
       scrollableBody={false}
       footerVariant="bar"
       panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]"
@@ -80,6 +89,7 @@ export function GruposProdutosTabsModal({
           isEmbedded
           embeddedFormId={GRUPO_PRODUTOS_MODAL_FORM_ID}
           hideEmbeddedFormActions
+          onGrupoNomeChange={setGrupoNome}
           onEmbedFormStateChange={setEmbedFormState}
           onEmbeddedTabChange={setEmbedSubTab}
           onClose={onClose}

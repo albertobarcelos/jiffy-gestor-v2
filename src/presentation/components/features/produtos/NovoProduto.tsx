@@ -18,6 +18,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { MdImage } from 'react-icons/md'
+import { cn } from '@/src/shared/utils/cn'
 
 /** API imperativa para o rodapé do `JiffySidePanelModal` (wizard 3 passos). */
 export interface NovoProdutoHandle {
@@ -27,6 +28,8 @@ export interface NovoProdutoHandle {
   savePartialAndClose: () => void
   /** Salvar completo (passo fiscal ou cadastro inteiro) */
   saveFinal: () => void
+  /** Há alterações em relação ao último baseline (carregamento ou salvamento). */
+  isDirty: () => boolean
 }
 
 export interface NovoProdutoProps {
@@ -133,12 +136,71 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(funct
   // Estados de loading
   const [isLoadingProduto, setIsLoadingProduto] = useState(false)
 
+  /** Página avulsa: confirmação antes de voltar à lista sem salvar */
+  const [showDiscardDialog, setShowDiscardDialog] = useState(false)
+  /** Snapshot JSON do formulário no último “ponto salvo” (carregar ou salvar com sucesso) */
+  const baselineSerializedRef = useRef<string | null>(null)
+  const createBaselineCommittedRef = useRef(false)
+
   // Verificar se é modo cópia via query param
   // Extrair o valor uma vez e usar como string estável
   const copyFromIdValue = searchParams.get('copyFrom')
   const copyFromId = useMemo(() => copyFromIdValue, [copyFromIdValue])
   const effectiveProdutoId = useMemo(() => produtoId || copyFromId, [produtoId, copyFromId])
   const effectiveIsCopyMode = useMemo(() => isCopyMode || !!copyFromId, [isCopyMode, copyFromId])
+
+  /** Snapshot só dos dados do produto (sem passo do wizard) — trocar de etapa não é “alteração”. */
+  const getFormSnapshot = useCallback(() => {
+    return JSON.stringify({
+      nomeProduto,
+      descricaoProduto,
+      precoVenda,
+      unidadeProduto,
+      grupoProduto,
+      favorito,
+      permiteDesconto,
+      permiteAcrescimo,
+      abreComplementos,
+      permiteAlterarPreco,
+      incideTaxa,
+      ativo,
+      grupoComplementosIds: [...grupoComplementosIds].sort(),
+      impressorasIds: [...impressorasIds].sort(),
+      ncm: ncm.trim(),
+      cest: cest.trim(),
+      origemMercadoria,
+      tipoProduto,
+      indicadorProducaoEscala,
+    })
+  }, [
+    nomeProduto,
+    descricaoProduto,
+    precoVenda,
+    unidadeProduto,
+    grupoProduto,
+    favorito,
+    permiteDesconto,
+    permiteAcrescimo,
+    abreComplementos,
+    permiteAlterarPreco,
+    incideTaxa,
+    ativo,
+    grupoComplementosIds,
+    impressorasIds,
+    ncm,
+    cest,
+    origemMercadoria,
+    tipoProduto,
+    indicadorProducaoEscala,
+  ])
+
+  const commitBaseline = useCallback(() => {
+    baselineSerializedRef.current = getFormSnapshot()
+  }, [getFormSnapshot])
+
+  /** Ref sempre aponta para o commit mais recente — evita baseline com snapshot desatualizado em async/setTimeout */
+  const commitBaselineLatestRef = useRef(commitBaseline)
+  commitBaselineLatestRef.current = commitBaseline
 
   useEffect(() => {
     if (effectiveProdutoId || effectiveIsCopyMode) {
@@ -154,6 +216,21 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(funct
     setTipoProduto('00') // Padrão na criação
     setIndicadorProducaoEscala(null)
   }, [defaultGrupoProdutoId, effectiveProdutoId, effectiveIsCopyMode, grupoProduto])
+
+  // Baseline inicial em modo criação (após grupo opcional do contexto)
+  useEffect(() => {
+    if (effectiveProdutoId || effectiveIsCopyMode) {
+      createBaselineCommittedRef.current = false
+      return
+    }
+    if (createBaselineCommittedRef.current) return
+    if (defaultGrupoProdutoId && !grupoProduto) return
+    const id = requestAnimationFrame(() => {
+      commitBaselineLatestRef.current()
+      createBaselineCommittedRef.current = true
+    })
+    return () => cancelAnimationFrame(id)
+  }, [effectiveProdutoId, effectiveIsCopyMode, defaultGrupoProdutoId, grupoProduto, commitBaseline])
 
   // Refs para evitar loops infinitos
   const hasLoadedProdutoRef = useRef(false)
@@ -304,6 +381,11 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(funct
             setNomeProduto(produto.nome || '')
             setDescricaoProduto(produto.descricao || '')
           }
+
+          // Após o React aplicar o estado vindo da API (debounce curto evita baseline antes do flush)
+          setTimeout(() => {
+            commitBaselineLatestRef.current()
+          }, 100)
         } else {
           // Se a requisição falhou, reseta as flags para permitir nova tentativa
           hasLoadedProdutoRef.current = false
@@ -341,6 +423,10 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(funct
       setIndicadorProducaoEscala(fiscalData.indicadorProducaoEscala || null)
       setFiscalStatus(fiscalData.fiscalStatus || undefined)
       hasLoadedFiscalDataRef.current = true
+      // Alinha baseline aos fiscais hidratados (antes: só passo 1–2 no baseline → falso “dirty” ao abrir passo 3)
+      setTimeout(() => {
+        commitBaselineLatestRef.current()
+      }, 0)
     } else if (effectiveProdutoId) {
       // Se não temos dados fiscais armazenados mas estamos editando, buscar do produto
       // Isso pode acontecer se o usuário navegou diretamente para o passo 3
@@ -372,6 +458,9 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(funct
             )
             setFiscalStatus(produto.fiscalStatus || undefined)
             hasLoadedFiscalDataRef.current = true
+            setTimeout(() => {
+              commitBaselineLatestRef.current()
+            }, 0)
           }
         } catch (error) {
           console.error('Erro ao carregar dados fiscais:', error)
@@ -761,11 +850,19 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(funct
   }
 
   const handleCancel = () => {
+    // Painel lateral: o pai intercepta e exibe confirmação quando houver alterações
     if (onClose) {
       onClose()
       return
     }
-    router.push('/produtos')
+    const dirty =
+      baselineSerializedRef.current !== null &&
+      getFormSnapshot() !== baselineSerializedRef.current
+    if (!dirty) {
+      router.push('/produtos')
+      return
+    }
+    setShowDiscardDialog(true)
   }
 
   const handleSave = async (opcoes?: { salvarSomenteDadosGerais?: boolean }) => {
@@ -1005,6 +1102,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(funct
           ? 'Produto atualizado com sucesso!'
           : 'Produto cadastrado com sucesso!'
       )
+      commitBaselineLatestRef.current()
       if (onSuccess) {
         // Passar dados do produto para atualização otimista do cache
         onSuccess(
@@ -1029,24 +1127,33 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(funct
   const handleSaveRef = useRef(handleSave)
   handleSaveRef.current = handleSave
 
-  useImperativeHandle(ref, () => ({
-    goNext: () => {
-      setSelectedPage(p => (p < 2 ? ((p + 1) as 0 | 1 | 2) : p))
-    },
-    goBack: () => {
-      setSelectedPage(p => {
-        if (p === 2) return 1
-        if (p === 1) return 0
-        return p
-      })
-    },
-    savePartialAndClose: () => {
-      void handleSaveRef.current({ salvarSomenteDadosGerais: true })
-    },
-    saveFinal: () => {
-      void handleSaveRef.current()
-    },
-  }))
+  useImperativeHandle(
+    ref,
+    () => ({
+      goNext: () => {
+        setSelectedPage(p => (p < 2 ? ((p + 1) as 0 | 1 | 2) : p))
+      },
+      goBack: () => {
+        setSelectedPage(p => {
+          if (p === 2) return 1
+          if (p === 1) return 0
+          return p
+        })
+      },
+      savePartialAndClose: () => {
+        void handleSaveRef.current({ salvarSomenteDadosGerais: true })
+      },
+      saveFinal: () => {
+        void handleSaveRef.current()
+      },
+      isDirty: () => {
+        if (isLoadingProduto) return false
+        if (baselineSerializedRef.current === null) return false
+        return getFormSnapshot() !== baselineSerializedRef.current
+      },
+    }),
+    [getFormSnapshot, isLoadingProduto]
+  )
 
   useEffect(() => {
     onWizardStepChange?.(selectedPage)
@@ -1256,6 +1363,53 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(funct
           />
         )}
       </div>
+
+      {/* Confirmação ao sair sem salvar (páginas /produtos/novo e /editar — sem onClose do painel) */}
+      {showDiscardDialog ? (
+        <div
+          className={cn(
+            'fixed inset-0 flex items-center justify-center bg-black/50 md:p-4',
+            isEmbedded ? 'z-[1400]' : 'z-50'
+          )}
+          role="presentation"
+        >
+          <div
+            className="w-[85vw] max-w-[85vw] rounded-lg bg-white p-6 shadow-lg md:w-auto md:max-w-md"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="novo-produto-discard-title"
+          >
+            <h3
+              id="novo-produto-discard-title"
+              className="mb-4 text-lg font-semibold text-primary-text"
+            >
+              Alterações não salvas
+            </h3>
+            <p className="mb-6 text-sm text-secondary-text">
+              Deseja sair sem salvar? As alterações serão perdidas.
+            </p>
+            <div className="flex flex-col justify-end gap-3 md:flex-row md:justify-end">
+              <button
+                type="button"
+                onClick={() => setShowDiscardDialog(false)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-primary-text transition-colors hover:bg-gray-50"
+              >
+                Continuar editando
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDiscardDialog(false)
+                  router.push('/produtos')
+                }}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
+              >
+                Sair sem salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 })

@@ -8,6 +8,7 @@ import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplem
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import Link from 'next/link'
 import { Produto } from '@/src/domain/entities/Produto'
 import { showToast } from '@/src/shared/utils/toast'
@@ -317,17 +318,17 @@ const ProdutoListItem = function ProdutoListItem({
 
       <div className="flex-1">
         <div className="flex items-center gap-3 flex-wrap">
-          <p className="text-primary-text font-semibold md:text-base text-sm flex flex-col-reverse md:flex-row md:items-center items-start md:gap-2">
+          <p className="text-primary-text font-normal md:text-base text-sm flex flex-col-reverse md:flex-row md:items-center items-start md:gap-2">
             <span className="uppercase">{produto.getNome()}</span>
             <span className="text-sm text-secondary-text md:ml-2 inline-flex items-center gap-1">
               <span className="text-xs">Cód. </span>
-              <span className="font-semibold">{produto.getCodigoProduto()}</span>
+              <span className="font-normal">{produto.getCodigoProduto()}</span>
             </span>
           </p>
         </div>
         {/* Mobile: 3 ícones na primeira linha; segunda linha em grade 3 colunas (6 itens) */}
         <div
-          className="mt-2 inline-grid grid-cols-3 gap-2 w-fit md:hidden"
+          className="mt-1.5 inline-grid grid-cols-3 gap-1 w-fit md:hidden"
         >
           {firstRowActions.map(({ key, label, Icon, field, modal }) => {
             if (field) {
@@ -348,7 +349,7 @@ const ProdutoListItem = function ProdutoListItem({
                     e.stopPropagation()
                     onToggleBoolean?.(field, !isActive)
                   }}
-                  className={`w-5 h-5 rounded-full flex items-center justify-center text-sm transition-all ${bgColor} ${iconColor} ${isLoading
+                  className={`w-4 h-4 rounded-full flex items-center justify-center text-xs transition-all ${bgColor} ${iconColor} ${isLoading
                       ? 'opacity-60 cursor-not-allowed'
                       : 'hover:bg-primary/80 hover:text-white  focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/80'
                     }`}
@@ -376,7 +377,7 @@ const ProdutoListItem = function ProdutoListItem({
                     e.stopPropagation()
                     handleModalClick?.()
                   }}
-                  className={`w-5 h-5 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${!handleModalClick ? 'opacity-60 cursor-not-allowed' : 'hover:bg-primary/10'}`}
+                  className={`w-4 h-4 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${!handleModalClick ? 'opacity-60 cursor-not-allowed' : 'hover:bg-primary/10'}`}
                 >
                   <Icon />
                 </button>
@@ -393,7 +394,7 @@ const ProdutoListItem = function ProdutoListItem({
                     e.stopPropagation()
                     onCopyProduto?.(produto.getId())
                   }}
-                  className="w-5 h-5 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-sm hover:bg-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="w-4 h-4 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-xs hover:bg-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <Icon />
                 </button>
@@ -404,7 +405,7 @@ const ProdutoListItem = function ProdutoListItem({
               <span
                 key={`${produto.getId()}-${key}`}
                 title={label}
-                className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-sm"
+                className="w-4 h-4 rounded-full bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-xs"
               >
                 <Icon />
               </span>
@@ -412,7 +413,7 @@ const ProdutoListItem = function ProdutoListItem({
           })}
         </div>
         <div
-          className="mt-2 inline-grid grid-cols-3 gap-2 w-fit md:hidden"
+          className="mt-1.5 inline-grid grid-cols-3 gap-1 w-fit md:hidden"
         >
           {secondRowActions.map(({ key, label, Icon, field, modal }) => {
             if (field) {
@@ -433,7 +434,7 @@ const ProdutoListItem = function ProdutoListItem({
                     e.stopPropagation()
                     onToggleBoolean?.(field, !isActive)
                   }}
-                  className={`w-5 h-5 rounded-full flex items-center justify-center text-sm transition-all ${bgColor} ${iconColor} ${
+                  className={`w-4 h-4 rounded-full flex items-center justify-center text-xs transition-all ${bgColor} ${iconColor} ${
                     isLoading
                       ? 'opacity-60 cursor-not-allowed'
                       : 'hover:bg-primary/80 hover:text-white  focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/80'
@@ -462,7 +463,7 @@ const ProdutoListItem = function ProdutoListItem({
                     e.stopPropagation()
                     handleModalClick?.()
                   }}
-                  className={`w-5 h-5 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                  className={`w-4 h-4 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                     !handleModalClick ? 'opacity-60 cursor-not-allowed' : 'hover:bg-primary/10'
                   }`}
                 >
@@ -481,7 +482,7 @@ const ProdutoListItem = function ProdutoListItem({
                     e.stopPropagation()
                     onCopyProduto?.(produto.getId())
                   }}
-                  className="w-5 h-5 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-sm hover:bg-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="w-4 h-4 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-xs hover:bg-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <Icon />
                 </button>
@@ -492,7 +493,7 @@ const ProdutoListItem = function ProdutoListItem({
               <span
                 key={`${produto.getId()}-${key}`}
                 title={label}
-                className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-sm"
+                className="w-4 h-4 rounded-full bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-xs"
               >
                 <Icon />
               </span>
@@ -501,7 +502,7 @@ const ProdutoListItem = function ProdutoListItem({
         </div>
 
         {/* Desktop: linha única */}
-        <div className="hidden md:flex items-center gap-2 mt-2">
+        <div className="hidden md:flex items-center gap-1.5 mt-1.5">
           {actionIcons.map(({ key, label, Icon, field, modal }) => {
             if (field) {
               const isActive = toggleStates[field]
@@ -521,7 +522,7 @@ const ProdutoListItem = function ProdutoListItem({
                     e.stopPropagation()
                     onToggleBoolean?.(field, !isActive)
                   }}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-lg transition-all ${bgColor} ${iconColor} ${
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-base transition-all ${bgColor} ${iconColor} ${
                     isLoading
                       ? 'opacity-60 cursor-not-allowed'
                       : 'hover:bg-primary/80 hover:text-white  focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/80'
@@ -550,7 +551,7 @@ const ProdutoListItem = function ProdutoListItem({
                     e.stopPropagation()
                     handleModalClick?.()
                   }}
-                  className={`w-8 h-8 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                  className={`w-7 h-7 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-base transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                     !handleModalClick ? 'opacity-60 cursor-not-allowed' : 'hover:bg-primary/10'
                   }`}
                 >
@@ -569,7 +570,7 @@ const ProdutoListItem = function ProdutoListItem({
                     e.stopPropagation()
                     onCopyProduto?.(produto.getId())
                   }}
-                  className="w-8 h-8 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-lg hover:bg-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="w-7 h-7 rounded-full bg-gray-100 border border-primary flex items-center justify-center text-[var(--color-primary)] text-base hover:bg-primary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <Icon />
                 </button>
@@ -580,7 +581,7 @@ const ProdutoListItem = function ProdutoListItem({
               <span
                 key={`${produto.getId()}-${key}`}
                 title={label}
-                className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-sm"
+                className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-[var(--color-primary)] text-base"
               >
                 <Icon />
               </span>
@@ -620,36 +621,38 @@ const ProdutoListItem = function ProdutoListItem({
                 }
               }}
               disabled={isSavingValor}
-              className=" p-2 rounded-xl border border-gray-200 focus:border-primary focus:outline-none md:text-sm text-xs font-semibold text-primary-text w-32 disabled:opacity-60 disabled:cursor-not-allowed"
+              className=" p-2 rounded-xl border border-gray-200 focus:border-primary focus:outline-none md:text-sm text-xs font-normal text-primary-text w-32 disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
         </div>
         <div className="flex items-center">
-          <label
-            title="Ativar/Desativar produto"
-            className={`relative inline-flex h-5 w-12 items-center ${isSavingStatus ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+          <div
+            className="tooltip-hover-below flex items-center justify-center"
             onMouseDown={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
+            data-tooltip={
+              isAtivo
+                ? 'Produto ativo — clique para desativar'
+                : 'Produto desativado — clique para ativar'
+            }
           >
-            <input
-              type="checkbox"
-              className="sr-only peer"
+            <JiffyIconSwitch
               checked={isAtivo}
-              onChange={(event) => {
-                event.stopPropagation()
-                onSwitchToggle?.(event.target.checked)
+              onChange={(e) => {
+                e.stopPropagation()
+                onSwitchToggle?.(e.target.checked)
               }}
-              onClick={(e) => e.stopPropagation()}
               disabled={isSavingStatus}
+              bordered={false}
+              size="sm"
+              className="shrink-0 px-0 py-0"
+              inputProps={{
+                'aria-label': isAtivo ? 'Desativar produto' : 'Ativar produto',
+                onClick: (e) => e.stopPropagation(),
+              }}
             />
-            <div
-              className="h-full w-full rounded-full bg-gray-300 transition-colors peer-focus:ring-2 peer-focus:ring-primary peer-checked:bg-primary"
-            />
-            <span
-              className="absolute left-1 top-1/2 block h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-6"
-            />
-          </label>
+          </div>
         </div>
       </div>
     </div>
@@ -865,9 +868,14 @@ const ProdutoListItem = function ProdutoListItem({
     if (produtoId && produtoData) {
       updateProdutoInCache(produtoId, produtoData)
     } else {
-      // Se for criação de novo produto, invalidar para buscar a lista atualizada
-      queryClient.invalidateQueries({
+      // Criação de produto, ou salvamento no painel sem payload (ex.: aba Grupo): refazer lista e metadados de grupo
+      void queryClient.invalidateQueries({
         queryKey: ['produtos', 'infinite'],
+        exact: false,
+        refetchType: 'active',
+      })
+      void queryClient.invalidateQueries({
+        queryKey: ['grupos-produtos'],
         exact: false,
         refetchType: 'active',
       })
@@ -1603,7 +1611,7 @@ const ProdutoListItem = function ProdutoListItem({
         </div>
       </div>
       <div className="h-[4px] border-t-2 border-primary/50 flex-shrink-0"></div>
-      <div className="bg-white md:px-[20px] px-1 md:py-2 border-b border-gray-100 flex-shrink-0">
+      <div className="bg-white px-1 md:py-2 border-b border-gray-100 flex-shrink-0">
           
         {/* Toggle de filtros apenas no mobile */}
         <div className="flex w-full sm:hidden justify-end items-center mt-2">
@@ -1713,7 +1721,7 @@ const ProdutoListItem = function ProdutoListItem({
       {/* Lista de produtos com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto md:px-[30px] px-1 mt-2 space-y-6 scrollbar-hide"
+        className="flex-1 overflow-y-auto px-1 mt-2 space-y-6 scrollbar-hide"
         style={{ maxHeight: 'calc(100vh - 230px)' }}
       >
         {/* Mostrar loading quando está carregando e não há produtos ainda */}
@@ -1737,9 +1745,13 @@ const ProdutoListItem = function ProdutoListItem({
           const primeiroProduto = items[0]
           const grupoId = primeiroProduto?.getGrupoId()
           const grupoVisual = grupoId ? grupoProdutoMap.get(grupoId) : undefined
+          const grupoAtivo = grupoVisual
+            ? gruposProdutos.find((g) => g.getId() === grupoId)?.isAtivo() ?? true
+            : true
           return (
             <div key={grupo} className="space-y-1">
-              <div className="flex items-center justify-between gap-5">
+              {/* Cabeçalho do grupo: sticky dentro do container rolável (empilha até o próximo grupo) */}
+              <div className="sticky top-0 z-20 -mx-1 flex items-center justify-between gap-5 bg-gray-50 px-1 py-1">
                 <div className="flex items-center gap-3">
                   {grupoVisual ? (
                     <span
@@ -1770,20 +1782,36 @@ const ProdutoListItem = function ProdutoListItem({
                       >
                         <MdModeEdit size={14} />
                       </button>
-                      <label className="relative inline-flex items-center h-5 w-12">
-                        <input
-                          type="checkbox"
-                          className="sr-only peer"
-                          checked={grupoVisual ? gruposProdutos.find((g) => g.getId() === grupoId)?.isAtivo() ?? true : true}
-                          onChange={() => handleToggleGroupStatus(grupoId)}
+                      <div
+                        className="tooltip-hover-below flex items-center justify-center"
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                        data-tooltip={
+                          grupoAtivo
+                            ? 'Grupo ativo — clique para desativar'
+                            : 'Grupo desativado — clique para ativar'
+                        }
+                      >
+                        <JiffyIconSwitch
+                          checked={grupoAtivo}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            handleToggleGroupStatus(grupoId)
+                          }}
                           disabled={!grupoId}
+                          bordered={false}
+                          size="sm"
+                          className="shrink-0 px-0 py-0"
+                          inputProps={{
+                            'aria-label': grupoAtivo ? 'Desativar grupo de produtos' : 'Ativar grupo de produtos',
+                            onClick: (e) => e.stopPropagation(),
+                          }}
                         />
-                        <div className="w-full h-full rounded-full bg-gray-300 peer-checked:bg-primary transition-colors" />
-                        <span className="absolute left-1 top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-white shadow peer-checked:translate-x-6 transition-transform" />
-                      </label>
+                      </div>
                     </div>
                     <p className="text-xs text-secondary-text">{items.length} produtos</p>
-                    {grupoVisual && !gruposProdutos.find((g) => g.getId() === grupoId)?.isAtivo() && (
+                    {grupoVisual && !grupoAtivo && (
                       <p className="text-[11px] text-error font-semibold uppercase">Grupo inativo</p>
                     )}
                   </div>
@@ -1812,8 +1840,16 @@ const ProdutoListItem = function ProdutoListItem({
               </div>
 
               {expandedGroups[grupo] === false ? (
-                <div className="rounded-xl border border-dashed border-secondary/40 px-4 py-3 text-sm text-secondary-text">
-                  Produtos ocultos. Clique em "Exibir" para visualizar.
+                <div className="rounded-xl border border-dashed border-secondary/40 px-4 py-1 text-sm text-secondary-text">
+                  Produtos ocultos. Clique {' '}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleGroup(grupo)}
+                    className="font-medium text-primary underline underline-offset-2 transition-colors hover:text-primary/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-sm"
+                  >
+                    aqui!
+                  </button>{' '}
+                  para visualizar.
                 </div>
               ) : (
                 <div className="">

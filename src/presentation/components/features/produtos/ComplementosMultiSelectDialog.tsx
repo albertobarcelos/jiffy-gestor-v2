@@ -339,7 +339,7 @@ export function ComplementosMultiSelectDialog({
               className="font-nunito h-9 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-xs text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
             />
           </div>
-          <div className="max-h-[280px] min-h-0 overflow-y-auto overscroll-y-contain rounded-lg border border-gray-100 bg-gray-50/50 md:max-h-[360px]">
+          <div className="max-h-[280px] min-h-0 overflow-y-auto overscroll-y-contain rounded-lg border border-gray-100 bg-gray-50/50 scrollbar-hide md:max-h-[360px]">
             {isLoadingSelectableGroups ? (
               <p className="font-nunito py-8 text-center text-xs text-secondary-text">
                 Carregando grupos...
@@ -410,14 +410,13 @@ export function ComplementosMultiSelectDialog({
     return (
       <>
         <div className="flex h-full flex-col overflow-hidden">
-          <div className="px-6 py-2">
+          <div className="px-6 py-3">
             {/* Mesmo padrão de NovoComplemento (&quot;Dados do Complemento&quot;): título + linha + ação na mesma linha */}
             <div className="flex min-w-0 flex-wrap items-center gap-3 md:gap-5">
               <h2
                 className="min-w-0 break-words font-exo text-lg font-semibold text-primary md:text-xl"
-                title={produtoNome ? `Complementos de ${produtoNome}` : 'Complementos'}
               >
-                {produtoNome ? `Complementos de ${produtoNome}` : 'Complementos'}
+                Complementos Vinculados
               </h2>
               <div className="h-px min-w-8 flex-1 bg-primary/70" />
               <button
@@ -434,7 +433,9 @@ export function ComplementosMultiSelectDialog({
               {groups.length} grupo{groups.length === 1 ? '' : 's'} vinculados
             </p>
           </div>
-          <div className="flex-1 overflow-y-auto px-2 py-4 md:px-6">{renderDialogBody()}</div>
+          <div className="flex-1 overflow-y-auto px-2 py-4 scrollbar-hide md:px-6">
+            {renderDialogBody()}
+          </div>
         </div>
         <GruposComplementosTabsModal
           state={gruposTabsModalState}
