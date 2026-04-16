@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   JiffySidePanelModal,
   type JiffySidePanelFooterActions,
@@ -9,7 +10,7 @@ import { Produto } from '@/src/domain/entities/Produto'
 import { NovoProduto, type NovoProdutoHandle } from './NovoProduto'
 import { ComplementosMultiSelectDialog } from './ComplementosMultiSelectDialog'
 import { ProdutoImpressorasDialog } from './ProdutoImpressorasDialog'
-import { NovoGrupo } from '../grupos-produtos/NovoGrupo'
+import { NovoGrupo, type NovoGrupoHandle } from '../grupos-produtos/NovoGrupo'
 import { GRUPO_PRODUTOS_MODAL_FORM_ID } from '../grupos-produtos/grupoProdutosModalConstants'
 import { cn } from '@/src/shared/utils/cn'
 
@@ -42,6 +43,7 @@ export function ProdutosTabsModal({
 }: ProdutosTabsModalProps) {
   const produtoId = state.produto?.getId()
   const npRef = useRef<NovoProdutoHandle>(null)
+  const grupoNgRef = useRef<NovoGrupoHandle>(null)
 
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2>(state.initialStepProduto ?? 0)
   const [wizardSaving, setWizardSaving] = useState(false)
@@ -86,6 +88,16 @@ export function ProdutosTabsModal({
   const handleCancelDiscardExit = useCallback(() => {
     setConfirmExitOpen(false)
   }, [])
+
+  /** Salva o produto e fecha o painel — alinhado ao rodapé do wizard (passos 0–1 vs fiscal). */
+  const handleSaveAndCloseFromConfirm = useCallback(() => {
+    setConfirmExitOpen(false)
+    if (wizardStep < 2) {
+      npRef.current?.savePartialAndClose()
+    } else {
+      npRef.current?.saveFinal()
+    }
+  }, [wizardStep])
 
   /**
    * Mantém cada aba montada após a primeira visita enquanto o painel estiver aberto,
@@ -214,6 +226,10 @@ export function ProdutosTabsModal({
     }
   }, [state.tab, wizardStep, wizardSaving, fiscalOnlyBack])
 
+  const handleSalvarGrupoAbaProdutos = useCallback(() => {
+    void grupoNgRef.current?.saveGrupo?.()
+  }, [])
+
   const footerComplementosOuImpressoras = useMemo(
     (): JiffySidePanelFooterActions => ({
       showSave: true,
@@ -234,11 +250,21 @@ export function ProdutosTabsModal({
       }
     }
     return {
+      showCancel: true,
+      cancelLabel: 'Fechar',
+      onCancel: handleRequestClose,
       showSave: true,
-      saveLabel: 'Fechar',
-      onSave: handleRequestClose,
+      saveLabel: 'Salvar',
+      onSave: handleSalvarGrupoAbaProdutos,
+      saveLoading: embedGrupoForm.isSubmitting,
+      saveDisabled: !embedGrupoForm.canSubmit || embedGrupoForm.isSubmitting,
     }
-  }, [embedGrupoTab, embedGrupoForm, handleRequestClose])
+  }, [
+    embedGrupoTab,
+    embedGrupoForm,
+    handleRequestClose,
+    handleSalvarGrupoAbaProdutos,
+  ])
 
   const footerActions = useMemo(() => {
     if (state.tab === 'produto') return footerProduto
@@ -377,6 +403,7 @@ export function ProdutosTabsModal({
           >
             {/* key só pelo grupoId: incluir a aba interna remontava o form e voltava para initialTab 0 */}
             <NovoGrupo
+              ref={grupoNgRef}
               key={state.grupoId}
               grupoId={state.grupoId!}
               isEmbedded
@@ -385,6 +412,7 @@ export function ProdutosTabsModal({
               onEmbedFormStateChange={setEmbedGrupoForm}
               onEmbeddedTabChange={setEmbedGrupoTab}
               onClose={handleRequestClose}
+              onReload={onReload}
               onSaved={() => {
                 onReload?.()
                 onClose()
@@ -400,45 +428,57 @@ export function ProdutosTabsModal({
       </div>
     </JiffySidePanelModal>
 
-    {confirmExitOpen ? (
-      <div
-        className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/50 md:p-4"
-        role="presentation"
-      >
-        <div
-          className="w-[85vw] max-w-[85vw] rounded-lg bg-white p-6 shadow-lg md:w-auto md:max-w-md"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="produtos-tabs-exit-title"
-        >
-          <h3
-            id="produtos-tabs-exit-title"
-            className="mb-4 text-lg font-semibold text-primary-text"
+    {confirmExitOpen && typeof document !== 'undefined'
+      ? createPortal(
+          <div
+            className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 md:p-4"
+            role="presentation"
           >
-            Alterações não salvas
-          </h3>
-          <p className="mb-6 text-sm text-secondary-text">
-            Deseja sair sem salvar? As alterações serão perdidas.
-          </p>
-          <div className="flex flex-col justify-end gap-3 md:flex-row md:justify-end">
-            <button
-              type="button"
-              onClick={handleCancelDiscardExit}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-primary-text transition-colors hover:bg-gray-50"
+            <div
+              className="w-[85vw] max-w-[85vw] rounded-lg bg-white p-6 shadow-lg md:w-auto md:max-w-md"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="produtos-tabs-exit-title"
             >
-              Continuar editando
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirmDiscardExit}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
-            >
-              Sair sem salvar
-            </button>
-          </div>
-        </div>
-      </div>
-    ) : null}
+              <h3
+                id="produtos-tabs-exit-title"
+                className="mb-4 text-lg font-semibold text-primary-text"
+              >
+                Alterações não salvas
+              </h3>
+              <p className="mb-6 text-sm text-secondary-text">
+                Você pode salvar antes de sair ou descartar as alterações.
+              </p>
+              <div className="flex flex-col justify-between mb-2 sm:flex-row sm:flex-wrap sm:justify-between">
+                <button
+                  type="button"
+                  onClick={handleCancelDiscardExit}
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-primary-text transition-colors hover:bg-gray-50"
+                >
+                  Continuar editando
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={handleConfirmDiscardExit}
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-secondary-text transition-colors hover:bg-gray-50"
+                >
+                  Sair sem salvar
+                </button>
+                
+              </div>
+              <button
+                  type="button"
+                  onClick={handleSaveAndCloseFromConfirm}
+                  className="w-full rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
+                >
+                  Salvar e fechar
+                </button>
+            </div>
+          </div>,
+          document.body
+        )
+      : null}
     </>
   )
 }

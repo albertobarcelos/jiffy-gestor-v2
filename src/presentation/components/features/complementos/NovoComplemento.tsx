@@ -1,6 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+} from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Complemento } from '@/src/domain/entities/Complemento'
@@ -75,20 +82,30 @@ interface NovoComplementoProps {
   onCancel?: () => void
 }
 
+/** API imperativa para confirmação ao fechar o painel (`PADRAO_MODAL_SAIR_SEM_SALVAR`). */
+export interface NovoComplementoHandle {
+  isDirty: () => boolean
+  saveComplementoAndClose: () => Promise<void>
+}
+
 /**
  * Componente para criar/editar complemento
  * Replica o design e funcionalidades do Flutter
  */
-export function NovoComplemento({
-  complementoId,
-  isEmbedded,
-  hideEmbeddedHeader,
-  embeddedFormId,
-  hideEmbeddedFormActions,
-  onEmbedFormStateChange,
-  onSaved,
-  onCancel,
-}: NovoComplementoProps) {
+export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplementoProps>(
+  function NovoComplemento(
+    {
+      complementoId,
+      isEmbedded,
+      hideEmbeddedHeader,
+      embeddedFormId,
+      hideEmbeddedFormActions,
+      onEmbedFormStateChange,
+      onSaved,
+      onCancel,
+    },
+    ref
+  ) {
   const router = useRouter()
   const { auth } = useAuthStore()
   const accessToken = auth?.getAccessToken()
@@ -104,6 +121,7 @@ export function NovoComplemento({
   // Estados de loading
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingComplemento, setIsLoadingComplemento] = useState(false)
+  const baselineSerializedRef = useRef<string>('')
 
   const emitEmbedFormState = useCallback(() => {
     onEmbedFormStateChange?.({
@@ -115,6 +133,61 @@ export function NovoComplemento({
   useEffect(() => {
     emitEmbedFormState()
   }, [emitEmbedFormState])
+
+  // Formatação de valor monetário
+  const formatValorInput = (value: string) => {
+    const digits = value.replace(/\D/g, '')
+    if (!digits) {
+      return ''
+    }
+    const numberValue = parseInt(digits, 10)
+    const formatted = (numberValue / 100).toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    })
+    return formatted
+  }
+
+  const formatValorFromNumber = (value: number) => {
+    return value.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    })
+  }
+
+  const parseValorToNumber = (value: string): number => {
+    const normalized = value.replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '')
+    const parsed = parseFloat(normalized)
+    return Number.isNaN(parsed) ? 0 : parsed
+  }
+
+  /** Snapshot alinhado ao body enviado no PATCH/POST. */
+  const getFormSnapshot = useCallback(() => {
+    return JSON.stringify({
+      nome: nome.trim().toUpperCase(),
+      descricao: descricao.trim().toUpperCase(),
+      valor: parseValorToNumber(valor),
+      ativo,
+      tipoImpactoPreco,
+    })
+  }, [nome, descricao, valor, ativo, tipoImpactoPreco])
+
+  const commitBaseline = useCallback(() => {
+    baselineSerializedRef.current = getFormSnapshot()
+  }, [getFormSnapshot])
+
+  const commitBaselineLatestRef = useRef(commitBaseline)
+  commitBaselineLatestRef.current = commitBaseline
+
+  // Baseline em modo criação
+  useEffect(() => {
+    if (isLoadingComplemento) return
+    if (isEditing) return
+    const t = window.setTimeout(() => {
+      commitBaselineLatestRef.current()
+    }, 100)
+    return () => window.clearTimeout(t)
+  }, [isLoadingComplemento, isEditing, complementoId])
 
   // Carregar dados do complemento em modo edição (cancela se id mudar ou desmontar)
   useEffect(() => {
@@ -153,6 +226,10 @@ export function NovoComplemento({
             tipoBanco === 'aumenta' || tipoBanco === 'diminui' ? tipoBanco : 'nenhum'
           setTipoImpactoPreco(tipoNormalizado)
           setAtivo(complemento.isAtivo())
+
+          window.setTimeout(() => {
+            commitBaselineLatestRef.current()
+          }, 100)
         }
       } catch (error) {
         if (!cancelled) {
@@ -172,35 +249,7 @@ export function NovoComplemento({
     }
   }, [isEditing, complementoId, accessToken])
 
-  // Formatação de valor monetário
-  const formatValorInput = (value: string) => {
-    const digits = value.replace(/\D/g, '')
-    if (!digits) {
-      return ''
-    }
-    const numberValue = parseInt(digits, 10)
-    const formatted = (numberValue / 100).toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    })
-    return formatted
-  }
-
-  const formatValorFromNumber = (value: number) => {
-    return value.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    })
-  }
-
-  const parseValorToNumber = (value: string): number => {
-    const normalized = value.replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '')
-    const parsed = parseFloat(normalized)
-    return Number.isNaN(parsed) ? 0 : parsed
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const persistComplemento = useCallback(async () => {
     const token = auth?.getAccessToken()
     if (!token) {
       alert('Token não encontrado')
@@ -243,6 +292,7 @@ export function NovoComplemento({
       }
 
       showToast.success(isEditing ? 'Complemento atualizado com sucesso!' : 'Complemento criado com sucesso!')
+      commitBaselineLatestRef.current()
       if (isEmbedded) {
         onSaved?.()
       } else {
@@ -254,6 +304,35 @@ export function NovoComplemento({
     } finally {
       setIsLoading(false)
     }
+  }, [
+    auth,
+    isEditing,
+    complementoId,
+    nome,
+    descricao,
+    valor,
+    ativo,
+    tipoImpactoPreco,
+    isEmbedded,
+    onSaved,
+    router,
+  ])
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      isDirty: () => {
+        if (isLoadingComplemento) return false
+        return getFormSnapshot() !== baselineSerializedRef.current
+      },
+      saveComplementoAndClose: () => persistComplemento(),
+    }),
+    [getFormSnapshot, isLoadingComplemento, persistComplemento]
+  )
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await persistComplemento()
   }
 
   const handleCancel = () => {
@@ -439,5 +518,6 @@ export function NovoComplemento({
       </div>
     </div>
   )
-}
+})
 
+NovoComplemento.displayName = 'NovoComplemento'

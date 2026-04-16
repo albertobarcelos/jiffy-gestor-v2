@@ -1,6 +1,13 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+} from 'react'
 import { useRouter } from 'next/navigation'
 import { MdAdd } from 'react-icons/md'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
@@ -59,6 +66,8 @@ interface NovoGrupoComplementoProps {
   }) => void
   onClose?: () => void
   onSaved?: () => void
+  /** Após salvar mantendo o painel aberto (rodapé na aba Complementos) — invalida listas. */
+  onReload?: () => void
   /**
    * No `GruposComplementosTabsModal`: o botão "Vincular complementos" só troca para a aba Complementos
    * (a lista e o vínculo ficam lá). Nas páginas `/cadastros/...` não é passado — mantém o modal seletor.
@@ -66,20 +75,35 @@ interface NovoGrupoComplementoProps {
   onGoToComplementosTab?: () => void
 }
 
+/** API imperativa para confirmação ao fechar o painel (`PADRAO_MODAL_SAIR_SEM_SALVAR`). */
+export interface NovoGrupoComplementoHandle {
+  isDirty: () => boolean
+  /** Salva o grupo sem fechar o painel (aba Complementos). */
+  saveGrupoComplemento: () => Promise<void>
+  saveGrupoComplementoAndClose: () => Promise<void>
+}
+
 /**
  * Componente para criar/editar grupo de complementos
  * Replica o design e funcionalidades do Flutter
  */
-export function NovoGrupoComplemento({
-  grupoId,
-  isEmbedded = false,
-  embeddedFormId,
-  hideEmbeddedFormActions,
-  onEmbedFormStateChange,
-  onClose,
-  onSaved,
-  onGoToComplementosTab,
-}: NovoGrupoComplementoProps) {
+export const NovoGrupoComplemento = forwardRef<
+  NovoGrupoComplementoHandle,
+  NovoGrupoComplementoProps
+>(function NovoGrupoComplemento(
+  {
+    grupoId,
+    isEmbedded = false,
+    embeddedFormId,
+    hideEmbeddedFormActions,
+    onEmbedFormStateChange,
+    onClose,
+    onSaved,
+    onReload,
+    onGoToComplementosTab,
+  },
+  ref
+) {
   const router = useRouter()
   const { auth } = useAuthStore()
   const isEditing = !!grupoId
@@ -96,6 +120,7 @@ export function NovoGrupoComplemento({
   const [isLoadingGrupo, setIsLoadingGrupo] = useState(false)
   const [showComplementosModal, setShowComplementosModal] = useState(false)
   const hasLoadedGrupoRef = useRef(false)
+  const baselineSerializedRef = useRef<string>('')
   const [complementosTabsState, setComplementosTabsState] = useState<ComplementosTabsModalState>({
     open: false,
     tab: 'complemento',
@@ -123,6 +148,38 @@ export function NovoGrupoComplemento({
   useEffect(() => {
     emitEmbedFormState()
   }, [emitEmbedFormState])
+
+  /** Snapshot dos campos persistidos — mesmo critério do PATCH/POST. */
+  const getFormSnapshot = useCallback(() => {
+    return JSON.stringify({
+      nome: nome.trim(),
+      qtdMinima,
+      qtdMaxima,
+      ativo,
+      complementosIds: [...selectedComplementosIds].map(String).sort(),
+    })
+  }, [nome, qtdMinima, qtdMaxima, ativo, selectedComplementosIds])
+
+  const commitBaseline = useCallback(() => {
+    baselineSerializedRef.current = getFormSnapshot()
+  }, [getFormSnapshot])
+
+  const commitBaselineLatestRef = useRef(commitBaseline)
+  commitBaselineLatestRef.current = commitBaseline
+
+  useEffect(() => {
+    hasLoadedGrupoRef.current = false
+  }, [grupoId])
+
+  // Baseline em modo criação (estado inicial)
+  useEffect(() => {
+    if (isLoadingGrupo) return
+    if (isEditing) return
+    const t = window.setTimeout(() => {
+      commitBaselineLatestRef.current()
+    }, 100)
+    return () => window.clearTimeout(t)
+  }, [isLoadingGrupo, isEditing, grupoId])
 
   // Carregar dados do grupo se estiver editando
   useEffect(() => {
@@ -161,6 +218,10 @@ export function NovoGrupoComplemento({
                     .filter(Boolean)
 
             setSelectedComplementosIds(complementosIds)
+
+            window.setTimeout(() => {
+              commitBaselineLatestRef.current()
+            }, 100)
           } catch (parseError) {
             console.error('Erro ao processar dados do grupo:', parseError)
             showToast.error('Erro ao carregar dados do grupo. Verifique se as quantidades estão corretas.')
@@ -182,8 +243,7 @@ export function NovoGrupoComplemento({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing, grupoId])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const persistGrupo = useCallback(async (opts?: { keepModalOpen?: boolean }) => {
     const token = auth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado')
@@ -237,7 +297,13 @@ export function NovoGrupoComplemento({
         isEditing ? 'Grupo de complementos atualizado com sucesso!' : 'Grupo de complementos criado com sucesso!'
       )
 
+      commitBaselineLatestRef.current()
+
       if (isEmbedded) {
+        if (opts?.keepModalOpen) {
+          onReload?.()
+          return
+        }
         onSaved?.()
         onClose?.()
       } else {
@@ -252,6 +318,38 @@ export function NovoGrupoComplemento({
     } finally {
       setIsLoading(false)
     }
+  }, [
+    auth,
+    isEditing,
+    grupoId,
+    nome,
+    qtdMinima,
+    qtdMaxima,
+    ativo,
+    selectedComplementosIds,
+    isEmbedded,
+    onReload,
+    onSaved,
+    onClose,
+    router,
+  ])
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      isDirty: () => {
+        if (isLoadingGrupo) return false
+        return getFormSnapshot() !== baselineSerializedRef.current
+      },
+      saveGrupoComplemento: () => persistGrupo({ keepModalOpen: true }),
+      saveGrupoComplementoAndClose: () => persistGrupo(),
+    }),
+    [getFormSnapshot, isLoadingGrupo, persistGrupo]
+  )
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await persistGrupo()
   }
 
   const handleCancel = () => {
@@ -468,5 +566,6 @@ export function NovoGrupoComplemento({
       />
     </div>
   )
-}
+})
 
+NovoGrupoComplemento.displayName = 'NovoGrupoComplemento'

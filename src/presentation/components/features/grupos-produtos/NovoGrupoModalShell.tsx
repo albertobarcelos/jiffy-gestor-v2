@@ -1,10 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
-import { NovoGrupo } from './NovoGrupo'
+import { NovoGrupo, type NovoGrupoHandle } from './NovoGrupo'
 import { GRUPO_PRODUTOS_MODAL_FORM_ID } from './grupoProdutosModalConstants'
 
 interface NovoGrupoModalShellProps {
@@ -37,6 +37,7 @@ export function NovoGrupoModalShell({ grupoId }: NovoGrupoModalShellProps) {
     canSubmit: false,
   })
   const [embedSubTab, setEmbedSubTab] = useState(0)
+  const ngRef = useRef<NovoGrupoHandle>(null)
 
   const handleClose = () => {
     router.push('/cadastros/grupos-produtos')
@@ -45,20 +46,39 @@ export function NovoGrupoModalShell({ grupoId }: NovoGrupoModalShellProps) {
     queryClient.invalidateQueries({ queryKey: ['produtos', 'infinite'] })
   }
 
+  const handleReloadCaches = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false })
+    void queryClient.invalidateQueries({
+      queryKey: ['produtos', 'infinite'],
+      exact: false,
+      refetchType: 'active',
+    })
+  }, [queryClient])
+
+  const handleSalvarGrupoAbaProdutos = useCallback(() => {
+    void ngRef.current?.saveGrupo?.()
+  }, [])
+
   const footerActions =
     embedSubTab === 0
       ? {
           showSave: true,
-          saveLabel: mode === 'edit' ? 'Atualizar' : 'Salvar',
+          saveLabel: 'Salvar',
           saveFormId: GRUPO_PRODUTOS_MODAL_FORM_ID,
           saveLoading: embedFormState.isSubmitting,
           saveDisabled:
             !embedFormState.canSubmit || embedFormState.isSubmitting,
         }
       : {
+          showCancel: true,
+          cancelLabel: 'Fechar',
+          onCancel: handleClose,
           showSave: true,
-          saveLabel: 'Fechar',
-          onSave: handleClose,
+          saveLabel: 'Salvar',
+          onSave: handleSalvarGrupoAbaProdutos,
+          saveLoading: embedFormState.isSubmitting,
+          saveDisabled:
+            !embedFormState.canSubmit || embedFormState.isSubmitting,
         }
 
   return (
@@ -74,6 +94,7 @@ export function NovoGrupoModalShell({ grupoId }: NovoGrupoModalShellProps) {
     >
       <div className="flex min-h-0 flex-1 flex-col">
         <NovoGrupo
+          ref={ngRef}
           grupoId={grupoId}
           isEmbedded
           embeddedFormId={GRUPO_PRODUTOS_MODAL_FORM_ID}
@@ -82,6 +103,7 @@ export function NovoGrupoModalShell({ grupoId }: NovoGrupoModalShellProps) {
           onEmbedFormStateChange={setEmbedFormState}
           onEmbeddedTabChange={setEmbedSubTab}
           onClose={handleClose}
+          onReload={handleReloadCaches}
           onSaved={handleClose}
         />
       </div>

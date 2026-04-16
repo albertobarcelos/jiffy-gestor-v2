@@ -1,6 +1,15 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, type FormEvent, type ReactNode } from 'react'
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+  type FormEvent,
+  type ReactNode,
+} from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
@@ -13,6 +22,7 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { Input } from '@/src/presentation/components/ui/input'
 import { cn } from '@/src/shared/utils/cn'
+import { showToast } from '@/src/shared/utils/toast'
 
 /** Labels outlined em preto — igual NovoGrupoComplemento */
 const sxOutlinedLabelTextoEscuro = {
@@ -58,7 +68,19 @@ interface NovoGrupoProps {
   onEmbeddedTabChange?: (tabIndex: number) => void
   onClose?: () => void
   onSaved?: () => void
+  /** Após salvar mantendo o painel aberto (ex.: aba Produtos vinculados) — invalida listas sem fechar. */
+  onReload?: () => void
   initialTab?: number // 0 = Detalhes do Grupo, 1 = Produtos Vinculados
+}
+
+/** API imperativa para confirmação ao fechar o painel (`PADRAO_MODAL_SAIR_SEM_SALVAR`). */
+export interface NovoGrupoHandle {
+  /** Há alterações em relação ao último baseline (carregamento ou salvamento). */
+  isDirty: () => boolean
+  /** Persiste o grupo sem depender do `<form>` (rodapé na aba Produtos vinculados). */
+  saveGrupo: () => Promise<void>
+  /** Salva e fecha o painel (mesmo fluxo do submit do formulário em modo embed). */
+  saveGrupoAndClose: () => Promise<void>
 }
 
 /** Envolve o card de detalhes em `<form>` apenas quando há `embeddedFormId` (submit pelo rodapé do painel) */
@@ -85,18 +107,22 @@ function GrupoDetalhesFormShell({
  * Componente para criar/editar grupo de produtos
  * Replica o design e lógica do Flutter NovoGrupoTabbedWidget
  */
-export function NovoGrupo({
-  grupoId,
-  isEmbedded = false,
-  embeddedFormId,
-  hideEmbeddedFormActions,
-  onGrupoNomeChange,
-  onEmbedFormStateChange,
-  onEmbeddedTabChange,
-  onClose,
-  onSaved,
-  initialTab = 0,
-}: NovoGrupoProps) {
+export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function NovoGrupo(
+  {
+    grupoId,
+    isEmbedded = false,
+    embeddedFormId,
+    hideEmbeddedFormActions,
+    onGrupoNomeChange,
+    onEmbedFormStateChange,
+    onEmbeddedTabChange,
+    onClose,
+    onSaved,
+    onReload,
+    initialTab = 0,
+  },
+  ref
+) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { auth } = useAuthStore()
@@ -172,10 +198,41 @@ export function NovoGrupo({
     [normalizeColor]
   )
 
+  /** Snapshot só dos campos persistidos — aba interna não entra (PADRAO_MODAL_SAIR_SEM_SALVAR). */
+  const getFormSnapshot = useCallback(() => {
+    return JSON.stringify({
+      nome,
+      ativo,
+      corHex: normalizeColor(corHex),
+      iconName,
+      ativoDelivery,
+      ativoLocal,
+    })
+  }, [nome, ativo, corHex, iconName, ativoDelivery, ativoLocal, normalizeColor])
+
+  const baselineSerializedRef = useRef<string>('')
+
+  const commitBaseline = useCallback(() => {
+    baselineSerializedRef.current = getFormSnapshot()
+  }, [getFormSnapshot])
+
+  const commitBaselineLatestRef = useRef(commitBaseline)
+  commitBaselineLatestRef.current = commitBaseline
+
   // Atualiza a aba ativa quando initialTab mudar
   useEffect(() => {
     setActiveTab(initialTab)
   }, [initialTab])
+
+  // Baseline inicial em modo criação (estado padrão aplicado)
+  useEffect(() => {
+    if (isLoadingData) return
+    if (isEditMode) return
+    const t = window.setTimeout(() => {
+      commitBaselineLatestRef.current()
+    }, 100)
+    return () => window.clearTimeout(t)
+  }, [isLoadingData, isEditMode, effectiveGrupoId])
 
   // Carrega dados do grupo para edição
   useEffect(() => {
@@ -218,6 +275,10 @@ export function NovoGrupo({
 
         hasLoadedGrupoRef.current = true
         loadedGrupoIdRef.current = effectiveGrupoId
+
+        window.setTimeout(() => {
+          commitBaselineLatestRef.current()
+        }, 100)
       } catch (error) {
         console.error('Erro ao carregar grupo:', error)
         alert('Erro ao carregar dados do grupo')
@@ -227,83 +288,121 @@ export function NovoGrupo({
     }
 
     loadGrupo()
-  }, [isEditMode, effectiveGrupoId, auth])
+  }, [isEditMode, effectiveGrupoId, auth, normalizeColor])
 
-  const handleSave = async () => {
-    if (!nome.trim()) {
-      alert('Nome do grupo é obrigatório')
-      return
-    }
-
-    const token = auth?.getAccessToken()
-    if (!token) {
-      alert('Token não encontrado')
-      return
-    }
-
-    setIsLoading(true)
-
-    try {
-      const url = isEditMode
-        ? `/api/grupos-produtos/${effectiveGrupoId}`
-        : '/api/grupos-produtos'
-      const method = isEditMode ? 'PATCH' : 'POST'
-
-      const body = isEditMode
-        ? {
-            nome,
-            ativo,
-            corHex,
-            iconName,
-            ativoDelivery,
-            ativoLocal,
-          }
-        : {
-            nome,
-            ativo,
-            corHex,
-            iconName,
-            ativoDelivery,
-            ativoLocal,
-          }
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Erro ao salvar grupo')
+  const handleSave = useCallback(
+    async (opts?: { keepModalOpen?: boolean }) => {
+      if (!nome.trim()) {
+        alert('Nome do grupo é obrigatório')
+        return
       }
 
-      // Sucesso — mesmo cache que na página avulsa (lista de produtos depende dos dois)
-      if (isEmbedded) {
-        void queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false })
-        void queryClient.invalidateQueries({
-          queryKey: ['produtos', 'infinite'],
-          exact: false,
-          refetchType: 'active',
+      const token = auth?.getAccessToken()
+      if (!token) {
+        alert('Token não encontrado')
+        return
+      }
+
+      setIsLoading(true)
+
+      try {
+        const url = isEditMode
+          ? `/api/grupos-produtos/${effectiveGrupoId}`
+          : '/api/grupos-produtos'
+        const method = isEditMode ? 'PATCH' : 'POST'
+
+        const body = isEditMode
+          ? {
+              nome,
+              ativo,
+              corHex,
+              iconName,
+              ativoDelivery,
+              ativoLocal,
+            }
+          : {
+              nome,
+              ativo,
+              corHex,
+              iconName,
+              ativoDelivery,
+              ativoLocal,
+            }
+
+        const response = await fetch(url, {
+          method,
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(body),
         })
-        onSaved?.()
-        onClose?.()
-      } else {
-        router.push('/cadastros/grupos-produtos')
-        router.refresh() // Força a revalidação dos dados da rota para recarregar a lista
-        queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false }) // Invalida todas as queries de grupos de produtos
-        queryClient.invalidateQueries({ queryKey: ['produtos', 'infinite'] }) // Invalida o cache do React Query para produtos
+
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.message || 'Erro ao salvar grupo')
+        }
+
+        // Sucesso — mesmo cache que na página avulsa (lista de produtos depende dos dois)
+        if (isEmbedded) {
+          void queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false })
+          void queryClient.invalidateQueries({
+            queryKey: ['produtos', 'infinite'],
+            exact: false,
+            refetchType: 'active',
+          })
+          commitBaselineLatestRef.current()
+          if (opts?.keepModalOpen) {
+            onReload?.()
+            showToast.success('Grupo salvo com sucesso.')
+            return
+          }
+          onSaved?.()
+          onClose?.()
+        } else {
+          router.push('/cadastros/grupos-produtos')
+          router.refresh() // Força a revalidação dos dados da rota para recarregar a lista
+          queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false }) // Invalida todas as queries de grupos de produtos
+          queryClient.invalidateQueries({ queryKey: ['produtos', 'infinite'] }) // Invalida o cache do React Query para produtos
+        }
+      } catch (error: any) {
+        console.error('Erro ao salvar grupo:', error)
+        alert(error.message || 'Erro ao salvar grupo')
+      } finally {
+        setIsLoading(false)
       }
-    } catch (error: any) {
-      console.error('Erro ao salvar grupo:', error)
-      alert(error.message || 'Erro ao salvar grupo')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+    },
+    [
+      nome,
+      isEditMode,
+      effectiveGrupoId,
+      ativo,
+      corHex,
+      iconName,
+      ativoDelivery,
+      ativoLocal,
+      auth,
+      isEmbedded,
+      queryClient,
+      router,
+      onReload,
+      onSaved,
+      onClose,
+    ]
+  )
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      isDirty: () => {
+        if (isLoadingData) return false
+        return getFormSnapshot() !== baselineSerializedRef.current
+      },
+      saveGrupo: () => handleSave({ keepModalOpen: true }),
+      saveGrupoAndClose: () => handleSave(),
+    }),
+    [getFormSnapshot, isLoadingData, handleSave]
+  )
 
   const handleCancel = () => {
     if (isEmbedded) {
@@ -624,5 +723,6 @@ export function NovoGrupo({
       />
     </div>
   )
-}
+})
 
+NovoGrupo.displayName = 'NovoGrupo'
