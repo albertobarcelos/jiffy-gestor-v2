@@ -1,6 +1,6 @@
 'use client'
 
-import { useReducer, useMemo, useEffect, useRef } from 'react'
+import { useReducer, useMemo, useEffect, useRef, useCallback } from 'react'
 import type { StatusFilter, TriState } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutosFilters'
 
 interface FiltersState {
@@ -107,19 +107,25 @@ export function useProdutosFilters() {
     [state.debouncedSearch, ativoFilter, ativoLocalBoolean, ativoDeliveryBoolean, state.grupoProdutoFilter, state.grupoComplementoFilter, state.limit]
   )
 
+  // `dispatch` é estável (garantia do useReducer), portanto essas funções também são estáveis.
+  const setSearch = useCallback((value: string) => dispatch({ type: 'SET_SEARCH', value }), [])
+  const setStatus = useCallback((value: StatusFilter) => dispatch({ type: 'SET_STATUS', value }), [])
+  const setAtivoLocal = useCallback((value: TriState) => dispatch({ type: 'SET_ATIVO_LOCAL', value }), [])
+  const setAtivoDelivery = useCallback((value: TriState) => dispatch({ type: 'SET_ATIVO_DELIVERY', value }), [])
+  const setGrupoProduto = useCallback((value: string) => dispatch({ type: 'SET_GRUPO_PRODUTO', value }), [])
+  const setGrupoComplemento = useCallback((value: string) => dispatch({ type: 'SET_GRUPO_COMPLEMENTO', value }), [])
+  const reset = useCallback(() => dispatch({ type: 'RESET' }), [])
+
+  const actions = useMemo(
+    () => ({ setSearch, setStatus, setAtivoLocal, setAtivoDelivery, setGrupoProduto, setGrupoComplemento, reset }),
+    [setSearch, setStatus, setAtivoLocal, setAtivoDelivery, setGrupoProduto, setGrupoComplemento, reset]
+  )
+
   return {
     state,
     dispatch,
     queryParams,
     filterStatus: state.filterStatus,
-    actions: {
-      setSearch: (value: string) => dispatch({ type: 'SET_SEARCH', value }),
-      setStatus: (value: StatusFilter) => dispatch({ type: 'SET_STATUS', value }),
-      setAtivoLocal: (value: TriState) => dispatch({ type: 'SET_ATIVO_LOCAL', value }),
-      setAtivoDelivery: (value: TriState) => dispatch({ type: 'SET_ATIVO_DELIVERY', value }),
-      setGrupoProduto: (value: string) => dispatch({ type: 'SET_GRUPO_PRODUTO', value }),
-      setGrupoComplemento: (value: string) => dispatch({ type: 'SET_GRUPO_COMPLEMENTO', value }),
-      reset: () => dispatch({ type: 'RESET' }),
-    },
+    actions,
   }
 }

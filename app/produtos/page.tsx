@@ -10,7 +10,7 @@ import { ProdutosList } from '@/src/presentation/components/features/produtos/Pr
  */
 export default function ProdutosPage() {
   return (
-    <div className="h-full">
+    <div className="flex min-h-0 flex-1 flex-col">
       <Suspense fallback={<div>Carregando produtos...</div>}>
         <ProdutosList />
       </Suspense>

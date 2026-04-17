@@ -1,6 +1,6 @@
 'use client'
 
-import type { Produto } from '@/src/domain/entities/Produto'
+import { memo } from 'react'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { MdKeyboardArrowDown, MdModeEdit } from 'react-icons/md'
@@ -10,23 +10,28 @@ interface GrupoVisual {
   iconName: string
 }
 
-interface ProdutosGroupHeaderProps {
+/**
+ * Handlers recebem os IDs como argumento para que o componente possa ser
+ * memoizado sem que callbacks inline invalidem o memo em cada render do pai.
+ */
+export interface ProdutosGroupHeaderProps {
   grupo: string
   grupoId?: string
+  groupKey: string
   grupoVisual?: GrupoVisual
   grupoAtivo: boolean
   itemCount: number
   isExpanded: boolean
-  primeiroProduto?: Produto
-  onToggleExpand: () => void
-  onEditGrupo: () => void
-  onToggleGrupoStatus: () => void
-  onAddProduto: () => void
+  onToggleExpand: (groupKey: string) => void
+  onEditGrupo: (grupoId: string | undefined) => void
+  onToggleGrupoStatus: (grupoId: string) => void
+  onAddProduto: (grupoNome: string, grupoId: string | undefined) => void
 }
 
-export function ProdutosGroupHeader({
+function ProdutosGroupHeaderInner({
   grupo,
   grupoId,
+  groupKey,
   grupoVisual,
   grupoAtivo,
   itemCount,
@@ -37,7 +42,7 @@ export function ProdutosGroupHeader({
   onAddProduto,
 }: ProdutosGroupHeaderProps) {
   return (
-    <div className="sticky top-0 z-20 -mx-1 flex items-center justify-between gap-5 bg-gray-50 px-1 py-1">
+    <div className="flex items-center justify-between gap-5 bg-gray-50 px-1 py-1">
       <div className="flex items-center gap-3">
         {grupoVisual ? (
           <span
@@ -61,7 +66,7 @@ export function ProdutosGroupHeader({
             <button
               type="button"
               title="Editar grupo"
-              onClick={onEditGrupo}
+              onClick={() => onEditGrupo(grupoId)}
               disabled={!grupoId}
               className={`w-5 h-5 rounded-full border border-gray-200 flex items-center justify-center text-primary-text hover:bg-primary/10 transition-colors ${
                 !grupoId ? 'opacity-50 cursor-not-allowed' : ''
@@ -82,7 +87,7 @@ export function ProdutosGroupHeader({
                 checked={grupoAtivo}
                 onChange={(e) => {
                   e.stopPropagation()
-                  onToggleGrupoStatus()
+                  if (grupoId) onToggleGrupoStatus(grupoId)
                 }}
                 disabled={!grupoId}
                 bordered={false}
@@ -105,7 +110,7 @@ export function ProdutosGroupHeader({
       <div className="flex flex-col-reverse md:flex-row items-center justify-end flex-1 md:gap-4 gap-2">
         <button
           type="button"
-          onClick={onAddProduto}
+          onClick={() => onAddProduto(grupo, grupoId)}
           className="h-8 md:px-[20px] px-2 bg-info border border-primary/50 text-primary rounded-lg font-semibold font-exo md:text-sm text-xs flex items-center md:gap-2 hover:bg-primary/10 transition-colors"
         >
           Adicionar produto
@@ -113,7 +118,7 @@ export function ProdutosGroupHeader({
         </button>
         <button
           type="button"
-          onClick={onToggleExpand}
+          onClick={() => onToggleExpand(groupKey)}
           className="flex items-center gap-1 text-primary md:text-sm text-xs font-semibold hover:text-primary/80 transition-colors"
           aria-expanded={isExpanded}
         >
@@ -126,3 +131,5 @@ export function ProdutosGroupHeader({
     </div>
   )
 }
+
+export const ProdutosGroupHeader = memo(ProdutosGroupHeaderInner)

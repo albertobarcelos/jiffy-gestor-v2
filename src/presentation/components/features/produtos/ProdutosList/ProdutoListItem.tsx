@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useMemo, useCallback } from 'react'
+import { memo, useMemo } from 'react'
 import type { Produto } from '@/src/domain/entities/Produto'
 import type { ToggleField } from '@/src/shared/types/produto'
 import { ProdutoActionIcons } from './ProdutoActionIcons'
@@ -11,21 +11,19 @@ export interface ProdutoListItemProps {
   produto: Produto
   isSavingValor?: boolean
   isSavingStatus?: boolean
-  savingToggleState?: Partial<Record<ToggleField, boolean>>
-  onValorChange: (valor: number) => void
-  onSwitchToggle: (status: boolean) => void
-  onToggleBoolean: (field: ToggleField, value: boolean) => void
-  onOpenComplementosModal: () => void
-  onOpenImpressorasModal: () => void
-  onEditProduto: () => void
-  onCopyProduto: () => void
+  onValorChange: (produtoId: string, valor: number) => void
+  onSwitchToggle: (produtoId: string, status: boolean) => void
+  onToggleBoolean: (produtoId: string, field: ToggleField, value: boolean) => void
+  onOpenComplementosModal: (produto: Produto) => void
+  onOpenImpressorasModal: (produto: Produto) => void
+  onEditProduto: (produtoId: string) => void
+  onCopyProduto: (produtoId: string) => void
 }
 
 function ProdutoListItemBase({
   produto,
   isSavingValor,
   isSavingStatus,
-  savingToggleState,
   onValorChange,
   onSwitchToggle,
   onToggleBoolean,
@@ -34,6 +32,7 @@ function ProdutoListItemBase({
   onEditProduto,
   onCopyProduto,
 }: ProdutoListItemProps) {
+  const produtoId = produto.getId()
   const isAtivo = produto.isAtivo()
 
   const toggleStates = useMemo<Record<ToggleField, boolean>>(
@@ -51,7 +50,6 @@ function ProdutoListItemBase({
   const sharedIconProps = {
     produto,
     toggleStates,
-    savingToggleState,
     onToggleBoolean,
     onOpenComplementosModal,
     onOpenImpressorasModal,
@@ -60,7 +58,7 @@ function ProdutoListItemBase({
 
   return (
     <div
-      onClick={onEditProduto}
+      onClick={() => onEditProduto(produtoId)}
       className="bg-white border border-gray-200 hover:bg-secondary-text/10 md:px-4 px-2 md:py-2 py-1 flex items-center cursor-pointer"
     >
       <div className="flex-1">
@@ -100,13 +98,13 @@ function ProdutoListItemBase({
           <ProdutoValorInput
             valor={produto.getValor()}
             disabled={isSavingValor}
-            onCommit={onValorChange}
+            onCommit={(valor) => onValorChange(produtoId, valor)}
           />
         </div>
         <ProdutoStatusSwitch
           isAtivo={isAtivo}
           disabled={isSavingStatus}
-          onChange={onSwitchToggle}
+          onChange={(status) => onSwitchToggle(produtoId, status)}
         />
       </div>
     </div>
@@ -118,7 +116,6 @@ function arePropsEqual(prev: ProdutoListItemProps, next: ProdutoListItemProps): 
     prev.produto === next.produto &&
     prev.isSavingValor === next.isSavingValor &&
     prev.isSavingStatus === next.isSavingStatus &&
-    prev.savingToggleState === next.savingToggleState &&
     prev.onValorChange === next.onValorChange &&
     prev.onSwitchToggle === next.onSwitchToggle &&
     prev.onToggleBoolean === next.onToggleBoolean &&
