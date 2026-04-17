@@ -111,7 +111,7 @@ const footerSavePrimarySx = {
   },
 } as const
 
-function footerSavePrimaryBarSx(isFirstColumn: boolean) {
+export function footerSavePrimaryBarSx(isFirstColumn: boolean) {
   const bl =
     isFirstColumn ?
       ({ borderBottomLeftRadius: PANEL_RADIUS_LEFT } as const)
@@ -178,7 +178,7 @@ function footerBarSecondarySx(isFirstColumn: boolean) {
 }
 
 /** Anterior / Próximo com tom primary/15 (equivalente visual a `bg-primary/15`) */
-function footerBarPrimaryMutedSx(isFirstColumn: boolean) {
+export function footerBarPrimaryMutedSx(isFirstColumn: boolean) {
   const bl =
     isFirstColumn ?
       ({ borderBottomLeftRadius: PANEL_RADIUS_LEFT } as const)

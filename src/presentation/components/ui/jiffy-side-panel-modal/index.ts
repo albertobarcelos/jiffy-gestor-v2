@@ -1,4 +1,8 @@
-export { JiffySidePanelModal } from './JiffySidePanelModal'
+export {
+  JiffySidePanelModal,
+  footerSavePrimaryBarSx,
+  footerBarPrimaryMutedSx,
+} from './JiffySidePanelModal'
 export type {
   JiffySidePanelModalProps,
   JiffySidePanelFooterActions,

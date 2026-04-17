@@ -79,6 +79,10 @@ import {
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { SeletorClienteModal } from './SeletorClienteModal'
 import {
+  ModalLancamentoProdutoPainel,
+  type ModalLancamentoProdutoPainelConfirmPayload,
+} from './ModalLancamentoProdutoPainel'
+import {
   ProdutosTabsModal,
   ProdutosTabsModalState,
 } from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
@@ -499,6 +503,12 @@ export function NovoPedidoModal({
   // Estados para complementos
   const [produtoSelecionadoParaComplementos, setProdutoSelecionadoParaComplementos] =
     useState<Produto | null>(null)
+  /** Fluxo no grid: painel único (slide) com preço e/ou complementos antes de lançar na lista */
+  const [modalLancamentoProdutoPainelOpen, setModalLancamentoProdutoPainelOpen] = useState(false)
+  const [produtoParaLancamentoPainel, setProdutoParaLancamentoPainel] = useState<Produto | null>(
+    null
+  )
+
   const [modalComplementosOpen, setModalComplementosOpen] = useState(false)
   // Estado para rastrear complementos selecionados por produto (produtoId -> complementoIds[])
   const [complementosSelecionados, setComplementosSelecionados] = useState<
@@ -1181,33 +1191,51 @@ export function NovoPedidoModal({
     const produto = produtosList.find(p => p.getId() === produtoId)
     if (!produto) return
 
-    const abreComplementos = produto.abreComplementosAtivo()
-    const temComplementos = produtoTemComplementos(produto)
+    const mostrarAlterarPreco = produto.permiteAlterarPrecoAtivo()
+    const mostrarComplementos =
+      produto.abreComplementosAtivo() && produtoTemComplementos(produto)
 
-    // Só abre o modal ao escolher no grupo quando abreComplementos está true; na lista o usuário abre pelo botão
-    if (abreComplementos && temComplementos) {
-      setProdutoSelecionadoParaComplementos(produto)
-      setProdutoIndexEdicaoComplementos(null) // Novo produto, não está editando
-      // Inicializar complementos vazios para novo produto
-      setComplementosSelecionados(prev => ({
+    if (!mostrarAlterarPreco && !mostrarComplementos) {
+      setProdutos(prev => [
         ...prev,
-        [produto.getId()]: [],
-      }))
-      setModalComplementosOpen(true)
+        {
+          produtoId: produto.getId(),
+          nome: produto.getNome(),
+          quantidade: 1,
+          valorUnitario: produto.getValor(),
+          complementos: [],
+        },
+      ])
       return
     }
 
-    // Se não tem complementos, adicionar diretamente
-    setProdutos([
-      ...produtos,
+    setProdutoParaLancamentoPainel(produto)
+    setModalLancamentoProdutoPainelOpen(true)
+  }
+
+  /** Confirma o painel unificado (grid): adiciona linha com valor e complementos já definidos */
+  const confirmarLancamentoProdutoPainel = ({
+    valorUnitario,
+    complementos,
+  }: ModalLancamentoProdutoPainelConfirmPayload) => {
+    const produto = produtoParaLancamentoPainel
+    if (!produto) return
+
+    setProdutos(prev => [
+      ...prev,
       {
         produtoId: produto.getId(),
         nome: produto.getNome(),
         quantidade: 1,
-        valorUnitario: produto.getValor(),
-        complementos: [],
+        valorUnitario,
+        complementos,
+        tipoDesconto: null,
+        valorDesconto: null,
+        tipoAcrescimo: null,
+        valorAcrescimo: null,
       },
     ])
+    // Fechamento e limpeza de `produtoParaLancamentoPainel` ficam no painel (onOpenChange + onAfterClose)
   }
 
   // Função para confirmar e adicionar/atualizar produto com complementos
@@ -1277,7 +1305,7 @@ export function NovoPedidoModal({
       }
       setProdutos(novosProdutos)
     } else {
-      // Adicionar novo produto com complementos à lista
+      // Novo item pelo diálogo de complementos (fluxo legado — hoje o grid usa o painel unificado)
       setProdutos([
         ...produtos,
         {
@@ -1670,6 +1698,8 @@ export function NovoPedidoModal({
     setGrupoSelecionadoId(null)
     setCurrentStep(1)
     setComplementosSelecionados({})
+    setModalLancamentoProdutoPainelOpen(false)
+    setProdutoParaLancamentoPainel(null)
     setProdutoSelecionadoParaComplementos(null)
     setModalComplementosOpen(false)
     setModalEdicaoProdutoOpen(false)
@@ -4366,6 +4396,21 @@ export function NovoPedidoModal({
             onSelect={handleSelectCliente}
           />
         )}
+
+        {produtoParaLancamentoPainel ? (
+          <ModalLancamentoProdutoPainel
+            open={modalLancamentoProdutoPainelOpen}
+            onOpenChange={setModalLancamentoProdutoPainelOpen}
+            onAfterClose={() => setProdutoParaLancamentoPainel(null)}
+            produto={produtoParaLancamentoPainel}
+            mostrarAlterarPreco={produtoParaLancamentoPainel.permiteAlterarPrecoAtivo()}
+            mostrarComplementos={
+              produtoParaLancamentoPainel.abreComplementosAtivo() &&
+              produtoTemComplementos(produtoParaLancamentoPainel)
+            }
+            onConfirm={confirmarLancamentoProdutoPainel}
+          />
+        ) : null}
 
         {/* Modal de Complementos */}
         {modalComplementosOpen &&
