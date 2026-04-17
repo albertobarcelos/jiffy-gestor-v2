@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHandle } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
@@ -60,11 +60,16 @@ interface EditarTerminaisProps {
   isEmbedded?: boolean
   /** `id` do `<form>` para o rodapé do `JiffySidePanelModal` (botão Salvar externo) */
   embeddedFormId?: string
-  /** Omite rodapé interno — ações ficam no painel lateral */
-  hideEmbeddedFormActions?: boolean
   onEmbedFormStateChange?: (state: { isSubmitting: boolean; canSubmit: boolean }) => void
   onSaved?: () => void
-  onCancel?: () => void
+  /** Embutido: fechar o painel após "Salvar e fechar" com sucesso. */
+  onCloseAfterSave?: () => void
+}
+
+/** API imperativa — confirmação ao fechar o painel (`PADRAO_MODAL_SAIR_SEM_SALVAR`). */
+export interface EditarTerminaisHandle {
+  isDirty: () => boolean
+  saveTerminalAndClose: () => void
 }
 
 interface Impressora {
@@ -95,16 +100,20 @@ interface TerminalPreferences {
  * Componente para editar terminal
  * Replica o design e funcionalidades do Flutter
  */
-export function EditarTerminais({
-  terminalId,
-  isEmbedded = false,
-  embeddedFormId,
-  hideEmbeddedFormActions = false,
-  onEmbedFormStateChange,
-  onSaved,
-  onCancel,
-}: EditarTerminaisProps) {
+export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminaisProps>(
+  function EditarTerminais(
+    {
+      terminalId,
+      isEmbedded = false,
+      embeddedFormId,
+      onEmbedFormStateChange,
+      onSaved,
+      onCloseAfterSave,
+    },
+    ref
+  ) {
   const { auth } = useAuthStore()
+  const formId = embeddedFormId ?? 'editar-terminal-form'
 
   // Estados do formulário
   const [nomeTerminal, setNomeTerminal] = useState('')
@@ -119,6 +128,34 @@ export function EditarTerminais({
   const [impressoras, setImpressoras] = useState<Impressora[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoadingTerminal, setIsLoadingTerminal] = useState(false)
+
+  const getFormSnapshot = useCallback(() => {
+    return JSON.stringify({
+      nomeTerminal: (nomeTerminal || '').trim(),
+      modeloDispositivo: (modeloDispositivo || '').trim(),
+      versaoApk: (versaoApk || '').trim(),
+      compartilhaValue,
+      fiscalAtivoValue,
+      impressoraSelecionadaId: impressoraSelecionadaId || '',
+    })
+  }, [
+    nomeTerminal,
+    modeloDispositivo,
+    versaoApk,
+    compartilhaValue,
+    fiscalAtivoValue,
+    impressoraSelecionadaId,
+  ])
+
+  const baselineSerializedRef = useRef('')
+  const embeddedCloseAfterSaveRef = useRef(false)
+
+  const commitBaseline = useCallback(() => {
+    baselineSerializedRef.current = getFormSnapshot()
+  }, [getFormSnapshot])
+
+  const commitBaselineLatestRef = useRef(commitBaseline)
+  commitBaselineLatestRef.current = commitBaseline
 
   /**
    * Carrega todas as impressoras com paginação completa
@@ -215,6 +252,9 @@ export function EditarTerminais({
       showToast.error('Erro ao carregar dados do terminal')
     } finally {
       setIsLoadingTerminal(false)
+      window.setTimeout(() => {
+        commitBaselineLatestRef.current()
+      }, 120)
     }
   }, [auth, terminalId])
 
@@ -248,6 +288,9 @@ export function EditarTerminais({
       if (data.impressoraFinalizacao?.id) {
         setImpressoraSelecionadaId(data.impressoraFinalizacao.id)
       }
+      window.setTimeout(() => {
+        commitBaselineLatestRef.current()
+      }, 120)
     } catch (error) {
       console.error('Erro ao carregar preferências:', error)
       showToast.error('Erro ao carregar preferências do terminal')
@@ -288,6 +331,9 @@ export function EditarTerminais({
    */
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault()
+    const shouldClosePanel = embeddedCloseAfterSaveRef.current
+    embeddedCloseAfterSaveRef.current = false
+
     if (!validateForm()) {
       return
     }
@@ -348,7 +394,19 @@ export function EditarTerminais({
       }
 
       showToast.success('Terminal atualizado com sucesso!')
-      onSaved?.()
+
+      window.setTimeout(() => {
+        commitBaselineLatestRef.current()
+      }, 0)
+
+      if (isEmbedded) {
+        onSaved?.()
+        if (shouldClosePanel) {
+          onCloseAfterSave?.()
+        }
+      } else {
+        onSaved?.()
+      }
     } catch (error: unknown) {
       console.error('Erro ao atualizar terminal:', error)
       const msg = error instanceof Error ? error.message : 'Erro ao atualizar terminal'
@@ -357,6 +415,24 @@ export function EditarTerminais({
       setIsSubmitting(false)
     }
   }
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      isDirty: () => {
+        if (isLoadingTerminal) return false
+        return getFormSnapshot() !== baselineSerializedRef.current
+      },
+      saveTerminalAndClose: () => {
+        embeddedCloseAfterSaveRef.current = true
+        const el = document.getElementById(formId)
+        if (el instanceof HTMLFormElement) {
+          el.requestSubmit()
+        }
+      },
+    }),
+    [formId, getFormSnapshot, isLoadingTerminal]
+  )
 
   return (
     <div
@@ -379,7 +455,7 @@ export function EditarTerminais({
         </div>
       ) : (
         <form
-          id={embeddedFormId}
+          id={formId}
           className="flex min-h-0 flex-1 flex-col"
           onSubmit={e => void handleSubmit(e)}
         >
@@ -549,7 +625,7 @@ export function EditarTerminais({
           </div>
 
           {/* Rodapé — só Salvar; no painel lateral o shell fornece o botão */}
-          {!(isEmbedded && hideEmbeddedFormActions) ? (
+          {!isEmbedded ? (
             <div className="flex flex-shrink-0 justify-end border-t border-[#B9CCD8] px-[30px] py-3">
               <Button
                 type="submit"
@@ -572,5 +648,7 @@ export function EditarTerminais({
       )}
     </div>
   )
-}
+})
+
+EditarTerminais.displayName = 'EditarTerminais'
 

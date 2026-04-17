@@ -25,6 +25,9 @@ interface TerminalConfig {
 
 export interface NovaImpressoraHandle {
   save: () => Promise<void>
+  /** Confirmação ao fechar o painel (`PADRAO_MODAL_SAIR_SEM_SALVAR`). */
+  isDirty: () => boolean
+  saveImpressoraAndClose: () => void
 }
 
 interface NovaImpressoraProps {
@@ -37,7 +40,8 @@ interface NovaImpressoraProps {
   onEmbedChromeStateChange?: (state: { canSave: boolean; isSubmitting: boolean }) => void
   onClose?: () => void
   onSaved?: () => void
-  onRequestClose?: (callback: () => void) => void // Callback para interceptar tentativas de fechar
+  /** Embutido no painel: fechar após salvar com sucesso quando o fluxo for “salvar e fechar”. */
+  onCloseAfterSave?: () => void
 }
 
 /**
@@ -103,7 +107,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
       onEmbedChromeStateChange,
       onClose,
       onSaved,
-      onRequestClose,
+      onCloseAfterSave,
     },
     ref
   ) {
@@ -146,6 +150,13 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
 
     const hasLoadedImpressoraRef = useRef(false)
     const hasLoadedTerminaisRef = useRef(false)
+    /** “Salvar e fechar” no shell do painel ou no diálogo interno (página cheia). */
+    const embeddedCloseAfterSaveRef = useRef(false)
+    /**
+     * Modo cópia: o baseline do form coincide com os dados carregados, mas o registro novo
+     * ainda não foi persistido — deve contar como alteração até o primeiro save com sucesso.
+     */
+    const copyAwaitingFirstPersistRef = useRef(isCopyMode)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const pageSize = 10
 
@@ -667,7 +678,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
     /**
      * Verifica se há mudanças não salvas
      */
-    const hasUnsavedChanges = (): boolean => {
+    const hasUnsavedChanges = useCallback((): boolean => {
       // Verifica se o nome mudou
       if (nome !== nomeInicial) {
         return true
@@ -699,7 +710,15 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
       }
 
       return false
-    }
+    }, [nome, nomeInicial, terminaisConfig, terminaisConfigInicial])
+
+    /** Inclui cópia ainda não gravada no servidor (baseline não reflete “novo registro”). */
+    const isDirtyForClosePrompt = useCallback((): boolean => {
+      if (isCopyMode && copyAwaitingFirstPersistRef.current) {
+        return true
+      }
+      return hasUnsavedChanges()
+    }, [isCopyMode, hasUnsavedChanges])
 
     /**
      * Salva o estado inicial após carregar dados
@@ -967,6 +986,9 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
      * Salva impressora
      */
     const handleSave = async () => {
+      const shouldClosePanel = embeddedCloseAfterSaveRef.current
+      embeddedCloseAfterSaveRef.current = false
+
       const token = auth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado')
@@ -1064,11 +1086,18 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
         setNomeInicial(nome)
         setTerminaisConfigInicial(JSON.parse(JSON.stringify(terminaisConfig)))
 
+        if (isCopyMode) {
+          copyAwaitingFirstPersistRef.current = false
+        }
+
         // Remove seleção após salvar
         clearSelection()
 
         if (isEmbedded) {
           onSaved?.()
+          if (shouldClosePanel) {
+            onCloseAfterSave?.()
+          }
         } else {
           router.push('/cadastros/impressoras')
         }
@@ -1085,7 +1114,15 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
      * Pode ser chamada tanto pelo botão cancelar quanto pelo fechamento do modal (clicar fora)
      */
     const handleRequestClose = useCallback(() => {
-      if (hasUnsavedChanges()) {
+      // Chrome do painel trata confirmação + fechamento (`ImpressorasTabsModal`).
+      if (isEmbedded && hideEmbeddedChrome) {
+        if (!isDirtyForClosePrompt()) {
+          onClose?.()
+        }
+        return
+      }
+
+      if (isDirtyForClosePrompt()) {
         setPendingClose(() => {
           if (isEmbedded) {
             return () => onClose?.()
@@ -1111,7 +1148,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
           }
         }
       }
-    }, [hasUnsavedChanges, isEmbedded, onClose, router])
+    }, [isDirtyForClosePrompt, isEmbedded, hideEmbeddedChrome, onClose, router])
 
     /**
      * Cancela e volta
@@ -1120,19 +1157,24 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
       handleRequestClose()
     }
 
-    // Expõe a função para o componente pai (via callback)
-    useEffect(() => {
-      if (onRequestClose) {
-        onRequestClose(handleRequestClose)
-      }
-    }, [onRequestClose, handleRequestClose])
-
     const handleSaveRef = useRef(handleSave)
     handleSaveRef.current = handleSave
 
-    useImperativeHandle(ref, () => ({
-      save: () => handleSaveRef.current(),
-    }))
+    useImperativeHandle(
+      ref,
+      () => ({
+        save: () => handleSaveRef.current(),
+        isDirty: () => {
+          if (isLoadingImpressora) return false
+          return isDirtyForClosePrompt()
+        },
+        saveImpressoraAndClose: () => {
+          embeddedCloseAfterSaveRef.current = true
+          void handleSaveRef.current()
+        },
+      }),
+      [isDirtyForClosePrompt, isLoadingImpressora]
+    )
 
     // Estado do rodapé do modal (Salvar / Atualizar)
     useEffect(() => {
@@ -1154,15 +1196,16 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
     }
 
     /**
-     * Cancela saída e salva antes
+     * Salvar e fechar — diálogo interno (página cheia ou embed com chrome próprio).
      */
-    const handleCancelExit = async () => {
+    const handleSaveAndCloseFromInternalDialog = async () => {
       setShowConfirmDialog(false)
+      if (isEmbedded) {
+        embeddedCloseAfterSaveRef.current = true
+      }
       try {
-        await handleSave()
-        // handleSave já redireciona, então não precisamos chamar pendingClose
+        await handleSaveRef.current()
       } catch (error) {
-        // Se houver erro, não fecha o modal
         console.error('Erro ao salvar:', error)
       }
     }
@@ -1767,47 +1810,56 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
           </div>
         </div>
 
-        {/* Diálogo de confirmação para sair sem salvar */}
-        {showConfirmDialog && (
+        {/* Diálogo interno — alinhado ao portal do `PADRAO_MODAL_SAIR_SEM_SALVAR` (não usado com `hideEmbeddedChrome`). */}
+        {showConfirmDialog && !(isEmbedded && hideEmbeddedChrome) ? (
           <div
-            className={cn(
-              'fixed inset-0 flex items-center justify-center bg-black/50 md:p-4',
-              isEmbedded && hideEmbeddedChrome ? 'z-[1400]' : 'z-50'
-            )}
+            className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/50 md:p-4"
+            role="presentation"
           >
-            <div className="w-[85vw] max-w-[85vw] rounded-lg bg-white p-6 shadow-lg md:w-auto md:max-w-md">
-              <h3 className="mb-4 text-lg font-semibold text-primary-text">
+            <div
+              className="w-[85vw] max-w-[85vw] rounded-lg bg-white p-6 shadow-lg md:w-auto md:max-w-md"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="nova-impressora-exit-title"
+            >
+              <h3
+                id="nova-impressora-exit-title"
+                className="mb-4 text-lg font-semibold text-primary-text"
+              >
                 Alterações não salvas
               </h3>
-              <p className="mb-6 text-secondary-text">
-                Você tem alterações não salvas. Deseja salvar antes de sair?
+              <p className="mb-6 text-sm text-secondary-text">
+                Você pode salvar antes de sair ou descartar as alterações.
               </p>
-              <div className="flex flex-col justify-end gap-3 md:flex-row">
+              <div className="mb-2 flex flex-col justify-between sm:flex-row sm:flex-wrap sm:justify-between">
                 <button
+                  type="button"
                   onClick={() => {
                     setShowConfirmDialog(false)
                     setPendingClose(null)
                   }}
-                  className="rounded-lg border border-gray-300 px-4 py-2 text-primary-text transition-colors hover:bg-gray-50"
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-primary-text transition-colors hover:bg-gray-50"
                 >
-                  Cancelar
+                  Continuar editando
                 </button>
                 <button
+                  type="button"
                   onClick={handleConfirmExit}
-                  className="rounded-lg bg-gray-200 px-4 py-2 text-primary-text transition-colors hover:bg-gray-300"
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-secondary-text transition-colors hover:bg-gray-50"
                 >
                   Sair sem salvar
                 </button>
-                <button
-                  onClick={handleCancelExit}
-                  className="rounded-lg bg-primary px-4 py-2 text-white transition-colors hover:bg-primary/90"
-                >
-                  Salvar e sair
-                </button>
               </div>
+              <button
+                type="button"
+                onClick={() => void handleSaveAndCloseFromInternalDialog()}
+                className="w-full rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
+              >
+                Salvar e fechar
+              </button>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
     )
   }

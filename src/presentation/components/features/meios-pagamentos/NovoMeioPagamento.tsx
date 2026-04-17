@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { useRouter } from 'next/navigation'
 import { MenuItem } from '@mui/material'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
@@ -54,30 +54,39 @@ interface NovoMeioPagamentoProps {
   hideEmbeddedHeader?: boolean
   /** `id` do `<form>` para o rodapé do painel usar `form="..."` no Salvar */
   embeddedFormId?: string
-  /** Omite Cancelar/Salvar no formulário — ações ficam no rodapé do `JiffySidePanelModal` */
-  hideEmbeddedFormActions?: boolean
   onEmbedFormStateChange?: (state: { isSubmitting: boolean; canSubmit: boolean }) => void
   onSaved?: () => void
-  onCancel?: () => void
+  /** Embutido: fechar o painel após “Salvar e fechar” com sucesso. */
+  onCloseAfterSave?: () => void
+}
+
+/** API imperativa — confirmação ao fechar o painel (`PADRAO_MODAL_SAIR_SEM_SALVAR`). */
+export interface NovoMeioPagamentoHandle {
+  isDirty: () => boolean
+  saveMeioPagamentoAndClose: () => void
 }
 
 /**
  * Componente para criar/editar meio de pagamento
  * Replica o design e funcionalidades do Flutter
  */
-export function NovoMeioPagamento({
-  meioPagamentoId,
-  isEmbedded = false,
-  hideEmbeddedHeader = false,
-  embeddedFormId,
-  hideEmbeddedFormActions = false,
-  onEmbedFormStateChange,
-  onSaved,
-  onCancel,
-}: NovoMeioPagamentoProps) {
+export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPagamentoProps>(
+  function NovoMeioPagamento(
+    {
+      meioPagamentoId,
+      isEmbedded = false,
+      hideEmbeddedHeader = false,
+      embeddedFormId,
+      onEmbedFormStateChange,
+      onSaved,
+      onCloseAfterSave,
+    },
+    ref
+  ) {
   const router = useRouter()
   const { auth } = useAuthStore()
   const isEditing = !!meioPagamentoId
+  const formId = embeddedFormId ?? 'novo-meio-pagamento-form'
 
   // Estados do formulário
   const [nome, setNome] = useState('')
@@ -89,6 +98,27 @@ export function NovoMeioPagamento({
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingMeioPagamento, setIsLoadingMeioPagamento] = useState(false)
   const hasLoadedMeioPagamentoRef = useRef(false)
+  const embeddedCloseAfterSaveRef = useRef(false)
+  /** Evita regravar baseline a cada tecla no modo criação. */
+  const createBaselineCommittedRef = useRef(false)
+
+  const getFormSnapshot = useCallback(() => {
+    return JSON.stringify({
+      nome: (nome || '').trim(),
+      tefAtivo,
+      formaPagamentoFiscal: (formaPagamentoFiscal || '').toLowerCase(),
+      ativo,
+    })
+  }, [nome, tefAtivo, formaPagamentoFiscal, ativo])
+
+  const baselineSerializedRef = useRef('')
+
+  const commitBaseline = useCallback(() => {
+    baselineSerializedRef.current = getFormSnapshot()
+  }, [getFormSnapshot])
+
+  const commitBaselineLatestRef = useRef(commitBaseline)
+  commitBaselineLatestRef.current = commitBaseline
 
   const emitEmbedFormState = useCallback(() => {
     onEmbedFormStateChange?.({
@@ -160,6 +190,9 @@ export function NovoMeioPagamento({
         console.error('Erro ao carregar meio de pagamento:', error)
       } finally {
         setIsLoadingMeioPagamento(false)
+        window.setTimeout(() => {
+          commitBaselineLatestRef.current()
+        }, 120)
       }
     }
 
@@ -167,8 +200,25 @@ export function NovoMeioPagamento({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing, meioPagamentoId])
 
+  /** Modo criação: baseline estável uma vez após estado inicial. */
+  useEffect(() => {
+    if (isEditing) {
+      createBaselineCommittedRef.current = false
+      return
+    }
+    if (!isLoadingMeioPagamento && !createBaselineCommittedRef.current) {
+      createBaselineCommittedRef.current = true
+      window.setTimeout(() => {
+        commitBaselineLatestRef.current()
+      }, 0)
+    }
+  }, [isEditing, isLoadingMeioPagamento])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const shouldClosePanel = embeddedCloseAfterSaveRef.current
+    embeddedCloseAfterSaveRef.current = false
+
     const token = auth?.getAccessToken()
     if (!token) {
       alert('Token não encontrado')
@@ -205,8 +255,15 @@ export function NovoMeioPagamento({
         throw new Error(errorData.error || 'Erro ao salvar meio de pagamento')
       }
 
-      if (isEmbedded && onSaved) {
-        onSaved()
+      window.setTimeout(() => {
+        commitBaselineLatestRef.current()
+      }, 0)
+
+      if (isEmbedded) {
+        onSaved?.()
+        if (shouldClosePanel) {
+          onCloseAfterSave?.()
+        }
       } else {
         alert(isEditing ? 'Meio de pagamento atualizado com sucesso!' : 'Meio de pagamento criado com sucesso!')
         router.push('/configuracoes?tab=meios-pagamentos')
@@ -220,12 +277,26 @@ export function NovoMeioPagamento({
   }
 
   const handleCancel = () => {
-    if (isEmbedded && onCancel) {
-      onCancel()
-    } else {
-      router.push('/configuracoes?tab=meios-pagamentos')
-    }
+    router.push('/configuracoes?tab=meios-pagamentos')
   }
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      isDirty: () => {
+        if (isLoadingMeioPagamento) return false
+        return getFormSnapshot() !== baselineSerializedRef.current
+      },
+      saveMeioPagamentoAndClose: () => {
+        embeddedCloseAfterSaveRef.current = true
+        const el = document.getElementById(formId)
+        if (el instanceof HTMLFormElement) {
+          el.requestSubmit()
+        }
+      },
+    }),
+    [formId, getFormSnapshot, isLoadingMeioPagamento]
+  )
 
   if (isLoadingMeioPagamento) {
     return (
@@ -252,7 +323,7 @@ export function NovoMeioPagamento({
       {/* Formulário com scroll */}
       <div className="flex-1 overflow-y-auto md:px-[30px] px-1 md:py-4 py-2">
         <form
-          id={embeddedFormId}
+          id={formId}
           onSubmit={handleSubmit}
           className="space-y-6"
         >
@@ -324,7 +395,7 @@ export function NovoMeioPagamento({
           </div>
 
           {/* Botões — fluxo em página cheia */}
-          {!(isEmbedded && hideEmbeddedFormActions) ? (
+          {!isEmbedded ? (
             <div className="flex justify-end gap-4 pr-2 pt-4">
               <Button
                 type="button"
@@ -355,4 +426,6 @@ export function NovoMeioPagamento({
       </div>
     </div>
   )
-}
+})
+
+NovoMeioPagamento.displayName = 'NovoMeioPagamento'
