@@ -606,8 +606,11 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
     <div className="flex h-full max-h-[calc(100vh-100px)] flex-col overflow-hidden">
       {/* Container principal */}
       <div className="bg-primary-background flex h-full min-h-0 flex-col overflow-hidden rounded-b-lg rounded-t-lg md:px-2">
-        {/* Filtro por tempo sem movimentação */}
-        <div className="flex items-center justify-end gap-2 py-2">
+      <div className="flex w-full py-1 flex-row items-center justify-between">
+            <p className="text-primary text-lg px-[30px] font-semibold">
+              Todas as Mesas Abertas
+            </p>
+            <div className="flex items-center justify-end gap-2">
           <label className="font-nunito flex items-center gap-2 text-xs text-primary-text md:text-sm">
             <input
               type="checkbox"
@@ -622,7 +625,8 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
             Mostrar mesas com +15 min sem movimentação
           </label>
         </div>
-
+      </div>
+      <div className="h-[1px] border-t-2 border-primary/70 flex-shrink-0"></div>
         {/* Cards de Métricas */}
         <div className="bg-primary-background sticky top-0 z-10 my-1 flex flex-shrink-0 gap-1 md:gap-2">
           {/* Vendas em Aberto (fixo) */}

@@ -1,17 +1,30 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { MdSearch, MdCalendarToday, MdFilterAltOff, MdFilterList, MdClose } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import {
   FormControl,
-  Select,
+  InputAdornment,
+  InputLabel,
   MenuItem,
+  Select,
+  TextField,
   CircularProgress,
 } from '@mui/material'
-import { EscolheDatasModal } from '../vendas/EscolheDatasModal'
+import { sxEntradaCompactaProdutoSelect } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
+import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
+import { FaturamentoRangeCalendar } from '@/src/presentation/components/ui/FaturamentoRangeCalendar'
+import { useDashboardFaturamentoPorDiaQuery } from '@/src/presentation/hooks/useDashboardFaturamentoPorDiaQuery'
+import {
+  primeiroMesQuadroDuploCalendario,
+  periodoFetchFaturamentoCalendarioDoisMeses,
+} from '@/src/shared/utils/calendarioIntervaloFaturamento'
+import { combinarIntervaloCalendarParaDatas } from '@/src/shared/utils/intervaloCalendarioComHoras'
+import { startOfDay } from 'date-fns'
+import type { DateRange } from 'react-day-picker'
 import { DetalhesFechamento } from './DetalhesFechamento'
 
 // Tipos
@@ -36,6 +49,135 @@ interface Terminal {
   nome?: string
 }
 
+/** Meses curtos — exibição do intervalo "Por datas" (alinhado a `VendasList`). */
+const MESES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'] as const
+
+function formatarDataHoraFiltroCurta(date: Date): string {
+  const dia = String(date.getDate()).padStart(2, '0')
+  const mes = MESES_ABREV[date.getMonth()]
+  const h = String(date.getHours()).padStart(2, '0')
+  const min = String(date.getMinutes()).padStart(2, '0')
+  return `${dia}-${mes} ${h}:${min}`
+}
+
+/** HH:mm a partir de Date — mesmo contrato do `VendasList` / calendário de intervalo. */
+function formatarHoraParaInputCalendar(d: Date | null | undefined): string {
+  if (!d) return '00:00'
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+/** Mantém só dígitos e aplica máscara dd/mm/aaaa durante a digitação (sem calendário nativo). */
+function aplicarMascaraDataDigitos(valor: string): string {
+  const d = valor.replace(/\D/g, '').slice(0, 8)
+  if (d.length <= 2) return d
+  if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`
+  return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`
+}
+
+/** Interpreta string dd/mm/aaaa completa no fuso local; retorna null se inválida. */
+function parseDataDDMMAAAA(texto: string): Date | null {
+  const m = texto.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+  if (!m) return null
+  const dia = Number(m[1])
+  const mes = Number(m[2])
+  const ano = Number(m[3])
+  if (mes < 1 || mes > 12 || dia < 1 || dia > 31) return null
+  const data = new Date(ano, mes - 1, dia)
+  if (
+    data.getFullYear() !== ano ||
+    data.getMonth() !== mes - 1 ||
+    data.getDate() !== dia
+  ) {
+    return null
+  }
+  return data
+}
+
+/** Borda do Select outlined — mesmo critério que `VendasList`. */
+const sxHistoricoFiltroOutlinedInputRoot = {
+  backgroundColor: '#fff',
+  '& .MuiOutlinedInput-notchedOutline': {
+    borderColor: 'rgba(0, 0, 0, 0.23)',
+    borderWidth: 1,
+  },
+  '&:hover .MuiOutlinedInput-notchedOutline': {
+    borderColor: 'rgba(0, 0, 0, 0.23)',
+  },
+  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+    borderWidth: 1,
+    borderColor: 'var(--color-primary)',
+  },
+} as const
+
+const sxHistoricoFiltroLabel = {
+  '& .MuiInputLabel-root': {
+    color: 'var(--color-secondary-text)',
+    fontWeight: 300,
+    fontSize: '0.975rem',
+    fontFamily: '"Nunito", sans-serif',
+  },
+  '& .MuiInputLabel-root.Mui-focused': {
+    color: 'var(--color-secondary-text)',
+    fontWeight: 300,
+  },
+  '& .MuiInputLabel-root.MuiInputLabel-shrink': {
+    color: 'var(--color-secondary-text)',
+    fontWeight: 300,
+  },
+} as const
+
+/** Selects de filtro: label na borda (outlined), alinhado a `VendasList`. */
+const sxHistoricoFiltroSelectBase = {
+  ...sxEntradaCompactaProdutoSelect,
+  minWidth: 200,
+  ...sxHistoricoFiltroLabel,
+  '& .MuiOutlinedInput-root': {
+    ...sxHistoricoFiltroOutlinedInputRoot,
+    height: 35,
+    minHeight: 35,
+    padding: '4px 2px 4px 0',
+  },
+} as const
+
+const sxHistoricoFiltroSelectStatus = {
+  ...sxHistoricoFiltroSelectBase,
+  '& .MuiOutlinedInput-root': {
+    ...sxHistoricoFiltroOutlinedInputRoot,
+    backgroundColor: 'var(--color-info)',
+    height: 35,
+    minHeight: 35,
+    padding: '4px 2px 4px 0',
+  },
+} as const
+
+/** Campo data: mesma tipografia de label/borda dos selects. */
+const sxHistoricoFiltroTextFieldDate = {
+  minWidth: 200,
+  marginTop: 0,
+  marginBottom: 0,
+  ...sxHistoricoFiltroLabel,
+  '& .MuiOutlinedInput-root': {
+    ...sxHistoricoFiltroOutlinedInputRoot,
+    backgroundColor: '#fff',
+    fontFamily: '"Nunito", sans-serif',
+    height: 35,
+    minHeight: 35,
+    alignItems: 'center',
+    boxSizing: 'border-box',
+  },
+  '& .MuiInputBase-input': {
+    fontSize: '0.875rem',
+    lineHeight: 1,
+    padding: '6px 4px',
+    fontFamily: '"Nunito", sans-serif',
+  },
+  '& .MuiInputAdornment-root': {
+    height: 35,
+    maxHeight: 35,
+    marginRight: 0,
+  },
+} as const
+
 /**
  * Componente de histórico de fechamento de caixa
  * Implementa scroll infinito, filtros avançados e exibição em tabela
@@ -51,10 +193,16 @@ export function HistoricoFechamento() {
   const [periodoInicial, setPeriodoInicial] = useState<Date | null>(null)
   const [periodoFinal, setPeriodoFinal] = useState<Date | null>(null)
   const [dataAberturaFilter, setDataAberturaFilter] = useState<Date | null>(null)
+  /** Texto mascarado dd/mm/aaaa — não usa `<input type="date">` para não abrir o calendário nativo. */
   const [dataAberturaInputValue, setDataAberturaInputValue] = useState<string>('')
   const [isDatasModalOpen, setIsDatasModalOpen] = useState(false)
-  const previousDateValueRef = useRef<string>('')
-
+  /** Rascunho do painel lateral (calendário duplo + horas) — mesmo fluxo que `VendasList`. */
+  const [rascunhoIntervaloRange, setRascunhoIntervaloRange] = useState<DateRange | undefined>(undefined)
+  const [mesCalendarioIntervalo, setMesCalendarioIntervalo] = useState(() =>
+    primeiroMesQuadroDuploCalendario(startOfDay(new Date()))
+  )
+  const [rascunhoHoraInicio, setRascunhoHoraInicio] = useState('00:00')
+  const [rascunhoHoraFim, setRascunhoHoraFim] = useState('23:59')
   // Estados de dados
   const [operacoesCaixa, setOperacoesCaixa] = useState<OperacaoCaixa[]>([])
   const [terminais, setTerminais] = useState<Terminal[]>([])
@@ -402,6 +550,51 @@ export function HistoricoFechamento() {
     }
   }, [searchQuery, statusFilter, terminalFilter, periodo, periodoInicial, periodoFinal, dataAberturaFilter])
 
+  const periodoFaturamentoCalendarioModal = useMemo(
+    () => periodoFetchFaturamentoCalendarioDoisMeses(mesCalendarioIntervalo),
+    [mesCalendarioIntervalo]
+  )
+
+  const {
+    data: faturamentoPorDiaCalendario,
+    isPending: faturamentoCalendarioPending,
+    isFetching: faturamentoCalendarioFetching,
+  } = useDashboardFaturamentoPorDiaQuery({
+    periodoInicial: periodoFaturamentoCalendarioModal.inicio,
+    periodoFinal: periodoFaturamentoCalendarioModal.fim,
+    enabled: isDatasModalOpen,
+  })
+
+  // Ao abrir o painel, sincroniza rascunho com o filtro "Por datas" ou padrão (hoje)
+  useEffect(() => {
+    if (!isDatasModalOpen) return
+    if (periodoInicial && periodoFinal) {
+      setRascunhoIntervaloRange({
+        from: startOfDay(periodoInicial),
+        to: startOfDay(periodoFinal),
+      })
+      setMesCalendarioIntervalo(primeiroMesQuadroDuploCalendario(startOfDay(periodoFinal)))
+      setRascunhoHoraInicio(formatarHoraParaInputCalendar(periodoInicial))
+      setRascunhoHoraFim(formatarHoraParaInputCalendar(periodoFinal))
+    } else {
+      const hoje = startOfDay(new Date())
+      setRascunhoIntervaloRange({ from: hoje, to: hoje })
+      setMesCalendarioIntervalo(primeiroMesQuadroDuploCalendario(hoje))
+      setRascunhoHoraInicio('00:00')
+      setRascunhoHoraFim('23:59')
+    }
+  }, [isDatasModalOpen, periodoInicial, periodoFinal])
+
+  /** Se o DayPicker enviar intervalo vazio, volta ao padrão de um dia (hoje). */
+  const handleRascunhoIntervaloRangeChange = useCallback((next: DateRange | undefined) => {
+    if (next != null) {
+      setRascunhoIntervaloRange(next)
+      return
+    }
+    const hoje = startOfDay(new Date())
+    setRascunhoIntervaloRange({ from: hoje, to: hoje })
+  }, [])
+
   // Scroll infinito
   useEffect(() => {
     const container = scrollContainerRef.current
@@ -455,8 +648,7 @@ export function HistoricoFechamento() {
       // Limpa o filtro de data de abertura individual quando usa período pré-definido
       setDataAberturaFilter(null)
       setDataAberturaInputValue('')
-      previousDateValueRef.current = ''
-      
+
       // Atualiza os refs manualmente
       filtersRef.current = {
         ...filtersRef.current,
@@ -520,7 +712,6 @@ export function HistoricoFechamento() {
     setPeriodoFinal(null)
     setDataAberturaFilter(null)
     setDataAberturaInputValue('')
-    previousDateValueRef.current = ''
 
     // Atualiza os refs manualmente para garantir que estão sincronizados
     filtersRef.current = {
@@ -538,39 +729,50 @@ export function HistoricoFechamento() {
   }
 
   /**
-   * Confirma seleção de datas e aplica filtro
+   * Confirma seleção de datas e aplica filtro (chamado após "Aplicar" no painel do calendário).
    */
-  const handleConfirmDatas = (dataInicial: Date | null, dataFinal: Date | null) => {
-    // Cancela o debounce anterior
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current)
-    }
+  const handleConfirmDatas = useCallback(
+    (dataInicial: Date | null, dataFinal: Date | null) => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
 
-    setPeriodoInicial(dataInicial)
-    setPeriodoFinal(dataFinal)
-    if (dataInicial || dataFinal) {
-      setPeriodo('Todos')
-    }
+      setPeriodoInicial(dataInicial)
+      setPeriodoFinal(dataFinal)
+      if (dataInicial || dataFinal) {
+        setPeriodo('Todos')
+      }
 
-    // Atualiza os refs manualmente para garantir que estão sincronizados
-    filtersRef.current = {
-      ...filtersRef.current,
-      periodoInicial: dataInicial,
-      periodoFinal: dataFinal,
-      periodo: dataInicial || dataFinal ? 'Todos' : filtersRef.current.periodo,
-    }
+      filtersRef.current = {
+        ...filtersRef.current,
+        periodoInicial: dataInicial,
+        periodoFinal: dataFinal,
+        periodo: dataInicial || dataFinal ? 'Todos' : filtersRef.current.periodo,
+      }
 
-    // Dispara a busca imediatamente sem debounce
-    fetchOperacoesCaixa(true)
-  }
+      fetchOperacoesCaixa(true)
+    },
+    [fetchOperacoesCaixa]
+  )
+
+  const handleAplicarIntervaloHistorico = useCallback(() => {
+    const { dataInicial, dataFinal } = combinarIntervaloCalendarParaDatas(
+      rascunhoIntervaloRange,
+      rascunhoHoraInicio,
+      rascunhoHoraFim
+    )
+    if (!dataInicial || !dataFinal) return
+    handleConfirmDatas(dataInicial, dataFinal)
+    setIsDatasModalOpen(false)
+  }, [rascunhoIntervaloRange, rascunhoHoraInicio, rascunhoHoraFim, handleConfirmDatas])
 
   return (
     <div className="flex flex-col h-full">
       {/* Container principal */}
-      <div className="bg-primary-background rounded-t-lg rounded-b-lg md:px-2">
+      <div className="bg-primary-background rounded-t-lg rounded-b-lg">
         {/* Título */}
-        <div className="md:px-4 py-1 flex flex-col md:flex-row items-center justify-between">
-          <h1 className="md:text-xl text-lg font-exo font-semibold text-primary">Histórico - Fechamento de Caixa</h1>
+        <div className="md:px-[30px] py-1 flex flex-col md:flex-row items-center justify-between">
+          <h1 className="text-lg font-exo font-semibold text-primary">Histórico - Fechamento de Caixa</h1>
           <div className="flex w-full md:w-auto flex-row items-end justify-end gap-2">
           <button
             type="button"
@@ -583,171 +785,111 @@ export function HistoricoFechamento() {
           </button>
           </div>
         </div>
+        <div className="h-[1px] border-t-2 border-primary/70 flex-shrink-0"></div>
         {/* Filtros Avançados */}
-        <div className={`bg-custom-2 rounded-t-lg px-2 pt-1 pb-2 flex flex-wrap justify-center items-end md:justify-start gap-x-2 gap-y-2 ${filtrosVisiveis ? 'flex' : 'hidden'}`}>
-          {/* Status */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-secondary-text font-nunito">Status</label>
-            <FormControl size="small" sx={{ minWidth: 200 }}>
-              <Select
-                value={statusFilter || ''}
-                onChange={(e) => setStatusFilter(e.target.value || null)}
-                displayEmpty
-                sx={{
-                  height: '32px',
-                  backgroundColor: 'var(--color-info)',
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'transparent',
-                  },
-                }}
-              >
-                <MenuItem value="">Selecione...</MenuItem>
-                <MenuItem value="aberto">Aberto</MenuItem>
-                <MenuItem value="fechado">Fechado</MenuItem>
-              </Select>
-            </FormControl>
+        <div className={`bg-custom-2 mt-1 pt-3 rounded-t-lg px-2 pb-1 flex flex-wrap justify-center items-end md:justify-start gap-2 ${filtrosVisiveis ? 'flex' : 'hidden'}`}>
+        <div className="flex-1 relative w-full md:max-w-[350px]">
+            <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
+            <input
+              type="text"
+              placeholder="Digite o Código ou Terminal..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-9 pl-10 pr-4 rounded-lg bg-info border shadow-sm text-sm font-nunito"
+            />
           </div>
+          {/* Status — outlined, rótulo na borda (padrão VendasList) */}
+          <FormControl size="small" variant="outlined" sx={sxHistoricoFiltroSelectStatus}>
+            <InputLabel id="hf-filtro-status-label" shrink>
+              Status
+            </InputLabel>
+            <Select
+              labelId="hf-filtro-status-label"
+              label="Status"
+              value={statusFilter || ''}
+              onChange={e => setStatusFilter(e.target.value || null)}
+              displayEmpty
+              className="font-nunito"
+            >
+              <MenuItem value="">
+                <span className="text-secondary-text">Selecione...</span>
+              </MenuItem>
+              <MenuItem value="aberto">Aberto</MenuItem>
+              <MenuItem value="fechado">Fechado</MenuItem>
+            </Select>
+          </FormControl>
 
           {/* Terminal */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-secondary-text font-nunito">Terminal</label>
-            <FormControl size="small" sx={{ minWidth: 200 }}>
-              <Select
-                value={terminalFilter || ''}
-                onChange={(e) => setTerminalFilter(e.target.value || null)}
-                disabled={isLoadingTerminais}
-                displayEmpty
-                sx={{
-                  height: '32px',
-                  backgroundColor: '#FFFFFF',
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'transparent',
-                  },
-                }}
-              >
-                <MenuItem value="">Selecione...</MenuItem>
-                {terminais.map((terminal) => (
-                  <MenuItem key={terminal.id} value={terminal.id}>
-                    {terminal.codigoInterno}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </div>
+          <FormControl size="small" variant="outlined" sx={sxHistoricoFiltroSelectBase}>
+            <InputLabel id="hf-filtro-terminal-label" shrink>
+              Terminal
+            </InputLabel>
+            <Select
+              labelId="hf-filtro-terminal-label"
+              label="Terminal"
+              value={terminalFilter || ''}
+              onChange={e => setTerminalFilter(e.target.value || null)}
+              disabled={isLoadingTerminais}
+              displayEmpty
+              className="font-nunito"
+            >
+              <MenuItem value="">
+                <span className="text-secondary-text">Selecione...</span>
+              </MenuItem>
+              {terminais.map(terminal => (
+                <MenuItem key={terminal.id} value={terminal.id}>
+                  {terminal.codigoInterno}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
-          {/* Data Abertura */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-secondary-text font-nunito">Data Abertura</label>
-            <div className="relative">
-              <MdCalendarToday className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text pointer-events-none" size={18} />
-              <input
-                type="date"
-                value={dataAberturaInputValue}
-                onChange={(e) => {
-                  const value = e.target.value
-                  // Atualiza o valor do input visualmente
-                  setDataAberturaInputValue(value)
-                  
-                  // Detecta quando uma data completa foi selecionada (clicada)
-                  // Compara com o valor anterior para garantir que é uma seleção real, não apenas navegação
-                  if (value && value.length === 10) {
-                    const previousValue = previousDateValueRef.current
-                    
-                    // Se não havia valor anterior, é a primeira seleção
-                    // Aplica o filtro normalmente
-                    if (!previousValue) {
-                      // Cria data no timezone local para evitar problemas de UTC
-                      const [year, month, day] = value.split('-').map(Number)
-                      const date = new Date(year, month - 1, day)
-                      // Verifica se a data é válida
-                      if (!isNaN(date.getTime())) {
-                        setDataAberturaFilter(date)
-                        previousDateValueRef.current = value
-                      }
-                      return
-                    }
-                    
-                    // Se o valor mudou, verifica se foi uma seleção real ou apenas navegação
-                    if (value !== previousValue) {
-                      // Extrai dia, mês e ano de ambos os valores
-                      const [year, month, day] = value.split('-').map(Number)
-                      const [prevYear, prevMonth, prevDay] = previousValue.split('-').map(Number)
-                      
-                      // Se apenas o mês mudou mas o dia permaneceu o mesmo, é navegação no calendário
-                      // Não aplica o filtro neste caso
-                      if (day === prevDay && month !== prevMonth) {
-                        // Apenas atualiza a referência, mas não aplica o filtro
-                        previousDateValueRef.current = value
-                        return
-                      }
-                      
-                      // Se o dia mudou, é uma seleção real do usuário
-                      // Cria data no timezone local para evitar problemas de UTC
-                      const date = new Date(year, month - 1, day)
-                      // Verifica se a data é válida
-                      if (!isNaN(date.getTime())) {
-                        // Compara com a data atual do filtro para evitar atualizações desnecessárias
-                        const currentDateStr = dataAberturaFilter 
-                          ? dataAberturaFilter.toISOString().split('T')[0] 
-                          : null
-                        if (value !== currentDateStr) {
-                          setDataAberturaFilter(date)
-                          previousDateValueRef.current = value
-                        }
-                      }
-                    }
-                  } else if (!value) {
-                    // Se o campo foi limpo, remove o filtro
-                    setDataAberturaFilter(null)
-                    previousDateValueRef.current = ''
-                  }
-                }}
-                onBlur={(e) => {
-                  // Fallback: se o usuário fechar o calendário, aplica o valor apenas se for uma seleção válida
-                  const value = e.target.value
-                  if (value && value.length === 10) {
-                    const previousValue = previousDateValueRef.current
-                    
-                    // Se não havia valor anterior ou o valor mudou significativamente, aplica
-                    if (!previousValue || value !== previousValue) {
-                      const [year, month, day] = value.split('-').map(Number)
-                      const date = new Date(year, month - 1, day)
-                      if (!isNaN(date.getTime())) {
-                        const currentDateStr = dataAberturaFilter 
-                          ? dataAberturaFilter.toISOString().split('T')[0] 
-                          : null
-                        // Só aplica se for diferente da data atual do filtro
-                        if (value !== currentDateStr) {
-                          setDataAberturaFilter(date)
-                          previousDateValueRef.current = value
-                        }
-                      }
-                    }
-                  }
-                }}
-                className="w-[200px] h-8 pl-10 pr-8 rounded-lg bg-white border border-gray-300 text-sm font-nunito text-primary-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
-              {dataAberturaFilter && (
-                <button
-                  onClick={() => {
-                    setDataAberturaFilter(null)
-                    setDataAberturaInputValue('')
-                    previousDateValueRef.current = ''
-                  }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-secondary-text hover:text-primary-text"
-                >
-                  <MdClose size={16} />
-                </button>
-              )}
-            </div>
-          </div>
+          {/* Data Abertura — texto com máscara dd/mm/aaaa; filtro só após data completa e válida */}
+          <TextField
+            type="text"
+            size="small"
+            variant="outlined"
+            label="Data Abertura"
+            placeholder="dd/mm/aaaa"
+            value={dataAberturaInputValue}
+            onChange={e => {
+              const masked = aplicarMascaraDataDigitos(e.target.value)
+              setDataAberturaInputValue(masked)
 
-          <div className="flex flex-col items-center gap-1">
-          {/* Label Período */}
-          <span className="text-primary text-sm font-exo">Período:</span>
-
+              const digitos = masked.replace(/\D/g, '')
+              if (digitos.length === 8) {
+                const parsed = parseDataDDMMAAAA(masked)
+                setDataAberturaFilter(parsed)
+              } else {
+                setDataAberturaFilter(null)
+              }
+            }}
+            autoComplete="off"
+            inputProps={{ inputMode: 'numeric', maxLength: 10 }}
+            InputLabelProps={{ shrink: true }}
+            sx={sxHistoricoFiltroTextFieldDate}
+            InputProps={{
+              endAdornment:
+                dataAberturaFilter || dataAberturaInputValue ? (
+                  <InputAdornment position="end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDataAberturaFilter(null)
+                        setDataAberturaInputValue('')
+                      }}
+                      className="flex text-secondary-text hover:text-primary-text"
+                      aria-label="Limpar data"
+                    >
+                      <MdClose size={16} />
+                    </button>
+                  </InputAdornment>
+                ) : undefined,
+            }}
+          />
           {/* Dropdown Período */}
-          <div className="flex flex-row gap-1">
+          <div className="flex flex-row flex-wrap items-center gap-3">
+          <span className="text-primary text-sm font-exo">Período:</span>
           <FormControl size="small" sx={{ minWidth: 120 }}>
             <Select
               value={periodo}
@@ -767,10 +909,8 @@ export function HistoricoFechamento() {
             >
               <MenuItem value="Todos">Todos</MenuItem>
               <MenuItem value="Hoje">Hoje</MenuItem>
-              <MenuItem value="Ontem">Ontem</MenuItem>
-              <MenuItem value="Últimos 7 Dias">Últimos 7 Dias</MenuItem>
               <MenuItem value="Mês Atual">Mês Atual</MenuItem>
-              <MenuItem value="Mês Passado">Mês Passado</MenuItem>
+              <MenuItem value="Últimos 7 Dias">Últimos 7 Dias</MenuItem>
               <MenuItem value="Últimos 30 Dias">Últimos 30 Dias</MenuItem>
               <MenuItem value="Últimos 60 Dias">Últimos 60 Dias</MenuItem>
               <MenuItem value="Últimos 90 Dias">Últimos 90 Dias</MenuItem>
@@ -780,41 +920,38 @@ export function HistoricoFechamento() {
 
           {/* Botão Por Datas */}
           <button
+            type="button"
             onClick={() => setIsDatasModalOpen(true)}
-            className="h-8 px-4 bg-primary text-white rounded-lg flex items-center gap-2 text-sm font-nunito hover:bg-primary/90 transition-colors"
+            className="font-nunito flex h-8 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
           >
             <MdCalendarToday size={18} />
             Por datas
           </button>
-          </div>
+          {periodoInicial && periodoFinal ? (
+            <div className="flex shrink-0 flex-col gap-0 text-[11px] leading-snug text-primary/85 sm:text-xs">
+              <span className="whitespace-nowrap">
+                Dt. Ini.: {formatarDataHoraFiltroCurta(periodoInicial)}
+              </span>
+              <span className="whitespace-nowrap">
+                Dt. Fim: {formatarDataHoraFiltroCurta(periodoFinal)}
+              </span>
+            </div>
+          ) : null}
+          
           </div>
           {/* Botão Limpar Filtros */}
           <button
             onClick={handleClearFilters}
-            className="h-8 px-4 bg-primary text-white rounded-lg flex items-center gap-2 text-sm font-nunito hover:bg-primary/90 transition-colors md:mt-6"
+            className="h-8 px-4 bg-primary text-white rounded-lg flex items-center gap-2 text-sm font-nunito hover:bg-primary/90 transition-colors"
           >
             <MdFilterAltOff size={18} />
             Limpar Filtros
           </button>
         </div>
-         {/* Filtros Superiores */}
-         <div className="flex flex-col md:flex-row items-center md:h-10 py-1">
-          <span className="text-primary text-xs font-exo pr-2.5">Pesquisar por Código ou Nome do Terminal: </span>
-          {/* Campo de Pesquisa */}
-          <div className="flex-1 relative w-full md:max-w-[300px]">
-            <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
-            <input
-              type="text"
-              placeholder="Pesquisar..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-8 pl-10 pr-4 rounded-lg bg-info border shadow-sm text-sm font-nunito"
-            />
-          </div>
-        </div>
+        
 
         {/* Cabeçalho da Tabela */}
-        <div className="bg-custom-2 px-3 py-2 flex items-center rounded-t-lg text-primary-text text-sm font-nunito font-semibold">
+        <div className="bg-custom-2 mt-2 px-3 py-2 flex items-center text-primary-text text-sm font-nunito font-semibold">
           <div className="flex-1 hidden md:flex">Cód. Terminal</div>
           <div className="flex-[1.5] text-[11px] md:text-sm">Terminal</div>
           <div className="flex-[2] hidden md:block">Fechado por</div>
@@ -894,14 +1031,43 @@ export function HistoricoFechamento() {
         </div>
       </div>
 
-      {/* Modal de Seleção de Datas */}
-      <EscolheDatasModal
+      {/* Painel lateral: calendário de intervalo + horas (igual `VendasList`) */}
+      <JiffySidePanelModal
         open={isDatasModalOpen}
         onClose={() => setIsDatasModalOpen(false)}
-        onConfirm={handleConfirmDatas}
-        dataInicial={periodoInicial}
-        dataFinal={periodoFinal}
-      />
+        title="Escolha o período"
+        panelClassName="!bg-[#f9fafb] w-[45vw] min-w-[260px] max-w-[min(100vw-1rem,95vw)] sm:min-w-[280px]"
+        scrollableBody={false}
+        footerSlot={
+          <button
+            type="button"
+            disabled={!rascunhoIntervaloRange?.from || !rascunhoIntervaloRange?.to}
+            onClick={handleAplicarIntervaloHistorico}
+            className="flex h-full w-full items-center justify-center rounded-b-l-lg bg-primary font-nunito text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Aplicar
+          </button>
+        }
+      >
+        <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center overflow-x-auto overflow-y-auto py-2">
+          <FaturamentoRangeCalendar
+            embutidoNoModal
+            embutidoFundoClaro
+            range={rascunhoIntervaloRange}
+            onRangeChange={handleRascunhoIntervaloRangeChange}
+            month={mesCalendarioIntervalo}
+            onMonthChange={setMesCalendarioIntervalo}
+            faturamentoPorDia={faturamentoPorDiaCalendario ?? {}}
+            faturamentoCarregando={faturamentoCalendarioPending || faturamentoCalendarioFetching}
+            horaInicio={rascunhoHoraInicio}
+            horaFim={rascunhoHoraFim}
+            onHorariosChange={(hi, hf) => {
+              setRascunhoHoraInicio(hi)
+              setRascunhoHoraFim(hf)
+            }}
+          />
+        </div>
+      </JiffySidePanelModal>
 
       {/* Modal de Detalhes do Fechamento */}
       {selectedOperacaoId && (

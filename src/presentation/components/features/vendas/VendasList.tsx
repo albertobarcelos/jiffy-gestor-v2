@@ -1070,7 +1070,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex w-full  pl-5 py-1 flex-col">
+      <div className="flex w-full py-1 flex-col">
             <p className="text-primary text-lg px-[30px] font-semibold">
               Todas as Vendas do PDV
             </p>
@@ -1206,7 +1206,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         </div>
         {/* Filtros Avançados */}
         <div
-          className={`flex flex-wrap items-end justify-center gap-x-2 gap-y-3 rounded-t-lg bg-primary/10 px-2 pb-2 pt-3 md:justify-start ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
+          className={`flex flex-wrap items-end justify-center gap-x-2 gap-y-3 rounded-t-lg bg-custom-2 px-2 pb-2 pt-3 md:justify-start ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
         >
           {/* Status da Venda — label na borda (outlined) */}
           <FormControl size="small" variant="outlined" sx={sxVendasFiltroSelectStatus}>
