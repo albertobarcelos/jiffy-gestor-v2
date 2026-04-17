@@ -44,6 +44,8 @@ export function ProdutosTabsModal({
   const produtoId = state.produto?.getId()
   const npRef = useRef<NovoProdutoHandle>(null)
   const grupoNgRef = useRef<NovoGrupoHandle>(null)
+  /** Evita fechar o painel quando o salvamento do produto é só etapa antes do salvamento do grupo */
+  const suppressCloseOnNextProdutoSuccessRef = useRef(false)
 
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2>(state.initialStepProduto ?? 0)
   const [wizardSaving, setWizardSaving] = useState(false)
@@ -72,13 +74,28 @@ export function ProdutosTabsModal({
     prevPainelAbertoRef.current = state.open
   }, [state.open])
 
-  const handleRequestClose = useCallback(() => {
-    if (state.tab === 'produto' && npRef.current?.isDirty?.()) {
-      setConfirmExitOpen(true)
+  // Limpa overlay de confirmação ao fechar; ao abrir, zera flags para não herdar sessão anterior
+  useEffect(() => {
+    if (!state.open) {
+      setConfirmExitOpen(false)
       return
     }
-    onClose()
-  }, [state.tab, onClose])
+    setConfirmExitOpen(false)
+    suppressCloseOnNextProdutoSuccessRef.current = false
+  }, [state.open])
+
+  const handleRequestClose = useCallback(() => {
+    // Duplo rAF: o baseline do produto pode ser commitado após load (setTimeout no filho); avaliar dirty no próximo frame evita falso positivo ao fechar logo ao abrir.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (npRef.current?.isDirty?.()) {
+          setConfirmExitOpen(true)
+          return
+        }
+        onClose()
+      })
+    })
+  }, [onClose])
 
   const handleConfirmDiscardExit = useCallback(() => {
     setConfirmExitOpen(false)
@@ -93,11 +110,45 @@ export function ProdutosTabsModal({
   const handleSaveAndCloseFromConfirm = useCallback(() => {
     setConfirmExitOpen(false)
     if (wizardStep < 2) {
-      npRef.current?.savePartialAndClose()
+      void npRef.current?.savePartialAndClose()
     } else {
-      npRef.current?.saveFinal()
+      void npRef.current?.saveFinal()
     }
   }, [wizardStep])
+
+  /** Persiste alterações pendentes do produto sem fechar o painel (orquestração com salvamento do grupo). */
+  const persistPendingProdutoChanges = useCallback(async (): Promise<boolean> => {
+    if (!npRef.current?.isDirty?.()) return true
+    suppressCloseOnNextProdutoSuccessRef.current = true
+    try {
+      const ok =
+        wizardStep < 2
+          ? await npRef.current.savePartialAndClose()
+          : await npRef.current.saveFinal()
+      if (!ok) {
+        suppressCloseOnNextProdutoSuccessRef.current = false
+      }
+      return ok
+    } catch {
+      suppressCloseOnNextProdutoSuccessRef.current = false
+      return false
+    }
+  }, [wizardStep])
+
+  /** Salva produto pendente (se houver) e em seguida o grupo — mesma ação do botão Salvar na aba Grupo. */
+  const handleSalvarGrupoCombinado = useCallback(async () => {
+    const produtoOk = await persistPendingProdutoChanges()
+    if (!produtoOk) return
+
+    if (embedGrupoTab === 0) {
+      const el = document.getElementById(GRUPO_PRODUTOS_MODAL_FORM_ID)
+      if (el instanceof HTMLFormElement) {
+        el.requestSubmit()
+      }
+    } else {
+      await grupoNgRef.current?.saveGrupo()
+    }
+  }, [embedGrupoTab, persistPendingProdutoChanges])
 
   /**
    * Mantém cada aba montada após a primeira visita enquanto o painel estiver aberto,
@@ -207,7 +258,7 @@ export function ProdutosTabsModal({
         showCancel: true,
         cancelVariant: 'primary',
         cancelLabel: 'Salvar e fechar',
-        onCancel: () => npRef.current?.savePartialAndClose(),
+        onCancel: () => void npRef.current?.savePartialAndClose(),
         cancelDisabled: wizardSaving,
       }
     }
@@ -220,15 +271,11 @@ export function ProdutosTabsModal({
       previousDisabled: wizardSaving,
       showSave: true,
       saveLabel: 'Salvar e fechar',
-      onSave: () => npRef.current?.saveFinal(),
+      onSave: () => void npRef.current?.saveFinal(),
       saveLoading: wizardSaving,
       saveDisabled: wizardSaving,
     }
   }, [state.tab, wizardStep, wizardSaving, fiscalOnlyBack])
-
-  const handleSalvarGrupoAbaProdutos = useCallback(() => {
-    void grupoNgRef.current?.saveGrupo?.()
-  }, [])
 
   const footerComplementosOuImpressoras = useMemo(
     (): JiffySidePanelFooterActions => ({
@@ -240,13 +287,18 @@ export function ProdutosTabsModal({
   )
 
   const footerGrupo = useMemo((): JiffySidePanelFooterActions => {
+    const savingGrupoOuProduto =
+      embedGrupoForm.isSubmitting || wizardSaving
+    const saveDisabled =
+      !embedGrupoForm.canSubmit || savingGrupoOuProduto
+
     if (embedGrupoTab === 0) {
       return {
         showSave: true,
         saveLabel: 'Salvar',
-        saveFormId: GRUPO_PRODUTOS_MODAL_FORM_ID,
-        saveLoading: embedGrupoForm.isSubmitting,
-        saveDisabled: !embedGrupoForm.canSubmit || embedGrupoForm.isSubmitting,
+        onSave: () => void handleSalvarGrupoCombinado(),
+        saveLoading: savingGrupoOuProduto,
+        saveDisabled,
       }
     }
     return {
@@ -255,15 +307,16 @@ export function ProdutosTabsModal({
       onCancel: handleRequestClose,
       showSave: true,
       saveLabel: 'Salvar',
-      onSave: handleSalvarGrupoAbaProdutos,
-      saveLoading: embedGrupoForm.isSubmitting,
-      saveDisabled: !embedGrupoForm.canSubmit || embedGrupoForm.isSubmitting,
+      onSave: () => void handleSalvarGrupoCombinado(),
+      saveLoading: savingGrupoOuProduto,
+      saveDisabled,
     }
   }, [
     embedGrupoTab,
     embedGrupoForm,
     handleRequestClose,
-    handleSalvarGrupoAbaProdutos,
+    handleSalvarGrupoCombinado,
+    wizardSaving,
   ])
 
   const footerActions = useMemo(() => {
@@ -343,6 +396,10 @@ export function ProdutosTabsModal({
               onClose={handleRequestClose}
               onSuccess={produtoData => {
                 onReload?.(produtoData?.produtoId, produtoData?.produtoData)
+                if (suppressCloseOnNextProdutoSuccessRef.current) {
+                  suppressCloseOnNextProdutoSuccessRef.current = false
+                  return
+                }
                 onClose()
               }}
             />
