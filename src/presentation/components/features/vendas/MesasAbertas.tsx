@@ -97,6 +97,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
   const [canLoadMore, setCanLoadMore] = useState(true)
   const [currentPage, setCurrentPage] = useState(0)
   const [selectedVendaId, setSelectedVendaId] = useState<string | null>(null)
+  const [detalhesVendaAberta, setDetalhesVendaAberta] = useState(false)
   const [elapsedTimeUpdateTrigger, setElapsedTimeUpdateTrigger] = useState(0) // Estado para forçar atualização do tempo decorrido
 
   useEffect(() => {
@@ -798,7 +799,10 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
               return (
                 <div
                   key={venda.id}
-                  onClick={() => setSelectedVendaId(venda.id)}
+                  onClick={() => {
+                    setSelectedVendaId(venda.id)
+                    setDetalhesVendaAberta(true)
+                  }}
                   className="relative flex h-[200px] cursor-pointer flex-col items-center justify-between rounded-lg bg-info shadow-sm shadow-primary-text/50 transition-all hover:bg-primary/5 md:h-[220px] md:w-[200px] md:px-2"
                 >
                   <div className="flex flex-grow flex-col items-center justify-center">
@@ -854,13 +858,14 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
       </div>
 
       {/* Modal de Detalhes */}
-      {selectedVendaId && (
+      {selectedVendaId ? (
         <DetalhesVendas
           vendaId={selectedVendaId}
-          open={!!selectedVendaId}
-          onClose={() => setSelectedVendaId(null)}
+          open={detalhesVendaAberta}
+          onClose={() => setDetalhesVendaAberta(false)}
+          onAfterClose={() => setSelectedVendaId(null)}
         />
-      )}
+      ) : null}
     </div>
   )
 }

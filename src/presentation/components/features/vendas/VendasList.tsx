@@ -413,6 +413,8 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   // Estados de UI
   const [isLoading, setIsLoading] = useState(false)
   const [selectedVendaId, setSelectedVendaId] = useState<string | null>(null)
+  /** `open` do painel de detalhes — separado do id para permitir animação de saída antes de limpar a venda. */
+  const [detalhesVendaAberta, setDetalhesVendaAberta] = useState(false)
   const [isLoadingMeiosPagamento, setIsLoadingMeiosPagamento] = useState(false)
   const [isLoadingTerminais, setIsLoadingTerminais] = useState(false)
   const [isDatasModalOpen, setIsDatasModalOpen] = useState(false)
@@ -1495,7 +1497,10 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               return (
                 <div
                   key={venda.id}
-                  onClick={() => setSelectedVendaId(venda.id)} // Adicionado onClick para abrir detalhes
+                  onClick={() => {
+                    setSelectedVendaId(venda.id)
+                    setDetalhesVendaAberta(true)
+                  }}
                   className={`flex cursor-pointer items-center rounded-lg py-1 transition-all hover:bg-primary/10 md:px-2 ${(() => {
                     let baseClasses = ''
                     if (venda.dataCancelamento) {
@@ -1585,6 +1590,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                       onClick={e => {
                         e.stopPropagation() // Impede que o clique no botão acione o clique da linha
                         setSelectedVendaId(venda.id)
+                        setDetalhesVendaAberta(true)
                       }}
                       className="flex h-10 w-10 items-center justify-center rounded text-primary transition-colors hover:bg-primary/10"
                       title="Comprovante de Venda"
@@ -1606,13 +1612,14 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       </div>
 
       {/* Modal de Detalhes */}
-      {selectedVendaId && (
+      {selectedVendaId ? (
         <DetalhesVendas
           vendaId={selectedVendaId}
-          open={!!selectedVendaId}
-          onClose={() => setSelectedVendaId(null)}
+          open={detalhesVendaAberta}
+          onClose={() => setDetalhesVendaAberta(false)}
+          onAfterClose={() => setSelectedVendaId(null)}
         />
-      )}
+      ) : null}
 
       {/* Painel lateral: mesmo calendário de intervalo + horas do dashboardV2 */}
       <JiffySidePanelModal

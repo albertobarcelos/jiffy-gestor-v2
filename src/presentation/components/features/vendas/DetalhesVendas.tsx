@@ -1,8 +1,18 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import {
+  forwardRef,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  type ReactElement,
+  type Ref,
+} from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
+import Modal from '@mui/material/Modal'
+import Slide from '@mui/material/Slide'
+import type { TransitionProps } from '@mui/material/transitions'
 import { MdClose, MdRestaurant, MdAttachMoney, MdCancel } from 'react-icons/md'
 import {
   CircularProgress,
@@ -13,6 +23,7 @@ import {
   DialogContent as MuiDialogContent,
   DialogActions,
 } from '@mui/material'
+import { PainelPedidoBackdrop } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { TipoVendaIcon } from './TipoVendaIcon'
@@ -106,9 +117,25 @@ interface DetalhesVendasProps {
   vendaId: string
   open: boolean
   onClose: () => void
+  /** Chamado após o painel terminar de deslizar para fora — use para limpar `vendaId` no pai sem cortar a animação. */
+  onAfterClose?: () => void
   tabelaOrigem?: 'venda' | 'venda_gestor' // Indica de qual tabela buscar
 }
 
+/** Mesmos tempos do `JiffySidePanelModal` — entrada/saída pela direita. */
+const PANEL_MS_DETALHES = { enter: 420, exit: 380 } as const
+
+const DetalhesVendasPainelSlide = forwardRef(function DetalhesVendasPainelSlide(
+  props: TransitionProps & { children: ReactElement },
+  ref: Ref<unknown>
+) {
+  return <Slide ref={ref} direction="left" {...props} />
+})
+DetalhesVendasPainelSlide.displayName = 'DetalhesVendasPainelSlide'
+
+/** Igual ao `panelClassName` padrão do `JiffySidePanelModal` — largura estável ao abrir (loading ou com dados). */
+const CLASSE_LARGURA_PAINEL_DETALHES_VENDA =
+  'w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]'
 /**
  * Modal de detalhes da venda
  * Exibe informações completas da venda, produtos lançados e pagamentos
@@ -117,6 +144,7 @@ export function DetalhesVendas({
   vendaId,
   open,
   onClose,
+  onAfterClose,
   tabelaOrigem = 'venda',
 }: DetalhesVendasProps) {
   const { auth } = useAuthStore()
@@ -132,6 +160,25 @@ export function DetalhesVendas({
   const [isCancelarModalOpen, setIsCancelarModalOpen] = useState(false)
   const [justificativa, setJustificativa] = useState('')
   const cancelarVenda = useCancelarVendaGestor()
+
+  /** Mantém o `Modal` montado até o fim do slide de saída (igual ao `JiffySidePanelModal`). */
+  const [internalOpen, setInternalOpen] = useState(open)
+
+  useEffect(() => {
+    if (open) setInternalOpen(true)
+  }, [open])
+
+  const handleSlideExited = useCallback(() => {
+    setInternalOpen(false)
+    onAfterClose?.()
+  }, [onAfterClose])
+
+  const handlePainelBackdropClose = useCallback(
+    (_: object, reason: 'backdropClick' | 'escapeKeyDown') => {
+      onClose()
+    },
+    [onClose]
+  )
 
   /**
    * Formata valor como moeda brasileira
@@ -586,16 +633,20 @@ export function DetalhesVendas({
   useEffect(() => {
     if (open && vendaId) {
       fetchVendaDetalhes()
-    } else {
-      // Quando o modal é fechado ou vendaId é nulo, limpa os estados
+    }
+  }, [open, vendaId, fetchVendaDetalhes])
+
+  // Após o slide fechar (`internalOpen` false), libera dados — evita sumir o conteúdo durante a animação
+  useEffect(() => {
+    if (!internalOpen) {
       setVenda(null)
       setNomeCliente(null)
-      setNomesUsuarios({}) // Limpa cache de usuários
-      setNomesMeiosPagamento({}) // Limpa cache de meios de pagamento
+      setNomesUsuarios({})
+      setNomesMeiosPagamento({})
       setIsCancelarModalOpen(false)
       setJustificativa('')
     }
-  }, [open, vendaId, fetchVendaDetalhes])
+  }, [internalOpen])
 
   /**
    * Calcula o resumo financeiro dos itens lançados
@@ -776,7 +827,7 @@ export function DetalhesVendas({
     return venda.valorFinal
   }, [venda, calcularValorProduto, calcularValorComplemento])
 
-  if (!open) return null
+  if (!internalOpen) return null
 
   const statusVenda = venda?.canceladoPorId
     ? 'CANCELADA'
@@ -792,53 +843,37 @@ export function DetalhesVendas({
         : 'bg-warning'
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={isOpen => {
-        if (!isOpen) {
-          onClose()
-        }
-      }}
-      fullWidth
-      maxWidth={false}
+    <Modal
+      open={internalOpen}
+      onClose={handlePainelBackdropClose}
+      closeAfterTransition
+      slots={{ backdrop: PainelPedidoBackdrop }}
       sx={{
-        '& .MuiDialog-container': {
-          justifyContent: 'center',
-          alignItems: 'center',
-          padding: {
-            xs: 0, // Remove padding em telas muito pequenas
-            sm: '16px', // Adiciona padding em telas maiores
-          },
-        },
-      }}
-      PaperProps={{
-        sx: {
-          borderRadius: '22px',
-          width: '100vw',
-          maxWidth: {
-            xs: '95vw', // Em telas muito pequenas, ocupa 100% da largura
-            sm: '95vw', // Em telas pequenas, ocupa 95% da largura
-            md: '620px', // Em telas médias e maiores, limita a 620px
-          },
-          maxHeight: '95vh',
-          margin: {
-            xs: 0, // Remove margem em telas muito pequenas
-            sm: '16px', // Adiciona margem em telas maiores
-          },
+        zIndex: 1300,
+        '& .MuiBackdrop-root': {
+          zIndex: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          transition: 'none',
         },
       }}
     >
-      <DialogContent
-        sx={{
-          p: 0,
-          maxHeight: '90vh',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
+      <DetalhesVendasPainelSlide
+        in={open}
+        timeout={{ enter: PANEL_MS_DETALHES.enter, exit: PANEL_MS_DETALHES.exit }}
+        onExited={handleSlideExited}
+        appear
+        mountOnEnter
+        unmountOnExit={false}
       >
+        <div
+          className={`absolute right-0 top-0 z-[1] flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden rounded-bl-xl rounded-tl-xl bg-white shadow-xl outline-none ${CLASSE_LARGURA_PAINEL_DETALHES_VENDA}`}
+          role="dialog"
+          aria-modal
+          aria-labelledby="detalhes-vendas-titulo-appbar"
+        >
+          <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden p-0">
         {/* AppBar */}
-        <div className="flex items-center gap-3 rounded-t-lg bg-primary py-3 md:px-4">
+        <div className="flex w-full shrink-0 items-center gap-3 rounded-t-lg bg-primary py-3 md:px-4">
           <div className="flex flex-1 items-center justify-center gap-2">
             {venda && (
               <TipoVendaIcon
@@ -855,7 +890,7 @@ export function DetalhesVendas({
                 corGestor="var(--color-info)"
               />
             )}
-            <div className="flex flex-col">
+            <div className="flex flex-col" id="detalhes-vendas-titulo-appbar">
               <span className="font-exo text-xl font-semibold text-white">
                 Venda Nº. {venda?.numeroVenda}
               </span>
@@ -870,10 +905,10 @@ export function DetalhesVendas({
           </button>
         </div>
 
-        {/* Conteúdo */}
-        <div className="flex-1 overflow-y-auto bg-info py-2 md:px-2">
+        {/* Conteúdo — flex-col: seções em coluna (evita flex padrão = row, que quebrava em 4 colunas) */}
+        <div className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto bg-info py-2 md:px-2">
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-12">
+            <div className="flex w-full min-w-0 flex-col items-center justify-center py-12">
               <JiffyLoading />
             </div>
           ) : venda ? (
@@ -1441,13 +1476,14 @@ export function DetalhesVendas({
             </div>
           )}
         </div>
-      </DialogContent>
+          </div>
 
       {/* Modal de Justificativa de Cancelamento */}
       <MuiDialog
         open={isCancelarModalOpen}
         onClose={() => setIsCancelarModalOpen(false)}
         maxWidth="sm"
+        sx={{ zIndex: 1400 }}
         PaperProps={{
           sx: {
             borderRadius: '16px',
@@ -1508,6 +1544,8 @@ export function DetalhesVendas({
           </Button>
         </DialogActions>
       </MuiDialog>
-    </Dialog>
+        </div>
+      </DetalhesVendasPainelSlide>
+    </Modal>
   )
 }

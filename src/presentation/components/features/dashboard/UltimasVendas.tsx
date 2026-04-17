@@ -50,8 +50,11 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
   }, [])
 
   const handleCloseModal = useCallback(() => {
-    setSelectedVendaId(null)
     setIsModalOpen(false)
+  }, [])
+
+  const handleAfterCloseDetalhes = useCallback(() => {
+    setSelectedVendaId(null)
   }, [])
 
   // Função para mapear o período do frontend para o formato esperado pela função calculatePeriodo
@@ -390,6 +393,7 @@ export function UltimasVendas({ periodo, periodoInicial, periodoFinal }: Ultimas
         vendaId={selectedVendaId || ''}
         open={isModalOpen}
         onClose={handleCloseModal}
+        onAfterClose={handleAfterCloseDetalhes}
       />
     </>
   )
