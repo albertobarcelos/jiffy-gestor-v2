@@ -1,6 +1,14 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  forwardRef,
+  useImperativeHandle,
+} from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { UsuarioGestor } from '@/src/domain/entities/UsuarioGestor'
@@ -27,7 +35,15 @@ interface NovoUsuarioGestorProps {
     canSubmit: boolean
   }) => void
   onSaved?: () => void
+  /** Só após "Salvar e fechar" no rodapé (`saveUsuarioAndClose`), depois de `onSaved`. */
+  onCloseAfterSave?: () => void
   onCancel?: () => void
+}
+
+/** API imperativa — confirmação ao fechar o painel (`PADRAO_MODAL_SAIR_SEM_SALVAR`). */
+export interface NovoUsuarioGestorHandle {
+  isDirty: () => boolean
+  saveUsuarioAndClose: () => void
 }
 
 interface PerfilGestor {
@@ -41,17 +57,21 @@ const MODULOS_ACESSO = ['Fiscal', 'Financeiro', 'Estoque', 'Dashboard'] as const
  * Componente para criar/editar usuário gestor
  * Replica o design e funcionalidades do Flutter
  */
-export function NovoUsuarioGestor({
-  usuarioId,
-  initialPerfilGestorId,
-  isEmbedded,
-  hideEmbeddedHeader = false,
-  embeddedFormId,
-  hideEmbeddedFormActions = false,
-  onEmbedFormStateChange,
-  onSaved,
-  onCancel,
-}: NovoUsuarioGestorProps) {
+export const NovoUsuarioGestor = forwardRef<NovoUsuarioGestorHandle, NovoUsuarioGestorProps>(
+  function NovoUsuarioGestor(
+    {
+      usuarioId,
+      initialPerfilGestorId,
+      isEmbedded,
+      hideEmbeddedHeader = false,
+      embeddedFormId,
+      onEmbedFormStateChange,
+      onSaved,
+      onCloseAfterSave,
+      onCancel,
+    },
+    ref
+  ) {
   const router = useRouter()
   const { auth } = useAuthStore()
   const isEditing = !!usuarioId
@@ -98,6 +118,37 @@ export function NovoUsuarioGestor({
       ),
     [nome, emailValido, perfilGestorId, isEditing, password]
   )
+
+  const getFormSnapshot = useCallback(() => {
+    const modulosKey = [...modulosAcesso].sort().join(',')
+    return JSON.stringify({
+      nome: (nome || '').trim(),
+      username: (username || '').trim(),
+      perfilGestorId: perfilGestorId || '',
+      ativo,
+      password: password || '',
+      modulosKey,
+    })
+  }, [nome, username, perfilGestorId, ativo, password, modulosAcesso])
+
+  const baselineSerializedRef = useRef('')
+  const embeddedCloseAfterSaveRef = useRef(false)
+
+  const commitBaseline = useCallback(() => {
+    baselineSerializedRef.current = getFormSnapshot()
+  }, [getFormSnapshot])
+
+  const commitBaselineLatestRef = useRef(commitBaseline)
+  commitBaselineLatestRef.current = commitBaseline
+
+  useEffect(() => {
+    if (isLoadingUsuario) return
+    if (isEditing) return
+    const t = window.setTimeout(() => {
+      commitBaselineLatestRef.current()
+    }, 100)
+    return () => window.clearTimeout(t)
+  }, [isLoadingUsuario, isEditing, usuarioId])
 
   useEffect(() => {
     onEmbedFormStateChange?.({
@@ -272,6 +323,9 @@ export function NovoUsuarioGestor({
         showToast.error(errorMessage)
       } finally {
         setIsLoadingUsuario(false)
+        window.setTimeout(() => {
+          commitBaselineLatestRef.current()
+        }, 150)
       }
     }
 
@@ -281,6 +335,9 @@ export function NovoUsuarioGestor({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const shouldClosePanel = embeddedCloseAfterSaveRef.current
+    embeddedCloseAfterSaveRef.current = false
+
     const token = auth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado')
@@ -351,8 +408,14 @@ export function NovoUsuarioGestor({
       showToast.success(
         isEditing ? 'Usuário gestor atualizado com sucesso!' : 'Usuário gestor criado com sucesso!'
       )
+      window.setTimeout(() => {
+        commitBaselineLatestRef.current()
+      }, 0)
       if (isEmbedded) {
         onSaved?.()
+        if (shouldClosePanel) {
+          onCloseAfterSave?.()
+        }
       } else {
         router.push('/cadastros/usuarios-gestor')
       }
@@ -360,6 +423,7 @@ export function NovoUsuarioGestor({
       showToast.error(error instanceof Error ? error.message : 'Erro ao salvar usuário gestor')
     } finally {
       setIsLoading(false)
+      onEmbedFormStateChange?.({ isSubmitting: false, canSubmit: canSubmitEmbed })
     }
   }
 
@@ -372,6 +436,24 @@ export function NovoUsuarioGestor({
   }
 
   // Função removida - módulos de acesso agora vêm do perfil gestor
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      isDirty: () => {
+        if (isLoadingUsuario) return false
+        return getFormSnapshot() !== baselineSerializedRef.current
+      },
+      saveUsuarioAndClose: () => {
+        embeddedCloseAfterSaveRef.current = true
+        const el = document.getElementById(formId)
+        if (el instanceof HTMLFormElement) {
+          el.requestSubmit()
+        }
+      },
+    }),
+    [formId, getFormSnapshot, isLoadingUsuario]
+  )
 
   if (isLoadingUsuario) {
     return (
@@ -704,7 +786,7 @@ export function NovoUsuarioGestor({
             </div>
           </div>
 
-          {!isEmbedded || !hideEmbeddedFormActions ? (
+          {!isEmbedded ? (
             <div className="flex justify-end gap-4 pt-2">
               <Button
                 type="button"
@@ -743,4 +825,6 @@ export function NovoUsuarioGestor({
       </div>
     </div>
   )
-}
+})
+
+NovoUsuarioGestor.displayName = 'NovoUsuarioGestor'

@@ -304,6 +304,7 @@ export function ProdutosTabsModal({
     return {
       showCancel: true,
       cancelLabel: 'Fechar',
+      cancelVariant: 'primaryTint10',
       onCancel: handleRequestClose,
       showSave: true,
       saveLabel: 'Salvar',

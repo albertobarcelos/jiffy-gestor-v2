@@ -393,9 +393,10 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
         showToast.success('Perfil criado com sucesso!')
         return
       }
-      closeTabsModal()
+      // "Salvar" em edição: só atualiza dados; fechar o painel é só por Fechar / Salvar e fechar.
+      handleStatusChange()
     },
-    [closeTabsModal, handleStatusChange]
+    [handleStatusChange]
   )
 
   const openUsuariosTabsModal = useCallback((config: Partial<UsuariosTabsModalState> = {}) => {

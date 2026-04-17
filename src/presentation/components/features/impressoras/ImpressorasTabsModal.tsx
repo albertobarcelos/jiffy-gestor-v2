@@ -38,7 +38,7 @@ export function ImpressorasTabsModal({ state, onClose, onReload }: ImpressorasTa
   }, [state.mode])
 
   const saveLabel = useMemo(() => {
-    if (state.mode === 'edit') return 'Atualizar'
+    if (state.mode === 'edit') return 'Salvar'
     return 'Salvar Impressora'
   }, [state.mode])
 

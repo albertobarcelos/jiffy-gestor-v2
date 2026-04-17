@@ -1,6 +1,14 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+} from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { PerfilUsuario } from '@/src/domain/entities/PerfilUsuario'
@@ -24,9 +32,23 @@ interface NovoPerfilUsuarioProps {
   embeddedFormId?: string
   hideEmbeddedFormActions?: boolean
   onEmbedFormStateChange?: (s: { isSubmitting: boolean; canSubmit: boolean }) => void
+  /** Embutido: notifica se há alterações não refletidas no baseline (ex.: bloquear aba Usuário no modal). */
+  onEmbedDirtyChange?: (dirty: boolean) => void
   /** Embutido: após POST com sucesso envia `perfilIdCriado` para o pai manter o modal aberto */
   onSaved?: (payload?: { perfilIdCriado?: string }) => void
+  /**
+   * Embutido: fechar o painel após "Salvar e fechar" com sucesso.
+   * Deve chamar `onClose` do modal direto — não usar `onCancel` (evita `handleRequestClose` / confirmação com `dirty` ainda não propagado).
+   */
+  onClosePanelAfterSave?: () => void
   onCancel?: () => void
+}
+
+/** API imperativa — confirmação ao fechar o painel (`PADRAO_MODAL_SAIR_SEM_SALVAR`). */
+export interface NovoPerfilUsuarioHandle {
+  isDirty: () => boolean
+  /** Submete o form do perfil e, em embed, força fechamento após sucesso (inclui criação com `perfilIdCriado`). */
+  savePerfilAndClose: () => void
 }
 
 interface MeioPagamento {
@@ -34,20 +56,35 @@ interface MeioPagamento {
   nome: string
 }
 
+/** Campos de permissão persistidos via PATCH (espelha `AtualizarPerfilUsuarioDTO`) */
+type PermissaoCampo =
+  | 'cancelarVenda'
+  | 'cancelarProduto'
+  | 'aplicarDescontoProduto'
+  | 'aplicarDescontoVenda'
+  | 'aplicarAcrescimoProduto'
+  | 'aplicarAcrescimoVenda'
+
 /**
  * Componente para criar/editar perfil de usuário
  * Replica o design e funcionalidades do Flutter
  */
-export function NovoPerfilUsuario({
-  perfilId,
-  isEmbedded = false,
-  hideEmbeddedHeader = false,
-  embeddedFormId,
-  hideEmbeddedFormActions = false,
-  onEmbedFormStateChange,
-  onSaved,
-  onCancel,
-}: NovoPerfilUsuarioProps) {
+export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilUsuarioProps>(
+  function NovoPerfilUsuario(
+    {
+      perfilId,
+      isEmbedded = false,
+      hideEmbeddedHeader = false,
+      embeddedFormId,
+      hideEmbeddedFormActions = false,
+      onEmbedFormStateChange,
+      onEmbedDirtyChange,
+      onSaved,
+      onClosePanelAfterSave,
+      onCancel,
+    },
+    ref
+  ) {
   const router = useRouter()
   const { auth } = useAuthStore()
   const isEditing = !!perfilId
@@ -64,6 +101,10 @@ export function NovoPerfilUsuario({
 
   // Estados de loading e dados
   const [isLoading, setIsLoading] = useState(false)
+  /** PATCH só dos meios ao alternar switch — não bloqueia o submit do formulário inteiro */
+  const [isSavingMeiosPagamento, setIsSavingMeiosPagamento] = useState(false)
+  /** PATCH das permissões ao alternar switch */
+  const [isSavingPermissoes, setIsSavingPermissoes] = useState(false)
   const [isLoadingPerfil, setIsLoadingPerfil] = useState(false)
   const [searchMeioPagamento, setSearchMeioPagamento] = useState('')
   const [meiosPagamentosTabsModalState, setMeiosPagamentosTabsModalState] =
@@ -79,6 +120,270 @@ export function NovoPerfilUsuario({
   const [perfilLoaded, setPerfilLoaded] = useState(false)
   const canSubmit = Boolean(role && role.trim() && selectedMeiosPagamento.length > 0)
   const formId = embeddedFormId ?? 'novo-perfil-usuario-form'
+
+  /** Snapshot só de dados persistidos (PADRAO_MODAL_SAIR_SEM_SALVAR). */
+  const getFormSnapshot = useCallback(() => {
+    const meiosIds = [...selectedMeiosPagamento]
+      .map((m) => m.id)
+      .sort()
+      .join(',')
+    return JSON.stringify({
+      role: (role || '').trim(),
+      meiosIds,
+      cancelarVenda,
+      cancelarProduto,
+      aplicarDescontoProduto,
+      aplicarDescontoVenda,
+      aplicarAcrescimoProduto,
+      aplicarAcrescimoVenda,
+    })
+  }, [
+    role,
+    selectedMeiosPagamento,
+    cancelarVenda,
+    cancelarProduto,
+    aplicarDescontoProduto,
+    aplicarDescontoVenda,
+    aplicarAcrescimoProduto,
+    aplicarAcrescimoVenda,
+  ])
+
+  const baselineSerializedRef = useRef('')
+  /** Incrementado a cada `commitBaseline` para o pai recalcular `dirty` (baseline está em ref). */
+  const [baselineTick, setBaselineTick] = useState(0)
+  /** Após "Salvar e fechar" no diálogo de confirmação — força `onCancel` no embed mesmo com `perfilIdCriado`. */
+  const closeAfterEmbeddedSaveRef = useRef(false)
+
+  const commitBaseline = useCallback(() => {
+    baselineSerializedRef.current = getFormSnapshot()
+    setBaselineTick(t => t + 1)
+  }, [getFormSnapshot])
+
+  const embedDirtyComputed = useMemo(() => {
+    if (isLoadingPerfil) return false
+    return getFormSnapshot() !== baselineSerializedRef.current
+  }, [getFormSnapshot, isLoadingPerfil, baselineTick])
+
+  useEffect(() => {
+    if (!isEmbedded || !onEmbedDirtyChange) return
+    onEmbedDirtyChange(embedDirtyComputed)
+  }, [isEmbedded, onEmbedDirtyChange, embedDirtyComputed])
+
+  useEffect(() => {
+    return () => {
+      if (isEmbedded) {
+        onEmbedDirtyChange?.(false)
+      }
+    }
+  }, [isEmbedded, onEmbedDirtyChange])
+
+  const commitBaselineLatestRef = useRef(commitBaseline)
+  commitBaselineLatestRef.current = commitBaseline
+
+  const selectedMeiosPagamentoRef = useRef(selectedMeiosPagamento)
+  selectedMeiosPagamentoRef.current = selectedMeiosPagamento
+
+  /** Evita reverter estado se outro PATCH de meios foi disparado depois */
+  const meiosPersistSeqRef = useRef(0)
+  const meiosPatchInFlightRef = useRef(0)
+
+  const persistAcessoMeiosPagamento = useCallback(
+    async (next: MeioPagamento[], previous: MeioPagamento[]) => {
+      if (!perfilId) return
+      const seqAtStart = ++meiosPersistSeqRef.current
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        if (seqAtStart === meiosPersistSeqRef.current) {
+          selectedMeiosPagamentoRef.current = previous
+          setSelectedMeiosPagamento(previous)
+        }
+        return
+      }
+
+      meiosPatchInFlightRef.current += 1
+      setIsSavingMeiosPagamento(true)
+      try {
+        const response = await fetch(`/api/perfis-usuarios-pdv/${perfilId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            acessoMeiosPagamento: next.map((mp) => mp.nome),
+          }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(
+            typeof errorData.error === 'string'
+              ? errorData.error
+              : `Erro ao atualizar meios (${response.status})`
+          )
+        }
+
+        if (seqAtStart !== meiosPersistSeqRef.current) return
+
+        perfilMeiosPagamentoNomesRef.current = next.map((m) => m.nome)
+        window.setTimeout(() => {
+          commitBaselineLatestRef.current()
+        }, 0)
+      } catch (err) {
+        console.error('Erro ao persistir meios de pagamento do perfil:', err)
+        showToast.error(
+          err instanceof Error ? err.message : 'Erro ao atualizar meios de pagamento'
+        )
+        if (seqAtStart === meiosPersistSeqRef.current) {
+          selectedMeiosPagamentoRef.current = previous
+          setSelectedMeiosPagamento(previous)
+        }
+      } finally {
+        meiosPatchInFlightRef.current -= 1
+        if (meiosPatchInFlightRef.current <= 0) {
+          meiosPatchInFlightRef.current = 0
+          setIsSavingMeiosPagamento(false)
+        }
+      }
+    },
+    [perfilId, auth]
+  )
+
+  // Baseline inicial em modo criação
+  useEffect(() => {
+    if (isLoadingPerfil) return
+    if (isEditing) return
+    const t = window.setTimeout(() => {
+      commitBaselineLatestRef.current()
+    }, 100)
+    return () => window.clearTimeout(t)
+  }, [isLoadingPerfil, isEditing, perfilId])
+
+  const permissoesPersistSeqRef = useRef(0)
+  const permissoesPatchInFlightRef = useRef(0)
+
+  const permissoesRef = useRef({
+    cancelarVenda: false,
+    cancelarProduto: false,
+    aplicarDescontoProduto: false,
+    aplicarDescontoVenda: false,
+    aplicarAcrescimoProduto: false,
+    aplicarAcrescimoVenda: false,
+  })
+
+  useEffect(() => {
+    permissoesRef.current = {
+      cancelarVenda,
+      cancelarProduto,
+      aplicarDescontoProduto,
+      aplicarDescontoVenda,
+      aplicarAcrescimoProduto,
+      aplicarAcrescimoVenda,
+    }
+  }, [
+    cancelarVenda,
+    cancelarProduto,
+    aplicarDescontoProduto,
+    aplicarDescontoVenda,
+    aplicarAcrescimoProduto,
+    aplicarAcrescimoVenda,
+  ])
+
+  const aplicarValorPermissao = useCallback((campo: PermissaoCampo, value: boolean) => {
+    switch (campo) {
+      case 'cancelarVenda':
+        setCancelarVenda(value)
+        break
+      case 'cancelarProduto':
+        setCancelarProduto(value)
+        break
+      case 'aplicarDescontoProduto':
+        setAplicarDescontoProduto(value)
+        break
+      case 'aplicarDescontoVenda':
+        setAplicarDescontoVenda(value)
+        break
+      case 'aplicarAcrescimoProduto':
+        setAplicarAcrescimoProduto(value)
+        break
+      case 'aplicarAcrescimoVenda':
+        setAplicarAcrescimoVenda(value)
+        break
+    }
+  }, [])
+
+  const persistPermissaoCampo = useCallback(
+    async (campo: PermissaoCampo, next: boolean, previous: boolean) => {
+      if (!perfilId) return
+      const seqAtStart = ++permissoesPersistSeqRef.current
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        if (seqAtStart === permissoesPersistSeqRef.current) {
+          permissoesRef.current = { ...permissoesRef.current, [campo]: previous }
+          aplicarValorPermissao(campo, previous)
+        }
+        return
+      }
+
+      permissoesPatchInFlightRef.current += 1
+      setIsSavingPermissoes(true)
+      try {
+        const response = await fetch(`/api/perfis-usuarios-pdv/${perfilId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ [campo]: next }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(
+            typeof errorData.error === 'string'
+              ? errorData.error
+              : `Erro ao atualizar permissões (${response.status})`
+          )
+        }
+
+        if (seqAtStart !== permissoesPersistSeqRef.current) return
+        window.setTimeout(() => {
+          commitBaselineLatestRef.current()
+        }, 0)
+      } catch (err) {
+        console.error('Erro ao persistir permissão do perfil:', err)
+        showToast.error(
+          err instanceof Error ? err.message : 'Erro ao atualizar permissão'
+        )
+        if (seqAtStart === permissoesPersistSeqRef.current) {
+          permissoesRef.current = { ...permissoesRef.current, [campo]: previous }
+          aplicarValorPermissao(campo, previous)
+        }
+      } finally {
+        permissoesPatchInFlightRef.current -= 1
+        if (permissoesPatchInFlightRef.current <= 0) {
+          permissoesPatchInFlightRef.current = 0
+          setIsSavingPermissoes(false)
+        }
+      }
+    },
+    [perfilId, auth, aplicarValorPermissao]
+  )
+
+  /** Atualiza UI e, se já existir perfil, persiste o campo via PATCH */
+  const handlePermissaoChange = useCallback(
+    (campo: PermissaoCampo, next: boolean) => {
+      const previous = permissoesRef.current[campo]
+      permissoesRef.current = { ...permissoesRef.current, [campo]: next }
+      aplicarValorPermissao(campo, next)
+      if (perfilId) {
+        void persistPermissaoCampo(campo, next, previous)
+      }
+    },
+    [perfilId, aplicarValorPermissao, persistPermissaoCampo]
+  )
 
   // Carregar lista de meios de pagamento usando React Query (com cache)
   const {
@@ -114,9 +419,18 @@ export function NovoPerfilUsuario({
 
   const meiosPagamentoFiltrados = useMemo(() => {
     const q = searchMeioPagamento.trim().toLowerCase()
-    if (!q) return meiosPagamento
-    return meiosPagamento.filter((m) => m.nome.toLowerCase().includes(q))
-  }, [meiosPagamento, searchMeioPagamento])
+    const lista =
+      !q ? [...meiosPagamento] : meiosPagamento.filter((m) => m.nome.toLowerCase().includes(q))
+    // Vinculados ao perfil primeiro; desempate alfabético estável
+    const vinculadosIds = new Set(selectedMeiosPagamento.map((m) => m.id))
+    lista.sort((a, b) => {
+      const av = vinculadosIds.has(a.id) ? 1 : 0
+      const bv = vinculadosIds.has(b.id) ? 1 : 0
+      if (bv !== av) return bv - av
+      return a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })
+    })
+    return lista
+  }, [meiosPagamento, searchMeioPagamento, selectedMeiosPagamento])
 
   // Carregar dados do perfil se estiver editando
   useEffect(() => {
@@ -171,6 +485,9 @@ export function NovoPerfilUsuario({
         console.error('Erro ao carregar perfil:', error)
       } finally {
         setIsLoadingPerfil(false)
+        window.setTimeout(() => {
+          commitBaselineLatestRef.current()
+        }, 250)
       }
     }
 
@@ -204,6 +521,11 @@ export function NovoPerfilUsuario({
       }
       return prev
     })
+    if (isEditing && perfilLoaded) {
+      window.setTimeout(() => {
+        commitBaselineLatestRef.current()
+      }, 200)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing, perfilLoaded, meiosPagamentoIds, meiosPagamento.length])
 
@@ -225,6 +547,9 @@ export function NovoPerfilUsuario({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const forceClosePanel = closeAfterEmbeddedSaveRef.current
+    closeAfterEmbeddedSaveRef.current = false
+
     const token = auth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado. Faça login novamente.')
@@ -353,9 +678,17 @@ export function NovoPerfilUsuario({
           hasLoadedPerfilRef.current = true
           setPerfilLoaded(true)
           onSaved?.({ perfilIdCriado: novoId })
+          commitBaselineLatestRef.current()
+          if (forceClosePanel) {
+            onClosePanelAfterSave?.()
+          }
         } else {
           showToast.success('Perfil atualizado com sucesso!')
           onSaved?.()
+          commitBaselineLatestRef.current()
+          if (forceClosePanel) {
+            onClosePanelAfterSave?.()
+          }
         }
       } else {
         showToast.success(isEditing ? 'Perfil atualizado com sucesso!' : 'Perfil criado com sucesso!')
@@ -386,38 +719,40 @@ export function NovoPerfilUsuario({
     }
   }
 
-  const toggleMeioPagamento = (meio: MeioPagamento) => {
-    setSelectedMeiosPagamento((prev) => {
+  const toggleMeioPagamento = useCallback(
+    (meio: MeioPagamento) => {
+      const prev = selectedMeiosPagamentoRef.current
       const exists = prev.find((mp) => mp.id === meio.id)
       if (exists) {
-        // Validação: não permite remover se for o último meio de pagamento
         if (prev.length === 1) {
-          // Sempre exibe o toast quando tenta remover o último item
-          // O ID garante que substitui o toast anterior se ainda estiver visível
           const toastId = 'meio-pagamento-error'
           toast.error('É necessário manter pelo menos um meio de pagamento selecionado', {
             id: toastId,
             duration: 5000,
           })
           lastMeioPagamentoErrorToastRef.current = toastId
-          return prev
+          return
         }
-        // Limpa o toast de erro se a remoção for bem-sucedida
         if (lastMeioPagamentoErrorToastRef.current) {
           toast.dismiss(lastMeioPagamentoErrorToastRef.current)
           lastMeioPagamentoErrorToastRef.current = null
         }
-        return prev.filter((mp) => mp.id !== meio.id)
-      } else {
-        // Limpa o toast de erro se adicionar um meio de pagamento
-        if (lastMeioPagamentoErrorToastRef.current) {
-          toast.dismiss(lastMeioPagamentoErrorToastRef.current)
-          lastMeioPagamentoErrorToastRef.current = null
-        }
-        return [...prev, meio]
+      } else if (lastMeioPagamentoErrorToastRef.current) {
+        toast.dismiss(lastMeioPagamentoErrorToastRef.current)
+        lastMeioPagamentoErrorToastRef.current = null
       }
-    })
-  }
+
+      const next = exists ? prev.filter((mp) => mp.id !== meio.id) : [...prev, meio]
+      selectedMeiosPagamentoRef.current = next
+      setSelectedMeiosPagamento(next)
+
+      // Perfil ainda não persistido: só estado local até o primeiro Salvar do formulário
+      if (perfilId) {
+        void persistAcessoMeiosPagamento(next, prev)
+      }
+    },
+    [perfilId, persistAcessoMeiosPagamento]
+  )
 
   const openMeiosPagamentosTabsModal = () => {
     setMeiosPagamentosTabsModalState({
@@ -444,6 +779,24 @@ export function NovoPerfilUsuario({
     // Recarrega a lista de meios de pagamento
     await refetchMeiosPagamento()
   }
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      isDirty: () => {
+        if (isLoadingPerfil) return false
+        return getFormSnapshot() !== baselineSerializedRef.current
+      },
+      savePerfilAndClose: () => {
+        closeAfterEmbeddedSaveRef.current = true
+        const el = document.getElementById(formId)
+        if (el instanceof HTMLFormElement) {
+          el.requestSubmit()
+        }
+      },
+    }),
+    [formId, getFormSnapshot, isLoadingPerfil]
+  )
 
   if (isLoadingPerfil) {
     return (
@@ -578,7 +931,11 @@ export function NovoPerfilUsuario({
                           <JiffyIconSwitch
                             checked={isVinculado}
                             onChange={() => toggleMeioPagamento(meio)}
-                            disabled={isLoading || isLoadingMeiosPagamento}
+                            disabled={
+                              isLoading ||
+                              isLoadingMeiosPagamento ||
+                              isSavingMeiosPagamento
+                            }
                             bordered={false}
                             size="sm"
                             className="shrink-0 justify-center gap-0 px-0 py-0"
@@ -611,8 +968,10 @@ export function NovoPerfilUsuario({
                 <span className="text-primary-text font-medium text-xs md:text-sm">Pode Cancelar Venda?</span>
                 <JiffyIconSwitch
                   checked={cancelarVenda}
-                  onChange={e => setCancelarVenda(e.target.checked)}
-                  disabled={isLoading}
+                  onChange={e =>
+                    handlePermissaoChange('cancelarVenda', e.target.checked)
+                  }
+                  disabled={isLoading || isSavingPermissoes}
                   bordered={false}
                   size="sm"
                   className="shrink-0"
@@ -625,8 +984,10 @@ export function NovoPerfilUsuario({
                 <span className="text-primary-text font-medium text-xs md:text-sm">Pode Cancelar Produto?</span>
                 <JiffyIconSwitch
                   checked={cancelarProduto}
-                  onChange={e => setCancelarProduto(e.target.checked)}
-                  disabled={isLoading}
+                  onChange={e =>
+                    handlePermissaoChange('cancelarProduto', e.target.checked)
+                  }
+                  disabled={isLoading || isSavingPermissoes}
                   bordered={false}
                   size="sm"
                   className="shrink-0"
@@ -639,8 +1000,10 @@ export function NovoPerfilUsuario({
                 <span className="text-primary-text font-medium text-xs md:text-sm">Pode Aplicar Desconto no Produto?</span>
                 <JiffyIconSwitch
                   checked={aplicarDescontoProduto}
-                  onChange={e => setAplicarDescontoProduto(e.target.checked)}
-                  disabled={isLoading}
+                  onChange={e =>
+                    handlePermissaoChange('aplicarDescontoProduto', e.target.checked)
+                  }
+                  disabled={isLoading || isSavingPermissoes}
                   bordered={false}
                   size="sm"
                   className="shrink-0"
@@ -653,8 +1016,10 @@ export function NovoPerfilUsuario({
                 <span className="text-primary-text font-medium text-xs md:text-sm">Pode Aplicar Desconto na Venda?</span>
                 <JiffyIconSwitch
                   checked={aplicarDescontoVenda}
-                  onChange={e => setAplicarDescontoVenda(e.target.checked)}
-                  disabled={isLoading}
+                  onChange={e =>
+                    handlePermissaoChange('aplicarDescontoVenda', e.target.checked)
+                  }
+                  disabled={isLoading || isSavingPermissoes}
                   bordered={false}
                   size="sm"
                   className="shrink-0"
@@ -667,8 +1032,10 @@ export function NovoPerfilUsuario({
                 <span className="text-primary-text font-medium text-xs md:text-sm">Pode Aplicar Acréscimo no Produto?</span>
                 <JiffyIconSwitch
                   checked={aplicarAcrescimoProduto}
-                  onChange={e => setAplicarAcrescimoProduto(e.target.checked)}
-                  disabled={isLoading}
+                  onChange={e =>
+                    handlePermissaoChange('aplicarAcrescimoProduto', e.target.checked)
+                  }
+                  disabled={isLoading || isSavingPermissoes}
                   bordered={false}
                   size="sm"
                   className="shrink-0"
@@ -681,8 +1048,10 @@ export function NovoPerfilUsuario({
                 <span className="text-primary-text font-medium text-xs md:text-sm">Pode Aplicar Acréscimo na Venda?</span>
                 <JiffyIconSwitch
                   checked={aplicarAcrescimoVenda}
-                  onChange={e => setAplicarAcrescimoVenda(e.target.checked)}
-                  disabled={isLoading}
+                  onChange={e =>
+                    handlePermissaoChange('aplicarAcrescimoVenda', e.target.checked)
+                  }
+                  disabled={isLoading || isSavingPermissoes}
                   bordered={false}
                   size="sm"
                   className="shrink-0"
@@ -731,5 +1100,6 @@ export function NovoPerfilUsuario({
       />
     </div>
   )
-}
+})
 
+NovoPerfilUsuario.displayName = 'NovoPerfilUsuario'

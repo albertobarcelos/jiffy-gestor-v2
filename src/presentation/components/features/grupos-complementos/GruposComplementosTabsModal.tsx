@@ -106,6 +106,7 @@ export function GruposComplementosTabsModal({
         ? {
             showCancel: true,
             cancelLabel: 'Fechar',
+            cancelVariant: 'primaryTint10' as const,
             onCancel: handleRequestClose,
             showSave: true,
             saveLabel: 'Salvar',

@@ -1,6 +1,14 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  forwardRef,
+  useImperativeHandle,
+} from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Usuario } from '@/src/domain/entities/Usuario'
@@ -26,8 +34,18 @@ interface NovoUsuarioProps {
   embeddedFormId?: string
   hideEmbeddedFormActions?: boolean
   onEmbedFormStateChange?: (s: { isSubmitting: boolean; canSubmit: boolean }) => void
+  /** Chamado após salvar com sucesso no embed (ex.: invalidar lista). */
   onSaved?: () => void
+  /** Só após "Salvar e fechar" no rodapé (`saveUsuarioAndClose`), depois de `onSaved`. */
+  onCloseAfterSave?: () => void
   onCancel?: () => void
+}
+
+/** API imperativa — confirmação ao fechar o painel (`PADRAO_MODAL_SAIR_SEM_SALVAR`). */
+export interface NovoUsuarioHandle {
+  isDirty: () => boolean
+  /** Submete o formulário (mesmo fluxo do botão Salvar no embed). */
+  saveUsuarioAndClose: () => void
 }
 
 interface PerfilPDV {
@@ -39,17 +57,20 @@ interface PerfilPDV {
  * Componente para criar/editar usuário
  * Replica o design e funcionalidades do Flutter
  */
-export function NovoUsuario({
-  usuarioId,
-  initialPerfilPdvId,
-  isEmbedded,
+export const NovoUsuario = forwardRef<NovoUsuarioHandle, NovoUsuarioProps>(function NovoUsuario(
+  {
+    usuarioId,
+    initialPerfilPdvId,
+    isEmbedded,
   hideEmbeddedHeader = false,
   embeddedFormId,
-  hideEmbeddedFormActions = false,
   onEmbedFormStateChange,
-  onSaved,
-  onCancel,
-}: NovoUsuarioProps) {
+    onSaved,
+    onCloseAfterSave,
+    onCancel,
+  },
+  ref
+) {
   const router = useRouter()
   const { auth } = useAuthStore()
   const isEditing = !!usuarioId
@@ -88,6 +109,38 @@ export function NovoUsuario({
       ),
     [nome, perfilPdvId, isEditing, password]
   )
+
+  const getFormSnapshot = useCallback(() => {
+    return JSON.stringify({
+      nome: (nome || '').trim(),
+      telefone: (telefone || '').trim(),
+      perfilPdvId: perfilPdvId || '',
+      ativo,
+      password: password || '',
+    })
+  }, [nome, telefone, perfilPdvId, ativo, password])
+
+  const baselineSerializedRef = useRef('')
+
+  const commitBaseline = useCallback(() => {
+    baselineSerializedRef.current = getFormSnapshot()
+  }, [getFormSnapshot])
+
+  const commitBaselineLatestRef = useRef(commitBaseline)
+  commitBaselineLatestRef.current = commitBaseline
+
+  /** Definido por `saveUsuarioAndClose` antes do submit — controla se o painel fecha após sucesso. */
+  const embeddedCloseAfterSaveRef = useRef(false)
+
+  // Baseline inicial em modo criação
+  useEffect(() => {
+    if (isLoadingUsuario) return
+    if (isEditing) return
+    const t = window.setTimeout(() => {
+      commitBaselineLatestRef.current()
+    }, 100)
+    return () => window.clearTimeout(t)
+  }, [isLoadingUsuario, isEditing, usuarioId])
 
   // Carrega todos os perfis PDV: usa `count` da API para saber quando parar
   const loadPerfisPDV = useCallback(async () => {
@@ -264,6 +317,9 @@ export function NovoUsuario({
         console.error('Erro ao carregar usuário:', error)
       } finally {
         setIsLoadingUsuario(false)
+        window.setTimeout(() => {
+          commitBaselineLatestRef.current()
+        }, 150)
       }
     }
 
@@ -273,6 +329,9 @@ export function NovoUsuario({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const shouldClosePanel = embeddedCloseAfterSaveRef.current
+    embeddedCloseAfterSaveRef.current = false
+
     const token = auth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado')
@@ -336,8 +395,14 @@ export function NovoUsuario({
       showToast.success(
         isEditing ? 'Usuário atualizado com sucesso!' : 'Usuário criado com sucesso!'
       )
+      window.setTimeout(() => {
+        commitBaselineLatestRef.current()
+      }, 0)
       if (isEmbedded) {
         onSaved?.()
+        if (shouldClosePanel) {
+          onCloseAfterSave?.()
+        }
       } else {
         router.push('/cadastros/usuarios')
       }
@@ -365,6 +430,24 @@ export function NovoUsuario({
     const numericValue = value.replace(/\D/g, '').slice(0, 4)
     setPassword(numericValue)
   }
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      isDirty: () => {
+        if (isLoadingUsuario) return false
+        return getFormSnapshot() !== baselineSerializedRef.current
+      },
+      saveUsuarioAndClose: () => {
+        embeddedCloseAfterSaveRef.current = true
+        const el = document.getElementById(formId)
+        if (el instanceof HTMLFormElement) {
+          el.requestSubmit()
+        }
+      },
+    }),
+    [formId, getFormSnapshot, isLoadingUsuario]
+  )
 
   if (isLoadingUsuario) {
     return (
@@ -606,7 +689,8 @@ export function NovoUsuario({
             </div>
           </div>
 
-          {!isEmbedded || !hideEmbeddedFormActions ? (
+          {/* Em painel lateral o rodapé é externo — nunca duplicar Cancelar/Salvar no corpo do form */}
+          {!isEmbedded ? (
             <div className="flex justify-end gap-4 pt-4 px-2">
               <Button
                 type="button"
@@ -644,5 +728,6 @@ export function NovoUsuario({
       </div>
     </div>
   )
-}
+})
 
+NovoUsuario.displayName = 'NovoUsuario'

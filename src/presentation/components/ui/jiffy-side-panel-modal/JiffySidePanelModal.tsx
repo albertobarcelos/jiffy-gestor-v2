@@ -30,7 +30,7 @@ const PainelSlide = forwardRef(function PainelSlide(
 PainelSlide.displayName = 'PainelSlide'
 
 /** Chaves dos botões do rodapé em modo `bar` — usado em `barActionOrder` */
-export type JiffyFooterBarKey = 'prev' | 'next' | 'cancel' | 'save'
+export type JiffyFooterBarKey = 'prev' | 'next' | 'cancel' | 'save' | 'saveAndClose'
 
 export interface JiffySidePanelFooterActions {
   showPrevious?: boolean
@@ -53,6 +53,17 @@ export interface JiffySidePanelFooterActions {
   /** Quando definido, o botão Salvar vira `type="submit"` associado ao `<form id="...">` do conteúdo */
   saveFormId?: string
   /**
+   * Rodapé `footerVariant="bar"`: tom do botão Salvar quando há também "Salvar e fechar"
+   * (`primaryMuted` = destaque menor que o botão final).
+   */
+  saveBarVariant?: 'primary' | 'primaryMuted'
+  /** Terceira coluna: salvar e encerrar o fluxo (onClick — não usa `saveFormId`) */
+  showSaveAndClose?: boolean
+  saveAndCloseLabel?: string
+  onSaveAndClose?: () => void | Promise<void>
+  saveAndCloseLoading?: boolean
+  saveAndCloseDisabled?: boolean
+  /**
    * Rodapé `footerVariant="bar"`: estilo de Anterior / Próximo.
    * `primaryMuted` = fundo primary ~15% (alinhado a `bg-primary/15`) e texto na cor primária.
    */
@@ -60,8 +71,9 @@ export interface JiffySidePanelFooterActions {
   /**
    * Rodapé `footerVariant="bar"`: estilo do botão de cancelar (ex.: "Salvar e fechar").
    * `primary` = mesmo visual do Salvar (fundo primário, texto branco).
+   * `primaryTint10` = fundo primary ~10% (equivalente visual a `bg-primary/10`), texto na cor primária.
    */
-  cancelVariant?: 'secondary' | 'primary'
+  cancelVariant?: 'secondary' | 'primary' | 'primaryTint10'
   /**
    * Rodapé `footerVariant="bar"`: ordem dos botões visíveis.
    * Padrão: Anterior → Próximo → Cancelar → Salvar (apenas os habilitados entram na grade).
@@ -74,7 +86,11 @@ export interface JiffySidePanelFooterActions {
 function hasFooterActions(fa?: JiffySidePanelFooterActions): boolean {
   if (!fa) return false
   return Boolean(
-    fa.showCancel || fa.showSave || fa.showPrevious || fa.showNext
+    fa.showCancel ||
+      fa.showSave ||
+      fa.showSaveAndClose ||
+      fa.showPrevious ||
+      fa.showNext
   )
 }
 
@@ -183,6 +199,28 @@ function footerBarPrimaryMutedSx(isFirstColumn: boolean) {
   }
 }
 
+/** Cancelar / Fechar com tom primary/10 (equivalente visual a `bg-primary/10`) */
+function footerBarPrimaryTint10Sx(isFirstColumn: boolean) {
+  const bl =
+    isFirstColumn ?
+      ({ borderBottomLeftRadius: PANEL_RADIUS_LEFT } as const)
+    : {}
+  return {
+    borderRadius: 0,
+    ...bl,
+    boxShadow: 'none',
+    borderWidth: 0,
+    backgroundColor: 'color-mix(in srgb, var(--color-primary) 10%, transparent)',
+    color: 'var(--color-primary)',
+    fontWeight: 600,
+    '&:hover': {
+      backgroundColor: 'color-mix(in srgb, var(--color-primary) 18%, transparent)',
+      boxShadow: 'none',
+      ...bl,
+    },
+  }
+}
+
 function footerBarPrevNextSx(
   isFirstColumn: boolean,
   tone: 'gray' | 'primaryMuted' | undefined
@@ -194,11 +232,11 @@ function footerBarPrevNextSx(
 
 function footerBarCancelSx(
   isFirstColumn: boolean,
-  variant: 'secondary' | 'primary' | undefined
+  variant: 'secondary' | 'primary' | 'primaryTint10' | undefined
 ) {
-  return variant === 'primary' ?
-      footerSavePrimaryBarSx(isFirstColumn)
-    : footerBarSecondarySx(isFirstColumn)
+  if (variant === 'primary') return footerSavePrimaryBarSx(isFirstColumn)
+  if (variant === 'primaryTint10') return footerBarPrimaryTint10Sx(isFirstColumn)
+  return footerBarSecondarySx(isFirstColumn)
 }
 
 const DEFAULT_BAR_ACTION_ORDER: readonly JiffyFooterBarKey[] = [
@@ -206,6 +244,7 @@ const DEFAULT_BAR_ACTION_ORDER: readonly JiffyFooterBarKey[] = [
   'next',
   'cancel',
   'save',
+  'saveAndClose',
 ]
 
 /** Monta a sequência de colunas respeitando `barActionOrder` e os flags visíveis */
@@ -215,6 +254,7 @@ function buildFooterBarKeys(fa: JiffySidePanelFooterActions): JiffyFooterBarKey[
   if (fa.showNext) visible.add('next')
   if (fa.showCancel) visible.add('cancel')
   if (fa.showSave) visible.add('save')
+  if (fa.showSaveAndClose) visible.add('saveAndClose')
 
   const order = fa.barActionOrder ?? [...DEFAULT_BAR_ACTION_ORDER]
   const keys: JiffyFooterBarKey[] = []
@@ -302,20 +342,39 @@ function JiffyPanelFooterBar({
           </Button>
         )
       }
-      case 'save':
+      case 'save': {
+        const saveMuted = fa.saveBarVariant === 'primaryMuted'
         return (
           <Button
             type={fa.saveFormId ? 'submit' : 'button'}
             form={fa.saveFormId}
-            variant="contained"
-            color="primary"
+            variant={saveMuted ? 'outlined' : 'contained'}
+            color={saveMuted ? 'inherit' : 'primary'}
             disabled={fa.saveDisabled}
             isLoading={fa.saveLoading}
             onClick={fa.saveFormId ? undefined : () => void fa.onSave?.()}
             className="h-12 min-h-12 w-full font-semibold shadow-none"
-            sx={footerSavePrimaryBarSx(isFirstColumn)}
+            sx={
+              saveMuted ? footerBarPrimaryMutedSx(isFirstColumn) : footerSavePrimaryBarSx(isFirstColumn)
+            }
           >
             {fa.saveLabel ?? 'Salvar'}
+          </Button>
+        )
+      }
+      case 'saveAndClose':
+        return (
+          <Button
+            type="button"
+            variant="contained"
+            color="primary"
+            disabled={fa.saveAndCloseDisabled}
+            isLoading={fa.saveAndCloseLoading}
+            onClick={() => void fa.onSaveAndClose?.()}
+            className="h-12 min-h-12 w-full font-semibold shadow-none"
+            sx={footerSavePrimaryBarSx(isFirstColumn)}
+          >
+            {fa.saveAndCloseLabel ?? 'Salvar e fechar'}
           </Button>
         )
       default:

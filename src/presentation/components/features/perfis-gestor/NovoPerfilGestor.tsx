@@ -1,6 +1,14 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  forwardRef,
+  useImperativeHandle,
+} from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { PerfilGestor } from '@/src/domain/entities/PerfilGestor'
@@ -23,23 +31,38 @@ interface NovoPerfilGestorProps {
   }) => void
   /** Embutido: após POST devolve o id para o modal ativar a aba Usuário sem fechar */
   onSaved?: (payload?: { perfilIdCriado?: string }) => void
+  /** Embutido: alterações em relação ao baseline (bloquear aba Usuário no modal). */
+  onEmbedDirtyChange?: (dirty: boolean) => void
+  /** Embutido: fechar o painel após "Salvar e fechar" com sucesso (chamar `onClose` do modal). */
+  onClosePanelAfterSave?: () => void
   onCancel?: () => void
+}
+
+/** API imperativa — confirmação ao fechar o painel (`PADRAO_MODAL_SAIR_SEM_SALVAR`). */
+export interface NovoPerfilGestorHandle {
+  isDirty: () => boolean
+  savePerfilAndClose: () => void
 }
 
 /**
  * Componente para criar/editar perfil gestor
  * Replica o design e funcionalidades do Flutter
  */
-export function NovoPerfilGestor({
-  perfilId,
-  isEmbedded = false,
-  hideEmbeddedHeader = false,
-  embeddedFormId,
-  hideEmbeddedFormActions = false,
-  onEmbedFormStateChange,
-  onSaved,
-  onCancel,
-}: NovoPerfilGestorProps) {
+export const NovoPerfilGestor = forwardRef<NovoPerfilGestorHandle, NovoPerfilGestorProps>(
+  function NovoPerfilGestor(
+    {
+      perfilId,
+      isEmbedded = false,
+      hideEmbeddedHeader = false,
+      embeddedFormId,
+      onEmbedFormStateChange,
+      onSaved,
+      onEmbedDirtyChange,
+      onClosePanelAfterSave,
+      onCancel,
+    },
+    ref
+  ) {
   const router = useRouter()
   const { auth } = useAuthStore()
   const isEditing = !!perfilId
@@ -59,6 +82,46 @@ export function NovoPerfilGestor({
   const formId = embeddedFormId ?? 'novo-perfil-gestor-form'
   const canSubmit = Boolean(role && role.trim())
 
+  const getFormSnapshot = useCallback(() => {
+    return JSON.stringify({
+      role: (role || '').trim(),
+      acessoFinanceiro,
+      acessoEstoque,
+      acessoFiscal,
+      acessoDashboard,
+    })
+  }, [role, acessoFinanceiro, acessoEstoque, acessoFiscal, acessoDashboard])
+
+  const baselineSerializedRef = useRef('')
+  const [baselineTick, setBaselineTick] = useState(0)
+  const closeAfterEmbeddedSaveRef = useRef(false)
+
+  const commitBaseline = useCallback(() => {
+    baselineSerializedRef.current = getFormSnapshot()
+    setBaselineTick(t => t + 1)
+  }, [getFormSnapshot])
+
+  const embedDirtyComputed = useMemo(() => {
+    if (isLoadingPerfil) return false
+    return getFormSnapshot() !== baselineSerializedRef.current
+  }, [getFormSnapshot, isLoadingPerfil, baselineTick])
+
+  useEffect(() => {
+    if (!isEmbedded || !onEmbedDirtyChange) return
+    onEmbedDirtyChange(embedDirtyComputed)
+  }, [isEmbedded, onEmbedDirtyChange, embedDirtyComputed])
+
+  useEffect(() => {
+    return () => {
+      if (isEmbedded) {
+        onEmbedDirtyChange?.(false)
+      }
+    }
+  }, [isEmbedded, onEmbedDirtyChange])
+
+  const commitBaselineLatestRef = useRef(commitBaseline)
+  commitBaselineLatestRef.current = commitBaseline
+
   useEffect(() => {
     onEmbedFormStateChange?.({
       isSubmitting: isLoading,
@@ -69,6 +132,16 @@ export function NovoPerfilGestor({
   useEffect(() => {
     hasLoadedPerfilRef.current = false
   }, [perfilId])
+
+  // Baseline inicial em modo criação (embed)
+  useEffect(() => {
+    if (isLoadingPerfil) return
+    if (isEditing) return
+    const t = window.setTimeout(() => {
+      commitBaselineLatestRef.current()
+    }, 100)
+    return () => window.clearTimeout(t)
+  }, [isLoadingPerfil, isEditing, perfilId])
 
   // Carregar dados do perfil se estiver editando
   useEffect(() => {
@@ -103,6 +176,9 @@ export function NovoPerfilGestor({
         // Erro ao carregar perfil gestor
       } finally {
         setIsLoadingPerfil(false)
+        window.setTimeout(() => {
+          commitBaselineLatestRef.current()
+        }, 120)
       }
     }
 
@@ -112,6 +188,9 @@ export function NovoPerfilGestor({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const forceClosePanel = closeAfterEmbeddedSaveRef.current
+    closeAfterEmbeddedSaveRef.current = false
+
     const token = auth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado. Faça login novamente.')
@@ -172,8 +251,16 @@ export function NovoPerfilGestor({
             return
           }
           onSaved?.({ perfilIdCriado: novoId })
+          commitBaselineLatestRef.current()
+          if (forceClosePanel) {
+            onClosePanelAfterSave?.()
+          }
         } else {
           onSaved?.()
+          commitBaselineLatestRef.current()
+          if (forceClosePanel) {
+            onClosePanelAfterSave?.()
+          }
         }
       } else {
         showToast.success(
@@ -189,6 +276,7 @@ export function NovoPerfilGestor({
       )
     } finally {
       setIsLoading(false)
+      onEmbedFormStateChange?.({ isSubmitting: false, canSubmit })
     }
   }
 
@@ -199,6 +287,24 @@ export function NovoPerfilGestor({
       router.push('/cadastros/perfis-gestor')
     }
   }
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      isDirty: () => {
+        if (isLoadingPerfil) return false
+        return getFormSnapshot() !== baselineSerializedRef.current
+      },
+      savePerfilAndClose: () => {
+        closeAfterEmbeddedSaveRef.current = true
+        const el = document.getElementById(formId)
+        if (el instanceof HTMLFormElement) {
+          el.requestSubmit()
+        }
+      },
+    }),
+    [formId, getFormSnapshot, isLoadingPerfil]
+  )
 
   if (isLoadingPerfil) {
     return (
@@ -392,7 +498,7 @@ export function NovoPerfilGestor({
             </div>
           </div>
 
-          {!isEmbedded || !hideEmbeddedFormActions ? (
+          {!isEmbedded ? (
             <div className="flex justify-end gap-4 pt-2">
               <Button
                 type="button"
@@ -425,4 +531,6 @@ export function NovoPerfilGestor({
       </div>
     </div>
   )
-}
+})
+
+NovoPerfilGestor.displayName = 'NovoPerfilGestor'

@@ -1,6 +1,13 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+} from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Cliente } from '@/src/domain/entities/Cliente'
@@ -22,6 +29,14 @@ interface NovoClienteProps {
   onEmbedFormStateChange?: (s: { isSubmitting: boolean; canSubmit: boolean }) => void
   onClose?: () => void
   onSaved?: () => void
+  /** Embutido: fechar o painel após "Salvar e fechar" com sucesso (ex.: `onClose` direto do modal). */
+  onCloseAfterSave?: () => void
+}
+
+/** API imperativa — confirmação ao fechar o painel (`PADRAO_MODAL_SAIR_SEM_SALVAR`). */
+export interface NovoClienteHandle {
+  isDirty: () => boolean
+  saveClienteAndClose: () => void
 }
 
 // Siglas dos estados brasileiros em ordem alfabética
@@ -69,16 +84,19 @@ const INDICADOR_IE_NAO_INFORMADO = '__none__'
  * Componente para criar/editar cliente
  * Replica o design e funcionalidades do Flutter
  */
-export function NovoCliente({
-  clienteId,
-  isEmbedded = false,
-  hideEmbeddedHeader = false,
-  embeddedFormId,
-  hideEmbeddedFormActions = false,
-  onEmbedFormStateChange,
-  onClose,
-  onSaved,
-}: NovoClienteProps) {
+export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(function NovoCliente(
+  {
+    clienteId,
+    isEmbedded = false,
+    hideEmbeddedHeader = false,
+    embeddedFormId,
+    onEmbedFormStateChange,
+    onClose,
+    onSaved,
+    onCloseAfterSave,
+  },
+  ref
+) {
   const router = useRouter()
   const { auth } = useAuthStore()
   const isEditing = !!clienteId
@@ -131,9 +149,77 @@ export function NovoCliente({
   } as const
   const UPPERCASE_INPUT_PROPS = { style: { textTransform: 'uppercase' } } as const
 
+  const getFormSnapshot = useCallback(() => {
+    return JSON.stringify({
+      nome: (nome || '').trim(),
+      razaoSocial: (razaoSocial || '').trim(),
+      cpf: cpf.replace(/\D/g, ''),
+      cnpj: cnpj.replace(/\D/g, ''),
+      telefone: telefone.replace(/\D/g, ''),
+      email: (email || '').trim(),
+      nomeFantasia: (nomeFantasia || '').trim(),
+      indicadorInscricaoEstadual: (indicadorInscricaoEstadual || '').trim(),
+      inscricaoEstadual: (inscricaoEstadual || '').trim(),
+      ativo,
+      incluirEndereco,
+      rua: (rua || '').trim(),
+      numero: (numero || '').trim(),
+      bairro: (bairro || '').trim(),
+      cidade: (cidade || '').trim(),
+      estado: (estado || '').trim(),
+      cep: cep.replace(/\D/g, ''),
+      complemento: (complemento || '').trim(),
+      codigoCidadeIbge: codigoCidadeIbge || '',
+      codigoEstadoIbge: codigoEstadoIbge || '',
+      cidadeValida,
+    })
+  }, [
+    nome,
+    razaoSocial,
+    cpf,
+    cnpj,
+    telefone,
+    email,
+    nomeFantasia,
+    indicadorInscricaoEstadual,
+    inscricaoEstadual,
+    ativo,
+    incluirEndereco,
+    rua,
+    numero,
+    bairro,
+    cidade,
+    estado,
+    cep,
+    complemento,
+    codigoCidadeIbge,
+    codigoEstadoIbge,
+    cidadeValida,
+  ])
+
+  const baselineSerializedRef = useRef('')
+  const embeddedCloseAfterSaveRef = useRef(false)
+
+  const commitBaseline = useCallback(() => {
+    baselineSerializedRef.current = getFormSnapshot()
+  }, [getFormSnapshot])
+
+  const commitBaselineLatestRef = useRef(commitBaseline)
+  commitBaselineLatestRef.current = commitBaseline
+
   useEffect(() => {
     onEmbedFormStateChange?.({ isSubmitting: isLoading, canSubmit })
   }, [onEmbedFormStateChange, isLoading, canSubmit])
+
+  // Baseline inicial em modo criação (embed)
+  useEffect(() => {
+    if (isLoadingCliente) return
+    if (isEditing) return
+    const t = window.setTimeout(() => {
+      commitBaselineLatestRef.current()
+    }, 100)
+    return () => window.clearTimeout(t)
+  }, [isLoadingCliente, isEditing, clienteId])
 
   // Carregar dados do cliente se estiver editando
   useEffect(() => {
@@ -249,6 +335,9 @@ export function NovoCliente({
         console.error('Erro ao carregar cliente:', error)
       } finally {
         setIsLoadingCliente(false)
+        window.setTimeout(() => {
+          commitBaselineLatestRef.current()
+        }, 150)
       }
     }
 
@@ -510,6 +599,9 @@ export function NovoCliente({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const shouldClosePanel = embeddedCloseAfterSaveRef.current
+    embeddedCloseAfterSaveRef.current = false
+
     const token = auth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado')
@@ -668,8 +760,17 @@ export function NovoCliente({
       if (mensagemApi) {
         showToast.info(mensagemApi)
       }
-      
-      if (onSaved) {
+
+      window.setTimeout(() => {
+        commitBaselineLatestRef.current()
+      }, 0)
+
+      if (isEmbedded) {
+        onSaved?.()
+        if (shouldClosePanel) {
+          onCloseAfterSave?.()
+        }
+      } else if (onSaved) {
         onSaved()
       } else {
         router.push('/cadastros/clientes')
@@ -692,6 +793,24 @@ export function NovoCliente({
       onEmbedFormStateChange?.({ isSubmitting: false, canSubmit })
     }
   }
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      isDirty: () => {
+        if (isLoadingCliente) return false
+        return getFormSnapshot() !== baselineSerializedRef.current
+      },
+      saveClienteAndClose: () => {
+        embeddedCloseAfterSaveRef.current = true
+        const el = document.getElementById(formId)
+        if (el instanceof HTMLFormElement) {
+          el.requestSubmit()
+        }
+      },
+    }),
+    [formId, getFormSnapshot, isLoadingCliente]
+  )
 
   const handleCancel = () => {
     if (isEmbedded) {
@@ -1256,7 +1375,7 @@ export function NovoCliente({
           )}
 
           {/* Botões de ação */}
-          {!isEmbedded || !hideEmbeddedFormActions ? (
+          {!isEmbedded ? (
             <div className="flex justify-end gap-4 py-4">
               <Button
                 type="button"
@@ -1291,5 +1410,7 @@ export function NovoCliente({
       </div>
     </div>
   )
-}
+})
+
+NovoCliente.displayName = 'NovoCliente'
 

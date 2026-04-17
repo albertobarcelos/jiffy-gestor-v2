@@ -1,6 +1,6 @@
 # Padrão: confirmação ao fechar modal com alterações não salvas
 
-**Status:** implementado no fluxo **Produto** (`NovoProduto` + `ProdutosTabsModal`).  
+**Status:** implementado no fluxo **Produto** (`NovoProduto` + `ProdutosTabsModal`), **Grupo de produtos** (`NovoGrupo` + `GruposProdutosTabsModal`) e **Perfil PDV + usuário** (`NovoPerfilUsuario` / `NovoUsuario` + `PerfisUsuariosTabsModal`).  
 **Próximos passos:** replicar **modal a modal**, quando solicitado — não aplicar em massa sem alinhar cada tela.
 
 ---
@@ -22,6 +22,9 @@ Após **salvar com sucesso**, o baseline deve ser atualizado para que `isDirty` 
 |--------|------------------|
 | `src/presentation/components/features/produtos/NovoProduto.tsx` | Snapshot JSON (`getFormSnapshot`), `baselineSerializedRef`, `commitBaseline()` após carga da API, após salvamento OK e baseline inicial em modo **criação**. `NovoProdutoHandle.isDirty()`. **Ref `commitBaselineLatestRef`** para chamar o commit mais recente em `setTimeout` / após `await` (evita baseline com snapshot **obsoleto** por closure do `useEffect`). **Snapshot sem passo do wizard** — trocar de etapa não marca dirty. **Re-baseline** após hidratar campos carregados em passo tardio (ex.: fiscal no passo 3). Cancelar em página avulsa (`/produtos/novo`, `/produtos/[id]/editar`) abre diálogo interno quando não há `onClose` do painel. |
 | `src/presentation/components/features/produtos/ProdutosTabsModal.tsx` | `handleRequestClose`: se `state.tab === 'produto'` e `npRef.current?.isDirty()`, abre `confirmExitOpen`; senão chama `onClose()`. `JiffySidePanelModal` recebe `onClose={handleRequestClose}`. `NovoProduto` recebe `onClose={handleRequestClose}`; **`onSuccess` continua chamando `onClose()` direto** (sem confirmação). Rodapés “Fechar” das outras abas usam `handleRequestClose`. Overlay de confirmação com `z-[1400]`. **`produtoFormSession`**: contador incrementado só quando `state.open` passa de `false` → `true`; usado no **`key`** do `NovoProduto` (`\`${id}-${mode}-${session}\``) para **remontar** o formulário a cada abertura do painel e **não herdar** baseline/alterações da sessão anterior após “Sair sem salvar”. |
+| `src/presentation/components/features/perfis-usuarios-pdv/NovoPerfilUsuario.tsx` | Snapshot JSON: `role`, IDs dos meios vinculados (ordenados), seis flags de permissão. `commitBaseline` após carga (timeout), após sincronizar meios com o perfil, após PATCH automático de meios/permissões, após POST/PATCH do formulário. `closeAfterEmbeddedSaveRef` + `savePerfilAndClose` (submit do form) para “Salvar e fechar” no diálogo; após sucesso embed, `commitBaseline` síncrono antes de `onCancel` para não reabrir o aviso. |
+| `src/presentation/components/features/usuarios/NovoUsuario.tsx` | Snapshot: `nome`, `telefone`, `perfilPdvId`, `ativo`, `password`. Baseline após carga (edição) e modo criação; `saveUsuarioAndClose` via `requestSubmit` do form. |
+| `src/presentation/components/features/perfis-usuarios-pdv/PerfisUsuariosTabsModal.tsx` | `perfilRef` / `usuarioRef`; `handleRequestClose` com duplo `requestAnimationFrame` consulta `isDirty` da aba ativa; rodapé “Fechar” → `handleRequestClose`. **`formSession`** + `key` em `NovoPerfilUsuario` e `NovoUsuario`. Portal de confirmação `z-[1400]`. |
 
 ---
 
@@ -99,4 +102,4 @@ Assim cada abertura do painel é uma **nova montagem** e novo carregamento/basel
 
 ---
 
-*Última atualização: baseline com `commitBaselineLatestRef`, snapshot sem passo do wizard, re-baseline após fiscal lazy, e `produtoFormSession` + `key` no `ProdutosTabsModal` para remontar o formulário a cada abertura.*
+*Última atualização: baseline com `commitBaselineLatestRef`, snapshot sem passo do wizard, re-baseline após fiscal lazy, e `produtoFormSession` + `key` no `ProdutosTabsModal` para remontar o formulário a cada abertura; fluxo **Perfil PDV + usuário** (`PerfisUsuariosTabsModal` + `NovoPerfilUsuario` / `NovoUsuario`).*
