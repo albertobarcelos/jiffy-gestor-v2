@@ -26,8 +26,10 @@ const entradaCompactaSelect = {
   fontSize: '0.875rem',
   minHeight: '1.5em',
   lineHeight: 1.4,
-  display: 'flex',
-  alignItems: 'center',
+  display: 'block',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
 } as const
 
 /** TextField / Input outlined */

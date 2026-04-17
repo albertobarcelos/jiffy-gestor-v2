@@ -1245,40 +1245,49 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(funct
       </div>
       ) : null}
 
-      {/* Indicador de steps */}
+      {/* Indicador de steps — clicáveis para navegação direta */}
       <div className={`py-1 ${showInnerProdutoHeader ? 'px-5' : 'px-2'}`}>
         <div className="flex items-center justify-center gap-4">
-          <div
-            className={`flex h-9 w-9 items-center justify-center rounded-full font-exo text-base font-bold transition-colors ${
+          <button
+            type="button"
+            onClick={() => setSelectedPage(0)}
+            title="Ir para Informações"
+            className={`flex h-9 w-9 items-center justify-center rounded-full font-exo text-base font-bold transition-all hover:scale-110 hover:shadow-md ${
               selectedPage >= 0 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-primary'
             }`}
           >
             1
-          </div>
+          </button>
           <div
             className={`h-[2px] w-28 transition-colors ${
               selectedPage >= 1 ? 'bg-[#B7E246]' : 'bg-[#CEDCF8]'
             }`}
           />
-          <div
-            className={`flex h-9 w-9 items-center justify-center rounded-full font-exo text-base font-bold transition-colors ${
+          <button
+            type="button"
+            onClick={() => setSelectedPage(1)}
+            title="Ir para Configurações"
+            className={`flex h-9 w-9 items-center justify-center rounded-full font-exo text-base font-bold transition-all hover:scale-110 hover:shadow-md ${
               selectedPage >= 1 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-[#1D3B53]'
             }`}
           >
             2
-          </div>
+          </button>
           <div
             className={`h-[2px] w-28 transition-colors ${
               selectedPage >= 2 ? 'bg-[#B7E246]' : 'bg-[#CEDCF8]'
             }`}
           />
-          <div
-            className={`flex h-9 w-9 items-center justify-center rounded-full font-exo text-base font-bold transition-colors ${
+          <button
+            type="button"
+            onClick={() => setSelectedPage(2)}
+            title="Ir para Configuração Fiscal"
+            className={`flex h-9 w-9 items-center justify-center rounded-full font-exo text-base font-bold transition-all hover:scale-110 hover:shadow-md ${
               selectedPage >= 2 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-[#1D3B53]'
             }`}
           >
             3
-          </div>
+          </button>
         </div>
       </div>
 

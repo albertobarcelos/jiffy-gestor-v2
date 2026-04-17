@@ -96,19 +96,34 @@ export function InformacoesProdutoStep({
       </p>
 
       <div className="space-y-4">
-        <Input
-          label="Nome do Produto"
-          required
-          size="small"
-          type="text"
-          value={nomeProduto}
-          onChange={e => onNomeProdutoChange(e.target.value)}
-          placeholder="Nome que aparecerá no PDV"
-          className="bg-white"
-          sx={sxEntradaCompactaProduto}
-          InputLabelProps={{ required: true }}
-        />
+        {/* Linha 1: Nome do Produto + Preço de Venda lado a lado */}
+        <div className="grid gap-4 md:grid-cols-[1fr_180px]">
+          <Input
+            label="Nome do Produto"
+            required
+            size="small"
+            type="text"
+            value={nomeProduto}
+            onChange={e => onNomeProdutoChange(e.target.value)}
+            placeholder="Nome que aparecerá no PDV"
+            className="bg-white"
+            sx={sxEntradaCompactaProduto}
+            InputLabelProps={{ required: true }}
+          />
 
+          <Input
+            label="Preço de Venda"
+            size="small"
+            type="text"
+            value={precoVenda}
+            onChange={e => handlePrecoChange(e.target.value)}
+            placeholder="R$ 0,00"
+            className="bg-white"
+            sx={sxEntradaCompactaProduto}
+          />
+        </div>
+
+        {/* Linha 2: Unidade + Grupo */}
         <div className="grid gap-4 md:grid-cols-2">
           <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
             <InputLabel id="np-unidade-label">Unidade</InputLabel>
@@ -164,30 +179,18 @@ export function InformacoesProdutoStep({
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <Input
-            label="Preço de Venda"
-            size="small"
-            type="text"
-            value={precoVenda}
-            onChange={e => handlePrecoChange(e.target.value)}
-            placeholder="R$ 0,00"
-            className="bg-white"
-            sx={sxEntradaCompactaProduto}
-          />
-
-          <Input
-            label="Descrição"
-            size="small"
-            value={descricaoProduto}
-            onChange={e => onDescricaoProdutoChange(e.target.value)}
-            placeholder="Descrição do produto"
-            className="bg-white"
-            multiline
-            minRows={3}
-            sx={sxEntradaCompactaProduto}
-          />
-        </div>
+        {/* Linha 3: Descrição */}
+        <Input
+          label="Descrição"
+          size="small"
+          value={descricaoProduto}
+          onChange={e => onDescricaoProdutoChange(e.target.value)}
+          placeholder="Descrição do produto"
+          className="bg-white"
+          multiline
+          minRows={3}
+          sx={sxEntradaCompactaProduto}
+        />
       </div>
 
       {!hideStepFooter ? (

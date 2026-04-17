@@ -1,8 +1,13 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { FormControl, InputAdornment, InputLabel, MenuItem, Select } from '@mui/material'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
+import {
+  sxEntradaCompactaProduto,
+  sxEntradaCompactaProdutoSelect,
+} from './produtoFormMuiSx'
 import { MdClose, MdWarning, MdRefresh, MdCheckCircle, MdError, MdTimer } from 'react-icons/md'
 
 const COOLDOWN_DURATION_MS = 2 * 60 * 1000 // 2 minutos em milissegundos
@@ -311,153 +316,112 @@ export function ConfiguracaoFiscalStep({
       </div>
 
       {/* Campos do formulário */}
-      <div className="space-y-2">
+      <div className="space-y-4">
         {/* Linha: NCM e CEST */}
         <div className="grid gap-4 md:grid-cols-2">
           {/* NCM */}
-          <div className="flex-1">
-            <label className="block text-sm font-semibold font-nunito mb-2 text-primary-text">
-              NCM
-            </label>
-            <div className="relative">
-              <Input
-                type="text"
-                value={ncm}
-                onChange={(e) => {
-                  // Permitir apenas dígitos numéricos e limitar a 8 caracteres
-                  const value = e.target.value.replace(/\D/g, '').slice(0, 8)
-                  onNcmChange(value)
-                }}
-                placeholder="Digite o código NCM (8 dígitos)"
-                className={`w-full rounded-lg pr-10 ${
-                  ncmValidation
-                    ? ncmValidation.valido
-                      ? 'border-green-500 focus:border-green-500'
-                      : 'border-red-500 focus:border-red-500'
-                    : ''
-                }`}
-              />
-              {/* Indicador de status no canto direito do input */}
-              {isValidatingNcm && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                </div>
-              )}
-              {!isValidatingNcm && ncmValidation && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  {ncmValidation.valido ? (
-                    <MdCheckCircle className="w-5 h-5 text-green-500" />
-                  ) : (
-                    <MdError className="w-5 h-5 text-red-500" />
-                  )}
-                </div>
-              )}
-            </div>
-            {/* Mensagem de feedback abaixo do campo */}
-            {!isValidatingNcm && ncmValidation && (
-              <p className={`text-xs mt-1 font-nunito ${
-                ncmValidation.valido ? 'text-green-600' : 'text-red-600'
-              }`}>
-                {ncmValidation.valido && ncmValidation.descricao
-                  ? ncmValidation.descricao
-                  : ncmValidation.mensagem}
-              </p>
-            )}
+          <div>
+            <Input
+              label="NCM"
+              size="small"
+              type="text"
+              value={ncm}
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, '').slice(0, 8)
+                onNcmChange(value)
+              }}
+              placeholder="8 dígitos"
+              className="bg-white"
+              sx={sxEntradaCompactaProduto}
+              inputProps={{ maxLength: 8 }}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    {isValidatingNcm && (
+                      <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    )}
+                    {!isValidatingNcm && ncmValidation && (
+                      ncmValidation.valido
+                        ? <MdCheckCircle className="w-5 h-5 text-green-500" />
+                        : <MdError className="w-5 h-5 text-red-500" />
+                    )}
+                  </InputAdornment>
+                ),
+              }}
+            />
             {isValidatingNcm && (
-              <p className="text-xs mt-1 font-nunito text-secondary-text">
-                Validando NCM...
+              <p className="mt-1 text-xs font-nunito text-secondary-text">Validando NCM...</p>
+            )}
+            {!isValidatingNcm && ncmValidation && (
+              <p className={`mt-1 text-xs font-nunito ${ncmValidation.valido ? 'text-green-600' : 'text-red-600'}`}>
+                {ncmValidation.valido && ncmValidation.descricao ? ncmValidation.descricao : ncmValidation.mensagem}
               </p>
             )}
           </div>
 
           {/* CEST */}
-          <div className="flex-1">
-            <label className="block text-sm font-semibold font-nunito mb-2 text-primary-text">
-              CEST
-            </label>
-            <div className="relative">
-              {hasCestsDisponiveis ? (
-                // Dropdown com CESTs compatíveis com o NCM
-                <select
+          <div>
+            {hasCestsDisponiveis ? (
+              <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect} disabled={!isNcmValid}>
+                <InputLabel id="fiscal-cest-label">CEST</InputLabel>
+                <Select
+                  labelId="fiscal-cest-label"
+                  label="CEST"
                   value={cest}
                   onChange={(e) => onCestChange(e.target.value)}
-                  className={`w-full h-14 px-4 pr-10 rounded-lg border bg-white text-primary-text focus:outline-none focus:border-primary-text hover:border-primary-text focus:border-2 font-nunito text-sm appearance-none ${
-                    cestValidation
-                      ? cestValidation.valido
-                        ? 'border-green-500 focus:border-green-500'
-                        : 'border-red-500 focus:border-red-500'
-                      : 'border-[#CBD0E3]'
-                  }`}
-                  disabled={!isNcmValid}
                 >
-                  <option value="">Selecione o CEST relacionado ao NCM</option>
+                  <MenuItem value=""><span className="text-secondary-text">Selecione o CEST</span></MenuItem>
                   {cestsDisponiveis!.map((item) => (
-                    <option key={item.codigo} value={item.codigo}>
-                      {item.codigo} - {item.descricao}
-                    </option>
+                    <MenuItem key={item.codigo} value={item.codigo}>
+                      {item.codigo} — {item.descricao}
+                    </MenuItem>
                   ))}
-                </select>
-              ) : (
-                // Input manual quando não há lista de CESTs
-                <Input
-                  type="text"
-                  value={cest}
-                  onChange={(e) => {
-                    // Permitir apenas dígitos numéricos e limitar a 7 caracteres
-                    const value = e.target.value.replace(/\D/g, '').slice(0, 7)
-                    onCestChange(value)
-                  }}
-                  placeholder={
-                    isLoadingCests
-                      ? 'Carregando CESTs...'
-                      : !isNcmValid
-                        ? 'Informe um NCM válido primeiro'
-                        : 'Digite o código CEST (7 dígitos)'
-                  }
-                  disabled={isLoadingCests || !isNcmValid}
-                  className={`w-full rounded-lg pr-10 ${
-                    cestValidation
-                      ? cestValidation.valido
-                        ? 'border-green-500 focus:border-green-500'
-                        : 'border-red-500 focus:border-red-500'
-                      : ''
-                  }`}
-                />
-              )}
-              {/* Indicador de status no canto direito */}
-              {(isValidatingCest || isLoadingCests) && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                </div>
-              )}
-              {!isValidatingCest && !isLoadingCests && cestValidation && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  {cestValidation.valido ? (
-                    <MdCheckCircle className="w-5 h-5 text-green-500" />
-                  ) : (
-                    <MdError className="w-5 h-5 text-red-500" />
-                  )}
-                </div>
-              )}
-            </div>
-            {/* Mensagem de feedback abaixo do campo */}
-            {!isValidatingCest && !isLoadingCests && cestValidation && (
-              <p className={`text-xs mt-1 font-nunito ${
-                cestValidation.valido ? 'text-green-600' : 'text-red-600'
-              }`}>
-                {cestValidation.valido && cestValidation.descricao
-                  ? cestValidation.descricao
-                  : cestValidation.mensagem}
-              </p>
-            )}
-            {isValidatingCest && (
-              <p className="text-xs mt-1 font-nunito text-secondary-text">
-                Validando CEST...
-              </p>
+                </Select>
+              </FormControl>
+            ) : (
+              <Input
+                label="CEST"
+                size="small"
+                type="text"
+                value={cest}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 7)
+                  onCestChange(value)
+                }}
+                placeholder={
+                  isLoadingCests ? 'Carregando...'
+                  : !isNcmValid ? 'Informe um NCM válido primeiro'
+                  : '7 dígitos'
+                }
+                disabled={isLoadingCests || !isNcmValid}
+                className="bg-white"
+                sx={sxEntradaCompactaProduto}
+                inputProps={{ maxLength: 7 }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      {(isValidatingCest || isLoadingCests) && (
+                        <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                      )}
+                      {!isValidatingCest && !isLoadingCests && cestValidation && (
+                        cestValidation.valido
+                          ? <MdCheckCircle className="w-5 h-5 text-green-500" />
+                          : <MdError className="w-5 h-5 text-red-500" />
+                      )}
+                    </InputAdornment>
+                  ),
+                }}
+              />
             )}
             {isLoadingCests && (
-              <p className="text-xs mt-1 font-nunito text-secondary-text">
-                Carregando CESTs compatíveis...
+              <p className="mt-1 text-xs font-nunito text-secondary-text">Carregando CESTs compatíveis...</p>
+            )}
+            {isValidatingCest && (
+              <p className="mt-1 text-xs font-nunito text-secondary-text">Validando CEST...</p>
+            )}
+            {!isValidatingCest && !isLoadingCests && cestValidation && (
+              <p className={`mt-1 text-xs font-nunito ${cestValidation.valido ? 'text-green-600' : 'text-red-600'}`}>
+                {cestValidation.valido && cestValidation.descricao ? cestValidation.descricao : cestValidation.mensagem}
               </p>
             )}
           </div>
@@ -465,82 +429,68 @@ export function ConfiguracaoFiscalStep({
 
         {/* Linha: Origem da Mercadoria e Tipo do Produto */}
         <div className="grid gap-4 md:grid-cols-2">
-          {/* Origem da Mercadoria */}
-          <div className="flex-1">
-            <label className="block text-sm font-semibold font-nunito mb-2 text-primary-text">
-              Origem da Mercadoria
-            </label>
-            <select
+          <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
+            <InputLabel id="fiscal-origem-label">Origem da Mercadoria</InputLabel>
+            <Select
+              labelId="fiscal-origem-label"
+              label="Origem da Mercadoria"
               value={origemMercadoria || ''}
               onChange={(e) => onOrigemMercadoriaChange(e.target.value || null)}
-              className="w-full h-14 px-4 rounded-lg border border-[#CBD0E3] bg-white text-primary-text focus:outline-none focus:border-primary-text hover:border-primary-text focus:border-2 font-nunito text-sm"
             >
-              <option value="">Selecione a origem da mercadoria</option>
-              {origensMercadoria.map((origem) => (
-                <option key={origem.value} value={origem.value}>
-                  {origem.label}
-                </option>
+              <MenuItem value=""><span className="text-secondary-text">Selecione a origem</span></MenuItem>
+              {origensMercadoria.map((o) => (
+                <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
               ))}
-            </select>
-          </div>
+            </Select>
+          </FormControl>
 
-          {/* Tipo do Produto */}
-          <div className="flex-1">
-            <label className="block text-sm font-semibold font-nunito mb-2 text-primary-text">
-              Tipo do Produto
-            </label>
-            <select
+          <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
+            <InputLabel id="fiscal-tipo-label">Tipo do Produto</InputLabel>
+            <Select
+              labelId="fiscal-tipo-label"
+              label="Tipo do Produto"
               value={tipoProduto || ''}
               onChange={(e) => onTipoProdutoChange(e.target.value || null)}
-              className="w-full h-14 px-4 rounded-lg border border-[#CBD0E3] bg-white text-primary-text focus:outline-none focus:border-primary-text hover:border-primary-text focus:border-2 font-nunito text-sm"
             >
-              <option value="">Selecione o tipo do produto</option>
-              {tiposProduto.map((tipo) => (
-                <option key={tipo.value} value={tipo.value}>
-                  {tipo.label}
-                </option>
+              <MenuItem value=""><span className="text-secondary-text">Selecione o tipo</span></MenuItem>
+              {tiposProduto.map((t) => (
+                <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>
               ))}
-            </select>
-          </div>
+            </Select>
+          </FormControl>
         </div>
 
         {/* Indicador de Produção em Escala Relevante */}
-        <div className="flex-1">
-          <p className="text-xs text-secondary-text font-nunito mb-2">
-            Obrigatório para produtos no Anexo XXVII (52/2017)
-          </p>
-          <label className="block text-sm font-semibold font-nunito mb-2 text-primary-text">
-            Indicador de Produção em Escala Relevante
-          </label>
-          <div className="relative">
-            <select
-              value={indicadorProducaoEscala || ''}
-              onChange={(e) => onIndicadorProducaoEscalaChange(e.target.value || null)}
-              className="w-full h-14 px-4 pr-12 rounded-lg border border-[#CBD0E3] bg-white text-primary-text focus:outline-none focus:border-primary-text hover:border-primary-text focus:border-2 font-nunito text-sm appearance-none"
-            >
-              <option value="">Selecione o indicador</option>
-              {indicadoresProducao.map((indicador) => (
-                <option key={indicador.value} value={indicador.value}>
-                  {indicador.label}
-                </option>
-              ))}
-            </select>
+        <div>
+          <div className="flex items-center gap-2">
+            <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
+              <InputLabel id="fiscal-indicador-label">Indicador de Produção em Escala Relevante</InputLabel>
+              <Select
+                labelId="fiscal-indicador-label"
+                label="Indicador de Produção em Escala Relevante"
+                value={indicadorProducaoEscala || ''}
+                onChange={(e) => onIndicadorProducaoEscalaChange(e.target.value || null)}
+              >
+                <MenuItem value=""><span className="text-secondary-text">Selecione o indicador</span></MenuItem>
+                {indicadoresProducao.map((i) => (
+                  <MenuItem key={i.value} value={i.value}>{i.label}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             {indicadorProducaoEscala && (
               <button
                 type="button"
                 onClick={() => onIndicadorProducaoEscalaChange(null)}
-                className="absolute right-8 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-secondary-text hover:text-primary-text z-10"
+                className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 hover:bg-gray-100 transition-colors text-secondary-text hover:text-primary-text"
                 aria-label="Limpar seleção"
               >
-                <MdClose size={14} />
+                <MdClose size={16} />
               </button>
             )}
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-              <svg className="w-4 h-4 text-secondary-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </div>
           </div>
+          <p className="mt-1 text-xs font-nunito text-secondary-text">
+            Obrigatório para produtos no Anexo XXVII (52/2017)
+          </p>
         </div>
       </div>
 
