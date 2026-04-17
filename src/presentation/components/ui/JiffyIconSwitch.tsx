@@ -17,7 +17,7 @@ export interface JiffyIconSwitchProps {
   className?: string
   /** Borda primary em volta da linha inteira (label + switch), como no modal de complemento */
   bordered?: boolean
-  /** `sm`: trilho menor (ex.: ativo na lista); `xs`: ainda menor (listas densas); `default`: padrão */
+  /** `sm`: trilho menor; `xs`: ainda menor (listas densas); `default`: igual ao ref. (w-11 / thumb w-5) */
   size?: 'default' | 'sm' | 'xs'
   /** Atributos extras no `<input type="checkbox">` (exceto type/className/checked/onChange/disabled) */
   inputProps?: Omit<
@@ -26,9 +26,27 @@ export interface JiffyIconSwitchProps {
   >
 }
 
+/** Trilho / thumb / ícones — mesmo easing do efeito Galahhad (mais “elástico”). */
+const EASING = 'cubic-bezier(0.27, 0.2, 0.25, 1.51)'
+const TRANSITION = `all 0.3s ${EASING}`
+/** Linha decorativa no trilho — ease-in-out como no original. */
+const EFFECT_TRANSITION = 'all 0.3s ease-in-out'
+
+const COLOR_TRACK_OFF = '#dc2626' /* red-600 */
+const COLOR_TRACK_ON  = '#16a34a' /* green-600 */
+const COLOR_ICON_CHECK = '#16a34a'
+const COLOR_ICON_CROSS = '#dc2626'
+
+const SIZES = {
+  /** Base: Tailwind w-11 × h-6, thumb w-5, ícone w-3 */
+  default: { trackW: 44, trackH: 24, circleDia: 20, iconW: 12 },
+  sm:      { trackW: 36, trackH: 20, circleDia: 16, iconW: 10 },
+  xs:      { trackW: 30, trackH: 16, circleDia: 14, iconW: 9 },
+} as const
+
 /**
- * Switch em formato “pill”: ✓ no trilho quando ligado, ✕ quando desligado.
- * Reutilizável em cadastros e listas (mesmo padrão visual do complemento).
+ * Switch pill (w-11 / thumb w-5 / ícones w-3), trilho vermelho/verde, ícones ✓/✕ em fill.
+ * Inclui linha decorativa animada + easing Galahhad; sombra do thumb alterna com o estado.
  */
 export function JiffyIconSwitch({
   checked,
@@ -45,16 +63,25 @@ export function JiffyIconSwitch({
 }: JiffyIconSwitchProps) {
   const generatedId = React.useId()
   const inputId = id ?? generatedId
-  const isXs = size === 'xs'
-  const isSm = size === 'sm'
+
+  const { trackW, trackH, circleDia, iconW } = SIZES[size] ?? SIZES.default
+
+  const offset     = Math.round((trackH - circleDia) / 2)
+  const circleLeft = checked ? trackW - circleDia - offset : offset
+
+  const effectW    = Math.round(circleDia / 2)
+  const effectH    = Math.max(1, Math.round(effectW / 2) - 1)
+  const effectLeft = checked
+    ? trackW - effectW - Math.round(effectW / 2) - offset
+    : offset + Math.round(effectW / 2)
 
   const hasLabel = label != null && label !== ''
   const labelEl = hasLabel ? (
     <span
       className={cn(
         'select-none font-medium text-primary-text',
-        isXs && 'text-[11px]',
-        isSm && 'text-xs'
+        size === 'xs' && 'text-[11px]',
+        size === 'sm' && 'text-xs'
       )}
     >
       {label}
@@ -63,63 +90,92 @@ export function JiffyIconSwitch({
 
   const track = (
     <div
-      className={cn(
-        'relative shrink-0 rounded-full transition-colors duration-200',
-        isXs ? 'h-4 w-8'
-        : isSm ? 'h-5 w-10'
-        : 'h-6 w-12',
-        checked ? 'bg-[var(--color-accent1)]' : 'bg-error',
-        disabled && 'opacity-60'
-      )}
+      style={{
+        width: trackW,
+        height: trackH,
+        background: checked ? COLOR_TRACK_ON : COLOR_TRACK_OFF,
+        borderRadius: 9999,
+        position: 'relative',
+        flexShrink: 0,
+        boxSizing: 'border-box',
+        transition: TRANSITION,
+        opacity: disabled ? 0.5 : 1,
+      }}
       aria-hidden
     >
+      {/* Linha decorativa atrás do thumb (efeito Galahhad) */}
       <span
-        className={cn(
-          'pointer-events-none absolute top-1/2 -translate-y-1/2 font-semibold leading-none text-white transition-opacity duration-200',
-          isXs ? 'left-[3px] text-[7px]'
-          : isSm ? 'left-[5px] text-[9px]'
-          : 'left-[7px] text-[11px]',
-          checked ? 'opacity-100' : 'opacity-0'
-        )}
-      >
-        ✓
-      </span>
+        style={{
+          position: 'absolute',
+          width: effectW,
+          height: effectH,
+          left: effectLeft,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          background: '#fff',
+          borderRadius: 1,
+          transition: EFFECT_TRANSITION,
+          pointerEvents: 'none',
+          zIndex: 0,
+        }}
+      />
+
       <span
-        className={cn(
-          // text-white sempre — se só opacity-0 no “ligado”, herda cor escura do label e o ✕ pisca preto ao desligar
-          'pointer-events-none absolute top-1/2 -translate-y-1/2 font-semibold leading-none text-white transition-opacity duration-200',
-          isXs ? 'right-[3px] text-[7px]'
-          : isSm ? 'right-[5px] text-[9px]'
-          : 'right-[7px] text-[11px]',
-          checked ? 'opacity-0' : 'opacity-100'
-        )}
+        style={{
+          width: circleDia,
+          height: circleDia,
+          background: '#fff',
+          borderRadius: '50%',
+          boxShadow: checked
+            ? '-1px 1px 2px rgba(163, 163, 163, 0.45)'
+            : '1px 1px 2px rgba(146, 146, 146, 0.45)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          position: 'absolute',
+          left: circleLeft,
+          top: offset,
+          zIndex: 1,
+          transition: TRANSITION,
+        }}
       >
-        ✕
-      </span>
-      {/* Thumb branco + anel interno com borda na cor do estado (igual ao trilho) */}
-      <span
-        className={cn(
-          'pointer-events-none absolute flex items-center justify-center rounded-full bg-white shadow-sm transition-transform duration-200 ease-out',
-          isXs ? 'top-[1px] left-[1px] h-3.5 w-3.5'
-          : isSm ? 'top-[2px] left-[2px] h-4 w-4'
-          : 'top-[3px] left-[3px] h-[18px] w-[18px]',
-          checked ?
-            isXs ? 'translate-x-[16px]'
-            : isSm ? 'translate-x-[20px]'
-            : 'translate-x-[22px]'
-          : 'translate-x-0'
-        )}
-      >
-        <span
-          className={cn(
-            'shrink-0 rounded-full border border-solid bg-white transition-colors duration-200',
-            isXs ? 'h-2.5 w-2.5'
-            : isSm ? 'h-3 w-3'
-            : 'h-[13px] w-[13px]',
-            checked ? 'border-[var(--color-accent1)]' : 'border-[var(--color-error)]'
-          )}
+        {/* Checkmark — mesmo path do exemplo (viewBox 24×24) */}
+        <svg
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          xmlns="http://www.w3.org/2000/svg"
+          style={{
+            width: iconW,
+            height: iconW,
+            position: 'absolute',
+            color: COLOR_ICON_CHECK,
+            transition: TRANSITION,
+            opacity: checked ? 1 : 0,
+            transform: checked ? 'scale(1)' : 'scale(0)',
+          }}
           aria-hidden
-        />
+        >
+          <path d="M9.9997 15.1709L19.1921 5.97852L20.6063 7.39273L9.9997 17.9993L3.63574 11.6354L5.04996 10.2212L9.9997 15.1709Z" />
+        </svg>
+
+        {/* X — mesmo path do exemplo */}
+        <svg
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          xmlns="http://www.w3.org/2000/svg"
+          style={{
+            width: iconW,
+            height: iconW,
+            position: 'absolute',
+            color: COLOR_ICON_CROSS,
+            transition: TRANSITION,
+            opacity: checked ? 0 : 1,
+            transform: checked ? 'scale(0)' : 'scale(1)',
+          }}
+          aria-hidden
+        >
+          <path d="M11.9997 10.5865L16.9495 5.63672L18.3637 7.05093L13.4139 12.0007L18.3637 16.9504L16.9495 18.3646L11.9997 13.4149L7.04996 18.3646L5.63574 16.9504L10.5855 12.0007L5.63574 7.05093L7.04996 5.63672L11.9997 10.5865Z" />
+        </svg>
       </span>
     </div>
   )
@@ -128,10 +184,9 @@ export function JiffyIconSwitch({
     <label
       className={cn(
         'flex items-center rounded-lg outline-none',
-        isXs ? 'gap-1 px-0 py-0'
-        : isSm ? 'gap-1.5 px-1 py-0'
+        size === 'xs' ? 'gap-1 px-0 py-0'
+        : size === 'sm' ? 'gap-1.5 px-1 py-0'
         : 'gap-3 px-4 py-1',
-        // Anel só com foco por teclado — evita o “quadrado” primary ao clicar com o mouse
         'has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-[var(--color-primary)] has-[input:focus-visible]:ring-offset-2',
         bordered && 'border border-[var(--color-primary)]',
         disabled ? 'cursor-not-allowed' : 'cursor-pointer',

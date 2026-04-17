@@ -591,12 +591,10 @@ const ProdutoListItem = function ProdutoListItem({
       </div>
 
       <div className="flex flex-col-reverse md:flex-row md:mr-16 items-end gap-4 flex-wrap justify-end md:items-center" onClick={(e) => e.stopPropagation()}>
-        <div className="flex flex-col">
-          <label className="text-xs text-secondary-text font-nunito mb-1">Valor (R$)</label>
-          <div className="relative">
-            
+        <div className="relative">
             <input
               type="text"
+              aria-label="Valor em reais"
               value={valorInput}
               onChange={(event) => {
                 const raw = event.target.value
@@ -621,9 +619,8 @@ const ProdutoListItem = function ProdutoListItem({
                 }
               }}
               disabled={isSavingValor}
-              className=" p-2 rounded-xl border border-gray-200 focus:border-primary focus:outline-none md:text-sm text-xs font-normal text-primary-text w-32 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="p-2 rounded-xl border border-gray-200 focus:border-primary focus:outline-none md:text-sm text-xs font-normal text-primary-text w-24 disabled:opacity-60 disabled:cursor-not-allowed"
             />
-          </div>
         </div>
         <div className="flex items-center">
           <div
