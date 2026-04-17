@@ -25,9 +25,9 @@ export interface NovoProdutoHandle {
   goNext: () => void
   goBack: () => void
   /** Mesmo fluxo que “Salvar e fechar” nos passos 1–2 */
-  savePartialAndClose: () => void
+  savePartialAndClose: () => Promise<boolean>
   /** Salvar completo (passo fiscal ou cadastro inteiro) */
-  saveFinal: () => void
+  saveFinal: () => Promise<boolean>
   /** Há alterações em relação ao último baseline (carregamento ou salvamento). */
   isDirty: () => boolean
 }
@@ -871,15 +871,15 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(funct
     if (salvarSomenteDadosGerais) {
       if (!nomeProduto?.trim()) {
         showToast.error('Informe o nome do produto.')
-        return
+        return false
       }
       if (!grupoProduto) {
         showToast.error('Selecione o grupo do produto.')
-        return
+        return false
       }
       if (!unidadeProduto) {
         showToast.error('Selecione a unidade de medida.')
-        return
+        return false
       }
     }
 
@@ -887,7 +887,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(funct
     const precoVendaNum = parseFloat(precoVenda.replace(/[^\d,]/g, '').replace(',', '.'))
     if (!precoVenda || precoVendaNum === 0) {
       showToast.error('O campo "Preço de Venda" não pode ser vazio ou zero.')
-      return
+      return false
     }
 
     // Validação do NCM: deve ter exatamente 8 dígitos numéricos quando preenchido
@@ -895,17 +895,17 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(funct
       const ncmTrimmed = ncm.trim()
       if (!/^\d{8}$/.test(ncmTrimmed)) {
         showToast.error('O código NCM deve conter exatamente 8 dígitos numéricos.')
-        return
+        return false
       }
       // Bloquear se a validação da API indicou NCM inválido
       if (ncmValidation && !ncmValidation.valido) {
         showToast.error(ncmValidation.mensagem || 'O código NCM informado não é válido.')
-        return
+        return false
       }
       // Bloquear se ainda está validando
       if (isValidatingNcm) {
         showToast.error('Aguarde a validação do NCM antes de salvar.')
-        return
+        return false
       }
     }
 
@@ -914,17 +914,17 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(funct
       const cestTrimmed = cest.trim()
       if (!/^\d{7}$/.test(cestTrimmed)) {
         showToast.error('O código CEST deve conter exatamente 7 dígitos numéricos.')
-        return
+        return false
       }
       // Bloquear se a validação da API indicou CEST inválido
       if (cestValidation && !cestValidation.valido) {
         showToast.error(cestValidation.mensagem || 'O código CEST informado não é válido.')
-        return
+        return false
       }
       // Bloquear se ainda está validando
       if (isValidatingCest) {
         showToast.error('Aguarde a validação do CEST antes de salvar.')
-        return
+        return false
       }
     }
 
@@ -933,7 +933,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(funct
       showToast.error(
         'A informação sobre a "Produção em Escala Relevante" foi preenchida sem preencher o código CEST'
       )
-      return
+      return false
     }
 
     const toastId = showToast.loading(
@@ -948,7 +948,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(funct
       const token = auth?.getAccessToken()
       if (!token) {
         showToast.errorLoading(toastId, 'Token não encontrado')
-        return
+        return false
       }
 
       // Montar objeto de dados fiscais (só inclui se houver pelo menos um campo preenchido)
@@ -1043,7 +1043,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(funct
         const error = await response.json().catch(() => ({}))
         const errorMessage = error.message || 'Erro ao salvar produto'
         showToast.errorLoading(toastId, errorMessage)
-        return
+        return false
       }
 
       // Se precisar remover grupos individualmente (quando array está vazio)
@@ -1115,10 +1115,12 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(funct
           router.push('/produtos')
         }, 500)
       }
+      return true
     } catch (error) {
       console.error('Erro ao salvar produto:', error)
       const errorMessage = handleApiError(error)
       showToast.errorLoading(toastId, errorMessage)
+      return false
     } finally {
       onWizardSavingChange?.(false)
     }
@@ -1140,12 +1142,8 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(funct
           return p
         })
       },
-      savePartialAndClose: () => {
-        void handleSaveRef.current({ salvarSomenteDadosGerais: true })
-      },
-      saveFinal: () => {
-        void handleSaveRef.current()
-      },
+      savePartialAndClose: () => handleSaveRef.current({ salvarSomenteDadosGerais: true }),
+      saveFinal: () => handleSaveRef.current(),
       isDirty: () => {
         if (isLoadingProduto) return false
         if (baselineSerializedRef.current === null) return false
