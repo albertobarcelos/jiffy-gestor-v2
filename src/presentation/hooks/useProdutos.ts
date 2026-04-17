@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Produto } from '@/src/domain/entities/Produto'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
@@ -178,7 +178,9 @@ export function useProdutosInfinite(params: Omit<ProdutosQueryParams, 'offset'> 
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
     refetchOnMount: false,
-    placeholderData: undefined,
+    // Mantém os dados anteriores visíveis enquanto a query com novos filtros carrega.
+    // Evita o "piscar" da lista (produtos somem e voltam) ao trocar filtro/busca.
+    placeholderData: keepPreviousData,
   })
 }
 

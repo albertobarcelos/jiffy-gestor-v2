@@ -37,6 +37,8 @@ export const cloneProdutoWithPatch = (produto: Produto, patch: ProdutoPatch): Pr
 
 /**
  * Aplica um patch otimista em todas as páginas do cache infinito do React Query.
+ * Retorna a mesma referência de página quando nenhum item foi alterado,
+ * evitando invalidação desnecessária de componentes que dependem de uma página específica.
  */
 export const applyPatchToInfinitePages = (
   oldData: any,
@@ -46,11 +48,14 @@ export const applyPatchToInfinitePages = (
   if (!oldData?.pages) return oldData
   return {
     ...oldData,
-    pages: oldData.pages.map((page: any) => ({
-      ...page,
-      produtos: page.produtos.map((p: Produto) =>
-        p.getId() === produtoId ? cloneProdutoWithPatch(p, patch) : p
-      ),
-    })),
+    pages: oldData.pages.map((page: any) => {
+      let touched = false
+      const produtos = page.produtos.map((p: Produto) => {
+        if (p.getId() !== produtoId) return p
+        touched = true
+        return cloneProdutoWithPatch(p, patch)
+      })
+      return touched ? { ...page, produtos } : page
+    }),
   }
 }

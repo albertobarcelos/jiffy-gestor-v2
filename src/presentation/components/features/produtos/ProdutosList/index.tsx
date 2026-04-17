@@ -7,7 +7,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useProdutosInfinite } from '@/src/presentation/hooks/useProdutos'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
-import { useProdutoPatchMutation } from '@/src/presentation/hooks/useProdutoPatchMutation'
+import { useProdutoPatchMutation, isSavingOf } from '@/src/presentation/hooks/useProdutoPatchMutation'
 import { useGrupoProdutoPatchMutation } from '@/src/presentation/hooks/useGrupoProdutoPatchMutation'
 import { useProdutosFilters } from '@/src/presentation/hooks/useProdutosFilters'
 import { useIsMobile } from '@/src/presentation/hooks/useIsMobile'
@@ -23,11 +23,24 @@ import { Produto } from '@/src/domain/entities/Produto'
 import type { ToggleField } from '@/src/shared/types/produto'
 import { sortProdutosAlphabetically, normalizeGroupName } from './utils'
 
-interface ProdutosListProps {
-  onReload?: () => void
+// ---------------------------------------------------------------------------
+// Tipos auxiliares para o cache do React Query
+// ---------------------------------------------------------------------------
+
+interface InfinitePage {
+  produtos: Produto[]
+  count?: number
 }
 
-export function ProdutosList({ onReload }: ProdutosListProps) {
+interface InfinitePagesData {
+  pages?: InfinitePage[]
+}
+
+// ---------------------------------------------------------------------------
+// Componente principal
+// ---------------------------------------------------------------------------
+
+export function ProdutosList() {
   const queryClient = useQueryClient()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -35,20 +48,19 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
   const isMobile = useIsMobile()
 
   const { state: filters, actions, queryParams, filterStatus } = useProdutosFilters()
-  // Sempre inicia como `false` para coincidir com o SSR.
-  // O useEffect abaixo corrige para o valor real após hidratação.
-  const [filtrosVisiveis, setFiltrosVisiveis] = useState(false)
 
-  useEffect(() => {
-    setFiltrosVisiveis(window.innerWidth >= 768)
-  }, [])
+  // Sempre inicia como `false` para coincidir com o SSR; corrigido após hidratação via useIsMobile.
+  const [filtrosVisiveis, setFiltrosVisiveis] = useState(false)
+  useEffect(() => { setFiltrosVisiveis(!isMobile) }, [isMobile])
+
+  // Indexado por grupoId (ou '__sem_grupo__') para evitar colisões de nome normalizado.
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
+
   const [tabsModalState, setTabsModalState] = useState<ProdutosTabsModalState>({
     open: false, tab: 'produto', mode: 'create',
     prefillGrupoProdutoId: undefined, grupoId: undefined,
   })
 
-  const sentinelRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   const patchMutation = useProdutoPatchMutation()
@@ -86,9 +98,12 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     return Array.from(map.entries())
   }, [produtosSorted])
 
+  // Map consolidado: visual + ativo por grupoId. Evita lookup O(N) por render.
   const grupoProdutoMap = useMemo(() => {
-    const map = new Map<string, { corHex: string; iconName: string }>()
-    gruposProdutos.forEach((g) => map.set(g.getId(), { corHex: g.getCorHex(), iconName: g.getIconName() }))
+    const map = new Map<string, { corHex: string; iconName: string; ativo: boolean }>()
+    gruposProdutos.forEach((g) =>
+      map.set(g.getId(), { corHex: g.getCorHex(), iconName: g.getIconName(), ativo: g.isAtivo() })
+    )
     return map
   }, [gruposProdutos])
 
@@ -97,33 +112,30 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     setExpandedGroups((prev) => {
       let changed = false
       const next: Record<string, boolean> = {}
-      produtosAgrupados.forEach(([grupo]) => {
-        if (typeof prev[grupo] === 'undefined') { changed = true; next[grupo] = true }
-        else next[grupo] = prev[grupo]
+      produtosAgrupados.forEach(([, items]) => {
+        const groupKey = items[0]?.getGrupoId() ?? '__sem_grupo__'
+        if (typeof prev[groupKey] === 'undefined') { changed = true; next[groupKey] = true }
+        else next[groupKey] = prev[groupKey]
       })
       return changed ? next : prev
     })
   }, [produtosAgrupados])
 
-  // Scroll infinito via IntersectionObserver no sentinel
+  // Scroll infinito: carrega próxima página quando o usuário chega perto do fim
   useEffect(() => {
-    const sentinel = sentinelRef.current
-    if (!sentinel) return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage && !isFetching) {
-          fetchNextPage()
-        }
-      },
-      { root: scrollContainerRef.current, rootMargin: '200px' }
-    )
-    observer.observe(sentinel)
-    return () => observer.disconnect()
-  }, [hasNextPage, isFetchingNextPage, isFetching, fetchNextPage])
+    if (hasNextPage && !isFetchingNextPage && !isFetching && data) {
+      fetchNextPage()
+    }
+  }, [hasNextPage, isFetchingNextPage, isFetching, fetchNextPage, data])
 
   useEffect(() => {
     if (error) console.error('Erro ao carregar produtos:', error)
   }, [error])
+
+  // Volta ao topo ao trocar filtros/busca
+  useEffect(() => {
+    scrollContainerRef.current?.scrollTo({ top: 0 })
+  }, [queryParams])
 
   // Modal helpers
   const openTabsModal = useCallback(
@@ -143,16 +155,16 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }, [router, searchParams, pathname])
 
-  const updateProdutoInCache = useCallback((produtoId: string, produtoData: any) => {
-    queryClient.setQueriesData(
+  const updateProdutoInCache = useCallback((produtoId: string, produtoData: unknown) => {
+    queryClient.setQueriesData<InfinitePagesData>(
       { queryKey: ['produtos', 'infinite'], exact: false },
-      (old: any) => {
-        if (!old?.pages) return old
+      (oldData) => {
+        if (!oldData?.pages) return oldData
         return {
-          ...old,
-          pages: old.pages.map((page: any) => ({
+          ...oldData,
+          pages: oldData.pages.map((page) => ({
             ...page,
-            produtos: page.produtos.map((p: Produto) => {
+            produtos: page.produtos.map((p) => {
               if (p.getId() !== produtoId) return p
               try { return Produto.fromJSON(produtoData) } catch { return p }
             }),
@@ -162,7 +174,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     )
   }, [queryClient])
 
-  const handleTabsModalReload = useCallback((produtoId?: string, produtoData?: any) => {
+  const handleTabsModalReload = useCallback((produtoId?: string, produtoData?: unknown) => {
     if (produtoId && produtoData) {
       updateProdutoInCache(produtoId, produtoData)
     } else {
@@ -171,7 +183,7 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     }
   }, [queryClient, updateProdutoInCache])
 
-  // Handlers estáveis — passam o id como arg, sem closure por item
+  // Handlers de produto — recebem produtoId como arg, sem closure por item
   const handleValorChange = useCallback((produtoId: string, novoValor: number) => {
     patchMutation.mutate({ type: 'valor', produtoId, novoValor })
   }, [patchMutation])
@@ -183,12 +195,6 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
   const handleToggleBooleanField = useCallback((produtoId: string, field: ToggleField, novoValor: boolean) => {
     patchMutation.mutate({ type: 'toggle', produtoId, field, novoValor })
   }, [patchMutation])
-
-  const handleToggleGroupStatus = useCallback((grupoId: string) => {
-    const grupo = gruposProdutos.find((g) => g.getId() === grupoId)
-    if (!grupo) return
-    grupoPatchMutation.mutate({ grupoId, novoStatus: !grupo.isAtivo() })
-  }, [gruposProdutos, grupoPatchMutation])
 
   const handleEditProduto = useCallback((produtoId: string) => {
     const produto = produtos.find((p) => p.getId() === produtoId)
@@ -210,25 +216,38 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
     openTabsModal({ tab: 'impressoras', mode: 'edit', produto, grupoId: produto.getGrupoId() })
   }, [openTabsModal])
 
-  const handleEditGrupoProduto = useCallback((grupoId?: string, produto?: Produto) => {
-    if (!grupoId) return
-    openTabsModal({ tab: 'grupo', mode: 'edit', grupoId, produto })
-  }, [openTabsModal])
+  // Handlers de grupo — todos estáveis, recebem IDs como argumento
+  const handleToggleExpand = useCallback((groupKey: string) => {
+    setExpandedGroups((prev) => {
+      const currentlyExpanded = prev[groupKey] !== false
+      return { ...prev, [groupKey]: !currentlyExpanded }
+    })
+  }, [])
 
-  const handleCreateProdutoForGroup = useCallback((grupoNome: string) => {
-    if (!grupoNome || grupoNome.toLowerCase() === 'sem grupo') {
+  const handleToggleGroupStatus = useCallback((grupoId: string) => {
+    const info = grupoProdutoMap.get(grupoId)
+    if (!info) return
+    grupoPatchMutation.mutate({ grupoId, novoStatus: !info.ativo })
+  }, [grupoProdutoMap, grupoPatchMutation])
+
+  const handleEditGrupoProduto = useCallback((grupoId: string | undefined) => {
+    if (!grupoId) return
+    const primeiroProduto = produtos.find((p) => p.getGrupoId() === grupoId)
+    openTabsModal({ tab: 'grupo', mode: 'edit', grupoId, produto: primeiroProduto })
+  }, [produtos, openTabsModal])
+
+  const handleAddProdutoForGroup = useCallback((grupoNome: string, grupoId: string | undefined) => {
+    if (!grupoId || grupoNome.toLowerCase() === 'sem grupo') {
       openTabsModal({ tab: 'produto', mode: 'create' })
       return
     }
-    const normalized = grupoNome.trim().toLowerCase()
-    const matched = gruposProdutos.find((g) => g.getNome().trim().toLowerCase() === normalized)
-    openTabsModal({ tab: 'produto', mode: 'create', prefillGrupoProdutoId: matched?.getId() })
-  }, [gruposProdutos, openTabsModal])
+    openTabsModal({ tab: 'produto', mode: 'create', prefillGrupoProdutoId: grupoId })
+  }, [openTabsModal])
 
   const isLoadingAny = isLoading || isFetching || isFetchingNextPage
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex min-h-0 flex-1 flex-col">
       <ProdutosHeader
         totalLocal={produtos.length}
         totalApi={totalProdutos}
@@ -262,92 +281,94 @@ export function ProdutosList({ onReload }: ProdutosListProps) {
 
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-1 mt-2 space-y-6 scrollbar-hide"
-        style={{ maxHeight: 'calc(100vh - 230px)' }}
+        className="flex-1 min-h-0 overflow-y-auto px-1 mt-2 scrollbar-hide"
       >
+        {/* Loading inicial */}
         {isLoadingAny && produtos.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 gap-2">
             <JiffyLoading />
           </div>
         )}
 
+        {/* Sem resultados */}
         {!isLoadingAny && produtos.length === 0 && data && (
           <div className="flex items-center justify-center py-12">
             <p className="text-secondary-text">Nenhum produto encontrado.</p>
           </div>
         )}
 
-        {produtosAgrupados.map(([grupo, items]) => {
-          const primeiroProduto = items[0]
-          const grupoId = primeiroProduto?.getGrupoId()
-          const grupoVisual = grupoId ? grupoProdutoMap.get(grupoId) : undefined
-          const grupoAtivo = grupoVisual
-            ? gruposProdutos.find((g) => g.getId() === grupoId)?.isAtivo() ?? true
-            : true
-          const isExpanded = expandedGroups[grupo] !== false
+        {/* Lista agrupada */}
+        {produtosAgrupados.length > 0 && (
+          <div role="list" aria-label="Lista de produtos" className="space-y-4 pb-4">
+            {produtosAgrupados.map(([grupo, items]) => {
+              const grupoId = items[0]?.getGrupoId()
+              const groupKey = grupoId ?? '__sem_grupo__'
+              const info = grupoId ? grupoProdutoMap.get(grupoId) : undefined
+              const grupoVisual = info ? { corHex: info.corHex, iconName: info.iconName } : undefined
+              const grupoAtivo = info?.ativo ?? true
+              const isExpanded = expandedGroups[groupKey] !== false
 
-          return (
-            <div key={grupo} className="space-y-1">
-              <ProdutosGroupHeader
-                grupo={grupo}
-                grupoId={grupoId}
-                grupoVisual={grupoVisual}
-                grupoAtivo={grupoAtivo}
-                itemCount={items.length}
-                isExpanded={isExpanded}
-                primeiroProduto={primeiroProduto}
-                onToggleExpand={() => setExpandedGroups((prev) => ({ ...prev, [grupo]: !prev[grupo] }))}
-                onEditGrupo={() => handleEditGrupoProduto(grupoId, primeiroProduto)}
-                onToggleGrupoStatus={() => grupoId && handleToggleGroupStatus(grupoId)}
-                onAddProduto={() => handleCreateProdutoForGroup(grupo)}
-              />
-
-              {!isExpanded ? (
-                <div className="rounded-xl border border-dashed border-secondary/40 px-4 py-1 text-sm text-secondary-text">
-                  Produtos ocultos. Clique{' '}
-                  <button
-                    type="button"
-                    onClick={() => setExpandedGroups((prev) => ({ ...prev, [grupo]: true }))}
-                    className="font-medium text-primary underline underline-offset-2 transition-colors hover:text-primary/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-sm"
-                  >
-                    aqui!
-                  </button>{' '}
-                  para visualizar.
-                </div>
-              ) : (
-                <div>
-                  {items.map((produto) => (
-                    <ProdutoListItem
-                      key={produto.getId()}
-                      produto={produto}
-                      isSavingValor={
-                        patchMutation.isPending &&
-                        (patchMutation.variables as any)?.produtoId === produto.getId() &&
-                        (patchMutation.variables as any)?.type === 'valor'
-                      }
-                      isSavingStatus={
-                        patchMutation.isPending &&
-                        (patchMutation.variables as any)?.produtoId === produto.getId() &&
-                        (patchMutation.variables as any)?.type === 'status'
-                      }
-                      savingToggleState={undefined}
-                      onValorChange={(valor) => handleValorChange(produto.getId(), valor)}
-                      onSwitchToggle={(status) => handleStatusToggle(produto.getId(), status)}
-                      onToggleBoolean={(field, value) => handleToggleBooleanField(produto.getId(), field, value)}
-                      onOpenComplementosModal={() => handleOpenComplementosModal(produto)}
-                      onOpenImpressorasModal={() => handleOpenImpressorasModal(produto)}
-                      onEditProduto={() => handleEditProduto(produto.getId())}
-                      onCopyProduto={() => handleCopyProduto(produto.getId())}
+              return (
+                <div key={groupKey} role="listitem" className="space-y-1">
+                  {/* sticky top-0 z-20: CSS nativo, sem JS, sem complexidade */}
+                  <div className="sticky top-0 z-20 -mx-1 bg-gray-50">
+                    <ProdutosGroupHeader
+                      grupo={grupo}
+                      grupoId={grupoId}
+                      groupKey={groupKey}
+                      grupoVisual={grupoVisual}
+                      grupoAtivo={grupoAtivo}
+                      itemCount={items.length}
+                      isExpanded={isExpanded}
+                      onToggleExpand={handleToggleExpand}
+                      onEditGrupo={handleEditGrupoProduto}
+                      onToggleGrupoStatus={handleToggleGroupStatus}
+                      onAddProduto={handleAddProdutoForGroup}
                     />
-                  ))}
-                </div>
-              )}
-            </div>
-          )
-        })}
+                  </div>
 
-        {/* Sentinel para scroll infinito */}
-        <div ref={sentinelRef} className="h-4" />
+                  {!isExpanded ? (
+                    <div className="rounded-xl border border-dashed border-secondary/40 px-4 py-1 text-sm text-secondary-text mx-1">
+                      Produtos ocultos. Clique{' '}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleExpand(groupKey)}
+                        className="font-medium text-primary underline underline-offset-2 transition-colors hover:text-primary/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-sm"
+                      >
+                        aqui!
+                      </button>{' '}
+                      para visualizar.
+                    </div>
+                  ) : (
+                    <div>
+                      {items.map((produto) => (
+                        // content-visibility: auto faz o browser pular layout/paint de itens
+                        // fora do viewport — virtualização CSS nativa, sem quebrar o sticky.
+                        <div
+                          key={produto.getId()}
+                          style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 90px' }}
+                        >
+                          <ProdutoListItem
+                            produto={produto}
+                            isSavingValor={isSavingOf(patchMutation, produto.getId(), 'valor')}
+                            isSavingStatus={isSavingOf(patchMutation, produto.getId(), 'status')}
+                            onValorChange={handleValorChange}
+                            onSwitchToggle={handleStatusToggle}
+                            onToggleBoolean={handleToggleBooleanField}
+                            onOpenComplementosModal={handleOpenComplementosModal}
+                            onOpenImpressorasModal={handleOpenImpressorasModal}
+                            onEditProduto={handleEditProduto}
+                            onCopyProduto={handleCopyProduto}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
 
         {isFetchingNextPage && (
           <div className="flex justify-center py-4">

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 
 /**
  * Retorna `true` enquanto a largura da janela for menor que `breakpoint` (padrão: 768px).
- * Usa `window.innerWidth < breakpoint` como limiar.
+ * Usa `matchMedia` em vez de listener de `resize` para disparar apenas quando o breakpoint é cruzado.
  */
 export function useIsMobile(breakpoint = 768): boolean {
   // Sempre inicia como `false` para coincidir com o SSR (sem window).
@@ -12,10 +12,11 @@ export function useIsMobile(breakpoint = 768): boolean {
   const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
-    const update = () => setIsMobile(window.innerWidth < breakpoint)
-    update()
-    window.addEventListener('resize', update)
-    return () => window.removeEventListener('resize', update)
+    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`)
+    setIsMobile(mq.matches)
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
   }, [breakpoint])
 
   return isMobile

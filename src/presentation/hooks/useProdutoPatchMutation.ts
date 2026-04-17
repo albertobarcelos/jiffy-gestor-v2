@@ -3,9 +3,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
-import { updateProdutoValor } from '@/src/application/use-cases/produtos/UpdateProdutoValorUseCase'
-import { updateProdutoStatus } from '@/src/application/use-cases/produtos/UpdateProdutoStatusUseCase'
-import { updateProdutoToggle } from '@/src/application/use-cases/produtos/UpdateProdutoToggleUseCase'
+import { updateProdutoPatch } from '@/src/application/use-cases/produtos/UpdateProdutoPatchUseCase'
 import { applyPatchToInfinitePages } from '@/src/presentation/components/features/produtos/ProdutosList/utils'
 import { toggleFieldConfig } from '@/src/presentation/components/features/produtos/ProdutosList/constants'
 import type { ProdutoPatch, ToggleField } from '@/src/shared/types/produto'
@@ -14,6 +12,19 @@ export type ProdutoPatchPayload =
   | { type: 'valor'; produtoId: string; novoValor: number }
   | { type: 'status'; produtoId: string; novoStatus: boolean; filterStatus?: string }
   | { type: 'toggle'; produtoId: string; field: ToggleField; novoValor: boolean }
+
+/** Verifica se a mutation está pendente para um produto/tipo específico. */
+export function isSavingOf(
+  mutation: { isPending: boolean; variables?: ProdutoPatchPayload },
+  produtoId: string,
+  type: ProdutoPatchPayload['type']
+): boolean {
+  return (
+    mutation.isPending &&
+    mutation.variables?.produtoId === produtoId &&
+    mutation.variables?.type === type
+  )
+}
 
 function payloadToPatch(payload: ProdutoPatchPayload): ProdutoPatch {
   switch (payload.type) {
@@ -41,7 +52,7 @@ function successMessage(payload: ProdutoPatchPayload): string {
 
 /**
  * Mutation com atualização otimista + rollback automático para patches de produto.
- * Elimina a necessidade de `localProdutos`, `pendingUpdatesRef` e os 3 mapas de saving.
+ * Usa updateProdutoPatch como único use-case de infra para todos os tipos de patch.
  */
 export function useProdutoPatchMutation() {
   const { auth } = useAuthStore()
@@ -51,20 +62,7 @@ export function useProdutoPatchMutation() {
     mutationFn: async (payload) => {
       const token = auth?.getAccessToken()
       if (!token) throw new Error('Token não encontrado. Faça login novamente.')
-
-      switch (payload.type) {
-        case 'valor':
-          return updateProdutoValor({ produtoId: payload.produtoId, novoValor: payload.novoValor, token })
-        case 'status':
-          return updateProdutoStatus({ produtoId: payload.produtoId, novoStatus: payload.novoStatus, token })
-        case 'toggle':
-          return updateProdutoToggle({
-            produtoId: payload.produtoId,
-            bodyKey: toggleFieldConfig[payload.field].bodyKey as string,
-            novoValor: payload.novoValor,
-            token,
-          })
-      }
+      return updateProdutoPatch({ produtoId: payload.produtoId, patch: payloadToPatch(payload), token })
     },
 
     onMutate: async (payload) => {
@@ -91,6 +89,14 @@ export function useProdutoPatchMutation() {
 
     onSuccess: (_data, payload) => {
       showToast.success(successMessage(payload))
+    },
+
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['produtos', 'infinite'],
+        exact: false,
+        refetchType: 'none',
+      })
     },
   })
 }

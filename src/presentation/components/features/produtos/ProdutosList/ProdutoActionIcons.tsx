@@ -7,12 +7,11 @@ import { actionIconsConfig } from './constants'
 interface ProdutoActionIconsProps {
   produto: Produto
   toggleStates: Record<ToggleField, boolean>
-  savingToggleState?: Partial<Record<ToggleField, boolean>>
   variant: 'desktop' | 'mobile-row1' | 'mobile-row2'
-  onToggleBoolean: (field: ToggleField, value: boolean) => void
-  onOpenComplementosModal: () => void
-  onOpenImpressorasModal: () => void
-  onCopyProduto: () => void
+  onToggleBoolean: (produtoId: string, field: ToggleField, value: boolean) => void
+  onOpenComplementosModal: (produto: Produto) => void
+  onOpenImpressorasModal: (produto: Produto) => void
+  onCopyProduto: (produtoId: string) => void
 }
 
 const ICON_SIZE: Record<ProdutoActionIconsProps['variant'], string> = {
@@ -30,7 +29,6 @@ const VARIANT_SLICE: Record<ProdutoActionIconsProps['variant'], [number, number]
 export function ProdutoActionIcons({
   produto,
   toggleStates,
-  savingToggleState,
   variant,
   onToggleBoolean,
   onOpenComplementosModal,
@@ -50,22 +48,20 @@ export function ProdutoActionIcons({
 
         if (field) {
           const isActive = toggleStates[field]
-          const isLoading = Boolean(savingToggleState?.[field])
           return (
             <button
               key={`${produtoId}-${key}`}
               type="button"
               title={label}
-              disabled={isLoading}
               onClick={(e) => {
                 e.stopPropagation()
-                onToggleBoolean(field, !isActive)
+                onToggleBoolean(produtoId, field, !isActive)
               }}
               className={`${baseClass} ${
                 isActive
                   ? 'bg-primary text-white border border-primary'
                   : 'bg-gray-300 text-white border border-transparent'
-              } ${isLoading ? 'opacity-60 cursor-not-allowed' : 'hover:bg-primary/80 hover:text-white'}`}
+              } hover:bg-primary/80 hover:text-white`}
             >
               <IconEl />
             </button>
@@ -81,7 +77,7 @@ export function ProdutoActionIcons({
               title={label}
               onClick={(e) => {
                 e.stopPropagation()
-                handleClick()
+                handleClick(produto)
               }}
               className={`${baseClass} bg-gray-100 border border-primary text-[var(--color-primary)] hover:bg-primary/10`}
             >
@@ -98,7 +94,7 @@ export function ProdutoActionIcons({
               title={label}
               onClick={(e) => {
                 e.stopPropagation()
-                onCopyProduto()
+                onCopyProduto(produtoId)
               }}
               className={`${baseClass} bg-gray-100 border border-primary text-[var(--color-primary)] hover:bg-primary/10`}
             >

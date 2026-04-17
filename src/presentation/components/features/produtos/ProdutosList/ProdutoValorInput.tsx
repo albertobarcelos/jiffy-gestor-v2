@@ -10,25 +10,20 @@ interface ProdutoValorInputProps {
 }
 
 export function ProdutoValorInput({ valor, disabled = false, onCommit }: ProdutoValorInputProps) {
-  const format = useCallback(
-    (v: number | string) => formatBRLFromMaskedInput(v),
-    []
-  )
-
-  const [inputValue, setInputValue] = useState(() => format(valor))
+  const [inputValue, setInputValue] = useState(() => formatBRLFromMaskedInput(valor))
 
   useEffect(() => {
-    setInputValue(format(valor))
-  }, [valor, format])
+    setInputValue(formatBRLFromMaskedInput(valor))
+  }, [valor])
 
   const handleCommit = useCallback(() => {
     const parsed = parseBRLToNumber(inputValue)
     if (parsed === null || parsed === valor) {
-      setInputValue(format(valor))
+      setInputValue(formatBRLFromMaskedInput(valor))
       return
     }
     onCommit(parsed)
-  }, [inputValue, valor, onCommit, format])
+  }, [inputValue, valor, onCommit])
 
   // Debounce: salva automaticamente 1,5 s após parar de digitar
   useEffect(() => {
