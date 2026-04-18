@@ -4,6 +4,7 @@ import {
   forwardRef,
   useCallback,
   useEffect,
+  useRef,
   useState,
   type ReactElement,
   type Ref,
@@ -91,6 +92,18 @@ interface ModalLancamentoProdutoPainelProps {
   /** `abreComplementos` e há grupos com complementos — exibe lista */
   mostrarComplementos: boolean
   onConfirm: (data: ModalLancamentoProdutoPainelConfirmPayload) => void
+  /** Título da faixa azul (cabeçalho) */
+  tituloBarra?: string
+  /**
+   * Valor unitário inicial fora do cadastro (ex.: linha já lançada no pedido).
+   * Se omitido, usa `produto.getValor()` para o campo e para confirmar quando não há alteração de preço.
+   */
+  valorUnitarioInicial?: number | null
+  /**
+   * Chaves `${grupoId}-${complementoId}` pré-selecionadas (ex.: edição de linha).
+   * Aplicadas só ao abrir o painel.
+   */
+  chavesComplementosIniciais?: string[]
 }
 
 function formatarNumeroComMilhar(valor: number): string {
@@ -150,10 +163,14 @@ export function ModalLancamentoProdutoPainel({
   mostrarAlterarPreco,
   mostrarComplementos,
   onConfirm,
+  tituloBarra = 'Lançar na venda',
+  valorUnitarioInicial,
+  chavesComplementosIniciais,
 }: ModalLancamentoProdutoPainelProps) {
   const [internalOpen, setInternalOpen] = useState(open)
   const [valorInput, setValorInput] = useState('')
   const [chavesComplementos, setChavesComplementos] = useState<string[]>([])
+  const painelJaAbertoRef = useRef(false)
 
   useEffect(() => {
     if (open) setInternalOpen(true)
@@ -164,12 +181,23 @@ export function ModalLancamentoProdutoPainel({
     onAfterClose?.()
   }, [onAfterClose])
 
+  // Inicializa preço/complementos ao abrir (uma vez por abertura — não sobrescreve toggles durante a edição)
   useEffect(() => {
-    if (!open || !produto) return
-    const base = produto.getValor()
+    if (!open) {
+      painelJaAbertoRef.current = false
+      return
+    }
+    if (!produto) return
+    if (painelJaAbertoRef.current) return
+    painelJaAbertoRef.current = true
+
+    const base =
+      valorUnitarioInicial !== undefined && valorUnitarioInicial !== null
+        ? valorUnitarioInicial
+        : produto.getValor()
     setValorInput(formatarNumeroComMilhar(Number.isFinite(base) && base >= 0 ? base : 0))
-    setChavesComplementos([])
-  }, [open, produto])
+    setChavesComplementos(chavesComplementosIniciais ?? [])
+  }, [open, produto, valorUnitarioInicial, chavesComplementosIniciais])
 
   const parseValorMoedaParaNumero = (texto: string): number | null => {
     const limpo = texto.replace(/\./g, '').replace(',', '.').trim()
@@ -193,6 +221,13 @@ export function ModalLancamentoProdutoPainel({
         return
       }
       valorUnitario = v
+    } else if (
+      valorUnitarioInicial !== undefined &&
+      valorUnitarioInicial !== null &&
+      Number.isFinite(valorUnitarioInicial)
+    ) {
+      // Linha já lançada sem edição de preço no cadastro: mantém o valor da linha
+      valorUnitario = valorUnitarioInicial
     }
 
     const complementos = mostrarComplementos
@@ -242,17 +277,17 @@ export function ModalLancamentoProdutoPainel({
         unmountOnExit={false}
       >
         <div
-          className="absolute right-0 top-0 z-[1] flex h-[100dvh] max-h-[100dvh] w-[min(28rem,100vw)] flex-col overflow-hidden rounded-bl-xl rounded-tl-xl bg-white shadow-xl outline-none sm:w-[min(540px,45vw)]"
+          className="absolute right-0 top-0 z-[1] flex h-[100dvh] max-h-[100dvh] w-[95vw] max-w-[100vw] flex-col overflow-hidden rounded-bl-xl rounded-tl-xl bg-white shadow-xl outline-none sm:w-[90vw] md:w-[min(900px,35vw)]"
           role="dialog"
           aria-modal
           aria-labelledby="modal-lancamento-produto-titulo"
         >
-          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-gray-200 bg-primary px-4 py-3">
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-gray-200 px-4 py-3">
             <h2
               id="modal-lancamento-produto-titulo"
-              className="font-exo min-w-0 flex-1 text-lg font-semibold text-white sm:text-xl"
+              className="font-exo min-w-0 flex-1 text-lg font-semibold text-primary-text sm:text-xl"
             >
-              Lançar na venda
+              {tituloBarra}
             </h2>
             <button
               type="button"

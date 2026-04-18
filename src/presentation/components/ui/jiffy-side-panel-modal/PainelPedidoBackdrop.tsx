@@ -14,7 +14,20 @@ type PainelPedidoBackdropProps = BackdropProps & {
 
 export const PainelPedidoBackdrop = forwardRef<HTMLDivElement, PainelPedidoBackdropProps>(
   function PainelPedidoBackdrop(
-    { open, invisible, className, sx, style, onClick, ownerState: _ownerState, ...other },
+    {
+      open,
+      invisible,
+      className,
+      sx,
+      style,
+      onClick,
+      ownerState: _ownerState,
+      /** Sincroniza timing com `Modal`/`closeAfterTransition`; não é atributo HTML */
+      transitionDuration: _transitionDuration,
+      components: _components,
+      componentsProps: _componentsProps,
+      ...other
+    },
     ref
   ) {
     return (

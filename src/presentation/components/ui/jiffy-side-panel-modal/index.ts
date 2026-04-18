@@ -1,7 +1,9 @@
 export {
   JiffySidePanelModal,
+  JiffyPainelSlide,
   footerSavePrimaryBarSx,
   footerBarPrimaryMutedSx,
+  footerBarGrayBarSx,
 } from './JiffySidePanelModal'
 export type {
   JiffySidePanelModalProps,

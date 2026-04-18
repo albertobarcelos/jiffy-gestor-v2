@@ -1215,14 +1215,14 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
 
     if (isLoadingImpressora) {
       return (
-        <div className="flex h-full flex-col items-center justify-center gap-2">
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2">
           <JiffyLoading />
         </div>
       )
     }
 
     return (
-      <div className="flex h-full flex-col">
+      <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
         {/* Header fixo — oculto quando o chrome vem do `JiffySidePanelModal` */}
         {!(isEmbedded && hideEmbeddedChrome) && (
           <div className="sticky top-0 z-10 border-b-2 border-primary/70 px-1 py-2 md:px-[30px]">
@@ -1258,37 +1258,39 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
           </div>
         )}
 
-        {/* Conteúdo com scroll */}
-        <div className="min-h-0 flex-1">
+        {/* Conteúdo: coluna flex — nome fixo; lista usa o restante da altura com rolagem interna */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div
             className={cn(
-              'space-y-3 py-2',
+              'flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-2',
               isEmbedded && hideEmbeddedChrome ? 'px-4 md:px-4' : 'px-1 md:px-2'
             )}
           >
             {/* Nome — label na borda (outlined), sem título externo */}
-            <Input
-              label="Nome da Impressora"
-              value={nome.toUpperCase()}
-              onChange={e => setNome(e.target.value)}
-              required
-              size="small"
-              placeholder="Digite o nome da impressora"
-              className="bg-info"
-              sx={sxInputNomeImpressora}
-            />
+            <div className="shrink-0">
+              <Input
+                label="Nome da Impressora"
+                value={nome.toUpperCase()}
+                onChange={e => setNome(e.target.value)}
+                required
+                size="small"
+                placeholder="Digite o nome da impressora"
+                className="bg-info"
+                sx={sxInputNomeImpressora}
+              />
+            </div>
 
-            {/* Tabela Config. por Terminal */}
-            <div className="overflow-x-visible md:overflow-visible">
-              <div className="overflow-hidden rounded-lg bg-info md:w-full md:min-w-[min(100%,520px)]">
-                <div className="border-b border-primary px-4 py-1">
+            {/* Tabela Config. por Terminal — ocupa altura fluida até o rodapé do painel */}
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:overflow-x-visible">
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-info md:w-full md:min-w-[min(100%,520px)]">
+                <div className="shrink-0 border-b border-primary px-4 py-1">
                   <h2 className="font-exo text-lg font-semibold text-primary">
                     Config. por Terminal
                   </h2>
                 </div>
 
                 {/* Barra de ações em lote — sempre visível; aplica só com terminais selecionados */}
-                <div className="border-b border-primary px-2 py-1">
+                <div className="shrink-0 border-b border-primary px-2 py-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-nunito text-sm font-medium text-primary-text">
                       {selectedTerminalIds.size === 0 ?
@@ -1455,7 +1457,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                   </div>
 
                 {/* Cabeçalho (desktop): terminal + toggles; detalhes em área expansível */}
-                <div className="hidden bg-custom-2 py-2 md:block rounded-lg mt-2">
+                <div className="mt-2 hidden shrink-0 rounded-lg bg-custom-2 py-2 md:block">
                   {/* Mesmo grid que as linhas: títulos centralizados como os switches/botão (flex w-full justify-center) */}
                   <div className={DESKTOP_TERMINAL_ROW_GRID}>
                     <div className="flex items-center justify-center">
@@ -1487,10 +1489,10 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                   </div>
                 </div>
 
-                {/* Lista de terminais com scroll — scrollbar-gutter evita deslocar colunas em relação ao cabeçalho */}
+                {/* Lista de terminais: altura flexível (viewport/painel), rolagem só aqui */}
                 <div
                   ref={scrollContainerRef}
-                  className="max-h-[500px] overflow-y-auto [scrollbar-gutter:stable]"
+                  className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
                 >
                   {(isLoadingTerminais || !hasLoadedTerminaisRef.current) &&
                     terminaisConfig.length === 0 && (

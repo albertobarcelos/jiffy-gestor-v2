@@ -6,14 +6,7 @@ import {
   useRef,
   useCallback,
   useEffect,
-  forwardRef,
-  type ReactElement,
-  type Ref,
 } from 'react'
-import Box from '@mui/material/Box'
-import Slide from '@mui/material/Slide'
-import type { BackdropProps } from '@mui/material/Backdrop'
-import type { TransitionProps } from '@mui/material/transitions'
 import {
   Dialog,
   DialogContent,
@@ -32,7 +25,6 @@ import {
 } from '@/src/presentation/components/ui/select'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Textarea } from '@/src/presentation/components/ui/textarea'
-import { Switch } from '@/src/presentation/components/ui/switch'
 import { useQuery } from '@tanstack/react-query'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
@@ -63,9 +55,6 @@ import {
   MdStore,
   MdPersonOutline,
   MdInfo,
-  MdAdd,
-  MdRemove,
-  MdClose,
   MdEdit,
   MdExpandLess,
   MdExpandMore,
@@ -82,10 +71,18 @@ import {
   ModalLancamentoProdutoPainel,
   type ModalLancamentoProdutoPainelConfirmPayload,
 } from './ModalLancamentoProdutoPainel'
+import { PainelEdicaoProdutoLinhaPedido } from './PainelEdicaoProdutoLinhaPedido'
 import {
   ProdutosTabsModal,
   ProdutosTabsModalState,
 } from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
+import {
+  PainelPedidoBackdrop,
+  JiffyPainelSlide,
+  footerBarGrayBarSx,
+  footerBarPrimaryMutedSx,
+  footerSavePrimaryBarSx,
+} from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 
 interface NovoPedidoModalProps {
   open: boolean
@@ -328,53 +325,6 @@ function statusFiscalEhEmitida(
   return s === 'EMITIDA'
 }
 
-/** Painel alinhado à direita: entra deslizando da direita e, ao fechar, volta para a direita */
-const PedidoPainelSlide = forwardRef(function PedidoPainelSlide(
-  props: TransitionProps & { children: ReactElement },
-  ref: Ref<unknown>
-) {
-  return <Slide ref={ref} direction="left" {...props} />
-})
-PedidoPainelSlide.displayName = 'PedidoPainelSlide'
-
-/**
- * Backdrop sem Fade interno do MUI — o Dialog repassa a mesma duração do papel ao Backdrop padrão,
- * o que esmaece o fundo na entrada; aqui o overlay aparece no mesmo frame, só o painel desliza.
- */
-const PainelPedidoBackdrop = forwardRef<HTMLDivElement, BackdropProps>(
-  function PainelPedidoBackdrop(
-    { open, invisible, className, sx, style, onClick, ...other },
-    ref
-  ) {
-    return (
-      <Box
-        ref={ref}
-        aria-hidden
-        className={['MuiBackdrop-root', className].filter(Boolean).join(' ')}
-        onClick={onClick}
-        {...other}
-        sx={[
-          {
-            position: 'fixed',
-            right: 0,
-            bottom: 0,
-            top: 0,
-            left: 0,
-            zIndex: -1,
-            display: open ? 'block' : 'none',
-            WebkitTapHighlightColor: 'transparent',
-            bgcolor: invisible ? 'transparent' : 'rgba(0, 0, 0, 0.5)',
-            transition: 'none',
-          },
-          ...(Array.isArray(sx) ? sx : sx != null ? [sx] : []),
-        ]}
-        style={style}
-      />
-    )
-  }
-)
-PainelPedidoBackdrop.displayName = 'PainelPedidoBackdrop'
-
 function statusFiscalPermiteCancelarNota(
   resumoStatus: string | null | undefined,
   statusUnificado: string | null | undefined,
@@ -500,24 +450,14 @@ export function NovoPedidoModal({
   // Estado para controlar valores em edição (índice do produto ou chave do complemento -> valor string)
   const [valoresEmEdicao, setValoresEmEdicao] = useState<Record<string | number, string>>({})
 
-  // Estados para complementos
-  const [produtoSelecionadoParaComplementos, setProdutoSelecionadoParaComplementos] =
-    useState<Produto | null>(null)
-  /** Fluxo no grid: painel único (slide) com preço e/ou complementos antes de lançar na lista */
+  /** Fluxo no grid / lista: painel único (slide) com preço e/ou complementos antes de lançar ou editar linha */
   const [modalLancamentoProdutoPainelOpen, setModalLancamentoProdutoPainelOpen] = useState(false)
   const [produtoParaLancamentoPainel, setProdutoParaLancamentoPainel] = useState<Produto | null>(
     null
   )
 
-  const [modalComplementosOpen, setModalComplementosOpen] = useState(false)
-  // Estado para rastrear complementos selecionados por produto (produtoId -> complementoIds[])
-  const [complementosSelecionados, setComplementosSelecionados] = useState<
-    Record<string, string[]>
-  >({})
-  // Estado para rastrear se estamos editando um produto existente (índice) ou adicionando um novo (null)
-  const [produtoIndexEdicaoComplementos, setProdutoIndexEdicaoComplementos] = useState<
-    number | null
-  >(null)
+  /** Índice da linha ao editar preço/complementos no painel; `null` = novo item pelo grid */
+  const [indiceLinhaPainelProduto, setIndiceLinhaPainelProduto] = useState<number | null>(null)
 
   // Estados para modal de edição de produto
   const [modalEdicaoProdutoOpen, setModalEdicaoProdutoOpen] = useState(false)
@@ -526,6 +466,8 @@ export function NovoPedidoModal({
   const [ehAcrescimo, setEhAcrescimo] = useState<boolean>(false) // false = desconto, true = acréscimo
   const [ehPorcentagem, setEhPorcentagem] = useState<boolean>(false) // false = valor fixo, true = porcentagem
   const [valorDescontoAcrescimo, setValorDescontoAcrescimo] = useState<string>('0')
+  /** Valor unitário no painel de edição de linha (formato brasileiro), quando `permiteAlterarPreco` */
+  const [valorUnitarioEdicaoPainel, setValorUnitarioEdicaoPainel] = useState<string>('')
 
   // Estado para modal de confirmação de saída
   const [modalConfirmacaoSaidaOpen, setModalConfirmacaoSaidaOpen] = useState(false)
@@ -1209,11 +1151,12 @@ export function NovoPedidoModal({
       return
     }
 
+    setIndiceLinhaPainelProduto(null)
     setProdutoParaLancamentoPainel(produto)
     setModalLancamentoProdutoPainelOpen(true)
   }
 
-  /** Confirma o painel unificado (grid): adiciona linha com valor e complementos já definidos */
+  /** Confirma o painel unificado: novo item pelo grid ou edição de linha (preço/complementos) */
   const confirmarLancamentoProdutoPainel = ({
     valorUnitario,
     complementos,
@@ -1221,99 +1164,54 @@ export function NovoPedidoModal({
     const produto = produtoParaLancamentoPainel
     if (!produto) return
 
-    setProdutos(prev => [
-      ...prev,
-      {
-        produtoId: produto.getId(),
-        nome: produto.getNome(),
-        quantidade: 1,
-        valorUnitario,
-        complementos,
-        tipoDesconto: null,
-        valorDesconto: null,
-        tipoAcrescimo: null,
-        valorAcrescimo: null,
-      },
-    ])
-    // Fechamento e limpeza de `produtoParaLancamentoPainel` ficam no painel (onOpenChange + onAfterClose)
-  }
+    const idxLinha = indiceLinhaPainelProduto
 
-  // Função para confirmar e adicionar/atualizar produto com complementos
-  const confirmarProdutoComComplementos = () => {
-    if (!produtoSelecionadoParaComplementos) return
-
-    const produtoId = produtoSelecionadoParaComplementos.getId()
-    const complementosAtuais = complementosSelecionados[produtoId] || []
-
-    // Criar array de complementos selecionados
-    const novosComplementos: ComplementoSelecionado[] = []
-    produtoSelecionadoParaComplementos.getGruposComplementos().forEach(
-      (grupo: {
-        id: string
-        nome: string
-        complementos: Array<{
-          id: string
-          nome: string
-          valor?: number
-          tipoImpactoPreco?: 'aumenta' | 'diminui' | 'nenhum'
-        }>
-      }) => {
-        grupo.complementos.forEach(
-          (comp: {
-            id: string
-            nome: string
-            valor?: number
-            tipoImpactoPreco?: 'aumenta' | 'diminui' | 'nenhum'
-          }) => {
-            const chaveComp = `${grupo.id}-${comp.id}`
-            if (complementosAtuais.includes(chaveComp)) {
-              // Se está editando um produto existente, manter a quantidade do complemento existente
-              let quantidade = 1
-              if (produtoIndexEdicaoComplementos !== null) {
-                const produtoExistente = produtos[produtoIndexEdicaoComplementos]
-                const complementoExistente = produtoExistente.complementos.find(
-                  c => c.grupoId === grupo.id && c.id === comp.id
-                )
-                quantidade = complementoExistente?.quantidade || 1
-              }
-
-              novosComplementos.push({
-                id: comp.id,
-                grupoId: grupo.id,
-                nome: comp.nome,
-                valor: comp.valor || 0,
-                quantidade,
-                tipoImpactoPreco: comp.tipoImpactoPreco || 'nenhum',
-              })
-            }
-          }
+    const complementosLinha: ComplementoSelecionado[] = complementos.map(c => {
+      if (idxLinha !== null) {
+        const atual = produtos[idxLinha]
+        const antigo = atual?.complementos.find(
+          x => x.grupoId === c.grupoId && x.id === c.id
         )
+        return {
+          id: c.id,
+          grupoId: c.grupoId,
+          nome: c.nome,
+          valor: c.valor,
+          quantidade: antigo?.quantidade ?? c.quantidade,
+          tipoImpactoPreco: c.tipoImpactoPreco,
+        }
       }
-    )
+      return {
+        id: c.id,
+        grupoId: c.grupoId,
+        nome: c.nome,
+        valor: c.valor,
+        quantidade: c.quantidade,
+        tipoImpactoPreco: c.tipoImpactoPreco,
+      }
+    })
 
-    // Se está editando um produto existente, atualizar
-    if (produtoIndexEdicaoComplementos !== null) {
-      const novosProdutos = [...produtos]
-      novosProdutos[produtoIndexEdicaoComplementos] = {
-        ...novosProdutos[produtoIndexEdicaoComplementos],
-        complementos: novosComplementos,
-        // Manter desconto e acréscimo existentes
-        tipoDesconto: novosProdutos[produtoIndexEdicaoComplementos].tipoDesconto || null,
-        valorDesconto: novosProdutos[produtoIndexEdicaoComplementos].valorDesconto || null,
-        tipoAcrescimo: novosProdutos[produtoIndexEdicaoComplementos].tipoAcrescimo || null,
-        valorAcrescimo: novosProdutos[produtoIndexEdicaoComplementos].valorAcrescimo || null,
-      }
-      setProdutos(novosProdutos)
+    if (idxLinha !== null) {
+      setProdutos(prev => {
+        const novos = [...prev]
+        const atual = novos[idxLinha]
+        if (!atual) return prev
+        novos[idxLinha] = {
+          ...atual,
+          valorUnitario,
+          complementos: complementosLinha,
+        }
+        return novos
+      })
     } else {
-      // Novo item pelo diálogo de complementos (fluxo legado — hoje o grid usa o painel unificado)
-      setProdutos([
-        ...produtos,
+      setProdutos(prev => [
+        ...prev,
         {
-          produtoId: produtoSelecionadoParaComplementos.getId(),
-          nome: produtoSelecionadoParaComplementos.getNome(),
+          produtoId: produto.getId(),
+          nome: produto.getNome(),
           quantidade: 1,
-          valorUnitario: produtoSelecionadoParaComplementos.getValor(),
-          complementos: novosComplementos,
+          valorUnitario,
+          complementos: complementosLinha,
           tipoDesconto: null,
           valorDesconto: null,
           tipoAcrescimo: null,
@@ -1321,34 +1219,19 @@ export function NovoPedidoModal({
         },
       ])
     }
-
-    // Fechar modal e limpar seleção
-    setModalComplementosOpen(false)
-    setProdutoSelecionadoParaComplementos(null)
-    setProdutoIndexEdicaoComplementos(null)
+    // Fechamento e limpeza de `produtoParaLancamentoPainel` ficam no painel (onOpenChange + onAfterClose)
   }
 
-  // Função para abrir modal de complementos para editar produto existente
+  /** Abre o painel de lançamento para ajustar complementos/preço em linha já na lista */
   const abrirModalComplementosProdutoExistente = (index: number) => {
     const produtoSelecionado = produtos[index]
     const produto = produtosList.find(p => p.getId() === produtoSelecionado.produtoId)
 
     if (!produto) return
 
-    // Na lista o modal abre sempre (permite vincular complementos mesmo sem grupos ainda); abreComplementos só controla abertura automática ao adicionar no grid
-    setProdutoSelecionadoParaComplementos(produto)
-    setProdutoIndexEdicaoComplementos(index)
-
-    // Inicializar complementos já selecionados do produto
-    const complementosChaves = produtoSelecionado.complementos.map(
-      comp => `${comp.grupoId}-${comp.id}`
-    )
-    setComplementosSelecionados(prev => ({
-      ...prev,
-      [produto.getId()]: complementosChaves,
-    }))
-
-    setModalComplementosOpen(true)
+    setIndiceLinhaPainelProduto(index)
+    setProdutoParaLancamentoPainel(produto)
+    setModalLancamentoProdutoPainelOpen(true)
   }
 
   // Função para abrir modal de edição de produto
@@ -1388,6 +1271,10 @@ export function NovoPedidoModal({
       setValorDescontoAcrescimo('0')
     }
 
+    setValorUnitarioEdicaoPainel(
+      produto.valorUnitario > 0 ? formatarNumeroComMilhar(produto.valorUnitario) : ''
+    )
+
     setModalEdicaoProdutoOpen(true)
   }
 
@@ -1402,6 +1289,22 @@ export function NovoPedidoModal({
     const produtoEntity = produtosList.find(p => p.getId() === produtoAtual.produtoId)
     const permiteDesconto = produtoEntity?.permiteDescontoAtivo() || false
     const permiteAcrescimo = produtoEntity?.permiteAcrescimoAtivo() || false
+    const permiteAlterarPreco = produtoEntity?.permiteAlterarPrecoAtivo() ?? false
+
+    let novoValorUnitario = produtoAtual.valorUnitario
+    if (permiteAlterarPreco) {
+      const limpo = valorUnitarioEdicaoPainel.replace(/\./g, '').replace(',', '.').trim()
+      const v = parseFloat(limpo)
+      if (
+        valorUnitarioEdicaoPainel.trim() === '' ||
+        !Number.isFinite(v) ||
+        v <= 0
+      ) {
+        showToast.error('Informe um valor unitário válido (maior que zero).')
+        return
+      }
+      novoValorUnitario = v
+    }
 
     // Converter valor de desconto/acréscimo
     let valorNum: number | null = null
@@ -1423,6 +1326,7 @@ export function NovoPedidoModal({
 
     novosProdutos[produtoIndexEdicao] = {
       ...produtoAtual,
+      valorUnitario: novoValorUnitario,
       quantidade: Math.floor(quantidadeEdicao), // Garantir que seja sempre inteiro
       tipoDesconto: podeAplicarDesconto ? (ehPorcentagem ? 'porcentagem' : 'fixo') : null,
       valorDesconto: podeAplicarDesconto ? valorNum : null,
@@ -1433,19 +1337,11 @@ export function NovoPedidoModal({
     setProdutos(novosProdutos)
     setModalEdicaoProdutoOpen(false)
     setProdutoIndexEdicao(null)
+    setValorUnitarioEdicaoPainel('')
   }
 
   const removerProduto = (index: number) => {
-    const produtoRemovido = produtos[index]
     setProdutos(produtos.filter((_, i) => i !== index))
-    // Limpar complementos selecionados do produto removido
-    if (produtoRemovido) {
-      setComplementosSelecionados(prev => {
-        const novo = { ...prev }
-        delete novo[produtoRemovido.produtoId]
-        return novo
-      })
-    }
   }
 
   const atualizarProduto = (index: number, campo: keyof ProdutoSelecionado, valor: any) => {
@@ -1480,18 +1376,6 @@ export function NovoPedidoModal({
       complementos: novosComplementos,
     }
     setProdutos(novosProdutos)
-
-    // Atualizar estado de complementos selecionados
-    const produtoId = novosProdutos[produtoIndex].produtoId
-    const complementoRemovido = produtos[produtoIndex].complementos[complementoIndex]
-    const chaveUnicaRemovida = `${complementoRemovido.grupoId}-${complementoRemovido.id}`
-    setComplementosSelecionados(prev => {
-      const atuais = prev[produtoId] || []
-      return {
-        ...prev,
-        [produtoId]: atuais.filter(chave => chave !== chaveUnicaRemovida),
-      }
-    })
   }
 
   const adicionarPagamento = () => {
@@ -1697,17 +1581,16 @@ export function NovoPedidoModal({
     setValorRecebido('')
     setGrupoSelecionadoId(null)
     setCurrentStep(1)
-    setComplementosSelecionados({})
     setModalLancamentoProdutoPainelOpen(false)
     setProdutoParaLancamentoPainel(null)
-    setProdutoSelecionadoParaComplementos(null)
-    setModalComplementosOpen(false)
+    setIndiceLinhaPainelProduto(null)
     setModalEdicaoProdutoOpen(false)
     setProdutoIndexEdicao(null)
     setQuantidadeEdicao(1)
     setEhAcrescimo(false)
     setEhPorcentagem(false)
     setValorDescontoAcrescimo('0')
+    setValorUnitarioEdicaoPainel('')
     setValorFinalVenda(null) // Limpar valor final ao resetar
     setDataFinalizacaoCarregada(null)
     setVendaGestorJaCancelada(false)
@@ -2524,7 +2407,7 @@ export function NovoPedidoModal({
         open={internalDialogOpen}
         onOpenChange={handleDialogOpenChange}
         maxWidth={false}
-        TransitionComponent={PedidoPainelSlide}
+        TransitionComponent={JiffyPainelSlide}
         transitionDuration={{ enter: 420, exit: 380 }}
         TransitionProps={{ onExited: handlePedidoPainelExited }}
         slots={{ backdrop: PainelPedidoBackdrop }}
@@ -2548,8 +2431,9 @@ export function NovoPedidoModal({
             maxHeight: '100vh',
             margin: 0,
             marginLeft: 'auto',
-            width: '53rem',
-            maxWidth: '100%',
+            // Mesma escala de largura que `GruposComplementosTabsModal` (panelClassName responsivo)
+            width: { xs: '95vw', sm: '90vw', md: 'min(900px, 45vw)' },
+            maxWidth: '100vw',
             borderRadius: 0,
           },
         }}
@@ -4291,100 +4175,211 @@ export function NovoPedidoModal({
 
           <DialogFooter
             sx={{
-              padding: '16px 24px 24px 24px',
+              padding: 0,
               flexShrink: 0,
               borderTop: '1px solid #e5e7eb',
               marginTop: 0,
+              // DialogActions vem com justify-content: flex-end — o grid ficava encolhido à direita
+              justifyContent: 'flex-start',
+              alignItems: 'stretch',
+              width: '100%',
+              boxSizing: 'border-box',
+              '& > *': {
+                flex: '1 1 100%',
+                maxWidth: '100%',
+                minWidth: 0,
+              },
             }}
           >
-            {/* Step 4: Cancelar Venda (fixo no rodapé) + Concluir ou Fechar (modo detalhes) */}
+            {/* Rodapé em faixa (mesmo padrão visual de `JiffySidePanelModal` footerVariant="bar") */}
             {currentStep === 4 ? (
-              <div className="flex w-full flex-wrap items-center justify-end gap-2">
-                {podeExibirCancelarVendaGestor && (
-                  <Button
-                    type="button"
-                    variant="contained"
-                    color="error"
-                    size="large"
-                    onClick={() => {
-                      setTipoCancelamentoSelecionado('venda')
-                      setModalCancelarVendaOpen(true)
-                    }}
-                    className="flex items-center gap-2"
-                  >
-                    <MdCancel className="h-5 w-5" />
-                    Cancelar Venda
-                  </Button>
-                )}
-                {podeExibirCancelarNotaFiscal && (
-                  <Button
-                    type="button"
-                    variant="contained"
-                    color="error"
-                    size="large"
-                    onClick={() => {
-                      setTipoCancelamentoSelecionado('nota')
-                      setModalCancelarVendaOpen(true)
-                    }}
-                    className="flex items-center gap-2"
-                  >
-                    <MdCancel className="h-5 w-5" />
-                    Cancelar Nota
-                  </Button>
-                )}
-                <Button
-                  size="large"
-                  onClick={() => {
-                    onSuccess()
-                    onClose()
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  {modoVisualizacao ? 'Fechar' : 'Concluir'}
-                </Button>
-              </div>
+              (() => {
+                type ChaveRodape4 = 'cancelVenda' | 'cancelNota' | 'fechar'
+                const chaves: ChaveRodape4[] = []
+                if (podeExibirCancelarVendaGestor) chaves.push('cancelVenda')
+                if (podeExibirCancelarNotaFiscal) chaves.push('cancelNota')
+                chaves.push('fechar')
+                const n = chaves.length
+                const painelRaioEsqInf = '0.75rem'
+                return (
+                  <div className="shrink-0 bg-white">
+                    <div
+                      className="grid w-full"
+                      style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}
+                    >
+                      {chaves.map((key, i) => (
+                        <div
+                          key={key}
+                          className={
+                            i < n - 1 ? 'min-w-0 border-r border-gray-200' : 'min-w-0'
+                          }
+                        >
+                          {key === 'cancelVenda' ? (
+                            <Button
+                              type="button"
+                              variant="contained"
+                              color="error"
+                              disabled={
+                                cancelarVendaGestor.isPending ||
+                                cancelarNotaFiscalVendaPdv.isPending ||
+                                cancelarNotaFiscalVendaGestor.isPending
+                              }
+                              onClick={() => {
+                                setTipoCancelamentoSelecionado('venda')
+                                setModalCancelarVendaOpen(true)
+                              }}
+                              className="h-12 min-h-12 w-full font-semibold shadow-none"
+                              sx={{
+                                borderRadius: 0,
+                                boxShadow: 'none',
+                                ...(i === 0 ? { borderBottomLeftRadius: painelRaioEsqInf } : {}),
+                              }}
+                            >
+                              <span className="inline-flex w-full items-center justify-center gap-2">
+                                <MdCancel className="h-5 w-5 shrink-0" aria-hidden />
+                                Cancelar Venda
+                              </span>
+                            </Button>
+                          ) : null}
+                          {key === 'cancelNota' ? (
+                            <Button
+                              type="button"
+                              variant="contained"
+                              color="error"
+                              disabled={
+                                cancelarVendaGestor.isPending ||
+                                cancelarNotaFiscalVendaPdv.isPending ||
+                                cancelarNotaFiscalVendaGestor.isPending
+                              }
+                              onClick={() => {
+                                setTipoCancelamentoSelecionado('nota')
+                                setModalCancelarVendaOpen(true)
+                              }}
+                              className="h-12 min-h-12 w-full font-semibold shadow-none"
+                              sx={{
+                                borderRadius: 0,
+                                boxShadow: 'none',
+                                ...(i === 0 ? { borderBottomLeftRadius: painelRaioEsqInf } : {}),
+                              }}
+                            >
+                              <span className="inline-flex w-full items-center justify-center gap-2">
+                                <MdCancel className="h-5 w-5 shrink-0" aria-hidden />
+                                Cancelar Nota
+                              </span>
+                            </Button>
+                          ) : null}
+                          {key === 'fechar' ? (
+                            <Button
+                              type="button"
+                              variant="contained"
+                              color="primary"
+                              onClick={() => {
+                                onSuccess()
+                                onClose()
+                              }}
+                              className="h-12 min-h-12 w-full font-semibold shadow-none"
+                              sx={footerSavePrimaryBarSx(i === 0)}
+                            >
+                              {modoVisualizacao ? 'Fechar' : 'Concluir'}
+                            </Button>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()
             ) : (
-              <>
-                <Button
-                  variant="outlined"
-                  onClick={handleClose}
-                  disabled={createVendaGestor.isPending}
-                >
-                  Cancelar
-                </Button>
-
-                {currentStep > 1 && (
-                  <Button
-                    variant="outlined"
-                    onClick={handlePreviousStep}
-                    disabled={createVendaGestor.isPending}
-                    className="flex items-center gap-2"
-                  >
-                    <MdArrowBack className="h-4 w-4" />
-                    Anterior
-                  </Button>
-                )}
-
-                {currentStep < 3 ? (
-                  <Button
-                    onClick={handleNextStep}
-                    disabled={createVendaGestor.isPending || (currentStep === 2 && !canGoToStep3())}
-                    className="flex items-center gap-2"
-                  >
-                    Próximo
-                    <MdArrowForward className="h-4 w-4" />
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={createVendaGestor.isPending || !canSubmit()}
-                    className="flex items-center gap-2"
-                  >
-                    {createVendaGestor.isPending ? 'Criando...' : 'Criar Pedido'}
-                  </Button>
-                )}
-              </>
+              (() => {
+                type ChaveWizard = 'cancelar' | 'anterior' | 'proximo' | 'criar'
+                const chaves: ChaveWizard[] = ['cancelar']
+                if (currentStep > 1) chaves.push('anterior')
+                if (currentStep < 3) chaves.push('proximo')
+                else chaves.push('criar')
+                const n = chaves.length
+                return (
+                  <div className="shrink-0 bg-white">
+                    <div
+                      className="grid w-full"
+                      style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}
+                    >
+                      {chaves.map((key, i) => {
+                        const isPrimeiraColuna = i === 0
+                        return (
+                          <div
+                            key={key}
+                            className={
+                              i < n - 1 ? 'min-w-0 border-r border-gray-200' : 'min-w-0'
+                            }
+                          >
+                            {key === 'cancelar' ? (
+                              <Button
+                                type="button"
+                                variant="outlined"
+                                color="inherit"
+                                onClick={handleClose}
+                                disabled={createVendaGestor.isPending}
+                                className="h-12 min-h-12 w-full font-semibold shadow-none"
+                                sx={footerBarGrayBarSx(isPrimeiraColuna)}
+                              >
+                                Cancelar
+                              </Button>
+                            ) : null}
+                            {key === 'anterior' ? (
+                              <Button
+                                type="button"
+                                variant="outlined"
+                                color="inherit"
+                                onClick={handlePreviousStep}
+                                disabled={createVendaGestor.isPending}
+                                className="h-12 min-h-12 w-full font-semibold shadow-none"
+                                sx={footerBarPrimaryMutedSx(isPrimeiraColuna)}
+                              >
+                                <span className="inline-flex w-full items-center justify-center gap-1.5">
+                                  <MdArrowBack className="h-5 w-5 shrink-0" aria-hidden />
+                                  Anterior
+                                </span>
+                              </Button>
+                            ) : null}
+                            {key === 'proximo' ? (
+                              <Button
+                                type="button"
+                                variant="contained"
+                                color="primary"
+                                onClick={handleNextStep}
+                                disabled={
+                                  createVendaGestor.isPending ||
+                                  (currentStep === 2 && !canGoToStep3())
+                                }
+                                className="h-12 min-h-12 w-full font-semibold shadow-none"
+                                sx={footerSavePrimaryBarSx(isPrimeiraColuna)}
+                              >
+                                <span className="inline-flex w-full items-center justify-center gap-1.5">
+                                  Próximo
+                                  <MdArrowForward className="h-5 w-5 shrink-0" aria-hidden />
+                                </span>
+                              </Button>
+                            ) : null}
+                            {key === 'criar' ? (
+                              <Button
+                                type="button"
+                                variant="contained"
+                                color="primary"
+                                onClick={handleSubmit}
+                                disabled={createVendaGestor.isPending || !canSubmit()}
+                                className="h-12 min-h-12 w-full font-semibold shadow-none"
+                                sx={footerSavePrimaryBarSx(isPrimeiraColuna)}
+                              >
+                                {createVendaGestor.isPending ? 'Criando...' : 'Criar Pedido'}
+                              </Button>
+                            ) : null}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })()
             )}
           </DialogFooter>
         </DialogContent>
@@ -4401,404 +4396,72 @@ export function NovoPedidoModal({
           <ModalLancamentoProdutoPainel
             open={modalLancamentoProdutoPainelOpen}
             onOpenChange={setModalLancamentoProdutoPainelOpen}
-            onAfterClose={() => setProdutoParaLancamentoPainel(null)}
+            onAfterClose={() => {
+              setProdutoParaLancamentoPainel(null)
+              setIndiceLinhaPainelProduto(null)
+            }}
             produto={produtoParaLancamentoPainel}
             mostrarAlterarPreco={produtoParaLancamentoPainel.permiteAlterarPrecoAtivo()}
             mostrarComplementos={
               produtoParaLancamentoPainel.abreComplementosAtivo() &&
               produtoTemComplementos(produtoParaLancamentoPainel)
             }
+            tituloBarra={
+              indiceLinhaPainelProduto !== null
+                ? 'Ajustar produto no pedido'
+                : 'Lançar na venda'
+            }
+            valorUnitarioInicial={
+              indiceLinhaPainelProduto !== null
+                ? produtos[indiceLinhaPainelProduto]?.valorUnitario
+                : undefined
+            }
+            chavesComplementosIniciais={
+              indiceLinhaPainelProduto !== null
+                ? produtos[indiceLinhaPainelProduto]?.complementos?.map(
+                    c => `${c.grupoId}-${c.id}`
+                  )
+                : undefined
+            }
             onConfirm={confirmarLancamentoProdutoPainel}
           />
         ) : null}
 
-        {/* Modal de Complementos */}
-        {modalComplementosOpen &&
-          produtoSelecionadoParaComplementos &&
-          (() => {
-            const produtoId = produtoSelecionadoParaComplementos.getId()
-            const complementosAtuais = complementosSelecionados[produtoId] || []
-
-            const toggleComplemento = (grupoId: string, complementoId: string) => {
-              const chaveUnica = `${grupoId}-${complementoId}`
-
-              setComplementosSelecionados(prev => {
-                const atuais = prev[produtoId] || []
-                const novos = atuais.includes(chaveUnica)
-                  ? atuais.filter(chave => chave !== chaveUnica)
-                  : [...atuais, chaveUnica]
-
-                return { ...prev, [produtoId]: novos }
-              })
+        {modalEdicaoProdutoOpen && produtoIndexEdicao !== null ? (
+          <PainelEdicaoProdutoLinhaPedido
+            open={modalEdicaoProdutoOpen}
+            onClose={() => {
+              setModalEdicaoProdutoOpen(false)
+              setProdutoIndexEdicao(null)
+              setValorUnitarioEdicaoPainel('')
+            }}
+            onConfirmar={confirmarEdicaoProduto}
+            title={produtos[produtoIndexEdicao].nome}
+            produtoLinha={produtos[produtoIndexEdicao]}
+            permiteAlterarPreco={
+              produtosList.find(p => p.getId() === produtos[produtoIndexEdicao].produtoId)
+                ?.permiteAlterarPrecoAtivo() ?? false
             }
-
-            return (
-              <Dialog
-                open={modalComplementosOpen}
-                onOpenChange={open => {
-                  setModalComplementosOpen(open)
-                  if (!open) {
-                    setProdutoSelecionadoParaComplementos(null)
-                    setProdutoIndexEdicaoComplementos(null)
-                  }
-                }}
-                maxWidth={false}
-                sx={{
-                  '& .MuiDialog-paper': {
-                    width: '500px',
-                    maxWidth: '500px',
-                  },
-                }}
-              >
-                <DialogContent>
-                  <DialogTitle>
-                    Complementos - {produtoSelecionadoParaComplementos.getNome()}
-                  </DialogTitle>
-                  <div className="max-h-96 overflow-y-auto">
-                    {produtoSelecionadoParaComplementos.getGruposComplementos().length > 0 ? (
-                      <div className="space-y-4">
-                        {produtoSelecionadoParaComplementos.getGruposComplementos().map(grupo => (
-                          <div key={grupo.id} className="rounded-lg border p-4">
-                            <h3 className="mb-2 text-lg font-semibold">{grupo.nome}</h3>
-                            {grupo.complementos && grupo.complementos.length > 0 ? (
-                              <div className="space-y-2">
-                                {grupo.complementos.map(complemento => {
-                                  const chaveUnica = `${grupo.id}-${complemento.id}`
-                                  const isSelecionado = complementosAtuais.includes(chaveUnica)
-                                  const valor = complemento.valor || 0
-                                  const tipoImpactoPreco = complemento.tipoImpactoPreco || 'nenhum'
-                                  return (
-                                    <div
-                                      key={chaveUnica}
-                                      className="flex cursor-pointer items-center justify-between rounded bg-gray-50 p-2 hover:bg-gray-100"
-                                      onClick={() => toggleComplemento(grupo.id, complemento.id)}
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <input
-                                          type="checkbox"
-                                          checked={isSelecionado}
-                                          onChange={() =>
-                                            toggleComplemento(grupo.id, complemento.id)
-                                          }
-                                          onClick={e => e.stopPropagation()}
-                                          className="h-4 w-4"
-                                        />
-                                        <span className="text-sm">{complemento.nome}</span>
-                                      </div>
-                                      <span className="text-sm font-semibold text-primary">
-                                        {formatarValorComplemento(valor, tipoImpactoPreco)}
-                                      </span>
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            ) : (
-                              <p className="text-sm text-gray-500">
-                                Nenhum complemento disponível neste grupo
-                              </p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="py-8 text-center text-gray-500">
-                        Nenhum complemento disponível para este produto
-                      </p>
-                    )}
-                  </div>
-                  <DialogFooter>
-                    <Button
-                      variant="outlined"
-                      onClick={() => {
-                        setModalComplementosOpen(false)
-                        setProdutoSelecionadoParaComplementos(null)
-                        setProdutoIndexEdicaoComplementos(null)
-                      }}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button onClick={confirmarProdutoComComplementos}>Confirmar</Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            )
-          })()}
-
-        {/* Modal de Edição de Produto */}
-        {modalEdicaoProdutoOpen &&
-          produtoIndexEdicao !== null &&
-          (() => {
-            const produto = produtos[produtoIndexEdicao]
-            const produtoEntity = produtosList.find(p => p.getId() === produto.produtoId)
-            const permiteDesconto = produtoEntity?.permiteDescontoAtivo() || false
-            const permiteAcrescimo = produtoEntity?.permiteAcrescimoAtivo() || false
-
-            return (
-              <Dialog
-                open={modalEdicaoProdutoOpen}
-                onOpenChange={open => {
-                  setModalEdicaoProdutoOpen(open)
-                  if (!open) {
-                    setProdutoIndexEdicao(null)
-                  }
-                }}
-                maxWidth={false}
-                sx={{
-                  '& .MuiDialog-paper': {
-                    width: '500px',
-                    maxWidth: '500px',
-                    backgroundColor: '#f0fdf4', // Light green background
-                  },
-                }}
-              >
-                <DialogContent sx={{ p: 3 }}>
-                  <div className="mb-4 flex items-start justify-between">
-                    <div className="flex-1">
-                      <DialogTitle sx={{ fontSize: '1.5rem', fontWeight: 'bold', mb: 1, p: 0 }}>
-                        {produto.nome}
-                      </DialogTitle>
-                      <div className="text-lg font-semibold text-gray-700">
-                        {(() => {
-                          const valorProduto = produto.valorUnitario * quantidadeEdicao
-                          // Calcular complementos com a quantidade em edição
-                          const valorComplementos = produto.complementos.reduce((sum, comp) => {
-                            const tipo = comp.tipoImpactoPreco || 'nenhum'
-                            const valorTotal = comp.valor * comp.quantidade * quantidadeEdicao
-                            if (tipo === 'aumenta') {
-                              return sum + valorTotal
-                            } else if (tipo === 'diminui') {
-                              return sum - valorTotal
-                            }
-                            return sum
-                          }, 0)
-                          return transformarParaReal(valorProduto + valorComplementos)
-                        })()}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setModalEdicaoProdutoOpen(false)
-                        setProdutoIndexEdicao(null)
-                      }}
-                      className="rounded p-1 transition-colors hover:bg-gray-200"
-                    >
-                      <MdClose className="h-5 w-5 text-gray-600" />
-                    </button>
-                  </div>
-
-                  {/* Quantidade */}
-                  <div className="mb-4 rounded-lg bg-white p-4">
-                    <div className="mb-3 text-sm font-semibold text-primary">Quantidade</div>
-                    <div className="flex items-center justify-center gap-4">
-                      <button
-                        type="button"
-                        onClick={() => setQuantidadeEdicao(Math.max(1, quantidadeEdicao - 1))}
-                        className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500 text-white transition-colors hover:bg-red-600"
-                      >
-                        <MdRemove className="h-5 w-5" />
-                      </button>
-                      <div className="min-w-[60px] text-center text-2xl font-semibold text-gray-900">
-                        {quantidadeEdicao.toFixed(0)}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setQuantidadeEdicao(quantidadeEdicao + 1)}
-                        className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-white transition-colors hover:bg-green-600"
-                      >
-                        <MdAdd className="h-5 w-5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Desconto/Acréscimo */}
-                  <div className="rounded-lg bg-white p-4">
-                    <div className="mb-3 text-center text-sm font-semibold text-primary">
-                      Desconto/Acréscimo
-                    </div>
-                    <div className="flex min-h-24 flex-col items-center gap-1">
-                      <div className="flex w-full items-center justify-between gap-4">
-                        {/* Switch Esquerdo: Desconto/Acréscimo */}
-                        <div className="flex min-w-[100px] flex-col items-center gap-1">
-                          <span className="text-xs text-gray-600">
-                            {ehAcrescimo ? 'Acréscimo' : 'Desconto'}
-                          </span>
-                          <Switch
-                            checked={ehAcrescimo}
-                            onChange={e => {
-                              setEhAcrescimo(e.target.checked)
-                              // Resetar valor ao mudar tipo
-                              setValorDescontoAcrescimo('0')
-                            }}
-                            color={ehAcrescimo ? 'success' : 'error'}
-                            sx={
-                              !ehAcrescimo
-                                ? {
-                                    // Quando for desconto (não marcado), forçar cor vermelha
-                                    '& .MuiSwitch-switchBase': {
-                                      color: '#d32f2f',
-                                    },
-                                    '& .MuiSwitch-switchBase.Mui-checked': {
-                                      color: '#d32f2f',
-                                    },
-                                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                                      backgroundColor: '#d32f2f',
-                                    },
-                                    '& .MuiSwitch-track': {
-                                      backgroundColor: '#d32f2f',
-                                    },
-                                  }
-                                : undefined
-                            }
-                          />
-                        </div>
-
-                        {/* Input Central */}
-                        <div className="max-w-[100px] flex-1">
-                          <Input
-                            type="text"
-                            value={valorDescontoAcrescimo}
-                            onChange={e => {
-                              let valorStr = e.target.value
-                                .replace(/\./g, '')
-                                .replace(',', '')
-                                .replace(/\D/g, '')
-                              if (valorStr === '') {
-                                setValorDescontoAcrescimo('0')
-                                return
-                              }
-                              if (ehPorcentagem) {
-                                // Para porcentagem, valor de 0 a 100
-                                const valorNum = parseInt(valorStr, 10)
-                                const valorLimitado = Math.min(100, valorNum)
-                                setValorDescontoAcrescimo(valorLimitado.toString())
-                              } else {
-                                // Para fixo, valor em centavos
-                                const valorCentavos = parseInt(valorStr, 10)
-                                const valorReais = valorCentavos / 100
-                                setValorDescontoAcrescimo(formatarNumeroComMilhar(valorReais))
-                              }
-                            }}
-                            disabled={
-                              (ehAcrescimo && !permiteAcrescimo) ||
-                              (!ehAcrescimo && !permiteDesconto)
-                            }
-                            className="w-full text-center"
-                            placeholder={ehPorcentagem ? '0' : '0,00'}
-                            sx={{
-                              '& .MuiOutlinedInput-root': {
-                                padding: '4px 8px',
-                                '& input': {
-                                  padding: '4px 8px',
-                                  textAlign: 'center',
-                                },
-                              },
-                            }}
-                          />
-                        </div>
-
-                        {/* Switch Direito: Porcentagem/Valor */}
-                        <div className="flex min-w-[100px] flex-col items-center gap-1">
-                          <span className="text-xs text-gray-600">
-                            {ehPorcentagem ? 'Porcentagem' : 'Valor Fixo'}
-                          </span>
-                          <Switch
-                            checked={ehPorcentagem}
-                            onChange={e => {
-                              setEhPorcentagem(e.target.checked)
-                              // Resetar valor ao mudar tipo
-                              setValorDescontoAcrescimo('0')
-                            }}
-                            color="default"
-                            sx={{
-                              '& .MuiSwitch-switchBase.Mui-checked': {
-                                color: '#000000',
-                              },
-                              '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                                backgroundColor: '#000000',
-                              },
-                              '& .MuiSwitch-track': {
-                                backgroundColor: '#9ca3af',
-                              },
-                            }}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col items-center gap-1">
-                        {((!ehAcrescimo && !permiteDesconto) ||
-                          (ehAcrescimo && !permiteAcrescimo)) && (
-                          <div className="mt-1 text-center text-xs text-red-600">
-                            {!ehAcrescimo
-                              ? 'Permitir desconto está desativado para este produto'
-                              : 'Permitir acréscimo está desativado para este produto'}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Exibir total calculado */}
-                    {(() => {
-                      const valorUnitario = produto.valorUnitario
-                      const valorProduto = valorUnitario * quantidadeEdicao
-                      // Calcular complementos com a quantidade em edição
-                      const valorComplementos = produto.complementos.reduce((sum, comp) => {
-                        const tipo = comp.tipoImpactoPreco || 'nenhum'
-                        const valorTotal = comp.valor * comp.quantidade * quantidadeEdicao
-                        if (tipo === 'aumenta') {
-                          return sum + valorTotal
-                        } else if (tipo === 'diminui') {
-                          return sum - valorTotal
-                        }
-                        return sum
-                      }, 0)
-                      const subtotal = valorProduto + valorComplementos // Incluir complementos no subtotal
-                      let valorCalculado = 0
-
-                      if (valorDescontoAcrescimo && valorDescontoAcrescimo !== '0') {
-                        if (ehPorcentagem) {
-                          const percentual = parseFloat(valorDescontoAcrescimo) || 0
-                          valorCalculado = subtotal * (percentual / 100) // Aplicar sobre produto + complementos
-                        } else {
-                          valorCalculado =
-                            parseFloat(
-                              valorDescontoAcrescimo.replace(/\./g, '').replace(',', '.')
-                            ) || 0
-                        }
-                      }
-
-                      const total = ehAcrescimo
-                        ? subtotal + valorCalculado
-                        : subtotal - valorCalculado
-
-                      return (
-                        <div className="mt-3 border-t border-gray-200 pt-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Total:</span>
-                            <span className="text-lg font-semibold text-gray-900">
-                              {transformarParaReal(Math.max(0, total))}
-                            </span>
-                          </div>
-                        </div>
-                      )
-                    })()}
-                  </div>
-
-                  <DialogFooter sx={{ mt: 3, gap: 2 }}>
-                    <Button
-                      variant="outlined"
-                      onClick={() => {
-                        setModalEdicaoProdutoOpen(false)
-                        setProdutoIndexEdicao(null)
-                      }}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button onClick={confirmarEdicaoProduto}>Confirmar</Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            )
-          })()}
+            valorUnitarioInput={valorUnitarioEdicaoPainel}
+            onValorUnitarioInputChange={setValorUnitarioEdicaoPainel}
+            permiteDesconto={
+              produtosList.find(p => p.getId() === produtos[produtoIndexEdicao].produtoId)
+                ?.permiteDescontoAtivo() ?? false
+            }
+            permiteAcrescimo={
+              produtosList.find(p => p.getId() === produtos[produtoIndexEdicao].produtoId)
+                ?.permiteAcrescimoAtivo() ?? false
+            }
+            quantidadeEdicao={quantidadeEdicao}
+            onQuantidadeEdicaoChange={setQuantidadeEdicao}
+            ehAcrescimo={ehAcrescimo}
+            onEhAcrescimoChange={setEhAcrescimo}
+            ehPorcentagem={ehPorcentagem}
+            onEhPorcentagemChange={setEhPorcentagem}
+            valorDescontoAcrescimo={valorDescontoAcrescimo}
+            onValorDescontoAcrescimoChange={setValorDescontoAcrescimo}
+          />
+        ) : null}
 
         {/* Modal de Confirmação de Saída */}
         <Dialog

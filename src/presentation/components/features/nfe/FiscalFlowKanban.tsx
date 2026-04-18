@@ -51,8 +51,10 @@ import { EscolheDatasModal } from '@/src/presentation/components/features/vendas
 import { showToast } from '@/src/shared/utils/toast'
 import { abrirDocumentoFiscalPdf } from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
 import { FormControl, Select, MenuItem } from '@mui/material'
-import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
-import { NovoCliente } from '@/src/presentation/components/features/clientes/NovoCliente'
+import {
+  ClientesTabsModal,
+  ClientesTabsModalState,
+} from '@/src/presentation/components/features/clientes/ClientesTabsModal'
 
 type Priority = 'high' | 'medium' | 'low'
 
@@ -400,8 +402,13 @@ export function FiscalFlowKanban() {
   const [filtrosVisiveisMobile, setFiltrosVisiveisMobile] = useState(false)
   const [isDatasModalOpen, setIsDatasModalOpen] = useState(false)
   const debounceSearchRef = useRef<NodeJS.Timeout | undefined>(undefined)
-  const [editarClienteModalOpen, setEditarClienteModalOpen] = useState(false)
-  const [editarClienteId, setEditarClienteId] = useState<string | null>(null)
+  /** Edição de cliente (lápis no card): mesmo painel que ClientesList / SeletorClienteModal */
+  const [clienteTabsModalState, setClienteTabsModalState] = useState<ClientesTabsModalState>({
+    open: false,
+    tab: 'cliente',
+    mode: 'edit',
+    clienteId: undefined,
+  })
 
   const [novoPedidoModalOpen, setNovoPedidoModalOpen] = useState(false)
   const [novoPedidoModalVisualizacaoOpen, setNovoPedidoModalVisualizacaoOpen] = useState(false)
@@ -999,13 +1006,25 @@ export function FiscalFlowKanban() {
   }, [])
 
   const handleAbrirEdicaoCliente = useCallback((clienteId: string) => {
-    setEditarClienteId(clienteId)
-    setEditarClienteModalOpen(true)
+    setClienteTabsModalState({
+      open: true,
+      tab: 'cliente',
+      mode: 'edit',
+      clienteId,
+    })
   }, [])
 
-  const handleFecharEdicaoCliente = useCallback(() => {
-    setEditarClienteModalOpen(false)
-    setEditarClienteId(null)
+  const handleFecharClienteTabsModal = useCallback(() => {
+    setClienteTabsModalState({
+      open: false,
+      tab: 'cliente',
+      mode: 'edit',
+      clienteId: undefined,
+    })
+  }, [])
+
+  const handleTabChangeClienteModal = useCallback((tab: 'cliente' | 'visualizar') => {
+    setClienteTabsModalState(prev => ({ ...prev, tab }))
   }, [])
 
   const handleConfirmDatas = useCallback((dataInicial: Date | null, dataFinal: Date | null) => {
@@ -1371,7 +1390,7 @@ export function FiscalFlowKanban() {
                           (column.id === 'COM_NFE' &&
                             (acaoFiscalEmAndamentoPorVenda[venda.id] === 'reemitindo' ||
                               acaoFiscalEmAndamentoPorVenda[venda.id] === 'emitindo'))
-                        // Editar cliente global (lápis → NovoCliente): PDV e Gestor; mesmas colunas; cliente já vinculado com nome
+                        // Editar cliente (lápis → ClientesTabsModal / NovoCliente embutido): PDV e Gestor; mesmas colunas; cliente já vinculado com nome
                         const podeEditarClienteNaVenda =
                           colunaPermiteEditarCliente &&
                           !vendaSemNomeCliente(venda) &&
@@ -1648,54 +1667,12 @@ export function FiscalFlowKanban() {
         />
       )}
 
-      {editarClienteModalOpen && Boolean(editarClienteId) && (
-        <Dialog
-          open={editarClienteModalOpen && Boolean(editarClienteId)}
-          onOpenChange={open => {
-            if (!open) handleFecharEdicaoCliente()
-          }}
-          fullWidth
-          maxWidth="xl"
-          sx={{
-            '& .MuiDialog-container': {
-              zIndex: 1500,
-              justifyContent: { xs: 'center', md: 'flex-end' },
-              alignItems: 'stretch',
-              margin: 0,
-            },
-            '& .MuiBackdrop-root': { zIndex: 1500 },
-            '& .MuiDialog-paper': { zIndex: 1500 },
-          }}
-          PaperProps={{
-            sx: {
-              height: '100vh',
-              maxHeight: '100vh',
-              width: { xs: '95vw', sm: '90vw', md: 'min(900px, 60vw)' },
-              margin: { xs: 'auto', md: 0 },
-              borderRadius: 0,
-              display: 'flex',
-              flexDirection: 'column',
-            },
-          }}
-        >
-          <DialogContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {editarClienteId && (
-              <div className="h-full overflow-y-auto">
-                <NovoCliente
-                  key={editarClienteId}
-                  clienteId={editarClienteId}
-                  isEmbedded
-                  onClose={handleFecharEdicaoCliente}
-                  onSaved={() => {
-                    refetch()
-                    handleFecharEdicaoCliente()
-                  }}
-                />
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      )}
+      <ClientesTabsModal
+        state={clienteTabsModalState}
+        onClose={handleFecharClienteTabsModal}
+        onReload={() => void refetch()}
+        onTabChange={handleTabChangeClienteModal}
+      />
     </div>
   )
 }

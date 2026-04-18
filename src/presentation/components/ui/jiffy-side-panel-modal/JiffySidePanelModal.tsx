@@ -21,13 +21,14 @@ const PANEL_MS = { enter: 420, exit: 380 } as const
 /** Raio dos cantos superiores/inferiores esquerdos do painel e do 1º botão da barra (Tailwind `rounded-xl`) */
 const PANEL_RADIUS_LEFT = '0.75rem'
 
-const PainelSlide = forwardRef(function PainelSlide(
+/** Slide `direction="left"` para Dialog/Modal — painel entra pela direita (reuso em outros modais) */
+export const JiffyPainelSlide = forwardRef(function JiffyPainelSlide(
   props: TransitionProps & { children: ReactElement },
   ref: Ref<unknown>
 ) {
   return <Slide ref={ref} direction="left" {...props} />
 })
-PainelSlide.displayName = 'PainelSlide'
+JiffyPainelSlide.displayName = 'JiffyPainelSlide'
 
 /** Chaves dos botões do rodapé em modo `bar` — usado em `barActionOrder` */
 export type JiffyFooterBarKey = 'prev' | 'next' | 'cancel' | 'save' | 'saveAndClose'
@@ -175,6 +176,11 @@ function footerBarSecondarySx(isFirstColumn: boolean) {
       ...bl,
     },
   }
+}
+
+/** Tom cinza dos secundários no rodapé `bar` (cancelar etc.) — reutilizável em outros modais */
+export function footerBarGrayBarSx(isFirstColumn: boolean) {
+  return footerBarSecondarySx(isFirstColumn)
 }
 
 /** Anterior / Próximo com tom primary/15 (equivalente visual a `bg-primary/15`) */
@@ -405,6 +411,8 @@ export interface JiffySidePanelModalProps {
   open: boolean
   onClose: () => void
   onAfterClose?: () => void
+  /** Empilha acima de outros modais (ex.: Dialog 1300) — padrão 1300 */
+  zIndex?: number
   title: React.ReactNode
   subtitle?: React.ReactNode
   /** Faixa de abas opcional — omitir quando o fluxo for uma única coluna de conteúdo */
@@ -439,6 +447,7 @@ export function JiffySidePanelModal({
   open,
   onClose,
   onAfterClose,
+  zIndex = 1300,
   title,
   subtitle,
   tabsSlot,
@@ -489,7 +498,7 @@ export function JiffySidePanelModal({
       closeAfterTransition
       slots={{ backdrop: PainelPedidoBackdrop }}
       sx={{
-        zIndex: 1300,
+        zIndex,
         // Backdrop abaixo do painel — se ambos ficarem em 1300, o overlay cobre o conteúdo e qualquer clique vira backdropClick
         '& .MuiBackdrop-root': {
           zIndex: 0,
@@ -498,7 +507,7 @@ export function JiffySidePanelModal({
         },
       }}
     >
-      <PainelSlide
+      <JiffyPainelSlide
         in={open}
         timeout={{ enter: PANEL_MS.enter, exit: PANEL_MS.exit }}
         onExited={handleSlideExited}
@@ -613,7 +622,7 @@ export function JiffySidePanelModal({
             </div>
           ) : null}
         </div>
-      </PainelSlide>
+      </JiffyPainelSlide>
     </Modal>
   )
 }

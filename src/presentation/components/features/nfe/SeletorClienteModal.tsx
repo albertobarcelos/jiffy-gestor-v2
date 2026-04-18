@@ -7,12 +7,17 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/src/presentation/components/ui/dialog'
+import {
+  PainelPedidoBackdrop,
+  JiffyPainelSlide,
+  footerBarPrimaryMutedSx,
+} from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Label } from '@/src/presentation/components/ui/label'
 import { useClientesInfinite } from '@/src/presentation/hooks/useClientes'
 import { Cliente } from '@/src/domain/entities/Cliente'
-import { MdSearch, MdClose, MdAdd } from 'react-icons/md'
+import { MdSearch, MdAdd } from 'react-icons/md'
 import {
   ClientesTabsModal,
   ClientesTabsModalState,
@@ -178,42 +183,56 @@ export function SeletorClienteModal({
   return (
     <Dialog
       open={open}
-      onOpenChange={handleClose}
+      onOpenChange={isOpen => {
+        if (!isOpen) handleClose()
+      }}
       maxWidth={false}
+      TransitionComponent={JiffyPainelSlide}
+      transitionDuration={{ enter: 420, exit: 380 }}
+      slots={{ backdrop: PainelPedidoBackdrop }}
       sx={{
         '& .MuiDialog-container': {
           zIndex: 1400,
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: 'stretch',
+          justifyContent: 'flex-end',
         },
-        '& .MuiBackdrop-root': { zIndex: 1400, backgroundColor: 'rgba(0, 0, 0, 0.5)' },
+        '& .MuiBackdrop-root': {
+          zIndex: 1400,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          transition: 'none',
+        },
         '& .MuiDialog-paper': {
           zIndex: 1400,
-          backgroundColor: '#f9fafb', // gray-50
+          backgroundColor: '#ffffff',
           opacity: 1,
-          maxHeight: '90vh',
-          margin: '32px',
-          width: 'auto',
-          maxWidth: 'calc(100% - 64px)',
+          height: '100vh',
+          maxHeight: '100vh',
+          margin: 0,
+          marginLeft: 'auto',
+          width: { xs: '95vw', sm: '90vw', md: 'min(900px, 35vw)' },
+          maxWidth: '100vw',
+          borderRadius: 0,
         },
       }}
     >
       <DialogContent
         sx={{
-          width: '42rem',
-          maxWidth: '100%',
-          height: '600px',
-          maxHeight: '90vh',
+          width: '100%',
+          height: '100%',
+          maxHeight: '100vh',
           overflow: 'hidden',
-          backgroundColor: '#f9fafb', // gray-50
+          backgroundColor: '#ffffff',
           padding: 0,
           display: 'flex',
           flexDirection: 'column',
         }}
       >
-        <div style={{ padding: '24px 24px 16px 24px', flexShrink: 0 }}>
-          <div className="flex items-center justify-between">
+        <div
+          style={{ padding: '24px 24px 16px 24px', flexShrink: 0 }}
+          className="bg-gray-50"
+        >
+          <div className="flex items-center justify-between border-b border-gray-200 pb-4">
             <DialogTitle>{title}</DialogTitle>
             <Button
               type="button"
@@ -242,11 +261,14 @@ export function SeletorClienteModal({
             padding: '0 24px',
             minHeight: 0,
           }}
-          className="scrollbar-thin"
+          className="scrollbar-thin bg-gray-50"
         >
+          <div className="flex flex-col border-b border-primary/70">
+            <span className="text-xl font-semibold text-primary">Clientes</span>
+          </div>
           {/* Total de clientes */}
           {!isLoading && clientes.length > 0 && (
-            <div className="mb-4">
+            <div className="mb-2 mt-2">
               <p className="text-sm text-secondary-text">
                 {debouncedSearch.trim()
                   ? `Encontrados ${clientes.length} cliente(s) para "${debouncedSearch.trim()}"`
@@ -338,7 +360,7 @@ export function SeletorClienteModal({
                       index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
                     } hover:bg-custom-2`}
                   >
-                    <div className="text-sm font-medium text-primary-text">{cliente.getNome()}</div>
+                    <div className="text-sm font-medium text-primary-text uppercase">{cliente.getNome()}</div>
                   </button>
                 ))}
 
@@ -361,13 +383,30 @@ export function SeletorClienteModal({
 
         <DialogFooter
           sx={{
-            padding: '16px 24px 24px 24px',
+            padding: 0,
             flexShrink: 0,
             borderTop: '1px solid #e5e7eb',
             marginTop: 0,
+            // DialogActions alinha à direita por padrão — uma coluna deve ocupar toda a largura
+            justifyContent: 'flex-start',
+            alignItems: 'stretch',
+            width: '100%',
+            boxSizing: 'border-box',
+            '& > *': {
+              flex: '1 1 100%',
+              maxWidth: '100%',
+              minWidth: 0,
+            },
           }}
         >
-          <Button variant="outlined" onClick={handleClose}>
+          <Button
+            type="button"
+            variant="outlined"
+            color="inherit"
+            onClick={handleClose}
+            className="h-12 min-h-12 w-full font-semibold shadow-none"
+            sx={footerBarPrimaryMutedSx(true)}
+          >
             Cancelar
           </Button>
         </DialogFooter>
