@@ -1,11 +1,12 @@
 'use client'
 
 import { TopNav } from '@/src/presentation/components/layouts/TopNav'
+import { AuthGuard } from '@/src/presentation/components/auth/AuthGuard'
 
 /**
  * Layout do dashboard com navegação superior
  * Altura da viewport em coluna: TopNav fixo no topo e apenas o main rola (mobile e desktop).
- * Proteção feita pelo middleware
+ * Token mínimo no middleware; sessão válida no cliente via AuthGuard.
  */
 export default function DashboardLayout({
   children,
@@ -17,7 +18,7 @@ export default function DashboardLayout({
       <TopNav />
 
       <main className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-1 md:px-2">
-        {children}
+        <AuthGuard>{children}</AuthGuard>
       </main>
     </div>
   )

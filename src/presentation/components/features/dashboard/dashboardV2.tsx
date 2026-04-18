@@ -288,8 +288,7 @@ function labelDataHoje() {
 }
 
 /**
- * Valores do Select de período (V2) → rótulos esperados por `calculatePeriodo`
- * (mesmo contrato do dashboard em `MetricCards` + `page.tsx`).
+ * Valores do Select de período (V2) → rótulos esperados por `calculatePeriodo`.
  */
 function periodoSelectV2ParaOpcaoCalculatePeriodo(periodoData: string): string {
   switch (periodoData) {
@@ -355,7 +354,7 @@ function filtroTopProdutoV2ParaOpcaoCalculatePeriodo(filtro: string): string {
   }
 }
 
-/** Mesmo contrato de `mapPeriodoToUseCaseFormat` em `TabelaTopProdutos` / API top-produtos. */
+/** Mapeia filtro local do card Top produtos → parâmetro `periodo` da API `/dashboard/top-produtos`. */
 function filtroTopProdutoV2ParaApiPeriodo(filtro: string): string {
   switch (filtro) {
     case 'hoje':

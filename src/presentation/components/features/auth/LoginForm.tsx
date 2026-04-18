@@ -75,7 +75,7 @@ export function LoginForm() {
       login(auth)
 
       // Redireciona para dashboard v2
-      window.location.href = '/dashboard/v2'
+      window.location.href = '/dashboard'
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao fazer login'
       setError(message)

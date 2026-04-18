@@ -21,9 +21,14 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Se está na raiz, redireciona para o dashboard v2 (mesmo destino pós-login)
+  // Raiz → dashboard (rota canônica)
   if (pathname === '/') {
-    return NextResponse.redirect(new URL('/dashboard/v2', request.url))
+    return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+
+  // Antiga URL /dashboard/v2 → /dashboard
+  if (pathname === '/dashboard/v2' || pathname === '/dashboard/v2/') {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
   // Verificar token no cookie OU no header Authorization

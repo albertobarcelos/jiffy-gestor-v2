@@ -134,7 +134,7 @@ export function TopNav() {
   const menuItems: MenuItem[] = [
     { 
       name: 'Dashboard', 
-      path: '/dashboard/v2', 
+      path: '/dashboard', 
       icon: MdDashboard 
     },
     {
@@ -397,7 +397,7 @@ export function TopNav() {
       <div className="h-full flex items-center justify-between xl:px-4">
         {/* Logo */}
         <div className="flex items-center">
-          <Link href="/dashboard/v2" className="flex items-center">
+          <Link href="/dashboard" className="flex items-center">
             <div className="relative ml-6 md:ml-0 w-12 h-12 sm:w-20 sm:h-16">
               <Image
                 src="/images/jiffy-100x100.gif"
