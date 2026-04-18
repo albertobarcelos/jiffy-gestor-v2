@@ -727,10 +727,12 @@ export function NovoPedidoModal({
     })
   }, [gruposData])
 
-  // Ordenar produtos por nome
+  // Grade do grupo: só produtos ativos; ordenação por nome
   const produtosList = useMemo(() => {
     if (!produtosPorGrupoData?.produtos) return []
-    return [...produtosPorGrupoData.produtos].sort((a, b) => a.getNome().localeCompare(b.getNome()))
+    return [...produtosPorGrupoData.produtos]
+      .filter(p => p.isAtivo())
+      .sort((a, b) => a.getNome().localeCompare(b.getNome()))
   }, [produtosPorGrupoData])
   const meiosPagamento = useMemo(() => {
     if (!meiosPagamentoData?.pages) return []
