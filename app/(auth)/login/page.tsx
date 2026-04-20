@@ -44,15 +44,15 @@ export default function LoginPage() {
         {/* Formulário de login (direita) */}
         <div className="w-full md:w-1/2 flex items-center justify-center p-6 md:p-12 relative z-10">
           <div className="w-full max-w-[450px]">
-            <div className="backdrop-blur-md bg-white/30 border-white border-2 rounded-[20px] p-8 shadow-[0_10px_30px_rgba(0,0,0,0.15)]">
+            <div className="backdrop-blur-md bg-white/30 border-white border-2 rounded-[20px] p-4 shadow-[0_10px_30px_rgba(0,0,0,0.15)]">
               {/* Logo */}
               <div className="flex justify-center mb-6">
-                <div className="relative w-[200px] h-[60px]">
+                <div className="relative w-full h-[150px]">
                   <Image
-                    src="/images/logo-branco.png"
+                    src="/images/jiffy-login.png"
                     alt="Jiffy Gestor"
                     fill
-                    sizes="200px"
+                    sizes="100%"
                     className="object-contain"
                     priority
                   />
@@ -60,11 +60,12 @@ export default function LoginPage() {
               </div>
 
               {/* Título - exatamente como Flutter */}
-              <h1 className="text-[28px] font-semibold text-gray-900 text-center mb-2 font-heading">
-                Bem-vindo ao Jiffy Gestor!
+              <h1 className="text-2xl font-semibold text-primary-text text-center mb-4 font-heading">
+              Sua operação mais inteligente 
+              <p className="">começa aqui!</p>
               </h1>
-              <p className="text-accent1 text-base text-center mb-8">
-                Faça login para continuar
+              <p className="text-secondary font-semibold text-base text-center mb-8">
+              Faça login para acessar o sistema
               </p>
 
               {/* Formulário */}

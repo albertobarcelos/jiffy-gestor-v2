@@ -77,9 +77,6 @@ const INDICADOR_IE_OPCOES = [
   { value: '9', label: 'Não contribuinte' },
 ] as const
 
-/** Valor interno do Select quando o indicador não foi escolhido (não enviado à API) */
-const INDICADOR_IE_NAO_INFORMADO = '__none__'
-
 /**
  * Componente para criar/editar cliente
  * Replica o design e funcionalidades do Flutter
@@ -109,8 +106,8 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
   const [telefone, setTelefone] = useState('')
   const [email, setEmail] = useState('')
   const [nomeFantasia, setNomeFantasia] = useState('')
-  const [indicadorInscricaoEstadual, setIndicadorInscricaoEstadual] = useState('')
-  const [inscricaoEstadual, setInscricaoEstadual] = useState('')
+  const [indicadorInscricaoEstadual, setIndicadorInscricaoEstadual] = useState('9')
+  const [inscricaoEstadual, setInscricaoEstadual] = useState(() => (isEditing ? '' : 'ISENTO'))
   const [ativo, setAtivo] = useState(true)
   const [incluirEndereco, setIncluirEndereco] = useState(false)
 
@@ -283,7 +280,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
           setNomeFantasia(cliente.getNomeFantasia() || '')
           const indIe = cliente.getIndicadorInscricaoEstadual()
           setIndicadorInscricaoEstadual(
-            indIe != null && String(indIe).trim() !== '' ? String(indIe) : ''
+            indIe != null && String(indIe).trim() !== '' ? String(indIe) : '9'
           )
           setInscricaoEstadual(cliente.getInscricaoEstadual() ?? '')
           setAtivo(cliente.isAtivo())
@@ -1120,17 +1117,25 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
                   select
                   id="cliente-indicador-ie"
                   label="Indicador da inscrição estadual"
-                  value={indicadorInscricaoEstadual || INDICADOR_IE_NAO_INFORMADO}
-                  onChange={(e) =>
-                    setIndicadorInscricaoEstadual(
-                      e.target.value === INDICADOR_IE_NAO_INFORMADO ? '' : e.target.value
-                    )
-                  }
+                  value={indicadorInscricaoEstadual}
+                  onChange={(e) => {
+                    const newValue = e.target.value
+                    setIndicadorInscricaoEstadual(newValue)
+
+                    // Se o usuário escolher "Contribuinte ICMS", não faz sentido manter "ISENTO" no campo IE
+                    if (newValue === '1' && inscricaoEstadual.trim().toUpperCase() === 'ISENTO') {
+                      setInscricaoEstadual('')
+                    }
+
+                    // Se o usuário escolher "Contribuinte isento" ou "Não contribuinte", preenche como ISENTO
+                    if (newValue === '2' || newValue === '9') {
+                      setInscricaoEstadual('ISENTO')
+                    }
+                  }}
                   size="small"
                   InputLabelProps={INPUT_LABEL_PROPS}
                   sx={inputSx}
                 >
-                  <MenuItem value={INDICADOR_IE_NAO_INFORMADO}>Não informado</MenuItem>
                   {INDICADOR_IE_OPCOES.map((opt) => (
                     <MenuItem key={opt.value} value={opt.value}>
                       {opt.label}

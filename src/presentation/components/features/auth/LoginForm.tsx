@@ -4,6 +4,14 @@ import { useState, FormEvent } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Auth } from '@/src/domain/entities/Auth'
 import { User } from '@/src/domain/entities/User'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/src/presentation/components/ui/dialog'
 
 /**
  * Componente de formulário de login
@@ -13,6 +21,7 @@ export function LoginForm() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({})
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false)
 
   const { login, setLoading, setError, isLoading } = useAuthStore()
 
@@ -247,17 +256,59 @@ export function LoginForm() {
       <button
         type="button"
         onClick={() => {
-          // TODO: Implementar recuperação de senha
-          alert('Para recuperar as credenciais de login, entre em contato com o suporte técnico.')
+          setForgotPasswordOpen(true)
         }}
         className="w-full text-center text-sm text-[var(--color-alternate)] hover:text-[var(--color-secondary)] transition-colors disabled:opacity-50"
         style={{
-          color: 'var(--color-accent1)',
+          color: 'var(--color-secondary)',
         }}
         disabled={isLoading}
       >
         Esqueceu sua senha?
       </button>
+
+      <Dialog
+        open={forgotPasswordOpen}
+        onOpenChange={(openState) => setForgotPasswordOpen(openState)}
+        maxWidth="xs"
+        fullWidth
+        sx={{
+          '& .MuiDialog-paper': {
+            borderRadius: 3,
+            p: 0,
+          },
+        }}
+      >
+        <DialogContent sx={{ p: 2.5 }}>
+          <DialogHeader sx={{ p: 0, pb: 1.5 }}>
+            <DialogTitle sx={{ fontSize: '1.05rem', color: 'var(--color-alternate)' }}>
+              Recuperação de senha
+            </DialogTitle>
+            <DialogDescription sx={{ mt: 1 }}>
+              Para recuperar seu acesso, fale com o suporte técnico. Se possível, informe seu e-mail e o CNPJ da
+              empresa para agilizar o atendimento.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter sx={{ p: 0, pt: 2, gap: 1, justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              onClick={() => setForgotPasswordOpen(false)}
+              className="h-10 rounded-lg border border-gray-300 px-4 text-sm font-semibold text-primary-text transition-colors hover:bg-gray-50"
+            >
+              Entendi
+            </button>
+            <a
+              href="https://wa.me/556592298724?text=Ol%C3%A1!%20Preciso%20de%20ajuda%20para%20recuperar%20minhas%20credenciais%20de%20login."
+              target="_blank"
+              rel="noreferrer"
+              className="h-10 rounded-lg bg-[var(--color-alternate)] px-4 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-secondary)] inline-flex items-center"
+            >
+              Falar com suporte
+            </a>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   )
 }

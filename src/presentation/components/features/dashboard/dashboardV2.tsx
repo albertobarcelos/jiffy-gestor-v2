@@ -2261,7 +2261,7 @@ export default function DashboardV2() {
           </button>
         }
       >
-        <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center overflow-x-auto overflow-y-auto py-2">
+        <div className="flex min-h-0 w-full flex-1 flex-col items-stretch justify-start overflow-x-auto overflow-y-auto">
           <FaturamentoRangeCalendar
             embutidoNoModal
             embutidoFundoClaro

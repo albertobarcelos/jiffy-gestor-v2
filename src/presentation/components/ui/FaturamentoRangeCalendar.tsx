@@ -279,6 +279,20 @@ export function FaturamentoRangeCalendar({
           --rdp-nav_button-width: 2rem;
           --rdp-nav_button-height: 2rem;
         }
+        /* Telas 2xl: dobra o “tamanho visual” do grid (células, navegação e espaço entre meses). */
+        @media (min-width: 1536px) {
+          .faturamento-rdp-scope .rdp-root {
+            --rdp-day-height: 3.25rem;
+            --rdp-day-width: 3.5rem;
+            --rdp-day_button-height: 3rem;
+            --rdp-day_button-width: 2.8rem;
+            --rdp-day_button-border-radius: 12px;
+            --rdp-nav-height: 3.25rem;
+            --rdp-months-gap: 1.25rem;
+            --rdp-nav_button-width: 3.5rem;
+            --rdp-nav_button-height: 3.5rem;
+          }
+        }
         .faturamento-rdp-scope.faturamento-rdp-modal .rdp-months {
           width: 100%;
           max-width: none;
@@ -361,7 +375,9 @@ export function FaturamentoRangeCalendar({
     <div
       className={cn(
         'faturamento-rdp-scope max-w-full overflow-x-auto',
-        fundoModalClaro ? 'faturamento-rdp-modal w-full text-gray-900' : 'w-fit text-white',
+        fundoModalClaro
+          ? 'faturamento-rdp-modal flex min-h-0 w-full flex-1 flex-col text-gray-900'
+          : 'w-fit text-white',
         embutidoNoModal ? 'px-2' : 'rounded-xl border border-white/20 bg-secondary bg-gradient-to-br from-secondary to-[#451090] p-4 shadow-lg',
         className
       )}
@@ -377,34 +393,43 @@ export function FaturamentoRangeCalendar({
       `}</style>
       {/* showOutsideDays=false: não mostra células do mês anterior/seguinte (evita duplicar datas e confundir com o intervalo). */}
       {/* navLayout=around: seta « no 1º mês (esq.) e seta » no último mês (dir.). */}
-      <Calendar
-        mode="range"
-        locale={ptBR}
-        numberOfMonths={2}
-        month={monthPicker}
-        onMonthChange={handleMonthChange}
-        endMonth={limiteMesNavegacao}
-        disabled={desabilitarDiasFuturos}
-        selected={range}
-        onSelect={setRange}
-        showOutsideDays={false}
-        navLayout="around"
-        formatters={formattersRdp}
-        className={cn(
-          'rounded-lg [&_.rdp-caption_label]:font-medium',
-          fundoModalClaro
-            ? 'w-full max-w-none border border-gray-200 bg-white p-2 text-primary-text [&_.rdp-caption_label]:text-sm [&_.rdp-selected]:!text-xs [&_.rdp-weekday]:py-1 [&_.rdp-weekday]:text-[10px] [&_.rdp-caption_label]:text-secondary [&_.rdp-dropdown]:text-[#330468] [&_.rdp-nav_button]:text-secondary [&_.rdp-weekday]:text-gray-500'
-            : 'w-fit p-2 [--rdp-nav-height:2.75rem] [&_.rdp-selected]:!text-sm border border-white/15 bg-white/5 text-accent1 [&_.rdp-caption_label]:text-accent1 [&_.rdp-dropdown]:text-[#330468] [&_.rdp-nav_button]:text-white [&_.rdp-weekday]:text-white/80'
-        )}
-        components={{
-          DayButton: dayButtonRenderer,
-        }}
-      />
+      <div className={cn(fundoModalClaro ? 'flex min-h-0 flex-1 flex-col' : '')}>
+        <div className={cn(fundoModalClaro ? 'flex min-h-0 flex-1 flex-col justify-center' : '')}>
+          <Calendar
+            mode="range"
+            locale={ptBR}
+            numberOfMonths={2}
+            month={monthPicker}
+            onMonthChange={handleMonthChange}
+            endMonth={limiteMesNavegacao}
+            disabled={desabilitarDiasFuturos}
+            selected={range}
+            onSelect={setRange}
+            showOutsideDays={false}
+            navLayout="around"
+            formatters={formattersRdp}
+            className={cn(
+              'rounded-lg [&_.rdp-caption_label]:font-medium',
+              fundoModalClaro
+                ? 'w-full max-w-none border border-gray-200 bg-white p-2 text-primary-text [&_.rdp-caption_label]:text-sm [&_.rdp-selected]:!text-xs [&_.rdp-weekday]:py-1 [&_.rdp-weekday]:text-[10px] [&_.rdp-caption_label]:text-secondary [&_.rdp-dropdown]:text-[#330468] [&_.rdp-nav_button]:text-secondary [&_.rdp-weekday]:text-gray-500 2xl:p-4 2xl:[&_.rdp-caption_label]:text-base 2xl:[&_.rdp-weekday]:text-xs 2xl:[&_.rdp-day_button>span:first-child]:text-base 2xl:[&_.rdp-day_button>span:last-child]:text-xs'
+                : 'w-fit p-2 [--rdp-nav-height:2.75rem] [&_.rdp-selected]:!text-sm border border-white/15 bg-white/5 text-accent1 [&_.rdp-caption_label]:text-accent1 [&_.rdp-dropdown]:text-[#330468] [&_.rdp-nav_button]:text-white [&_.rdp-weekday]:text-white/80'
+            )}
+            components={{
+              DayButton: dayButtonRenderer,
+            }}
+          />
+        </div>
+      </div>
 
-      <div className={cn('mt-4 border-t pt-4', fundoModalClaro ? 'border-gray-200' : 'border-white/20')}>
-        <div className="mx-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div
+        className={cn(
+          'mt-4 border-t pt-4 xl:pt-6 2xl:pt-8',
+          fundoModalClaro ? 'shrink-0 border-gray-200' : 'border-white/20'
+        )}
+      >
+        <div className="mx-2 grid grid-cols-1 gap-4 xl:gap-6 2xl:gap-8 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="faturamento-range-hora-inicio" className="text-sm font-medium text-primary-text">
+            <label htmlFor="faturamento-range-hora-inicio" className="text-sm xl:text-base 2xl:text-lg font-medium text-primary-text">
               Hora de início
             </label>
             <div className="relative flex items-center">
@@ -419,7 +444,7 @@ export function FaturamentoRangeCalendar({
                   onHorariosChange?.(v, horaFim)
                 }}
                 className={cn(
-                  'w-full rounded-lg border py-2 pl-3 pr-10 text-sm',
+                  'w-full rounded-lg border py-2 pl-3 pr-10 text-sm xl:text-base 2xl:text-lg',
                   fundoModalClaro
                     ? 'border-gray-300 bg-white text-gray-900 placeholder:text-gray-400'
                     : 'border-[#530CA3]/40 bg-[#F5F3FF] text-[#330468] placeholder:text-[#530CA3]/60',
@@ -436,7 +461,7 @@ export function FaturamentoRangeCalendar({
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="faturamento-range-hora-fim" className="text-sm font-medium text-primary-text">
+            <label htmlFor="faturamento-range-hora-fim" className="text-sm  xl:text-base 2xl:text-lg font-medium text-primary-text">
               Hora de término
             </label>
             <div className="relative flex items-center">
@@ -451,7 +476,7 @@ export function FaturamentoRangeCalendar({
                   onHorariosChange?.(horaInicio, v)
                 }}
                 className={cn(
-                  'w-full rounded-lg border py-2 pl-3 pr-10 text-sm',
+                  'w-full rounded-lg border py-2 pl-3 pr-10 text-sm xl:text-base 2xl:text-lg',
                   fundoModalClaro
                     ? 'border-gray-300 bg-white text-primary-text'
                     : 'border-[#530CA3]/40 bg-[#F5F3FF] text-[#330468]',
@@ -472,12 +497,12 @@ export function FaturamentoRangeCalendar({
         <div
           className={cn(
             'mt-6 border-t pt-2',
-            fundoModalClaro ? 'border-gray-200 bg-primary/10 rounded-lg p-2' : 'border-white/20'
+            fundoModalClaro ? 'border-gray-200 bg-primary/10 rounded-lg p-2 2xl:p-6' : 'border-white/20'
           )}
         >
           <p
             className={cn(
-              'text-sm font-medium py-2',
+              'text-sm xl:text-base 2xl:text-lg font-medium py-2',
               fundoModalClaro ? 'text-primary-text' : 'text-white/80'
             )}
           >
@@ -485,7 +510,7 @@ export function FaturamentoRangeCalendar({
           </p>
           <p
             className={cn(
-              'mt-1 break-words text-sm leading-snug py-2',
+              'mt-1 break-words text-sm xl:text-base 2xl:text-lg leading-snug py-2',
               fundoModalClaro ? 'text-primary' : 'text-white',
               !textoPeriodoSelecionado && 'italic opacity-80'
             )}
