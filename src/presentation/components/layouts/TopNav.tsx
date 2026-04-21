@@ -18,7 +18,8 @@ import {
   MdAddCircle,
   MdReceipt,
   MdAccountBalance,
-  MdHistory
+  MdHistory,
+  MdPercent,
 } from 'react-icons/md'
 import type { IconType } from 'react-icons'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
@@ -52,6 +53,7 @@ export function TopNav() {
     const routesToPrefetch = [
       '/cadastros/grupos-complementos',
       '/cadastros/complementos',
+      '/cadastros/taxas',
       '/produtos',
       '/cadastros/grupos-produtos',
       '/estoque',
@@ -146,6 +148,7 @@ export function TopNav() {
         { name: 'Produtos', path: '/produtos', icon: MdShoppingBag },
         { name: 'Grupo de Complementos', path: '/cadastros/grupos-complementos', icon: MdCategory },
         { name: 'Complementos', path: '/cadastros/complementos', icon: MdAddCircle },
+        { name: 'Taxas', path: '/cadastros/taxas', icon: MdPercent },
       ],
     },
     {

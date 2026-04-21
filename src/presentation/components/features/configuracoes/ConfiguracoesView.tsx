@@ -7,6 +7,8 @@ import { EmpresaTab } from './tabs/EmpresaTab'
 import { TerminaisTab } from './tabs/TerminaisTab'
 import { ImpressorasList } from '@/src/presentation/components/features/impressoras/ImpressorasList'
 import { MeiosPagamentosList } from '@/src/presentation/components/features/meios-pagamentos/MeiosPagamentosList'
+import { TaxasList } from '@/src/presentation/components/features/taxas/TaxasList'
+import { ComissoesList } from '@/src/presentation/components/features/comissoes/ComissoesList'
 import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
 import { cn } from '@/src/shared/utils/cn'
 
@@ -18,7 +20,14 @@ const CadastroPorPlanilha = dynamic(
   { ssr: false, loading: () => <PageLoading /> }
 )
 
-type ConfigTab = 'empresa' | 'terminais' | 'impressoras' | 'planilha' | 'meios-pagamentos'
+type ConfigTab =
+  | 'empresa'
+  | 'terminais'
+  | 'impressoras'
+  | 'planilha'
+  | 'meios-pagamentos'
+  | 'taxas'
+  | 'comissoes'
 
 const TAB_QUERY_VALUES: readonly ConfigTab[] = [
   'empresa',
@@ -26,6 +35,8 @@ const TAB_QUERY_VALUES: readonly ConfigTab[] = [
   'impressoras',
   'planilha',
   'meios-pagamentos',
+  'taxas',
+  'comissoes',
 ]
 
 function parseTabParam(value: string | null): ConfigTab {
@@ -85,6 +96,8 @@ export function ConfiguracoesView() {
           {tabBtn('terminais', 'Terminais')}
           {tabBtn('impressoras', 'Impressoras')}
           {tabBtn('meios-pagamentos', 'Meios de pagamento')}
+          {tabBtn('taxas', 'Taxas')}
+          {tabBtn('comissoes', 'Comissões')}
           {tabBtn('planilha', 'Importar Dados')}
         </div>
       </div>
@@ -98,6 +111,16 @@ export function ConfiguracoesView() {
           {activeTab === 'meios-pagamentos' && (
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
               <MeiosPagamentosList />
+            </div>
+          )}
+          {activeTab === 'taxas' && (
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <TaxasList />
+            </div>
+          )}
+          {activeTab === 'comissoes' && (
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <ComissoesList />
             </div>
           )}
           {activeTab === 'planilha' && (
