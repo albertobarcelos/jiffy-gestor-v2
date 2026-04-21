@@ -99,20 +99,48 @@ const LIMITE_TOP_GARCONS_V2_COMPLETO = 500
  */
 const DIAS_COMPARACAO_PERIODO_PERSONALIZADO = 30
 
-/** Paleta cíclica para N métodos distintos (mesma ideia do modal de métodos). */
-const PALETA_PRINCIPAL_FORMAS_PAGAMENTO = [
-  '#00B074',
-  '#003366',
-  '#B4DD2B',
-  '#006699',
-  '#530CA3',
-  '#FF9800',
-  '#9C27B0',
-  '#00BCD4',
-  '#E91E63',
-  '#530CA3',
-  '#14B8A6',
-]
+/**
+ * Cor fixa por forma de pagamento fiscal (cadastro — campo estável; nome do meio pode ser “dindin” etc.).
+ * Chaves como em `NovoMeioPagamento` / API (minúsculas, snake_case).
+ */
+const COR_POR_FORMA_PAGAMENTO_FISCAL: Record<string, string> = {
+  dinheiro: '#00B074',
+  pix: '#B4DD2B',
+  cartao_credito: '#003366',
+  cartao_debito: '#006699',
+  vale_alimentacao: '#530CA3',
+  vale_refeicao: '#FF9800',
+  vale_presente: '#9C27B0',
+  vale_combustivel: '#00BCD4',
+}
+
+/** Quando a API enviar variação de chave (legado / normalização). */
+const ALIAS_FORMA_PAGAMENTO_FISCAL: Record<string, keyof typeof COR_POR_FORMA_PAGAMENTO_FISCAL> = {
+  cartao_de_credito: 'cartao_credito',
+  cartao_de_debito: 'cartao_debito',
+}
+
+const COR_FORMA_FISCAL_FALLBACK = '#14B8A6'
+
+/** Normaliza forma fiscal para lookup (minúsculas, sem acento, espaços → _). */
+function normalizarChaveFormaPagamentoFiscal(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '_')
+}
+
+function corPrincipalDonutPorFormaFiscal(formaRaw: string): string {
+  const chave = normalizarChaveFormaPagamentoFiscal(formaRaw)
+  if (!chave) return COR_FORMA_FISCAL_FALLBACK
+  const direto = COR_POR_FORMA_PAGAMENTO_FISCAL[chave]
+  if (direto) return direto
+  const viaAlias = ALIAS_FORMA_PAGAMENTO_FISCAL[chave]
+  if (viaAlias) return COR_POR_FORMA_PAGAMENTO_FISCAL[viaAlias]
+  return COR_FORMA_FISCAL_FALLBACK
+}
 
 /** Linha do período atual (filtro) e do período anterior — gráfico comparativo V2 */
 const LINHA_PERIODO_ATUAL = '#530CA3'
@@ -308,13 +336,7 @@ function periodoSelectV2ParaOpcaoCalculatePeriodo(periodoData: string): string {
 }
 
 /** Valores do `<select>` de período em Top produtos / Top garçons (espelham o filtro global quando sincronizados). */
-type FiltroPeriodoTopTabelasV2 =
-  | 'hoje'
-  | 'ontem'
-  | 'semana'
-  | '30dias'
-  | 'mes'
-  | 'personalizado'
+type FiltroPeriodoTopTabelasV2 = 'hoje' | 'ontem' | 'semana' | '30dias' | 'mes' | 'personalizado'
 
 /** Filtro global do topo → valor inicial/alinhado dos selects das tabelas inferiores. */
 function periodoTopoV2ParaFiltroTabelas(periodoData: string): FiltroPeriodoTopTabelasV2 {
@@ -706,7 +728,9 @@ export default function DashboardV2() {
   const [periodoPersonalizadoFim, setPeriodoPersonalizadoFim] = useState<Date | null>(null)
   const [modalIntervaloPersonalizadoAberto, setModalIntervaloPersonalizadoAberto] = useState(false)
   /** Rascunho do modal de intervalo (calendário + horas) antes de aplicar. */
-  const [rascunhoIntervaloRange, setRascunhoIntervaloRange] = useState<DateRange | undefined>(undefined)
+  const [rascunhoIntervaloRange, setRascunhoIntervaloRange] = useState<DateRange | undefined>(
+    undefined
+  )
   /** Primeiro mês visível no DayPicker (painel esquerdo), alinhado ao fetch de faturamento por dia. */
   const [mesCalendarioIntervalo, setMesCalendarioIntervalo] = useState(() =>
     primeiroMesQuadroDuploCalendario(startOfDay(new Date()))
@@ -957,11 +981,7 @@ export default function DashboardV2() {
   )
 
   const { inicio: inicioResumo, fim: fimResumo } = useMemo(() => {
-    if (
-      periodoData === 'personalizado' &&
-      periodoPersonalizadoInicio &&
-      periodoPersonalizadoFim
-    ) {
+    if (periodoData === 'personalizado' && periodoPersonalizadoInicio && periodoPersonalizadoFim) {
       return { inicio: periodoPersonalizadoInicio, fim: periodoPersonalizadoFim }
     }
     return calculatePeriodo(opcaoCalculatePeriodo)
@@ -1072,8 +1092,7 @@ export default function DashboardV2() {
     isLoading: carregandoMetodosPagamento,
     isError: erroMetodosPagamento,
   } = useDashboardMetodosPagamentoDetalhadoQuery({
-    periodo:
-      periodoData === 'personalizado' ? 'Últimos 30 Dias' : opcaoCalculatePeriodo,
+    periodo: periodoData === 'personalizado' ? 'Últimos 30 Dias' : opcaoCalculatePeriodo,
     periodoInicial: inicioResumo,
     periodoFinal: fimResumo,
     enabled: inicioResumo != null && fimResumo != null,
@@ -1343,32 +1362,35 @@ export default function DashboardV2() {
     }
   }
 
-  const handlePeriodoDataChange = useCallback((v: string) => {
-    if (v === 'personalizado') {
-      if (periodoPersonalizadoInicio && periodoPersonalizadoFim) {
-        const fim = startOfDay(periodoPersonalizadoFim)
-        setRascunhoIntervaloRange({
-          from: startOfDay(periodoPersonalizadoInicio),
-          to: fim,
-        })
-        setMesCalendarioIntervalo(primeiroMesQuadroDuploCalendario(fim))
-        setRascunhoHoraInicio(formatarHoraParaInputCalendar(periodoPersonalizadoInicio))
-        setRascunhoHoraFim(formatarHoraParaInputCalendar(periodoPersonalizadoFim))
-      } else {
-        /* Sem período salvo: intervalo de um único dia = hoje; calendário com mês anterior à esquerda e mês atual à direita. */
-        const hoje = startOfDay(new Date())
-        setRascunhoIntervaloRange({ from: hoje, to: hoje })
-        setMesCalendarioIntervalo(primeiroMesQuadroDuploCalendario(hoje))
-        setRascunhoHoraInicio('00:00')
-        setRascunhoHoraFim('23:59')
+  const handlePeriodoDataChange = useCallback(
+    (v: string) => {
+      if (v === 'personalizado') {
+        if (periodoPersonalizadoInicio && periodoPersonalizadoFim) {
+          const fim = startOfDay(periodoPersonalizadoFim)
+          setRascunhoIntervaloRange({
+            from: startOfDay(periodoPersonalizadoInicio),
+            to: fim,
+          })
+          setMesCalendarioIntervalo(primeiroMesQuadroDuploCalendario(fim))
+          setRascunhoHoraInicio(formatarHoraParaInputCalendar(periodoPersonalizadoInicio))
+          setRascunhoHoraFim(formatarHoraParaInputCalendar(periodoPersonalizadoFim))
+        } else {
+          /* Sem período salvo: intervalo de um único dia = hoje; calendário com mês anterior à esquerda e mês atual à direita. */
+          const hoje = startOfDay(new Date())
+          setRascunhoIntervaloRange({ from: hoje, to: hoje })
+          setMesCalendarioIntervalo(primeiroMesQuadroDuploCalendario(hoje))
+          setRascunhoHoraInicio('00:00')
+          setRascunhoHoraFim('23:59')
+        }
+        setModalIntervaloPersonalizadoAberto(true)
+        return
       }
-      setModalIntervaloPersonalizadoAberto(true)
-      return
-    }
-    setPeriodoData(v)
-    setPeriodoPersonalizadoInicio(null)
-    setPeriodoPersonalizadoFim(null)
-  }, [periodoPersonalizadoInicio, periodoPersonalizadoFim])
+      setPeriodoData(v)
+      setPeriodoPersonalizadoInicio(null)
+      setPeriodoPersonalizadoFim(null)
+    },
+    [periodoPersonalizadoInicio, periodoPersonalizadoFim]
+  )
 
   const handleConfirmarIntervaloPersonalizado = useCallback(
     (v: { dataInicial: Date | null; dataFinal: Date | null }) => {
@@ -1409,7 +1431,12 @@ export default function DashboardV2() {
     if (!dataInicial || !dataFinal) return
     handleConfirmarIntervaloPersonalizado({ dataInicial, dataFinal })
     setModalIntervaloPersonalizadoAberto(false)
-  }, [rascunhoIntervaloRange, rascunhoHoraInicio, rascunhoHoraFim, handleConfirmarIntervaloPersonalizado])
+  }, [
+    rascunhoIntervaloRange,
+    rascunhoHoraInicio,
+    rascunhoHoraFim,
+    handleConfirmarIntervaloPersonalizado,
+  ])
 
   return (
     <div className="font-nunito min-h-0 w-full bg-gray-50 pb-8 pt-2">
@@ -1424,7 +1451,6 @@ export default function DashboardV2() {
           </p>
         </div>
         <span className="ml-2 mr-8 inline-flex shrink-0 items-center gap-1">
-          
           <MuiTooltip
             title="Atualizar dados"
             placement="bottom"
@@ -1960,11 +1986,7 @@ export default function DashboardV2() {
                   <DonutFormaPagamento
                     key={`${item.getMetodo()}-${index}`}
                     label={item.getMetodo()}
-                    principal={
-                      PALETA_PRINCIPAL_FORMAS_PAGAMENTO[
-                        index % PALETA_PRINCIPAL_FORMAS_PAGAMENTO.length
-                      ]
-                    }
+                    principal={corPrincipalDonutPorFormaFiscal(item.getFormaPagamentoFiscal())}
                     secundaria={COR_ARCO_RESTO_FORMAS_PAGAMENTO}
                     pct={item.getPercentual()}
                   />
@@ -2011,9 +2033,7 @@ export default function DashboardV2() {
             <div className="relative min-w-[120px] shrink-0 self-end xl:self-auto">
               <select
                 value={filtroTopProduto}
-                onChange={e =>
-                  setFiltroTopProduto(e.target.value as FiltroPeriodoTopTabelasV2)
-                }
+                onChange={e => setFiltroTopProduto(e.target.value as FiltroPeriodoTopTabelasV2)}
                 className="w-full appearance-none rounded-lg border border-gray-200 bg-gray-50 py-2 pl-3 pr-9 text-sm font-medium text-primary-text focus:border-secondary"
                 aria-label="Período do ranking de produtos"
               >
@@ -2143,9 +2163,7 @@ export default function DashboardV2() {
             <div className="relative min-w-[120px] self-end sm:self-auto">
               <select
                 value={filtroTopGarcom}
-                onChange={e =>
-                  setFiltroTopGarcom(e.target.value as FiltroPeriodoTopTabelasV2)
-                }
+                onChange={e => setFiltroTopGarcom(e.target.value as FiltroPeriodoTopTabelasV2)}
                 className="w-full appearance-none rounded-lg border border-gray-200 bg-gray-50 py-2 pl-3 pr-9 text-sm font-medium text-primary-text focus:border-secondary"
                 aria-label="Período do ranking de garçons"
               >
@@ -2255,7 +2273,7 @@ export default function DashboardV2() {
             type="button"
             disabled={!rascunhoIntervaloRange?.from || !rascunhoIntervaloRange?.to}
             onClick={handleAplicarIntervaloPersonalizadoModal}
-            className="flex h-full w-full items-center justify-center rounded-b-l-lg bg-primary font-nunito text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-b-l-lg font-nunito flex h-full w-full items-center justify-center bg-primary text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Aplicar
           </button>

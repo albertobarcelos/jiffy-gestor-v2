@@ -107,7 +107,11 @@ function getPeriodoDates(periodo: string): PeriodoDates {
 /**
  * Executa promises em lotes com concorrência limitada.
  */
-async function promisePool<T, R>(items: T[], concurrency: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+async function promisePool<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
   const results: R[] = []
   for (let i = 0; i < items.length; i += concurrency) {
     const chunk = items.slice(i, i + concurrency)
@@ -156,16 +160,12 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
     baseParams.append('status', 'FINALIZADA')
 
     const firstData = await this.fetchVendasListPage(baseUrl, headers, baseParams, 0)
-    const allIds = firstData.items.map((v) => v.id)
+    const allIds = firstData.items.map(v => v.id)
 
     let totalPages = 1
     if (typeof firstData.totalPages === 'number' && firstData.totalPages > 0) {
       totalPages = firstData.totalPages
-    } else if (
-      firstData.count != null &&
-      firstData.limit != null &&
-      firstData.limit > 0
-    ) {
+    } else if (firstData.count != null && firstData.limit != null && firstData.limit > 0) {
       totalPages = Math.ceil(firstData.count / firstData.limit)
     } else if (allIds.length < VENDAS_LIST_PAGE_SIZE) {
       return allIds
@@ -174,7 +174,7 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
       let page = 1
       for (;;) {
         const data = await this.fetchVendasListPage(baseUrl, headers, baseParams, page)
-        const ids = data.items.map((v) => v.id)
+        const ids = data.items.map(v => v.id)
         allIds.push(...ids)
         if (ids.length < VENDAS_LIST_PAGE_SIZE) {
           break
@@ -190,10 +190,10 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
 
     const restIndexes = Array.from({ length: totalPages - 1 }, (_, i) => i + 1)
     const restPages = await Promise.all(
-      restIndexes.map((pi) => this.fetchVendasListPage(baseUrl, headers, baseParams, pi))
+      restIndexes.map(pi => this.fetchVendasListPage(baseUrl, headers, baseParams, pi))
     )
     for (const d of restPages) {
-      allIds.push(...d.items.map((v) => v.id))
+      allIds.push(...d.items.map(v => v.id))
     }
     return allIds
   }
@@ -247,10 +247,10 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
     cache: Map<string, MeioPagamentoApiResponse>,
     idsNecessarios: Set<string>
   ): Promise<void> {
-    const faltantes = [...idsNecessarios].filter((id) => id && !cache.has(id))
+    const faltantes = [...idsNecessarios].filter(id => id && !cache.has(id))
     if (faltantes.length === 0) return
 
-    await promisePool(faltantes, MEIOS_FETCH_CONCORRENCIA, async (id) => {
+    await promisePool(faltantes, MEIOS_FETCH_CONCORRENCIA, async id => {
       const res = await fetch(`${baseUrl}/api/v1/pagamento/meios-pagamento/${id}`, { headers })
       if (!res.ok) {
         return
@@ -270,8 +270,10 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
     headers: HeadersInit,
     vendaIds: string[]
   ): Promise<(VendaDetalhesApiResponse | null)[]> {
-    return promisePool(vendaIds, VENDAS_DETALHE_CONCORRENCIA, async (vendaId) => {
-      const detalhesResponse = await fetch(`${baseUrl}/api/v1/operacao-pdv/vendas/${vendaId}`, { headers })
+    return promisePool(vendaIds, VENDAS_DETALHE_CONCORRENCIA, async vendaId => {
+      const detalhesResponse = await fetch(`${baseUrl}/api/v1/operacao-pdv/vendas/${vendaId}`, {
+        headers,
+      })
       if (!detalhesResponse.ok) {
         return null
       }
@@ -292,16 +294,14 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
     return true
   }
 
-  private filtrarPagamentosValidos(
-    pagamentos: VendaDetalhesApiResponse['pagamentos']
-  ): {
+  private filtrarPagamentosValidos(pagamentos: VendaDetalhesApiResponse['pagamentos']): {
     validos: VendaDetalhesApiResponse['pagamentos']
     cancelados: number
     tefNaoConfirmados: number
   } {
     let cancelados = 0
     let tefNaoConfirmados = 0
-    const validos = pagamentos.filter((pagamento) => {
+    const validos = pagamentos.filter(pagamento => {
       const isCancelado =
         pagamento.cancelado === true ||
         (pagamento.dataCancelamento !== null && pagamento.dataCancelamento !== undefined)
@@ -386,7 +386,7 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
     ])
     const allDetailedVendas = detalhesBrutos.filter(Boolean) as VendaDetalhesApiResponse[]
 
-    const detailedVendas = allDetailedVendas.filter((venda) => this.isVendaFinalizada(venda))
+    const detailedVendas = allDetailedVendas.filter(venda => this.isVendaFinalizada(venda))
 
     /** Uma passagem por venda: pagamentos válidos reutilizados na agregação. */
     const vendasComPagamentosValidos: Array<{
@@ -410,11 +410,13 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
 
     await this.garantirMeiosFaltantesNoCache(baseUrl, headers, paymentMethodCache, idsMeiosUsados)
 
-    const methodAggregation = new Map<string, { metodo: string; valor: number; quantidade: number }>()
+    const methodAggregation = new Map<
+      string,
+      { metodo: string; formaPagamentoFiscal: string; valor: number; quantidade: number }
+    >()
     let totalSalesValue = 0
 
     for (const { venda, pagamentosValidos } of vendasComPagamentosValidos) {
-
       const totalPagoValido = pagamentosValidos.reduce((sum, pagamento) => sum + pagamento.valor, 0)
 
       const trocoCalculado = venda.valorFinal
@@ -426,6 +428,7 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
         metodoNome: string
         isDinheiro: boolean
         valorOriginal: number
+        formaPagamentoFiscal: string
       }> = []
 
       for (const pagamento of pagamentosValidos) {
@@ -441,10 +444,16 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
           metodoNome,
           isDinheiro: isDinheiroFlag,
           valorOriginal: pagamento.valor,
+          formaPagamentoFiscal: paymentMethodData?.formaPagamentoFiscal ?? '',
         })
       }
 
-      for (const { metodoNome, isDinheiro: isDinheiroVal, valorOriginal } of pagamentosComDados) {
+      for (const {
+        metodoNome,
+        isDinheiro: isDinheiroVal,
+        valorOriginal,
+        formaPagamentoFiscal: formaFiscalRaw,
+      } of pagamentosComDados) {
         let valorPagamento = valorOriginal
 
         if (isDinheiroVal && trocoCalculado > 0 && totalPagamentosDinheiro > 0) {
@@ -459,10 +468,14 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
           const existing = methodAggregation.get(metodoNome)!
           existing.valor += valorPagamento
           existing.quantidade += 1
+          if (!existing.formaPagamentoFiscal && formaFiscalRaw) {
+            existing.formaPagamentoFiscal = formaFiscalRaw
+          }
           methodAggregation.set(metodoNome, existing)
         } else {
           methodAggregation.set(metodoNome, {
             metodo: metodoNome,
+            formaPagamentoFiscal: formaFiscalRaw,
             valor: valorPagamento,
             quantidade: 1,
           })
@@ -471,12 +484,13 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
     }
 
     const metodosPagamento: DashboardMetodoPagamento[] = Array.from(methodAggregation.values())
-      .map((item) =>
+      .map(item =>
         DashboardMetodoPagamento.create({
           metodo: item.metodo,
           valor: item.valor,
           quantidade: item.quantidade,
           percentual: totalSalesValue > 0 ? (item.valor / totalSalesValue) * 100 : 0,
+          formaPagamentoFiscal: item.formaPagamentoFiscal,
         })
       )
       .sort((a, b) => b.getValor() - a.getValor())

@@ -148,7 +148,6 @@ export function TopNav() {
         { name: 'Produtos', path: '/produtos', icon: MdShoppingBag },
         { name: 'Grupo de Complementos', path: '/cadastros/grupos-complementos', icon: MdCategory },
         { name: 'Complementos', path: '/cadastros/complementos', icon: MdAddCircle },
-        { name: 'Taxas', path: '/cadastros/taxas', icon: MdPercent },
       ],
     },
     {
