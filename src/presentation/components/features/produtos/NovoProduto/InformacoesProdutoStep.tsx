@@ -3,10 +3,7 @@
 import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
-import {
-  sxEntradaCompactaProduto,
-  sxEntradaCompactaProdutoSelect,
-} from './produtoFormMuiSx'
+import { sxEntradaCompactaProduto, sxEntradaCompactaProdutoSelect } from './produtoFormMuiSx'
 
 interface InformacoesProdutoStepProps {
   nomeProduto: string
@@ -19,6 +16,9 @@ interface InformacoesProdutoStepProps {
   onUnidadeProdutoChange: (value: string | null) => void
   grupoProduto: string | null
   onGrupoProdutoChange: (value: string | null) => void
+  /** EAN / código de barras (GTIN — até 14 dígitos numéricos). */
+  codigoEanBarras: string
+  onCodigoEanBarrasChange: (value: string) => void
   grupos: any[]
   isLoadingGrupos: boolean
   onNext: () => void
@@ -43,6 +43,8 @@ export function InformacoesProdutoStep({
   onUnidadeProdutoChange,
   grupoProduto,
   onGrupoProdutoChange,
+  codigoEanBarras,
+  onCodigoEanBarrasChange,
   grupos,
   isLoadingGrupos,
   onNext,
@@ -123,32 +125,20 @@ export function InformacoesProdutoStep({
           />
         </div>
 
-        {/* Linha 2: Unidade + Grupo */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
-            <InputLabel id="np-unidade-label">Unidade</InputLabel>
-            <Select
-              labelId="np-unidade-label"
-              label="Unidade"
-              value={unidadeProduto || ''}
-              onChange={e => onUnidadeProdutoChange(e.target.value || null)}
-            >
-              <MenuItem value="">
-                <span className="text-secondary-text">Escolha a unidade</span>
-              </MenuItem>
-              <MenuItem value="UN">Unitário</MenuItem>
-              <MenuItem value="KG">Kg</MenuItem>
-              <MenuItem value="LT">Litro</MenuItem>
-            </Select>
-          </FormControl>
-
-          <div className="min-w-0">
+        {/* Linha 2: Unidade (mais estreita) + Grupo + Código EAN — três colunas em desktop */}
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,9.5rem)_minmax(0,1fr)]">
+        <div className="min-w-0">
             {isLoadingGrupos ? (
               <div className="flex h-[40px] w-full items-center justify-center rounded-md border border-dashed border-[#CBD0E3] bg-white">
                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               </div>
             ) : (
-              <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
+              <FormControl
+                fullWidth
+                size="small"
+                variant="outlined"
+                sx={sxEntradaCompactaProdutoSelect}
+              >
                 <InputLabel id="np-grupo-label">Grupo</InputLabel>
                 <Select
                   labelId="np-grupo-label"
@@ -164,11 +154,7 @@ export function InformacoesProdutoStep({
                     const nome = getGrupoNome(grupo)
                     const ativo = isGrupoAtivo(grupo)
                     return (
-                      <MenuItem
-                        key={id}
-                        value={id}
-                        sx={ativo ? undefined : { color: '#9CA3AF' }}
-                      >
+                      <MenuItem key={id} value={id} sx={ativo ? undefined : { color: '#9CA3AF' }}>
                         {ativo ? nome : `${nome} (inativo)`}
                       </MenuItem>
                     )
@@ -176,6 +162,49 @@ export function InformacoesProdutoStep({
                 </Select>
               </FormControl>
             )}
+          </div>
+          <div className="min-w-0">
+            <FormControl
+              fullWidth
+              size="small"
+              variant="outlined"
+              sx={sxEntradaCompactaProdutoSelect}
+            >
+              <InputLabel id="np-unidade-label">Unidade</InputLabel>
+              <Select
+                labelId="np-unidade-label"
+                label="Unidade"
+                value={unidadeProduto || ''}
+                onChange={e => onUnidadeProdutoChange(e.target.value || null)}
+              >
+                <MenuItem value="">
+                  <span className="text-secondary-text">Escolha a unidade</span>
+                </MenuItem>
+                <MenuItem value="UN">Unitário</MenuItem>
+                <MenuItem value="KG">Kg</MenuItem>
+                <MenuItem value="LT">Litro</MenuItem>
+              </Select>
+            </FormControl>
+          </div>
+
+          
+
+          <div className="min-w-0">
+            <Input
+              label="Código EAN(barras)"
+              size="small"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              value={codigoEanBarras}
+              onChange={e => {
+                const digits = e.target.value.replace(/\D/g, '').slice(0, 14)
+                onCodigoEanBarrasChange(digits)
+              }}
+              placeholder="Digite o código"
+              className="bg-white"
+              sx={sxEntradaCompactaProduto}
+            />
           </div>
         </div>
 

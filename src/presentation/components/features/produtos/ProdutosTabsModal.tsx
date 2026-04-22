@@ -122,9 +122,7 @@ export function ProdutosTabsModal({
     suppressCloseOnNextProdutoSuccessRef.current = true
     try {
       const ok =
-        wizardStep < 2
-          ? await npRef.current.savePartialAndClose()
-          : await npRef.current.saveFinal()
+        wizardStep < 2 ? await npRef.current.savePartialAndClose() : await npRef.current.saveFinal()
       if (!ok) {
         suppressCloseOnNextProdutoSuccessRef.current = false
       }
@@ -287,10 +285,8 @@ export function ProdutosTabsModal({
   )
 
   const footerGrupo = useMemo((): JiffySidePanelFooterActions => {
-    const savingGrupoOuProduto =
-      embedGrupoForm.isSubmitting || wizardSaving
-    const saveDisabled =
-      !embedGrupoForm.canSubmit || savingGrupoOuProduto
+    const savingGrupoOuProduto = embedGrupoForm.isSubmitting || wizardSaving
+    const saveDisabled = !embedGrupoForm.canSubmit || savingGrupoOuProduto
 
     if (embedGrupoTab === 0) {
       return {
@@ -312,13 +308,7 @@ export function ProdutosTabsModal({
       saveLoading: savingGrupoOuProduto,
       saveDisabled,
     }
-  }, [
-    embedGrupoTab,
-    embedGrupoForm,
-    handleRequestClose,
-    handleSalvarGrupoCombinado,
-    wizardSaving,
-  ])
+  }, [embedGrupoTab, embedGrupoForm, handleRequestClose, handleSalvarGrupoCombinado, wizardSaving])
 
   const footerActions = useMemo(() => {
     if (state.tab === 'produto') return footerProduto
@@ -333,210 +323,209 @@ export function ProdutosTabsModal({
 
   return (
     <>
-    <JiffySidePanelModal
-      key={dialogKey}
-      open={state.open}
-      onClose={handleRequestClose}
-      title={title}
-      subtitle={subtitle}
-      scrollableBody={false}
-      footerVariant="bar"
-      panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]"
-      footerActions={footerActions}
-      tabsSlot={
-        <div className="flex flex-wrap gap-1 px-2 pb-0">
-          {(
-            [
-              { key: 'produto' as const, label: 'Produto', disabled: false },
-              { key: 'complementos' as const, label: 'Complementos', disabled: !produtoId },
-              { key: 'impressoras' as const, label: 'Impressoras', disabled: !produtoId },
-              { key: 'grupo' as const, label: 'Grupo', disabled: !state.grupoId },
-            ] as const
-          ).map(tab => (
-            <button
-              key={tab.key}
-              type="button"
-              disabled={tab.disabled}
-              onClick={() => !tab.disabled && onTabChange(tab.key)}
-              className={`rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors ${
-                state.tab === tab.key
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
-              } ${tab.disabled ? 'cursor-not-allowed opacity-50' : ''}`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      }
-    >
-      <div className="flex min-h-0 flex-1 flex-col">
-        {showProdutoPanel ? (
-          <div
-            className={cn(
-              'flex min-h-0 flex-1 flex-col overflow-hidden',
-              state.tab !== 'produto' && 'hidden'
-            )}
-            aria-hidden={state.tab !== 'produto'}
-          >
-            <NovoProduto
-              key={`${produtoId ?? 'new'}-${state.mode}-${produtoFormSession}`}
-              ref={npRef}
-              produtoId={state.mode === 'create' ? undefined : produtoId}
-              isCopyMode={state.mode === 'copy'}
-              defaultGrupoProdutoId={
-                state.mode === 'create' ? state.prefillGrupoProdutoId : undefined
-              }
-              initialStep={state.initialStepProduto ?? 0}
-              isEmbedded
-              hideEmbeddedHeader
-              hideEmbeddedFormActions
-              onWizardStepChange={setWizardStep}
-              onWizardSavingChange={setWizardSaving}
-              onFiscalUnavailableChange={setFiscalOnlyBack}
-              onClose={handleRequestClose}
-              onSuccess={produtoData => {
-                onReload?.(produtoData?.produtoId, produtoData?.produtoData)
-                if (suppressCloseOnNextProdutoSuccessRef.current) {
-                  suppressCloseOnNextProdutoSuccessRef.current = false
-                  return
-                }
-                onClose()
-              }}
-            />
-          </div>
-        ) : null}
-
-        {showComplementosPanel ? (
-          <div
-            className={cn(
-              'flex min-h-0 flex-1 flex-col overflow-hidden',
-              state.tab !== 'complementos' && 'hidden'
-            )}
-            aria-hidden={state.tab !== 'complementos'}
-          >
-            <ComplementosMultiSelectDialog
-              open={state.open}
-              produtoId={produtoId}
-              produtoNome={state.produto?.getNome()}
-              onClose={handleRequestClose}
-              isEmbedded
-            />
-          </div>
-        ) : state.open && state.tab === 'complementos' && !produtoId ? (
-          <div className="flex h-full min-h-0 flex-1 items-center justify-center text-sm text-secondary-text">
-            Selecione um produto para gerenciar complementos.
-          </div>
-        ) : null}
-
-        {showImpressorasPanel ? (
-          <div
-            className={cn(
-              'flex min-h-0 flex-1 flex-col overflow-hidden',
-              state.tab !== 'impressoras' && 'hidden'
-            )}
-            aria-hidden={state.tab !== 'impressoras'}
-          >
-            <ProdutoImpressorasDialog
-              open={state.open}
-              produtoId={produtoId}
-              produtoNome={state.produto?.getNome()}
-              onClose={handleRequestClose}
-              isEmbedded
-            />
-          </div>
-        ) : state.open && state.tab === 'impressoras' && !produtoId ? (
-          <div className="flex h-full min-h-0 flex-1 items-center justify-center text-sm text-secondary-text">
-            Selecione um produto para gerenciar impressoras.
-          </div>
-        ) : null}
-
-        {showGrupoPanel ? (
-          <div
-            className={cn(
-              'flex min-h-0 flex-1 flex-col overflow-hidden',
-              state.tab !== 'grupo' && 'hidden'
-            )}
-            aria-hidden={state.tab !== 'grupo'}
-          >
-            {/* key só pelo grupoId: incluir a aba interna remontava o form e voltava para initialTab 0 */}
-            <NovoGrupo
-              ref={grupoNgRef}
-              key={state.grupoId}
-              grupoId={state.grupoId!}
-              isEmbedded
-              embeddedFormId={GRUPO_PRODUTOS_MODAL_FORM_ID}
-              hideEmbeddedFormActions
-              onEmbedFormStateChange={setEmbedGrupoForm}
-              onEmbeddedTabChange={setEmbedGrupoTab}
-              onClose={handleRequestClose}
-              onReload={onReload}
-              onSaved={() => {
-                onReload?.()
-                onClose()
-              }}
-              initialTab={state.initialTabGrupo ?? 0}
-            />
-          </div>
-        ) : state.open && state.tab === 'grupo' && !state.grupoId ? (
-          <div className="flex h-full min-h-0 flex-1 items-center justify-center text-sm text-secondary-text">
-            Selecione um grupo válido para editar.
-          </div>
-        ) : null}
-      </div>
-    </JiffySidePanelModal>
-
-    {confirmExitOpen && typeof document !== 'undefined'
-      ? createPortal(
-          <div
-            className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 md:p-4"
-            role="presentation"
-          >
-            <div
-              className="w-[85vw] max-w-[85vw] rounded-lg bg-white p-6 shadow-lg md:w-auto md:max-w-md"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="produtos-tabs-exit-title"
-            >
-              <h3
-                id="produtos-tabs-exit-title"
-                className="mb-4 text-lg font-semibold text-primary-text"
-              >
-                Alterações não salvas
-              </h3>
-              <p className="mb-6 text-sm text-secondary-text">
-                Você pode salvar antes de sair ou descartar as alterações.
-              </p>
-              <div className="flex flex-col justify-between mb-2 sm:flex-row sm:flex-wrap sm:justify-between">
-                <button
-                  type="button"
-                  onClick={handleCancelDiscardExit}
-                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-primary-text transition-colors hover:bg-gray-50"
-                >
-                  Continuar editando
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={handleConfirmDiscardExit}
-                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-secondary-text transition-colors hover:bg-gray-50"
-                >
-                  Sair sem salvar
-                </button>
-                
-              </div>
+      <JiffySidePanelModal
+        key={dialogKey}
+        open={state.open}
+        onClose={handleRequestClose}
+        title={title}
+        subtitle={subtitle}
+        scrollableBody={false}
+        footerVariant="bar"
+        panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]"
+        footerActions={footerActions}
+        tabsSlot={
+          <div className="flex flex-wrap gap-1 px-2 pb-0">
+            {(
+              [
+                { key: 'produto' as const, label: 'Produto', disabled: false },
+                { key: 'grupo' as const, label: 'Grupo', disabled: !state.grupoId },
+                { key: 'complementos' as const, label: 'Complementos', disabled: !produtoId },
+                { key: 'impressoras' as const, label: 'Impressoras', disabled: !produtoId },
+              ] as const
+            ).map(tab => (
               <button
+                key={tab.key}
+                type="button"
+                disabled={tab.disabled}
+                onClick={() => !tab.disabled && onTabChange(tab.key)}
+                className={`rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                  state.tab === tab.key
+                    ? 'bg-primary text-white'
+                    : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
+                } ${tab.disabled ? 'cursor-not-allowed opacity-50' : ''}`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        }
+      >
+        <div className="flex min-h-0 flex-1 flex-col">
+          {showProdutoPanel ? (
+            <div
+              className={cn(
+                'flex min-h-0 flex-1 flex-col overflow-hidden',
+                state.tab !== 'produto' && 'hidden'
+              )}
+              aria-hidden={state.tab !== 'produto'}
+            >
+              <NovoProduto
+                key={`${produtoId ?? 'new'}-${state.mode}-${produtoFormSession}`}
+                ref={npRef}
+                produtoId={state.mode === 'create' ? undefined : produtoId}
+                isCopyMode={state.mode === 'copy'}
+                defaultGrupoProdutoId={
+                  state.mode === 'create' ? state.prefillGrupoProdutoId : undefined
+                }
+                initialStep={state.initialStepProduto ?? 0}
+                isEmbedded
+                hideEmbeddedHeader
+                hideEmbeddedFormActions
+                onWizardStepChange={setWizardStep}
+                onWizardSavingChange={setWizardSaving}
+                onFiscalUnavailableChange={setFiscalOnlyBack}
+                onClose={handleRequestClose}
+                onSuccess={produtoData => {
+                  onReload?.(produtoData?.produtoId, produtoData?.produtoData)
+                  if (suppressCloseOnNextProdutoSuccessRef.current) {
+                    suppressCloseOnNextProdutoSuccessRef.current = false
+                    return
+                  }
+                  onClose()
+                }}
+              />
+            </div>
+          ) : null}
+
+          {showComplementosPanel ? (
+            <div
+              className={cn(
+                'flex min-h-0 flex-1 flex-col overflow-hidden',
+                state.tab !== 'complementos' && 'hidden'
+              )}
+              aria-hidden={state.tab !== 'complementos'}
+            >
+              <ComplementosMultiSelectDialog
+                open={state.open}
+                produtoId={produtoId}
+                produtoNome={state.produto?.getNome()}
+                onClose={handleRequestClose}
+                isEmbedded
+              />
+            </div>
+          ) : state.open && state.tab === 'complementos' && !produtoId ? (
+            <div className="flex h-full min-h-0 flex-1 items-center justify-center text-sm text-secondary-text">
+              Selecione um produto para gerenciar complementos.
+            </div>
+          ) : null}
+
+          {showImpressorasPanel ? (
+            <div
+              className={cn(
+                'flex min-h-0 flex-1 flex-col overflow-hidden',
+                state.tab !== 'impressoras' && 'hidden'
+              )}
+              aria-hidden={state.tab !== 'impressoras'}
+            >
+              <ProdutoImpressorasDialog
+                open={state.open}
+                produtoId={produtoId}
+                produtoNome={state.produto?.getNome()}
+                onClose={handleRequestClose}
+                isEmbedded
+              />
+            </div>
+          ) : state.open && state.tab === 'impressoras' && !produtoId ? (
+            <div className="flex h-full min-h-0 flex-1 items-center justify-center text-sm text-secondary-text">
+              Selecione um produto para gerenciar impressoras.
+            </div>
+          ) : null}
+
+          {showGrupoPanel ? (
+            <div
+              className={cn(
+                'flex min-h-0 flex-1 flex-col overflow-hidden',
+                state.tab !== 'grupo' && 'hidden'
+              )}
+              aria-hidden={state.tab !== 'grupo'}
+            >
+              {/* key só pelo grupoId: incluir a aba interna remontava o form e voltava para initialTab 0 */}
+              <NovoGrupo
+                ref={grupoNgRef}
+                key={state.grupoId}
+                grupoId={state.grupoId!}
+                isEmbedded
+                embeddedFormId={GRUPO_PRODUTOS_MODAL_FORM_ID}
+                hideEmbeddedFormActions
+                onEmbedFormStateChange={setEmbedGrupoForm}
+                onEmbeddedTabChange={setEmbedGrupoTab}
+                onClose={handleRequestClose}
+                onReload={onReload}
+                onSaved={() => {
+                  onReload?.()
+                  onClose()
+                }}
+                initialTab={state.initialTabGrupo ?? 0}
+              />
+            </div>
+          ) : state.open && state.tab === 'grupo' && !state.grupoId ? (
+            <div className="flex h-full min-h-0 flex-1 items-center justify-center text-sm text-secondary-text">
+              Selecione um grupo válido para editar.
+            </div>
+          ) : null}
+        </div>
+      </JiffySidePanelModal>
+
+      {confirmExitOpen && typeof document !== 'undefined'
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 md:p-4"
+              role="presentation"
+            >
+              <div
+                className="w-[85vw] max-w-[85vw] rounded-lg bg-white p-6 shadow-lg md:w-auto md:max-w-md"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="produtos-tabs-exit-title"
+              >
+                <h3
+                  id="produtos-tabs-exit-title"
+                  className="mb-4 text-lg font-semibold text-primary-text"
+                >
+                  Alterações não salvas
+                </h3>
+                <p className="mb-6 text-sm text-secondary-text">
+                  Você pode salvar antes de sair ou descartar as alterações.
+                </p>
+                <div className="mb-2 flex flex-col justify-between sm:flex-row sm:flex-wrap sm:justify-between">
+                  <button
+                    type="button"
+                    onClick={handleCancelDiscardExit}
+                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-primary-text transition-colors hover:bg-gray-50"
+                  >
+                    Continuar editando
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleConfirmDiscardExit}
+                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-secondary-text transition-colors hover:bg-gray-50"
+                  >
+                    Sair sem salvar
+                  </button>
+                </div>
+                <button
                   type="button"
                   onClick={handleSaveAndCloseFromConfirm}
                   className="w-full rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
                 >
                   Salvar e fechar
                 </button>
-            </div>
-          </div>,
-          document.body
-        )
-      : null}
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
     </>
   )
 }

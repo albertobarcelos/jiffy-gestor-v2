@@ -849,9 +849,7 @@ export default function DashboardV2() {
    */
   const linhasTopProdutosV2 = useMemo(() => {
     const lista = dadosTopProdutos ?? []
-    const visivel = topProdutosListaCompleta
-      ? lista
-      : lista.slice(0, LIMITE_TOP_PRODUTOS_V2_RESUMO)
+    const visivel = topProdutosListaCompleta ? lista : lista.slice(0, LIMITE_TOP_PRODUTOS_V2_RESUMO)
     const somaValor = visivel.reduce((acc, p) => acc + p.getValorTotal(), 0)
     const linhas = visivel.map((p, i) => {
       const valor = p.getValorTotal()
@@ -885,23 +883,21 @@ export default function DashboardV2() {
   }, [dadosTopProdutos, topProdutosListaCompleta])
 
   const maxValorProduto = useMemo(
-    () =>
-      Math.max(
-        ...linhasTopProdutosV2.filter(p => !p.vazio).map(p => p.valor),
-        1
-      ),
+    () => Math.max(...linhasTopProdutosV2.filter(p => !p.vazio).map(p => p.valor), 1),
     [linhasTopProdutosV2]
   )
 
   /** Soma valor e quantidade só dos itens exibidos (base do modo % na barra). */
   const totaisListaTopProdutosV2 = useMemo(() => {
-    return linhasTopProdutosV2.filter(p => !p.vazio).reduce(
-      (acc, p) => ({
-        somaValor: acc.somaValor + p.valor,
-        somaQtd: acc.somaQtd + p.qtd,
-      }),
-      { somaValor: 0, somaQtd: 0 }
-    )
+    return linhasTopProdutosV2
+      .filter(p => !p.vazio)
+      .reduce(
+        (acc, p) => ({
+          somaValor: acc.somaValor + p.valor,
+          somaQtd: acc.somaQtd + p.qtd,
+        }),
+        { somaValor: 0, somaQtd: 0 }
+      )
   }, [linhasTopProdutosV2])
 
   const opcaoPeriodoTopGarcom = useMemo(
@@ -957,7 +953,7 @@ export default function DashboardV2() {
    * Resumo: 10 linhas fixas (com traços). Lista completa: todas as linhas retornadas, com rolagem se necessário.
    */
   const linhasTopGarconsV2 = useMemo(() => {
-    const lista = dadosTopGarcons
+    const lista = dadosTopGarcons ?? []
     if (topGarconsListaCompleta) {
       return lista.map((g, i) => ({
         key: `garcom-rank-${i + 1}-${g.getNome()}`,
@@ -2102,16 +2098,14 @@ export default function DashboardV2() {
             ) : (
               <>
                 {linhasTopProdutosV2.map((p, idx) => {
-                  const larguraBarra =
-                    p.vazio
-                      ? 0
-                      : modoTopProduto === 'porcentagem'
+                  const larguraBarra = p.vazio
+                    ? 0
+                    : modoTopProduto === 'porcentagem'
                       ? p.pct
                       : Math.round((p.valor / maxValorProduto) * 100)
-                  const rotuloMeio =
-                    p.vazio
-                      ? '—'
-                      : modoTopProduto === 'porcentagem'
+                  const rotuloMeio = p.vazio
+                    ? '—'
+                    : modoTopProduto === 'porcentagem'
                       ? `${p.pct}%`
                       : formatarMoeda(p.valor)
                   return (
@@ -2233,12 +2227,13 @@ export default function DashboardV2() {
               <div className="flex min-h-[200px] items-center justify-center py-8">
                 <JiffyLoading className="!gap-0 !py-0" />
               </div>
-            ) : erroTopGarcons ? (
-              <p className="py-6 text-center text-sm text-[#D92D20]">
-                Não foi possível carregar o top garçons.
-              </p>
             ) : (
               <>
+                {erroTopGarcons ? (
+                  <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-center text-sm text-[#D92D20]">
+                    Não foi possível carregar o top garçons.
+                  </p>
+                ) : null}
                 <div
                   className={
                     topGarconsListaCompleta

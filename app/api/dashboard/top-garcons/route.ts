@@ -98,6 +98,54 @@ type VendaDetalhe = Record<string, unknown> & {
   valorFinal?: number
 }
 
+type VendasListPage = {
+  items?: Array<{ id?: string }>
+}
+
+/**
+ * Coleta IDs de vendas FINALIZADAS paginando de 100 em 100 até o último lote incompleto.
+ * Limita quantos IDs seguem para busca de detalhe (N× GET por venda) para não estourar o timeout da rota Next.
+ * Acima desse teto o ranking/totais são amostra — agregação 100% exigiria endpoint agregado no PDV.
+ */
+async function fetchTodosIdsVendasFinalizadas(args: {
+  apiClient: ApiClient
+  headers: Record<string, string>
+  /** Já com status, período etc.; não deve conter limit/offset. */
+  baseParams: URLSearchParams
+}): Promise<string[]> {
+  const PAGE = 100
+  /** Evita loop enorme se a API ignorar offset ou responder sempre página cheia. */
+  const MAX_PAGES_LISTA = 80
+  /** Cada ID vira um GET `/vendas/:id` — limite defensivo para o BFF não dar 504 / abort. */
+  const MAX_IDS_PARA_DETALHAR = 400
+  const ids: string[] = []
+
+  paginas: for (let pageIndex = 0; pageIndex < MAX_PAGES_LISTA; pageIndex++) {
+    const p = new URLSearchParams(args.baseParams.toString())
+    p.set('limit', String(PAGE))
+    p.set('offset', String(pageIndex * PAGE))
+
+    const resp = await args.apiClient.request<VendasListPage>(
+      `/api/v1/operacao-pdv/vendas?${p.toString()}`,
+      { method: 'GET', headers: args.headers }
+    )
+
+    const page = resp.data ?? {}
+    const items = Array.isArray(page.items) ? page.items : []
+
+    for (const v of items) {
+      const id = typeof v?.id === 'string' ? v.id : ''
+      if (!id) continue
+      ids.push(id)
+      if (ids.length >= MAX_IDS_PARA_DETALHAR) break paginas
+    }
+
+    if (items.length === 0 || items.length < PAGE) break
+  }
+
+  return ids
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const periodo = searchParams.get('periodo') || 'hoje'
@@ -126,8 +174,6 @@ export async function GET(request: NextRequest) {
   }
 
   params.append('status', 'FINALIZADA')
-  // Mesmo limite do top-produtos: amostra de vendas no período (pode não cobrir 100% se houver mais de 100 vendas).
-  params.append('limit', '100')
 
   try {
     const apiClient = new ApiClient()
@@ -151,12 +197,11 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const vendasResponse = await apiClient.request<{ items?: Array<{ id: string }> }>(
-      `/api/v1/operacao-pdv/vendas?${params.toString()}`,
-      { method: 'GET', headers }
-    )
-
-    const vendaIds: string[] = (vendasResponse.data?.items || []).map(venda => venda.id)
+    const vendaIds = await fetchTodosIdsVendasFinalizadas({
+      apiClient,
+      headers,
+      baseParams: params,
+    })
 
     if (vendaIds.length === 0) {
       return NextResponse.json({ items: [], totalUsuariosComVendas: 0 })
