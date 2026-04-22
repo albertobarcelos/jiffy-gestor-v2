@@ -12,12 +12,13 @@ import { Complemento } from '@/src/domain/entities/Complemento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
-import { MdClose, MdSearch, MdAdd } from 'react-icons/md'
+import { MdClose, MdSearch, MdAdd, MdKeyboardArrowDown } from 'react-icons/md'
 import {
   GruposComplementosTabsModal,
   GruposComplementosTabsModalState,
 } from '../grupos-complementos/GruposComplementosTabsModal'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
+import { cn } from '@/src/shared/utils/cn'
 
 interface GrupoComplemento {
   id: string
@@ -36,6 +37,43 @@ interface GrupoCatalogoItem {
 }
 
 const LISTAGEM_PAGE_SIZE = 25
+
+function formatarValorComplemento(valor: number): string {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
+}
+
+/** Ordenação alinhada ao modal de grupo (ordem explícita, depois nome) */
+function ordenarComplementosParaExibicao(lista: Complemento[]): Complemento[] {
+  return [...lista].sort((a, b) => {
+    const oa = a.getOrdem()
+    const ob = b.getOrdem()
+    if (oa != null && ob != null && oa !== ob) return oa - ob
+    if (oa != null && ob == null) return -1
+    if (oa == null && ob != null) return 1
+    return (a.getNome() || '').localeCompare(b.getNome() || '', 'pt-BR', { sensitivity: 'base' })
+  })
+}
+
+/** Atualiza apenas o flag ativo para refletir o PATCH sem recarregar o grupo inteiro */
+function atualizarAtivoNaLista(
+  complementos: Complemento[],
+  complementoId: string,
+  ativo: boolean
+): Complemento[] {
+  return complementos.map(c =>
+    c.getId() !== complementoId
+      ? c
+      : Complemento.create(
+          c.getId(),
+          c.getNome(),
+          c.getDescricao(),
+          c.getValor(),
+          ativo,
+          c.getTipoImpactoPreco(),
+          c.getOrdem()
+        )
+  )
+}
 
 /** Vinculados primeiro; depois ordem alfabética por nome */
 function ordenarVinculadosPrimeiro<T extends { id: string; nome?: string }>(
@@ -75,6 +113,14 @@ export function ComplementosMultiSelectDialog({
   const [allSelectableGroups, setAllSelectableGroups] = useState<GrupoCatalogoItem[]>([])
   const [isLoadingSelectableGroups, setIsLoadingSelectableGroups] = useState(false)
   const [catalogSearch, setCatalogSearch] = useState('')
+  /** IDs de grupos com a lista de complementos expandida na UI */
+  const [expandedGrupoIds, setExpandedGrupoIds] = useState<Set<string>>(() => new Set())
+  /** Complementos carregados sob demanda (grupos ainda não vinculados ao produto) */
+  const [detalhesComplementosCache, setDetalhesComplementosCache] = useState<
+    Record<string, Complemento[]>
+  >({})
+  const [loadingDetalheGrupoId, setLoadingDetalheGrupoId] = useState<string | null>(null)
+  const [togglingComplementoId, setTogglingComplementoId] = useState<string | null>(null)
   const [gruposTabsModalState, setGruposTabsModalState] =
     useState<GruposComplementosTabsModalState>({
       open: false,
@@ -211,7 +257,82 @@ export function ComplementosMultiSelectDialog({
     }
   }, [open, loadGroups, loadSelectableGroups])
 
+  useEffect(() => {
+    if (!open) {
+      setExpandedGrupoIds(new Set())
+      setDetalhesComplementosCache({})
+      setLoadingDetalheGrupoId(null)
+      setTogglingComplementoId(null)
+    }
+  }, [open])
+
   const gruposVinculadosIds = useMemo(() => groups.map(g => g.id), [groups])
+
+  const carregarComplementosDoGrupo = useCallback(
+    async (grupoId: string) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+      setLoadingDetalheGrupoId(grupoId)
+      try {
+        const response = await fetch(`/api/grupos-complementos/${grupoId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          cache: 'no-store',
+        })
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || errorData.message || 'Erro ao carregar complementos')
+        }
+        const data = await response.json()
+        const raw = Array.isArray(data.complementos) ? data.complementos : []
+        const mapped = raw.map((item: any) => Complemento.fromJSON(item))
+        setDetalhesComplementosCache(prev => ({ ...prev, [grupoId]: mapped }))
+      } catch (err) {
+        console.error(err)
+        showToast.error(
+          err instanceof Error ? err.message : 'Erro ao carregar complementos do grupo.'
+        )
+        setDetalhesComplementosCache(prev => ({ ...prev, [grupoId]: [] }))
+      } finally {
+        setLoadingDetalheGrupoId(null)
+      }
+    },
+    [auth]
+  )
+
+  const toggleGrupoExpanded = useCallback((grupoId: string) => {
+    setExpandedGrupoIds(prev => {
+      const next = new Set(prev)
+      if (next.has(grupoId)) {
+        next.delete(grupoId)
+      } else {
+        next.add(grupoId)
+      }
+      return next
+    })
+  }, [])
+
+  /** Complementos de grupos não vinculados: carrega sob demanda (inclui após desvincular com painel aberto). */
+  useEffect(() => {
+    for (const grupoId of expandedGrupoIds) {
+      const vinculado = groups.some(g => g.id === grupoId)
+      if (vinculado) continue
+      if (Object.hasOwn(detalhesComplementosCache, grupoId)) continue
+      if (loadingDetalheGrupoId === grupoId) continue
+      void carregarComplementosDoGrupo(grupoId)
+    }
+  }, [
+    expandedGrupoIds,
+    groups,
+    detalhesComplementosCache,
+    loadingDetalheGrupoId,
+    carregarComplementosDoGrupo,
+  ])
 
   const gruposCatalogoParaLista = useMemo(() => {
     const term = catalogSearch.trim().toLowerCase()
@@ -278,6 +399,63 @@ export function ComplementosMultiSelectDialog({
       }
     },
     [salvandoGrupoId, produtoId, groups, persistGruposSelection]
+  )
+
+  const handleToggleComplementoAtivo = useCallback(
+    async (grupoListaId: string, comp: Complemento, novoAtivo: boolean) => {
+      const complementoId = comp.getId()
+      if (comp.isAtivo() === novoAtivo) return
+
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      setTogglingComplementoId(complementoId)
+      try {
+        const response = await fetch(`/api/complementos/${complementoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ ativo: novoAtivo }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || errorData.error || 'Erro ao atualizar complemento')
+        }
+
+        setGroups(prev =>
+          prev.map(g =>
+            g.id === grupoListaId
+              ? {
+                  ...g,
+                  complementos: atualizarAtivoNaLista(g.complementos, complementoId, novoAtivo),
+                }
+              : g
+          )
+        )
+        setDetalhesComplementosCache(prev =>
+          Object.hasOwn(prev, grupoListaId)
+            ? {
+                ...prev,
+                [grupoListaId]: atualizarAtivoNaLista(prev[grupoListaId], complementoId, novoAtivo),
+              }
+            : prev
+        )
+
+        showToast.success(novoAtivo ? 'Complemento ativado.' : 'Complemento desativado.')
+      } catch (err) {
+        console.error(err)
+        showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar complemento.')
+      } finally {
+        setTogglingComplementoId(null)
+      }
+    },
+    [auth]
   )
 
   const handleClose = () => {
@@ -353,7 +531,7 @@ export function ComplementosMultiSelectDialog({
               className="font-nunito h-9 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-xs text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
             />
           </div>
-          <div className="scrollbar-hide max-h-[280px] min-h-0 overflow-y-auto overscroll-y-contain rounded-lg border border-gray-100 bg-gray-50/50 md:max-h-[360px]">
+          <div className="scrollbar-hide max-h-[280px] min-h-0 overflow-y-auto rounded-lg border border-gray-100 bg-gray-50/50 md:max-h-[360px]">
             {isLoadingSelectableGroups ? (
               <p className="font-nunito py-8 text-center text-xs text-secondary-text">
                 Carregando grupos...
@@ -362,45 +540,138 @@ export function ComplementosMultiSelectDialog({
               <ul className="divide-y divide-gray-100">
                 {gruposCatalogoParaLista.map(grupo => {
                   const vinculado = gruposVinculadosIds.includes(grupo.id)
+                  const expandido = expandedGrupoIds.has(grupo.id)
+                  const grupoVinculado = groups.find(g => g.id === grupo.id)
+                  const complementosLista =
+                    grupoVinculado?.complementos ?? detalhesComplementosCache[grupo.id] ?? []
+                  const complementosOrdenados = ordenarComplementosParaExibicao(complementosLista)
+                  const mostrarLoadingDetalhe =
+                    expandido &&
+                    !grupoVinculado &&
+                    loadingDetalheGrupoId === grupo.id &&
+                    !(grupo.id in detalhesComplementosCache)
+
                   return (
-                    <li
-                      key={grupo.id}
-                      className="flex items-center justify-between gap-2 px-2 py-1.5 hover:bg-white/80"
-                    >
-                      <div className="min-w-0 flex-1 py-2">
-                        <p className="font-nunito truncate text-xs font-medium uppercase text-primary-text">
-                          {grupo.nome || 'Grupo'}
-                        </p>
-                        {grupo.obrigatorio ? (
-                          <span className="mt-0.5 inline-flex rounded-full bg-primary/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-primary">
-                            Obrigatório
-                          </span>
-                        ) : null}
+                    <li key={grupo.id}>
+                      <div className="flex items-center justify-between gap-1 px-2 py-1.5 hover:bg-white/80">
+                        <button
+                          type="button"
+                          onClick={() => toggleGrupoExpanded(grupo.id)}
+                          className="flex min-w-0 flex-1 items-start gap-1 rounded-md py-2 text-left outline-none ring-primary focus-visible:ring-2"
+                          aria-expanded={expandido}
+                          aria-controls={`grupo-comp-list-${grupo.id}`}
+                          id={`grupo-comp-trigger-${grupo.id}`}
+                        >
+                          <MdKeyboardArrowDown
+                            className={cn(
+                              'mt-0.5 shrink-0 text-secondary-text transition-transform duration-200',
+                              expandido ? 'rotate-0' : '-rotate-90'
+                            )}
+                            size={20}
+                            aria-hidden
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="font-nunito truncate text-xs font-medium uppercase text-primary-text">
+                              {grupo.nome || 'Grupo'}
+                            </p>
+                            {grupo.obrigatorio ? (
+                              <span className="mt-0.5 inline-flex rounded-full bg-primary/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-primary">
+                                Obrigatório
+                              </span>
+                            ) : null}
+                          </div>
+                        </button>
+                        <div
+                          className="shrink-0 self-center"
+                          onClick={e => e.stopPropagation()}
+                          onMouseDown={e => e.stopPropagation()}
+                        >
+                          <JiffyIconSwitch
+                            checked={vinculado}
+                            onChange={e => {
+                              e.stopPropagation()
+                              void handleToggleCatalogGrupo(grupo.id)
+                            }}
+                            labelPosition="start"
+                            bordered={false}
+                            size="xs"
+                            className="shrink-0"
+                            disabled={salvandoGrupoId === grupo.id}
+                            inputProps={{
+                              'aria-label': vinculado
+                                ? `Desvincular grupo ${grupo.nome ?? ''}`
+                                : `Vincular grupo ${grupo.nome ?? ''}`,
+                              onClick: e => e.stopPropagation(),
+                            }}
+                          />
+                        </div>
                       </div>
-                      <div
-                        className="shrink-0"
-                        onClick={e => e.stopPropagation()}
-                        onMouseDown={e => e.stopPropagation()}
-                      >
-                        <JiffyIconSwitch
-                          checked={vinculado}
-                          onChange={e => {
-                            e.stopPropagation()
-                            void handleToggleCatalogGrupo(grupo.id)
-                          }}
-                          labelPosition="start"
-                          bordered={false}
-                          size="xs"
-                          className="shrink-0"
-                          disabled={salvandoGrupoId === grupo.id}
-                          inputProps={{
-                            'aria-label': vinculado
-                              ? `Desvincular grupo ${grupo.nome ?? ''}`
-                              : `Vincular grupo ${grupo.nome ?? ''}`,
-                            onClick: e => e.stopPropagation(),
-                          }}
-                        />
-                      </div>
+                      {expandido ? (
+                        <div
+                          id={`grupo-comp-list-${grupo.id}`}
+                          role="region"
+                          aria-labelledby={`grupo-comp-trigger-${grupo.id}`}
+                          className="border-t border-gray-200 bg-info py-2 pl-8 pr-2 md:py-3 md:pl-10 md:pr-3"
+                        >
+                          {mostrarLoadingDetalhe ? (
+                            <div className="flex justify-center py-10">
+                              <JiffyLoading />
+                            </div>
+                          ) : complementosOrdenados.length === 0 ? (
+                            <p className="text-center text-sm text-secondary-text">
+                              Nenhum complemento neste grupo.
+                            </p>
+                          ) : (
+                            <>
+                              {complementosOrdenados.map(comp => (
+                                <div
+                                  key={comp.getId()}
+                                  className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 border-b border-gray-200 p-2 transition-colors hover:bg-primary-bg/60"
+                                >
+                                  <p
+                                    className={cn(
+                                      'min-w-0 truncate text-sm font-normal text-primary-text',
+                                      !comp.isAtivo() && 'text-secondary-text line-through'
+                                    )}
+                                  >
+                                    {comp.getNome()}
+                                  </p>
+                                  <div className="min-w-[100px] rounded border border-gray-200 bg-white px-2 py-1 text-right text-xs font-normal tabular-nums text-primary-text">
+                                    {formatarValorComplemento(comp.getValor())}
+                                  </div>
+                                  <div
+                                    className="flex justify-end self-center"
+                                    onClick={e => e.stopPropagation()}
+                                    onMouseDown={e => e.stopPropagation()}
+                                  >
+                                    <JiffyIconSwitch
+                                      size="xs"
+                                      checked={comp.isAtivo()}
+                                      onChange={e => {
+                                        e.stopPropagation()
+                                        void handleToggleComplementoAtivo(
+                                          grupo.id,
+                                          comp,
+                                          e.target.checked
+                                        )
+                                      }}
+                                      disabled={togglingComplementoId === comp.getId()}
+                                      bordered={false}
+                                      className="shrink-0"
+                                      inputProps={{
+                                        'aria-label': comp.isAtivo()
+                                          ? 'Desativar complemento'
+                                          : 'Ativar complemento',
+                                        onClick: ev => ev.stopPropagation(),
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </>
+                          )}
+                        </div>
+                      ) : null}
                     </li>
                   )
                 })}
