@@ -1,6 +1,14 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  forwardRef,
+  useImperativeHandle,
+} from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Impressora } from '@/src/domain/entities/Impressora'
@@ -9,7 +17,7 @@ import { cn } from '@/src/shared/utils/cn'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { Input } from '@/src/presentation/components/ui/input'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
-import { MdCheck, MdExpandLess, MdExpandMore, MdPhone } from 'react-icons/md'
+import { MdCheck, MdExpandLess, MdExpandMore, MdPhone, MdSearch } from 'react-icons/md'
 
 interface TerminalConfig {
   terminalId: string
@@ -66,6 +74,9 @@ const MODELOS_OPTIONS = ['Genérico', 'Sunmi Integrada', 'Stone Integrada', 'Pag
 /** Grid desktop (cabeçalho + linhas): mesma largura de colunas e padding para alinhar títulos aos controles */
 const DESKTOP_TERMINAL_ROW_GRID =
   'grid grid-cols-[auto_minmax(0,1fr)_7rem_7rem_3.5rem] items-center gap-3 px-2'
+
+/** Debounce do termo enviado ao GET `/api/terminais?q=` (nova impressora — lista via API). */
+const BUSCA_TERMINAL_DEBOUNCE_MS = 480
 
 /** Labels outlined em preto — igual NovoGrupo / grupo de complementos */
 const sxOutlinedLabelTextoEscuro = {
@@ -150,6 +161,12 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
 
     const hasLoadedImpressoraRef = useRef(false)
     const hasLoadedTerminaisRef = useRef(false)
+
+    const [buscaTerminalDraft, setBuscaTerminalDraft] = useState('')
+    const [buscaTerminalQ, setBuscaTerminalQ] = useState('')
+    /** Ref síncrona para `q` nas requisições sem alterar deps de callbacks pesados. */
+    const buscaTerminalQRef = useRef('')
+    buscaTerminalQRef.current = buscaTerminalQ.trim()
     /** “Salvar e fechar” no shell do painel ou no diálogo interno (página cheia). */
     const embeddedCloseAfterSaveRef = useRef(false)
     /**
@@ -159,6 +176,13 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
     const copyAwaitingFirstPersistRef = useRef(isCopyMode)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const pageSize = 10
+
+    useEffect(() => {
+      const t = window.setTimeout(() => {
+        setBuscaTerminalQ(buscaTerminalDraft.trim())
+      }, BUSCA_TERMINAL_DEBOUNCE_MS)
+      return () => window.clearTimeout(t)
+    }, [buscaTerminalDraft])
 
     /**
      * Aplica máscara de IP (###.###.#.###)
@@ -326,6 +350,10 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
             limit: pageSize.toString(),
             offset: offset.toString(),
           })
+          const qBusca = buscaTerminalQRef.current
+          if (qBusca) {
+            params.set('q', qBusca)
+          }
 
           const response = await fetch(`/api/terminais?${params.toString()}`, {
             headers: {
@@ -415,6 +443,10 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
             limit: pageSize.toString(),
             offset: offset.toString(),
           })
+          const qBusca = buscaTerminalQRef.current
+          if (qBusca) {
+            params.set('q', qBusca)
+          }
 
           const response = await fetch(`/api/terminais?${params.toString()}`, {
             headers: {
@@ -675,6 +707,29 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
       return () => container.removeEventListener('scroll', handleScroll)
     }, [currentPage, hasMoreTerminals, isLoadingMore, isEditing, loadTerminais])
 
+    /** Edição/cópia: filtro local por nome. Nova impressora: lista já vem filtrada da API (`q`). */
+    const terminaisVisiveis = useMemo(() => {
+      if (!isEditing && !isCopyMode) return terminaisConfig
+      const q = buscaTerminalDraft.trim().toLowerCase()
+      if (!q) return terminaisConfig
+      return terminaisConfig.filter(t => t.nome.toLowerCase().includes(q))
+    }, [terminaisConfig, buscaTerminalDraft, isEditing, isCopyMode])
+
+    /** Nova impressora (sem impressoraId): recarrega lista com `q` após debounce. */
+    useEffect(() => {
+      if (!isAuthenticated) return
+      if (impressoraId && (isEditing || isCopyMode)) return
+      if (!hasLoadedTerminaisRef.current) return
+      void loadAllTerminais()
+    }, [
+      buscaTerminalQ,
+      isAuthenticated,
+      impressoraId,
+      isEditing,
+      isCopyMode,
+      loadAllTerminais,
+    ])
+
     /**
      * Verifica se há mudanças não salvas
      */
@@ -745,13 +800,17 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
 
     const toggleSelectAll = () => {
       setSelectedTerminalIds(prev => {
-        if (prev.size === terminaisConfig.length) {
-          // Se todos estão selecionados, desmarca todos
-          return new Set()
-        } else {
-          // Seleciona todos
-          return new Set(terminaisConfig.map(t => t.terminalId))
+        const visibleIds = terminaisVisiveis.map(t => t.terminalId)
+        const allVisibleSelected =
+          visibleIds.length > 0 && visibleIds.every(id => prev.has(id))
+        if (allVisibleSelected) {
+          const next = new Set(prev)
+          for (const id of visibleIds) next.delete(id)
+          return next
         }
+        const next = new Set(prev)
+        for (const id of visibleIds) next.add(id)
+        return next
       })
     }
 
@@ -764,7 +823,8 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
     }
 
     const isAllSelected = (): boolean => {
-      return terminaisConfig.length > 0 && selectedTerminalIds.size === terminaisConfig.length
+      if (terminaisVisiveis.length === 0) return false
+      return terminaisVisiveis.every(t => selectedTerminalIds.has(t.terminalId))
     }
 
     const toggleTerminalExpanded = (terminalId: string) => {
@@ -1292,20 +1352,37 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                 {/* Barra de ações em lote — sempre visível; aplica só com terminais selecionados */}
                 <div className="shrink-0 border-b border-primary px-2 py-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-nunito text-sm font-medium text-primary-text">
+                    <span className="min-w-0 flex-1 font-nunito text-sm font-medium text-primary-text">
                       {selectedTerminalIds.size === 0 ?
                         'Nenhum terminal selecionado'
                       : `${selectedTerminalIds.size} terminal(is) selecionado(s)`}
                     </span>
-                    {selectedTerminalIds.size > 0 ?
-                      <button
-                        type="button"
-                        onClick={clearSelection}
-                        className="rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
-                      >
-                        Limpar seleção
-                      </button>
-                    : null}
+                    <div className="flex min-w-0 flex-[1_1_14rem] flex-wrap items-center justify-end gap-2 sm:flex-initial">
+                      <div className="relative w-full min-w-[12rem] max-w-sm flex-1 sm:w-60">
+                        <MdSearch
+                          className="pointer-events-none absolute left-2.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-secondary-text"
+                          aria-hidden
+                        />
+                        <input
+                          type="search"
+                          value={buscaTerminalDraft}
+                          onChange={e => setBuscaTerminalDraft(e.target.value)}
+                          placeholder="Buscar terminal por nome..."
+                          autoComplete="off"
+                          className="font-nunito h-8 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+                          aria-label="Buscar terminal por nome"
+                        />
+                      </div>
+                      {selectedTerminalIds.size > 0 ?
+                        <button
+                          type="button"
+                          onClick={clearSelection}
+                          className="shrink-0 rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+                        >
+                          Limpar seleção
+                        </button>
+                      : null}
+                    </div>
                   </div>
                   <div className="space-y-1">
                     {/* Primeira linha: Modelo, IP, Porta */}
@@ -1507,17 +1584,39 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                       <div className="flex flex-col items-center justify-center gap-4 py-12">
                         <MdPhone className="text-secondary-text" size={48} />
                         <p className="text-lg font-semibold text-primary-text">
-                          Nenhum terminal cadastrado
+                          {buscaTerminalQ.trim() ?
+                            'Nenhum terminal encontrado para esta busca'
+                          : 'Nenhum terminal cadastrado'}
                         </p>
                         <p className="max-w-xs text-center text-sm text-secondary-text">
-                          Parece que você ainda não tem nenhum terminal cadastrado. Cadastre um
-                          terminal na seção de configurações para começar a configurar impressoras.
+                          {buscaTerminalQ.trim() ?
+                            'Tente outro termo ou limpe a busca para ver todos os terminais disponíveis.'
+                          : 'Parece que você ainda não tem nenhum terminal cadastrado. Cadastre um terminal na seção de configurações para começar a configurar impressoras.'}
                         </p>
                       </div>
                     )}
 
-                  {terminaisConfig.map((config, index) => {
-                    const isZebraEven = index % 2 === 0
+                  {terminaisConfig.length > 0 &&
+                    terminaisVisiveis.length === 0 &&
+                    (isEditing || isCopyMode) &&
+                    buscaTerminalDraft.trim() !== '' && (
+                      <div className="flex flex-col items-center justify-center gap-3 px-4 py-12">
+                        <MdSearch className="text-secondary-text" size={40} aria-hidden />
+                        <p className="text-lg font-semibold text-primary-text">
+                          Nenhum terminal encontrado para esta busca
+                        </p>
+                        <p className="max-w-xs text-center text-sm text-secondary-text">
+                          Ajuste o termo ou limpe o campo de busca.
+                        </p>
+                      </div>
+                    )}
+
+                  {terminaisVisiveis.map((config, visibleIdx) => {
+                    const index = terminaisConfig.findIndex(
+                      t => t.terminalId === config.terminalId
+                    )
+                    if (index < 0) return null
+                    const isZebraEven = visibleIdx % 2 === 0
                     const bgClass = isZebraEven ? 'bg-gray-50' : 'bg-white'
                     const isExpanded = expandedTerminalIds.has(config.terminalId)
 

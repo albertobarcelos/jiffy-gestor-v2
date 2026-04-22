@@ -37,7 +37,9 @@ export type ProdutoImpressoraResumoInicial = Readonly<{
   ativo: boolean
 }>
 
-function mapResumoToImpressoras(resumo?: ReadonlyArray<ProdutoImpressoraResumoInicial>): ProdutoImpressora[] {
+function mapResumoToImpressoras(
+  resumo?: ReadonlyArray<ProdutoImpressoraResumoInicial>
+): ProdutoImpressora[] {
   if (!resumo?.length) return []
   return resumo
     .filter(i => Boolean(i?.id))
@@ -76,9 +78,9 @@ export function ProdutoImpressorasDialog({
   )
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [isUpdating, setIsUpdating] = useState(false)
   const [allImpressoras, setAllImpressoras] = useState<ProdutoImpressora[]>([])
   const [isLoadingAllImpressoras, setIsLoadingAllImpressoras] = useState(false)
+  /** Durante o PATCH só o switch desta impressora fica desabilitado (evita “congelar” toda a lista). */
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [impressorasModalState, setImpressorasModalState] = useState<ImpressorasTabsModalState>({
     open: false,
@@ -316,7 +318,6 @@ export function ProdutoImpressorasDialog({
         return false
       }
 
-      setIsUpdating(true)
       try {
         const response = await fetch(`/api/produtos/${produtoId}`, {
           method: 'PATCH',
@@ -355,8 +356,6 @@ export function ProdutoImpressorasDialog({
         console.error(err)
         showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar impressoras.')
         return false
-      } finally {
-        setIsUpdating(false)
       }
     },
     [produtoId, findImpressoraById]
@@ -364,7 +363,8 @@ export function ProdutoImpressorasDialog({
 
   const handleToggleVinculo = useCallback(
     async (impressoraId: string, vincular: boolean) => {
-      if (isUpdating || togglingId) return
+      // Evita PATCH paralelos (lista de IDs inconsistente até o primeiro terminar).
+      if (togglingId !== null) return
       const next = new Set(linkedIds)
       if (vincular) next.add(impressoraId)
       else next.delete(impressoraId)
@@ -379,22 +379,28 @@ export function ProdutoImpressorasDialog({
         setTogglingId(null)
       }
     },
-    [isUpdating, togglingId, linkedIds, persistImpressorasSelection]
+    [togglingId, linkedIds, persistImpressorasSelection]
   )
+
+  /** Um único fluxo visual: só some o Jiffy quando produto + catálogo `/api/impressoras` terminarem. */
+  const carregandoListaImpressoras = isLoading || isLoadingAllImpressoras
 
   /** Mesmo shell visual de `renderCatalogoGruposCard` em ComplementosMultiSelectDialog */
   const renderCatalogoImpressorasCard = () => (
     <div className="mb-4 flex min-h-0 flex-col rounded-lg border border-[#E6E9F4] bg-white p-2 shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
-      {isLoading ? (
+      {carregandoListaImpressoras && !error ? (
         <div className="flex flex-col items-center justify-center gap-2 py-12">
           <JiffyLoading />
         </div>
-      ) : error ? (
+      ) : error && !isLoading ? (
         <div className="flex flex-col items-center justify-center space-y-3 py-12 text-center">
           <p className="text-sm text-secondary-text">{error}</p>
           <button
             type="button"
-            onClick={() => void loadImpressoras()}
+            onClick={() => {
+              void loadImpressoras()
+              void loadAllImpressoras()
+            }}
             className="text-sm font-semibold text-primary hover:underline"
           >
             Tentar novamente
@@ -415,12 +421,8 @@ export function ProdutoImpressorasDialog({
               className="font-nunito h-9 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-xs text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
             />
           </div>
-          <div className="max-h-[280px] min-h-0 overflow-y-auto overscroll-y-contain rounded-lg border border-gray-100 bg-gray-50/50 scrollbar-hide md:max-h-[360px]">
-            {isLoadingAllImpressoras ? (
-              <p className="font-nunito py-8 text-center text-xs text-secondary-text">
-                Carregando impressoras...
-              </p>
-            ) : filteredAllImpressoras.length ? (
+          <div className="scrollbar-hide max-h-[280px] min-h-0 overflow-y-auto overscroll-y-contain rounded-lg border border-gray-100 bg-gray-50/50 md:max-h-[360px]">
+            {filteredAllImpressoras.length ? (
               <ul className="divide-y divide-gray-100">
                 {filteredAllImpressoras.map(impressora => {
                   const isLinked = linkedIds.has(impressora.id)
@@ -432,13 +434,13 @@ export function ProdutoImpressorasDialog({
                     >
                       <div className="min-w-0 flex-1 py-2">
                         <div className="flex items-center gap-2">
-                          <p className="font-nunito truncate uppercase text-xs font-medium text-primary-text">
+                          <p className="font-nunito truncate text-xs font-medium uppercase text-primary-text">
                             {impressora.nome || 'Impressora'}
                           </p>
                           <button
                             type="button"
                             onClick={() => handleEditImpressora(impressora)}
-                            disabled={isUpdating}
+                            disabled={togglingId !== null}
                             className="shrink-0 text-primary transition-colors hover:text-primary/80 disabled:cursor-not-allowed disabled:opacity-60"
                             aria-label={`Editar ${impressora.nome}`}
                             title="Editar impressora"
@@ -446,8 +448,12 @@ export function ProdutoImpressorasDialog({
                             <MdEdit size={16} />
                           </button>
                         </div>
-                        {(impressora.modelo || impressora.local || impressora.tipoConexao || impressora.ip || impressora.porta) && (
-                          <p className="mt-0.5 font-nunito text-xs leading-snug text-secondary-text">
+                        {(impressora.modelo ||
+                          impressora.local ||
+                          impressora.tipoConexao ||
+                          impressora.ip ||
+                          impressora.porta) && (
+                          <p className="font-nunito mt-0.5 text-xs leading-snug text-secondary-text">
                             {[
                               impressora.modelo && `Modelo: ${impressora.modelo}`,
                               impressora.local && `Local: ${impressora.local}`,
@@ -475,7 +481,7 @@ export function ProdutoImpressorasDialog({
                           bordered={false}
                           size="xs"
                           className="shrink-0"
-                          disabled={isUpdating || isRowLoading}
+                          disabled={isRowLoading}
                           inputProps={{
                             'aria-label': isLinked
                               ? `Desvincular impressora ${impressora.nome ?? ''}`
@@ -517,7 +523,7 @@ export function ProdutoImpressorasDialog({
         <button
           type="button"
           onClick={handleOpenNovaImpressora}
-          disabled={isUpdating}
+          disabled={togglingId !== null}
           className="flex shrink-0 items-center rounded-lg border border-primary bg-primary px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 md:h-8 md:gap-2 md:px-4 md:text-sm"
         >
           <MdAdd size={18} />
@@ -549,7 +555,7 @@ export function ProdutoImpressorasDialog({
       <>
         <div className="flex h-full flex-col overflow-hidden">
           {embeddedSectionHeader}
-          <div className="flex-1 overflow-y-auto px-2 py-4 scrollbar-hide md:px-6">
+          <div className="scrollbar-hide flex-1 overflow-y-auto px-2 py-4 md:px-6">
             {renderDialogBody()}
           </div>
         </div>
@@ -600,7 +606,7 @@ export function ProdutoImpressorasDialog({
               <button
                 type="button"
                 onClick={handleOpenNovaImpressora}
-                disabled={isUpdating}
+                disabled={togglingId !== null}
                 className="flex shrink-0 items-center rounded-lg border border-primary bg-primary px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 md:h-8 md:gap-2 md:px-4 md:text-sm"
               >
                 <MdAdd size={18} />

@@ -19,7 +19,7 @@ import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitc
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
 import { cn } from '@/src/shared/utils/cn'
-import { MdPhone } from 'react-icons/md'
+import { MdPhone, MdSearch } from 'react-icons/md'
 
 /** Labels outlined em preto — igual NovoComplemento / NovaImpressora */
 const sxOutlinedLabelTextoEscuro = {
@@ -62,6 +62,9 @@ const DESKTOP_TAXA_TERMINAL_GRID =
   'grid grid-cols-[auto_minmax(0,1fr)_repeat(4,minmax(4.5rem,1fr))] items-center gap-2 px-2'
 
 const PAGE_SIZE_TERMINAIS = 100
+
+/** Debounce do termo enviado ao GET `/api/terminais?q=` (backend: preferencias/terminais). */
+const BUSCA_TERMINAL_DEBOUNCE_MS = 480
 
 /** Botões de ação em lote na grade 4×2 (Config. por Terminal). */
 const BULK_TERMINAL_BTN_CLASS =
@@ -168,6 +171,12 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
   const [carregandoTerminais, setCarregandoTerminais] = useState(false)
   const hasLoadedTerminaisRef = useRef(false)
 
+  const [buscaTerminalDraft, setBuscaTerminalDraft] = useState('')
+  const [buscaTerminalQ, setBuscaTerminalQ] = useState('')
+  /** Ref síncrona — `fetchListaTerminais` lê o q atual sem recriar callbacks que disparariam reload da taxa no modo edição. */
+  const buscaTerminalQRef = useRef('')
+  buscaTerminalQRef.current = buscaTerminalQ.trim()
+
   const [selectedTerminalIds, setSelectedTerminalIds] = useState<Set<string>>(new Set())
 
   const [nome, setNome] = useState('')
@@ -238,13 +247,21 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
     return () => window.clearTimeout(t)
   }, [])
 
-  /** Lista paginada de terminais — reutilizada na criação e na edição (merge com GET taxa). */
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setBuscaTerminalQ(buscaTerminalDraft.trim())
+    }, BUSCA_TERMINAL_DEBOUNCE_MS)
+    return () => window.clearTimeout(t)
+  }, [buscaTerminalDraft])
+
+  /** Lista paginada de terminais — reutilizada na criação e na edição (merge com GET taxa). Usa `buscaTerminalQRef` para o parâmetro `q`. */
   const fetchListaTerminais = useCallback(async (bearerToken: string): Promise<TerminalListaItem[]> => {
     const acumulado: TerminalListaItem[] = []
     let offset = 0
     let hasMore = true
     let iterations = 0
     const maxIterations = 200
+    const q = buscaTerminalQRef.current
 
     while (hasMore && iterations < maxIterations) {
       iterations++
@@ -252,6 +269,9 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
         limit: String(PAGE_SIZE_TERMINAIS),
         offset: String(offset),
       })
+      if (q) {
+        params.set('q', q)
+      }
 
       const response = await fetch(`/api/terminais?${params.toString()}`, {
         headers: {
@@ -433,6 +453,13 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
       void loadAllTerminais()
     }
   }, [isAuthenticated, taxaEditId, carregarEdicaoTaxa, loadAllTerminais])
+
+  /** Recarrega só a lista de terminais quando o termo debounced muda (criação ou edição), sem novo GET da taxa. */
+  useEffect(() => {
+    if (!isAuthenticated) return
+    if (!hasLoadedTerminaisRef.current) return
+    void loadAllTerminais()
+  }, [buscaTerminalQ, isAuthenticated, loadAllTerminais])
 
   const emitEmbedFormState = useCallback(() => {
     onEmbedFormStateChange?.({
@@ -820,20 +847,37 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
 
             <div className="shrink-0 border-b border-primary px-2 py-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-nunito text-sm font-medium text-primary-text">
+                <span className="min-w-0 flex-1 font-nunito text-sm font-medium text-primary-text">
                   {selectedTerminalIds.size === 0
                     ? 'Nenhum terminal selecionado'
                     : `${selectedTerminalIds.size} terminal(is) selecionado(s)`}
                 </span>
-                {selectedTerminalIds.size > 0 ? (
-                  <button
-                    type="button"
-                    onClick={clearSelection}
-                    className="rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
-                  >
-                    Limpar seleção
-                  </button>
-                ) : null}
+                <div className="flex min-w-0 flex-[1_1_14rem] flex-wrap items-center justify-end gap-2 sm:flex-initial">
+                  <div className="relative w-full min-w-[12rem] max-w-sm flex-1 sm:w-60">
+                    <MdSearch
+                      className="pointer-events-none absolute left-2.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-secondary-text"
+                      aria-hidden
+                    />
+                    <input
+                      type="search"
+                      value={buscaTerminalDraft}
+                      onChange={e => setBuscaTerminalDraft(e.target.value)}
+                      placeholder="Buscar terminal por nome..."
+                      autoComplete="off"
+                      className="font-nunito h-8 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+                      aria-label="Buscar terminal por nome"
+                    />
+                  </div>
+                  {selectedTerminalIds.size > 0 ? (
+                    <button
+                      type="button"
+                      onClick={clearSelection}
+                      className="shrink-0 rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+                    >
+                      Limpar seleção
+                    </button>
+                  ) : null}
+                </div>
               </div>
 
               <div className="mt-1 overflow-x-auto pb-0.5 [-webkit-overflow-scrolling:touch]">
