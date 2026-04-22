@@ -550,22 +550,22 @@ export function ComissoesList() {
               </div>
             </div>
 
-            <div className="hidden h-11 items-center gap-[10px] rounded-lg bg-custom-2 px-2 md:grid md:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))] md:px-4">
-              <span className="text-xs font-semibold text-primary-text md:text-sm">
+            <div className="hidden h-11 items-center gap-[10px] rounded-lg bg-custom-2 px-2 md:flex md:px-4">
+              <div className="flex-[2] text-xs font-semibold text-primary-text md:text-sm">
                 Usuário PDV
-              </span>
-              <span className="hidden text-xs font-semibold text-primary-text md:block md:text-sm">
+              </div>
+              <div className="hidden flex-1 text-xs font-semibold text-primary-text md:flex md:text-sm text-center justify-end">
                 Vendas participadas (R$)
-              </span>
-              <span className="hidden text-xs font-semibold text-primary-text lg:block lg:text-sm">
+              </div>
+              <div className="hidden flex-1 text-xs font-semibold text-primary-text lg:flex lg:text-sm text-center justify-end">
                 Base taxa (R$)
-              </span>
-              <span className="hidden text-xs font-semibold text-primary-text md:block md:text-sm">
+              </div>
+              <div className="hidden flex-1 text-xs font-semibold text-primary-text md:flex md:text-sm text-center justify-center">
                 Qtd. vendas
-              </span>
-              <span className="text-end text-xs font-semibold text-primary-text md:text-sm">
+              </div>
+              <div className="flex-1 text-end text-xs font-semibold text-primary-text">
                 Comissão (R$)
-              </span>
+              </div>
             </div>
 
             <div className="divide-y divide-gray-100 rounded-lg border border-gray-100 bg-white">
@@ -578,23 +578,23 @@ export function ComissoesList() {
                   <div
                     key={`${row.usuarioPdvId}-${index}`}
                     className={cn(
-                      'grid grid-cols-1 gap-2 px-3 py-3 md:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))] md:items-center md:gap-[10px] md:px-4',
+                      'flex flex-col gap-2 px-3 py-3 md:flex-row md:items-center md:gap-[10px] md:px-4',
                       index % 2 === 0 ? 'bg-gray-50/80' : 'bg-white'
                     )}
                   >
-                    <div className="min-w-0 font-medium text-primary-text">
+                    <div className="min-w-0 font-medium uppercase text-primary-text md:flex-[2]">
                       {row.nomeUsuarioPdv}
                     </div>
-                    <div className="text-sm tabular-nums text-primary-text md:text-right">
+                    <div className="text-sm tabular-nums text-primary-text md:flex-1 md:text-right">
                       {fmtBrl(row.valorTotalVendasParticipadas)}
                     </div>
-                    <div className="text-sm tabular-nums text-primary-text md:text-right">
+                    <div className="hidden text-sm tabular-nums text-primary-text lg:flex lg:flex-1 lg:justify-end">
                       {fmtBrl(row.valorBaseTaxaUsuario)}
                     </div>
-                    <div className="text-sm tabular-nums text-primary-text md:text-right">
+                    <div className="text-sm tabular-nums text-primary-text md:flex-1 md:text-center">
                       {fmtInt(row.countVendasParticipadas)}
                     </div>
-                    <div className="font-semibold tabular-nums text-primary md:text-right">
+                    <div className="font-semibold tabular-nums text-primary md:flex-1 md:text-right">
                       {fmtBrl(row.valorTotalComissao)}
                     </div>
                   </div>
