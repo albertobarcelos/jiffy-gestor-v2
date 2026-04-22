@@ -29,8 +29,9 @@ Restaurar `scrollTop` em `useEffect` ou “consertar scroll” só no container 
 No `JiffyIconSwitch`:
 
 - O controle interativo é um **`<button type="button" role="switch" aria-checked={...}>`** com o mesmo visual (trilho/thumb).
-- O `onChange` do componente continua no formato **compatível com checkbox** (`e.target.checked`) para não quebrar telas existentes.
+- O `onChange` do componente continua no formato **compatível com checkbox** (`e.target.checked`) para não quebrar telas existentes. O evento sintético **não** deve reutilizar o `target` do `click` do botão (não há `checked` no `HTMLButtonElement`); monte um `target` falso com `checked` / `value` / `type: 'checkbox'`. Não espalhe o `MouseEvent` inteiro como se fosse `ChangeEvent` — isso fez `e.target.checked` virar `undefined` e o switch “não mudar” em toda a aplicação.
 - Teclado: Space/Enter no `<button>` geram **`click`** nativo — não duplicar toggle em `onKeyDown`.
+- `type="button"` deve permanecer após `...inputProps` / `restInputProps` para nunca virar `submit` em formulário.
 
 ## Ao criar novo switch customizado
 

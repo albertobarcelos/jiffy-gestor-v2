@@ -44,22 +44,39 @@ const SIZES = {
   xs: { trackW: 30, trackH: 16, circleDia: 14, iconW: 9 },
 } as const
 
-/** Evento compatível com handlers que esperam `ChangeEvent` de checkbox (ex.: `e.target.checked`). */
+/**
+ * Evento compatível com handlers que esperam `ChangeEvent` de checkbox (`e.target.checked`).
+ * Não espalhar o SyntheticEvent original: o `target` real é o `<button>` e alguns ambientes
+ * acabam lendo `checked` indefinido — o toggle parece “morto” em todas as telas.
+ */
 function emitCheckboxLikeChange(
   nextChecked: boolean,
-  native: React.MouseEvent<HTMLButtonElement> | React.KeyboardEvent<HTMLButtonElement>
+  native: React.MouseEvent<HTMLButtonElement>
 ): React.ChangeEvent<HTMLInputElement> {
-  const target = {
+  const btn = native.currentTarget
+  const fakeTarget = {
     checked: nextChecked,
     value: nextChecked ? 'on' : '',
     type: 'checkbox',
-    name: (native.target as HTMLButtonElement).getAttribute('name') ?? '',
+    name: btn.getAttribute('name') ?? '',
+    id: btn.id,
   } as HTMLInputElement
+
   return {
-    ...native,
-    target,
-    currentTarget: native.currentTarget as unknown as HTMLInputElement,
-  } as React.ChangeEvent<HTMLInputElement>
+    target: fakeTarget,
+    currentTarget: fakeTarget,
+    nativeEvent: native.nativeEvent,
+    bubbles: native.bubbles,
+    cancelable: native.cancelable,
+    defaultPrevented: native.defaultPrevented,
+    preventDefault: () => native.preventDefault(),
+    stopPropagation: () => native.stopPropagation(),
+    isDefaultPrevented: () => native.defaultPrevented,
+    isPropagationStopped: () => native.isPropagationStopped(),
+    persist: () => {},
+    timeStamp: native.timeStamp,
+    type: 'change',
+  } as unknown as React.ChangeEvent<HTMLInputElement>
 }
 
 /**
@@ -205,9 +222,7 @@ export function JiffyIconSwitch({
     </div>
   )
 
-  const handleToggle = (
-    ev: React.MouseEvent<HTMLButtonElement> | React.KeyboardEvent<HTMLButtonElement>
-  ) => {
+  const handleToggle = (ev: React.MouseEvent<HTMLButtonElement>) => {
     if (disabled) return
     const next = !checked
     onChange(emitCheckboxLikeChange(next, ev))
@@ -215,13 +230,13 @@ export function JiffyIconSwitch({
 
   return (
     <button
-      type="button"
       id={controlId}
       name={name}
       role="switch"
       aria-checked={checked}
       disabled={disabled}
       {...(restInputProps as React.ButtonHTMLAttributes<HTMLButtonElement>)}
+      type="button"
       className={cn(
         'flex items-center rounded-lg outline-none [overflow-anchor:none]',
         size === 'xs' ? 'gap-1 px-0 py-0'
@@ -236,7 +251,7 @@ export function JiffyIconSwitch({
       onBlur={inputOnBlur as React.FocusEventHandler<HTMLButtonElement> | undefined}
       onClick={(e) => {
         inputOnClick?.(e as unknown as React.MouseEvent<HTMLInputElement>)
-        if (!e.defaultPrevented) handleToggle(e)
+        handleToggle(e)
       }}
       onKeyDown={(e) => {
         inputOnKeyDown?.(e as unknown as React.KeyboardEvent<HTMLInputElement>)
