@@ -496,6 +496,9 @@ export function JiffySidePanelModal({
       open={internalOpen}
       onClose={handleModalClose}
       closeAfterTransition
+      disableAutoFocus
+      disableEnforceFocus
+      disableRestoreFocus
       slots={{ backdrop: PainelPedidoBackdrop }}
       sx={{
         zIndex,

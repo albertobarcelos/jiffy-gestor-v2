@@ -103,6 +103,21 @@ export class PerfilUsuarioRepository implements IPerfilUsuarioRepository {
         aplicarDescontoVenda: data.aplicarDescontoVenda !== undefined ? data.aplicarDescontoVenda : false,
         aplicarAcrescimoProduto: data.aplicarAcrescimoProduto !== undefined ? data.aplicarAcrescimoProduto : false,
         aplicarAcrescimoVenda: data.aplicarAcrescimoVenda !== undefined ? data.aplicarAcrescimoVenda : false,
+        removerProdutoLancado: data.removerProdutoLancado !== undefined ? data.removerProdutoLancado : false,
+        removerPagamento: data.removerPagamento !== undefined ? data.removerPagamento : false,
+        reimprimir: data.reimprimir !== undefined ? data.reimprimir : false,
+        acessoVisaoGeral: data.acessoVisaoGeral !== undefined ? data.acessoVisaoGeral : false,
+        acessoHistorico: data.acessoHistorico !== undefined ? data.acessoHistorico : false,
+        acessoMesa: data.acessoMesa !== undefined ? data.acessoMesa : false,
+        acessoBalcao: data.acessoBalcao !== undefined ? data.acessoBalcao : false,
+        acessoConfiguracoes: data.acessoConfiguracoes !== undefined ? data.acessoConfiguracoes : false,
+        crudCardapio: data.crudCardapio !== undefined ? data.crudCardapio : false,
+        crudUsuario: data.crudUsuario !== undefined ? data.crudUsuario : false,
+        crudCliente: data.crudCliente !== undefined ? data.crudCliente : false,
+        encerrarCaixa: data.encerrarCaixa !== undefined ? data.encerrarCaixa : false,
+        lancarTaxa: data.lancarTaxa !== undefined ? data.lancarTaxa : false,
+        removerTaxa: data.removerTaxa !== undefined ? data.removerTaxa : false,
+        removerLicenca: data.removerLicenca !== undefined ? data.removerLicenca : false,
       }
 
       const response = await this.apiClient.request<any>(
@@ -150,6 +165,21 @@ export class PerfilUsuarioRepository implements IPerfilUsuarioRepository {
       if (data.aplicarDescontoVenda !== undefined) requestBody.aplicarDescontoVenda = data.aplicarDescontoVenda
       if (data.aplicarAcrescimoProduto !== undefined) requestBody.aplicarAcrescimoProduto = data.aplicarAcrescimoProduto
       if (data.aplicarAcrescimoVenda !== undefined) requestBody.aplicarAcrescimoVenda = data.aplicarAcrescimoVenda
+      if (data.removerProdutoLancado !== undefined) requestBody.removerProdutoLancado = data.removerProdutoLancado
+      if (data.removerPagamento !== undefined) requestBody.removerPagamento = data.removerPagamento
+      if (data.reimprimir !== undefined) requestBody.reimprimir = data.reimprimir
+      if (data.acessoVisaoGeral !== undefined) requestBody.acessoVisaoGeral = data.acessoVisaoGeral
+      if (data.acessoHistorico !== undefined) requestBody.acessoHistorico = data.acessoHistorico
+      if (data.acessoMesa !== undefined) requestBody.acessoMesa = data.acessoMesa
+      if (data.acessoBalcao !== undefined) requestBody.acessoBalcao = data.acessoBalcao
+      if (data.acessoConfiguracoes !== undefined) requestBody.acessoConfiguracoes = data.acessoConfiguracoes
+      if (data.crudCardapio !== undefined) requestBody.crudCardapio = data.crudCardapio
+      if (data.crudUsuario !== undefined) requestBody.crudUsuario = data.crudUsuario
+      if (data.crudCliente !== undefined) requestBody.crudCliente = data.crudCliente
+      if (data.encerrarCaixa !== undefined) requestBody.encerrarCaixa = data.encerrarCaixa
+      if (data.lancarTaxa !== undefined) requestBody.lancarTaxa = data.lancarTaxa
+      if (data.removerTaxa !== undefined) requestBody.removerTaxa = data.removerTaxa
+      if (data.removerLicenca !== undefined) requestBody.removerLicenca = data.removerLicenca
 
       // Log para debug
       console.log('📤 [PerfilUsuarioRepository] Enviando para API externa:', {

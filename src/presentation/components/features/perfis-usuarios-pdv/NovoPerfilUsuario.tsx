@@ -64,6 +64,21 @@ type PermissaoCampo =
   | 'aplicarDescontoVenda'
   | 'aplicarAcrescimoProduto'
   | 'aplicarAcrescimoVenda'
+  | 'removerProdutoLancado'
+  | 'removerPagamento'
+  | 'reimprimir'
+  | 'acessoVisaoGeral'
+  | 'acessoHistorico'
+  | 'acessoMesa'
+  | 'acessoBalcao'
+  | 'acessoConfiguracoes'
+  | 'crudCardapio'
+  | 'crudUsuario'
+  | 'crudCliente'
+  | 'encerrarCaixa'
+  | 'lancarTaxa'
+  | 'removerTaxa'
+  | 'removerLicenca'
 
 /**
  * Componente para criar/editar perfil de usuário
@@ -98,13 +113,30 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
   const [aplicarDescontoVenda, setAplicarDescontoVenda] = useState(false)
   const [aplicarAcrescimoProduto, setAplicarAcrescimoProduto] = useState(false)
   const [aplicarAcrescimoVenda, setAplicarAcrescimoVenda] = useState(false)
+  const [removerProdutoLancado, setRemoverProdutoLancado] = useState(false)
+  const [removerPagamento, setRemoverPagamento] = useState(false)
+  const [reimprimir, setReimprimir] = useState(false)
+  const [acessoVisaoGeral, setAcessoVisaoGeral] = useState(false)
+  const [acessoHistorico, setAcessoHistorico] = useState(false)
+  const [acessoMesa, setAcessoMesa] = useState(false)
+  const [acessoBalcao, setAcessoBalcao] = useState(false)
+  const [acessoConfiguracoes, setAcessoConfiguracoes] = useState(false)
+  const [crudCardapio, setCrudCardapio] = useState(false)
+  const [crudUsuario, setCrudUsuario] = useState(false)
+  const [crudCliente, setCrudCliente] = useState(false)
+  const [encerrarCaixa, setEncerrarCaixa] = useState(false)
+  const [lancarTaxa, setLancarTaxa] = useState(false)
+  const [removerTaxa, setRemoverTaxa] = useState(false)
+  const [removerLicenca, setRemoverLicenca] = useState(false)
 
   // Estados de loading e dados
   const [isLoading, setIsLoading] = useState(false)
   /** PATCH só dos meios ao alternar switch — não bloqueia o submit do formulário inteiro */
   const [isSavingMeiosPagamento, setIsSavingMeiosPagamento] = useState(false)
   /** PATCH das permissões ao alternar switch */
-  const [isSavingPermissoes, setIsSavingPermissoes] = useState(false)
+  const [savingPermissoes, setSavingPermissoes] = useState<Set<PermissaoCampo>>(
+    () => new Set()
+  )
   const [isLoadingPerfil, setIsLoadingPerfil] = useState(false)
   const [searchMeioPagamento, setSearchMeioPagamento] = useState('')
   const [meiosPagamentosTabsModalState, setMeiosPagamentosTabsModalState] =
@@ -136,6 +168,21 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
       aplicarDescontoVenda,
       aplicarAcrescimoProduto,
       aplicarAcrescimoVenda,
+      removerProdutoLancado,
+      removerPagamento,
+      reimprimir,
+      acessoVisaoGeral,
+      acessoHistorico,
+      acessoMesa,
+      acessoBalcao,
+      acessoConfiguracoes,
+      crudCardapio,
+      crudUsuario,
+      crudCliente,
+      encerrarCaixa,
+      lancarTaxa,
+      removerTaxa,
+      removerLicenca,
     })
   }, [
     role,
@@ -146,6 +193,21 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
     aplicarDescontoVenda,
     aplicarAcrescimoProduto,
     aplicarAcrescimoVenda,
+    removerProdutoLancado,
+    removerPagamento,
+    reimprimir,
+    acessoVisaoGeral,
+    acessoHistorico,
+    acessoMesa,
+    acessoBalcao,
+    acessoConfiguracoes,
+    crudCardapio,
+    crudUsuario,
+    crudCliente,
+    encerrarCaixa,
+    lancarTaxa,
+    removerTaxa,
+    removerLicenca,
   ])
 
   const baselineSerializedRef = useRef('')
@@ -270,6 +332,21 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
     aplicarDescontoVenda: false,
     aplicarAcrescimoProduto: false,
     aplicarAcrescimoVenda: false,
+    removerProdutoLancado: false,
+    removerPagamento: false,
+    reimprimir: false,
+    acessoVisaoGeral: false,
+    acessoHistorico: false,
+    acessoMesa: false,
+    acessoBalcao: false,
+    acessoConfiguracoes: false,
+    crudCardapio: false,
+    crudUsuario: false,
+    crudCliente: false,
+    encerrarCaixa: false,
+    lancarTaxa: false,
+    removerTaxa: false,
+    removerLicenca: false,
   })
 
   useEffect(() => {
@@ -280,6 +357,21 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
       aplicarDescontoVenda,
       aplicarAcrescimoProduto,
       aplicarAcrescimoVenda,
+      removerProdutoLancado,
+      removerPagamento,
+      reimprimir,
+      acessoVisaoGeral,
+      acessoHistorico,
+      acessoMesa,
+      acessoBalcao,
+      acessoConfiguracoes,
+      crudCardapio,
+      crudUsuario,
+      crudCliente,
+      encerrarCaixa,
+      lancarTaxa,
+      removerTaxa,
+      removerLicenca,
     }
   }, [
     cancelarVenda,
@@ -288,6 +380,21 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
     aplicarDescontoVenda,
     aplicarAcrescimoProduto,
     aplicarAcrescimoVenda,
+    removerProdutoLancado,
+    removerPagamento,
+    reimprimir,
+    acessoVisaoGeral,
+    acessoHistorico,
+    acessoMesa,
+    acessoBalcao,
+    acessoConfiguracoes,
+    crudCardapio,
+    crudUsuario,
+    crudCliente,
+    encerrarCaixa,
+    lancarTaxa,
+    removerTaxa,
+    removerLicenca,
   ])
 
   const aplicarValorPermissao = useCallback((campo: PermissaoCampo, value: boolean) => {
@@ -310,6 +417,51 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
       case 'aplicarAcrescimoVenda':
         setAplicarAcrescimoVenda(value)
         break
+      case 'removerProdutoLancado':
+        setRemoverProdutoLancado(value)
+        break
+      case 'removerPagamento':
+        setRemoverPagamento(value)
+        break
+      case 'reimprimir':
+        setReimprimir(value)
+        break
+      case 'acessoVisaoGeral':
+        setAcessoVisaoGeral(value)
+        break
+      case 'acessoHistorico':
+        setAcessoHistorico(value)
+        break
+      case 'acessoMesa':
+        setAcessoMesa(value)
+        break
+      case 'acessoBalcao':
+        setAcessoBalcao(value)
+        break
+      case 'acessoConfiguracoes':
+        setAcessoConfiguracoes(value)
+        break
+      case 'crudCardapio':
+        setCrudCardapio(value)
+        break
+      case 'crudUsuario':
+        setCrudUsuario(value)
+        break
+      case 'crudCliente':
+        setCrudCliente(value)
+        break
+      case 'encerrarCaixa':
+        setEncerrarCaixa(value)
+        break
+      case 'lancarTaxa':
+        setLancarTaxa(value)
+        break
+      case 'removerTaxa':
+        setRemoverTaxa(value)
+        break
+      case 'removerLicenca':
+        setRemoverLicenca(value)
+        break
     }
   }, [])
 
@@ -328,7 +480,11 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
       }
 
       permissoesPatchInFlightRef.current += 1
-      setIsSavingPermissoes(true)
+      setSavingPermissoes(prev => {
+        const nextSet = new Set(prev)
+        nextSet.add(campo)
+        return nextSet
+      })
       try {
         const response = await fetch(`/api/perfis-usuarios-pdv/${perfilId}`, {
           method: 'PATCH',
@@ -365,8 +521,12 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
         permissoesPatchInFlightRef.current -= 1
         if (permissoesPatchInFlightRef.current <= 0) {
           permissoesPatchInFlightRef.current = 0
-          setIsSavingPermissoes(false)
         }
+        setSavingPermissoes(prev => {
+          const nextSet = new Set(prev)
+          nextSet.delete(campo)
+          return nextSet
+        })
       }
     },
     [perfilId, auth, aplicarValorPermissao]
@@ -404,13 +564,18 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
-  // Achatando todas as páginas em uma única lista
-  const meiosPagamento: MeioPagamento[] = data?.pages.flatMap((page) =>
-    page.meiosPagamento.map((meio) => ({
-      id: meio.getId(),
-      nome: meio.getNome(),
-    }))
-  ) || []
+  // Lista achatada das páginas — memoizada por `data` para não criar novo array a cada render.
+  // Sem isso, qualquer setState (ex.: toggle de permissão) recria `meiosPagamento`, invalida os
+  // useMemos abaixo e roda sort/filtro de novo desnecessariamente (reflow junto ao scroll do modal).
+  const meiosPagamento = useMemo<MeioPagamento[]>(() => {
+    if (!data?.pages?.length) return []
+    return data.pages.flatMap((page) =>
+      page.meiosPagamento.map((meio) => ({
+        id: meio.getId(),
+        nome: meio.getNome(),
+      }))
+    )
+  }, [data])
 
   // Cria uma string serializada dos IDs dos meios de pagamento para usar como dependência estável
   const meiosPagamentoIds = useMemo(() => {
@@ -462,6 +627,21 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
           setAplicarDescontoVenda(perfil.canAplicarDescontoVenda())
           setAplicarAcrescimoProduto(perfil.canAplicarAcrescimoProduto())
           setAplicarAcrescimoVenda(perfil.canAplicarAcrescimoVenda())
+          setRemoverProdutoLancado(perfil.canRemoverProdutoLancado())
+          setRemoverPagamento(perfil.canRemoverPagamento())
+          setReimprimir(perfil.canReimprimir())
+          setAcessoVisaoGeral(perfil.canAcessoVisaoGeral())
+          setAcessoHistorico(perfil.canAcessoHistorico())
+          setAcessoMesa(perfil.canAcessoMesa())
+          setAcessoBalcao(perfil.canAcessoBalcao())
+          setAcessoConfiguracoes(perfil.canAcessoConfiguracoes())
+          setCrudCardapio(perfil.canCrudCardapio())
+          setCrudUsuario(perfil.canCrudUsuario())
+          setCrudCliente(perfil.canCrudCliente())
+          setEncerrarCaixa(perfil.canEncerrarCaixa())
+          setLancarTaxa(perfil.canLancarTaxa())
+          setRemoverTaxa(perfil.canRemoverTaxa())
+          setRemoverLicenca(perfil.canRemoverLicenca())
 
           // Guarda os nomes dos meios de pagamento do perfil para usar depois
           const nomesMeios = perfil.getAcessoMeiosPagamento()
@@ -583,6 +763,21 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
         aplicarDescontoVenda,
         aplicarAcrescimoProduto,
         aplicarAcrescimoVenda,
+        removerProdutoLancado,
+        removerPagamento,
+        reimprimir,
+        acessoVisaoGeral,
+        acessoHistorico,
+        acessoMesa,
+        acessoBalcao,
+        acessoConfiguracoes,
+        crudCardapio,
+        crudUsuario,
+        crudCliente,
+        encerrarCaixa,
+        lancarTaxa,
+        removerTaxa,
+        removerLicenca,
       }
 
       // Debug: log do body antes de enviar
@@ -967,96 +1162,308 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
               <div className="flex items-center justify-between p-1 bg-white">
                 <span className="text-primary-text font-medium text-xs md:text-sm">Pode Cancelar Venda?</span>
                 <JiffyIconSwitch
-                  checked={cancelarVenda}
-                  onChange={e =>
-                    handlePermissaoChange('cancelarVenda', e.target.checked)
-                  }
-                  disabled={isLoading || isSavingPermissoes}
-                  bordered={false}
-                  size="sm"
-                  className="shrink-0"
-                  inputProps={{ 'aria-label': 'Permitir cancelar venda' }}
-                />
+                    checked={cancelarVenda}
+                    onChange={e => handlePermissaoChange('cancelarVenda', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('cancelarVenda')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir cancelar venda' }}
+                  />
+
               </div>
 
               {/* Toggle Cancelar Produto */}
               <div className="flex items-center justify-between p-1 bg-white">
                 <span className="text-primary-text font-medium text-xs md:text-sm">Pode Cancelar Produto?</span>
                 <JiffyIconSwitch
-                  checked={cancelarProduto}
-                  onChange={e =>
-                    handlePermissaoChange('cancelarProduto', e.target.checked)
-                  }
-                  disabled={isLoading || isSavingPermissoes}
-                  bordered={false}
-                  size="sm"
-                  className="shrink-0"
-                  inputProps={{ 'aria-label': 'Permitir cancelar produto' }}
-                />
+                    checked={cancelarProduto}
+                    onChange={e => handlePermissaoChange('cancelarProduto', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('cancelarProduto')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir cancelar produto' }}
+                  />
+
               </div>
 
               {/* Toggle Aplicar Desconto Produto */}
               <div className="flex items-center justify-between p-1 bg-white">
                 <span className="text-primary-text font-medium text-xs md:text-sm">Pode Aplicar Desconto no Produto?</span>
                 <JiffyIconSwitch
-                  checked={aplicarDescontoProduto}
-                  onChange={e =>
-                    handlePermissaoChange('aplicarDescontoProduto', e.target.checked)
-                  }
-                  disabled={isLoading || isSavingPermissoes}
-                  bordered={false}
-                  size="sm"
-                  className="shrink-0"
-                  inputProps={{ 'aria-label': 'Permitir aplicar desconto no produto' }}
-                />
+                    checked={aplicarDescontoProduto}
+                    onChange={e => handlePermissaoChange('aplicarDescontoProduto', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('aplicarDescontoProduto')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir aplicar desconto no produto' }}
+                  />
+
               </div>
 
               {/* Toggle Aplicar Desconto Venda */}
               <div className="flex items-center justify-between p-1 bg-white">
                 <span className="text-primary-text font-medium text-xs md:text-sm">Pode Aplicar Desconto na Venda?</span>
                 <JiffyIconSwitch
-                  checked={aplicarDescontoVenda}
-                  onChange={e =>
-                    handlePermissaoChange('aplicarDescontoVenda', e.target.checked)
-                  }
-                  disabled={isLoading || isSavingPermissoes}
-                  bordered={false}
-                  size="sm"
-                  className="shrink-0"
-                  inputProps={{ 'aria-label': 'Permitir aplicar desconto na venda' }}
-                />
+                    checked={aplicarDescontoVenda}
+                    onChange={e => handlePermissaoChange('aplicarDescontoVenda', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('aplicarDescontoVenda')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir aplicar desconto na venda' }}
+                  />
+
               </div>
 
               {/* Toggle Aplicar Acréscimo Produto */}
               <div className="flex items-center justify-between p-1 bg-white">
                 <span className="text-primary-text font-medium text-xs md:text-sm">Pode Aplicar Acréscimo no Produto?</span>
                 <JiffyIconSwitch
-                  checked={aplicarAcrescimoProduto}
-                  onChange={e =>
-                    handlePermissaoChange('aplicarAcrescimoProduto', e.target.checked)
-                  }
-                  disabled={isLoading || isSavingPermissoes}
-                  bordered={false}
-                  size="sm"
-                  className="shrink-0"
-                  inputProps={{ 'aria-label': 'Permitir aplicar acréscimo no produto' }}
-                />
+                    checked={aplicarAcrescimoProduto}
+                    onChange={e => handlePermissaoChange('aplicarAcrescimoProduto', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('aplicarAcrescimoProduto')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir aplicar acréscimo no produto' }}
+                  />
+
               </div>
 
               {/* Toggle Aplicar Acréscimo Venda */}
               <div className="flex items-center justify-between p-1 bg-white">
                 <span className="text-primary-text font-medium text-xs md:text-sm">Pode Aplicar Acréscimo na Venda?</span>
                 <JiffyIconSwitch
-                  checked={aplicarAcrescimoVenda}
-                  onChange={e =>
-                    handlePermissaoChange('aplicarAcrescimoVenda', e.target.checked)
-                  }
-                  disabled={isLoading || isSavingPermissoes}
-                  bordered={false}
-                  size="sm"
-                  className="shrink-0"
-                  inputProps={{ 'aria-label': 'Permitir aplicar acréscimo na venda' }}
-                />
+                    checked={aplicarAcrescimoVenda}
+                    onChange={e => handlePermissaoChange('aplicarAcrescimoVenda', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('aplicarAcrescimoVenda')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir aplicar acréscimo na venda' }}
+                  />
+
+              </div>
+
+              <div className="my-2 h-px w-full bg-gray-200" aria-hidden />
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Remover Produto Lançado?</span>
+                <JiffyIconSwitch
+                    checked={removerProdutoLancado}
+                    onChange={e => handlePermissaoChange('removerProdutoLancado', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('removerProdutoLancado')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir remover produto lançado' }}
+                  />
+
+              </div>
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Remover Pagamento?</span>
+                <JiffyIconSwitch
+                    checked={removerPagamento}
+                    onChange={e => handlePermissaoChange('removerPagamento', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('removerPagamento')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir remover pagamento' }}
+                  />
+
+              </div>
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Reimprimir?</span>
+                <JiffyIconSwitch
+                    checked={reimprimir}
+                    onChange={e => handlePermissaoChange('reimprimir', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('reimprimir')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir reimprimir' }}
+                  />
+
+              </div>
+
+              <div className="my-2 h-px w-full bg-gray-200" aria-hidden />
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Acesso à Visão Geral?</span>
+                <JiffyIconSwitch
+                    checked={acessoVisaoGeral}
+                    onChange={e => handlePermissaoChange('acessoVisaoGeral', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('acessoVisaoGeral')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir acesso visão geral' }}
+                  />
+
+              </div>
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Acesso ao Histórico?</span>
+                <JiffyIconSwitch
+                    checked={acessoHistorico}
+                    onChange={e => handlePermissaoChange('acessoHistorico', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('acessoHistorico')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir acesso histórico' }}
+                  />
+
+              </div>
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Acesso a Mesas?</span>
+                <JiffyIconSwitch
+                    checked={acessoMesa}
+                    onChange={e => handlePermissaoChange('acessoMesa', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('acessoMesa')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir acesso mesas' }}
+                  />
+
+              </div>
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Acesso ao Balcão?</span>
+                <JiffyIconSwitch
+                    checked={acessoBalcao}
+                    onChange={e => handlePermissaoChange('acessoBalcao', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('acessoBalcao')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir acesso balcão' }}
+                  />
+
+              </div>
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Acesso a Configurações?</span>
+                <JiffyIconSwitch
+                    checked={acessoConfiguracoes}
+                    onChange={e => handlePermissaoChange('acessoConfiguracoes', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('acessoConfiguracoes')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir acesso configurações' }}
+                  />
+
+              </div>
+
+              <div className="my-2 h-px w-full bg-gray-200" aria-hidden />
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">CRUD Cardápio?</span>
+                <JiffyIconSwitch
+                    checked={crudCardapio}
+                    onChange={e => handlePermissaoChange('crudCardapio', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('crudCardapio')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir CRUD cardápio' }}
+                  />
+
+              </div>
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">CRUD Usuário?</span>
+                <JiffyIconSwitch
+                    checked={crudUsuario}
+                    onChange={e => handlePermissaoChange('crudUsuario', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('crudUsuario')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir CRUD usuário' }}
+                  />
+
+              </div>
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">CRUD Cliente?</span>
+                <JiffyIconSwitch
+                    checked={crudCliente}
+                    onChange={e => handlePermissaoChange('crudCliente', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('crudCliente')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir CRUD cliente' }}
+                  />
+
+              </div>
+
+              <div className="my-2 h-px w-full bg-gray-200" aria-hidden />
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Encerrar Caixa?</span>
+                <JiffyIconSwitch
+                    checked={encerrarCaixa}
+                    onChange={e => handlePermissaoChange('encerrarCaixa', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('encerrarCaixa')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir encerrar caixa' }}
+                  />
+
+              </div>
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Lançar Taxa?</span>
+                <JiffyIconSwitch
+                    checked={lancarTaxa}
+                    onChange={e => handlePermissaoChange('lancarTaxa', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('lancarTaxa')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir lançar taxa' }}
+                  />
+
+              </div>
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Remover Taxa?</span>
+                <JiffyIconSwitch
+                    checked={removerTaxa}
+                    onChange={e => handlePermissaoChange('removerTaxa', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('removerTaxa')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir remover taxa' }}
+                  />
+
+              </div>
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Remover Licença?</span>
+                <JiffyIconSwitch
+                    checked={removerLicenca}
+                    onChange={e => handlePermissaoChange('removerLicenca', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('removerLicenca')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir remover licença' }}
+                  />
+
               </div>
             </div>
           </div>

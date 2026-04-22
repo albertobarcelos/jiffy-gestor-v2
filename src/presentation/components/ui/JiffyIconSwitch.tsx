@@ -13,13 +13,13 @@ export interface JiffyIconSwitchProps {
   labelPosition?: 'start' | 'end'
   id?: string
   name?: string
-  /** Classes no `<label>` (ex.: `justify-end`, `w-full`) */
+  /** Classes no controle (ex.: `justify-end`, `w-full`) */
   className?: string
   /** Borda primary em volta da linha inteira (label + switch), como no modal de complemento */
   bordered?: boolean
   /** `sm`: trilho menor; `xs`: ainda menor (listas densas); `default`: igual ao ref. (w-11 / thumb w-5) */
   size?: 'default' | 'sm' | 'xs'
-  /** Atributos extras no `<input type="checkbox">` (exceto type/className/checked/onChange/disabled) */
+  /** Atributos extras — repassados ao `<button>` (exceto type/className/checked/onChange/disabled) */
   inputProps?: Omit<
     React.InputHTMLAttributes<HTMLInputElement>,
     'type' | 'className' | 'checked' | 'onChange' | 'disabled'
@@ -33,20 +33,39 @@ const TRANSITION = `all 0.3s ${EASING}`
 const EFFECT_TRANSITION = 'all 0.3s ease-in-out'
 
 const COLOR_TRACK_OFF = '#dc2626' /* red-600 */
-const COLOR_TRACK_ON  = '#16a34a' /* green-600 */
+const COLOR_TRACK_ON = '#16a34a' /* green-600 */
 const COLOR_ICON_CHECK = '#16a34a'
 const COLOR_ICON_CROSS = '#dc2626'
 
 const SIZES = {
   /** Base: Tailwind w-11 × h-6, thumb w-5, ícone w-3 */
   default: { trackW: 44, trackH: 24, circleDia: 20, iconW: 12 },
-  sm:      { trackW: 36, trackH: 20, circleDia: 16, iconW: 10 },
-  xs:      { trackW: 30, trackH: 16, circleDia: 14, iconW: 9 },
+  sm: { trackW: 36, trackH: 20, circleDia: 16, iconW: 10 },
+  xs: { trackW: 30, trackH: 16, circleDia: 14, iconW: 9 },
 } as const
+
+/** Evento compatível com handlers que esperam `ChangeEvent` de checkbox (ex.: `e.target.checked`). */
+function emitCheckboxLikeChange(
+  nextChecked: boolean,
+  native: React.MouseEvent<HTMLButtonElement> | React.KeyboardEvent<HTMLButtonElement>
+): React.ChangeEvent<HTMLInputElement> {
+  const target = {
+    checked: nextChecked,
+    value: nextChecked ? 'on' : '',
+    type: 'checkbox',
+    name: (native.target as HTMLButtonElement).getAttribute('name') ?? '',
+  } as HTMLInputElement
+  return {
+    ...native,
+    target,
+    currentTarget: native.currentTarget as unknown as HTMLInputElement,
+  } as React.ChangeEvent<HTMLInputElement>
+}
 
 /**
  * Switch pill (w-11 / thumb w-5 / ícones w-3), trilho vermelho/verde, ícones ✓/✕ em fill.
- * Inclui linha decorativa animada + easing Galahhad; sombra do thumb alterna com o estado.
+ * Usa `<button role="switch">` em vez de checkbox `sr-only`: o foco fica no controle visível,
+ * evitando scrollIntoView extremo que quebrava modais com lista longa de switches.
  */
 export function JiffyIconSwitch({
   checked,
@@ -62,15 +81,23 @@ export function JiffyIconSwitch({
   inputProps,
 }: JiffyIconSwitchProps) {
   const generatedId = React.useId()
-  const inputId = id ?? generatedId
+  const controlId = id ?? generatedId
+
+  const {
+    onClick: inputOnClick,
+    onKeyDown: inputOnKeyDown,
+    onFocus: inputOnFocus,
+    onBlur: inputOnBlur,
+    ...restInputProps
+  } = inputProps ?? {}
 
   const { trackW, trackH, circleDia, iconW } = SIZES[size] ?? SIZES.default
 
-  const offset     = Math.round((trackH - circleDia) / 2)
+  const offset = Math.round((trackH - circleDia) / 2)
   const circleLeft = checked ? trackW - circleDia - offset : offset
 
-  const effectW    = Math.round(circleDia / 2)
-  const effectH    = Math.max(1, Math.round(effectW / 2) - 1)
+  const effectW = Math.round(circleDia / 2)
+  const effectH = Math.max(1, Math.round(effectW / 2) - 1)
   const effectLeft = checked
     ? trackW - effectW - Math.round(effectW / 2) - offset
     : offset + Math.round(effectW / 2)
@@ -139,7 +166,6 @@ export function JiffyIconSwitch({
           transition: TRANSITION,
         }}
       >
-        {/* Checkmark — mesmo path do exemplo (viewBox 24×24) */}
         <svg
           viewBox="0 0 24 24"
           fill="currentColor"
@@ -158,7 +184,6 @@ export function JiffyIconSwitch({
           <path d="M9.9997 15.1709L19.1921 5.97852L20.6063 7.39273L9.9997 17.9993L3.63574 11.6354L5.04996 10.2212L9.9997 15.1709Z" />
         </svg>
 
-        {/* X — mesmo path do exemplo */}
         <svg
           viewBox="0 0 24 24"
           fill="currentColor"
@@ -180,30 +205,44 @@ export function JiffyIconSwitch({
     </div>
   )
 
+  const handleToggle = (
+    ev: React.MouseEvent<HTMLButtonElement> | React.KeyboardEvent<HTMLButtonElement>
+  ) => {
+    if (disabled) return
+    const next = !checked
+    onChange(emitCheckboxLikeChange(next, ev))
+  }
+
   return (
-    <label
+    <button
+      type="button"
+      id={controlId}
+      name={name}
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      {...(restInputProps as React.ButtonHTMLAttributes<HTMLButtonElement>)}
       className={cn(
-        'flex items-center rounded-lg outline-none',
+        'flex items-center rounded-lg outline-none [overflow-anchor:none]',
         size === 'xs' ? 'gap-1 px-0 py-0'
         : size === 'sm' ? 'gap-1.5 px-1 py-0'
         : 'gap-3 px-4 py-1',
-        'has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-[var(--color-primary)] has-[input:focus-visible]:ring-offset-2',
+        'focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2',
         bordered && 'border border-[var(--color-primary)]',
         disabled ? 'cursor-not-allowed' : 'cursor-pointer',
         className
       )}
+      onFocus={inputOnFocus as React.FocusEventHandler<HTMLButtonElement> | undefined}
+      onBlur={inputOnBlur as React.FocusEventHandler<HTMLButtonElement> | undefined}
+      onClick={(e) => {
+        inputOnClick?.(e as unknown as React.MouseEvent<HTMLInputElement>)
+        if (!e.defaultPrevented) handleToggle(e)
+      }}
+      onKeyDown={(e) => {
+        inputOnKeyDown?.(e as unknown as React.KeyboardEvent<HTMLInputElement>)
+      }}
     >
       {labelPosition === 'start' ? labelEl : null}
-      <input
-        id={inputId}
-        type="checkbox"
-        name={name}
-        checked={checked}
-        onChange={onChange}
-        disabled={disabled}
-        className="sr-only"
-        {...inputProps}
-      />
       {labelPosition === 'end' ? (
         <>
           {track}
@@ -212,6 +251,6 @@ export function JiffyIconSwitch({
       ) : (
         track
       )}
-    </label>
+    </button>
   )
 }

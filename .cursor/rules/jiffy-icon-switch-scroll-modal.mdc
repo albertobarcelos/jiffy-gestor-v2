@@ -1,0 +1,41 @@
+---
+description: JiffyIconSwitch — salto de scroll / layout quebrado em modais com lista longa
+globs:
+  - "**/JiffyIconSwitch.tsx"
+  - "**/*Modal*.tsx"
+  - "**/jiffy-side-panel-modal/**"
+alwaysApply: false
+---
+
+# JiffyIconSwitch e modais com lista rolável
+
+## Sintoma
+
+Em listas longas dentro de modal/painel (`overflow-y-auto`, `100dvh`, flex), ao clicar num switch **perto do fim da lista**:
+
+- a tela “pisca” branca ou o **rodapé sobe** e aparece faixa vazia abaixo;
+- às vezes não dá mais rolar até o conteúdo de cima.
+
+## Causa raiz
+
+**Não usar** `<input type="checkbox">` apenas com classe `sr-only` como controle focável do switch.
+
+O foco vai para um retângulo efetivamente fora/invisível; o navegador aplica **scrollIntoView** para tentar mostrar esse foco, brigando com o scroll interno do modal → reflow e layout estranho.
+
+Restaurar `scrollTop` em `useEffect` ou “consertar scroll” só no container local costuma **não** bastar.
+
+## Correção aplicada (padrão do projeto)
+
+No `JiffyIconSwitch`:
+
+- O controle interativo é um **`<button type="button" role="switch" aria-checked={...}>`** com o mesmo visual (trilho/thumb).
+- O `onChange` do componente continua no formato **compatível com checkbox** (`e.target.checked`) para não quebrar telas existentes.
+- Teclado: Space/Enter no `<button>` geram **`click`** nativo — não duplicar toggle em `onKeyDown`.
+
+## Ao criar novo switch customizado
+
+Se não usar `JiffyIconSwitch`, **evite** checkbox `sr-only` como único foco em lista rolável dentro de modal; prefira `role="switch"` em botão ou padrão que mantenha o foco no elemento visível sob o cursor.
+
+## Contexto de layout (referência)
+
+`PerfisUsuariosTabsModal` usa `scrollableBody={false}` no `JiffySidePanelModal`; o scroll fica no filho (`min-h-0 flex-1 overflow-y-auto`). Aninhamento flex + `100dvh` aumenta a sensibilidade ao foco incorreto.
