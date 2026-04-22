@@ -187,6 +187,8 @@ export function TopNav() {
         },
         { name: 'Relatórios Vendas', path: '/relatorios-vendas', icon: MdAssessment },
         { name: 'Hist. Fechamentos', path: '/historico-fechamento', icon: MdHistory },
+        { name: 'Comissões', path: '/vendas/comissoes', icon: MdPercent },
+
       ],
     },
     { name: 'Painel do Contador', path: '/painel-contador', icon: MdAccountBalance },

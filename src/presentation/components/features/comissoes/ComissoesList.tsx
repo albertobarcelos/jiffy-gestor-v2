@@ -22,6 +22,7 @@ import { cn } from '@/src/shared/utils/cn'
 const PAGE_SIZE = 10
 /** Limite máximo aceito pelo fiscal em GET /api/v1/taxas (validação no backend). */
 const TAXAS_PAGE_FETCH = 100
+const SEARCH_DEBOUNCE_MS = 650
 
 const ORDER_FIELD_OPTIONS: { value: OrderByFieldComissoes; label: string }[] = [
   { value: 'nomeUsuarioPdv', label: 'Nome do usuário PDV' },
@@ -68,8 +69,8 @@ const FILTROS_INICIAIS: FiltrosUI = {
   criacaoFim: '',
   finalIni: '',
   finalFim: '',
-  orderByField: 'valorTotalComissao',
-  orderByDirection: 'desc',
+  orderByField: 'nomeUsuarioPdv',
+  orderByDirection: 'asc',
 }
 
 function parseYmdLocal(s: string): Date | null {
@@ -192,10 +193,18 @@ export function ComissoesList() {
 
   const taxasOpts = taxasPercentualQuery.data ?? []
 
-  const aplicarFiltros = useCallback(() => {
-    setOffset(0)
-    setActive({ ...draft })
-  }, [draft])
+  /** Aplica busca automaticamente após pequena pausa ao digitar. */
+  useEffect(() => {
+    if (!taxaId) return
+    if (draft.q === active.q) return
+
+    const timer = setTimeout(() => {
+      setOffset(0)
+      setActive(prev => ({ ...prev, q: draft.q }))
+    }, SEARCH_DEBOUNCE_MS)
+
+    return () => clearTimeout(timer)
+  }, [active.q, draft.q, taxaId])
 
   /** Reseta filtros opcionais (mantém taxa selecionada). */
   const limparTodosFiltros = useCallback(() => {
@@ -323,7 +332,7 @@ export function ComissoesList() {
             </select>
           </div>
 
-          <div className="relative min-w-0 xl:max-w-[260px] xl:flex-[1_1_200px]">
+          <div className="relative min-w-0 xl:max-w-[240px] xl:flex-[1_1_200px]">
             <label htmlFor="comissoes-busca" className="sr-only">
               Buscar usuário PDV
             </label>
@@ -397,15 +406,20 @@ export function ComissoesList() {
           <div className="flex w-full flex-wrap items-end gap-2 xl:ml-auto xl:w-auto xl:flex-[2_1_280px] xl:justify-end">
             <div className="min-w-[min(100%,12rem)] flex-1 sm:min-w-[14rem] xl:min-w-[11rem] xl:flex-initial">
               <span className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-secondary-text">
-                Ordenar
+                Ordenar por:
               </span>
               <select
                 value={draft.orderByField}
                 onChange={e =>
-                  setDraft(d => ({
-                    ...d,
-                    orderByField: e.target.value as OrderByFieldComissoes,
-                  }))
+                  setDraft(prev => {
+                    const next = {
+                      ...prev,
+                      orderByField: e.target.value as OrderByFieldComissoes,
+                    }
+                    setOffset(0)
+                    setActive(next)
+                    return next
+                  })
                 }
                 className={`${inputCompact} h-9`}
               >
@@ -418,34 +432,61 @@ export function ComissoesList() {
             </div>
             <div className="w-[8.25rem] shrink-0">
               <span className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-secondary-text">
-                Direção
+                Sentido:
               </span>
-              <select
-                value={draft.orderByDirection}
-                onChange={e =>
-                  setDraft(d => ({
-                    ...d,
-                    orderByDirection: e.target.value as OrderByDirectionComissoes,
-                  }))
-                }
-                className={`${inputCompact} h-9`}
+              <div
+                className="inline-flex h-9 w-full rounded-md border border-gray-200 bg-white p-0.5"
+                role="group"
+                aria-label="Sentido da ordenação"
               >
-                <option value="desc">Maior → menor</option>
-                <option value="asc">Menor → maior</option>
-              </select>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDraft(prev => {
+                      const next = { ...prev, orderByDirection: 'asc' as const }
+                      setOffset(0)
+                      setActive(next)
+                      return next
+                    })
+                  }
+                  className={cn(
+                    'flex-1 rounded-sm px-2 text-xs font-semibold transition-colors',
+                    draft.orderByDirection === 'asc'
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'text-primary-text hover:bg-gray-50'
+                  )}
+                  aria-pressed={draft.orderByDirection === 'asc'}
+                  title="Crescente (menor → maior)"
+                >
+                  Cresc.
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDraft(prev => {
+                      const next = { ...prev, orderByDirection: 'desc' as const }
+                      setOffset(0)
+                      setActive(next)
+                      return next
+                    })
+                  }
+                  className={cn(
+                    'flex-1 rounded-sm px-2 text-xs font-semibold transition-colors',
+                    draft.orderByDirection === 'desc'
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'text-primary-text hover:bg-gray-50'
+                  )}
+                  aria-pressed={draft.orderByDirection === 'desc'}
+                  title="Decrescente (maior → menor)"
+                >
+                  Decresc.
+                </button>
+              </div>
             </div>
             <button
               type="button"
-              onClick={() => aplicarFiltros()}
-              disabled={!taxaId}
-              className="h-9 w-full shrink-0 rounded-md bg-primary px-4 font-exo text-xs font-semibold text-info transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-            >
-              Aplicar
-            </button>
-            <button
-              type="button"
               onClick={limparTodosFiltros}
-              className="h-9 w-full shrink-0 rounded-md border border-gray-300 bg-white px-3 font-exo text-xs font-semibold text-secondary-text transition-colors hover:border-gray-400 hover:bg-gray-50 sm:w-auto"
+              className="h-9 w-full shrink-0 rounded-md border border-primary/50 bg-primary/10 px-3 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/15 sm:w-auto"
             >
               Limpar
             </button>

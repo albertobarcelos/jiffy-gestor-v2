@@ -842,32 +842,60 @@ export default function DashboardV2() {
     topProdutosListaCompleta ||
     quantidadeTopProdutosRetornada <= LIMITE_TOP_PRODUTOS_V2_RESUMO
 
-  /** Linhas do card: participação em % = fatia do valor total entre os itens exibidos (no resumo, só as 10 primeiras). */
+  /**
+   * Linhas do card.
+   * Resumo: mantém linhas fixas (com traços) para estabilidade visual.
+   * Lista completa: renderiza somente o que vier da API.
+   */
   const linhasTopProdutosV2 = useMemo(() => {
     const lista = dadosTopProdutos ?? []
-    const visivel = topProdutosListaCompleta ? lista : lista.slice(0, LIMITE_TOP_PRODUTOS_V2_RESUMO)
+    const visivel = topProdutosListaCompleta
+      ? lista
+      : lista.slice(0, LIMITE_TOP_PRODUTOS_V2_RESUMO)
     const somaValor = visivel.reduce((acc, p) => acc + p.getValorTotal(), 0)
-    return visivel.map((p, i) => {
+    const linhas = visivel.map((p, i) => {
       const valor = p.getValorTotal()
       const pct = somaValor > 0 ? Math.round((valor / somaValor) * 100) : 0
       return {
         id: `${p.getRank()}-${i}-${p.getProduto()}`,
+        vazio: false as const,
         nome: p.getProduto(),
         qtd: p.getQuantidade(),
         valor,
         pct,
       }
     })
+
+    if (topProdutosListaCompleta) return linhas
+
+    const faltantes = Math.max(0, LIMITE_TOP_PRODUTOS_V2_RESUMO - linhas.length)
+    if (faltantes === 0) return linhas
+
+    return [
+      ...linhas,
+      ...Array.from({ length: faltantes }, (_, idx) => ({
+        id: `top-produto-vazio-${idx}`,
+        vazio: true as const,
+        nome: '—',
+        qtd: 0,
+        valor: 0,
+        pct: 0,
+      })),
+    ]
   }, [dadosTopProdutos, topProdutosListaCompleta])
 
   const maxValorProduto = useMemo(
-    () => Math.max(...linhasTopProdutosV2.map(p => p.valor), 1),
+    () =>
+      Math.max(
+        ...linhasTopProdutosV2.filter(p => !p.vazio).map(p => p.valor),
+        1
+      ),
     [linhasTopProdutosV2]
   )
 
   /** Soma valor e quantidade só dos itens exibidos (base do modo % na barra). */
   const totaisListaTopProdutosV2 = useMemo(() => {
-    return linhasTopProdutosV2.reduce(
+    return linhasTopProdutosV2.filter(p => !p.vazio).reduce(
       (acc, p) => ({
         somaValor: acc.somaValor + p.valor,
         somaQtd: acc.somaQtd + p.qtd,
@@ -2002,7 +2030,7 @@ export default function DashboardV2() {
         <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-5">
           <div className="mb-4 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between xl:gap-3">
             <h2 className="shrink-0 font-exo text-lg font-semibold text-primary-text md:text-xl">
-              Top produtos
+              Top Produtos
             </h2>
             <div className="flex flex-1 flex-wrap items-center justify-center gap-2 xl:justify-center">
               <div className="inline-flex rounded-lg bg-violet-100/90 p-0.5">
@@ -2075,11 +2103,17 @@ export default function DashboardV2() {
               <>
                 {linhasTopProdutosV2.map((p, idx) => {
                   const larguraBarra =
-                    modoTopProduto === 'porcentagem'
+                    p.vazio
+                      ? 0
+                      : modoTopProduto === 'porcentagem'
                       ? p.pct
                       : Math.round((p.valor / maxValorProduto) * 100)
                   const rotuloMeio =
-                    modoTopProduto === 'porcentagem' ? `${p.pct}%` : formatarMoeda(p.valor)
+                    p.vazio
+                      ? '—'
+                      : modoTopProduto === 'porcentagem'
+                      ? `${p.pct}%`
+                      : formatarMoeda(p.valor)
                   return (
                     <div
                       key={p.id}
@@ -2089,11 +2123,17 @@ export default function DashboardV2() {
                     >
                       <div className="flex min-w-0 flex-[1.4] items-center gap-2 md:flex-[1.6]">
                         <span className="font-regular text-sm uppercase text-primary-text">
-                          {p.nome}
+                          {p.vazio ? '—' : p.nome}
                         </span>
                       </div>
                       <div className="font-regular min-w-0 flex-1 text-center text-sm text-primary-text">
-                        {p.qtd} <span className="text-xs">un</span>
+                        {p.vazio ? (
+                          '—'
+                        ) : (
+                          <>
+                            {p.qtd} <span className="text-xs">un</span>
+                          </>
+                        )}
                       </div>
                       <div className="min-w-0 flex-1">
                         {/* Barra em camadas: trilho + preenchimento + rótulo centralizado por cima */}
@@ -2108,7 +2148,7 @@ export default function DashboardV2() {
                         </div>
                       </div>
                       <div className="font-regular min-w-0 flex-1 text-right text-sm text-primary-text">
-                        {formatarMoeda(p.valor)}
+                        {p.vazio ? '—' : formatarMoeda(p.valor)}
                       </div>
                     </div>
                   )
