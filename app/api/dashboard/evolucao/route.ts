@@ -135,23 +135,52 @@ function roundMinutesForInterval(minutes: number, intervaloMinutos: number): num
   return minutes < 15 ? 0 : 30
 }
 
+/** Início/fim típicos de “dia inteiro” no fuso da empresa (evita usar getHours() do servidor). */
+function limitesPadraoDiaInteiroNoFuso(inicio: Date, fim: Date, timeZone: string): boolean {
+  const pi = partesDataHoraNoFuso(inicio, timeZone)
+  const pf = partesDataHoraNoFuso(fim, timeZone)
+  const inicioMeiaNoite = pi.hour === 0 && pi.minute === 0
+  const fimUltimoMinuto = pf.hour === 23 && pf.minute >= 59
+  return inicioMeiaNoite && fimUltimoMinuto
+}
+
 function shouldGroupByHour(params: {
   periodoInicial?: Date | null
   periodoFinal?: Date | null
   isCustomDates: boolean
   intervaloHora?: number | null
+  /** Fuso da empresa — obrigatório para decidir dia inteiro vs hora sem depender do TZ do Node. */
+  timeZoneAgregacao: string
 }): boolean {
-  const { periodoInicial, periodoFinal, isCustomDates, intervaloHora } = params
+  const { periodoInicial, periodoFinal, isCustomDates, intervaloHora, timeZoneAgregacao } = params
   if (isCustomDates && periodoInicial && periodoFinal) {
-    const diffInHours = (periodoFinal.getTime() - periodoInicial.getTime()) / (1000 * 60 * 60)
-    const hasSpecificHours =
-      periodoInicial.getHours() !== 0 ||
-      periodoInicial.getMinutes() !== 0 ||
-      periodoFinal.getHours() !== 23 ||
-      periodoFinal.getMinutes() !== 59
-    return diffInHours < 48 || hasSpecificHours
+    const diffMs = periodoFinal.getTime() - periodoInicial.getTime()
+    const diffInHours = diffMs / (1000 * 60 * 60)
+
+    /* Calendário / dois meses: sempre bucket por dia civil no fuso da empresa. */
+    if (diffInHours >= 48) {
+      return false
+    }
+
+    /*
+     * Gráfico “hoje” com granularidade: o client envia intervaloHora — precisa agrupar por slot de hora.
+     */
+    if (typeof intervaloHora === 'number' && intervaloHora > 0) {
+      return true
+    }
+
+    /*
+     * Um ou poucos dias com limites 00:00–23:59 no fuso da loja → soma por dia (não por hora).
+     * Antes: hasSpecificHours usava Date#getHours() do processo Node (UTC/laptop), marcando “horário específico”
+     * para meia-noite BR (03:00 UTC) e ligando agrupamento por hora em intervalos largos — valores perto da meia-noite UTC iam parar no dia errado no cliente.
+     */
+    if (limitesPadraoDiaInteiroNoFuso(periodoInicial, periodoFinal, timeZoneAgregacao)) {
+      return false
+    }
+
+    /* Intervalo curto com horários arbitrários → manter buckets por hora + data. */
+    return true
   }
-  // Caso "Hoje" no frontend: o client já manda intervaloHora quando quer agrupar.
   return typeof intervaloHora === 'number' && intervaloHora > 0
 }
 
@@ -271,6 +300,7 @@ export async function GET(request: NextRequest) {
       periodoFinal: isCustomDates ? new Date(periodoFinal) : null,
       isCustomDates,
       intervaloHora,
+      timeZoneAgregacao: fusoAgregacao,
     })
 
     const mapFinalizadas = new Map<string, { label: string; valor: number }>()

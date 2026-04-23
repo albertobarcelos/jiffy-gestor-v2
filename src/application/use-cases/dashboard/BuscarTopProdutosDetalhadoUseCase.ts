@@ -23,8 +23,8 @@ export class BuscarTopProdutosDetalhadoUseCase {
 
     // Se datas personalizadas foram fornecidas, passa elas para a API
     if (periodoInicialCustom && periodoFinalCustom) {
-      params.append('periodoInicial', periodoInicialCustom.toISOString())
-      params.append('periodoFinal', periodoFinalCustom.toISOString())
+      params.append('dataFinalizacaoInicial', periodoInicialCustom.toISOString())
+      params.append('dataFinalizacaoFinal', periodoFinalCustom.toISOString())
     }
 
     const response = await fetch(`/api/dashboard/top-produtos?${params.toString()}`, {
@@ -49,4 +49,3 @@ export class BuscarTopProdutosDetalhadoUseCase {
     )
   }
 }
-

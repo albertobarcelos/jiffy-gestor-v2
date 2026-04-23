@@ -16,30 +16,28 @@ export async function GET(request: NextRequest) {
     const { tokenInfo } = validation
 
     const { searchParams } = new URL(request.url)
-    
+
     // Verificar se é requisição para endpoint unificado
-    const isUnificado = searchParams.get('unificado') === 'true' || request.url.includes('/unificado')
-    
+    const isUnificado =
+      searchParams.get('unificado') === 'true' || request.url.includes('/unificado')
+
     if (isUnificado) {
       // Validar empresaId
       if (!tokenInfo.empresaId) {
-        return NextResponse.json(
-          { error: 'Empresa não identificada no token' },
-          { status: 401 }
-        )
+        return NextResponse.json({ error: 'Empresa não identificada no token' }, { status: 401 })
       }
 
       // Redirecionar para endpoint unificado
       const params = new URLSearchParams()
       params.append('empresaId', tokenInfo.empresaId ?? '')
-      
+
       const origem = searchParams.get('origem')
       const statusFiscal = searchParams.get('statusFiscal')
       const mes = searchParams.get('mes')
       const ano = searchParams.get('ano')
       const page = searchParams.get('page')
       const limit = searchParams.get('limit')
-      
+
       if (origem) params.append('origem', origem)
       if (statusFiscal) params.append('statusFiscal', statusFiscal)
       if (mes) params.append('mes', mes)
@@ -61,14 +59,14 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json(response.data || {})
     }
-    
+
     // Parâmetros de paginação
     const limitParam = searchParams.get('limit')
     const offsetParam = searchParams.get('offset')
 
     const limit = searchParams.get('limit') || ''
     const offset = searchParams.get('offset') || ''
-    
+
     // Parâmetros de filtro
     const q = searchParams.get('q') || ''
     const tipoVenda = searchParams.get('tipoVenda') || ''
@@ -78,15 +76,13 @@ export async function GET(request: NextRequest) {
     const valorFinalMaximo = searchParams.get('valorFinalMaximo') || ''
     const meioPagamentoId = searchParams.get('meioPagamentoId') || ''
     const terminalId = searchParams.get('terminalId') || ''
-    const periodoInicial = searchParams.get('periodoInicial') || ''
-    const periodoFinal = searchParams.get('periodoFinal') || ''
     const dataFinalizacaoInicial = searchParams.get('dataFinalizacaoInicial') || ''
     const dataFinalizacaoFinal = searchParams.get('dataFinalizacaoFinal') || ''
     const dataCriacaoInicial = searchParams.get('dataCriacaoInicial') || ''
     const dataCriacaoFinal = searchParams.get('dataCriacaoFinal') || ''
     const solicitarEmissaoFiscal = searchParams.get('solicitarEmissaoFiscal') || ''
     const statusFiscal = searchParams.get('statusFiscal') || ''
-    
+
     // Status pode ter múltiplos valores
     const statusParams = searchParams.getAll('status')
 
@@ -105,17 +101,15 @@ export async function GET(request: NextRequest) {
     if (valorFinalMaximo) params.append('valorFinalMaximo', valorFinalMaximo)
     if (meioPagamentoId) params.append('meioPagamentoId', meioPagamentoId)
     if (terminalId) params.append('terminalId', terminalId)
-    if (periodoInicial) params.append('periodoInicial', periodoInicial)
-    if (periodoFinal) params.append('periodoFinal', periodoFinal)
     if (dataFinalizacaoInicial) params.append('dataFinalizacaoInicial', dataFinalizacaoInicial)
     if (dataFinalizacaoFinal) params.append('dataFinalizacaoFinal', dataFinalizacaoFinal)
     if (dataCriacaoInicial) params.append('dataCriacaoInicial', dataCriacaoInicial)
     if (dataCriacaoFinal) params.append('dataCriacaoFinal', dataCriacaoFinal)
     if (solicitarEmissaoFiscal) params.append('solicitarEmissaoFiscal', solicitarEmissaoFiscal)
     if (statusFiscal) params.append('statusFiscal', statusFiscal)
-    
+
     // Adiciona múltiplos valores de status
-    statusParams.forEach((status) => {
+    statusParams.forEach(status => {
       params.append('status', status)
     })
 
@@ -139,10 +133,7 @@ export async function GET(request: NextRequest) {
         { status: error.status }
       )
     }
-    return NextResponse.json(
-      { error: 'Erro interno do servidor' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
   }
 }
 
@@ -159,7 +150,7 @@ export async function POST(request: NextRequest) {
     const { tokenInfo } = validation
 
     const body = await request.json()
-    
+
     // Log para debug
     console.log('📤 Criando venda - Token Info:', {
       userId: tokenInfo.userId,
@@ -169,21 +160,17 @@ export async function POST(request: NextRequest) {
 
     const apiClient = new ApiClient()
     // Usar rota específica para gestor quando origem = "GESTOR"
-    const endpoint = body.origem === 'GESTOR' 
-      ? `/api/v1/gestor/vendas`
-      : `/api/v1/operacao-pdv/vendas`
-    
-    const response = await apiClient.request<any>(
-      endpoint,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${tokenInfo.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      }
-    )
+    const endpoint =
+      body.origem === 'GESTOR' ? `/api/v1/gestor/vendas` : `/api/v1/operacao-pdv/vendas`
+
+    const response = await apiClient.request<any>(endpoint, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${tokenInfo.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    })
 
     return NextResponse.json(response.data || {}, { status: 201 })
   } catch (error) {
@@ -206,9 +193,11 @@ export async function POST(request: NextRequest) {
       stack: error instanceof Error ? error.stack : undefined,
     })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Erro interno do servidor', details: String(error) },
+      {
+        error: error instanceof Error ? error.message : 'Erro interno do servidor',
+        details: String(error),
+      },
       { status: 500 }
     )
   }
 }
-

@@ -1,19 +1,13 @@
 /**
  * Intervalo por data de finalização na API `/api/v1/operacao-pdv/vendas`.
- * Aceita os nomes novos e mantém fallback para `periodoInicial`/`periodoFinal` (legado).
+ * Somente `dataFinalizacaoInicial` e `dataFinalizacaoFinal` (contrato atual).
  */
 export function lerIntervaloFinalizacaoVendasPdv(searchParams: URLSearchParams): {
   inicial: string
   final: string
 } | null {
-  const inicial =
-    searchParams.get('dataFinalizacaoInicial')?.trim() ||
-    searchParams.get('periodoInicial')?.trim() ||
-    ''
-  const final =
-    searchParams.get('dataFinalizacaoFinal')?.trim() ||
-    searchParams.get('periodoFinal')?.trim() ||
-    ''
+  const inicial = searchParams.get('dataFinalizacaoInicial')?.trim() || ''
+  const final = searchParams.get('dataFinalizacaoFinal')?.trim() || ''
   if (!inicial || !final) return null
   return { inicial, final }
 }
