@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
+import {
+  appendIntervaloFinalizacaoVendasPdv,
+  lerIntervaloFinalizacaoVendasPdv,
+} from '@/src/shared/utils/parametrosDataFinalizacaoVendasPdv'
 
 type VendasMetricas = {
   totalFaturado?: number
@@ -118,12 +122,11 @@ export async function GET(request: NextRequest) {
     const { tokenInfo } = validation
 
     const { searchParams } = new URL(request.url)
-    const periodoInicial = searchParams.get('periodoInicial') || ''
-    const periodoFinal = searchParams.get('periodoFinal') || ''
-
     const paramsBase = new URLSearchParams()
-    if (periodoInicial) paramsBase.append('periodoInicial', periodoInicial)
-    if (periodoFinal) paramsBase.append('periodoFinal', periodoFinal)
+    const intervalo = lerIntervaloFinalizacaoVendasPdv(searchParams)
+    if (intervalo) {
+      appendIntervaloFinalizacaoVendasPdv(paramsBase, intervalo)
+    }
 
     const apiClient = new ApiClient()
     const headers = {

@@ -154,8 +154,8 @@ export class BuscarMetodosPagamentoDetalhadoUseCase {
     const baseParams = new URLSearchParams()
 
     if (periodoInicial && periodoFinal) {
-      baseParams.append('periodoInicial', periodoInicial)
-      baseParams.append('periodoFinal', periodoFinal)
+      baseParams.append('dataFinalizacaoInicial', periodoInicial)
+      baseParams.append('dataFinalizacaoFinal', periodoFinal)
     }
     baseParams.append('status', 'FINALIZADA')
 

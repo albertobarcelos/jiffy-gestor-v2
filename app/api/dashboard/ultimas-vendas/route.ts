@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
+import {
+  appendIntervaloFinalizacaoVendasPdv,
+  lerIntervaloFinalizacaoVendasPdv,
+} from '@/src/shared/utils/parametrosDataFinalizacaoVendasPdv'
 
 type VendasListResponse = {
   items?: Array<Record<string, unknown>>
@@ -41,8 +45,7 @@ export async function GET(request: NextRequest) {
     const { tokenInfo } = validation
 
     const { searchParams } = new URL(request.url)
-    const periodoInicial = searchParams.get('periodoInicial') || ''
-    const periodoFinal = searchParams.get('periodoFinal') || ''
+    const intervalo = lerIntervaloFinalizacaoVendasPdv(searchParams)
     const limit = Math.min(Math.max(Number(searchParams.get('limit') || '20'), 1), 100)
     const offset = Math.max(Number(searchParams.get('offset') || '0'), 0)
 
@@ -56,8 +59,9 @@ export async function GET(request: NextRequest) {
     params.append('limit', String(limit))
     params.append('offset', String(offset))
     params.append('status', 'FINALIZADA')
-    if (periodoInicial) params.append('periodoInicial', periodoInicial)
-    if (periodoFinal) params.append('periodoFinal', periodoFinal)
+    if (intervalo) {
+      appendIntervaloFinalizacaoVendasPdv(params, intervalo)
+    }
 
     const vendasResp = await apiClient.request<VendasListResponse>(
       `/api/v1/operacao-pdv/vendas?${params.toString()}`,

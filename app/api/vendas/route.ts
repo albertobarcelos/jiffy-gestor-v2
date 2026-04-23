@@ -80,6 +80,10 @@ export async function GET(request: NextRequest) {
     const terminalId = searchParams.get('terminalId') || ''
     const periodoInicial = searchParams.get('periodoInicial') || ''
     const periodoFinal = searchParams.get('periodoFinal') || ''
+    const dataFinalizacaoInicial = searchParams.get('dataFinalizacaoInicial') || ''
+    const dataFinalizacaoFinal = searchParams.get('dataFinalizacaoFinal') || ''
+    const dataCriacaoInicial = searchParams.get('dataCriacaoInicial') || ''
+    const dataCriacaoFinal = searchParams.get('dataCriacaoFinal') || ''
     const solicitarEmissaoFiscal = searchParams.get('solicitarEmissaoFiscal') || ''
     const statusFiscal = searchParams.get('statusFiscal') || ''
     
@@ -103,6 +107,10 @@ export async function GET(request: NextRequest) {
     if (terminalId) params.append('terminalId', terminalId)
     if (periodoInicial) params.append('periodoInicial', periodoInicial)
     if (periodoFinal) params.append('periodoFinal', periodoFinal)
+    if (dataFinalizacaoInicial) params.append('dataFinalizacaoInicial', dataFinalizacaoInicial)
+    if (dataFinalizacaoFinal) params.append('dataFinalizacaoFinal', dataFinalizacaoFinal)
+    if (dataCriacaoInicial) params.append('dataCriacaoInicial', dataCriacaoInicial)
+    if (dataCriacaoFinal) params.append('dataCriacaoFinal', dataCriacaoFinal)
     if (solicitarEmissaoFiscal) params.append('solicitarEmissaoFiscal', solicitarEmissaoFiscal)
     if (statusFiscal) params.append('statusFiscal', statusFiscal)
     

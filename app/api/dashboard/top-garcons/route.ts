@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
+import {
+  appendIntervaloFinalizacaoVendasPdv,
+  lerIntervaloFinalizacaoVendasPdv,
+} from '@/src/shared/utils/parametrosDataFinalizacaoVendasPdv'
 
 interface PeriodoDates {
   periodoInicial: string
@@ -84,17 +88,20 @@ function userIdFromVendaDetail(d: Record<string, unknown>): string {
   )
 }
 
-function somaQuantidadeProdutos(produtos: Array<{ quantidade?: number }> | undefined): number {
+function somaQuantidadeProdutos(
+  produtos: Array<{ quantidade?: number; removido?: boolean }> | undefined
+): number {
   if (!Array.isArray(produtos)) return 0
   let s = 0
   for (const p of produtos) {
+    if (p?.removido === true) continue
     s += typeof p.quantidade === 'number' ? p.quantidade : 0
   }
   return s
 }
 
 type VendaDetalhe = Record<string, unknown> & {
-  produtosLancados?: Array<{ quantidade?: number }>
+  produtosLancados?: Array<{ quantidade?: number; removido?: boolean }>
   valorFinal?: number
 }
 
@@ -151,9 +158,6 @@ export async function GET(request: NextRequest) {
   const periodo = searchParams.get('periodo') || 'hoje'
   /** Resumo: 10 linhas; “ver todos”: até 500 (mesma ideia do top produtos). */
   const limit = Math.min(Math.max(Number(searchParams.get('limit') || '10'), 1), 500)
-  const periodoInicialCustom = searchParams.get('periodoInicial')
-  const periodoFinalCustom = searchParams.get('periodoFinal')
-
   const validation = validateRequest(request)
   if (!validation.valid || !validation.tokenInfo) {
     return validation.error!
@@ -162,14 +166,13 @@ export async function GET(request: NextRequest) {
 
   const params = new URLSearchParams()
 
-  if (periodoInicialCustom && periodoFinalCustom) {
-    params.append('periodoInicial', periodoInicialCustom)
-    params.append('periodoFinal', periodoFinalCustom)
+  const intervaloCustom = lerIntervaloFinalizacaoVendasPdv(searchParams)
+  if (intervaloCustom) {
+    appendIntervaloFinalizacaoVendasPdv(params, intervaloCustom)
   } else {
     const { periodoInicial, periodoFinal } = getPeriodoDates(periodo)
     if (periodoInicial && periodoFinal) {
-      params.append('periodoInicial', periodoInicial)
-      params.append('periodoFinal', periodoFinal)
+      appendIntervaloFinalizacaoVendasPdv(params, { inicial: periodoInicial, final: periodoFinal })
     }
   }
 
@@ -186,8 +189,7 @@ export async function GET(request: NextRequest) {
       empresaId: tokenInfo.empresaId,
       periodo,
       limit,
-      periodoInicial: periodoInicialCustom || '',
-      periodoFinal: periodoFinalCustom || '',
+      intervaloCustom: intervaloCustom ?? null,
     })
     const cached = globalThis.__jiffyTopGarconsCache?.get(cacheKey)
     if (cached && cached.expiresAt > Date.now()) {

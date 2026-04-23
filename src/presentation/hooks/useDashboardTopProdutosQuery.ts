@@ -24,8 +24,8 @@ async function fetchTopProdutos(params: Params): Promise<DashboardTopProduto[]> 
   search.append('periodo', params.periodo)
   search.append('limit', String(params.limit ?? 10))
   if (params.periodoInicial && params.periodoFinal) {
-    search.append('periodoInicial', params.periodoInicial.toISOString())
-    search.append('periodoFinal', params.periodoFinal.toISOString())
+    search.append('dataFinalizacaoInicial', params.periodoInicial.toISOString())
+    search.append('dataFinalizacaoFinal', params.periodoFinal.toISOString())
   }
 
   const response = await fetch(`/api/dashboard/top-produtos?${search.toString()}`)

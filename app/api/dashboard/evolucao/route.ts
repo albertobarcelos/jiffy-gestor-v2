@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 import { ufBrasilParaTimeZoneIANA } from '@/src/shared/utils/fusoHorarioBrasil'
+import { lerIntervaloFinalizacaoVendasPdv } from '@/src/shared/utils/parametrosDataFinalizacaoVendasPdv'
 
 type Status = 'FINALIZADA' | 'CANCELADA'
 
@@ -154,11 +155,11 @@ function shouldGroupByHour(params: {
 async function fetchAllVendasStatus(args: {
   apiClient: ApiClient
   headers: Record<string, string>
-  periodoInicial?: string
-  periodoFinal?: string
+  dataFinalizacaoInicial?: string
+  dataFinalizacaoFinal?: string
   status: Status
 }): Promise<VendaLike[]> {
-  const { apiClient, headers, periodoInicial, periodoFinal, status } = args
+  const { apiClient, headers, dataFinalizacaoInicial, dataFinalizacaoFinal, status } = args
   const limit = 100
   let offset = 0
   let totalPages = 1
@@ -166,8 +167,8 @@ async function fetchAllVendasStatus(args: {
 
   while (offset / limit < totalPages) {
     const params = new URLSearchParams()
-    if (periodoInicial) params.append('periodoInicial', periodoInicial)
-    if (periodoFinal) params.append('periodoFinal', periodoFinal)
+    if (dataFinalizacaoInicial) params.append('dataFinalizacaoInicial', dataFinalizacaoInicial)
+    if (dataFinalizacaoFinal) params.append('dataFinalizacaoFinal', dataFinalizacaoFinal)
     params.append('status', status)
     params.append('limit', String(limit))
     params.append('offset', String(offset))
@@ -213,8 +214,9 @@ export async function GET(request: NextRequest) {
     const { tokenInfo } = validation
 
     const { searchParams } = new URL(request.url)
-    const periodoInicial = searchParams.get('periodoInicial') || ''
-    const periodoFinal = searchParams.get('periodoFinal') || ''
+    const intervaloDatas = lerIntervaloFinalizacaoVendasPdv(searchParams)
+    const periodoInicial = intervaloDatas?.inicial ?? ''
+    const periodoFinal = intervaloDatas?.final ?? ''
     const statuses = searchParams.getAll('status').filter(Boolean) as Status[]
     const intervaloHoraRaw = searchParams.get('intervaloHora')
     const intervaloHora = intervaloHoraRaw ? Number(intervaloHoraRaw) : null
@@ -235,8 +237,8 @@ export async function GET(request: NextRequest) {
         ? fetchAllVendasStatus({
             apiClient,
             headers,
-            periodoInicial: periodoInicial || undefined,
-            periodoFinal: periodoFinal || undefined,
+            dataFinalizacaoInicial: periodoInicial || undefined,
+            dataFinalizacaoFinal: periodoFinal || undefined,
             status: 'FINALIZADA',
           })
         : Promise.resolve([]),
@@ -244,8 +246,8 @@ export async function GET(request: NextRequest) {
         ? fetchAllVendasStatus({
             apiClient,
             headers,
-            periodoInicial: periodoInicial || undefined,
-            periodoFinal: periodoFinal || undefined,
+            dataFinalizacaoInicial: periodoInicial || undefined,
+            dataFinalizacaoFinal: periodoFinal || undefined,
             status: 'CANCELADA',
           })
         : Promise.resolve([]),

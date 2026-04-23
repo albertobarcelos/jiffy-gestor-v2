@@ -39,8 +39,8 @@ type Params = {
 
 async function fetchFaturamentoPorDia(params: Params): Promise<Record<string, number>> {
   const search = new URLSearchParams()
-  search.append('periodoInicial', params.periodoInicial.toISOString())
-  search.append('periodoFinal', params.periodoFinal.toISOString())
+  search.append('dataFinalizacaoInicial', params.periodoInicial.toISOString())
+  search.append('dataFinalizacaoFinal', params.periodoFinal.toISOString())
   search.append('status', 'FINALIZADA')
 
   const response = await fetch(`/api/dashboard/evolucao?${search.toString()}`)

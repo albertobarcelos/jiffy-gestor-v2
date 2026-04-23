@@ -35,8 +35,8 @@ type DashboardResumoParams = {
 
 async function fetchDashboardResumo(params: DashboardResumoParams): Promise<DashboardResumoResponse> {
   const search = new URLSearchParams()
-  if (params.periodoInicial) search.append('periodoInicial', params.periodoInicial.toISOString())
-  if (params.periodoFinal) search.append('periodoFinal', params.periodoFinal.toISOString())
+  if (params.periodoInicial) search.append('dataFinalizacaoInicial', params.periodoInicial.toISOString())
+  if (params.periodoFinal) search.append('dataFinalizacaoFinal', params.periodoFinal.toISOString())
 
   const response = await fetch(`/api/dashboard/resumo?${search.toString()}`)
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>

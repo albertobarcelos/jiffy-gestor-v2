@@ -17,8 +17,8 @@ type Params = {
 
 async function fetchDashboardEvolucao(params: Params): Promise<DashboardEvolucaoPoint[]> {
   const search = new URLSearchParams()
-  if (params.periodoInicial) search.append('periodoInicial', params.periodoInicial.toISOString())
-  if (params.periodoFinal) search.append('periodoFinal', params.periodoFinal.toISOString())
+  if (params.periodoInicial) search.append('dataFinalizacaoInicial', params.periodoInicial.toISOString())
+  if (params.periodoFinal) search.append('dataFinalizacaoFinal', params.periodoFinal.toISOString())
   if (typeof params.intervaloHora === 'number') search.append('intervaloHora', String(params.intervaloHora))
 
   params.selectedStatuses.forEach(status => search.append('status', status))

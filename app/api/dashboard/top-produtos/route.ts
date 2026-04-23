@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
+import {
+  appendIntervaloFinalizacaoVendasPdv,
+  lerIntervaloFinalizacaoVendasPdv,
+} from '@/src/shared/utils/parametrosDataFinalizacaoVendasPdv'
 
 interface PeriodoDates {
   periodoInicial: string
@@ -76,9 +80,6 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const periodo = searchParams.get('periodo') || 'hoje'
   const limit = Number(searchParams.get('limit') || '10')
-  const periodoInicialCustom = searchParams.get('periodoInicial')
-  const periodoFinalCustom = searchParams.get('periodoFinal')
-
   const validation = validateRequest(request)
   if (!validation.valid || !validation.tokenInfo) {
     return validation.error!
@@ -87,16 +88,13 @@ export async function GET(request: NextRequest) {
 
   const params = new URLSearchParams()
 
-  // Se datas personalizadas foram fornecidas, usa elas
-  if (periodoInicialCustom && periodoFinalCustom) {
-    params.append('periodoInicial', periodoInicialCustom)
-    params.append('periodoFinal', periodoFinalCustom)
+  const intervaloCustom = lerIntervaloFinalizacaoVendasPdv(searchParams)
+  if (intervaloCustom) {
+    appendIntervaloFinalizacaoVendasPdv(params, intervaloCustom)
   } else {
-    // Caso contrário, usa a função de cálculo de período
     const { periodoInicial, periodoFinal } = getPeriodoDates(periodo)
     if (periodoInicial && periodoFinal) {
-      params.append('periodoInicial', periodoInicial)
-      params.append('periodoFinal', periodoFinal)
+      appendIntervaloFinalizacaoVendasPdv(params, { inicial: periodoInicial, final: periodoFinal })
     }
   }
 
@@ -114,8 +112,7 @@ export async function GET(request: NextRequest) {
       empresaId: tokenInfo.empresaId,
       periodo,
       limit,
-      periodoInicial: periodoInicialCustom || '',
-      periodoFinal: periodoFinalCustom || '',
+      intervaloCustom: intervaloCustom ?? null,
     })
     const cached = globalThis.__jiffyTopProdutosCache?.get(cacheKey)
     if (cached && cached.expiresAt > Date.now()) {
@@ -157,10 +154,14 @@ export async function GET(request: NextRequest) {
       10,
       async (vendaId) => {
         try {
-          const resp = await apiClient.request<{ produtosLancados?: Array<{ produtoId: string; quantidade: number; valorFinal: number }> }>(
-            `/api/v1/operacao-pdv/vendas/${vendaId}`,
-            { method: 'GET', headers }
-          )
+          const resp = await apiClient.request<{
+            produtosLancados?: Array<{
+              produtoId: string
+              quantidade: number
+              valorFinal: number
+              removido?: boolean
+            }>
+          }>(`/api/v1/operacao-pdv/vendas/${vendaId}`, { method: 'GET', headers })
           return resp.data
         } catch {
           return null
@@ -173,6 +174,8 @@ export async function GET(request: NextRequest) {
       if (!venda?.produtosLancados) continue
       for (const p of venda.produtosLancados) {
         if (!p?.produtoId) continue
+        /* Itens cancelados/removidos da comanda não contam como venda efetiva. */
+        if (p.removido === true) continue
         const existing = aggregationByProdutoId.get(p.produtoId)
         const quantidade = typeof p.quantidade === 'number' ? p.quantidade : 0
         const valorTotal = typeof p.valorFinal === 'number' ? p.valorFinal : 0

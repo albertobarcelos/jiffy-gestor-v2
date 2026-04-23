@@ -216,11 +216,22 @@ function buildVendasListQueryParams(filters: VendasFiltrosQuerySnapshot): URLSea
     inicioFiltro = inicio
     fimFiltro = fim
   }
+  /**
+   * Backend: período por data de finalização (`dataFinalizacaoInicial`/`dataFinalizacaoFinal`).
+   * Com status apenas ABERTA não é permitido filtrar por finalização — usa-se data de criação.
+   */
+  const usarDatasCriacao = normalizedStatus === 'ABERTA'
   if (inicioFiltro) {
-    baseParams.append('periodoInicial', inicioFiltro.toISOString())
+    baseParams.append(
+      usarDatasCriacao ? 'dataCriacaoInicial' : 'dataFinalizacaoInicial',
+      inicioFiltro.toISOString()
+    )
   }
   if (fimFiltro) {
-    baseParams.append('periodoFinal', fimFiltro.toISOString())
+    baseParams.append(
+      usarDatasCriacao ? 'dataCriacaoFinal' : 'dataFinalizacaoFinal',
+      fimFiltro.toISOString()
+    )
   }
 
   return baseParams
@@ -1010,6 +1021,10 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       currentSearchParams.delete('canceladoPorId')
       currentSearchParams.delete('periodoInicial')
       currentSearchParams.delete('periodoFinal')
+      currentSearchParams.delete('dataFinalizacaoInicial')
+      currentSearchParams.delete('dataFinalizacaoFinal')
+      currentSearchParams.delete('dataCriacaoInicial')
+      currentSearchParams.delete('dataCriacaoFinal')
 
       router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
     } else {
