@@ -10,6 +10,7 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { FaturamentoRangeCalendar } from '@/src/presentation/components/ui/FaturamentoRangeCalendar'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useComissoesPdv } from '@/src/presentation/hooks/useComissoesPdv'
 import type { ComissoesPdvFetchParams } from '@/src/presentation/hooks/useComissoesPdv'
 import type {
@@ -113,6 +114,7 @@ function textoPeriodoResumo(ini: string, fim: string): string {
  */
 export function ComissoesList() {
   const { auth } = useAuthStore()
+  const { timezoneAgregacao } = useEmpresaMe()
   const token = auth?.getAccessToken()
 
   const [taxaId, setTaxaId] = useState('')
@@ -531,6 +533,7 @@ export function ComissoesList() {
             onMonthChange={setMesCalendarioIntervalo}
             faturamentoPorDia={undefined}
             faturamentoCarregando={false}
+            timeZoneEmpresa={timezoneAgregacao}
             horaInicio={rascunhoHoraInicio}
             horaFim={rascunhoHoraFim}
             onHorariosChange={(hi, hf) => {
@@ -595,13 +598,13 @@ export function ComissoesList() {
               <div className="flex-[2] text-xs font-semibold text-primary-text md:text-sm">
                 Usuário PDV
               </div>
-              <div className="hidden flex-1 text-xs font-semibold text-primary-text md:flex md:text-sm text-center justify-end">
+              <div className="hidden flex-1 justify-end text-center text-xs font-semibold text-primary-text md:flex md:text-sm">
                 Vendas participadas (R$)
               </div>
-              <div className="hidden flex-1 text-xs font-semibold text-primary-text lg:flex lg:text-sm text-center justify-end">
+              <div className="hidden flex-1 justify-end text-center text-xs font-semibold text-primary-text lg:flex lg:text-sm">
                 Base taxa (R$)
               </div>
-              <div className="hidden flex-1 text-xs font-semibold text-primary-text md:flex md:text-sm text-center justify-center">
+              <div className="hidden flex-1 justify-center text-center text-xs font-semibold text-primary-text md:flex md:text-sm">
                 Qtd. vendas
               </div>
               <div className="flex-1 text-end text-xs font-semibold text-primary-text">

@@ -16,6 +16,10 @@ import {
   combinarIntervaloCalendarParaDatas,
   formatarDataHoraIntervaloCurta,
 } from '@/src/shared/utils/intervaloCalendarioComHoras'
+import {
+  formatIsoDiaCivilEmFusoIANA,
+  parseIsoParaDataLocalMeioDia,
+} from '@/src/shared/utils/timezoneAgregacaoEmpresa'
 
 /**
  * O Intl/pt-BR devolve o nome do mês em minúsculas; CSS `capitalize` nem sempre altera o texto gerado.
@@ -59,6 +63,8 @@ type FaturamentoDayButtonProps = DayButtonProps & {
   resolverValor: (isoDate: string, foraDoMes: boolean) => number | null
   /** Células maiores no painel lateral (modal) — proporcional ao --rdp-day_* ampliado. */
   celulasAmpliadas?: boolean
+  /** Fuso da empresa — mesma regra dos buckets em GET /api/dashboard/evolucao. */
+  timeZoneEmpresa?: string
 }
 
 /**
@@ -71,6 +77,7 @@ function FaturamentoDayButton({
   children,
   resolverValor,
   celulasAmpliadas = false,
+  timeZoneEmpresa,
   ...rest
 }: FaturamentoDayButtonProps) {
   const ref = React.useRef<HTMLButtonElement>(null)
@@ -80,7 +87,16 @@ function FaturamentoDayButton({
   }, [modifiers.focused])
 
   const foraDoMes = Boolean(modifiers.outside)
-  const valor = resolverValor(day.isoDate, foraDoMes)
+  /*
+   * Não usar `day.date` como referência: o RDP pode usar meia-noite UTC para o ISO do dia,
+   * e ao converter para o fuso da empresa vira o dia civil anterior (ex.: célula 23 → bucket 22).
+   * O `isoDate` é o dia do grid; meio-dia local evita virada por UTC/DST ao mapear para IANA.
+   */
+  const instanteDiaDoGrid = parseIsoParaDataLocalMeioDia(day.isoDate)
+  const chaveMapa = timeZoneEmpresa?.trim()
+    ? formatIsoDiaCivilEmFusoIANA(instanteDiaDoGrid, timeZoneEmpresa.trim())
+    : day.isoDate
+  const valor = resolverValor(chaveMapa, foraDoMes)
 
   return (
     <button
@@ -128,6 +144,8 @@ export type FaturamentoRangeCalendarProps = {
   faturamentoPorDia?: Record<string, number>
   /** Enquanto true, não exibe o valor na célula (evita número errado durante o fetch). */
   faturamentoCarregando?: boolean
+  /** Fuso IANA da empresa (`parametroEmpresa.timezone`) — alinha células ao agrupamento da API. */
+  timeZoneEmpresa?: string
   /** Mês do primeiro painel (esquerda), controlado pelo pai para alinhar fetch aos dois meses visíveis. */
   month?: Date
   onMonthChange?: (month: Date) => void
@@ -156,6 +174,7 @@ export function FaturamentoRangeCalendar({
   onHorariosChange,
   faturamentoPorDia,
   faturamentoCarregando = false,
+  timeZoneEmpresa,
   month: monthControlled,
   onMonthChange,
   embutidoNoModal = false,
@@ -210,9 +229,10 @@ export function FaturamentoRangeCalendar({
         {...props}
         resolverValor={resolverValor}
         celulasAmpliadas={fundoModalClaro}
+        timeZoneEmpresa={timeZoneEmpresa}
       />
     ),
-    [resolverValor, fundoModalClaro]
+    [resolverValor, fundoModalClaro, timeZoneEmpresa]
   )
 
   const formattersRdp = React.useMemo(
@@ -556,6 +576,10 @@ export function FaturamentoRangeCalendar({
       {/* navLayout=around: seta « no 1º mês (esq.) e seta » no último mês (dir.). */}
       <div className={cn(fundoModalClaro ? 'flex min-h-0 flex-1 flex-col' : '')}>
         <div className={cn(fundoModalClaro ? 'flex min-h-0 flex-1 flex-col justify-center' : '')}>
+          {/*
+            Não usar timeZone no DayPicker: o mês exibido deixava de bater com o `month` (Date no fuso local).
+            O fuso da empresa entra só na chave yyyy-MM-dd do mapa de faturamento em FaturamentoDayButton.
+          */}
           <Calendar
             mode="range"
             locale={ptBR}

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
-import { ufBrasilParaTimeZoneIANA } from '@/src/shared/utils/fusoHorarioBrasil'
 import { lerIntervaloFinalizacaoVendasPdv } from '@/src/shared/utils/parametrosDataFinalizacaoVendasPdv'
+import { resolverTimezoneAgregacaoEmpresa } from '@/src/shared/utils/timezoneAgregacaoEmpresa'
 
 type Status = 'FINALIZADA' | 'CANCELADA'
 
@@ -20,16 +20,6 @@ type VendasPage = {
   limit?: number
 }
 
-/** Verifica se o identificador IANA é aceito pelo motor de datas do runtime. */
-function timeZoneIANAValido(tz: string): boolean {
-  try {
-    Intl.DateTimeFormat('en-US', { timeZone: tz }).format(new Date())
-    return true
-  } catch {
-    return false
-  }
-}
-
 /**
  * Define o fuso para bucket diário/hora do faturamento na evolução.
  * Prioridade: `parametroEmpresa.timezone` (GET /empresas/me) → mapeamento por UF do endereço → Brasília.
@@ -44,24 +34,14 @@ async function obterFusoAgregacaoDaEmpresaLogada(
       headers,
     })
     const data = response.data ?? {}
-    const parametro = data.parametroEmpresa as Record<string, unknown> | undefined
-    const tzApi =
-      (typeof parametro?.timezone === 'string' ? parametro.timezone : '') ||
-      (typeof parametro?.timeZone === 'string' ? parametro.timeZone : '') ||
-      (typeof data.timezone === 'string' ? data.timezone : '')
-    const tzTrim = tzApi.trim()
-    if (tzTrim.length > 0 && timeZoneIANAValido(tzTrim)) {
-      return tzTrim
+    const tz = resolverTimezoneAgregacaoEmpresa(data)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[api/dashboard/evolucao] empresas/me → timezone agregação:', {
+        parametroEmpresa: data.parametroEmpresa,
+        timezoneResolvido: tz,
+      })
     }
-
-    const endereco = (data.endereco ?? data.endereco_data) as Record<string, unknown> | undefined
-    const estado =
-      typeof endereco?.estado === 'string'
-        ? endereco.estado
-        : typeof data.uf === 'string'
-          ? data.uf
-          : ''
-    return ufBrasilParaTimeZoneIANA(estado)
+    return tz
   } catch {
     return 'America/Sao_Paulo'
   }
@@ -196,10 +176,13 @@ async function fetchAllVendasStatus(args: {
     params.append('limit', String(limit))
     params.append('offset', String(offset))
 
-    const resp = await apiClient.request<VendasPage>(`/api/v1/operacao-pdv/vendas?${params.toString()}`, {
-      method: 'GET',
-      headers,
-    })
+    const resp = await apiClient.request<VendasPage>(
+      `/api/v1/operacao-pdv/vendas?${params.toString()}`,
+      {
+        method: 'GET',
+        headers,
+      }
+    )
 
     const page = resp.data ?? {}
     const items = Array.isArray(page.items) ? page.items : []
@@ -208,7 +191,11 @@ async function fetchAllVendasStatus(args: {
     if (offset === 0) {
       if (typeof page.totalPages === 'number' && page.totalPages > 0) {
         totalPages = page.totalPages
-      } else if (typeof page.count === 'number' && typeof page.limit === 'number' && page.limit > 0) {
+      } else if (
+        typeof page.count === 'number' &&
+        typeof page.limit === 'number' &&
+        page.limit > 0
+      ) {
         totalPages = Math.ceil(page.count / page.limit)
       } else {
         totalPages = items.length < limit ? 1 : 200
@@ -252,7 +239,9 @@ export async function GET(request: NextRequest) {
     }
 
     const selectedStatuses: Status[] =
-      statuses.length > 0 ? statuses.filter(s => s === 'FINALIZADA' || s === 'CANCELADA') : ['FINALIZADA']
+      statuses.length > 0
+        ? statuses.filter(s => s === 'FINALIZADA' || s === 'CANCELADA')
+        : ['FINALIZADA']
 
     const [fusoAgregacao, finalizadas, canceladas] = await Promise.all([
       obterFusoAgregacaoDaEmpresaLogada(apiClient, headers),
@@ -287,7 +276,12 @@ export async function GET(request: NextRequest) {
     const mapFinalizadas = new Map<string, { label: string; valor: number }>()
     const mapCanceladas = new Map<string, { label: string; valor: number }>()
 
-    const addToMap = (m: Map<string, { label: string; valor: number }>, key: string, label: string, value: number) => {
+    const addToMap = (
+      m: Map<string, { label: string; valor: number }>,
+      key: string,
+      label: string,
+      value: number
+    ) => {
       const current = m.get(key)
       if (current) {
         m.set(key, { label: current.label, valor: current.valor + value })
@@ -348,4 +342,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
   }
 }
-

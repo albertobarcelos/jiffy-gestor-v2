@@ -685,7 +685,7 @@ function DonutFormaPagamento({
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <div className="relative h-[120px] w-[120px] outline-none md:h-[144px] md:w-[144px] [&_.recharts-wrapper:focus]:outline-none [&_.recharts-surface:focus]:outline-none [&_svg:focus]:outline-none [&_*:focus]:outline-none [&_*:focus-visible]:outline-none [&_.recharts-sector:focus]:stroke-none [&_.recharts-sector:focus-visible]:stroke-none">
+      <div className="relative h-[120px] w-[120px] outline-none md:h-[144px] md:w-[144px] [&_*:focus-visible]:outline-none [&_*:focus]:outline-none [&_.recharts-sector:focus-visible]:stroke-none [&_.recharts-sector:focus]:stroke-none [&_.recharts-surface:focus]:outline-none [&_.recharts-wrapper:focus]:outline-none [&_svg:focus]:outline-none">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart tabIndex={-1}>
             <Pie
@@ -735,6 +735,7 @@ export default function DashboardV2() {
   const queryClient = useQueryClient()
   const {
     empresa: empresaLogada,
+    timezoneAgregacao,
     isLoading: carregandoEmpresa,
     error: erroEmpresa,
     refetch: refetchEmpresa,
@@ -1747,9 +1748,7 @@ export default function DashboardV2() {
                 comparacaoPeriodoAnterior.pct > 0 ? (
                   <span className="text-lg font-semibold tracking-wide">
                     Suas vendas estão{' '}
-                    <span className="text-xl font-bold">
-                      {comparacaoPeriodoAnterior.pct}%
-                    </span>{' '}
+                    <span className="text-xl font-bold">{comparacaoPeriodoAnterior.pct}%</span>{' '}
                     acima {copyComparacao.acimaResto}
                   </span>
                 ) : comparacaoPeriodoAnterior.pct < 0 ? (
@@ -1929,7 +1928,7 @@ export default function DashboardV2() {
               {rotuloLinhaGraficoPeriodoAnterior(periodoData)}
             </span>
           </div>
-          <div className="h-[280px] w-full min-w-0 outline-none md:h-[320px] [&_.recharts-wrapper:focus]:outline-none [&_.recharts-surface:focus]:outline-none [&_svg:focus]:outline-none [&_*:focus]:outline-none [&_*:focus-visible]:outline-none [&_.recharts-layer:focus]:outline-none [&_.recharts-layer:focus-visible]:outline-none">
+          <div className="h-[280px] w-full min-w-0 outline-none md:h-[320px] [&_*:focus-visible]:outline-none [&_*:focus]:outline-none [&_.recharts-layer:focus-visible]:outline-none [&_.recharts-layer:focus]:outline-none [&_.recharts-surface:focus]:outline-none [&_.recharts-wrapper:focus]:outline-none [&_svg:focus]:outline-none">
             {carregandoGraficoComparativo ? (
               <div className="flex h-full min-h-[260px] items-center justify-center">
                 <JiffyLoading className="!gap-0 !py-0" />
@@ -2356,6 +2355,7 @@ export default function DashboardV2() {
             onMonthChange={setMesCalendarioIntervalo}
             faturamentoPorDia={faturamentoPorDiaCalendario ?? {}}
             faturamentoCarregando={faturamentoCalendarioPending || faturamentoCalendarioFetching}
+            timeZoneEmpresa={timezoneAgregacao}
             horaInicio={rascunhoHoraInicio}
             horaFim={rascunhoHoraFim}
             onHorariosChange={(hi, hf) => {

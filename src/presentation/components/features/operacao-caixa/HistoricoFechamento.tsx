@@ -18,6 +18,7 @@ import { sxEntradaCompactaProdutoSelect } from '@/src/presentation/components/fe
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { FaturamentoRangeCalendar } from '@/src/presentation/components/ui/FaturamentoRangeCalendar'
 import { useDashboardFaturamentoPorDiaQuery } from '@/src/presentation/hooks/useDashboardFaturamentoPorDiaQuery'
+import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import {
   primeiroMesQuadroDuploCalendario,
   periodoFetchFaturamentoCalendarioDoisMeses,
@@ -50,7 +51,20 @@ interface Terminal {
 }
 
 /** Meses curtos — exibição do intervalo "Por datas" (alinhado a `VendasList`). */
-const MESES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'] as const
+const MESES_ABREV = [
+  'jan',
+  'fev',
+  'mar',
+  'abr',
+  'mai',
+  'jun',
+  'jul',
+  'ago',
+  'set',
+  'out',
+  'nov',
+  'dez',
+] as const
 
 function formatarDataHoraFiltroCurta(date: Date): string {
   const dia = String(date.getDate()).padStart(2, '0')
@@ -83,11 +97,7 @@ function parseDataDDMMAAAA(texto: string): Date | null {
   const ano = Number(m[3])
   if (mes < 1 || mes > 12 || dia < 1 || dia > 31) return null
   const data = new Date(ano, mes - 1, dia)
-  if (
-    data.getFullYear() !== ano ||
-    data.getMonth() !== mes - 1 ||
-    data.getDate() !== dia
-  ) {
+  if (data.getFullYear() !== ano || data.getMonth() !== mes - 1 || data.getDate() !== dia) {
     return null
   }
   return data
@@ -184,6 +194,7 @@ const sxHistoricoFiltroTextFieldDate = {
  */
 export function HistoricoFechamento() {
   const { auth } = useAuthStore()
+  const { timezoneAgregacao } = useEmpresaMe()
 
   // Estados de filtros
   const [searchQuery, setSearchQuery] = useState('')
@@ -197,7 +208,9 @@ export function HistoricoFechamento() {
   const [dataAberturaInputValue, setDataAberturaInputValue] = useState<string>('')
   const [isDatasModalOpen, setIsDatasModalOpen] = useState(false)
   /** Rascunho do painel lateral (calendário duplo + horas) — mesmo fluxo que `VendasList`. */
-  const [rascunhoIntervaloRange, setRascunhoIntervaloRange] = useState<DateRange | undefined>(undefined)
+  const [rascunhoIntervaloRange, setRascunhoIntervaloRange] = useState<DateRange | undefined>(
+    undefined
+  )
   const [mesCalendarioIntervalo, setMesCalendarioIntervalo] = useState(() =>
     primeiroMesQuadroDuploCalendario(startOfDay(new Date()))
   )
@@ -244,7 +257,15 @@ export function HistoricoFechamento() {
       periodoFinal,
       dataAberturaFilter,
     }
-  }, [searchQuery, periodo, statusFilter, terminalFilter, periodoInicial, periodoFinal, dataAberturaFilter])
+  }, [
+    searchQuery,
+    periodo,
+    statusFilter,
+    terminalFilter,
+    periodoInicial,
+    periodoFinal,
+    dataAberturaFilter,
+  ])
 
   /**
    * Formata data para exibição na lista
@@ -443,9 +464,9 @@ export function HistoricoFechamento() {
             // Após reset, a próxima página será 1
             setCurrentPage(1)
           } else {
-            setOperacoesCaixa((prev) => [...prev, ...newItems])
+            setOperacoesCaixa(prev => [...prev, ...newItems])
             // Incrementa a página para a próxima busca
-            setCurrentPage((prev) => prev + 1)
+            setCurrentPage(prev => prev + 1)
           }
 
           // Verifica se há mais itens para carregar
@@ -511,12 +532,14 @@ export function HistoricoFechamento() {
         const data = await response.json()
 
         if (data.items && Array.isArray(data.items)) {
-          const mappedTerminals = data.items.map((t: any) => ({
-            id: t.id || t._id || '',
-            codigoInterno: t.codigoInterno || t.codigo_interno || t.nome || t.name || '',
-            nome: t.nome || t.name || '',
-          })).filter((t: Terminal) => t.id && t.codigoInterno)
-          
+          const mappedTerminals = data.items
+            .map((t: any) => ({
+              id: t.id || t._id || '',
+              codigoInterno: t.codigoInterno || t.codigo_interno || t.nome || t.name || '',
+              nome: t.nome || t.name || '',
+            }))
+            .filter((t: Terminal) => t.id && t.codigoInterno)
+
           allTerminals.push(...mappedTerminals)
           hasMore = data.hasNextPage !== false && data.items.length === limit
           currentOffset += limit
@@ -548,7 +571,15 @@ export function HistoricoFechamento() {
         clearTimeout(debounceTimerRef.current)
       }
     }
-  }, [searchQuery, statusFilter, terminalFilter, periodo, periodoInicial, periodoFinal, dataAberturaFilter])
+  }, [
+    searchQuery,
+    statusFilter,
+    terminalFilter,
+    periodo,
+    periodoInicial,
+    periodoFinal,
+    dataAberturaFilter,
+  ])
 
   const periodoFaturamentoCalendarioModal = useMemo(
     () => periodoFetchFaturamentoCalendarioDoisMeses(mesCalendarioIntervalo),
@@ -657,14 +688,14 @@ export function HistoricoFechamento() {
         periodoFinal: fim,
         dataAberturaFilter: null,
       }
-      
+
       // Dispara a busca imediatamente com reset da página (sem debounce)
       fetchOperacoesCaixa(true)
     } else if (periodo === 'Todos') {
       // Limpa os filtros de período
       setPeriodoInicial(null)
       setPeriodoFinal(null)
-      
+
       // Atualiza os refs manualmente
       filtersRef.current = {
         ...filtersRef.current,
@@ -672,7 +703,7 @@ export function HistoricoFechamento() {
         periodoInicial: null,
         periodoFinal: null,
       }
-      
+
       // Dispara a busca imediatamente com reset da página (sem debounce)
       fetchOperacoesCaixa(true)
     }
@@ -767,35 +798,42 @@ export function HistoricoFechamento() {
   }, [rascunhoIntervaloRange, rascunhoHoraInicio, rascunhoHoraFim, handleConfirmDatas])
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col">
       {/* Container principal */}
-      <div className="bg-primary-background rounded-t-lg rounded-b-lg">
+      <div className="bg-primary-background rounded-b-lg rounded-t-lg">
         {/* Título */}
-        <div className="md:px-[30px] py-1 flex flex-col md:flex-row items-center justify-between">
-          <h1 className="text-lg font-exo font-semibold text-primary">Histórico - Fechamento de Caixa</h1>
-          <div className="flex w-full md:w-auto flex-row items-end justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => setFiltrosVisiveis((prev) => !prev)}
-            className="flex items-center gap-2 px-3 py-1 rounded-md bg-primary text-white text-xs md:text-sm font-nunito shadow-sm"
-            aria-expanded={filtrosVisiveis}
-          >
-            {filtrosVisiveis ? <MdFilterAltOff size={18} /> : <MdFilterList size={18} />}
-            <span>{filtrosVisiveis ? 'Ocultar filtros' : 'Mostrar filtros'}</span>
-          </button>
+        <div className="flex flex-col items-center justify-between py-1 md:flex-row md:px-[30px]">
+          <h1 className="font-exo text-lg font-semibold text-primary">
+            Histórico - Fechamento de Caixa
+          </h1>
+          <div className="flex w-full flex-row items-end justify-end gap-2 md:w-auto">
+            <button
+              type="button"
+              onClick={() => setFiltrosVisiveis(prev => !prev)}
+              className="font-nunito flex items-center gap-2 rounded-md bg-primary px-3 py-1 text-xs text-white shadow-sm md:text-sm"
+              aria-expanded={filtrosVisiveis}
+            >
+              {filtrosVisiveis ? <MdFilterAltOff size={18} /> : <MdFilterList size={18} />}
+              <span>{filtrosVisiveis ? 'Ocultar filtros' : 'Mostrar filtros'}</span>
+            </button>
           </div>
         </div>
-        <div className="h-[1px] border-t-2 border-primary/70 flex-shrink-0"></div>
+        <div className="h-[1px] flex-shrink-0 border-t-2 border-primary/70"></div>
         {/* Filtros Avançados */}
-        <div className={`bg-custom-2 mt-1 pt-3 rounded-t-lg px-2 pb-1 flex flex-wrap justify-center items-end md:justify-start gap-2 ${filtrosVisiveis ? 'flex' : 'hidden'}`}>
-        <div className="flex-1 relative w-full md:max-w-[350px]">
-            <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
+        <div
+          className={`mt-1 flex flex-wrap items-end justify-center gap-2 rounded-t-lg bg-custom-2 px-2 pb-1 pt-3 md:justify-start ${filtrosVisiveis ? 'flex' : 'hidden'}`}
+        >
+          <div className="relative w-full flex-1 md:max-w-[350px]">
+            <MdSearch
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text"
+              size={20}
+            />
             <input
               type="text"
               placeholder="Digite o Código ou Terminal..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-9 pl-10 pr-4 rounded-lg bg-info border shadow-sm text-sm font-nunito"
+              onChange={e => setSearchQuery(e.target.value)}
+              className="font-nunito h-9 w-full rounded-lg border bg-info pl-10 pr-4 text-sm shadow-sm"
             />
           </div>
           {/* Status — outlined, rótulo na borda (padrão VendasList) */}
@@ -889,82 +927,79 @@ export function HistoricoFechamento() {
           />
           {/* Dropdown Período */}
           <div className="flex flex-row flex-wrap items-center gap-3">
-          <span className="text-primary text-sm font-exo">Período:</span>
-          <FormControl size="small" sx={{ minWidth: 120 }}>
-            <Select
-              value={periodo}
-              onChange={(e) => setPeriodo(e.target.value)}
-              sx={{
-                height: '32px',
-                backgroundColor: 'var(--color-primary)',
-                color: 'white',
-                fontSize: '13px',
-                '& .MuiOutlinedInput-notchedOutline': {
-                  borderColor: 'var(--color-primary)',
-                },
-                '& .MuiSvgIcon-root': {
+            <span className="font-exo text-sm text-primary">Período:</span>
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <Select
+                value={periodo}
+                onChange={e => setPeriodo(e.target.value)}
+                sx={{
+                  height: '32px',
+                  backgroundColor: 'var(--color-primary)',
                   color: 'white',
-                },
-              }}
-            >
-              <MenuItem value="Todos">Todos</MenuItem>
-              <MenuItem value="Hoje">Hoje</MenuItem>
-              <MenuItem value="Mês Atual">Mês Atual</MenuItem>
-              <MenuItem value="Últimos 7 Dias">Últimos 7 Dias</MenuItem>
-              <MenuItem value="Últimos 30 Dias">Últimos 30 Dias</MenuItem>
-              <MenuItem value="Últimos 60 Dias">Últimos 60 Dias</MenuItem>
-              <MenuItem value="Últimos 90 Dias">Últimos 90 Dias</MenuItem>
-            </Select>
-          </FormControl>
-          
+                  fontSize: '13px',
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'var(--color-primary)',
+                  },
+                  '& .MuiSvgIcon-root': {
+                    color: 'white',
+                  },
+                }}
+              >
+                <MenuItem value="Todos">Todos</MenuItem>
+                <MenuItem value="Hoje">Hoje</MenuItem>
+                <MenuItem value="Mês Atual">Mês Atual</MenuItem>
+                <MenuItem value="Últimos 7 Dias">Últimos 7 Dias</MenuItem>
+                <MenuItem value="Últimos 30 Dias">Últimos 30 Dias</MenuItem>
+                <MenuItem value="Últimos 60 Dias">Últimos 60 Dias</MenuItem>
+                <MenuItem value="Últimos 90 Dias">Últimos 90 Dias</MenuItem>
+              </Select>
+            </FormControl>
 
-          {/* Botão Por Datas */}
-          <button
-            type="button"
-            onClick={() => setIsDatasModalOpen(true)}
-            className="font-nunito flex h-8 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
-          >
-            <MdCalendarToday size={18} />
-            Por datas
-          </button>
-          {periodoInicial && periodoFinal ? (
-            <div className="flex shrink-0 flex-col gap-0 text-[11px] leading-snug text-primary/85 sm:text-xs">
-              <span className="whitespace-nowrap">
-                Dt. Ini.: {formatarDataHoraFiltroCurta(periodoInicial)}
-              </span>
-              <span className="whitespace-nowrap">
-                Dt. Fim: {formatarDataHoraFiltroCurta(periodoFinal)}
-              </span>
-            </div>
-          ) : null}
-          
+            {/* Botão Por Datas */}
+            <button
+              type="button"
+              onClick={() => setIsDatasModalOpen(true)}
+              className="font-nunito flex h-8 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
+            >
+              <MdCalendarToday size={18} />
+              Por datas
+            </button>
+            {periodoInicial && periodoFinal ? (
+              <div className="flex shrink-0 flex-col gap-0 text-[11px] leading-snug text-primary/85 sm:text-xs">
+                <span className="whitespace-nowrap">
+                  Dt. Ini.: {formatarDataHoraFiltroCurta(periodoInicial)}
+                </span>
+                <span className="whitespace-nowrap">
+                  Dt. Fim: {formatarDataHoraFiltroCurta(periodoFinal)}
+                </span>
+              </div>
+            ) : null}
           </div>
           {/* Botão Limpar Filtros */}
           <button
             onClick={handleClearFilters}
-            className="h-8 px-4 bg-primary text-white rounded-lg flex items-center gap-2 text-sm font-nunito hover:bg-primary/90 transition-colors"
+            className="font-nunito flex h-8 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
           >
             <MdFilterAltOff size={18} />
             Limpar Filtros
           </button>
         </div>
-        
 
         {/* Cabeçalho da Tabela */}
-        <div className="bg-custom-2 mt-2 px-3 py-2 flex items-center text-primary-text text-sm font-nunito font-semibold">
-          <div className="flex-1 hidden md:flex">Cód. Terminal</div>
+        <div className="font-nunito mt-2 flex items-center bg-custom-2 px-3 py-2 text-sm font-semibold text-primary-text">
+          <div className="hidden flex-1 md:flex">Cód. Terminal</div>
           <div className="flex-[1.5] text-[11px] md:text-sm">Terminal</div>
-          <div className="flex-[2] hidden md:block">Fechado por</div>
+          <div className="hidden flex-[2] md:block">Fechado por</div>
           <div className="flex-1 text-[11px] md:text-sm">Dt. Aberto</div>
           <div className="flex-1 text-[11px] md:text-sm">Dt. Fechado</div>
-          <div className="flex-1 text-center hidden md:block">Período Aberto</div>
-          <div className="flex-1 md:text-center text-right text-[11px] md:text-sm">Status</div>
+          <div className="hidden flex-1 text-center md:block">Período Aberto</div>
+          <div className="flex-1 text-right text-[11px] md:text-center md:text-sm">Status</div>
         </div>
 
         {/* Lista de Operações */}
         <div
           ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto bg-primary-background scrollbar-hide"
+          className="bg-primary-background scrollbar-hide flex-1 overflow-y-auto"
           style={{ maxHeight: 'calc(100vh - 300px)' }}
         >
           {isLoading && operacoesCaixa.length === 0 ? (
@@ -972,15 +1007,20 @@ export function HistoricoFechamento() {
               <JiffyLoading />
             </div>
           ) : operacoesCaixa.length === 0 ? (
-            <div className="flex justify-center items-center py-12">
+            <div className="flex items-center justify-center py-12">
               <p className="text-secondary-text">Nenhuma operação de caixa encontrada.</p>
             </div>
           ) : (
             <>
               {operacoesCaixa.map((operacao, index) => {
                 const dataAbertura = formatDateList(operacao.dataAbertura)
-                const dataFechamento = operacao.dataFechamento ? formatDateList(operacao.dataFechamento) : null
-                const periodoAberto = calcularPeriodoAberto(operacao.dataAbertura, operacao.dataFechamento)
+                const dataFechamento = operacao.dataFechamento
+                  ? formatDateList(operacao.dataFechamento)
+                  : null
+                const periodoAberto = calcularPeriodoAberto(
+                  operacao.dataAbertura,
+                  operacao.dataFechamento
+                )
                 const isZebraEven = index % 2 === 0
 
                 return (
@@ -990,24 +1030,28 @@ export function HistoricoFechamento() {
                       setSelectedOperacaoId(operacao.id)
                       setIsDetalhesModalOpen(true)
                     }}
-                    className={`md:mx-2 md:p-3 p-2 rounded-lg cursor-pointer transition-all ${isZebraEven ? 'bg-white hover:bg-primary/10' : 'bg-gray-50 hover:bg-primary/10'}`}
+                    className={`cursor-pointer rounded-lg p-2 transition-all md:mx-2 md:p-3 ${isZebraEven ? 'bg-white hover:bg-primary/10' : 'bg-gray-50 hover:bg-primary/10'}`}
                   >
-                    <div className="flex items-center text-sm font-nunito text-primary-text">
-                      <div className="flex-1 hidden md:block">{operacao.codigoTerminal || '-'}</div>
-                      <div className="flex-[1.5] text-[11px] md:text-sm">{operacao.nomeTerminal || '-'}</div>
-                      <div className="flex-[2] hidden md:block">{operacao.nomeResponsavelFechamento || '-'}</div>
-                      <div className="flex-1 flex flex-col items-center md:items-start text-[11px] md:text-sm text-center md:text-left">
+                    <div className="font-nunito flex items-center text-sm text-primary-text">
+                      <div className="hidden flex-1 md:block">{operacao.codigoTerminal || '-'}</div>
+                      <div className="flex-[1.5] text-[11px] md:text-sm">
+                        {operacao.nomeTerminal || '-'}
+                      </div>
+                      <div className="hidden flex-[2] md:block">
+                        {operacao.nomeResponsavelFechamento || '-'}
+                      </div>
+                      <div className="flex flex-1 flex-col items-center text-center text-[11px] md:items-start md:text-left md:text-sm">
                         <span className="">{dataAbertura.date}</span>
                         <span className="">{dataAbertura.time}</span>
                       </div>
-                      <div className="flex-1 flex flex-col items-center md:items-start text-[11px] md:text-sm text-center md:text-left">
+                      <div className="flex flex-1 flex-col items-center text-center text-[11px] md:items-start md:text-left md:text-sm">
                         <span className="">{dataFechamento ? dataFechamento.date : '-'}</span>
                         <span className="">{dataFechamento ? dataFechamento.time : ''}</span>
                       </div>
-                      <div className="flex-1 text-center hidden md:block">{periodoAberto}</div>
-                      <div className="flex-1 flex items-end md:justify-center justify-end">
+                      <div className="hidden flex-1 text-center md:block">{periodoAberto}</div>
+                      <div className="flex flex-1 items-end justify-end md:justify-center">
                         <span
-                          className={`md:px-3 px-1 py-1 rounded md:text-xs text-[10px] md:font-semibold ${
+                          className={`rounded px-1 py-1 text-[10px] md:px-3 md:text-xs md:font-semibold ${
                             operacao.status === 'aberto'
                               ? 'bg-warning text-white'
                               : 'bg-success text-white'
@@ -1022,7 +1066,7 @@ export function HistoricoFechamento() {
               })}
 
               {isLoadingMore && (
-                <div className="flex justify-center items-center py-4">
+                <div className="flex items-center justify-center py-4">
                   <CircularProgress size={24} />
                 </div>
               )}
@@ -1043,7 +1087,7 @@ export function HistoricoFechamento() {
             type="button"
             disabled={!rascunhoIntervaloRange?.from || !rascunhoIntervaloRange?.to}
             onClick={handleAplicarIntervaloHistorico}
-            className="flex h-full w-full items-center justify-center rounded-b-l-lg bg-primary font-nunito text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-b-l-lg font-nunito flex h-full w-full items-center justify-center bg-primary text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Aplicar
           </button>
@@ -1059,6 +1103,7 @@ export function HistoricoFechamento() {
             onMonthChange={setMesCalendarioIntervalo}
             faturamentoPorDia={faturamentoPorDiaCalendario ?? {}}
             faturamentoCarregando={faturamentoCalendarioPending || faturamentoCalendarioFetching}
+            timeZoneEmpresa={timezoneAgregacao}
             horaInicio={rascunhoHoraInicio}
             horaFim={rascunhoHoraFim}
             onHorariosChange={(hi, hf) => {
@@ -1083,4 +1128,3 @@ export function HistoricoFechamento() {
     </div>
   )
 }
-

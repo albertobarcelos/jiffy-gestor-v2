@@ -17,14 +17,7 @@ import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { DetalhesVendas } from './DetalhesVendas'
 import { GraficoVendasPorUsuarioModal } from './GraficoVendasPorUsuarioModal'
-import {
-  FormControl,
-  InputAdornment,
-  InputLabel,
-  MenuItem,
-  Select,
-  TextField,
-} from '@mui/material'
+import { FormControl, InputAdornment, InputLabel, MenuItem, Select, TextField } from '@mui/material'
 import { sxEntradaCompactaProdutoSelect } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { TipoVendaIcon } from './TipoVendaIcon'
 import { calculatePeriodo } from '@/src/shared/utils/dateFilters' // Importar calculatePeriodo
@@ -38,6 +31,7 @@ import { combinarIntervaloCalendarParaDatas } from '@/src/shared/utils/intervalo
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { FaturamentoRangeCalendar } from '@/src/presentation/components/ui/FaturamentoRangeCalendar'
 import { useDashboardFaturamentoPorDiaQuery } from '@/src/presentation/hooks/useDashboardFaturamentoPorDiaQuery'
+import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 // Tipos
 interface Venda {
   id: string
@@ -104,7 +98,20 @@ function normalizarPeriodoSelect(v: string | undefined): string {
 }
 
 /** Meses curtos para exibir o intervalo de "Por datas" (igual ao dashboard). */
-const MESES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'] as const
+const MESES_ABREV = [
+  'jan',
+  'fev',
+  'mar',
+  'abr',
+  'mai',
+  'jun',
+  'jul',
+  'ago',
+  'set',
+  'out',
+  'nov',
+  'dez',
+] as const
 
 function formatarDataHoraFiltroCurta(date: Date): string {
   const dia = String(date.getDate()).padStart(2, '0')
@@ -394,6 +401,7 @@ const sxVendasFiltroTextFieldMoeda = {
  */
 export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   const { auth } = useAuthStore()
+  const { timezoneAgregacao } = useEmpresaMe()
   const router = useRouter()
   const pathname = usePathname()
 
@@ -430,7 +438,9 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   const [isLoadingTerminais, setIsLoadingTerminais] = useState(false)
   const [isDatasModalOpen, setIsDatasModalOpen] = useState(false)
   /** Rascunho do painel lateral (calendário duplo + horas) — alinhado ao dashboardV2. */
-  const [rascunhoIntervaloRange, setRascunhoIntervaloRange] = useState<DateRange | undefined>(undefined)
+  const [rascunhoIntervaloRange, setRascunhoIntervaloRange] = useState<DateRange | undefined>(
+    undefined
+  )
   const [mesCalendarioIntervalo, setMesCalendarioIntervalo] = useState(() =>
     primeiroMesQuadroDuploCalendario(startOfDay(new Date()))
   )
@@ -915,11 +925,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       clearTimeout(debounceTimerRef.current)
     }
 
-    const delay = primeiraMontagemListaRef.current
-      ? 0
-      : periodoInicial && periodoFinal
-        ? 100
-        : 500
+    const delay = primeiraMontagemListaRef.current ? 0 : periodoInicial && periodoFinal ? 100 : 500
     primeiraMontagemListaRef.current = false
 
     debounceTimerRef.current = setTimeout(() => {
@@ -1087,13 +1093,10 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex w-full py-1 flex-col">
-            <p className="text-primary text-lg px-[30px] font-semibold">
-              Todas as Vendas do PDV
-            </p>
-            
+      <div className="flex w-full flex-col py-1">
+        <p className="px-[30px] text-lg font-semibold text-primary">Todas as Vendas do PDV</p>
       </div>
-      <div className="h-[1px] border-t-2 border-primary/70 flex-shrink-0"></div>
+      <div className="h-[1px] flex-shrink-0 border-t-2 border-primary/70"></div>
       {/* Container principal */}
       <div className="bg-primary-background rounded-b-lg rounded-t-lg">
         {/* Toggle de filtros no mobile */}
@@ -1468,19 +1471,19 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         <div className="overflow-hidden rounded-lg bg-info">
           {/* Cabeçalho */}
           <div className="font-nunito flex items-center gap-2 rounded-t-lg bg-custom-2 py-2 text-sm font-semibold text-primary-text md:px-3">
-            <div className="hidden flex-1  md:flex">Código Venda</div>
-            <div className="flex-1 text-center text-xs  md:text-sm">Data Abertura</div>
-            <div className="hidden flex-1 text-center text-xs  md:flex md:text-sm">
+            <div className="hidden flex-1 md:flex">Código Venda</div>
+            <div className="flex-1 text-center text-xs md:text-sm">Data Abertura</div>
+            <div className="hidden flex-1 text-center text-xs md:flex md:text-sm">
               Data Finalização
             </div>
-            <div className="flex-1 text-center text-xs  md:text-sm">Tipo Venda</div>
-            <div className="hidden flex-1 justify-center  md:flex">Cód. Terminal</div>
-            <div className="flex-[2] text-center text-xs  md:text-sm">Usuário PDV</div>
-            <div className="hidden flex-1 justify-end text-xs  md:flex md:text-sm">
+            <div className="flex-1 text-center text-xs md:text-sm">Tipo Venda</div>
+            <div className="hidden flex-1 justify-center md:flex">Cód. Terminal</div>
+            <div className="flex-[2] text-center text-xs md:text-sm">Usuário PDV</div>
+            <div className="hidden flex-1 justify-end text-xs md:flex md:text-sm">
               VL. Cancelado
             </div>
-            <div className="flex-1 text-right text-xs  md:text-sm">VL. Faturado</div>
-            <div className="hidden flex-1 justify-end  md:flex">Comprovante</div>
+            <div className="flex-1 text-right text-xs md:text-sm">VL. Faturado</div>
+            <div className="hidden flex-1 justify-end md:flex">Comprovante</div>
           </div>
 
           {/* Lista com scroll */}
@@ -1543,20 +1546,12 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                     </span>
                   </div>
                   <div className="flex flex-1 flex-col items-center">
-                    <span className="text-xs text-primary-text md:text-sm">
-                      {dateAbertura}
-                    </span>
-                    <span className="text-xs text-primary-text md:text-sm">
-                      {timeAbertura}
-                    </span>
+                    <span className="text-xs text-primary-text md:text-sm">{dateAbertura}</span>
+                    <span className="text-xs text-primary-text md:text-sm">{timeAbertura}</span>
                   </div>
                   <div className="hidden flex-1 flex-col items-center justify-center md:flex">
-                    <span className="text-xs text-primary-text md:text-sm">
-                      {dateFinalizacao}
-                    </span>
-                    <span className="text-xs text-primary-text md:text-sm">
-                      {timeFinalizacao}
-                    </span>
+                    <span className="text-xs text-primary-text md:text-sm">{dateFinalizacao}</span>
+                    <span className="text-xs text-primary-text md:text-sm">{timeFinalizacao}</span>
                   </div>
                   <div className="flex flex-1 flex-col items-center justify-center">
                     <TipoVendaIcon
@@ -1568,14 +1563,10 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                     />
                   </div>
                   <div className="hidden flex-1 text-center md:block">
-                    <span className="text-sm text-primary-text">
-                      #{venda.codigoTerminal}
-                    </span>
+                    <span className="text-sm text-primary-text">#{venda.codigoTerminal}</span>
                   </div>
                   <div className="flex-[2] text-center">
-                    <span className="text-xs text-primary-text md:text-sm">
-                      {usuarioNome}
-                    </span>
+                    <span className="text-xs text-primary-text md:text-sm">{usuarioNome}</span>
                   </div>
                   <div className="hidden flex-1 text-right md:block">
                     <span className="text-xs text-primary-text md:text-sm">
@@ -1648,7 +1639,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             type="button"
             disabled={!rascunhoIntervaloRange?.from || !rascunhoIntervaloRange?.to}
             onClick={handleAplicarIntervaloDatasVendas}
-            className="flex h-full w-full items-center justify-center rounded-b-l-lg bg-primary font-nunito text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-b-l-lg font-nunito flex h-full w-full items-center justify-center bg-primary text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Aplicar
           </button>
@@ -1664,6 +1655,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             onMonthChange={setMesCalendarioIntervalo}
             faturamentoPorDia={faturamentoPorDiaCalendario ?? {}}
             faturamentoCarregando={faturamentoCalendarioPending || faturamentoCalendarioFetching}
+            timeZoneEmpresa={timezoneAgregacao}
             horaInicio={rascunhoHoraInicio}
             horaFim={rascunhoHoraFim}
             onHorariosChange={(hi, hf) => {

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { resolverTimezoneAgregacaoEmpresa } from '@/src/shared/utils/timezoneAgregacaoEmpresa'
 
 /** Resumo da empresa da sessão (mesma rota usada em configurações / painel contador) */
 export interface EmpresaMeResumo {
@@ -16,6 +17,7 @@ export interface EmpresaMeResumo {
 export function useEmpresaMe() {
   const { auth, isAuthenticated, isRehydrated } = useAuthStore()
   const [empresa, setEmpresa] = useState<EmpresaMeResumo | null>(null)
+  const [timezoneAgregacao, setTimezoneAgregacao] = useState('America/Sao_Paulo')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -23,6 +25,7 @@ export function useEmpresaMe() {
     if (!isRehydrated || !isAuthenticated || !auth) {
       setIsLoading(false)
       setEmpresa(null)
+      setTimezoneAgregacao('America/Sao_Paulo')
       setError(null)
       return
     }
@@ -31,6 +34,7 @@ export function useEmpresaMe() {
     if (!token) {
       setIsLoading(false)
       setEmpresa(null)
+      setTimezoneAgregacao('America/Sao_Paulo')
       setError('Sessão sem token')
       return
     }
@@ -56,9 +60,18 @@ export function useEmpresaMe() {
       )
       const nomeExibicao = nomeBruto?.trim() ?? 'Empresa'
 
+      const tzAgg = resolverTimezoneAgregacaoEmpresa(data)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[useEmpresaMe] GET /api/empresas/me — timezone agregação:', {
+          parametroEmpresa: data.parametroEmpresa,
+          timezoneResolvido: tzAgg,
+        })
+      }
+      setTimezoneAgregacao(tzAgg)
       setEmpresa({ id, nomeExibicao })
     } catch (e) {
       setEmpresa(null)
+      setTimezoneAgregacao('America/Sao_Paulo')
       setError(e instanceof Error ? e.message : 'Erro ao carregar empresa')
     } finally {
       setIsLoading(false)
@@ -69,5 +82,5 @@ export function useEmpresaMe() {
     void fetchEmpresa()
   }, [fetchEmpresa])
 
-  return { empresa, isLoading, error, refetch: fetchEmpresa }
+  return { empresa, timezoneAgregacao, isLoading, error, refetch: fetchEmpresa }
 }
