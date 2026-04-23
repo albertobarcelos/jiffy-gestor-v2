@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect, useLayoutEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Dialog,
@@ -88,6 +88,10 @@ export function ProdutoImpressorasDialog({
     mode: 'create',
   })
 
+  /** Ordem das linhas do catálogo enquanto o painel está aberto (sem reordenar a cada toggle). */
+  const sessionCatalogOrderRef = useRef<string[] | null>(null)
+  const [sessionOrderTick, setSessionOrderTick] = useState(0)
+
   const loadImpressoras = useCallback(
     async (signal?: AbortSignal) => {
       if (!produtoId) return
@@ -158,7 +162,7 @@ export function ProdutoImpressorasDialog({
 
     setIsLoadingAllImpressoras(true)
     try {
-      const limit = 25
+      const limit = 100
       let offset = 0
       let hasMore = true
       const collected: ProdutoImpressora[] = []
@@ -232,9 +236,48 @@ export function ProdutoImpressorasDialog({
     }
   }, [open, produtoId, isRehydrated, loadImpressoras, loadAllImpressoras])
 
+  useEffect(() => {
+    if (!open) {
+      sessionCatalogOrderRef.current = null
+      setSessionOrderTick(0)
+    }
+  }, [open])
+
   const linkedIds = useMemo(() => {
     return new Set(impressoras.map(i => i.id))
   }, [impressoras])
+
+  /** Captura ordem inicial (vinculadas primeiro) uma vez por abertura, após catálogo e vínculos carregados */
+  useEffect(() => {
+    if (!open || isLoading || isLoadingAllImpressoras || allImpressoras.length === 0) return
+    if (sessionCatalogOrderRef.current !== null) return
+
+    const normalized = searchQuery.trim().toLowerCase()
+    const filtered = !normalized
+      ? [...allImpressoras]
+      : allImpressoras.filter(impressora => {
+          const target = `${impressora.nome} ${impressora.modelo ?? ''} ${impressora.local ?? ''}`
+          return target.toLowerCase().includes(normalized)
+        })
+
+    const linkedSet = new Set(impressoras.map(i => i.id))
+    const collator = new Intl.Collator('pt-BR', { sensitivity: 'base' })
+    const sorted = [...filtered].sort((a, b) => {
+      const aLinked = linkedSet.has(a.id)
+      const bLinked = linkedSet.has(b.id)
+      if (aLinked !== bLinked) return aLinked ? -1 : 1
+      return collator.compare(a.nome, b.nome)
+    })
+    sessionCatalogOrderRef.current = sorted.map(i => i.id)
+    setSessionOrderTick(t => t + 1)
+  }, [open, isLoading, isLoadingAllImpressoras, allImpressoras, searchQuery, impressoras])
+
+  const findImpressoraById = useCallback(
+    (id: string): ProdutoImpressora | undefined => {
+      return allImpressoras.find(item => item.id === id) || impressoras.find(item => item.id === id)
+    },
+    [allImpressoras, impressoras]
+  )
 
   const filteredAllImpressoras = useMemo(() => {
     const base = allImpressoras ?? []
@@ -246,26 +289,29 @@ export function ProdutoImpressorasDialog({
           return target.toLowerCase().includes(normalized)
         })
 
-    // Vinculadas ao produto primeiro; dentro de cada bloco, ordem alfabética por nome
+    const linkedFallback = new Set(impressoras.map(i => i.id))
     const collator = new Intl.Collator('pt-BR', { sensitivity: 'base' })
-    filtered.sort((a, b) => {
-      const aLinked = linkedIds.has(a.id)
-      const bLinked = linkedIds.has(b.id)
-      if (aLinked !== bLinked) {
-        return aLinked ? -1 : 1
-      }
+
+    const ordemSessao = sessionCatalogOrderRef.current
+    if (!open || ordemSessao === null) {
+      return [...filtered].sort((a, b) => {
+        const aLinked = linkedFallback.has(a.id)
+        const bLinked = linkedFallback.has(b.id)
+        if (aLinked !== bLinked) return aLinked ? -1 : 1
+        return collator.compare(a.nome, b.nome)
+      })
+    }
+
+    const ordemMap = new Map(ordemSessao.map((id, idx) => [id, idx]))
+    return [...filtered].sort((a, b) => {
+      const ia = ordemMap.get(a.id)
+      const ib = ordemMap.get(b.id)
+      if (ia !== undefined && ib !== undefined) return ia - ib
+      if (ia !== undefined) return -1
+      if (ib !== undefined) return 1
       return collator.compare(a.nome, b.nome)
     })
-
-    return filtered
-  }, [allImpressoras, searchQuery, linkedIds])
-
-  const findImpressoraById = useCallback(
-    (id: string): ProdutoImpressora | undefined => {
-      return allImpressoras.find(item => item.id === id) || impressoras.find(item => item.id === id)
-    },
-    [allImpressoras, impressoras]
-  )
+  }, [allImpressoras, searchQuery, impressoras, open, sessionOrderTick])
 
   const handleClose = () => {
     onClose()
@@ -306,7 +352,11 @@ export function ProdutoImpressorasDialog({
   }
 
   const persistImpressorasSelection = useCallback(
-    async (ids: string[], successMessage?: string) => {
+    async (
+      ids: string[],
+      successMessage?: string,
+      options?: { optimisticPreApplied?: boolean }
+    ) => {
       if (!produtoId) {
         showToast.error('Produto não encontrado.')
         return false
@@ -333,19 +383,21 @@ export function ProdutoImpressorasDialog({
           throw new Error(errorData.message || 'Erro ao atualizar impressoras do produto')
         }
 
-        const updatedList: ProdutoImpressora[] = ids.map(printerId => {
-          const detalhes = findImpressoraById(printerId)
-          if (detalhes) {
-            return detalhes
-          }
-          return {
-            id: printerId,
-            nome: 'Impressora',
-            ativo: true,
-          }
-        })
+        if (!options?.optimisticPreApplied) {
+          const updatedList: ProdutoImpressora[] = ids.map(printerId => {
+            const detalhes = findImpressoraById(printerId)
+            if (detalhes) {
+              return detalhes
+            }
+            return {
+              id: printerId,
+              nome: 'Impressora',
+              ativo: true,
+            }
+          })
+          setImpressoras(updatedList)
+        }
 
-        setImpressoras(updatedList)
         if (successMessage) {
           showToast.success(successMessage)
         } else {
@@ -363,23 +415,57 @@ export function ProdutoImpressorasDialog({
 
   const handleToggleVinculo = useCallback(
     async (impressoraId: string, vincular: boolean) => {
-      // Evita PATCH paralelos (lista de IDs inconsistente até o primeiro terminar).
       if (togglingId !== null) return
+
       const next = new Set(linkedIds)
       if (vincular) next.add(impressoraId)
       else next.delete(impressoraId)
+      const newIds = Array.from(next)
+
+      const antesSnapshot = impressoras
+      const catalogOrderBefore = sessionCatalogOrderRef.current
+        ? [...sessionCatalogOrderRef.current]
+        : null
+
+      const optimisticList: ProdutoImpressora[] = newIds.map(printerId => {
+        const detalhes = findImpressoraById(printerId)
+        if (detalhes) return detalhes
+        return {
+          id: printerId,
+          nome: 'Impressora',
+          ativo: true,
+        }
+      })
+      setImpressoras(optimisticList)
+
+      if (sessionCatalogOrderRef.current) {
+        if (!vincular) {
+          sessionCatalogOrderRef.current = sessionCatalogOrderRef.current.filter(
+            x => x !== impressoraId
+          )
+        } else if (!sessionCatalogOrderRef.current.includes(impressoraId)) {
+          sessionCatalogOrderRef.current = [...sessionCatalogOrderRef.current, impressoraId]
+        }
+        setSessionOrderTick(t => t + 1)
+      }
 
       setTogglingId(impressoraId)
       try {
-        await persistImpressorasSelection(
-          Array.from(next),
-          vincular ? 'Impressora vinculada ao produto!' : 'Impressora removida do produto.'
+        const ok = await persistImpressorasSelection(
+          newIds,
+          vincular ? 'Impressora vinculada ao produto!' : 'Impressora removida do produto.',
+          { optimisticPreApplied: true }
         )
+        if (!ok) {
+          setImpressoras(antesSnapshot)
+          sessionCatalogOrderRef.current = catalogOrderBefore
+          setSessionOrderTick(t => t + 1)
+        }
       } finally {
         setTogglingId(null)
       }
     },
-    [togglingId, linkedIds, persistImpressorasSelection]
+    [togglingId, linkedIds, impressoras, findImpressoraById, persistImpressorasSelection]
   )
 
   /** Um único fluxo visual: só some o Jiffy quando produto + catálogo `/api/impressoras` terminarem. */

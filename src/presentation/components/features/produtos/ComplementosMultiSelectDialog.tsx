@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -36,7 +36,20 @@ interface GrupoCatalogoItem {
   obrigatorio: boolean
 }
 
-const LISTAGEM_PAGE_SIZE = 25
+/** Máximo permitido pela API (`GrupoComplementoRepository` / schema: limit ≤ 100). */
+const LISTAGEM_PAGE_SIZE = 100
+
+/** Mesmo shape do GET produto e do GET grupo — evita duplicar lógica de parse */
+function mapApiGrupoToGrupoComplemento(grupo: any): GrupoComplemento {
+  return {
+    id: grupo.id?.toString() || '',
+    nome: grupo.nome?.toString() || '',
+    complementos: (grupo.complementos || []).map((item: any) => Complemento.fromJSON(item)),
+    obrigatorio: Boolean(grupo.obrigatorio),
+    qtdMinima: typeof grupo.qtdMinima === 'number' ? grupo.qtdMinima : grupo.obrigatorio ? 1 : 0,
+    qtdMaxima: typeof grupo.qtdMaxima === 'number' && grupo.qtdMaxima > 0 ? grupo.qtdMaxima : 0,
+  }
+}
 
 function formatarValorComplemento(valor: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
@@ -89,6 +102,18 @@ function ordenarVinculadosPrimeiro<T extends { id: string; nome?: string }>(
   })
 }
 
+/**
+ * Garante pelo menos um grupo de complementos vinculado ao produto.
+ * Não há validação equivalente neste repositório na rota PATCH (`app/api/produtos/[id]`) —
+ * o payload segue para o cardápio; convém confirmar no Swagger/API externa se lá existe regra.
+ */
+function mensagemSeRemoverTodosGruposComplementos(idsPropostos: string[]): string | null {
+  if (idsPropostos.length === 0) {
+    return 'Não é possível remover todos os grupos de complementos. Mantenha pelo menos um grupo vinculado ao produto.'
+  }
+  return null
+}
+
 interface ComplementosMultiSelectDialogProps {
   open: boolean
   produtoId?: string
@@ -129,6 +154,14 @@ export function ComplementosMultiSelectDialog({
       grupo: undefined,
     })
 
+  /**
+   * Ordem das linhas do catálogo enquanto o painel está aberto (evita reordenar a cada toggle).
+   * Ao fechar o modal, zera — na próxima abertura volta a ordenar “vinculados primeiro”.
+   */
+  const sessionCatalogOrderRef = useRef<string[] | null>(null)
+  /** Incrementa quando a ordem estável da sessão é definida (ref sozinha não dispara render). */
+  const [sessionOrderTick, setSessionOrderTick] = useState(0)
+
   const loadGroups = useCallback(
     async (options?: { silent?: boolean }) => {
       if (!open || !produtoId) return
@@ -160,16 +193,9 @@ export function ComplementosMultiSelectDialog({
         }
 
         const produto = await response.json()
-        const grupos: GrupoComplemento[] = (produto.gruposComplementos || []).map((grupo: any) => ({
-          id: grupo.id,
-          nome: grupo.nome,
-          complementos: (grupo.complementos || []).map((item: any) => Complemento.fromJSON(item)),
-          obrigatorio: Boolean(grupo.obrigatorio),
-          qtdMinima:
-            typeof grupo.qtdMinima === 'number' ? grupo.qtdMinima : grupo.obrigatorio ? 1 : 0,
-          qtdMaxima:
-            typeof grupo.qtdMaxima === 'number' && grupo.qtdMaxima > 0 ? grupo.qtdMaxima : 0,
-        }))
+        const grupos: GrupoComplemento[] = (produto.gruposComplementos || []).map((grupo: any) =>
+          mapApiGrupoToGrupoComplemento(grupo)
+        )
 
         setGroups(grupos)
       } catch (err) {
@@ -252,8 +278,7 @@ export function ComplementosMultiSelectDialog({
   useEffect(() => {
     if (open) {
       setCatalogSearch('')
-      loadGroups()
-      void loadSelectableGroups()
+      void Promise.all([loadGroups(), loadSelectableGroups()])
     }
   }, [open, loadGroups, loadSelectableGroups])
 
@@ -263,10 +288,51 @@ export function ComplementosMultiSelectDialog({
       setDetalhesComplementosCache({})
       setLoadingDetalheGrupoId(null)
       setTogglingComplementoId(null)
+      sessionCatalogOrderRef.current = null
+      setSessionOrderTick(0)
     }
   }, [open])
 
+  /** Captura ordem inicial (“vinculados primeiro”) uma vez por abertura, após catálogo e vínculos estarem carregados */
+  useEffect(() => {
+    if (!open || isLoading || allSelectableGroups.length === 0) return
+    if (sessionCatalogOrderRef.current !== null) return
+
+    const term = catalogSearch.trim().toLowerCase()
+    const filtrados = !term
+      ? allSelectableGroups
+      : allSelectableGroups.filter(item => (item.nome || '').toLowerCase().includes(term))
+
+    sessionCatalogOrderRef.current = ordenarVinculadosPrimeiro(filtrados, groups.map(g => g.id)).map(
+      g => g.id
+    )
+    setSessionOrderTick(t => t + 1)
+  }, [open, isLoading, allSelectableGroups, catalogSearch, groups])
+
   const gruposVinculadosIds = useMemo(() => groups.map(g => g.id), [groups])
+
+  /** Um único GET por grupo — reutilizado ao expandir catálogo e após vínculo (substitui GET produto inteiro). */
+  const fetchGrupoComplementoPorId = useCallback(
+    async (grupoId: string): Promise<GrupoComplemento | null> => {
+      const token = auth?.getAccessToken()
+      if (!token) return null
+      try {
+        const response = await fetch(`/api/grupos-complementos/${grupoId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          cache: 'no-store',
+        })
+        if (!response.ok) return null
+        const data = await response.json()
+        return mapApiGrupoToGrupoComplemento(data)
+      } catch {
+        return null
+      }
+    },
+    [auth]
+  )
 
   const carregarComplementosDoGrupo = useCallback(
     async (grupoId: string) => {
@@ -277,21 +343,11 @@ export function ComplementosMultiSelectDialog({
       }
       setLoadingDetalheGrupoId(grupoId)
       try {
-        const response = await fetch(`/api/grupos-complementos/${grupoId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          cache: 'no-store',
-        })
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.error || errorData.message || 'Erro ao carregar complementos')
+        const grupo = await fetchGrupoComplementoPorId(grupoId)
+        if (!grupo?.id) {
+          throw new Error('Erro ao carregar complementos do grupo')
         }
-        const data = await response.json()
-        const raw = Array.isArray(data.complementos) ? data.complementos : []
-        const mapped = raw.map((item: any) => Complemento.fromJSON(item))
-        setDetalhesComplementosCache(prev => ({ ...prev, [grupoId]: mapped }))
+        setDetalhesComplementosCache(prev => ({ ...prev, [grupoId]: grupo.complementos }))
       } catch (err) {
         console.error(err)
         showToast.error(
@@ -302,7 +358,7 @@ export function ComplementosMultiSelectDialog({
         setLoadingDetalheGrupoId(null)
       }
     },
-    [auth]
+    [fetchGrupoComplementoPorId, auth]
   )
 
   const toggleGrupoExpanded = useCallback((grupoId: string) => {
@@ -339,11 +395,35 @@ export function ComplementosMultiSelectDialog({
     const filtrados = !term
       ? allSelectableGroups
       : allSelectableGroups.filter(item => (item.nome || '').toLowerCase().includes(term))
-    return ordenarVinculadosPrimeiro(filtrados, gruposVinculadosIds)
-  }, [allSelectableGroups, catalogSearch, gruposVinculadosIds])
+
+    const ordemSessao = sessionCatalogOrderRef.current
+    if (!open || ordemSessao === null) {
+      return ordenarVinculadosPrimeiro(filtrados, gruposVinculadosIds)
+    }
+
+    const ordemMap = new Map(ordemSessao.map((id, idx) => [id, idx]))
+    return [...filtrados].sort((a, b) => {
+      const ia = ordemMap.get(a.id)
+      const ib = ordemMap.get(b.id)
+      if (ia !== undefined && ib !== undefined) return ia - ib
+      if (ia !== undefined) return -1
+      if (ib !== undefined) return 1
+      return (a.nome || '').localeCompare(b.nome || '', 'pt-BR', { sensitivity: 'base' })
+    })
+  }, [allSelectableGroups, catalogSearch, gruposVinculadosIds, open, sessionOrderTick])
 
   const persistGruposSelection = useCallback(
-    async (ids: string[], successMessage?: string, options?: { silentSuccess?: boolean }) => {
+    async (
+      ids: string[],
+      successMessage?: string,
+      options?: {
+        silentSuccess?: boolean
+        /** Estado local já atualizado antes do PATCH (switch otimista). */
+        optimisticPreApplied?: boolean
+        /** IDs antes do otimismo — obrigatório se `optimisticPreApplied`. */
+        antesIdsSnapshot?: string[]
+      }
+    ) => {
       if (!produtoId) {
         showToast.error('Produto não encontrado.')
         return false
@@ -354,6 +434,14 @@ export function ComplementosMultiSelectDialog({
         showToast.error('Token não encontrado. Faça login novamente.')
         return false
       }
+
+      const minMsg = mensagemSeRemoverTodosGruposComplementos(ids)
+      if (minMsg) {
+        showToast.error(minMsg)
+        return false
+      }
+
+      const antesIds = options?.antesIdsSnapshot ?? groups.map(g => g.id)
 
       try {
         const response = await fetch(`/api/produtos/${produtoId}`, {
@@ -370,7 +458,47 @@ export function ComplementosMultiSelectDialog({
           throw new Error(errorData.message || 'Erro ao atualizar grupos de complementos')
         }
 
-        await loadGroups({ silent: true })
+        const removedIds = antesIds.filter(id => !ids.includes(id))
+        const addedIds = ids.filter(id => !antesIds.includes(id))
+
+        if (options?.optimisticPreApplied) {
+          if (addedIds.length > 0) {
+            const carregados = await Promise.all(addedIds.map(gid => fetchGrupoComplementoPorId(gid)))
+            const novos = carregados.filter((g): g is GrupoComplemento => g !== null)
+            if (novos.length === addedIds.length) {
+              setGroups(prev =>
+                prev.map(g => {
+                  const rich = novos.find(n => n.id === g.id)
+                  return rich ?? g
+                })
+              )
+            } else {
+              await loadGroups({ silent: true })
+            }
+          }
+        } else {
+          if (removedIds.length > 0) {
+            setGroups(prev => prev.filter(g => !removedIds.includes(g.id)))
+            setDetalhesComplementosCache(prev => {
+              const next = { ...prev }
+              for (const id of removedIds) {
+                delete next[id]
+              }
+              return next
+            })
+          }
+
+          if (addedIds.length > 0) {
+            const carregados = await Promise.all(addedIds.map(gid => fetchGrupoComplementoPorId(gid)))
+            const novos = carregados.filter((g): g is GrupoComplemento => g !== null)
+            if (novos.length === addedIds.length) {
+              setGroups(prev => [...prev, ...novos])
+            } else {
+              await loadGroups({ silent: true })
+            }
+          }
+        }
+
         if (!options?.silentSuccess) {
           showToast.success(successMessage ?? 'Grupos atualizados com sucesso!')
         }
@@ -381,24 +509,90 @@ export function ComplementosMultiSelectDialog({
         return false
       }
     },
-    [produtoId, auth, loadGroups]
+    [produtoId, auth, groups, fetchGrupoComplementoPorId, loadGroups]
   )
 
-  /** Liga/desliga vínculo na lista completa (mesmo PATCH do modal) */
+  /** Liga/desliga vínculo: estado otimista + ordem da lista estável até fechar o painel */
   const handleToggleCatalogGrupo = useCallback(
     async (id: string) => {
-      // Evita PATCH paralelos (lista de IDs ficaria inconsistente até o primeiro terminar).
       if (salvandoGrupoId !== null || !produtoId) return
-      const current = groups.map(g => g.id)
-      const newIds = current.includes(id) ? current.filter(x => x !== id) : [...current, id]
+
+      const antesSnapshot = groups
+      const antesIds = groups.map(g => g.id)
+      const catalogOrderBefore = sessionCatalogOrderRef.current
+        ? [...sessionCatalogOrderRef.current]
+        : null
+      const newIds = antesIds.includes(id) ? antesIds.filter(x => x !== id) : [...antesIds, id]
+
+      const minMsg = mensagemSeRemoverTodosGruposComplementos(newIds)
+      if (minMsg) {
+        showToast.error(minMsg)
+        return
+      }
+
+      const removedIds = antesIds.filter(x => !newIds.includes(x))
+      const addedIds = newIds.filter(x => !antesIds.includes(x))
+
+      if (removedIds.length > 0) {
+        setGroups(prev => prev.filter(g => !removedIds.includes(g.id)))
+        setDetalhesComplementosCache(prev => {
+          const next = { ...prev }
+          for (const rid of removedIds) delete next[rid]
+          return next
+        })
+        if (sessionCatalogOrderRef.current) {
+          sessionCatalogOrderRef.current = sessionCatalogOrderRef.current.filter(x => !removedIds.includes(x))
+          setSessionOrderTick(t => t + 1)
+        }
+      }
+
+      if (addedIds.length > 0) {
+        setGroups(prev => {
+          let next = prev
+          for (const gid of addedIds) {
+            if (next.some(g => g.id === gid)) continue
+            const meta = allSelectableGroups.find(g => g.id === gid)
+            next = [
+              ...next,
+              {
+                id: gid,
+                nome: meta?.nome ?? 'Grupo',
+                complementos: [],
+                obrigatorio: Boolean(meta?.obrigatorio),
+                qtdMinima: meta?.obrigatorio ? 1 : 0,
+                qtdMaxima: 0,
+              },
+            ]
+          }
+          return next
+        })
+        if (sessionCatalogOrderRef.current) {
+          for (const gid of addedIds) {
+            if (!sessionCatalogOrderRef.current.includes(gid)) {
+              sessionCatalogOrderRef.current = [...sessionCatalogOrderRef.current, gid]
+            }
+          }
+          setSessionOrderTick(t => t + 1)
+        }
+      }
+
       setSalvandoGrupoId(id)
       try {
-        await persistGruposSelection(newIds, undefined, { silentSuccess: true })
+        const ok = await persistGruposSelection(newIds, undefined, {
+          silentSuccess: true,
+          optimisticPreApplied: true,
+          antesIdsSnapshot: antesIds,
+        })
+        if (!ok) {
+          setGroups(antesSnapshot)
+          sessionCatalogOrderRef.current = catalogOrderBefore
+          setSessionOrderTick(t => t + 1)
+        }
       } finally {
         setSalvandoGrupoId(null)
       }
     },
-    [salvandoGrupoId, produtoId, groups, persistGruposSelection]
+    [salvandoGrupoId, produtoId, groups, allSelectableGroups, persistGruposSelection]
   )
 
   const handleToggleComplementoAtivo = useCallback(
@@ -486,8 +680,7 @@ export function ComplementosMultiSelectDialog({
   }, [])
 
   const handleGruposTabsReload = useCallback(async () => {
-    await loadGroups({ silent: true })
-    await loadSelectableGroups()
+    await Promise.all([loadGroups({ silent: true }), loadSelectableGroups()])
   }, [loadGroups, loadSelectableGroups])
 
   const handleGruposTabsClose = useCallback(() => {

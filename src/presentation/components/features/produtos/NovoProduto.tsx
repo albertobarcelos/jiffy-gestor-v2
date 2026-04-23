@@ -279,6 +279,8 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
     const { data: grupos = [], isLoading: isLoadingGrupos } = useGruposProdutos({
       limit: 100,
+      /** Painel lateral: evita refetch ao voltar o foco ao browser (mantém lista estável durante edição). */
+      refetchOnWindowFocus: isEmbedded ? false : undefined,
     })
 
     // Carregar dados do produto se estiver editando ou copiando (apenas uma vez por produtoId)
