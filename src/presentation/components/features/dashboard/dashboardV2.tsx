@@ -651,22 +651,43 @@ function DonutFormaPagamento({
   secundaria,
   pct,
   label,
+  valor,
+  formaPagamentoFiscal,
 }: {
   principal: string
   secundaria: string
   pct: number
   label: string
+  valor: number
+  formaPagamentoFiscal: string
 }) {
   const fatiaPrincipal = Math.min(100, Math.max(0, pct))
   const data = [
     { name: 'principal', value: fatiaPrincipal, fill: principal },
     { name: 'resto', value: Math.max(0, 100 - fatiaPrincipal), fill: secundaria },
   ]
+
+  const icone = useMemo(() => {
+    const raw = (formaPagamentoFiscal ?? '').trim().toLowerCase()
+    const forma =
+      raw in ALIAS_FORMA_PAGAMENTO_FISCAL
+        ? ALIAS_FORMA_PAGAMENTO_FISCAL[raw]
+        : (raw as keyof typeof COR_POR_FORMA_PAGAMENTO_FISCAL)
+
+    if (forma === 'dinheiro') return DollarSign
+    if (forma === 'pix') return Receipt
+    if (forma === 'cartao_credito' || forma === 'cartao_debito') return CreditCard
+    if (forma.startsWith('vale_')) return Receipt
+    return DollarSign
+  }, [formaPagamentoFiscal])
+
+  const textoTooltipValor = useMemo(() => `Valor: ${formatarMoeda(valor ?? 0)}`, [valor])
+
   return (
     <div className="flex flex-col items-center gap-2">
-      <div className="relative h-[120px] w-[120px] md:h-[144px] md:w-[144px]">
+      <div className="relative h-[120px] w-[120px] outline-none md:h-[144px] md:w-[144px] [&_.recharts-wrapper:focus]:outline-none [&_.recharts-surface:focus]:outline-none [&_svg:focus]:outline-none [&_*:focus]:outline-none [&_*:focus-visible]:outline-none [&_.recharts-sector:focus]:stroke-none [&_.recharts-sector:focus-visible]:stroke-none">
         <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
+          <PieChart tabIndex={-1}>
             <Pie
               data={data}
               cx="50%"
@@ -690,8 +711,16 @@ function DonutFormaPagamento({
           {formatarPercentualMiniDonut(pct)}
         </span>
       </div>
-      <p className="text-center text-[10px] font-semibold uppercase tracking-wide text-primary-text md:text-xs">
-        {label}
+      <p className="flex items-center justify-center gap-1.5 text-center text-[10px] font-semibold uppercase tracking-wide text-primary-text md:text-xs">
+        <MuiTooltip title={textoTooltipValor} placement="top" arrow>
+          <span className="inline-flex items-center">
+            {(() => {
+              const Icon = icone
+              return <Icon className="h-3.5 w-3.5" style={{ color: principal }} aria-hidden />
+            })()}
+          </span>
+        </MuiTooltip>
+        <span>{label}</span>
       </p>
     </div>
   )
@@ -1718,7 +1747,7 @@ export default function DashboardV2() {
                 comparacaoPeriodoAnterior.pct > 0 ? (
                   <span className="text-lg font-semibold tracking-wide">
                     Suas vendas estão{' '}
-                    <span className="text-xl font-bold text-[#00B074]">
+                    <span className="text-xl font-bold">
                       {comparacaoPeriodoAnterior.pct}%
                     </span>{' '}
                     acima {copyComparacao.acimaResto}
@@ -1900,7 +1929,7 @@ export default function DashboardV2() {
               {rotuloLinhaGraficoPeriodoAnterior(periodoData)}
             </span>
           </div>
-          <div className="h-[280px] w-full min-w-0 md:h-[320px]">
+          <div className="h-[280px] w-full min-w-0 outline-none md:h-[320px] [&_.recharts-wrapper:focus]:outline-none [&_.recharts-surface:focus]:outline-none [&_svg:focus]:outline-none [&_*:focus]:outline-none [&_*:focus-visible]:outline-none [&_.recharts-layer:focus]:outline-none [&_.recharts-layer:focus-visible]:outline-none">
             {carregandoGraficoComparativo ? (
               <div className="flex h-full min-h-[260px] items-center justify-center">
                 <JiffyLoading className="!gap-0 !py-0" />
@@ -1916,6 +1945,7 @@ export default function DashboardV2() {
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
+                  tabIndex={-1}
                   data={dadosGraficoComparativo}
                   margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
                 >
@@ -2013,6 +2043,8 @@ export default function DashboardV2() {
                     principal={corPrincipalDonutPorFormaFiscal(item.getFormaPagamentoFiscal())}
                     secundaria={COR_ARCO_RESTO_FORMAS_PAGAMENTO}
                     pct={item.getPercentual()}
+                    valor={item.getValor()}
+                    formaPagamentoFiscal={item.getFormaPagamentoFiscal()}
                   />
                 ))}
               </div>

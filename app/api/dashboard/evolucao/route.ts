@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
+import { ufBrasilParaTimeZoneIANA } from '@/src/shared/utils/fusoHorarioBrasil'
 
 type Status = 'FINALIZADA' | 'CANCELADA'
 
@@ -18,6 +19,30 @@ type VendasPage = {
   limit?: number
 }
 
+/** Lê UF do cadastro da empresa autenticada e converte para IANA (fallback: Brasília). */
+async function obterFusoAgregacaoDaEmpresaLogada(
+  apiClient: ApiClient,
+  headers: Record<string, string>
+): Promise<string> {
+  try {
+    const response = await apiClient.request<Record<string, unknown>>('/api/v1/empresas/me', {
+      method: 'GET',
+      headers,
+    })
+    const data = response.data ?? {}
+    const endereco = (data.endereco ?? data.endereco_data) as Record<string, unknown> | undefined
+    const estado =
+      typeof endereco?.estado === 'string'
+        ? endereco.estado
+        : typeof data.uf === 'string'
+          ? data.uf
+          : ''
+    return ufBrasilParaTimeZoneIANA(estado)
+  } catch {
+    return 'America/Sao_Paulo'
+  }
+}
+
 function parseDateSafe(value: unknown): Date | null {
   if (typeof value !== 'string' || !value) return null
   const d = new Date(value)
@@ -32,19 +57,62 @@ function resolveVendaValor(v: VendaLike): number {
   return typeof v.valorFinal === 'number' && Number.isFinite(v.valorFinal) ? v.valorFinal : 0
 }
 
-function formatDayLabel(date: Date): string {
-  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
+/** Rótulo curto consistente para uma data civil (ano/mês/dia), sem depender do TZ do servidor. */
+function formatDayLabelCivil(year: number, month: number, day: number): string {
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0)).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'short',
+    timeZone: 'UTC',
+  })
 }
 
 function pad2(n: number): string {
   return n.toString().padStart(2, '0')
 }
 
-function buildHourKey(date: Date, roundedMinutes: number): { key: string; label: string } {
-  const year = date.getFullYear()
-  const month = pad2(date.getMonth() + 1)
-  const day = pad2(date.getDate())
-  const hour = pad2(date.getHours())
+/** Partes de calendário + relógio da instância `date` quando vista no fuso informado. */
+function partesDataHoraNoFuso(date: Date, timeZone: string) {
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  const parts = dtf.formatToParts(date)
+  const map: Partial<Record<Intl.DateTimeFormatPartTypes, string>> = {}
+  for (const p of parts) {
+    if (p.type !== 'literal') map[p.type] = p.value
+  }
+  let year = Number(map.year)
+  let month = Number(map.month)
+  let day = Number(map.day)
+  let hour = Number(map.hour)
+  let minute = Number(map.minute)
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    year = date.getFullYear()
+    month = date.getMonth() + 1
+    day = date.getDate()
+  }
+  if (!Number.isFinite(hour)) hour = date.getHours()
+  if (!Number.isFinite(minute)) minute = date.getMinutes()
+  /* Alguns motores representam meia-noite como hora 24. */
+  if (hour === 24) hour = 0
+  return { year, month, day, hour, minute }
+}
+
+function buildHourKey(
+  date: Date,
+  roundedMinutes: number,
+  timeZone: string
+): { key: string; label: string } {
+  const p = partesDataHoraNoFuso(date, timeZone)
+  const year = p.year
+  const month = pad2(p.month)
+  const day = pad2(p.day)
+  const hour = pad2(p.hour)
   const minutes = pad2(roundedMinutes)
   const key = `${year}-${month}-${day} ${hour}:${minutes}`
   const label = `${day}/${month} ${hour}:${minutes}`
@@ -161,7 +229,8 @@ export async function GET(request: NextRequest) {
     const selectedStatuses: Status[] =
       statuses.length > 0 ? statuses.filter(s => s === 'FINALIZADA' || s === 'CANCELADA') : ['FINALIZADA']
 
-    const [finalizadas, canceladas] = await Promise.all([
+    const [fusoAgregacao, finalizadas, canceladas] = await Promise.all([
+      obterFusoAgregacaoDaEmpresaLogada(apiClient, headers),
       selectedStatuses.includes('FINALIZADA')
         ? fetchAllVendasStatus({
             apiClient,
@@ -208,16 +277,18 @@ export async function GET(request: NextRequest) {
       const valor = resolveVendaValor(v)
 
       if (groupByHour) {
-        const rounded = roundMinutesForInterval(date.getMinutes(), intervaloMinutos)
-        const { key, label } = buildHourKey(date, rounded)
+        const { minute } = partesDataHoraNoFuso(date, fusoAgregacao)
+        const rounded = roundMinutesForInterval(minute, intervaloMinutos)
+        const { key, label } = buildHourKey(date, rounded, fusoAgregacao)
         if (target === 'FINALIZADA') addToMap(mapFinalizadas, key, label, valor)
         else addToMap(mapCanceladas, key, label, valor)
       } else {
-        const year = date.getFullYear()
-        const month = pad2(date.getMonth() + 1)
-        const day = pad2(date.getDate())
+        const p = partesDataHoraNoFuso(date, fusoAgregacao)
+        const year = p.year
+        const month = pad2(p.month)
+        const day = pad2(p.day)
         const key = `${year}-${month}-${day}`
-        const label = formatDayLabel(date)
+        const label = formatDayLabelCivil(p.year, p.month, p.day)
         if (target === 'FINALIZADA') addToMap(mapFinalizadas, key, label, valor)
         else addToMap(mapCanceladas, key, label, valor)
       }
