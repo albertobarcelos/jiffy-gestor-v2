@@ -20,7 +20,20 @@ type VendasPage = {
   limit?: number
 }
 
-/** Lê UF do cadastro da empresa autenticada e converte para IANA (fallback: Brasília). */
+/** Verifica se o identificador IANA é aceito pelo motor de datas do runtime. */
+function timeZoneIANAValido(tz: string): boolean {
+  try {
+    Intl.DateTimeFormat('en-US', { timeZone: tz }).format(new Date())
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Define o fuso para bucket diário/hora do faturamento na evolução.
+ * Prioridade: `parametroEmpresa.timezone` (GET /empresas/me) → mapeamento por UF do endereço → Brasília.
+ */
 async function obterFusoAgregacaoDaEmpresaLogada(
   apiClient: ApiClient,
   headers: Record<string, string>
@@ -31,6 +44,16 @@ async function obterFusoAgregacaoDaEmpresaLogada(
       headers,
     })
     const data = response.data ?? {}
+    const parametro = data.parametroEmpresa as Record<string, unknown> | undefined
+    const tzApi =
+      (typeof parametro?.timezone === 'string' ? parametro.timezone : '') ||
+      (typeof parametro?.timeZone === 'string' ? parametro.timeZone : '') ||
+      (typeof data.timezone === 'string' ? data.timezone : '')
+    const tzTrim = tzApi.trim()
+    if (tzTrim.length > 0 && timeZoneIANAValido(tzTrim)) {
+      return tzTrim
+    }
+
     const endereco = (data.endereco ?? data.endereco_data) as Record<string, unknown> | undefined
     const estado =
       typeof endereco?.estado === 'string'
