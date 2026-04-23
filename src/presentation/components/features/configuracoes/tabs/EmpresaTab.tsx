@@ -84,6 +84,24 @@ const ESTADOS_BRASILEIROS = [
   { sigla: 'TO', nome: 'Tocantins' },
 ]
 
+/** Fusos IANA usados no Brasil (campo `parametroEmpresa.timezone` na API). */
+const FUSOS_IANA_BRASIL = [
+  { id: 'America/Noronha', label: 'America/Noronha (Fernando de Noronha)' },
+  { id: 'America/Sao_Paulo', label: 'America/Sao_Paulo — Brasília (maior parte do país)' },
+  { id: 'America/Araguaina', label: 'America/Araguaina' },
+  { id: 'America/Fortaleza', label: 'America/Fortaleza' },
+  { id: 'America/Recife', label: 'America/Recife' },
+  { id: 'America/Maceio', label: 'America/Maceió' },
+  { id: 'America/Bahia', label: 'America/Bahia' },
+  { id: 'America/Belem', label: 'America/Belém' },
+  { id: 'America/Cuiaba', label: 'America/Cuiabá (MT)' },
+  { id: 'America/Campo_Grande', label: 'America/Campo Grande (MS)' },
+  { id: 'America/Manaus', label: 'America/Manaus (AM)' },
+  { id: 'America/Porto_Velho', label: 'America/Porto Velho (RO)' },
+  { id: 'America/Boa_Vista', label: 'America/Boa Vista (RR)' },
+  { id: 'America/Rio_Branco', label: 'America/Rio Branco (AC)' },
+]
+
 /**
  * Tab de Empresa - Edição de dados da empresa
  */
@@ -108,7 +126,11 @@ export function EmpresaTab() {
   const [estado, setEstado] = useState('')
   const [cidadeValida, setCidadeValida] = useState<boolean | null>(null)
   const [codigoCidadeIbge, setCodigoCidadeIbge] = useState<string | null>(null)
-  
+  /** Valor exibido no select (IANA); vem de `parametroEmpresa.timezone` no GET /empresas/me. */
+  const [timezone, setTimezone] = useState('')
+  /** Snapshot de `parametroEmpresa` para PATCH preservar tipos impressão/cobrança etc. */
+  const [parametroEmpresaDraft, setParametroEmpresaDraft] = useState<Record<string, unknown>>({})
+
   // Ref para rastrear o último valor de cidade usado para buscar código IBGE
   const ultimaCidadeBuscada = useRef<string>('')
 
@@ -131,12 +153,27 @@ export function EmpresaTab() {
 
       if (response.ok) {
         const data = await response.json()
-        
+
         // Debug: log da resposta da API
         if (process.env.NODE_ENV === 'development') {
           console.log('Resposta da API de empresa:', data)
         }
-        
+
+        const raw = data as Record<string, unknown>
+        const rawPe = raw.parametroEmpresa
+        if (rawPe && typeof rawPe === 'object' && !Array.isArray(rawPe)) {
+          setParametroEmpresaDraft({ ...(rawPe as Record<string, unknown>) })
+          const pe = rawPe as Record<string, unknown>
+          const tz =
+            (typeof pe.timezone === 'string' && pe.timezone) ||
+            (typeof pe.timeZone === 'string' && pe.timeZone) ||
+            ''
+          setTimezone(String(tz).trim())
+        } else {
+          setParametroEmpresaDraft({})
+          setTimezone('')
+        }
+
         try {
           const empresaData = Cliente.fromJSON(data)
           setEmpresa(empresaData)
@@ -147,7 +184,7 @@ export function EmpresaTab() {
           setNomeFantasia(empresaData.getNomeFantasia() || '')
           setEmail(empresaData.getEmail() || '')
           setTelefone(empresaData.getTelefone() || '')
-          
+
           const endereco = empresaData.getEndereco()
           if (endereco) {
             setCep(endereco.cep || '')
@@ -157,7 +194,7 @@ export function EmpresaTab() {
             setBairro(endereco.bairro || '')
             setCidade(endereco.cidade || '')
             setEstado(endereco.estado || '')
-            
+
             // Carregar código IBGE se cidade e estado estiverem preenchidos
             if (endereco.cidade && endereco.estado) {
               const cidade = endereco.cidade
@@ -184,7 +221,11 @@ export function EmpresaTab() {
           setEmpresa(empresaData)
         }
       } else {
-        console.error('Erro na resposta da API:', response.status, await response.text().catch(() => ''))
+        console.error(
+          'Erro na resposta da API:',
+          response.status,
+          await response.text().catch(() => '')
+        )
       }
     } catch (error) {
       console.error('Erro ao carregar empresa:', error)
@@ -216,18 +257,21 @@ export function EmpresaTab() {
       if (response.ok) {
         const data = await response.json()
         const municipios = data.municipios || []
-        
+
         // Normalizar nome da cidade para comparação (remover acentos, converter para minúsculas)
-        const normalizar = (str: string) => 
-          str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-        
+        const normalizar = (str: string) =>
+          str
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+
         const cidadeNormalizada = normalizar(nomeCidade.trim())
-        
+
         // Buscar município correspondente
-        const municipio = municipios.find((m: any) => 
-          normalizar(m.nomeCidade) === cidadeNormalizada
+        const municipio = municipios.find(
+          (m: any) => normalizar(m.nomeCidade) === cidadeNormalizada
         )
-        
+
         if (municipio && municipio.codigoCidadeIbge) {
           setCodigoCidadeIbge(municipio.codigoCidadeIbge)
           return true
@@ -284,7 +328,7 @@ export function EmpresaTab() {
         // Se não tem código IBGE, validar via API
         // Usar o nome da cidade do formulário, mas se tivermos ultimaCidadeBuscada, usar ela
         const nomeCidadeParaValidar = ultimaCidadeBuscada.current || cidade.trim()
-        
+
         try {
           const response = await fetch(
             `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(nomeCidadeParaValidar)}&uf=${estado}`
@@ -292,7 +336,9 @@ export function EmpresaTab() {
           if (response.ok) {
             const data = await response.json()
             if (!data.valido) {
-              showToast.error(`Cidade "${nomeCidadeParaValidar}" não encontrada no estado ${estado}. Por favor, selecione uma cidade válida.`)
+              showToast.error(
+                `Cidade "${nomeCidadeParaValidar}" não encontrada no estado ${estado}. Por favor, selecione uma cidade válida.`
+              )
               return
             }
             // Buscar código IBGE se não estiver definido
@@ -318,7 +364,7 @@ export function EmpresaTab() {
     try {
       // Monta o body apenas com campos que têm valor
       const body: Record<string, any> = {}
-      
+
       if (cnpj) body.cnpj = cnpj
       if (razaoSocial) body.razaoSocial = razaoSocial
       if (nomeFantasia) body.nomeFantasia = nomeFantasia
@@ -343,6 +389,17 @@ export function EmpresaTab() {
         body.endereco = endereco
       }
 
+      /* PATCH: `parametroEmpresa.timezone` — preserva outros campos já retornados pela API. */
+      const parametroEmpresa: Record<string, unknown> = { ...parametroEmpresaDraft }
+      if (timezone.trim()) {
+        parametroEmpresa.timezone = timezone.trim()
+      } else {
+        delete parametroEmpresa.timezone
+      }
+      if (Object.keys(parametroEmpresa).length > 0) {
+        body.parametroEmpresa = parametroEmpresa
+      }
+
       console.log('Enviando dados:', body)
 
       const response = await fetch(`/api/empresas/${empresa.getId()}`, {
@@ -355,7 +412,7 @@ export function EmpresaTab() {
       })
 
       const responseData = await response.json().catch(() => ({}))
-      
+
       if (response.ok) {
         setIsEditing(false)
         await loadEmpresa()
@@ -380,233 +437,249 @@ export function EmpresaTab() {
   }
 
   return (
-    <div className="h-full overflow-y-auto md:px-6 px-1 py-1 scrollbar-hide">
+    <div className="scrollbar-hide h-full overflow-y-auto px-1 py-1 md:px-6">
       <div className="space-y-2">
         <div className="flex items-center justify-between border-b-2 border-primary/70 pb-2">
-        <div>
-          <h3 className="text-primary text-lg md:text-xl font-semibold">
-            Dados da Empresa
-          </h3>
-          <p className="text-secondary-text text-xs md:text-sm">
-            Gerencie as informações da sua empresa
-          </p>
-        </div>
-        {!isEditing && (
-          <button
-            onClick={() => setIsEditing(true)}
-            className="h-8 px-6 bg-primary text-white rounded-lg text-sm font-medium font-exo hover:bg-primary/90 transition-colors"
-          >
-            Editar
-          </button>
-        )}
-        {isEditing && (
-          <div className="flex flex-col md:flex-row gap-2">
-            <button
-              onClick={handleSave}
-              disabled={cidadeValida === false && cidade.length > 0}
-              className="h-8 px-6 bg-primary text-white rounded-lg text-sm font-medium font-exo hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span>✓</span> Salvar
-            </button>
-            <button
-              onClick={() => {
-                setIsEditing(false)
-                loadEmpresa()
-              }}
-              className="h-8 px-6 bg-primary/10 text-primary border border-primary rounded-lg text-sm font-medium font-exo hover:bg-primary/15 transition-colors"
-            >
-              Cancelar
-            </button>
+          <div>
+            <h3 className="text-lg font-semibold text-primary md:text-xl">Dados da Empresa</h3>
+            <p className="text-xs text-secondary-text md:text-sm">
+              Gerencie as informações da sua empresa
+            </p>
           </div>
-        )}
-      </div>
-
-      <div className="bg-info md:px-[18px] px-1 space-y-4">
-        {/* Dados Básicos */}
-        <div>
-          <h4 className="text-primary text-lg font-semibold font-nunito mb-2">
-            Dados Básicos
-          </h4>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <Input
-              label="CNPJ"
-              value={cnpj}
-              onChange={e => setCnpj(e.target.value)}
-              disabled={!isEditing}
-              size="small"
-              sx={sxEntradaEmpresa}
-            />
-            <Input
-              label="Razão Social"
-              value={razaoSocial}
-              onChange={e => setRazaoSocial(e.target.value)}
-              disabled={!isEditing}
-              size="small"
-              sx={sxEntradaEmpresa}
-            />
-            <Input
-              label="Nome Fantasia"
-              value={nomeFantasia}
-              onChange={e => setNomeFantasia(e.target.value)}
-              disabled={!isEditing}
-              size="small"
-              sx={sxEntradaEmpresa}
-            />
-            <Input
-              type="email"
-              label="Email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              disabled={!isEditing}
-              size="small"
-              sx={sxEntradaEmpresa}
-            />
-            <Input
-              label="Telefone"
-              value={telefone}
-              onChange={e => setTelefone(e.target.value)}
-              disabled={!isEditing}
-              size="small"
-              sx={sxEntradaEmpresa}
-            />
-          </div>
+          {!isEditing && (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="h-8 rounded-lg bg-primary px-6 font-exo text-sm font-medium text-white transition-colors hover:bg-primary/90"
+            >
+              Editar
+            </button>
+          )}
+          {isEditing && (
+            <div className="flex flex-col gap-2 md:flex-row">
+              <button
+                onClick={handleSave}
+                disabled={cidadeValida === false && cidade.length > 0}
+                className="flex h-8 items-center gap-2 rounded-lg bg-primary px-6 font-exo text-sm font-medium text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span>✓</span> Salvar
+              </button>
+              <button
+                onClick={() => {
+                  setIsEditing(false)
+                  loadEmpresa()
+                }}
+                className="h-8 rounded-lg border border-primary bg-primary/10 px-6 font-exo text-sm font-medium text-primary transition-colors hover:bg-primary/15"
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Endereço */}
-        <div>
-          <h4 className="text-primary text-lg font-semibold font-nunito mb-2">
-            Endereço
-          </h4>
-          <div className="space-y-4">
-            {/* Linha 1: CEP + Rua */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="space-y-4 bg-info px-1 md:px-[18px]">
+          {/* Dados Básicos */}
+          <div>
+            <h4 className="font-nunito mb-2 text-lg font-semibold text-primary">Dados Básicos</h4>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Input
-                label="CEP"
-                value={cep}
-                onChange={e => setCep(e.target.value)}
+                label="CNPJ"
+                value={cnpj}
+                onChange={e => setCnpj(e.target.value)}
                 disabled={!isEditing}
                 size="small"
                 sx={sxEntradaEmpresa}
               />
-              <div className="md:col-span-2">
+              <Input
+                label="Razão Social"
+                value={razaoSocial}
+                onChange={e => setRazaoSocial(e.target.value)}
+                disabled={!isEditing}
+                size="small"
+                sx={sxEntradaEmpresa}
+              />
+              <Input
+                label="Nome Fantasia"
+                value={nomeFantasia}
+                onChange={e => setNomeFantasia(e.target.value)}
+                disabled={!isEditing}
+                size="small"
+                sx={sxEntradaEmpresa}
+              />
+              <Input
+                type="email"
+                label="Email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                disabled={!isEditing}
+                size="small"
+                sx={sxEntradaEmpresa}
+              />
+              <Input
+                label="Telefone"
+                value={telefone}
+                onChange={e => setTelefone(e.target.value)}
+                disabled={!isEditing}
+                size="small"
+                sx={sxEntradaEmpresa}
+              />
+            </div>
+          </div>
+
+          {/* Endereço */}
+          <div>
+            <h4 className="font-nunito mb-2 text-lg font-semibold text-primary">Endereço</h4>
+            <div className="space-y-4">
+              {/* Linha 1: CEP + Rua */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <Input
-                  label="Rua"
-                  value={rua}
-                  onChange={e => setRua(e.target.value)}
+                  label="CEP"
+                  value={cep}
+                  onChange={e => setCep(e.target.value)}
+                  disabled={!isEditing}
+                  size="small"
+                  sx={sxEntradaEmpresa}
+                />
+                <div className="md:col-span-2">
+                  <Input
+                    label="Rua"
+                    value={rua}
+                    onChange={e => setRua(e.target.value)}
+                    disabled={!isEditing}
+                    size="small"
+                    sx={sxEntradaEmpresa}
+                  />
+                </div>
+              </div>
+
+              {/* Linha 2: Número, Complemento e Bairro */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <Input
+                  label="Número"
+                  value={numero}
+                  onChange={e => setNumero(e.target.value)}
+                  disabled={!isEditing}
+                  size="small"
+                  sx={sxEntradaEmpresa}
+                />
+                <Input
+                  label="Complemento"
+                  value={complemento}
+                  onChange={e => setComplemento(e.target.value)}
+                  disabled={!isEditing}
+                  size="small"
+                  sx={sxEntradaEmpresa}
+                />
+                <Input
+                  label="Bairro"
+                  value={bairro}
+                  onChange={e => setBairro(e.target.value)}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
                 />
               </div>
-            </div>
 
-            {/* Linha 2: Número, Complemento e Bairro */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <Input
-                label="Número"
-                value={numero}
-                onChange={e => setNumero(e.target.value)}
-                disabled={!isEditing}
-                size="small"
-                sx={sxEntradaEmpresa}
-              />
-              <Input
-                label="Complemento"
-                value={complemento}
-                onChange={e => setComplemento(e.target.value)}
-                disabled={!isEditing}
-                size="small"
-                sx={sxEntradaEmpresa}
-              />
-              <Input
-                label="Bairro"
-                value={bairro}
-                onChange={e => setBairro(e.target.value)}
-                disabled={!isEditing}
-                size="small"
-                sx={sxEntradaEmpresa}
-              />
-            </div>
+              {/* Linha 3: Estado + Cidade + Fuso horário (IANA) */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <Input
+                  select
+                  label="Estado"
+                  value={estado}
+                  onChange={async e => {
+                    const novoEstado = e.target.value
+                    const cidadeAnterior = cidade
 
-            {/* Linha 3: Estado + Cidade */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <Input
-                select
-                label="Estado"
-                value={estado}
-                onChange={async e => {
-                  const novoEstado = e.target.value
-                  const cidadeAnterior = cidade
+                    setCodigoCidadeIbge(null)
+                    ultimaCidadeBuscada.current = ''
+                    setCidadeValida(null)
 
-                  setCodigoCidadeIbge(null)
-                  ultimaCidadeBuscada.current = ''
-                  setCidadeValida(null)
-
-                  if (cidadeAnterior && cidadeAnterior.trim() && novoEstado) {
-                    await new Promise(resolve => setTimeout(resolve, 100))
-                    const encontrou = await buscarCodigoIbge(cidadeAnterior.trim(), novoEstado)
-                    if (encontrou) {
-                      setEstado(novoEstado)
-                      setCidadeValida(true)
+                    if (cidadeAnterior && cidadeAnterior.trim() && novoEstado) {
+                      await new Promise(resolve => setTimeout(resolve, 100))
+                      const encontrou = await buscarCodigoIbge(cidadeAnterior.trim(), novoEstado)
+                      if (encontrou) {
+                        setEstado(novoEstado)
+                        setCidadeValida(true)
+                      } else {
+                        setEstado(novoEstado)
+                        setCidade('')
+                      }
                     } else {
                       setEstado(novoEstado)
                       setCidade('')
                     }
-                  } else {
-                    setEstado(novoEstado)
-                    setCidade('')
-                  }
-                }}
-                disabled={!isEditing}
-                size="small"
-                sx={sxEntradaEmpresa}
-                InputLabelProps={{ shrink: true }}
-                SelectProps={{ displayEmpty: true }}
-              >
-                <MenuItem value="">
-                  <em>Selecione o estado</em>
-                </MenuItem>
-                {ESTADOS_BRASILEIROS.map(estadoOption => (
-                  <MenuItem key={estadoOption.sigla} value={estadoOption.sigla}>
-                    {estadoOption.sigla} - {estadoOption.nome}
+                  }}
+                  disabled={!isEditing}
+                  size="small"
+                  sx={sxEntradaEmpresa}
+                  InputLabelProps={{ shrink: true }}
+                  SelectProps={{ displayEmpty: true }}
+                >
+                  <MenuItem value="">
+                    <em>Selecione o estado</em>
                   </MenuItem>
-                ))}
-              </Input>
-              <CidadeAutocomplete
-                value={cidade}
-                onChange={novaCidade => {
-                  setCidade(novaCidade)
-                  if (!novaCidade) {
-                    setCodigoCidadeIbge(null)
-                    ultimaCidadeBuscada.current = ''
-                  }
-                }}
-                estado={estado}
-                label="Cidade"
-                placeholder="Digite o nome da cidade"
-                required={false}
-                disabled={!isEditing || !estado}
-                useNativeInput={false}
-                sx={sxEntradaEmpresa}
-                onCidadeSelecionada={(nomeCidade, codigoIbge) => {
-                  setCodigoCidadeIbge(codigoIbge)
-                  ultimaCidadeBuscada.current = nomeCidade
-                  setCidadeValida(true)
-                  setCidade(nomeCidade)
-                }}
-                onValidationChange={async isValid => {
-                  setCidadeValida(isValid)
-                  if (isValid && cidade && estado && !codigoCidadeIbge) {
-                    await buscarCodigoIbge(cidade.trim(), estado)
-                  }
-                }}
-              />
+                  {ESTADOS_BRASILEIROS.map(estadoOption => (
+                    <MenuItem key={estadoOption.sigla} value={estadoOption.sigla}>
+                      {estadoOption.sigla} - {estadoOption.nome}
+                    </MenuItem>
+                  ))}
+                </Input>
+                <CidadeAutocomplete
+                  value={cidade}
+                  onChange={novaCidade => {
+                    setCidade(novaCidade)
+                    if (!novaCidade) {
+                      setCodigoCidadeIbge(null)
+                      ultimaCidadeBuscada.current = ''
+                    }
+                  }}
+                  estado={estado}
+                  label="Cidade"
+                  placeholder="Digite o nome da cidade"
+                  required={false}
+                  disabled={!isEditing || !estado}
+                  useNativeInput={false}
+                  sx={sxEntradaEmpresa}
+                  onCidadeSelecionada={(nomeCidade, codigoIbge) => {
+                    setCodigoCidadeIbge(codigoIbge)
+                    ultimaCidadeBuscada.current = nomeCidade
+                    setCidadeValida(true)
+                    setCidade(nomeCidade)
+                  }}
+                  onValidationChange={async isValid => {
+                    setCidadeValida(isValid)
+                    if (isValid && cidade && estado && !codigoCidadeIbge) {
+                      await buscarCodigoIbge(cidade.trim(), estado)
+                    }
+                  }}
+                />
+                <Input
+                  select
+                  label="Fuso horário (IANA)"
+                  value={timezone}
+                  onChange={e => setTimezone(e.target.value)}
+                  disabled={!isEditing}
+                  size="small"
+                  sx={sxEntradaEmpresa}
+                  InputLabelProps={{ shrink: true }}
+                  SelectProps={{ displayEmpty: true }}
+                >
+                  <MenuItem value="">
+                    <em>Selecione o fuso</em>
+                  </MenuItem>
+                  {timezone && !FUSOS_IANA_BRASIL.some(f => f.id === timezone) && (
+                    <MenuItem value={timezone}>{timezone} (registrado na API)</MenuItem>
+                  )}
+                  {FUSOS_IANA_BRASIL.map(f => (
+                    <MenuItem key={f.id} value={f.id}>
+                      {f.label}
+                    </MenuItem>
+                  ))}
+                </Input>
+              </div>
             </div>
           </div>
         </div>
       </div>
-      </div>
     </div>
   )
 }
-
