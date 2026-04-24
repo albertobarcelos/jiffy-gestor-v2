@@ -339,10 +339,11 @@ export function FaturamentoRangeCalendar({
             max-width: 100%;
           }
           .faturamento-rdp-scope.faturamento-rdp-modal .rdp-root {
-            --rdp-day-width: clamp(1.35rem, calc((100cqw - 2 * var(--fat-pad)) / 7), 5rem);
-            --rdp-day_button-width: clamp(1.25rem, calc((100cqw - 2 * var(--fat-pad)) / 7 - 0.08rem), 4.85rem);
-            --rdp-day-height: clamp(2.05rem, calc((100cqw - 2 * var(--fat-pad)) / 7 * 1.2), 5rem);
-            --rdp-day_button-height: clamp(1.9rem, calc((100cqw - 2 * var(--fat-pad)) / 7 * 1.1), 4.85rem);
+            --rdp-day-width: clamp(1.85rem, calc((100cqw - 2 * var(--fat-pad)) / 7), 5rem);
+            --rdp-day_button-width: clamp(1.75rem, calc((100cqw - 2 * var(--fat-pad)) / 7 - 0.08rem), 4.85rem);
+            /* Dias quadrados: altura acompanha largura (evita retângulos em modais estreitos). */
+            --rdp-day-height: var(--rdp-day-width);
+            --rdp-day_button-height: var(--rdp-day_button-width);
             --rdp-nav-height: clamp(2rem, 10.5cqw, 3.35rem);
             --rdp-nav_button-width: clamp(1.5rem, 8.5cqw, 3.25rem);
             --rdp-nav_button-height: clamp(1.5rem, 8.5cqw, 3.25rem);
@@ -362,10 +363,11 @@ export function FaturamentoRangeCalendar({
             min-width: 0;
           }
           .faturamento-rdp-scope.faturamento-rdp-modal .rdp-root {
-            --rdp-day-width: clamp(1.25rem, calc((100cqw - 2 * var(--fat-pad) - var(--fat-gap-meses)) / 14), 3.85rem);
-            --rdp-day_button-width: clamp(1.15rem, calc((100cqw - 2 * var(--fat-pad) - var(--fat-gap-meses)) / 14 - 0.08rem), 3.65rem);
-            --rdp-day-height: clamp(2rem, calc((100cqw - 2 * var(--fat-pad) - var(--fat-gap-meses)) / 14 * 1.22), 4rem);
-            --rdp-day_button-height: clamp(1.85rem, calc((100cqw - 2 * var(--fat-pad) - var(--fat-gap-meses)) / 14 * 1.12), 3.85rem);
+            --rdp-day-width: clamp(1.75rem, calc((100cqw - 2 * var(--fat-pad) - var(--fat-gap-meses)) / 14), 3.85rem);
+            --rdp-day_button-width: clamp(1.65rem, calc((100cqw - 2 * var(--fat-pad) - var(--fat-gap-meses)) / 14 - 0.08rem), 3.65rem);
+            /* Dias quadrados: altura acompanha largura (evita retângulos em modais estreitos). */
+            --rdp-day-height: var(--rdp-day-width);
+            --rdp-day_button-height: var(--rdp-day_button-width);
             --rdp-nav-height: clamp(2.05rem, 7cqw, 3.35rem);
             --rdp-nav_button-width: clamp(1.45rem, 5.75cqw, 3.5rem);
             --rdp-nav_button-height: clamp(1.45rem, 5.75cqw, 3.5rem);
@@ -387,10 +389,10 @@ export function FaturamentoRangeCalendar({
             }
           }
           .faturamento-rdp-scope.faturamento-rdp-modal .rdp-root {
-            --rdp-day-width: 2.25rem;
-            --rdp-day_button-width: 2.1rem;
-            --rdp-day-height: 2.65rem;
-            --rdp-day_button-height: 2.45rem;
+            --rdp-day-width: 3rem;
+            --rdp-day_button-width: 2.75rem;
+            --rdp-day-height: var(--rdp-day-width);
+            --rdp-day_button-height: var(--rdp-day_button-width);
             --rdp-months-gap: 0.625rem;
             --rdp-nav-height: 2.45rem;
             --rdp-nav_button-width: 2rem;
@@ -458,10 +460,11 @@ export function FaturamentoRangeCalendar({
             max-width: 100%;
           }
           .faturamento-rdp-scope:not(.faturamento-rdp-modal) .rdp-root {
-            --rdp-day-width: clamp(1.65rem, calc((100cqw - 2 * var(--fat-pad)) / 7), 5rem);
-            --rdp-day_button-width: clamp(1.55rem, calc((100cqw - 2 * var(--fat-pad)) / 7 - 0.1rem), 4.85rem);
-            --rdp-day-height: clamp(2.85rem, calc((100cqw - 2 * var(--fat-pad)) / 7 * 1.18), 5.25rem);
-            --rdp-day_button-height: clamp(2.65rem, calc((100cqw - 2 * var(--fat-pad)) / 7 * 1.08), 5rem);
+            --rdp-day-width: clamp(2.15rem, calc((100cqw - 2 * var(--fat-pad)) / 7), 5rem);
+            --rdp-day_button-width: clamp(2.05rem, calc((100cqw - 2 * var(--fat-pad)) / 7 - 0.1rem), 4.85rem);
+            /* Dias quadrados: altura acompanha largura. */
+            --rdp-day-height: var(--rdp-day-width);
+            --rdp-day_button-height: var(--rdp-day_button-width);
             --rdp-nav-height: clamp(2.45rem, 11cqw, 3.5rem);
             --rdp-nav_button-width: clamp(2rem, 9cqw, 3.25rem);
             --rdp-nav_button-height: clamp(2rem, 9cqw, 3.25rem);
@@ -479,10 +482,11 @@ export function FaturamentoRangeCalendar({
             min-width: 0;
           }
           .faturamento-rdp-scope:not(.faturamento-rdp-modal) .rdp-root {
-            --rdp-day-width: clamp(1.55rem, calc((100cqw - 2 * var(--fat-pad) - var(--fat-gap-meses)) / 14), 4.25rem);
-            --rdp-day_button-width: clamp(1.45rem, calc((100cqw - 2 * var(--fat-pad) - var(--fat-gap-meses)) / 14 - 0.08rem), 4rem);
-            --rdp-day-height: clamp(2.65rem, calc((100cqw - 2 * var(--fat-pad) - var(--fat-gap-meses)) / 14 * 1.2), 4.75rem);
-            --rdp-day_button-height: clamp(2.45rem, calc((100cqw - 2 * var(--fat-pad) - var(--fat-gap-meses)) / 14 * 1.1), 4.5rem);
+            --rdp-day-width: clamp(2.05rem, calc((100cqw - 2 * var(--fat-pad) - var(--fat-gap-meses)) / 14), 4.25rem);
+            --rdp-day_button-width: clamp(1.95rem, calc((100cqw - 2 * var(--fat-pad) - var(--fat-gap-meses)) / 14 - 0.08rem), 4rem);
+            /* Dias quadrados: altura acompanha largura. */
+            --rdp-day-height: var(--rdp-day-width);
+            --rdp-day_button-height: var(--rdp-day_button-width);
             --rdp-nav-height: clamp(2.5rem, 7.5cqw, 3.75rem);
             --rdp-nav_button-width: clamp(2rem, 6cqw, 3.25rem);
             --rdp-nav_button-height: clamp(2rem, 6cqw, 3.25rem);
@@ -502,10 +506,10 @@ export function FaturamentoRangeCalendar({
             }
           }
           .faturamento-rdp-scope:not(.faturamento-rdp-modal) .rdp-root {
-            --rdp-day-height: 3.35rem;
-            --rdp-day-width: 2.85rem;
-            --rdp-day_button-height: 3.45rem;
+            --rdp-day-width: 3.5rem;
             --rdp-day_button-width: 2.65rem;
+            --rdp-day-height: var(--rdp-day-width);
+            --rdp-day_button-height: var(--rdp-day_button-width);
             --rdp-months-gap: 1.25rem;
             --rdp-nav-height: 2.65rem;
             --rdp-nav_button-width: 2.15rem;
@@ -548,7 +552,7 @@ export function FaturamentoRangeCalendar({
           : 'w-full min-w-0 max-w-full text-white',
         embutidoNoModal
           ? 'px-2'
-          : 'rounded-xl border border-white/20 bg-secondary bg-gradient-to-br from-secondary to-[#451090] p-4 shadow-lg',
+          : 'rounded-xl border border-white/20 bg-secondary bg-gradient-to-br from-secondary to-[#451090] px-4 shadow-lg',
         className
       )}
       style={temaRdp}
@@ -565,6 +569,19 @@ export function FaturamentoRangeCalendar({
           width: 100%;
           max-width: 100%;
           min-width: 0;
+        }
+        /*
+         * Inputs de hora: não usar breakpoints de viewport (sm:) porque em telas físicas menores com
+         * alta resolução / escala de DPI o viewport em CSS px é "grande", mas o modal fica estreito.
+         * Container query = quebra por largura real do componente.
+         */
+        .faturamento-rdp-scope .fat-time-grid {
+          grid-template-columns: 1fr;
+        }
+        @container fat-cal (min-width: 520px) {
+          .faturamento-rdp-scope .fat-time-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
         }
         /*
          * O style.css do RDP define em .rdp-root --rdp-range_* e --rdp-day-width/height (44px).
@@ -596,7 +613,7 @@ export function FaturamentoRangeCalendar({
             className={cn(
               'rounded-lg [&_.rdp-caption_label]:font-medium',
               fundoModalClaro
-                ? 'w-full max-w-none border border-gray-200 bg-white p-2 text-primary-text xl:p-3 2xl:p-4 [&_.rdp-caption_label]:text-secondary 2xl:[&_.rdp-caption_label]:text-base 2xl:[&_.rdp-day_button>span:first-child]:text-base 2xl:[&_.rdp-day_button>span:last-child]:text-xs [&_.rdp-dropdown]:text-[#330468] [&_.rdp-nav_button]:text-secondary [&_.rdp-selected]:!text-xs [&_.rdp-weekday]:py-1 [&_.rdp-weekday]:text-gray-500 2xl:[&_.rdp-weekday]:text-xs'
+                ? 'w-full max-w-none border border-gray-200 bg-white px-2 text-primary-text xl:p-3 2xl:p-4 [&_.rdp-caption_label]:text-secondary 2xl:[&_.rdp-caption_label]:text-base 2xl:[&_.rdp-day_button>span:first-child]:text-base 2xl:[&_.rdp-day_button>span:last-child]:text-xs [&_.rdp-dropdown]:text-[#330468] [&_.rdp-nav_button]:text-secondary [&_.rdp-selected]:!text-xs [&_.rdp-weekday]:py-1 [&_.rdp-weekday]:text-gray-500 2xl:[&_.rdp-weekday]:text-xs'
                 : 'w-full min-w-0 max-w-full border border-white/15 bg-white/5 p-2 text-accent1 [--rdp-nav-height:2.75rem] [&_.rdp-caption_label]:text-accent1 [&_.rdp-dropdown]:text-[#330468] [&_.rdp-nav_button]:text-white [&_.rdp-selected]:!text-sm [&_.rdp-weekday]:text-white/80'
             )}
             components={{
@@ -608,12 +625,12 @@ export function FaturamentoRangeCalendar({
 
       <div
         className={cn(
-          'mt-4 border-t pt-4 xl:pt-6 2xl:pt-8',
+          'mt-1 border-t pt-1',
           fundoModalClaro ? 'shrink-0 border-gray-200' : 'border-white/20'
         )}
       >
-        <div className="mx-2 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:gap-6 2xl:gap-8">
-          <div className="flex flex-col gap-1.5">
+        <div className="fat-time-grid mx-2 grid grid-cols-1 gap-2 xl:gap-4 2xl:gap-8">
+          <div className="flex flex-col gap-1">
             <label
               htmlFor="faturamento-range-hora-inicio"
               className="text-sm font-medium text-primary-text"
@@ -632,7 +649,7 @@ export function FaturamentoRangeCalendar({
                   onHorariosChange?.(v, horaFim)
                 }}
                 className={cn(
-                  'w-full rounded-lg border py-2 pl-3 pr-10 text-sm',
+                  'w-full rounded-lg border py-1 pl-3 pr-10 text-sm',
                   fundoModalClaro
                     ? 'border-gray-300 bg-white text-gray-900 placeholder:text-gray-400'
                     : 'border-[#530CA3]/40 bg-[#F5F3FF] text-[#330468] placeholder:text-[#530CA3]/60',
@@ -648,7 +665,7 @@ export function FaturamentoRangeCalendar({
               />
             </div>
           </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1">
             <label
               htmlFor="faturamento-range-hora-fim"
               className="text-sm font-medium text-primary-text"
@@ -667,7 +684,7 @@ export function FaturamentoRangeCalendar({
                   onHorariosChange?.(horaInicio, v)
                 }}
                 className={cn(
-                  'w-full rounded-lg border py-2 pl-3 pr-10 text-sm',
+                  'w-full rounded-lg border py-1 pl-3 pr-10 text-sm',
                   fundoModalClaro
                     ? 'border-gray-300 bg-white text-primary-text'
                     : 'border-[#530CA3]/40 bg-[#F5F3FF] text-[#330468]',
@@ -687,7 +704,7 @@ export function FaturamentoRangeCalendar({
 
         <div
           className={cn(
-            'mt-6 border-t pt-2',
+            'mt-1 border-t pt-2',
             fundoModalClaro
               ? 'rounded-lg border-gray-200 bg-primary/10 p-2 2xl:p-6'
               : 'border-white/20'
@@ -695,7 +712,7 @@ export function FaturamentoRangeCalendar({
         >
           <p
             className={cn(
-              'py-2 text-sm font-medium',
+              'text-sm font-medium',
               fundoModalClaro ? 'text-primary-text' : 'text-white/80'
             )}
           >
@@ -703,7 +720,7 @@ export function FaturamentoRangeCalendar({
           </p>
           <p
             className={cn(
-              'mt-1 break-words py-2 text-sm leading-snug',
+              'break-words py-1 text-sm leading-snug',
               fundoModalClaro ? 'text-primary' : 'text-white',
               !textoPeriodoSelecionado && 'italic opacity-80'
             )}

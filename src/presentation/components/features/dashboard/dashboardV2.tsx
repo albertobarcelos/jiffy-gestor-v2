@@ -52,10 +52,7 @@ import {
   ChevronRight,
   FilterX,
   RefreshCw,
-  DollarSign,
-  CreditCard,
   FileX2,
-  Receipt,
   UtensilsCrossed,
   X,
 } from 'lucide-react'
@@ -669,20 +666,6 @@ function DonutFormaPagamento({
     { name: 'resto', value: Math.max(0, 100 - fatiaPrincipal), fill: secundaria },
   ]
 
-  const icone = useMemo(() => {
-    const raw = (formaPagamentoFiscal ?? '').trim().toLowerCase()
-    const forma =
-      raw in ALIAS_FORMA_PAGAMENTO_FISCAL
-        ? ALIAS_FORMA_PAGAMENTO_FISCAL[raw]
-        : (raw as keyof typeof COR_POR_FORMA_PAGAMENTO_FISCAL)
-
-    if (forma === 'dinheiro') return DollarSign
-    if (forma === 'pix') return Receipt
-    if (forma === 'cartao_credito' || forma === 'cartao_debito') return CreditCard
-    if (forma.startsWith('vale_')) return Receipt
-    return DollarSign
-  }, [formaPagamentoFiscal])
-
   const textoTooltipValor = useMemo(() => `Valor: ${formatarMoeda(valor ?? 0)}`, [valor])
 
   return (
@@ -715,14 +698,8 @@ function DonutFormaPagamento({
       </div>
       <p className="flex items-center justify-center gap-1.5 text-center text-[10px] font-semibold uppercase tracking-wide text-primary-text md:text-xs">
         <MuiTooltip title={textoTooltipValor} placement="top" arrow>
-          <span className="inline-flex items-center">
-            {(() => {
-              const Icon = icone
-              return <Icon className="h-3.5 w-3.5" style={{ color: principal }} aria-hidden />
-            })()}
-          </span>
+          <span className="cursor-help">{label}</span>
         </MuiTooltip>
-        <span>{label}</span>
       </p>
     </div>
   )
