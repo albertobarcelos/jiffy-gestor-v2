@@ -127,6 +127,71 @@ function formatarHoraParaInputCalendar(d: Date | null | undefined): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
+function getTimeZoneOffsetMinutes(date: Date, timeZone: string): number {
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
+  const parts = dtf.formatToParts(date)
+  const map: Partial<Record<Intl.DateTimeFormatPartTypes, string>> = {}
+  for (const p of parts) {
+    if (p.type !== 'literal') map[p.type] = p.value
+  }
+  const year = Number(map.year)
+  const month = Number(map.month)
+  const day = Number(map.day)
+  let hour = Number(map.hour)
+  const minute = Number(map.minute)
+  const second = Number(map.second)
+  if (hour === 24) hour = 0
+  const asUTC = Date.UTC(year, month - 1, day, hour, minute, second)
+  return Math.round((asUTC - date.getTime()) / 60000)
+}
+
+function zonedLocalPartsToUtcDate(
+  dateParts: {
+    year: number
+    month: number
+    day: number
+    hour: number
+    minute: number
+    second: number
+    millisecond: number
+  },
+  timeZone: string
+): Date {
+  const { year, month, day, hour, minute, second, millisecond } = dateParts
+  const guess = Date.UTC(year, month - 1, day, hour, minute, second, millisecond)
+  const off1 = getTimeZoneOffsetMinutes(new Date(guess), timeZone)
+  const utc1 = guess - off1 * 60_000
+  const off2 = getTimeZoneOffsetMinutes(new Date(utc1), timeZone)
+  const utc2 = guess - off2 * 60_000
+  return new Date(utc2)
+}
+
+function toISOStringNoFusoEmpresa(date: Date, timeZoneEmpresa: string): string {
+  const tz = timeZoneEmpresa.trim()
+  if (!tz) return date.toISOString()
+  return zonedLocalPartsToUtcDate(
+    {
+      year: date.getFullYear(),
+      month: date.getMonth() + 1,
+      day: date.getDate(),
+      hour: date.getHours(),
+      minute: date.getMinutes(),
+      second: date.getSeconds(),
+      millisecond: date.getMilliseconds(),
+    },
+    tz
+  ).toISOString()
+}
+
 /** Snapshot dos filtros para montar a query da listagem (GET /api/vendas). */
 interface VendasFiltrosQuerySnapshot {
   searchQuery: string
@@ -168,7 +233,10 @@ function normalizarMoedaFiltroVLista(value: string): number | null {
 }
 
 /** Monta query string da listagem (sem limit/offset). */
-function buildVendasListQueryParams(filters: VendasFiltrosQuerySnapshot): URLSearchParams {
+function buildVendasListQueryParams(
+  filters: VendasFiltrosQuerySnapshot,
+  args?: { timeZoneEmpresa?: string }
+): URLSearchParams {
   const baseParams = new URLSearchParams()
 
   if (filters.searchQuery) {
@@ -228,16 +296,17 @@ function buildVendasListQueryParams(filters: VendasFiltrosQuerySnapshot): URLSea
    * Com status apenas ABERTA não é permitido filtrar por finalização — usa-se data de criação.
    */
   const usarDatasCriacao = normalizedStatus === 'ABERTA'
+  const tzEmpresa = args?.timeZoneEmpresa?.trim() || ''
   if (inicioFiltro) {
     baseParams.append(
       usarDatasCriacao ? 'dataCriacaoInicial' : 'dataFinalizacaoInicial',
-      inicioFiltro.toISOString()
+      usarDatasCriacao || !tzEmpresa ? inicioFiltro.toISOString() : toISOStringNoFusoEmpresa(inicioFiltro, tzEmpresa)
     )
   }
   if (fimFiltro) {
     baseParams.append(
       usarDatasCriacao ? 'dataCriacaoFinal' : 'dataFinalizacaoFinal',
-      fimFiltro.toISOString()
+      usarDatasCriacao || !tzEmpresa ? fimFiltro.toISOString() : toISOStringNoFusoEmpresa(fimFiltro, tzEmpresa)
     )
   }
 
@@ -549,6 +618,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     periodoInicial: periodoFaturamentoCalendarioModal.inicio,
     periodoFinal: periodoFaturamentoCalendarioModal.fim,
     enabled: isDatasModalOpen,
+    timeZoneEmpresa: timezoneAgregacao,
   })
 
   // Ao abrir o painel lateral, sincroniza rascunho com o filtro "Por datas" ou padrão (hoje)
@@ -788,7 +858,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
    */
   const buscarPaginaVendas = useCallback(
     async (offset: number, filters: VendasFiltrosQuerySnapshot, token: string) => {
-      const baseParams = buildVendasListQueryParams(filters)
+      const baseParams = buildVendasListQueryParams(filters, { timeZoneEmpresa: timezoneAgregacao })
       const params = new URLSearchParams(baseParams.toString())
       params.append('limit', String(pageSize))
       params.append('offset', String(offset))
@@ -819,7 +889,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         limit: typeof data.limit === 'number' ? data.limit : undefined,
       }
     },
-    [pageSize]
+    [pageSize, timezoneAgregacao]
   )
 
   /**

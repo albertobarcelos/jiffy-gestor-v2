@@ -26,12 +26,14 @@ import {
   mergePontosEvolucaoComparacao,
   type MetricaEvolucaoComparativo,
 } from '@/src/presentation/components/features/dashboard/dashboardV2ComparacaoChart'
+// (dateFilters) não usado aqui: ranges agora são calculados no fuso da empresa
 import {
-  calculatePeriodo,
-  calculatePeriodoAnteriorParaComparacao,
-  permiteOpcoesIntervaloPorHora,
-  deslocarPeriodoEmDiasCorridos,
-} from '@/src/shared/utils/dateFilters'
+  assumirDateComoNoFusoEmpresaParaUtc,
+  calcularPeriodoAnteriorParaComparacaoNoFusoEmpresa,
+  calcularPeriodoNoFusoEmpresa,
+  deslocarPeriodoEmDiasCorridosUtc,
+  permiteOpcoesIntervaloPorHoraNoFuso,
+} from '@/src/shared/utils/periodoNoFusoEmpresa'
 import {
   Line,
   LineChart,
@@ -781,6 +783,7 @@ export default function DashboardV2() {
     periodoInicial: periodoFaturamentoCalendarioModal.inicio,
     periodoFinal: periodoFaturamentoCalendarioModal.fim,
     enabled: modalIntervaloPersonalizadoAberto,
+    timeZoneEmpresa: timezoneAgregacao,
   })
 
   const corComparativoLinhaAtual =
@@ -826,20 +829,25 @@ export default function DashboardV2() {
   )
 
   const { inicio: inicioTopProduto, fim: fimTopProduto } = useMemo(() => {
+    const tzEmpresa = timezoneAgregacao?.trim() || 'America/Sao_Paulo'
     if (
       filtroTopProduto === 'personalizado' &&
       periodoPersonalizadoInicio &&
       periodoPersonalizadoFim
     ) {
-      return { inicio: periodoPersonalizadoInicio, fim: periodoPersonalizadoFim }
+      return {
+        inicio: assumirDateComoNoFusoEmpresaParaUtc(periodoPersonalizadoInicio, tzEmpresa),
+        fim: assumirDateComoNoFusoEmpresaParaUtc(periodoPersonalizadoFim, tzEmpresa),
+      }
     }
-    return calculatePeriodo(opcaoPeriodoTopProduto)
+    return calcularPeriodoNoFusoEmpresa(opcaoPeriodoTopProduto, tzEmpresa)
   }, [
     filtroTopProduto,
     opcaoPeriodoTopProduto,
     periodoPersonalizadoInicio,
     periodoPersonalizadoFim,
     dadosAtualizadosEm,
+    timezoneAgregacao,
   ])
 
   const periodoApiTopProduto = useMemo(
@@ -936,20 +944,25 @@ export default function DashboardV2() {
   )
 
   const { inicio: inicioTopGarcom, fim: fimTopGarcom } = useMemo(() => {
+    const tzEmpresa = timezoneAgregacao?.trim() || 'America/Sao_Paulo'
     if (
       filtroTopGarcom === 'personalizado' &&
       periodoPersonalizadoInicio &&
       periodoPersonalizadoFim
     ) {
-      return { inicio: periodoPersonalizadoInicio, fim: periodoPersonalizadoFim }
+      return {
+        inicio: assumirDateComoNoFusoEmpresaParaUtc(periodoPersonalizadoInicio, tzEmpresa),
+        fim: assumirDateComoNoFusoEmpresaParaUtc(periodoPersonalizadoFim, tzEmpresa),
+      }
     }
-    return calculatePeriodo(opcaoPeriodoTopGarcom)
+    return calcularPeriodoNoFusoEmpresa(opcaoPeriodoTopGarcom, tzEmpresa)
   }, [
     filtroTopGarcom,
     opcaoPeriodoTopGarcom,
     periodoPersonalizadoInicio,
     periodoPersonalizadoFim,
     dadosAtualizadosEm,
+    timezoneAgregacao,
   ])
 
   const periodoApiTopGarcom = useMemo(
@@ -1035,41 +1048,48 @@ export default function DashboardV2() {
   )
 
   const { inicio: inicioResumo, fim: fimResumo } = useMemo(() => {
+    const tzEmpresa = timezoneAgregacao?.trim() || 'America/Sao_Paulo'
     if (periodoData === 'personalizado' && periodoPersonalizadoInicio && periodoPersonalizadoFim) {
-      return { inicio: periodoPersonalizadoInicio, fim: periodoPersonalizadoFim }
+      return {
+        inicio: assumirDateComoNoFusoEmpresaParaUtc(periodoPersonalizadoInicio, tzEmpresa),
+        fim: assumirDateComoNoFusoEmpresaParaUtc(periodoPersonalizadoFim, tzEmpresa),
+      }
     }
-    return calculatePeriodo(opcaoCalculatePeriodo)
+    return calcularPeriodoNoFusoEmpresa(opcaoCalculatePeriodo, tzEmpresa)
   }, [
     periodoData,
     periodoPersonalizadoInicio,
     periodoPersonalizadoFim,
     opcaoCalculatePeriodo,
     dadosAtualizadosEm,
+    timezoneAgregacao,
   ])
 
   const { inicio: inicioAnterior, fim: fimAnterior } = useMemo(() => {
+    const tzEmpresa = timezoneAgregacao?.trim() || 'America/Sao_Paulo'
     if (periodoData === 'personalizado' && inicioResumo && fimResumo) {
-      return deslocarPeriodoEmDiasCorridos(
+      return deslocarPeriodoEmDiasCorridosUtc(
         inicioResumo,
         fimResumo,
         DIAS_COMPARACAO_PERIODO_PERSONALIZADO
       )
     }
-    const r = calculatePeriodoAnteriorParaComparacao(opcaoCalculatePeriodo)
+    const r = calcularPeriodoAnteriorParaComparacaoNoFusoEmpresa(opcaoCalculatePeriodo, tzEmpresa)
     if (!r) return { inicio: null, fim: null }
     return r
-  }, [periodoData, inicioResumo, fimResumo, opcaoCalculatePeriodo, dadosAtualizadosEm])
+  }, [periodoData, inicioResumo, fimResumo, opcaoCalculatePeriodo, dadosAtualizadosEm, timezoneAgregacao])
 
   /**
    * Por hora: hoje/ontem, ou intervalo personalizado com até 2 dias corridos inclusivos
    * (mesma regra de `permiteOpcoesIntervaloPorHora`).
    */
   const permiteGraficoPorHora = useMemo(() => {
+    const tzEmpresa = timezoneAgregacao?.trim() || 'America/Sao_Paulo'
     if (periodoData === 'personalizado' && inicioResumo && fimResumo) {
-      return permiteOpcoesIntervaloPorHora(inicioResumo, fimResumo)
+      return permiteOpcoesIntervaloPorHoraNoFuso(inicioResumo, fimResumo, tzEmpresa)
     }
     return periodoData === 'hoje' || periodoData === 'ontem'
-  }, [periodoData, inicioResumo, fimResumo])
+  }, [periodoData, inicioResumo, fimResumo, timezoneAgregacao])
 
   /** Detecta retorno de 7/30 dias → hoje/ontem para restaurar agregação de 30 min (evita estado “Por dia” inválido). */
   const estavaEmPeriodoSoDiarioRef = useRef(false)
@@ -1113,7 +1133,11 @@ export default function DashboardV2() {
     granularidade !== 'dia' &&
     inicioResumo &&
     fimResumo &&
-    permiteOpcoesIntervaloPorHora(inicioResumo, fimResumo)
+    permiteOpcoesIntervaloPorHoraNoFuso(
+      inicioResumo,
+      fimResumo,
+      timezoneAgregacao?.trim() || 'America/Sao_Paulo'
+    )
       ? intervaloMinutosAgregacaoGraficoV2(granularidade)
       : undefined
 

@@ -594,6 +594,7 @@ export function HistoricoFechamento() {
     periodoInicial: periodoFaturamentoCalendarioModal.inicio,
     periodoFinal: periodoFaturamentoCalendarioModal.fim,
     enabled: isDatasModalOpen,
+    timeZoneEmpresa: timezoneAgregacao,
   })
 
   // Ao abrir o painel, sincroniza rascunho com o filtro "Por datas" ou padrão (hoje)
