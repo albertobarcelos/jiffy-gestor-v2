@@ -5,7 +5,6 @@ import {
   useEffect,
   useRef,
   useCallback,
-  useMemo,
   forwardRef,
   useImperativeHandle,
 } from 'react'
@@ -18,15 +17,6 @@ import { Button } from '@/src/presentation/components/ui/button'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
-import { useComplementos } from '@/src/presentation/hooks/useComplementos'
-import {
-  ComplementosTabsModal,
-  ComplementosTabsModalState,
-} from '@/src/presentation/components/features/complementos/ComplementosTabsModal'
-import { ComplementosSelectModal } from '@/src/presentation/components/features/complementos/ComplementosSelectModal'
-import type { Complemento } from '@/src/domain/entities/Complemento'
-
-const EMPTY_COMPLEMENTOS: Complemento[] = []
 
 /** Labels outlined em preto (MUI usa cinza por padrão) — igual NovoComplemento */
 const sxOutlinedLabelTextoEscuro = {
@@ -55,6 +45,13 @@ const sxEntradaCompactaGrupo = {
   '& .MuiOutlinedInput-input': entradaCompactaInput,
 } as const
 
+export interface NovoGrupoComplementoBasicData {
+  nome: string
+  qtdMinima: string
+  qtdMaxima: string
+  ativo: boolean
+}
+
 interface NovoGrupoComplementoProps {
   grupoId?: string
   /** Dentro de modal com abas: layout full-height, título da seção fixo e callbacks no salvar/fechar */
@@ -72,11 +69,11 @@ interface NovoGrupoComplementoProps {
   onSaved?: () => void
   /** Após salvar mantendo o painel aberto (rodapé na aba Complementos) — invalida listas. */
   onReload?: () => void
-  /**
-   * No `GruposComplementosTabsModal`: com grupo já salvo, o botão "Vincular complementos" troca para a
-   * aba Complementos. Sem `grupoId` (criação), abre o seletor local — a API exige ≥1 complemento no POST.
-   * Fora do modal de abas não é passado: sempre usa o seletor.
-   */
+  /** IDs mantidos pelo modal pai durante a criação; edição persiste vínculos na aba Complementos. */
+  complementosIdsDraft?: string[]
+  /** Expõe os dados básicos para o fluxo do modal de abas (ex.: título na aba Complementos em criação). */
+  onBasicDataChange?: (data: NovoGrupoComplementoBasicData) => void
+  /** Atalho único para a aba Complementos, tanto em criação quanto em edição. */
   onGoToComplementosTab?: () => void
 }
 
@@ -105,6 +102,8 @@ export const NovoGrupoComplemento = forwardRef<
     onClose,
     onSaved,
     onReload,
+    complementosIdsDraft = [],
+    onBasicDataChange,
     onGoToComplementosTab,
   },
   ref
@@ -118,35 +117,19 @@ export const NovoGrupoComplemento = forwardRef<
   const [qtdMinima, setQtdMinima] = useState('0')
   const [qtdMaxima, setQtdMaxima] = useState('0')
   const [ativo, setAtivo] = useState(true)
-  const [selectedComplementosIds, setSelectedComplementosIds] = useState<string[]>([])
 
   // Estados de loading e dados
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingGrupo, setIsLoadingGrupo] = useState(false)
-  const [showComplementosModal, setShowComplementosModal] = useState(false)
   const hasLoadedGrupoRef = useRef(false)
   const baselineSerializedRef = useRef<string>('')
-  const [complementosTabsState, setComplementosTabsState] = useState<ComplementosTabsModalState>({
-    open: false,
-    tab: 'complemento',
-    mode: 'create',
-    complementoId: undefined,
-  })
-
-  // Carregar lista de complementos disponíveis usando React Query (com cache)
-  const {
-    data: complementosData,
-    isLoading: isLoadingComplementos,
-    refetch: refetchComplementos,
-  } = useComplementos({
-    ativo: true,
-    limit: 1000,
-  })
-  const complementos = complementosData ?? EMPTY_COMPLEMENTOS
 
   const onEmbedFormStateChangeRef = useRef(onEmbedFormStateChange)
   onEmbedFormStateChangeRef.current = onEmbedFormStateChange
   const lastEmbedSyncRef = useRef<{ isSubmitting: boolean; canSubmit: boolean } | null>(null)
+  const onBasicDataChangeRef = useRef(onBasicDataChange)
+  onBasicDataChangeRef.current = onBasicDataChange
+  const lastBasicDataSerializedRef = useRef<string>('')
 
   useEffect(() => {
     const next = {
@@ -165,6 +148,19 @@ export const NovoGrupoComplemento = forwardRef<
     onEmbedFormStateChangeRef.current?.(next)
   }, [isLoading, nome])
 
+  useEffect(() => {
+    const next: NovoGrupoComplementoBasicData = {
+      nome,
+      qtdMinima,
+      qtdMaxima,
+      ativo,
+    }
+    const serialized = JSON.stringify(next)
+    if (serialized === lastBasicDataSerializedRef.current) return
+    lastBasicDataSerializedRef.current = serialized
+    onBasicDataChangeRef.current?.(next)
+  }, [nome, qtdMinima, qtdMaxima, ativo])
+
   /** Snapshot dos campos persistidos — mesmo critério do PATCH/POST. */
   const getFormSnapshot = useCallback(() => {
     return JSON.stringify({
@@ -172,9 +168,11 @@ export const NovoGrupoComplemento = forwardRef<
       qtdMinima,
       qtdMaxima,
       ativo,
-      complementosIds: [...selectedComplementosIds].map(String).sort(),
+      complementosIds: isEditing
+        ? []
+        : [...complementosIdsDraft].map(String).sort(),
     })
-  }, [nome, qtdMinima, qtdMaxima, ativo, selectedComplementosIds])
+  }, [nome, qtdMinima, qtdMaxima, ativo, isEditing, complementosIdsDraft])
 
   const commitBaseline = useCallback(() => {
     baselineSerializedRef.current = getFormSnapshot()
@@ -226,15 +224,6 @@ export const NovoGrupoComplemento = forwardRef<
             setQtdMaxima(grupo.getQtdMaxima().toString())
             setAtivo(grupo.isAtivo())
 
-            const complementosIds =
-              grupo.getComplementosIds()?.length
-                ? grupo.getComplementosIds()!
-                : (grupo.getComplementos() || [])
-                    .map((comp: any) => comp?.id?.toString())
-                    .filter(Boolean)
-
-            setSelectedComplementosIds(complementosIds)
-
             window.setTimeout(() => {
               commitBaselineLatestRef.current()
             }, 100)
@@ -274,6 +263,11 @@ export const NovoGrupoComplemento = forwardRef<
       return
     }
 
+    if (!isEditing && complementosIdsDraft.length === 0) {
+      showToast.error('Vincule pelo menos um complemento antes de salvar o grupo.')
+      return
+    }
+
     const toastId = showToast.loading(
       isEditing ? 'Salvando alterações...' : 'Criando grupo de complementos...'
     )
@@ -286,7 +280,10 @@ export const NovoGrupoComplemento = forwardRef<
         qtdMinima: qtdMinimaNum,
         qtdMaxima: qtdMaximaNum,
         ativo,
-        complementosIds: selectedComplementosIds,
+      }
+
+      if (!isEditing) {
+        body.complementosIds = complementosIdsDraft
       }
 
       const url = isEditing
@@ -342,7 +339,7 @@ export const NovoGrupoComplemento = forwardRef<
     qtdMinima,
     qtdMaxima,
     ativo,
-    selectedComplementosIds,
+    complementosIdsDraft,
     isEmbedded,
     onReload,
     onSaved,
@@ -376,50 +373,6 @@ export const NovoGrupoComplemento = forwardRef<
     }
   }
 
-  const toggleComplemento = (complementoId: string) => {
-    setSelectedComplementosIds((prev) => {
-      if (prev.includes(complementoId)) {
-        return prev.filter((id) => id !== complementoId)
-      }
-      return [...prev, complementoId]
-    })
-  }
-
-  const openComplementoCreateModal = () => {
-    setComplementosTabsState((prev) => ({
-      ...prev,
-      open: true,
-      tab: 'complemento',
-      mode: 'create',
-      complementoId: undefined,
-    }))
-  }
-
-  const closeComplementosTabsModal = () => {
-    setComplementosTabsState((prev) => ({
-      ...prev,
-      open: false,
-    }))
-  }
-
-  const handleComplementosTabChange = (tab: 'complemento') => {
-    setComplementosTabsState((prev) => ({
-      ...prev,
-      tab,
-    }))
-  }
-
-  const handleComplementosTabsReload = async () => {
-    await refetchComplementos()
-  }
-
-  const resumoComplementosVinculados = useMemo(() => {
-    return selectedComplementosIds.map((id) => {
-      const found = complementos.find((c) => c.getId() === id)
-      return { id, nome: found?.getNome() ?? `ID ${id}` }
-    })
-  }, [complementos, selectedComplementosIds])
-
   if (isLoadingGrupo) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-2">
@@ -427,10 +380,6 @@ export const NovoGrupoComplemento = forwardRef<
       </div>
     )
   }
-
-  /** Seletor de catálogo: fora do painel de abas, ou criação no painel (ainda sem id persistido). */
-  const showComplementosSelectInTabsModal =
-    !onGoToComplementosTab || !grupoId
 
   return (
     <div
@@ -500,7 +449,7 @@ export const NovoGrupoComplemento = forwardRef<
                 />
               </div>
 
-              {/* Complementos: criação no painel de abas usa o seletor (API exige ids no POST); com grupo salvo, atalho para a aba */}
+              {/* Complementos: a gestão de vínculos acontece exclusivamente na aba Complementos. */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Complementos
@@ -508,39 +457,14 @@ export const NovoGrupoComplemento = forwardRef<
                 <button
                   type="button"
                   onClick={() => {
-                    if (onGoToComplementosTab && grupoId) {
-                      onGoToComplementosTab()
-                      return
-                    }
-                    setShowComplementosModal(true)
+                    onGoToComplementosTab?.()
                   }}
+                  disabled={!onGoToComplementosTab}
                   className="inline-flex items-center h-8 text-sm md:text-lg gap-2 px-5 py-2 rounded-lg bg-primary text-info font-medium shadow hover:bg-primary/90 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <MdAdd className="md:text-lg text-sm" />
                   Vincular complementos
                 </button>
-                {resumoComplementosVinculados.length > 0 ? (
-                  <>
-                    <ul className="mt-3 max-h-40 list-none space-y-1 overflow-y-auto rounded-lg border border-primary/20 bg-white/80 p-2 text-sm">
-                      {resumoComplementosVinculados.map(({ id, nome }) => (
-                        <li
-                          key={id}
-                          className="truncate rounded-md px-2 py-1.5 font-nunito text-primary-text"
-                        >
-                          {nome}
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="mt-1 font-nunito text-xs text-secondary-text">
-                      {resumoComplementosVinculados.length} vinculado
-                      {resumoComplementosVinculados.length === 1 ? '' : 's'}
-                    </p>
-                  </>
-                ) : (
-                  <p className="mt-2 font-nunito text-xs text-secondary-text">
-                    Nenhum complemento vinculado. Use o botão acima para selecionar.
-                  </p>
-                )}
               </div>
 
             </div>
@@ -582,27 +506,6 @@ export const NovoGrupoComplemento = forwardRef<
         </form>
       </div>
 
-      {showComplementosSelectInTabsModal ? (
-        <ComplementosSelectModal
-          open={showComplementosModal}
-          title="Vincular Complementos"
-          complementos={complementos}
-          selectedIds={selectedComplementosIds}
-          isLoading={isLoadingComplementos}
-          onToggle={toggleComplemento}
-          onConfirm={() => setShowComplementosModal(false)}
-          onClose={() => setShowComplementosModal(false)}
-          onCreateComplemento={openComplementoCreateModal}
-          confirmLabel="Vincular selecionados"
-          emptyMessage="Nenhum complemento disponível."
-        />
-      ) : null}
-      <ComplementosTabsModal
-        state={complementosTabsState}
-        onClose={closeComplementosTabsModal}
-        onTabChange={handleComplementosTabChange}
-        onReload={handleComplementosTabsReload}
-      />
     </div>
   )
 })

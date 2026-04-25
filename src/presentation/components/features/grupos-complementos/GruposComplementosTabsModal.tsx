@@ -6,11 +6,18 @@ import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import {
   NovoGrupoComplemento,
+  type NovoGrupoComplementoBasicData,
   type NovoGrupoComplementoHandle,
 } from './NovoGrupoComplemento'
 import { GrupoComplementoComplementosModal } from './GrupoComplementoComplementosModal'
 
 const GRUPO_TABS_FORM_ID = 'grupos-complemento-tabs-modal-form'
+const INITIAL_BASIC_DATA: NovoGrupoComplementoBasicData = {
+  nome: '',
+  qtdMinima: '0',
+  qtdMaxima: '0',
+  ativo: true,
+}
 
 type TabKey = 'grupo' | 'complementos'
 
@@ -46,10 +53,18 @@ export function GruposComplementosTabsModal({
    */
   const [grupoComplementoFormSession, setGrupoComplementoFormSession] = useState(0)
   const prevPainelAbertoRef = useRef(false)
+  const [draftComplementosIds, setDraftComplementosIds] = useState<string[]>([])
+  const [basicData, setBasicData] = useState<NovoGrupoComplementoBasicData>(INITIAL_BASIC_DATA)
 
   useEffect(() => {
     if (state.open && !prevPainelAbertoRef.current) {
       setGrupoComplementoFormSession(s => s + 1)
+      setDraftComplementosIds([])
+      setBasicData(INITIAL_BASIC_DATA)
+    }
+    if (!state.open) {
+      setDraftComplementosIds([])
+      setBasicData(INITIAL_BASIC_DATA)
     }
     prevPainelAbertoRef.current = state.open
   }, [state.open])
@@ -78,8 +93,12 @@ export function GruposComplementosTabsModal({
 
   /** Salva dados do grupo (formulário na aba oculta) sem fechar o painel — rodapé na aba Complementos. */
   const handleSalvarGrupoAbaComplementos = useCallback(() => {
+    if (state.mode === 'create') {
+      void ngcRef.current?.saveGrupoComplementoAndClose?.()
+      return
+    }
     void ngcRef.current?.saveGrupoComplemento?.()
-  }, [])
+  }, [state.mode])
 
   const goToComplementosTab = useCallback(() => {
     onTabChange('complementos')
@@ -96,6 +115,9 @@ export function GruposComplementosTabsModal({
     canSubmit: false,
   })
 
+  const createSemComplementos =
+    state.mode === 'create' && draftComplementosIds.length === 0
+
   const footerActions =
     state.tab === 'grupo'
       ? {
@@ -104,7 +126,7 @@ export function GruposComplementosTabsModal({
           saveFormId: GRUPO_TABS_FORM_ID,
           saveLoading: embedFormState.isSubmitting,
           saveDisabled:
-            !embedFormState.canSubmit || embedFormState.isSubmitting,
+            !embedFormState.canSubmit || embedFormState.isSubmitting || createSemComplementos,
         }
       : state.tab === 'complementos'
         ? {
@@ -117,7 +139,7 @@ export function GruposComplementosTabsModal({
             onSave: handleSalvarGrupoAbaComplementos,
             saveLoading: embedFormState.isSubmitting,
             saveDisabled:
-              !embedFormState.canSubmit || embedFormState.isSubmitting,
+              !embedFormState.canSubmit || embedFormState.isSubmitting || createSemComplementos,
           }
         : undefined
 
@@ -139,7 +161,7 @@ export function GruposComplementosTabsModal({
                 {
                   key: 'complementos' as const,
                   label: 'Complementos',
-                  disabled: !grupoId,
+                  disabled: false,
                 },
               ] as const
             ).map(tab => (
@@ -180,6 +202,8 @@ export function GruposComplementosTabsModal({
               onEmbedFormStateChange={setEmbedFormState}
               onClose={handleRequestClose}
               onReload={onReload}
+              complementosIdsDraft={draftComplementosIds}
+              onBasicDataChange={setBasicData}
               onGoToComplementosTab={goToComplementosTab}
               onSaved={() => {
                 onReload?.()
@@ -196,18 +220,16 @@ export function GruposComplementosTabsModal({
             }
             aria-hidden={state.tab !== 'complementos'}
           >
-            {grupoId && state.grupo ? (
-              <GrupoComplementoComplementosModal
-                isEmbedded
-                grupo={state.grupo}
-                onClose={handleRequestClose}
-                onUpdated={onReload}
-              />
-            ) : (
-              <div className="flex h-full flex-1 items-center justify-center text-sm text-secondary-text">
-                Selecione um grupo válido para gerenciar complementos.
-              </div>
-            )}
+            <GrupoComplementoComplementosModal
+              isEmbedded
+              mode={state.mode === 'create' ? 'draft' : 'persisted'}
+              grupo={state.grupo}
+              draftGrupoNome={basicData.nome.trim() || 'Novo grupo'}
+              draftLinkedIds={draftComplementosIds}
+              onDraftLinkedIdsChange={setDraftComplementosIds}
+              onClose={handleRequestClose}
+              onUpdated={onReload}
+            />
           </div>
         </div>
       </JiffySidePanelModal>
