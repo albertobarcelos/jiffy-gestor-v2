@@ -75,10 +75,7 @@ export function LoginForm() {
       )
 
       const expiresAt = new Date(authData.expiresAt)
-      const hoursUntilExpiry = Math.ceil(
-        (expiresAt.getTime() - Date.now()) / (1000 * 60 * 60)
-      )
-      const auth = Auth.create(authData.accessToken, user, hoursUntilExpiry)
+      const auth = Auth.createWithExpiration(authData.accessToken, user, expiresAt)
 
       // Atualiza o store
       login(auth)

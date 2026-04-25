@@ -22,6 +22,9 @@ interface GrupoComplementoComplementosModalProps {
   isEmbedded?: boolean
 }
 
+/** Evita `[]` novo a cada render quando o React Query ainda não devolveu `data` (causa loop em useEffect). */
+const EMPTY_COMPLEMENTOS: Complemento[] = []
+
 /** IDs dos complementos vinculados ao grupo (a partir da entidade ou do GET do grupo) */
 function getLinkedIdsFromGrupo(g: GrupoComplemento): string[] {
   const rawIds = g.getComplementosIds()
@@ -61,10 +64,11 @@ export function GrupoComplementoComplementosModal({
   const [togglingStatus, setTogglingStatus] = useState<Record<string, boolean>>({})
 
   const {
-    data: todosComplementos = [],
+    data: todosComplementosData,
     isLoading: isLoadingTodosComplementos,
     refetch: refetchComplementos,
   } = useComplementos({ limit: 2000 })
+  const todosComplementos = todosComplementosData ?? EMPTY_COMPLEMENTOS
   const [complementosTabsState, setComplementosTabsState] = useState<ComplementosTabsModalState>({
     open: false,
     tab: 'complemento',
@@ -125,7 +129,7 @@ export function GrupoComplementoComplementosModal({
     }
   }, [isVisible, grupo, carregarComplementos])
 
-  const catalogo = useMemo(() => (todosComplementos ?? []) as Complemento[], [todosComplementos])
+  const catalogo = useMemo(() => todosComplementos as Complemento[], [todosComplementos])
 
   const filteredComplementos = useMemo(() => {
     const term = searchTerm.trim().toLowerCase()
@@ -296,7 +300,7 @@ export function GrupoComplementoComplementosModal({
         return
       }
 
-      const lista = (todosComplementos ?? []) as Complemento[]
+      const lista = todosComplementos as Complemento[]
       const complementoAtual = lista.find((c) => c.getId() === complementoId)
       if (!complementoAtual) {
         showToast.error('Complemento não encontrado.')
@@ -360,7 +364,7 @@ export function GrupoComplementoComplementosModal({
 
       const novaDescricao = descricaoInputs[complementoId] ?? ''
 
-      const lista = (todosComplementos ?? []) as Complemento[]
+      const lista = todosComplementos as Complemento[]
       const complementoAtual = lista.find((c) => c.getId() === complementoId)
       if (!complementoAtual) {
         showToast.error('Complemento não encontrado.')
@@ -422,7 +426,7 @@ export function GrupoComplementoComplementosModal({
         return
       }
 
-      const lista = (todosComplementos ?? []) as Complemento[]
+      const lista = todosComplementos as Complemento[]
       const complementoAtual = lista.find((c) => c.getId() === complementoId)
       if (!complementoAtual) {
         showToast.error('Complemento não encontrado.')
@@ -479,7 +483,7 @@ export function GrupoComplementoComplementosModal({
         return
       }
 
-      const lista = (todosComplementos ?? []) as Complemento[]
+      const lista = todosComplementos as Complemento[]
       const complementoAtual = lista.find((c) => c.getId() === complementoId)
       if (!complementoAtual) {
         showToast.error('Complemento não encontrado.')
@@ -532,7 +536,7 @@ export function GrupoComplementoComplementosModal({
   useEffect(() => {
     const novosValorInputs: Record<string, string> = {}
     const novasDescricaoInputs: Record<string, string> = {}
-    ;(todosComplementos ?? []).forEach((c) => {
+    todosComplementos.forEach((c) => {
       const comp = c as Complemento
       const id = comp.getId()
       novosValorInputs[id] = formatValorFromNumber(comp.getValor())
