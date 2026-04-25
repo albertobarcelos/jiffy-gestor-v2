@@ -81,6 +81,10 @@ export function GruposComplementosTabsModal({
     void ngcRef.current?.saveGrupoComplemento?.()
   }, [])
 
+  const goToComplementosTab = useCallback(() => {
+    onTabChange('complementos')
+  }, [onTabChange])
+
   const title = useMemo(() => {
     return state.mode === 'create'
       ? 'Novo Grupo de Complementos'
@@ -176,7 +180,7 @@ export function GruposComplementosTabsModal({
               onEmbedFormStateChange={setEmbedFormState}
               onClose={handleRequestClose}
               onReload={onReload}
-              onGoToComplementosTab={() => onTabChange('complementos')}
+              onGoToComplementosTab={goToComplementosTab}
               onSaved={() => {
                 onReload?.()
                 onClose()

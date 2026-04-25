@@ -5,6 +5,7 @@ import {
   useEffect,
   useRef,
   useCallback,
+  useMemo,
   forwardRef,
   useImperativeHandle,
 } from 'react'
@@ -23,6 +24,9 @@ import {
   ComplementosTabsModalState,
 } from '@/src/presentation/components/features/complementos/ComplementosTabsModal'
 import { ComplementosSelectModal } from '@/src/presentation/components/features/complementos/ComplementosSelectModal'
+import type { Complemento } from '@/src/domain/entities/Complemento'
+
+const EMPTY_COMPLEMENTOS: Complemento[] = []
 
 /** Labels outlined em preto (MUI usa cinza por padrão) — igual NovoComplemento */
 const sxOutlinedLabelTextoEscuro = {
@@ -69,8 +73,9 @@ interface NovoGrupoComplementoProps {
   /** Após salvar mantendo o painel aberto (rodapé na aba Complementos) — invalida listas. */
   onReload?: () => void
   /**
-   * No `GruposComplementosTabsModal`: o botão "Vincular complementos" só troca para a aba Complementos
-   * (a lista e o vínculo ficam lá). Nas páginas `/cadastros/...` não é passado — mantém o modal seletor.
+   * No `GruposComplementosTabsModal`: com grupo já salvo, o botão "Vincular complementos" troca para a
+   * aba Complementos. Sem `grupoId` (criação), abre o seletor local — a API exige ≥1 complemento no POST.
+   * Fora do modal de abas não é passado: sempre usa o seletor.
    */
   onGoToComplementosTab?: () => void
 }
@@ -130,24 +135,35 @@ export const NovoGrupoComplemento = forwardRef<
 
   // Carregar lista de complementos disponíveis usando React Query (com cache)
   const {
-    data: complementos = [],
+    data: complementosData,
     isLoading: isLoadingComplementos,
     refetch: refetchComplementos,
   } = useComplementos({
     ativo: true,
     limit: 1000,
   })
+  const complementos = complementosData ?? EMPTY_COMPLEMENTOS
 
-  const emitEmbedFormState = useCallback(() => {
-    onEmbedFormStateChange?.({
-      isSubmitting: isLoading,
-      canSubmit: nome.trim().length > 0,
-    })
-  }, [isLoading, nome, onEmbedFormStateChange])
+  const onEmbedFormStateChangeRef = useRef(onEmbedFormStateChange)
+  onEmbedFormStateChangeRef.current = onEmbedFormStateChange
+  const lastEmbedSyncRef = useRef<{ isSubmitting: boolean; canSubmit: boolean } | null>(null)
 
   useEffect(() => {
-    emitEmbedFormState()
-  }, [emitEmbedFormState])
+    const next = {
+      isSubmitting: isLoading,
+      canSubmit: nome.trim().length > 0,
+    }
+    const prev = lastEmbedSyncRef.current
+    if (
+      prev &&
+      prev.isSubmitting === next.isSubmitting &&
+      prev.canSubmit === next.canSubmit
+    ) {
+      return
+    }
+    lastEmbedSyncRef.current = next
+    onEmbedFormStateChangeRef.current?.(next)
+  }, [isLoading, nome])
 
   /** Snapshot dos campos persistidos — mesmo critério do PATCH/POST. */
   const getFormSnapshot = useCallback(() => {
@@ -397,6 +413,13 @@ export const NovoGrupoComplemento = forwardRef<
     await refetchComplementos()
   }
 
+  const resumoComplementosVinculados = useMemo(() => {
+    return selectedComplementosIds.map((id) => {
+      const found = complementos.find((c) => c.getId() === id)
+      return { id, nome: found?.getNome() ?? `ID ${id}` }
+    })
+  }, [complementos, selectedComplementosIds])
+
   if (isLoadingGrupo) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-2">
@@ -405,7 +428,9 @@ export const NovoGrupoComplemento = forwardRef<
     )
   }
 
-  const podeIrParaAbaComplementos = Boolean(onGoToComplementosTab && grupoId)
+  /** Seletor de catálogo: fora do painel de abas, ou criação no painel (ainda sem id persistido). */
+  const showComplementosSelectInTabsModal =
+    !onGoToComplementosTab || !grupoId
 
   return (
     <div
@@ -475,24 +500,16 @@ export const NovoGrupoComplemento = forwardRef<
                 />
               </div>
 
-              {/* Complementos: no modal com abas só o atalho para a aba Complementos; em página cheia mantém o seletor */}
+              {/* Complementos: criação no painel de abas usa o seletor (API exige ids no POST); com grupo salvo, atalho para a aba */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Complementos
                 </label>
                 <button
                   type="button"
-                  title={
-                    onGoToComplementosTab && !grupoId
-                      ? 'Salve o grupo para depois gerenciar complementos na aba Complementos'
-                      : undefined
-                  }
-                  disabled={onGoToComplementosTab ? !podeIrParaAbaComplementos : false}
                   onClick={() => {
-                    if (onGoToComplementosTab) {
-                      if (grupoId) {
-                        onGoToComplementosTab()
-                      }
+                    if (onGoToComplementosTab && grupoId) {
+                      onGoToComplementosTab()
                       return
                     }
                     setShowComplementosModal(true)
@@ -502,6 +519,28 @@ export const NovoGrupoComplemento = forwardRef<
                   <MdAdd className="md:text-lg text-sm" />
                   Vincular complementos
                 </button>
+                {resumoComplementosVinculados.length > 0 ? (
+                  <>
+                    <ul className="mt-3 max-h-40 list-none space-y-1 overflow-y-auto rounded-lg border border-primary/20 bg-white/80 p-2 text-sm">
+                      {resumoComplementosVinculados.map(({ id, nome }) => (
+                        <li
+                          key={id}
+                          className="truncate rounded-md px-2 py-1.5 font-nunito text-primary-text"
+                        >
+                          {nome}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-1 font-nunito text-xs text-secondary-text">
+                      {resumoComplementosVinculados.length} vinculado
+                      {resumoComplementosVinculados.length === 1 ? '' : 's'}
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-2 font-nunito text-xs text-secondary-text">
+                    Nenhum complemento vinculado. Use o botão acima para selecionar.
+                  </p>
+                )}
               </div>
 
             </div>
@@ -543,11 +582,11 @@ export const NovoGrupoComplemento = forwardRef<
         </form>
       </div>
 
-      {!onGoToComplementosTab ? (
+      {showComplementosSelectInTabsModal ? (
         <ComplementosSelectModal
           open={showComplementosModal}
           title="Vincular Complementos"
-          complementos={Array.isArray(complementos) ? complementos : []}
+          complementos={complementos}
           selectedIds={selectedComplementosIds}
           isLoading={isLoadingComplementos}
           onToggle={toggleComplemento}
