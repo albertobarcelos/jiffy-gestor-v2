@@ -20,6 +20,10 @@ interface GrupoComplementoComplementosModalProps {
   onClose?: () => void
   onUpdated?: () => void
   isEmbedded?: boolean
+  mode?: 'persisted' | 'draft'
+  draftGrupoNome?: string
+  draftLinkedIds?: string[]
+  onDraftLinkedIdsChange?: (ids: string[]) => void
 }
 
 /** Evita `[]` novo a cada render quando o React Query ainda não devolveu `data` (causa loop em useEffect). */
@@ -49,9 +53,14 @@ export function GrupoComplementoComplementosModal({
   onClose,
   onUpdated,
   isEmbedded = false,
+  mode = 'persisted',
+  draftGrupoNome,
+  draftLinkedIds = [],
+  onDraftLinkedIdsChange,
 }: GrupoComplementoComplementosModalProps) {
   const { auth } = useAuthStore()
   const queryClient = useQueryClient()
+  const isDraftMode = mode === 'draft'
   const [searchTerm, setSearchTerm] = useState('')
   const [isLoadingGrupoComplementos, setIsLoadingGrupoComplementos] = useState(false)
   const [linkedIds, setLinkedIds] = useState<string[]>([])
@@ -113,10 +122,11 @@ export function GrupoComplementoComplementosModal({
     [auth]
   )
 
-  const isVisible = isEmbedded ? Boolean(grupo) : open
+  const isVisible = isEmbedded ? Boolean(grupo) || isDraftMode : open
+  const effectiveLinkedIds = isDraftMode ? draftLinkedIds : linkedIds
 
   useEffect(() => {
-    if (!isVisible || !grupo) {
+    if (!isVisible || isDraftMode || !grupo) {
       return
     }
 
@@ -127,7 +137,7 @@ export function GrupoComplementoComplementosModal({
     } else {
       carregarComplementos(grupo.getId())
     }
-  }, [isVisible, grupo, carregarComplementos])
+  }, [isVisible, isDraftMode, grupo, carregarComplementos])
 
   const catalogo = useMemo(() => todosComplementos as Complemento[], [todosComplementos])
 
@@ -148,14 +158,14 @@ export function GrupoComplementoComplementosModal({
     const vinculados: Complemento[] = []
     const naoVinculados: Complemento[] = []
     for (const c of filteredComplementos) {
-      if (linkedIds.includes(c.getId())) {
+      if (effectiveLinkedIds.includes(c.getId())) {
         vinculados.push(c)
       } else {
         naoVinculados.push(c)
       }
     }
     return [...vinculados, ...naoVinculados]
-  }, [filteredComplementos, linkedIds])
+  }, [filteredComplementos, effectiveLinkedIds])
 
   const updateGrupoComplementos = useCallback(
     async (novosIds: string[], successMessage: string) => {
@@ -197,14 +207,19 @@ export function GrupoComplementoComplementosModal({
 
   const handleToggleVinculo = useCallback(
     async (complementoId: string, vincular: boolean) => {
-      if (!grupo) return
-      const next = new Set(linkedIds)
+      if (!grupo && !isDraftMode) return
+      const next = new Set(effectiveLinkedIds)
       if (vincular) {
         next.add(complementoId)
       } else {
         next.delete(complementoId)
       }
       const novosIds = Array.from(next)
+      if (isDraftMode) {
+        onDraftLinkedIdsChange?.(novosIds)
+        return
+      }
+
       setVinculoLoadingId(complementoId)
       try {
         await updateGrupoComplementos(
@@ -215,7 +230,7 @@ export function GrupoComplementoComplementosModal({
         setVinculoLoadingId(null)
       }
     },
-    [grupo, linkedIds, updateGrupoComplementos]
+    [grupo, isDraftMode, effectiveLinkedIds, onDraftLinkedIdsChange, updateGrupoComplementos]
   )
 
   const openComplementoCreateModal = useCallback(() => {
@@ -546,7 +561,7 @@ export function GrupoComplementoComplementosModal({
     setDescricaoInputs((prev) => ({ ...prev, ...novasDescricaoInputs }))
   }, [todosComplementos, formatValorFromNumber])
 
-  if (!isVisible || !grupo) {
+  if (!isVisible || (!grupo && !isDraftMode)) {
     return null
   }
 
@@ -574,7 +589,9 @@ export function GrupoComplementoComplementosModal({
               Novo complemento
             </button>
           </div>
-          <p className="mb-2 text-xs font-semibold text-primary-text md:text-lg">{grupo.getNome()}</p>
+          <p className="mb-2 text-xs font-semibold text-primary-text md:text-lg">
+            {grupo?.getNome() || draftGrupoNome || 'Novo grupo'}
+          </p>
 
           <div className="mb-2">
             <label className="mb-1 block text-xs font-semibold text-secondary-text">
@@ -623,7 +640,7 @@ export function GrupoComplementoComplementosModal({
             {complementosOrdenados.map((item) => {
             const comp = item as Complemento
             const id = comp.getId()
-            const isLinked = linkedIds.includes(id)
+            const isLinked = effectiveLinkedIds.includes(id)
             return (
               <div
                 key={id}
