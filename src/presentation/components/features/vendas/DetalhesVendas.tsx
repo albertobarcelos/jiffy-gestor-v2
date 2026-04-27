@@ -51,6 +51,15 @@ interface VendaDetalhes {
   identificacao?: string
   troco?: number
   produtosLancados: ProdutoLancado[]
+  /** Taxas aplicadas na venda (ex.: serviço, couvert) — exibidas após os produtos. */
+  taxasLancadas?: TaxaLancada[]
+  /** Desconto / acréscimo sobre o total da venda (além do item). */
+  totalDesconto?: number
+  totalAcrescimo?: number
+  tipoDesconto?: string | null
+  valorDesconto?: number | null
+  tipoAcrescimo?: string | null
+  valorAcrescimo?: number | null
   pagamentos: Pagamento[]
   // Campos fiscais
   statusVenda?: string | null
@@ -61,10 +70,29 @@ interface VendaDetalhes {
   retornoSefaz?: string | null
 }
 
+interface TaxaLancada {
+  id: string
+  vendaId?: string
+  taxaId?: string
+  nome: string
+  tipo: string
+  valor: number
+  quantidade: number
+  valorCalculado: number
+  lancadoAutomatico?: boolean
+  lancadoPorId?: string
+  removidoPorId?: string
+  dataLancamento?: string
+  dataRemocao?: string
+}
+
 interface ProdutoLancado {
+  id?: string
   nomeProduto: string
   quantidade: number
   valorUnitario: number
+  /** Quando true, indica que houve incidência de taxa sobre o item (útil para contexto com `taxasLancadas`). */
+  incidiuTaxa?: boolean
   desconto?: string | number
   tipoDesconto?: 'porcentagem' | 'fixo'
   acrescimo?: string | number
@@ -136,6 +164,115 @@ DetalhesVendasPainelSlide.displayName = 'DetalhesVendasPainelSlide'
 /** Igual ao `panelClassName` padrão do `JiffySidePanelModal` — largura estável ao abrir (loading ou com dados). */
 const CLASSE_LARGURA_PAINEL_DETALHES_VENDA =
   'w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]'
+
+/**
+ * Indica se o tipo na raiz da venda deve exibir linha de desconto/acréscimo.
+ * Ignora vazio e placeholder típico de contratos OpenAPI (`"string"`).
+ */
+function tipoAjusteVendaInformado(tipo: unknown): boolean {
+  if (tipo == null) return false
+  const s = String(tipo).trim()
+  if (s.length === 0) return false
+  if (s.toLowerCase() === 'string') return false
+  return true
+}
+
+/** Taxa/ajuste percentual no contrato (ex.: "percentual", "porcentagem"). */
+function tipoEhPercentual(tipo: unknown): boolean {
+  const t = String(tipo ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+  return (
+    t === 'percentual' ||
+    t === 'porcentagem' ||
+    t === 'percentage' ||
+    t.includes('percent')
+  )
+}
+
+/**
+ * Exibe "(%)" para tipo percentual; caso contrário "Tipo: …" quando informado.
+ */
+function rotuloTipoOuPercentual(tipo: unknown): string {
+  if (tipoEhPercentual(tipo)) return '(%)'
+  if (tipoAjusteVendaInformado(tipo)) return `Tipo: ${String(tipo).trim()}`
+  return 'Tipo: —'
+}
+
+/** Lê número finito na raiz do JSON (camelCase do contrato + fallback PascalCase). */
+function lerNumeroCampoVendaRaiz(raw: Record<string, unknown>, ...keys: string[]): number {
+  for (const key of keys) {
+    if (!Object.prototype.hasOwnProperty.call(raw, key)) continue
+    const v = raw[key]
+    if (v == null || v === '') continue
+    const n = typeof v === 'number' ? v : Number(String(v).replace(/\s/g, '').replace(',', '.'))
+    if (Number.isFinite(n)) return n
+  }
+  return 0
+}
+
+/** Normaliza desconto/acréscimo no total da venda a partir dos campos na raiz do JSON. */
+function extrairAjustesTotaisVendaDaApi(dataRaw: Record<string, unknown>): {
+  totalDesconto: number
+  totalAcrescimo: number
+  valorDesconto: number
+  valorAcrescimo: number
+  tipoDesconto: string | null
+  tipoAcrescimo: string | null
+} {
+  const totalDesconto = lerNumeroCampoVendaRaiz(
+    dataRaw,
+    'totalDesconto',
+    'TotalDesconto',
+    'total_desconto'
+  )
+  const totalAcrescimo = lerNumeroCampoVendaRaiz(
+    dataRaw,
+    'totalAcrescimo',
+    'TotalAcrescimo',
+    'total_acrescimo'
+  )
+  const valorDesconto = lerNumeroCampoVendaRaiz(
+    dataRaw,
+    'valorDesconto',
+    'ValorDesconto',
+    'valor_desconto'
+  )
+  const valorAcrescimo = lerNumeroCampoVendaRaiz(
+    dataRaw,
+    'valorAcrescimo',
+    'ValorAcrescimo',
+    'valor_acrescimo'
+  )
+
+  const td = dataRaw.tipoDesconto ?? dataRaw.TipoDesconto ?? dataRaw.tipo_desconto
+  const ta = dataRaw.tipoAcrescimo ?? dataRaw.TipoAcrescimo ?? dataRaw.tipo_acrescimo
+
+  return {
+    totalDesconto,
+    totalAcrescimo,
+    valorDesconto,
+    valorAcrescimo,
+    tipoDesconto: tipoAjusteVendaInformado(td) ? String(td).trim() : null,
+    tipoAcrescimo: tipoAjusteVendaInformado(ta) ? String(ta).trim() : null,
+  }
+}
+
+/**
+ * Valor na raiz do JSON já calculado pelo backend: só é válido para uso se > 0.
+ */
+function valorRaizPositivo(raw: unknown): number | null {
+  if (raw == null || raw === '') return null
+  const n =
+    typeof raw === 'number'
+      ? raw
+      : Number(String(raw).replace(/\s/g, '').replace(',', '.'))
+  if (!Number.isFinite(n) || n <= 0) return null
+  return n
+}
+
 /**
  * Modal de detalhes da venda
  * Exibe informações completas da venda, produtos lançados e pagamentos
@@ -356,6 +493,14 @@ export function DetalhesVendas({
   }, [])
 
   /**
+   * Base do item para o resumo financeiro: unitário × quantidade, sem desconto/acréscimo do produto.
+   * Complementos são somados separadamente no resumo (mesma regra de impacto de preço).
+   */
+  const calcularValorBaseProdutoResumo = useCallback((produto: ProdutoLancado): number => {
+    return produto.valorUnitario * produto.quantidade
+  }, [])
+
+  /**
    * Busca detalhes da venda
    */
   const fetchVendaDetalhes = useCallback(async () => {
@@ -497,6 +642,26 @@ export function DetalhesVendas({
         })
       )
 
+      const taxasLancadasNormalizadas: TaxaLancada[] = Array.isArray(dataRaw.taxasLancadas)
+        ? dataRaw.taxasLancadas.map((t: Record<string, unknown>, idx: number) => ({
+            id: String(t.id ?? `taxa-${idx}`),
+            vendaId: t.vendaId != null ? String(t.vendaId) : undefined,
+            taxaId: t.taxaId != null ? String(t.taxaId) : undefined,
+            nome: String(t.nome ?? 'Taxa'),
+            tipo: String(t.tipo ?? '—'),
+            valor: Number(t.valor) || 0,
+            quantidade: Number(t.quantidade) || 0,
+            valorCalculado: Number(t.valorCalculado) || 0,
+            lancadoAutomatico: Boolean(t.lancadoAutomatico),
+            lancadoPorId: t.lancadoPorId != null ? String(t.lancadoPorId) : undefined,
+            removidoPorId: t.removidoPorId != null ? String(t.removidoPorId) : undefined,
+            dataLancamento: t.dataLancamento != null ? String(t.dataLancamento) : undefined,
+            dataRemocao: t.dataRemocao != null ? String(t.dataRemocao) : undefined,
+          }))
+        : []
+
+      const ajusteVendaApi = extrairAjustesTotaisVendaDaApi(dataRaw as Record<string, unknown>)
+
       const data: VendaDetalhes = {
         ...dataRaw,
         codigoTerminal: codigoTerminal,
@@ -504,6 +669,13 @@ export function DetalhesVendas({
         documentoFiscalId,
         retornoSefaz,
         produtosLancados: produtosLancadosMapeados,
+        taxasLancadas: taxasLancadasNormalizadas,
+        totalDesconto: ajusteVendaApi.totalDesconto,
+        totalAcrescimo: ajusteVendaApi.totalAcrescimo,
+        valorDesconto: ajusteVendaApi.valorDesconto,
+        valorAcrescimo: ajusteVendaApi.valorAcrescimo,
+        tipoDesconto: ajusteVendaApi.tipoDesconto,
+        tipoAcrescimo: ajusteVendaApi.tipoAcrescimo,
       }
 
       // Debug: log para verificar se o campo está sendo capturado
@@ -547,6 +719,10 @@ export function DetalhesVendas({
       data.pagamentos?.forEach(p => {
         if (p.realizadoPorId) userIdsToFetch.add(p.realizadoPorId)
         if (p.canceladoPorId) userIdsToFetch.add(p.canceladoPorId)
+      })
+      data.taxasLancadas?.forEach(t => {
+        if (t.lancadoPorId) userIdsToFetch.add(t.lancadoPorId)
+        if (t.removidoPorId) userIdsToFetch.add(t.removidoPorId)
       })
 
       // Coleta todos os IDs de meios de pagamento únicos que precisam ser buscados
@@ -649,65 +825,33 @@ export function DetalhesVendas({
   }, [internalOpen])
 
   /**
-   * Calcula o resumo financeiro dos itens lançados
+   * Resumo financeiro alinhado ao cupom:
+   * A = soma (base do produto sem desc./acrésc. do item + complementos) para todas as linhas
+   * Itens cancelados = mesma base + complementos nas linhas removidas ou em venda cancelada
+   * Itens líquidos = A − cancelados; B = taxas; C/D = totalAcrescimo/totalDesconto (raiz); E = líquido + B + C − D
    */
   const resumoFinanceiro = useMemo(() => {
-    if (!venda || !venda.produtosLancados || venda.produtosLancados.length === 0) {
+    if (!venda) {
       return {
         totalItensLancados: 0,
         totalItensCancelados: 0,
-        totalDosItens: 0,
-        totalDescontosConta: 0,
-        totalAcrescimosConta: 0,
-        totalCupom: 0,
+        totalItensEfetivos: 0,
+        totalTaxas: 0,
+        totalAcrescimoVenda: 0,
+        totalDescontoVenda: 0,
+        totalResumo: 0,
       }
     }
 
     const isVendaCancelada = !!venda.canceladoPorId
+    const produtos = venda.produtosLancados ?? []
 
-    let totalItensLancados = 0 // Soma TODOS os itens lançados (cancelados + não cancelados)
+    let totalItensLancados = 0
     let totalItensCancelados = 0
-    let totalDescontosConta = 0 // Soma todos os descontos aplicados nos produtos
-    let totalAcrescimosConta = 0 // Soma todos os acréscimos aplicados nos produtos
 
-    venda.produtosLancados.forEach(produto => {
-      // Valor base do produto (sem desconto/acréscimo)
-      const valorBaseProduto = produto.valorUnitario * produto.quantidade
+    produtos.forEach(produto => {
+      const valorTotalProduto = calcularValorBaseProdutoResumo(produto)
 
-      // Calcula valor do desconto aplicado (se houver)
-      let valorDesconto = 0
-      if (produto.desconto) {
-        const descontoValue =
-          typeof produto.desconto === 'string' ? parseFloat(produto.desconto) : produto.desconto
-        if (produto.tipoDesconto === 'porcentagem') {
-          // Backend retorna 0.1 para 10%, então multiplica diretamente
-          valorDesconto = valorBaseProduto * descontoValue
-        } else {
-          // Desconto fixo
-          valorDesconto = descontoValue
-        }
-        totalDescontosConta += valorDesconto
-      }
-
-      // Calcula valor do acréscimo aplicado (se houver)
-      let valorAcrescimo = 0
-      if (produto.acrescimo) {
-        const acrescimoValue =
-          typeof produto.acrescimo === 'string' ? parseFloat(produto.acrescimo) : produto.acrescimo
-        if (produto.tipoAcrescimo === 'porcentagem') {
-          // Backend retorna 0.1 para 10%, então multiplica diretamente
-          valorAcrescimo = valorBaseProduto * acrescimoValue
-        } else {
-          // Acréscimo fixo
-          valorAcrescimo = acrescimoValue
-        }
-        totalAcrescimosConta += valorAcrescimo
-      }
-
-      // Calcula valor total do produto (com descontos/acréscimos)
-      const valorTotalProduto = calcularValorProduto(produto)
-
-      // Soma complementos que impactam preço
       let valorComplementos = 0
       if (produto.complementos && produto.complementos.length > 0) {
         produto.complementos.forEach(complemento => {
@@ -721,34 +865,39 @@ export function DetalhesVendas({
 
       const valorTotalComComplementos = valorTotalProduto + valorComplementos
 
-      // SEMPRE soma ao total lançado (independente se foi cancelado ou não)
+      // Sempre entra no total “lançado” (histórico completo)
       totalItensLancados += valorTotalComComplementos
 
-      // Se a venda está cancelada, TODOS os produtos são considerados cancelados
-      // Caso contrário, apenas produtos removidos individualmente
+      // Venda cancelada: tudo conta como cancelado; senão, só linhas removidas
       if (isVendaCancelada || produto.removido) {
         totalItensCancelados += valorTotalComComplementos
       }
     })
 
-    // Total dos itens (A - B)
-    const totalDosItens = totalItensLancados - totalItensCancelados
+    const totalItensEfetivos = totalItensLancados - totalItensCancelados
 
-    // Total do cupom: se cancelada, usa o total calculado (soma de todos os produtos)
-    // Caso contrário, usa o valorFinal da venda
-    const totalCupom = isVendaCancelada
-      ? totalItensLancados // Quando cancelada, totalCupom = total de todos os produtos
-      : venda.valorFinal
+    const totalTaxas = (venda.taxasLancadas ?? []).reduce((acc, taxa) => {
+      const removida = Boolean(taxa.dataRemocao?.trim())
+      if (removida) return acc
+      return acc + (Number(taxa.valorCalculado) || 0)
+    }, 0)
+
+    // C e D: apenas campos total* da raiz (backend), sem recálculo — só entram se > 0
+    const totalAcrescimoVenda = valorRaizPositivo(venda.totalAcrescimo) ?? 0
+    const totalDescontoVenda = valorRaizPositivo(venda.totalDesconto) ?? 0
+
+    const totalResumo = totalItensEfetivos + totalTaxas + totalAcrescimoVenda - totalDescontoVenda
 
     return {
       totalItensLancados,
       totalItensCancelados,
-      totalDosItens,
-      totalDescontosConta,
-      totalAcrescimosConta,
-      totalCupom,
+      totalItensEfetivos,
+      totalTaxas,
+      totalAcrescimoVenda,
+      totalDescontoVenda,
+      totalResumo,
     }
-  }, [venda, calcularValorProduto, calcularValorComplemento])
+  }, [venda, calcularValorBaseProdutoResumo, calcularValorComplemento])
 
   /**
    * Calcula o troco baseado nos pagamentos válidos
@@ -826,6 +975,36 @@ export function DetalhesVendas({
     // Se não está cancelada, usa o valorFinal da venda
     return venda.valorFinal
   }, [venda, calcularValorProduto, calcularValorComplemento])
+
+  /**
+   * Acréscimo/desconto na venda: exibe apenas `valorDesconto` e `valorAcrescimo` da raiz (backend),
+   * sem recálculo — linha só aparece se o respectivo campo for > 0.
+   */
+  const ajustesTotaisVenda = useMemo(() => {
+    if (!venda) {
+      return {
+        mostrarSecao: false,
+        temDesconto: false,
+        temAcrescimo: false,
+        valorDescontoExibir: null as number | null,
+        valorAcrescimoExibir: null as number | null,
+      }
+    }
+
+    const valorDescontoExibir = valorRaizPositivo(venda.valorDesconto)
+    const valorAcrescimoExibir = valorRaizPositivo(venda.valorAcrescimo)
+
+    const temDesconto = valorDescontoExibir != null
+    const temAcrescimo = valorAcrescimoExibir != null
+
+    return {
+      mostrarSecao: temDesconto || temAcrescimo,
+      temDesconto,
+      temAcrescimo,
+      valorDescontoExibir,
+      valorAcrescimoExibir,
+    }
+  }, [venda])
 
   if (!internalOpen) return null
 
@@ -1279,6 +1458,123 @@ export function DetalhesVendas({
                     )
                   })}
 
+                  {(venda.taxasLancadas?.length ?? 0) > 0 && (
+                    <>
+                      <div className="my-2 border-t border-dashed border-gray-400" />
+                      <p className="font-nunito mb-1 text-xs font-semibold uppercase tracking-wide text-secondary-text">
+                        Taxas lançadas
+                      </p>
+                      {(venda.taxasLancadas ?? []).map(taxa => {
+                        const isVendaCancelada = statusVenda === 'CANCELADA'
+                        const isTaxaRemovida = Boolean(taxa.dataRemocao?.trim())
+                        const isCanceladoTaxa = isVendaCancelada || isTaxaRemovida
+                        const valorUnitTaxa = Number(taxa.valor) || 0
+                        const qtdTaxa = Number(taxa.quantidade) || 0
+                        const totalTaxa = Number(taxa.valorCalculado) || 0
+                        const textoUnitarioTaxa = tipoEhPercentual(taxa.tipo)
+                          ? `${Math.round(valorUnitTaxa * 100)}%`
+                          : formatNumber(valorUnitTaxa)
+
+                        return (
+                          <div
+                            key={taxa.id || `${taxa.nome}-${taxa.dataLancamento}`}
+                            className={`rounded-lg px-1 md:px-3 ${
+                              isCanceladoTaxa ? 'bg-error/20' : 'bg-white'
+                            }`}
+                          >
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-nunito min-w-0 flex-1 text-xs font-semibold text-primary-text md:text-sm">
+                                  {qtdTaxa}x {taxa.nome} ({textoUnitarioTaxa})
+                                </span>
+                                <span
+                                  className={`font-nunito shrink-0 text-sm font-semibold text-primary-text ${isCanceladoTaxa ? 'line-through' : ''}`}
+                                >
+                                  {formatCurrency(totalTaxa)}
+                                </span>
+                              </div>
+                              <div className="mt-1 flex flex-col text-xs text-secondary-text md:ml-7 md:flex-row md:flex-wrap md:gap-x-1">
+                                {taxa.dataLancamento && (
+                                  <span>Lançado: {formatDateTime(taxa.dataLancamento)}</span>
+                                )}
+                                {taxa.dataLancamento && taxa.lancadoPorId && (
+                                  <span className="hidden md:inline">|</span>
+                                )}
+                                {taxa.lancadoPorId && (
+                                  <span>
+                                    Usuário: {nomesUsuarios[taxa.lancadoPorId] || taxa.lancadoPorId}
+                                  </span>
+                                )}
+                              </div>
+                              {isTaxaRemovida && taxa.removidoPorId && (
+                                <div className="ml-7 mt-1 text-xs text-error">
+                                  Removido por:{' '}
+                                  {nomesUsuarios[taxa.removidoPorId] || taxa.removidoPorId}
+                                </div>
+                              )}
+                              {isTaxaRemovida && taxa.dataRemocao && (
+                                <div className="ml-7 text-xs text-error">
+                                  Removido em: {formatDateTime(taxa.dataRemocao)}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </>
+                  )}
+
+                  {ajustesTotaisVenda.mostrarSecao && (
+                    <>
+                      <div className="my-2 border-t border-dashed border-gray-400" />
+                      <p className="font-nunito mb-1 text-xs font-semibold uppercase tracking-wide text-secondary-text">
+                        Acréscimo/Desconto na Venda
+                      </p>
+                      {ajustesTotaisVenda.temDesconto && (
+                        <div className="rounded-lg bg-white px-1 md:px-3">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="min-w-0 flex-[2]">
+                                <span className="font-nunito text-xs font-semibold text-primary-text md:text-sm">
+                                  Desconto na venda
+                                </span>
+                              </div>
+                              <div className="font-nunito flex flex-1 flex-col justify-start gap-0.5 text-xs text-secondary-text md:flex-row md:items-center md:gap-2 md:text-sm">
+                                <span className="whitespace-nowrap">
+                                  {rotuloTipoOuPercentual(venda.tipoDesconto)}
+                                </span>
+                              </div>
+                              <div className="font-nunito flex flex-1 shrink-0 items-center justify-end text-sm font-semibold text-error">
+                                -{formatCurrency(ajustesTotaisVenda.valorDescontoExibir ?? 0)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {ajustesTotaisVenda.temAcrescimo && (
+                        <div className="rounded-lg bg-white px-1 md:px-3">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="min-w-0 flex-[2]">
+                                <span className="font-nunito text-xs font-semibold text-primary-text md:text-sm">
+                                  Acréscimo na venda
+                                </span>
+                              </div>
+                              <div className="font-nunito flex flex-1 flex-col justify-start gap-0.5 text-xs text-secondary-text md:flex-row md:items-center md:gap-2 md:text-sm">
+                                <span className="whitespace-nowrap">
+                                  {rotuloTipoOuPercentual(venda.tipoAcrescimo)}
+                                </span>
+                              </div>
+                              <div className="font-nunito flex flex-1 shrink-0 items-center justify-end text-sm font-semibold text-primary-text">
+                                {formatCurrency(ajustesTotaisVenda.valorAcrescimoExibir ?? 0)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+
                   {/* Total da Venda */}
                   <div className="rounded-lg border-2 border-primary bg-primary/10 px-3 py-2">
                     <div className="flex items-center justify-between">
@@ -1418,53 +1714,60 @@ export function DetalhesVendas({
                 <div className="border-t border-dashed border-gray-400"></div>
 
                 <div className="space-y-1.5 rounded-lg px-4 py-2">
-                  {/* A - Total de itens lançados */}
+                  {/* A: todos os produtos lançados (inclui cancelados / removidos) */}
                   <div className="flex items-center justify-between">
                     <span className="font-nunito text-xs font-medium text-gray-800">
-                      A - Total de itens lançados (+)
+                      A - Total itens lançados (+)
                     </span>
                     <span className="font-nunito text-right text-xs font-semibold tabular-nums text-gray-800">
                       {formatNumber(resumoFinanceiro.totalItensLancados)}
                     </span>
                   </div>
 
-                  {/* B - Total de itens cancelados */}
                   <div className="flex items-center justify-between">
                     <span className="font-nunito text-xs font-medium text-gray-800">
-                      B - Total de itens cancelados (-)
+                     B - Itens cancelados (-)
                     </span>
                     <span className="font-nunito text-right text-xs font-semibold tabular-nums text-gray-800 line-through">
                       {formatNumber(resumoFinanceiro.totalItensCancelados)}
                     </span>
                   </div>
 
-                  {/* D - Total dos itens (A - B) */}
-                  <div className="mt-1 flex items-center justify-between border-t border-gray-400 pt-1.5">
-                    <span className="font-nunito text-xs font-medium text-gray-800">
-                      C - Total dos itens (A - B)
-                    </span>
-                    <span className="font-nunito text-right text-xs font-semibold tabular-nums text-gray-800">
-                      {formatNumber(resumoFinanceiro.totalDosItens)}
-                    </span>
-                  </div>
-
-                  {/* Total de descontos na conta */}
-                  <div className="flex items-center justify-between pt-4">
-                    <span className="font-nunito text-xs font-medium text-gray-800">
-                      Total de descontos na conta
-                    </span>
-                    <span className="font-nunito text-right text-xs font-semibold tabular-nums text-gray-800">
-                      {formatNumber(resumoFinanceiro.totalDescontosConta)}
-                    </span>
-                  </div>
-
-                  {/* Total de acréscimos na conta */}
                   <div className="flex items-center justify-between">
                     <span className="font-nunito text-xs font-medium text-gray-800">
-                      Total de acréscimos na conta
+                      C - Total taxas (+)
                     </span>
                     <span className="font-nunito text-right text-xs font-semibold tabular-nums text-gray-800">
-                      {formatNumber(resumoFinanceiro.totalAcrescimosConta)}
+                      {formatNumber(resumoFinanceiro.totalTaxas)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="font-nunito text-xs font-medium text-gray-800">
+                      D - Total acréscimos à venda (+)
+                    </span>
+                    <span className="font-nunito text-right text-xs font-semibold tabular-nums text-gray-800">
+                      {formatNumber(resumoFinanceiro.totalAcrescimoVenda)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="font-nunito text-xs font-medium text-gray-800">
+                      E - Total descontos à venda (-)
+                    </span>
+                    <span className="font-nunito text-right text-xs font-semibold tabular-nums text-gray-800">
+                      {resumoFinanceiro.totalDescontoVenda > 0
+                        ? `-${formatNumber(resumoFinanceiro.totalDescontoVenda)}`
+                        : formatNumber(resumoFinanceiro.totalDescontoVenda)}
+                    </span>
+                  </div>
+
+                  <div className="mt-1 flex items-center justify-between border-t border-gray-400 pt-1.5">
+                    <span className="font-nunito text-xs font-medium text-gray-800">
+                      F - Total (A − B + C + D − E)
+                    </span>
+                    <span className="font-nunito text-right text-xs font-semibold tabular-nums text-gray-800">
+                      {formatNumber(resumoFinanceiro.totalResumo)}
                     </span>
                   </div>
                 </div>
