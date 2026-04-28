@@ -55,12 +55,11 @@ const sxEntradaCompactaComplemento = {
   '& .MuiSelect-select': entradaCompactaSelect,
 } as const
 
-/** Nome e descrição: exibição em maiúsculas + estado já normalizado no onChange */
+/** Nome e descrição: estado normalizado no onChange (placeholder não deve ficar em caixa alta). */
 const sxCampoTextoMaiusculo = {
   ...sxEntradaCompactaComplemento,
   '& .MuiOutlinedInput-input': {
     ...entradaCompactaInput,
-    textTransform: 'uppercase' as const,
   },
 } as const
 
@@ -419,7 +418,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
                 onChange={e => setNome(e.target.value.toUpperCase())}
                 required
                 size="small"
-                placeholder="Nome do complemento"
+                placeholder="Nome do Complemento"
                 className="bg-white"
                 sx={sxCampoTextoMaiusculo}
                 InputLabelProps={{ required: true }}
@@ -430,7 +429,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
                 value={descricao}
                 onChange={e => setDescricao(e.target.value.toUpperCase())}
                 size="small"
-                placeholder="Descrição do complemento"
+                placeholder="Descrição do Complemento"
                 className="bg-white"
                 sx={sxCampoTextoMaiusculo}
               />

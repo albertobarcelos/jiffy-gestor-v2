@@ -110,7 +110,7 @@ export const GrupoItem = memo(function GrupoItem({
       {/* Nome - área clicável */}
       <div 
         onClick={handleRowClick}
-        className="flex-[4] font-nunito font-normal uppercase text-xs md:text-sm text-primary-text cursor-pointer flex flex-col md:flex-row items-start md:items-center justify-start gap-2"
+        className="flex-[4] font-nunito font-normal text-xs md:text-sm text-primary-text cursor-pointer flex flex-col md:flex-row items-start md:items-center justify-start gap-2"
       >
         <span>{nome}</span>
         <div className="flex items-center gap-1">

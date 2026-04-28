@@ -101,9 +101,9 @@ const ComplementoRow = memo(function ComplementoRow({
             savingTipo ? 'opacity-70 cursor-not-allowed' : ''
           }`}
         >
-          <option value="nenhum">Nenhum</option>
-          <option value="aumenta">Aumenta</option>
-          <option value="diminui">Diminui</option>
+          <option value="nenhum">NENHUM</option>
+          <option value="aumenta">AUMENTA</option>
+          <option value="diminui">DIMINUI</option>
         </select>
       </div>
       <div

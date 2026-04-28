@@ -89,7 +89,7 @@ const GrupoItem = memo(function GrupoItem({
         </div>
         <div className="md:flex-[3] flex-[2] min-w-0 flex items-start">
           <div className="flex flex-col md:flex-row gap-1">
-            <span className="flex items-center gap-2 truncate font-normal uppercase md:text-sm text-xs text-primary-text">
+            <span className="flex items-center gap-2 truncate font-normal md:text-sm text-xs text-primary-text">
               {grupo.getNome()}
             </span>
               <button
@@ -131,7 +131,7 @@ const GrupoItem = memo(function GrupoItem({
                 className={`flex items-center gap-2 ${item.invertButtons ? 'flex-row-reverse justify-end' : ''}`}
               >
                 <div className="flex flex-col items-center text-center text-xs text-secondary-text min-w-[70px]">
-                  <span className="uppercase tracking-wide">{item.label}</span>
+                  <span className="tracking-wide">{item.label}</span>
                   <span className="text-sm font-normal text-primary-text">{item.valor}</span>
                 </div>
                 <div className="flex flex-col gap-1">

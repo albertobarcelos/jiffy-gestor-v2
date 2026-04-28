@@ -398,10 +398,11 @@ export const NovoGrupoComplemento = forwardRef<
             <div className="bg-info rounded-[12px] md:p-5">
               <div className="mb-2 flex items-center gap-5">
                 <h2 className="shrink-0 text-primary md:text-xl text-sm font-semibold">
-                  Dados do Grupo de Complementos
+                  Dados Do Grupo De Complementos
                 </h2>
                 <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
               </div>
+                <div className="flex my-6 justify-end">
             <JiffyIconSwitch
               checked={ativo}
               onChange={e => setAtivo(e.target.checked)}
@@ -410,11 +411,12 @@ export const NovoGrupoComplemento = forwardRef<
               size="sm"
               className="mb-6 justify-end"
             />
+            </div>
             <div className="space-y-8">
               <Input
                 label="Nome do Grupo"
                 value={nome}
-                onChange={(e) => setNome(e.target.value)}
+                onChange={(e) => setNome(e.target.value.toLocaleUpperCase('pt-BR'))}
                 required
                 size="small"
                 placeholder="Digite o nome do grupo de complementos"
@@ -463,7 +465,7 @@ export const NovoGrupoComplemento = forwardRef<
                   className="inline-flex items-center h-8 text-sm md:text-lg gap-2 px-5 py-2 rounded-lg bg-primary text-info font-medium shadow hover:bg-primary/90 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <MdAdd className="md:text-lg text-sm" />
-                  Vincular complementos
+                  Vincular Complementos
                 </button>
               </div>
 

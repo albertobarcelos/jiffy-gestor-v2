@@ -65,7 +65,7 @@ function ProdutoListItemBase({
         {/* Nome e código */}
         <div className="flex items-center gap-3 flex-wrap">
           <p className="text-primary-text font-normal md:text-base text-sm flex flex-col-reverse md:flex-row md:items-center items-start md:gap-2">
-            <span className="uppercase">{produto.getNome()}</span>
+            <span className="tracking-wide">{produto.getNome()}</span>
             <span className="text-sm text-secondary-text md:ml-2 inline-flex items-center gap-1">
               <span className="text-xs">Cód. </span>
               <span className="font-normal">{produto.getCodigoProduto()}</span>

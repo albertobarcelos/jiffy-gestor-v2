@@ -764,7 +764,7 @@ export function ComplementosMultiSelectDialog({
                             aria-hidden
                           />
                           <div className="min-w-0 flex-1">
-                            <p className="font-nunito truncate text-xs font-medium uppercase text-primary-text">
+                            <p className="font-nunito truncate text-xs font-medium text-primary-text">
                               {grupo.nome || 'Grupo'}
                             </p>
                             {grupo.obrigatorio ? (

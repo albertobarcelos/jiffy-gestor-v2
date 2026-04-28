@@ -140,7 +140,7 @@ export function IconPickerModal({
     <JiffySidePanelModal
       open={isOpen}
       onClose={onClose}
-      title="Selecione um ícone"
+      title="SELECIONE UM ÍCONE"
       panelClassName="w-[min(32rem,100vw)] max-w-[100vw] sm:w-[min(38rem,90rem)]"
       scrollableBody={false}
       tabsSlot={tabsSlot}
@@ -163,7 +163,7 @@ export function IconPickerModal({
             type="text"
             value={searchText}
             onChange={e => setSearchText(e.target.value)}
-            placeholder="Buscar ícone..."
+            placeholder="BUSCAR ÍCONE..."
             className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-10 pr-4 text-xs text-primary-text placeholder:text-secondary-text focus:outline-none"
           />
         </div>
@@ -243,7 +243,7 @@ function IconCard({ icon, selectedColor, onSelect }: IconCardProps) {
     >
       <DinamicIcon iconName={icon.name} color={iconColor} size={32} className="mb-2" />
       <span className="font-nunito line-clamp-2 text-center text-xs" style={{ color: iconColor }}>
-        {icon.tags.length > 0 ? icon.tags[0] : icon.name}
+        {(icon.tags.length > 0 ? icon.tags[0] : icon.name).toLocaleUpperCase('pt-BR')}
       </span>
     </button>
   )

@@ -60,7 +60,7 @@ function ProdutosGroupHeaderInner({
 
         <div>
           <div className="flex items-center gap-2">
-            <p className="text-sm md:text-base font-semibold text-primary-text tracking-wide uppercase">
+            <p className="text-sm md:text-base font-semibold text-primary-text tracking-wide">
               {grupo}
             </p>
             <button

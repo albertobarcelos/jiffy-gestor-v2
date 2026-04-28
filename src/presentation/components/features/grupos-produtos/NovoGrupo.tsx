@@ -538,7 +538,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                     <Input
                       label="Nome do Grupo"
                       value={nome}
-                      onChange={e => setNome(e.target.value)}
+                      onChange={e => setNome(e.target.value.toLocaleUpperCase('pt-BR'))}
                       required
                       size="small"
                       placeholder="Digite o nome do grupo"

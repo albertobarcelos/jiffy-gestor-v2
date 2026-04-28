@@ -106,8 +106,8 @@ export function InformacoesProdutoStep({
             size="small"
             type="text"
             value={nomeProduto}
-            onChange={e => onNomeProdutoChange(e.target.value)}
-            placeholder="Nome que aparecerá no PDV"
+            onChange={e => onNomeProdutoChange(e.target.value.toLocaleUpperCase('pt-BR'))}
+            placeholder="Nome que Aparecerá no PDV"
             className="bg-white"
             sx={sxEntradaCompactaProduto}
             InputLabelProps={{ required: true }}
@@ -147,7 +147,7 @@ export function InformacoesProdutoStep({
                   onChange={e => onGrupoProdutoChange(e.target.value || null)}
                 >
                   <MenuItem value="">
-                    <span className="text-secondary-text">Selecione o grupo</span>
+                    <span className="text-secondary-text">Selecione o Grupo</span>
                   </MenuItem>
                   {grupos.map(grupo => {
                     const id = getGrupoId(grupo)
@@ -155,7 +155,7 @@ export function InformacoesProdutoStep({
                     const ativo = isGrupoAtivo(grupo)
                     return (
                       <MenuItem key={id} value={id} sx={ativo ? undefined : { color: '#9CA3AF' }}>
-                        {ativo ? nome : `${nome} (inativo)`}
+                        {ativo ? nome : `${nome} (Inativo)`}
                       </MenuItem>
                     )
                   })}
@@ -178,7 +178,7 @@ export function InformacoesProdutoStep({
                 onChange={e => onUnidadeProdutoChange(e.target.value || null)}
               >
                 <MenuItem value="">
-                  <span className="text-secondary-text">Escolha a unidade</span>
+                  <span className="text-secondary-text">Escolha a Unidade</span>
                 </MenuItem>
                 <MenuItem value="UN">Unitário</MenuItem>
                 <MenuItem value="KG">Kg</MenuItem>
@@ -191,7 +191,7 @@ export function InformacoesProdutoStep({
 
           <div className="min-w-0">
             <Input
-              label="Código EAN(barras)"
+              label="Código EAN(Barras)"
               size="small"
               type="text"
               inputMode="numeric"
@@ -201,7 +201,7 @@ export function InformacoesProdutoStep({
                 const digits = e.target.value.replace(/\D/g, '').slice(0, 14)
                 onCodigoEanBarrasChange(digits)
               }}
-              placeholder="Digite o código"
+              placeholder="Digite o Código"
               className="bg-white"
               sx={sxEntradaCompactaProduto}
             />
@@ -213,8 +213,8 @@ export function InformacoesProdutoStep({
           label="Descrição"
           size="small"
           value={descricaoProduto}
-          onChange={e => onDescricaoProdutoChange(e.target.value)}
-          placeholder="Descrição do produto"
+          onChange={e => onDescricaoProdutoChange(e.target.value.toLocaleUpperCase('pt-BR'))}
+          placeholder="Descrição do Produto"
           className="bg-white"
           multiline
           minRows={3}

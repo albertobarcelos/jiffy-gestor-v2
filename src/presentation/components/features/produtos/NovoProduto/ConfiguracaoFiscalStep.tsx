@@ -373,7 +373,7 @@ export function ConfiguracaoFiscalStep({
                   <MenuItem value=""><span className="text-secondary-text">Selecione o CEST</span></MenuItem>
                   {cestsDisponiveis!.map((item) => (
                     <MenuItem key={item.codigo} value={item.codigo}>
-                      {item.codigo} — {item.descricao}
+                      {item.codigo} — {item.descricao}{item.segmento ? ` — ${item.segmento}` : ''}
                     </MenuItem>
                   ))}
                 </Select>
