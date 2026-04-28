@@ -7,6 +7,7 @@ import {
   useCallback,
   useMemo,
   type ReactElement,
+  type ReactNode,
   type Ref,
 } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
@@ -29,6 +30,10 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { TipoVendaIcon } from './TipoVendaIcon'
 import { useCancelarVendaGestor } from '@/src/presentation/hooks/useVendas'
 import { StatusFiscalBadge } from '@/src/presentation/components/features/nfe/StatusFiscalBadge'
+import {
+  abrirDocumentoFiscalPdf,
+  tipoDocFiscalFromModelo,
+} from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
 
 // Tipos
 interface VendaDetalhes {
@@ -68,6 +73,27 @@ interface VendaDetalhes {
   statusFiscal?: string | null
   documentoFiscalId?: string | null
   retornoSefaz?: string | null
+  /** Objeto na raiz do JSON (`resumoFiscal`) — detalhes consolidados para a aba Fiscal. */
+  resumoFiscal?: ResumoFiscal | null
+}
+
+/** Grupo `resumoFiscal` na raiz da API de detalhes da venda. */
+interface ResumoFiscal {
+  id: string
+  chaveFiscal: string | null
+  codigoRetorno: string | null
+  terminalId: string | null
+  dataCriacao: string | null
+  dataEmissao: string | null
+  dataUltimaModificacao: string | null
+  documentoFiscalId: string | null
+  empresaId: string | null
+  modelo: number | null
+  numero: string | number | null
+  retornoSefaz: string | null
+  serie: string | number | null
+  status: string | null
+  vendaId: string | null
 }
 
 interface TaxaLancada {
@@ -193,12 +219,40 @@ function tipoEhPercentual(tipo: unknown): boolean {
 }
 
 /**
- * Exibe "(%)" para tipo percentual; caso contrário "Tipo: …" quando informado.
+ * Sufixo do título "Desconto/Acréscimo na venda": `(20%)` se percentual (valor em decimal),
+ * `(2,00)` se fixo — alinhado ao contrato da raiz da venda.
  */
-function rotuloTipoOuPercentual(tipo: unknown): string {
-  if (tipoEhPercentual(tipo)) return '(%)'
-  if (tipoAjusteVendaInformado(tipo)) return `Tipo: ${String(tipo).trim()}`
-  return 'Tipo: —'
+function sufixoTituloAjusteVenda(tipo: unknown, valorConfigRaw: unknown): string {
+  if (valorConfigRaw == null || valorConfigRaw === '') return ''
+  const v =
+    typeof valorConfigRaw === 'number'
+      ? valorConfigRaw
+      : Number(String(valorConfigRaw).replace(/\s/g, '').replace(',', '.'))
+  if (!Number.isFinite(v)) return ''
+
+  if (tipoEhPercentual(tipo)) {
+    // Contrato pode enviar taxa como decimal (0,2 → 20%) ou pontos percentuais (20 → 20%).
+    const pct = v >= 0 && v <= 1 ? Math.round(v * 100) : Math.round(v)
+    return ` (${pct}%)`
+  }
+  return ` (${new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(v)})`
+}
+
+/** Converte taxa percentual do contrato (0,2 ou 20) em multiplicador sobre a base. */
+function multiplicadorPercentualContrato(valorArmazenado: number): number {
+  if (!Number.isFinite(valorArmazenado) || valorArmazenado < 0) return 0
+  return valorArmazenado <= 1 ? valorArmazenado : valorArmazenado / 100
+}
+
+/** Lê número de configuração de desconto/acréscimo na raiz da venda. */
+function lerNumeroConfigAjusteVenda(raw: unknown): number | null {
+  if (raw == null || raw === '') return null
+  const n =
+    typeof raw === 'number' ? raw : Number(String(raw).replace(/\s/g, '').replace(',', '.'))
+  return Number.isFinite(n) ? n : null
 }
 
 /** Lê número finito na raiz do JSON (camelCase do contrato + fallback PascalCase). */
@@ -273,6 +327,153 @@ function valorRaizPositivo(raw: unknown): number | null {
   return n
 }
 
+/** Texto para exibição quando o campo fiscal é nulo ou vazio. */
+function textoCampoFiscal(raw: unknown): string {
+  if (raw == null || raw === '') return '—'
+  return String(raw).trim() || '—'
+}
+
+/** Normaliza `resumoFiscal` da API — ausente ou inválido retorna `undefined`. */
+function normalizarResumoFiscal(raw: unknown): ResumoFiscal | undefined {
+  if (raw == null) return undefined
+  // Algumas APIs enviam lista com um único resumo
+  if (Array.isArray(raw)) {
+    const primeiro = raw.find(item => item != null && typeof item === 'object')
+    return primeiro ? normalizarResumoFiscal(primeiro) : undefined
+  }
+  if (typeof raw !== 'object') return undefined
+  const r = raw as Record<string, unknown>
+
+  const str = (key: string): string | null => {
+    const v = r[key]
+    if (v == null || v === '') return null
+    return String(v).trim()
+  }
+
+  const numOrNull = (key: string): number | null => {
+    const v = r[key]
+    if (v == null || v === '') return null
+    const n = typeof v === 'number' ? v : Number(v)
+    return Number.isFinite(n) ? n : null
+  }
+
+  const numeroSerieRaw = r.numero ?? r.Numero
+  const serieRaw = r.serie ?? r.Serie
+
+  const id = str('id') ?? str('Id')
+  if (!id) return undefined
+
+  return {
+    id,
+    chaveFiscal: str('chaveFiscal') ?? str('ChaveFiscal'),
+    codigoRetorno: str('codigoRetorno') ?? str('CodigoRetorno'),
+    terminalId: str('terminalId') ?? str('TerminalId'),
+    dataCriacao: str('dataCriacao') ?? str('DataCriacao'),
+    dataEmissao: str('dataEmissao') ?? str('DataEmissao'),
+    dataUltimaModificacao:
+      str('dataUltimaModificacao') ?? str('DataUltimaModificacao'),
+    documentoFiscalId: str('documentoFiscalId') ?? str('DocumentoFiscalId'),
+    empresaId: str('empresaId') ?? str('EmpresaId'),
+    modelo: numOrNull('modelo') ?? numOrNull('Modelo'),
+    numero:
+      numeroSerieRaw != null && numeroSerieRaw !== ''
+        ? typeof numeroSerieRaw === 'number'
+          ? numeroSerieRaw
+          : String(numeroSerieRaw)
+        : null,
+    retornoSefaz: str('retornoSefaz') ?? str('RetornoSefaz'),
+    serie:
+      serieRaw != null && serieRaw !== ''
+        ? typeof serieRaw === 'number'
+          ? serieRaw
+          : String(serieRaw)
+        : null,
+    status: str('status') ?? str('Status'),
+    vendaId: str('vendaId') ?? str('VendaId'),
+  }
+}
+
+/** PDF DANFE/DANFCE só após autorização — mesmo critério do NovoPedidoModal / Kanban. */
+function statusFiscalEhEmitida(
+  resumoStatus: string | null | undefined,
+  statusNaVenda: string | null | undefined
+): boolean {
+  const r = resumoStatus != null ? String(resumoStatus).trim() : ''
+  const u = statusNaVenda != null ? String(statusNaVenda).trim() : ''
+  const s = (r !== '' ? r : u).toUpperCase()
+  return s === 'EMITIDA'
+}
+
+/** Indica se há dados para exibir a aba Fiscal (objeto não vazio na raiz ou normalizado). */
+function vendaPossuiResumoFiscalParaAba(v: VendaDetalhes | null): boolean {
+  const rf = v?.resumoFiscal as unknown
+  if (rf == null) return false
+  if (Array.isArray(rf)) return rf.some(x => x != null && typeof x === 'object')
+  if (typeof rf !== 'object') return false
+  const o = rf as Record<string, unknown>
+  return Object.keys(o).length > 0
+}
+
+/** Nome do terminal a partir do GET `/api/terminais/[id]/detalhes`. */
+function nomeTerminalDeDetalhesApi(data: Record<string, unknown>): string | null {
+  const raw =
+    data.nome ??
+    data.descricao ??
+    data.codigoInterno ??
+    data.codigo ??
+    data.codigoTerminal ??
+    data.code
+  if (raw != null && String(raw).trim()) return String(raw).trim()
+  return null
+}
+
+/** Nome da empresa a partir do GET `/api/empresas/[id]`. */
+function nomeEmpresaDeApi(data: Record<string, unknown>): string | null {
+  const raw = data.nome ?? data.razaoSocial ?? data.nomeFantasia ?? data.name
+  if (raw != null && String(raw).trim()) return String(raw).trim()
+  return null
+}
+
+/** Busca nome amigável do terminal para a aba Fiscal. */
+async function buscarNomeTerminalParaResumoFiscal(
+  token: string,
+  terminalId: string
+): Promise<string | null> {
+  try {
+    const res = await fetch(`/api/terminais/${encodeURIComponent(terminalId)}/detalhes`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    })
+    if (!res.ok) return null
+    const d = (await res.json()) as Record<string, unknown>
+    return nomeTerminalDeDetalhesApi(d)
+  } catch {
+    return null
+  }
+}
+
+/** Busca nome amigável da empresa para a aba Fiscal. */
+async function buscarNomeEmpresaParaResumoFiscal(
+  token: string,
+  empresaId: string
+): Promise<string | null> {
+  try {
+    const res = await fetch(`/api/empresas/${encodeURIComponent(empresaId)}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    })
+    if (!res.ok) return null
+    const d = (await res.json()) as Record<string, unknown>
+    return nomeEmpresaDeApi(d)
+  } catch {
+    return null
+  }
+}
+
 /**
  * Modal de detalhes da venda
  * Exibe informações completas da venda, produtos lançados e pagamentos
@@ -292,6 +493,12 @@ export function DetalhesVendas({
     Record<string, MeioPagamentoDetalhes>
   >({})
   const [nomeCliente, setNomeCliente] = useState<string | null>(null)
+  /** Nomes resolvidos via API para a aba Fiscal (`resumoFiscal`). */
+  const [nomeTerminalResumoFiscal, setNomeTerminalResumoFiscal] = useState<string | null>(null)
+  const [nomeEmpresaResumoFiscal, setNomeEmpresaResumoFiscal] = useState<string | null>(null)
+
+  /** Aba ativa quando há `resumoFiscal`: 0 = Informações da Venda, 1 = Fiscal. */
+  const [painelTabDetalhes, setPainelTabDetalhes] = useState(0)
 
   // Estados para modal de cancelamento
   const [isCancelarModalOpen, setIsCancelarModalOpen] = useState(false)
@@ -304,6 +511,10 @@ export function DetalhesVendas({
   useEffect(() => {
     if (open) setInternalOpen(true)
   }, [open])
+
+  useEffect(() => {
+    if (open) setPainelTabDetalhes(0)
+  }, [open, vendaId])
 
   const handleSlideExited = useCallback(() => {
     setInternalOpen(false)
@@ -516,13 +727,17 @@ export function DetalhesVendas({
     setIsLoading(true)
     setVenda(null) // Limpa venda anterior para evitar exibição de dados antigos durante o carregamento
     setNomeCliente(null) // Limpa cliente anterior
+    setNomeTerminalResumoFiscal(null)
+    setNomeEmpresaResumoFiscal(null)
     setNomesUsuarios({}) // Limpa usuários anteriores
     setNomesMeiosPagamento({}) // Limpa meios de pagamento anteriores
 
     try {
-      // Determinar endpoint baseado na tabela de origem
-      const endpoint =
+      // API exige `incluirFiscal=true` para trazer `resumoFiscal` no JSON (padrão do contrato: false)
+      const queryFiscal = new URLSearchParams({ incluirFiscal: 'true' }).toString()
+      const endpointBase =
         tabelaOrigem === 'venda_gestor' ? `/api/vendas/gestor/${vendaId}` : `/api/vendas/${vendaId}`
+      const endpoint = `${endpointBase}?${queryFiscal}`
 
       const response = await fetch(endpoint, {
         headers: {
@@ -661,6 +876,10 @@ export function DetalhesVendas({
         : []
 
       const ajusteVendaApi = extrairAjustesTotaisVendaDaApi(dataRaw as Record<string, unknown>)
+      const rawRecord = dataRaw as Record<string, unknown>
+      const rawResumoFiscal =
+        rawRecord.resumoFiscal ?? rawRecord.ResumoFiscal ?? rawRecord.resumo_fiscal
+      const resumoFiscalNorm = normalizarResumoFiscal(rawResumoFiscal)
 
       const data: VendaDetalhes = {
         ...dataRaw,
@@ -676,6 +895,8 @@ export function DetalhesVendas({
         valorAcrescimo: ajusteVendaApi.valorAcrescimo,
         tipoDesconto: ajusteVendaApi.tipoDesconto,
         tipoAcrescimo: ajusteVendaApi.tipoAcrescimo,
+        // Só sobrescreve quando a normalização funciona; senão mantém `resumoFiscal` do `...dataRaw`
+        ...(resumoFiscalNorm != null ? { resumoFiscal: resumoFiscalNorm } : {}),
       }
 
       // Debug: log para verificar se o campo está sendo capturado
@@ -707,6 +928,10 @@ export function DetalhesVendas({
 
       setVenda(data)
 
+      const rfOpt = data.resumoFiscal as ResumoFiscal | undefined | null
+      const terminalIdResumo = rfOpt?.terminalId?.trim() || null
+      const empresaIdResumo = rfOpt?.empresaId?.trim() || null
+
       // Coleta todos os IDs de usuários únicos que precisam ser buscados
       const userIdsToFetch = new Set<string>()
       if (data.abertoPorId) userIdsToFetch.add(data.abertoPorId)
@@ -731,12 +956,19 @@ export function DetalhesVendas({
         if (p.meioPagamentoId) meioIdsToFetch.add(p.meioPagamentoId)
       })
 
-      // Executa todas as buscas de dados auxiliares em paralelo
-      const [userNamesResolved, meioPagamentoResolved, clienteNomeResult] = await Promise.all([
-        Promise.all(Array.from(userIdsToFetch).map(id => fetchUsuarioNome(id))),
-        Promise.all(Array.from(meioIdsToFetch).map(id => fetchMeioPagamento(id))),
-        data.clienteId ? fetchClienteNome(data.clienteId) : Promise.resolve(null),
-      ])
+      // Executa todas as buscas de dados auxiliares em paralelo (inclui terminal/empresa para aba Fiscal)
+      const [userNamesResolved, meioPagamentoResolved, clienteNomeResult, nomeTerminalRf, nomeEmpresaRf] =
+        await Promise.all([
+          Promise.all(Array.from(userIdsToFetch).map(id => fetchUsuarioNome(id))),
+          Promise.all(Array.from(meioIdsToFetch).map(id => fetchMeioPagamento(id))),
+          data.clienteId ? fetchClienteNome(data.clienteId) : Promise.resolve(null),
+          terminalIdResumo
+            ? buscarNomeTerminalParaResumoFiscal(token, terminalIdResumo)
+            : Promise.resolve(null),
+          empresaIdResumo
+            ? buscarNomeEmpresaParaResumoFiscal(token, empresaIdResumo)
+            : Promise.resolve(null),
+        ])
 
       // Constrói e atualiza o estado de nomes de usuários
       const finalNomesUsuarios: Record<string, string> = {}
@@ -761,9 +993,14 @@ export function DetalhesVendas({
       if (clienteNomeResult) {
         setNomeCliente(clienteNomeResult)
       }
+
+      setNomeTerminalResumoFiscal(nomeTerminalRf)
+      setNomeEmpresaResumoFiscal(nomeEmpresaRf)
     } catch (error) {
       console.error('Erro ao buscar detalhes da venda:', error)
       showToast.error('Erro ao buscar detalhes da venda')
+      setNomeTerminalResumoFiscal(null)
+      setNomeEmpresaResumoFiscal(null)
       setVenda(null) // Garante que a venda é limpa em caso de erro
       onClose() // Fecha o modal em caso de erro grave para evitar loop infinito
     } finally {
@@ -817,6 +1054,8 @@ export function DetalhesVendas({
     if (!internalOpen) {
       setVenda(null)
       setNomeCliente(null)
+      setNomeTerminalResumoFiscal(null)
+      setNomeEmpresaResumoFiscal(null)
       setNomesUsuarios({})
       setNomesMeiosPagamento({})
       setIsCancelarModalOpen(false)
@@ -938,47 +1177,38 @@ export function DetalhesVendas({
   }, [venda])
 
   /**
-   * Calcula o total da venda
-   * Se a venda está cancelada, soma TODOS os produtos lançados (ignorando remoções anteriores)
-   * Caso contrário, usa o valorFinal da venda
+   * Total da venda exibido no modal: sempre o campo `valorFinal` retornado pelo backend.
    */
   const totalVendaCalculado = useMemo(() => {
-    if (!venda || !venda.produtosLancados || venda.produtosLancados.length === 0) {
-      return venda?.valorFinal || 0
+    return venda?.valorFinal ?? 0
+  }, [venda])
+
+  /**
+   * Base para % de desconto/acréscimo na venda: soma de todas as linhas — total do item (já com
+   * desconto/acréscimo do produto) + complementos que alteram preço.
+   */
+  const subtotalLinhasParaAjustePercentual = useMemo(() => {
+    if (!venda?.produtosLancados?.length) return 0
+    let soma = 0
+    for (const produto of venda.produtosLancados) {
+      let valorComplementos = 0
+      if (produto.complementos && produto.complementos.length > 0) {
+        produto.complementos.forEach(complemento => {
+          if (complemento.tipoImpactoPreco === 'aumenta') {
+            valorComplementos += calcularValorComplemento(complemento)
+          } else if (complemento.tipoImpactoPreco === 'diminui') {
+            valorComplementos -= calcularValorComplemento(complemento)
+          }
+        })
+      }
+      soma += calcularValorProduto(produto) + valorComplementos
     }
-
-    const isVendaCancelada = !!venda.canceladoPorId
-
-    if (isVendaCancelada) {
-      // Quando cancelada, soma TODOS os produtos lançados, mesmo que tenham sido removidos antes
-      let total = 0
-      venda.produtosLancados.forEach(produto => {
-        const valorTotalProduto = calcularValorProduto(produto)
-
-        // Soma complementos que impactam preço
-        let valorComplementos = 0
-        if (produto.complementos && produto.complementos.length > 0) {
-          produto.complementos.forEach(complemento => {
-            if (complemento.tipoImpactoPreco === 'aumenta') {
-              valorComplementos += calcularValorComplemento(complemento)
-            } else if (complemento.tipoImpactoPreco === 'diminui') {
-              valorComplementos -= calcularValorComplemento(complemento)
-            }
-          })
-        }
-
-        total += valorTotalProduto + valorComplementos
-      })
-      return total
-    }
-
-    // Se não está cancelada, usa o valorFinal da venda
-    return venda.valorFinal
+    return soma
   }, [venda, calcularValorProduto, calcularValorComplemento])
 
   /**
-   * Acréscimo/desconto na venda: exibe apenas `valorDesconto` e `valorAcrescimo` da raiz (backend),
-   * sem recálculo — linha só aparece se o respectivo campo for > 0.
+   * Acréscimo/desconto na venda: tipo fixo usa valor monetário da raiz (backend); tipo percentual
+   * exibe o valor em R$ calculado sobre a soma dos totais das linhas (subtotalLinhasParaAjustePercentual).
    */
   const ajustesTotaisVenda = useMemo(() => {
     if (!venda) {
@@ -991,11 +1221,39 @@ export function DetalhesVendas({
       }
     }
 
-    const valorDescontoExibir = valorRaizPositivo(venda.valorDesconto)
-    const valorAcrescimoExibir = valorRaizPositivo(venda.valorAcrescimo)
+    const base = subtotalLinhasParaAjustePercentual
 
-    const temDesconto = valorDescontoExibir != null
-    const temAcrescimo = valorAcrescimoExibir != null
+    let valorDescontoExibir: number | null = null
+    let temDesconto = false
+    if (tipoAjusteVendaInformado(venda.tipoDesconto)) {
+      if (tipoEhPercentual(venda.tipoDesconto)) {
+        const taxa = lerNumeroConfigAjusteVenda(venda.valorDesconto)
+        if (taxa != null) {
+          valorDescontoExibir =
+            Math.round(base * multiplicadorPercentualContrato(taxa) * 100) / 100
+          temDesconto = true
+        }
+      } else {
+        valorDescontoExibir = valorRaizPositivo(venda.valorDesconto)
+        temDesconto = valorDescontoExibir != null
+      }
+    }
+
+    let valorAcrescimoExibir: number | null = null
+    let temAcrescimo = false
+    if (tipoAjusteVendaInformado(venda.tipoAcrescimo)) {
+      if (tipoEhPercentual(venda.tipoAcrescimo)) {
+        const taxa = lerNumeroConfigAjusteVenda(venda.valorAcrescimo)
+        if (taxa != null) {
+          valorAcrescimoExibir =
+            Math.round(base * multiplicadorPercentualContrato(taxa) * 100) / 100
+          temAcrescimo = true
+        }
+      } else {
+        valorAcrescimoExibir = valorRaizPositivo(venda.valorAcrescimo)
+        temAcrescimo = valorAcrescimoExibir != null
+      }
+    }
 
     return {
       mostrarSecao: temDesconto || temAcrescimo,
@@ -1004,7 +1262,19 @@ export function DetalhesVendas({
       valorDescontoExibir,
       valorAcrescimoExibir,
     }
-  }, [venda])
+  }, [venda, subtotalLinhasParaAjustePercentual])
+
+  const temResumoFiscal = useMemo(() => vendaPossuiResumoFiscalParaAba(venda), [venda])
+
+  /** Normalizado; se a API mandou objeto bruto ainda compatível, reutiliza para a aba Fiscal. */
+  const resumoFiscalParaExibicao = useMemo((): ResumoFiscal | null => {
+    if (!venda?.resumoFiscal) return null
+    const n = normalizarResumoFiscal(venda.resumoFiscal as unknown)
+    if (n) return n
+    const raw = venda.resumoFiscal
+    if (Array.isArray(raw) || typeof raw !== 'object' || raw === null) return null
+    return raw as ResumoFiscal
+  }, [venda?.resumoFiscal])
 
   if (!internalOpen) return null
 
@@ -1084,6 +1354,40 @@ export function DetalhesVendas({
           </button>
         </div>
 
+        {/* Abas fora do scroll: evita conteúdo rolado aparecer no vão entre header e tabs (sticky+padding). */}
+        {!isLoading && venda && temResumoFiscal && (
+          <div className="z-[2] w-full shrink-0 border-b border-gray-200 bg-info md:px-2">
+            <div className="flex flex-wrap gap-1 px-2 pb-0 pt-1" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={painelTabDetalhes === 0}
+                onClick={() => setPainelTabDetalhes(0)}
+                className={`rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                  painelTabDetalhes === 0
+                    ? 'bg-primary text-white'
+                    : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
+                }`}
+              >
+                Informações da Venda
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={painelTabDetalhes === 1}
+                onClick={() => setPainelTabDetalhes(1)}
+                className={`rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                  painelTabDetalhes === 1
+                    ? 'bg-primary text-white'
+                    : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
+                }`}
+              >
+                Fiscal
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Conteúdo — flex-col: seções em coluna (evita flex padrão = row, que quebrava em 4 colunas) */}
         <div className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto bg-info py-2 md:px-2">
           {isLoading ? (
@@ -1092,11 +1396,13 @@ export function DetalhesVendas({
             </div>
           ) : venda ? (
             <>
-              {/* Card Informações da Venda */}
-              <div className="mb-2 p-2">
-                <h2 className="font-exo text-lg font-semibold text-primary-text">
-                  Informações da Venda
-                </h2>
+              {(!temResumoFiscal || painelTabDetalhes === 0) && (
+                <>
+                  {/* Card Informações da Venda */}
+                  <div className="mb-2 p-2">
+                    <h2 className="font-exo text-lg font-semibold text-primary-text">
+                      Informações da Venda
+                    </h2>
                 <div className="mb-2 border-t border-dashed border-gray-400"></div>
 
                 <div className="space-y-2 md:px-2">
@@ -1206,14 +1512,6 @@ export function DetalhesVendas({
                     <div className="font-nunito flex items-center justify-between rounded-lg bg-white px-3 text-sm text-primary-text">
                       <span>Status Fiscal:</span>
                       <StatusFiscalBadge status={venda.statusFiscal} />
-                    </div>
-                  )}
-
-                  {/* Solicitar Emissão Fiscal */}
-                  {venda.solicitarEmissaoFiscal && (
-                    <div className="font-nunito flex justify-between rounded-lg bg-yellow-50 px-3 text-sm text-primary-text">
-                      <span>Solicitar Emissão Fiscal:</span>
-                      <span className="font-semibold text-yellow-600">Sim</span>
                     </div>
                   )}
 
@@ -1461,8 +1759,8 @@ export function DetalhesVendas({
                   {(venda.taxasLancadas?.length ?? 0) > 0 && (
                     <>
                       <div className="my-2 border-t border-dashed border-gray-400" />
-                      <p className="font-nunito mb-1 text-xs font-semibold uppercase tracking-wide text-secondary-text">
-                        Taxas lançadas
+                      <p className="font-nunito mb-1 text-lg font-semibold text-primary-text">
+                        Taxas Lançadas
                       </p>
                       {(venda.taxasLancadas ?? []).map(taxa => {
                         const isVendaCancelada = statusVenda === 'CANCELADA'
@@ -1527,26 +1825,20 @@ export function DetalhesVendas({
                   {ajustesTotaisVenda.mostrarSecao && (
                     <>
                       <div className="my-2 border-t border-dashed border-gray-400" />
-                      <p className="font-nunito mb-1 text-xs font-semibold uppercase tracking-wide text-secondary-text">
+                      <p className="font-nunito mb-1 text-lg font-semibold text-primary-text">
                         Acréscimo/Desconto na Venda
                       </p>
                       {ajustesTotaisVenda.temDesconto && (
                         <div className="rounded-lg bg-white px-1 md:px-3">
                           <div className="flex flex-col gap-1">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="min-w-0 flex-[2]">
-                                <span className="font-nunito text-xs font-semibold text-primary-text md:text-sm">
-                                  Desconto na venda
-                                </span>
-                              </div>
-                              <div className="font-nunito flex flex-1 flex-col justify-start gap-0.5 text-xs text-secondary-text md:flex-row md:items-center md:gap-2 md:text-sm">
-                                <span className="whitespace-nowrap">
-                                  {rotuloTipoOuPercentual(venda.tipoDesconto)}
-                                </span>
-                              </div>
-                              <div className="font-nunito flex flex-1 shrink-0 items-center justify-end text-sm font-semibold text-error">
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="font-nunito min-w-0 flex-1 text-xs font-semibold text-primary-text md:text-sm">
+                                Desconto na venda
+                                {sufixoTituloAjusteVenda(venda.tipoDesconto, venda.valorDesconto)}
+                              </span>
+                              <span className="font-nunito shrink-0 text-sm font-semibold text-error">
                                 -{formatCurrency(ajustesTotaisVenda.valorDescontoExibir ?? 0)}
-                              </div>
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -1554,20 +1846,14 @@ export function DetalhesVendas({
                       {ajustesTotaisVenda.temAcrescimo && (
                         <div className="rounded-lg bg-white px-1 md:px-3">
                           <div className="flex flex-col gap-1">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="min-w-0 flex-[2]">
-                                <span className="font-nunito text-xs font-semibold text-primary-text md:text-sm">
-                                  Acréscimo na venda
-                                </span>
-                              </div>
-                              <div className="font-nunito flex flex-1 flex-col justify-start gap-0.5 text-xs text-secondary-text md:flex-row md:items-center md:gap-2 md:text-sm">
-                                <span className="whitespace-nowrap">
-                                  {rotuloTipoOuPercentual(venda.tipoAcrescimo)}
-                                </span>
-                              </div>
-                              <div className="font-nunito flex flex-1 shrink-0 items-center justify-end text-sm font-semibold text-primary-text">
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="font-nunito min-w-0 flex-1 text-xs font-semibold text-primary-text md:text-sm">
+                                Acréscimo na venda
+                                {sufixoTituloAjusteVenda(venda.tipoAcrescimo, venda.valorAcrescimo)}
+                              </span>
+                              <span className="font-nunito shrink-0 text-sm font-semibold text-primary-text">
                                 {formatCurrency(ajustesTotaisVenda.valorAcrescimoExibir ?? 0)}
-                              </div>
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -1772,6 +2058,152 @@ export function DetalhesVendas({
                   </div>
                 </div>
               </div>
+                </>
+              )}
+
+              {temResumoFiscal &&
+                painelTabDetalhes === 1 &&
+                resumoFiscalParaExibicao && (
+                  <div className="mb-4 p-2">
+                    <div className="flex flex-col gap-3 bg-gray-50/90 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                      <h2 className="font-exo text-lg font-semibold text-primary-text">
+                        Resumo Fiscal
+                      </h2>
+                      {Boolean(
+                        resumoFiscalParaExibicao.documentoFiscalId &&
+                          String(resumoFiscalParaExibicao.documentoFiscalId).trim() !== ''
+                      ) &&
+                        statusFiscalEhEmitida(
+                          resumoFiscalParaExibicao.status,
+                          venda.statusFiscal
+                        ) && (
+                          <button
+                            type="button"
+                            className="shrink-0 rounded-lg border-2 border-primary px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/5"
+                            onClick={() => {
+                              void abrirDocumentoFiscalPdf(
+                                String(resumoFiscalParaExibicao.documentoFiscalId).trim(),
+                                tipoDocFiscalFromModelo(resumoFiscalParaExibicao.modelo)
+                              )
+                            }}
+                          >
+                            Ver{' '}
+                            {tipoDocFiscalFromModelo(resumoFiscalParaExibicao.modelo) === 'NFE'
+                              ? 'NFe'
+                              : 'NFCe'}
+                          </button>
+                        )}
+                    </div>
+                    <div className="mb-2 border-t border-dashed border-gray-400" />
+                    <div className="flex flex-col gap-1 md:px-2">
+                      {(
+                        [
+                          {
+                            label: 'Retorno SEFAZ',
+                            value: textoCampoFiscal(resumoFiscalParaExibicao.retornoSefaz),
+                            rowClassName:
+                              resumoFiscalParaExibicao.status === 'REJEITADA'
+                                ? 'bg-red-50 text-red-700'
+                                : resumoFiscalParaExibicao.retornoSefaz
+                                  ? 'bg-blue-50 text-primary-text'
+                                  : undefined,
+                            multilineValue: true,
+                          },
+                          {
+                            label: 'Status',
+                            value: resumoFiscalParaExibicao.status ? (
+                              <StatusFiscalBadge status={resumoFiscalParaExibicao.status} />
+                            ) : (
+                              '—'
+                            ),
+                          },
+                          {
+                            label: 'Chave fiscal',
+                            value: textoCampoFiscal(resumoFiscalParaExibicao.chaveFiscal),
+                          },
+                          {
+                            label: 'Código retorno',
+                            value: textoCampoFiscal(resumoFiscalParaExibicao.codigoRetorno),
+                          },
+                          {
+                            label: 'Terminal',
+                            value:
+                              nomeTerminalResumoFiscal ??
+                              textoCampoFiscal(resumoFiscalParaExibicao.terminalId),
+                          },
+                          {
+                            label: 'Modelo',
+                            value:
+                              resumoFiscalParaExibicao.modelo != null
+                                ? String(resumoFiscalParaExibicao.modelo)
+                                : '—',
+                          },
+                          {
+                            label: 'Número',
+                            value:
+                              resumoFiscalParaExibicao.numero != null
+                                ? String(resumoFiscalParaExibicao.numero)
+                                : '—',
+                          },
+                          {
+                            label: 'Série',
+                            value: textoCampoFiscal(resumoFiscalParaExibicao.serie),
+                          },
+                          {
+                            label: 'Empresa',
+                            value:
+                              nomeEmpresaResumoFiscal ??
+                              textoCampoFiscal(resumoFiscalParaExibicao.empresaId),
+                          },
+                          {
+                            label: 'Data criação',
+                            value: resumoFiscalParaExibicao.dataCriacao
+                              ? formatDateTime(resumoFiscalParaExibicao.dataCriacao)
+                              : '—',
+                          },
+                          {
+                            label: 'Data emissão',
+                            value: resumoFiscalParaExibicao.dataEmissao
+                              ? formatDateTime(resumoFiscalParaExibicao.dataEmissao)
+                              : '—',
+                          },
+                          {
+                            label: 'Última modificação',
+                            value: resumoFiscalParaExibicao.dataUltimaModificacao
+                              ? formatDateTime(resumoFiscalParaExibicao.dataUltimaModificacao)
+                              : '—',
+                          },
+                        ] as {
+                          label: string
+                          value: ReactNode
+                          rowClassName?: string
+                          multilineValue?: boolean
+                        }[]
+                      ).map(({ label, value, rowClassName, multilineValue }, index) => {
+                        const zebra =
+                          rowClassName ??
+                          (index % 2 === 0 ? 'bg-white' : 'bg-gray-50')
+                        return (
+                          <div
+                            key={label}
+                            className={`font-nunito flex items-start justify-between gap-2 rounded-lg px-1 py-1.5 text-xs md:px-2 md:text-sm ${zebra} ${
+                              rowClassName ? 'text-inherit' : 'text-primary-text'
+                            }`}
+                          >
+                            <span className="shrink-0 pt-0.5">{label}:</span>
+                            <span
+                              className={`max-w-[65%] text-right font-medium break-words ${
+                                multilineValue ? 'whitespace-pre-wrap' : ''
+                              }`}
+                            >
+                              {value}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
             </>
           ) : (
             <div className="flex items-center justify-center py-12">

@@ -77,6 +77,11 @@ const INDICADOR_IE_OPCOES = [
   { value: '9', label: 'Não contribuinte' },
 ] as const
 
+/** Somente contribuinte ICMS (1) permite editar IE; nos demais o campo fica fixo em ISENTO. */
+function indicadorPermiteEditarIe(ind: string): boolean {
+  return String(ind).trim() === '1'
+}
+
 /**
  * Componente para criar/editar cliente
  * Replica o design e funcionalidades do Flutter
@@ -279,10 +284,11 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
           setEmail(cliente.getEmail() || '')
           setNomeFantasia(cliente.getNomeFantasia() || '')
           const indIe = cliente.getIndicadorInscricaoEstadual()
-          setIndicadorInscricaoEstadual(
+          const indStr =
             indIe != null && String(indIe).trim() !== '' ? String(indIe) : '9'
-          )
-          setInscricaoEstadual(cliente.getInscricaoEstadual() ?? '')
+          setIndicadorInscricaoEstadual(indStr)
+          const ieApi = cliente.getInscricaoEstadual() ?? ''
+          setInscricaoEstadual(indicadorPermiteEditarIe(indStr) ? ieApi : 'ISENTO')
           setAtivo(cliente.isAtivo())
           
           // Formata CEP e endereço ao carregar
@@ -1151,6 +1157,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
                   onChange={(e) => setInscricaoEstadual(e.target.value)}
                   placeholder="Número da IE ou ISENTO"
                   size="small"
+                  disabled={!indicadorPermiteEditarIe(indicadorInscricaoEstadual)}
                   InputLabelProps={INPUT_LABEL_PROPS}
                   sx={{
                     ...inputSx,
