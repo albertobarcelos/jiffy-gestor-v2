@@ -368,7 +368,7 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
               </div>
               
               {/* Impressora (Nome) */}
-              <div className="flex-[2] font-normal uppercase md:text-sm text-xs text-primary-text">
+              <div className="flex-[2] font-normal md:text-sm text-xs text-primary-text">
                 {impressora.getNome()}
               </div>
               

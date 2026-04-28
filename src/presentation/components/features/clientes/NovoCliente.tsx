@@ -36,45 +36,47 @@ interface NovoClienteProps {
 /** API imperativa — confirmação ao fechar o painel (`PADRAO_MODAL_SAIR_SEM_SALVAR`). */
 export interface NovoClienteHandle {
   isDirty: () => boolean
+  /** Salva o cliente sem fechar o painel (modo embedded). */
+  saveCliente: () => void
   saveClienteAndClose: () => void
 }
 
 // Siglas dos estados brasileiros em ordem alfabética
 const ESTADOS_BRASILEIROS = [
-  { sigla: 'AC', nome: 'Acre' },
-  { sigla: 'AL', nome: 'Alagoas' },
-  { sigla: 'AP', nome: 'Amapá' },
-  { sigla: 'AM', nome: 'Amazonas' },
-  { sigla: 'BA', nome: 'Bahia' },
-  { sigla: 'CE', nome: 'Ceará' },
-  { sigla: 'DF', nome: 'Distrito Federal' },
-  { sigla: 'ES', nome: 'Espírito Santo' },
-  { sigla: 'GO', nome: 'Goiás' },
-  { sigla: 'MA', nome: 'Maranhão' },
-  { sigla: 'MT', nome: 'Mato Grosso' },
-  { sigla: 'MS', nome: 'Mato Grosso do Sul' },
-  { sigla: 'MG', nome: 'Minas Gerais' },
-  { sigla: 'PA', nome: 'Pará' },
-  { sigla: 'PB', nome: 'Paraíba' },
-  { sigla: 'PR', nome: 'Paraná' },
-  { sigla: 'PE', nome: 'Pernambuco' },
-  { sigla: 'PI', nome: 'Piauí' },
-  { sigla: 'RJ', nome: 'Rio de Janeiro' },
-  { sigla: 'RN', nome: 'Rio Grande do Norte' },
-  { sigla: 'RS', nome: 'Rio Grande do Sul' },
-  { sigla: 'RO', nome: 'Rondônia' },
-  { sigla: 'RR', nome: 'Roraima' },
-  { sigla: 'SC', nome: 'Santa Catarina' },
-  { sigla: 'SP', nome: 'São Paulo' },
-  { sigla: 'SE', nome: 'Sergipe' },
-  { sigla: 'TO', nome: 'Tocantins' },
+  { sigla: 'AC', nome: 'ACRE' },
+  { sigla: 'AL', nome: 'ALAGOAS' },
+  { sigla: 'AP', nome: 'AMAPÁ' },
+  { sigla: 'AM', nome: 'AMAZONAS' },
+  { sigla: 'BA', nome: 'BAHIA' },
+  { sigla: 'CE', nome: 'CEARÁ' },
+  { sigla: 'DF', nome: 'DISTRITO FEDERAL' },
+  { sigla: 'ES', nome: 'ESPÍRITO SANTO' },
+  { sigla: 'GO', nome: 'GOIÁS' },
+  { sigla: 'MA', nome: 'MARANHÃO' },
+  { sigla: 'MT', nome: 'MATO GROSSO' },
+  { sigla: 'MS', nome: 'MATO GROSSO DO SUL' },
+  { sigla: 'MG', nome: 'MINAS GERAIS' },
+  { sigla: 'PA', nome: 'PARÁ' },
+  { sigla: 'PB', nome: 'PARAÍBA' },
+  { sigla: 'PR', nome: 'PARANÁ' },
+  { sigla: 'PE', nome: 'PERNAMBUCO' },
+  { sigla: 'PI', nome: 'PIAUÍ' },
+  { sigla: 'RJ', nome: 'RIO DE JANEIRO' },
+  { sigla: 'RN', nome: 'RIO GRANDE DO NORTE' },
+  { sigla: 'RS', nome: 'RIO GRANDE DO SUL' },
+  { sigla: 'RO', nome: 'RONDÔNIA' },
+  { sigla: 'RR', nome: 'RORAIMA' },
+  { sigla: 'SC', nome: 'SANTA CATARINA' },
+  { sigla: 'SP', nome: 'SÃO PAULO' },
+  { sigla: 'SE', nome: 'SERGIPE' },
+  { sigla: 'TO', nome: 'TOCANTINS' },
 ]
 
 /** Indicador da inscrição estadual (padrão SPED / documentação fiscal) */
 const INDICADOR_IE_OPCOES = [
-  { value: '1', label: 'Contribuinte ICMS' },
-  { value: '2', label: 'Contribuinte isento de IE' },
-  { value: '9', label: 'Não contribuinte' },
+  { value: '1', label: 'CONTRIBUINTE ICMS' },
+  { value: '2', label: 'CONTRIBUINTE ISENTO DE IE' },
+  { value: '9', label: 'NÃO CONTRIBUINTE' },
 ] as const
 
 /** Somente contribuinte ICMS (1) permite editar IE; nos demais o campo fica fixo em ISENTO. */
@@ -149,7 +151,11 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
       fontSize: '14px',
     },
   } as const
-  const UPPERCASE_INPUT_PROPS = { style: { textTransform: 'uppercase' } } as const
+  /**
+   * Força apenas o texto digitado em caixa alta via `onChange` nos campos relevantes.
+   * Não aplicamos `textTransform` aqui porque isso também altera a exibição do placeholder.
+   */
+  const UPPERCASE_INPUT_PROPS = {} as const
 
   const getFormSnapshot = useCallback(() => {
     return JSON.stringify({
@@ -505,6 +511,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
     setEstado('')
     setCodigoCidadeIbge('')
     setCodigoEstadoIbge('')
+    setCidadeValida(null)
 
     try {
       // API ViaCEP - gratuita e pública
@@ -534,16 +541,16 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
 
       // Preenche os campos de endereço automaticamente
       if (data.logradouro) {
-        setRua(data.logradouro)
+        setRua(String(data.logradouro).toLocaleUpperCase('pt-BR'))
       }
       if (data.bairro) {
-        setBairro(data.bairro)
+        setBairro(String(data.bairro).toLocaleUpperCase('pt-BR'))
       }
       if (data.complemento) {
-        setComplemento(data.complemento)
+        setComplemento(String(data.complemento).toLocaleUpperCase('pt-BR'))
       }
       if (data.localidade) {
-        setCidade(data.localidade)
+        setCidade(String(data.localidade).toLocaleUpperCase('pt-BR'))
       }
       if (data.uf) {
         const ufUpper = data.uf.toUpperCase()
@@ -659,12 +666,16 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
 
     try {
       const cepLimpo = cep.replace(/\D/g, '')
+      const toNullableString = (value: string): string | null => {
+        const trimmed = value.trim()
+        return trimmed ? trimmed : null
+      }
 
       const body: any = {
         nome,
-        razaoSocial: razaoSocial || undefined,
-        email: email || undefined,
-        nomeFantasia: nomeFantasia || undefined,
+        razaoSocial: isEditing ? toNullableString(razaoSocial) : razaoSocial || undefined,
+        email: isEditing ? toNullableString(email) : email || undefined,
+        nomeFantasia: isEditing ? toNullableString(nomeFantasia) : nomeFantasia || undefined,
         ativo,
       }
 
@@ -672,7 +683,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
       if (indicadorInscricaoEstadual.trim()) {
         body.indicadorInscricaoEstadual = indicadorInscricaoEstadual.trim()
       }
-      body.inscricaoEstadual = inscricaoEstadual.trim()
+      body.inscricaoEstadual = isEditing ? toNullableString(inscricaoEstadual) : inscricaoEstadual.trim()
 
       // CPF e CNPJ: na edição envia o que estiver no formulário (ambos se preenchidos); string vazia limpa no backend
       if (isEditing) {
@@ -691,13 +702,13 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
       if (incluirEndereco) {
         // Se o switch estiver ativado, envia os dados do endereço
         body.endereco = {
-          rua: rua || undefined,
-          numero: numero || undefined,
-          bairro: bairro || undefined,
-          cidade: cidade || undefined,
+          rua: isEditing ? toNullableString(rua) : rua || undefined,
+          numero: isEditing ? toNullableString(numero) : numero || undefined,
+          bairro: isEditing ? toNullableString(bairro) : bairro || undefined,
+          cidade: isEditing ? toNullableString(cidade) : cidade || undefined,
           estado: estado || undefined,
-          cep: cepLimpo || undefined,
-          complemento: complemento || undefined,
+          cep: isEditing ? (cepLimpo ? cepLimpo : null) : cepLimpo || undefined,
+          complemento: isEditing ? toNullableString(complemento) : complemento || undefined,
           codigoCidadeIbge: codigoCidadeIbge || undefined,
           codigoEstadoIbge: codigoEstadoIbge || undefined,
         }
@@ -803,6 +814,13 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
       isDirty: () => {
         if (isLoadingCliente) return false
         return getFormSnapshot() !== baselineSerializedRef.current
+      },
+      saveCliente: () => {
+        embeddedCloseAfterSaveRef.current = false
+        const el = document.getElementById(formId)
+        if (el instanceof HTMLFormElement) {
+          el.requestSubmit()
+        }
       },
       saveClienteAndClose: () => {
         embeddedCloseAfterSaveRef.current = true
@@ -917,9 +935,9 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
               <Input
                 label="Nome"
                 value={nome}
-                onChange={(e) => setNome(e.target.value)}
+                onChange={(e) => setNome(e.target.value.toLocaleUpperCase('pt-BR'))}
                 required
-                placeholder="Nome completo"
+                placeholder="Nome Completo"
                 size="small"
                 InputLabelProps={INPUT_LABEL_PROPS}
                 inputProps={UPPERCASE_INPUT_PROPS}
@@ -938,8 +956,8 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
               <Input
                 label="Razão Social"
                 value={razaoSocial}
-                onChange={(e) => setRazaoSocial(e.target.value)}
-                placeholder="Razão social"
+                onChange={(e) => setRazaoSocial(e.target.value.toLocaleUpperCase('pt-BR'))}
+                placeholder="Razão Social"
                 size="small"
                 InputLabelProps={INPUT_LABEL_PROPS}
                 inputProps={UPPERCASE_INPUT_PROPS}
@@ -1087,8 +1105,8 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
             <Input
               label="Nome Fantasia"
               value={nomeFantasia}
-              onChange={(e) => setNomeFantasia(e.target.value)}
-              placeholder="Nome fantasia"
+              onChange={(e) => setNomeFantasia(e.target.value.toLocaleUpperCase('pt-BR'))}
+              placeholder="Nome Fantasia"
               size="small"
               InputLabelProps={INPUT_LABEL_PROPS}
               inputProps={UPPERCASE_INPUT_PROPS}
@@ -1155,7 +1173,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
                   label="Inscrição estadual"
                   value={inscricaoEstadual}
                   onChange={(e) => setInscricaoEstadual(e.target.value)}
-                  placeholder="Número da IE ou ISENTO"
+                  placeholder="Número Da IE Ou Isento"
                   size="small"
                   disabled={!indicadorPermiteEditarIe(indicadorInscricaoEstadual)}
                   InputLabelProps={INPUT_LABEL_PROPS}
@@ -1253,8 +1271,8 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
                 <Input
                   label="Rua"
                   value={rua}
-                  onChange={(e) => setRua(e.target.value)}
-                  placeholder="Nome da rua"
+                  onChange={(e) => setRua(e.target.value.toLocaleUpperCase('pt-BR'))}
+                  placeholder="Nome Da Rua"
                   size="small"
                   InputLabelProps={INPUT_LABEL_PROPS}
                   inputProps={UPPERCASE_INPUT_PROPS}
@@ -1295,7 +1313,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
                 <Input
                   label="Bairro"
                   value={bairro}
-                  onChange={(e) => setBairro(e.target.value)}
+                  onChange={(e) => setBairro(e.target.value.toLocaleUpperCase('pt-BR'))}
                   placeholder="Bairro"
                   size="small"
                   className="col-span-2"
@@ -1316,7 +1334,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
                 <Input
                   label="Complemento"
                   value={complemento}
-                  onChange={(e) => setComplemento(e.target.value)}
+                  onChange={(e) => setComplemento(e.target.value.toLocaleUpperCase('pt-BR'))}
                   placeholder="Complemento"
                   size="small"
                   InputLabelProps={INPUT_LABEL_PROPS}
@@ -1361,11 +1379,11 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
                     onChange={setCidade}
                     estado={estado}
                     label="Cidade"
-                    placeholder="Digite o nome da cidade"
+                    placeholder="Digite O Nome Da Cidade"
                     required={false}
                     disabled={!estado}
                     onValidationChange={setCidadeValida}
-                    onCidadeSelecionada={setCodigoCidadeIbge}
+                    onCidadeSelecionada={(_, codigoIbge) => setCodigoCidadeIbge(codigoIbge)}
                     className="w-full"
                     size="small"
                     sx={{
@@ -1377,7 +1395,6 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
                       '& .MuiInputBase-input': {
                         padding: '8px 14px',
                         fontSize: '14px',
-                        textTransform: 'uppercase',
                       },
                     }}
                   />

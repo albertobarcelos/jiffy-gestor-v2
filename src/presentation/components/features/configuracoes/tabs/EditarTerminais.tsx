@@ -55,6 +55,9 @@ const sxEntradaTerminal = {
   '& .MuiSelect-select': entradaCompactaSelect,
 } as const
 
+/** Nome do terminal digitado em maiúsculas. */
+const maiusculasPt = (valor: string) => valor.toLocaleUpperCase('pt-BR')
+
 interface EditarTerminaisProps {
   terminalId: string
   isEmbedded?: boolean
@@ -244,7 +247,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
       const data: TerminalData = await response.json()
 
       // Preenche campos do formulário
-      setNomeTerminal(data.nome || '')
+      setNomeTerminal(maiusculasPt(data.nome || ''))
       setModeloDispositivo(data.modeloDispositivo || '')
       setVersaoApk(data.versaoApk || '')
     } catch (error) {
@@ -483,7 +486,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                 <Input
                   label="Nome do Terminal"
                   value={nomeTerminal}
-                  onChange={e => setNomeTerminal(e.target.value)}
+                  onChange={e => setNomeTerminal(maiusculasPt(e.target.value))}
                   placeholder="Digite o nome do Terminal"
                   size="small"
                   required

@@ -47,6 +47,9 @@ const sxEntradaCompactaMeioPagamento = {
   '& .MuiSelect-select': entradaCompactaSelect,
 } as const
 
+/** Nome do meio de pagamento em maiúsculas. */
+const maiusculasPt = (valor: string) => valor.toLocaleUpperCase('pt-BR')
+
 interface NovoMeioPagamentoProps {
   meioPagamentoId?: string
   isEmbedded?: boolean
@@ -179,7 +182,7 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
           const data = await response.json()
           const meioPagamento = MeioPagamento.fromJSON(data)
 
-          setNome(meioPagamento.getNome())
+          setNome(maiusculasPt(meioPagamento.getNome() || ''))
           setTefAtivo(meioPagamento.isTefAtivo())
           // Garantir que o valor está em lowercase para corresponder às opções do select
           const formaFiscal = meioPagamento.getFormaPagamentoFiscal().toLowerCase()
@@ -340,7 +343,7 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
               <Input
                 label="Nome do Meio de Pagamento"
                 value={nome}
-                onChange={(e) => setNome(e.target.value)}
+                onChange={(e) => setNome(maiusculasPt(e.target.value))}
                 required
                 size="small"
                 placeholder="Digite o nome do meio de pagamento"

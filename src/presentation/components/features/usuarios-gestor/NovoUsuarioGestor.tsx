@@ -610,7 +610,7 @@ export const NovoUsuarioGestor = forwardRef<NovoUsuarioGestorHandle, NovoUsuario
                       const id = String(selected)
                       const p = perfisGestor.find((x) => x.id === id)
                       return (
-                        <span className="font-nunito uppercase">
+                        <span className="font-nunito ">
                           {p ? p.role : id}
                         </span>
                       )
@@ -620,14 +620,11 @@ export const NovoUsuarioGestor = forwardRef<NovoUsuarioGestorHandle, NovoUsuario
                     'aria-label': 'Perfil gestor do usuário',
                   }}
                 >
-                  <MenuItem value="">
-                    <em>Selecione um perfil gestor...</em>
-                  </MenuItem>
+                  
                   {perfisGestor.map((perfil) => (
                     <MenuItem
                       key={perfil.id}
                       value={perfil.id}
-                      sx={{ textTransform: 'uppercase' }}
                     >
                       {perfil.role}
                     </MenuItem>
@@ -735,7 +732,7 @@ export const NovoUsuarioGestor = forwardRef<NovoUsuarioGestorHandle, NovoUsuario
                 </div>
               ) : !perfilGestorCompleto ? (
                 <div className="flex items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-6">
-                  <JiffyLoading className="!gap-0 !py-0" size={24} />
+                  <JiffyLoading className="!gap-0 !py-0" />
                 </div>
               ) : (
                 <div className="space-y-0">

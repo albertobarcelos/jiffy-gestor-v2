@@ -28,6 +28,8 @@ interface PerfisUsuariosListProps {
  * Replica exatamente o design e lógica do Flutter
  */
 export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
+  const PERFIS_PAGE_LIMIT = 25
+  const USUARIOS_PAGE_LIMIT = 25
   const [perfis, setPerfis] = useState<PerfilUsuario[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
@@ -77,12 +79,15 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
         const contagens = await Promise.all(
           perfilIds.map(async (perfilId) => {
             try {
-              const response = await fetch(`/api/usuarios?perfilPdvId=${perfilId}&limit=1&offset=0`, {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                  'Content-Type': 'application/json',
-                },
-              })
+              const response = await fetch(
+                `/api/usuarios?perfilPdvId=${perfilId}&limit=${USUARIOS_PAGE_LIMIT}&offset=0`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                }
+              )
 
               if (response.ok) {
                 const data = await response.json()
@@ -132,7 +137,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
         // Loop para carregar todas as páginas
         while (hasMore) {
           const params = new URLSearchParams({
-            limit: '10',
+            limit: PERFIS_PAGE_LIMIT.toString(),
             offset: currentOffset.toString(),
           })
 
@@ -167,8 +172,8 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
           }
 
           // Verifica se há mais páginas
-          // Se retornou menos de 10 itens, não há mais páginas
-          hasMore = newPerfis.length === 10
+          // Se retornou menos do limit, não há mais páginas
+          hasMore = newPerfis.length === PERFIS_PAGE_LIMIT
           currentOffset += newPerfis.length
         }
 
@@ -196,12 +201,15 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
       if (!token || usuariosPorPerfil[perfilId]) return
 
       try {
-        const response = await fetch(`/api/usuarios?perfilPdvId=${perfilId}&limit=100&offset=0`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
+        const response = await fetch(
+          `/api/usuarios?perfilPdvId=${perfilId}&limit=${USUARIOS_PAGE_LIMIT}&offset=0`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        )
 
         if (response.ok) {
           const data = await response.json()
@@ -278,12 +286,15 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
         showToast.error(error.message || 'Erro ao atualizar status do usuário')
 
         // Reverte a atualização otimista em caso de erro
-        const response = await fetch(`/api/usuarios?perfilPdvId=${perfilId}&limit=100&offset=0`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
+        const response = await fetch(
+          `/api/usuarios?perfilPdvId=${perfilId}&limit=${USUARIOS_PAGE_LIMIT}&offset=0`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        )
 
         if (response.ok) {
           const data = await response.json()
@@ -564,7 +575,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
                     <MdKeyboardArrowRight size={18} />
                   </span>
                 </button>
-                <div className="md:flex-[3] flex-[2] uppercase font-normal text-left md:text-sm text-xs text-primary-text flex items-center gap-2">
+                <div className="md:flex-[3] flex-[2] font-normal text-left md:text-sm text-xs text-primary-text flex items-center gap-2">
                   {perfil.getRole()}
                   <button
                     type="button"
@@ -610,7 +621,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
                         <div className="flex items-center justify-start gap-2 w-full">
                           <div className="flex flex-col">
                             <div className="flex items-center gap-2">
-                              <p className="uppercase font-normal text-sm text-primary-text">
+                              <p className=" font-normal text-sm text-primary-text">
                                 {usuario.nome}
                               </p>
                               <button

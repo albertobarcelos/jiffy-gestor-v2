@@ -53,35 +53,38 @@ const sxEntradaEmpresa = {
   '& .MuiSelect-select': entradaCompactaSelect,
 } as const
 
+/** Digitação em maiúsculas (e-mail e selects com valor técnico ficam de fora). */
+const maiusculasPt = (valor: string) => valor.toLocaleUpperCase('pt-BR')
+
 // Siglas dos estados brasileiros em ordem alfabética
 const ESTADOS_BRASILEIROS = [
-  { sigla: 'AC', nome: 'Acre' },
-  { sigla: 'AL', nome: 'Alagoas' },
-  { sigla: 'AP', nome: 'Amapá' },
-  { sigla: 'AM', nome: 'Amazonas' },
-  { sigla: 'BA', nome: 'Bahia' },
-  { sigla: 'CE', nome: 'Ceará' },
-  { sigla: 'DF', nome: 'Distrito Federal' },
-  { sigla: 'ES', nome: 'Espírito Santo' },
-  { sigla: 'GO', nome: 'Goiás' },
-  { sigla: 'MA', nome: 'Maranhão' },
-  { sigla: 'MT', nome: 'Mato Grosso' },
-  { sigla: 'MS', nome: 'Mato Grosso do Sul' },
-  { sigla: 'MG', nome: 'Minas Gerais' },
-  { sigla: 'PA', nome: 'Pará' },
-  { sigla: 'PB', nome: 'Paraíba' },
-  { sigla: 'PR', nome: 'Paraná' },
-  { sigla: 'PE', nome: 'Pernambuco' },
-  { sigla: 'PI', nome: 'Piauí' },
-  { sigla: 'RJ', nome: 'Rio de Janeiro' },
-  { sigla: 'RN', nome: 'Rio Grande do Norte' },
-  { sigla: 'RS', nome: 'Rio Grande do Sul' },
-  { sigla: 'RO', nome: 'Rondônia' },
-  { sigla: 'RR', nome: 'Roraima' },
-  { sigla: 'SC', nome: 'Santa Catarina' },
-  { sigla: 'SP', nome: 'São Paulo' },
-  { sigla: 'SE', nome: 'Sergipe' },
-  { sigla: 'TO', nome: 'Tocantins' },
+  { sigla: 'AC', nome: 'ACRE' },
+  { sigla: 'AL', nome: 'ALAGOAS' },
+  { sigla: 'AP', nome: 'AMAPÁ' },
+  { sigla: 'AM', nome: 'AMAZONAS' },
+  { sigla: 'BA', nome: 'BAHIA' },
+  { sigla: 'CE', nome: 'CEARÁ' },
+  { sigla: 'DF', nome: 'DISTRITO FEDERAL' },
+  { sigla: 'ES', nome: 'ESPÍRITO SANTO' },
+  { sigla: 'GO', nome: 'GOIÁS' },
+  { sigla: 'MA', nome: 'MARANHÃO' },
+  { sigla: 'MT', nome: 'MATO GROSSO' },
+  { sigla: 'MS', nome: 'MATO GROSSO DO SUL' },
+  { sigla: 'MG', nome: 'MINAS GERAIS' },
+  { sigla: 'PA', nome: 'PARÁ' },
+  { sigla: 'PB', nome: 'PARAÍBA' },
+  { sigla: 'PR', nome: 'PARANÁ' },
+  { sigla: 'PE', nome: 'PERNAMBUCO' },
+  { sigla: 'PI', nome: 'PIAUÍ' },
+  { sigla: 'RJ', nome: 'RIO DE JANEIRO' },
+  { sigla: 'RN', nome: 'RIO GRANDE DO NORTE' },
+  { sigla: 'RS', nome: 'RIO GRANDE DO SUL' },
+  { sigla: 'RO', nome: 'RONDÔNIA' },
+  { sigla: 'RR', nome: 'RORAIMA' },
+  { sigla: 'SC', nome: 'SANTA CATARINA' },
+  { sigla: 'SP', nome: 'SÃO PAULO' },
+  { sigla: 'SE', nome: 'SERGIPE' },
+  { sigla: 'TO', nome: 'TOCANTINS' },
 ]
 
 /** Fusos IANA usados no Brasil (campo `parametroEmpresa.timezone` na API). */
@@ -179,20 +182,20 @@ export function EmpresaTab() {
           setEmpresa(empresaData)
 
           // Preencher campos
-          setCnpj(empresaData.getCnpj() || '')
-          setRazaoSocial(empresaData.getRazaoSocial() || '')
-          setNomeFantasia(empresaData.getNomeFantasia() || '')
+          setCnpj(maiusculasPt(empresaData.getCnpj() || ''))
+          setRazaoSocial(maiusculasPt(empresaData.getRazaoSocial() || ''))
+          setNomeFantasia(maiusculasPt(empresaData.getNomeFantasia() || ''))
           setEmail(empresaData.getEmail() || '')
-          setTelefone(empresaData.getTelefone() || '')
+          setTelefone(maiusculasPt(empresaData.getTelefone() || ''))
 
           const endereco = empresaData.getEndereco()
           if (endereco) {
-            setCep(endereco.cep || '')
-            setRua(endereco.rua || '')
-            setNumero(endereco.numero || '')
-            setComplemento(endereco.complemento || '')
-            setBairro(endereco.bairro || '')
-            setCidade(endereco.cidade || '')
+            setCep(maiusculasPt(endereco.cep || ''))
+            setRua(maiusculasPt(endereco.rua || ''))
+            setNumero(maiusculasPt(endereco.numero || ''))
+            setComplemento(maiusculasPt(endereco.complemento || ''))
+            setBairro(maiusculasPt(endereco.bairro || ''))
+            setCidade(maiusculasPt(endereco.cidade || ''))
             setEstado(endereco.estado || '')
 
             // Carregar código IBGE se cidade e estado estiverem preenchidos
@@ -484,7 +487,7 @@ export function EmpresaTab() {
               <Input
                 label="CNPJ"
                 value={cnpj}
-                onChange={e => setCnpj(e.target.value)}
+                onChange={e => setCnpj(maiusculasPt(e.target.value))}
                 disabled={!isEditing}
                 size="small"
                 sx={sxEntradaEmpresa}
@@ -492,7 +495,7 @@ export function EmpresaTab() {
               <Input
                 label="Razão Social"
                 value={razaoSocial}
-                onChange={e => setRazaoSocial(e.target.value)}
+                onChange={e => setRazaoSocial(maiusculasPt(e.target.value))}
                 disabled={!isEditing}
                 size="small"
                 sx={sxEntradaEmpresa}
@@ -500,7 +503,7 @@ export function EmpresaTab() {
               <Input
                 label="Nome Fantasia"
                 value={nomeFantasia}
-                onChange={e => setNomeFantasia(e.target.value)}
+                onChange={e => setNomeFantasia(maiusculasPt(e.target.value))}
                 disabled={!isEditing}
                 size="small"
                 sx={sxEntradaEmpresa}
@@ -517,7 +520,7 @@ export function EmpresaTab() {
               <Input
                 label="Telefone"
                 value={telefone}
-                onChange={e => setTelefone(e.target.value)}
+                onChange={e => setTelefone(maiusculasPt(e.target.value))}
                 disabled={!isEditing}
                 size="small"
                 sx={sxEntradaEmpresa}
@@ -534,7 +537,7 @@ export function EmpresaTab() {
                 <Input
                   label="CEP"
                   value={cep}
-                  onChange={e => setCep(e.target.value)}
+                  onChange={e => setCep(maiusculasPt(e.target.value))}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
@@ -543,7 +546,7 @@ export function EmpresaTab() {
                   <Input
                     label="Rua"
                     value={rua}
-                    onChange={e => setRua(e.target.value)}
+                    onChange={e => setRua(maiusculasPt(e.target.value))}
                     disabled={!isEditing}
                     size="small"
                     sx={sxEntradaEmpresa}
@@ -556,7 +559,7 @@ export function EmpresaTab() {
                 <Input
                   label="Número"
                   value={numero}
-                  onChange={e => setNumero(e.target.value)}
+                  onChange={e => setNumero(maiusculasPt(e.target.value))}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
@@ -564,7 +567,7 @@ export function EmpresaTab() {
                 <Input
                   label="Complemento"
                   value={complemento}
-                  onChange={e => setComplemento(e.target.value)}
+                  onChange={e => setComplemento(maiusculasPt(e.target.value))}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
@@ -572,7 +575,7 @@ export function EmpresaTab() {
                 <Input
                   label="Bairro"
                   value={bairro}
-                  onChange={e => setBairro(e.target.value)}
+                  onChange={e => setBairro(maiusculasPt(e.target.value))}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
@@ -626,7 +629,7 @@ export function EmpresaTab() {
                 <CidadeAutocomplete
                   value={cidade}
                   onChange={novaCidade => {
-                    setCidade(novaCidade)
+                    setCidade(maiusculasPt(novaCidade))
                     if (!novaCidade) {
                       setCodigoCidadeIbge(null)
                       ultimaCidadeBuscada.current = ''
@@ -643,7 +646,7 @@ export function EmpresaTab() {
                     setCodigoCidadeIbge(codigoIbge)
                     ultimaCidadeBuscada.current = nomeCidade
                     setCidadeValida(true)
-                    setCidade(nomeCidade)
+                    setCidade(maiusculasPt(nomeCidade))
                   }}
                   onValidationChange={async isValid => {
                     setCidadeValida(isValid)

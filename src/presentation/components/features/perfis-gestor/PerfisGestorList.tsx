@@ -715,7 +715,7 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
                   </span>
                 </button>
                 <div className="md:flex-[3] font-nunito text-left md:text-sm text-primary-text flex items-center gap-2">
-                  <span className="uppercase font-normal">{perfil.getRole()}</span>
+                  <span className="font-normal">{perfil.getRole()}</span>
                   <button
                     type="button"
                     onClick={(e) => {
@@ -794,7 +794,7 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
                       </span>
                     </button>
                     <span className="text-base font-semibold text-secondary-text">Perfil:</span>
-                    <span className="font-nunito font-normal text-base text-primary-text uppercase max-w-[55%] truncate">
+                    <span className="font-nunito font-normal text-base text-primary-text max-w-[55%] truncate">
                       {perfil.getRole()}
                     </span>
                   </div>

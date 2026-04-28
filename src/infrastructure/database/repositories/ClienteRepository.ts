@@ -153,7 +153,13 @@ export class ClienteRepository implements IClienteRepository {
       const requestBody: any = {}
 
       if (data.nome) requestBody.nome = data.nome
-      if (data.razaoSocial !== undefined) requestBody.razaoSocial = data.razaoSocial || ''
+      if (data.razaoSocial !== undefined) {
+        requestBody.razaoSocial =
+          data.razaoSocial === null ||
+          (typeof data.razaoSocial === 'string' && data.razaoSocial.trim() === '')
+            ? null
+            : data.razaoSocial
+      }
       
       // CPF e CNPJ: 
       // - Se o campo estiver presente no DTO e for string vazia, envia null (para limpar/apagar)
@@ -183,8 +189,20 @@ export class ClienteRepository implements IClienteRepository {
           requestBody.telefone = t.replace(/\D/g, '')
         }
       }
-      if (data.email !== undefined) requestBody.email = data.email || ''
-      if (data.nomeFantasia !== undefined) requestBody.nomeFantasia = data.nomeFantasia || ''
+      if (data.email !== undefined) {
+        // Email: string vazia pode ser rejeitada pela API externa; usar null para limpar.
+        requestBody.email =
+          data.email === null || (typeof data.email === 'string' && data.email.trim() === '')
+            ? null
+            : data.email
+      }
+      if (data.nomeFantasia !== undefined) {
+        requestBody.nomeFantasia =
+          data.nomeFantasia === null ||
+          (typeof data.nomeFantasia === 'string' && data.nomeFantasia.trim() === '')
+            ? null
+            : data.nomeFantasia
+      }
       if (data.indicadorInscricaoEstadual !== undefined) {
         requestBody.indicadorInscricaoEstadual = data.indicadorInscricaoEstadual
       }
@@ -208,15 +226,21 @@ export class ClienteRepository implements IClienteRepository {
         requestBodyCompleto: JSON.stringify(requestBody, null, 2),
       })
 
+      // Endereço: a API externa não aceita null nestes campos; string vazia representa limpar.
       if (data.endereco) {
+        const enderecoLimpo = (
+          v: string | null | undefined
+        ): string =>
+          v === null || (typeof v === 'string' && v.trim() === '') ? '' : (v ?? '')
+
         requestBody.endereco = {
-          rua: data.endereco.rua || '',
-          numero: data.endereco.numero || '',
-          bairro: data.endereco.bairro || '',
-          cidade: data.endereco.cidade || '',
-          estado: data.endereco.estado || '',
-          cep: data.endereco.cep || '',
-          complemento: data.endereco.complemento || '',
+          rua: enderecoLimpo(data.endereco.rua),
+          numero: enderecoLimpo(data.endereco.numero),
+          bairro: enderecoLimpo(data.endereco.bairro),
+          cidade: enderecoLimpo(data.endereco.cidade),
+          estado: data.endereco.estado?.trim() ?? '',
+          cep: enderecoLimpo(data.endereco.cep),
+          complemento: enderecoLimpo(data.endereco.complemento),
         }
       }
 

@@ -6,13 +6,7 @@ import { showToast } from '@/src/shared/utils/toast'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Label } from '@/src/presentation/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/src/presentation/components/ui/select'
+import { MenuItem } from '@mui/material'
 import { MdCheckCircle, MdError, MdSave } from 'react-icons/md'
 import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -44,36 +38,104 @@ interface ConfiguracaoFiscal {
   contribuinteIcms?: boolean
 }
 
-// Siglas dos estados brasileiros em ordem alfabética
+/** Labels outlined — alinhado a EmpresaTab / NovoMeioPagamento */
+const sxOutlinedLabelTextoEscuro = {
+  '& .MuiInputLabel-root': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiInputLabel-root.Mui-focused': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiInputLabel-root.MuiInputLabel-shrink': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiFormLabel-asterisk': {
+    color: 'var(--color-error)',
+  },
+} as const
+
+const entradaCompactaInput = {
+  padding: '12px 10px',
+  fontSize: '0.875rem',
+} as const
+
+const entradaCompactaSelect = {
+  padding: '12px 10px',
+  fontSize: '0.875rem',
+  minHeight: '1.5em',
+  lineHeight: 1.4,
+  display: 'flex',
+  alignItems: 'center',
+} as const
+
+const sxEntradaConfig = {
+  ...sxOutlinedLabelTextoEscuro,
+  '& .MuiOutlinedInput-root': {
+    backgroundColor: '#fff',
+    borderRadius: '8px',
+  },
+  '& .MuiOutlinedInput-notchedOutline': {
+    borderColor: 'rgba(0, 0, 0, 0.23)',
+  },
+  '& .MuiOutlinedInput-input': entradaCompactaInput,
+  '& .MuiOutlinedInput-input.Mui-disabled': {
+    WebkitTextFillColor: 'var(--color-primary-text)',
+    opacity: 0.85,
+  },
+  '& .MuiSelect-select': entradaCompactaSelect,
+} as const
+
+/** Maiúsculas em campos de texto (exceto e-mail). */
+const maiusculasPt = (valor: string) => valor.toLocaleUpperCase('pt-BR')
+
+// Siglas dos estados brasileiros em ordem alfabética (rótulos em maiúsculas — mesmo padrão EmpresaTab)
 const ESTADOS_BRASILEIROS = [
-  { sigla: 'AC', nome: 'Acre' },
-  { sigla: 'AL', nome: 'Alagoas' },
-  { sigla: 'AP', nome: 'Amapá' },
-  { sigla: 'AM', nome: 'Amazonas' },
-  { sigla: 'BA', nome: 'Bahia' },
-  { sigla: 'CE', nome: 'Ceará' },
-  { sigla: 'DF', nome: 'Distrito Federal' },
-  { sigla: 'ES', nome: 'Espírito Santo' },
-  { sigla: 'GO', nome: 'Goiás' },
-  { sigla: 'MA', nome: 'Maranhão' },
-  { sigla: 'MT', nome: 'Mato Grosso' },
-  { sigla: 'MS', nome: 'Mato Grosso do Sul' },
-  { sigla: 'MG', nome: 'Minas Gerais' },
-  { sigla: 'PA', nome: 'Pará' },
-  { sigla: 'PB', nome: 'Paraíba' },
-  { sigla: 'PR', nome: 'Paraná' },
-  { sigla: 'PE', nome: 'Pernambuco' },
-  { sigla: 'PI', nome: 'Piauí' },
-  { sigla: 'RJ', nome: 'Rio de Janeiro' },
-  { sigla: 'RN', nome: 'Rio Grande do Norte' },
-  { sigla: 'RS', nome: 'Rio Grande do Sul' },
-  { sigla: 'RO', nome: 'Rondônia' },
-  { sigla: 'RR', nome: 'Roraima' },
-  { sigla: 'SC', nome: 'Santa Catarina' },
-  { sigla: 'SP', nome: 'São Paulo' },
-  { sigla: 'SE', nome: 'Sergipe' },
-  { sigla: 'TO', nome: 'Tocantins' },
+  { sigla: 'AC', nome: 'ACRE' },
+  { sigla: 'AL', nome: 'ALAGOAS' },
+  { sigla: 'AP', nome: 'AMAPÁ' },
+  { sigla: 'AM', nome: 'AMAZONAS' },
+  { sigla: 'BA', nome: 'BAHIA' },
+  { sigla: 'CE', nome: 'CEARÁ' },
+  { sigla: 'DF', nome: 'DISTRITO FEDERAL' },
+  { sigla: 'ES', nome: 'ESPÍRITO SANTO' },
+  { sigla: 'GO', nome: 'GOIÁS' },
+  { sigla: 'MA', nome: 'MARANHÃO' },
+  { sigla: 'MT', nome: 'MATO GROSSO' },
+  { sigla: 'MS', nome: 'MATO GROSSO DO SUL' },
+  { sigla: 'MG', nome: 'MINAS GERAIS' },
+  { sigla: 'PA', nome: 'PARÁ' },
+  { sigla: 'PB', nome: 'PARAÍBA' },
+  { sigla: 'PR', nome: 'PARANÁ' },
+  { sigla: 'PE', nome: 'PERNAMBUCO' },
+  { sigla: 'PI', nome: 'PIAUÍ' },
+  { sigla: 'RJ', nome: 'RIO DE JANEIRO' },
+  { sigla: 'RN', nome: 'RIO GRANDE DO NORTE' },
+  { sigla: 'RS', nome: 'RIO GRANDE DO SUL' },
+  { sigla: 'RO', nome: 'RONDÔNIA' },
+  { sigla: 'RR', nome: 'RORAIMA' },
+  { sigla: 'SC', nome: 'SANTA CATARINA' },
+  { sigla: 'SP', nome: 'SÃO PAULO' },
+  { sigla: 'SE', nome: 'SERGIPE' },
+  { sigla: 'TO', nome: 'TOCANTINS' },
 ]
+
+/**
+ * Converte UF vinda da API para sigla existente no Select.
+ * Evita `value` inválido no select de UF (opções só com sigla de 2 letras).
+ */
+function normalizarSiglaUf(raw: string | undefined | null): string {
+  if (raw == null) return ''
+  const t = String(raw).trim()
+  if (!t) return ''
+  const sigla = t.toUpperCase()
+  if (ESTADOS_BRASILEIROS.some((e) => e.sigla === sigla)) {
+    return sigla
+  }
+  const porNome = ESTADOS_BRASILEIROS.find(
+    (e) => e.nome.localeCompare(t, 'pt-BR', { sensitivity: 'accent' }) === 0
+  )
+  return porNome?.sigla ?? ''
+}
 
 /** Máscara CNPJ 00.000.000/0000-00 a partir de qualquer string (só dígitos contam) */
 function formatarCnpjMascara(valor: string): string {
@@ -171,25 +233,33 @@ export function ConfiguracaoEmpresaCompleta() {
         
         setFormDataEmpresa({
           cnpj: formatarCnpjMascara(empresaData.cnpj || ''),
-          razaoSocial: empresaData.razaoSocial || empresaData.nome || '',
-          nomeFantasia: empresaData.nomeFantasia || '',
+          razaoSocial: maiusculasPt(
+            String(empresaData.razaoSocial || empresaData.nome || '')
+          ),
+          nomeFantasia: maiusculasPt(String(empresaData.nomeFantasia || '')),
           email: empresaData.email || '',
           telefone: formatarTelefoneMascara(empresaData.telefone || ''),
           cep: formatarCepMascara(empresaData.endereco?.cep || ''),
-          rua: empresaData.endereco?.rua || empresaData.endereco?.logradouro || '',
-          numero: empresaData.endereco?.numero || '',
-          complemento: empresaData.endereco?.complemento || '',
-          bairro: empresaData.endereco?.bairro || '',
-          cidade: empresaData.endereco?.cidade || '',
-          estado: empresaData.endereco?.estado || empresaData.endereco?.uf || '',
+          rua: maiusculasPt(
+            String(empresaData.endereco?.rua || empresaData.endereco?.logradouro || '')
+          ),
+          numero: maiusculasPt(String(empresaData.endereco?.numero || '')),
+          complemento: maiusculasPt(String(empresaData.endereco?.complemento || '')),
+          bairro: maiusculasPt(String(empresaData.endereco?.bairro || '')),
+          cidade: maiusculasPt(String(empresaData.endereco?.cidade || '')),
+          estado: normalizarSiglaUf(
+            empresaData.endereco?.estado || empresaData.endereco?.uf || ''
+          ),
         })
         
-        // Carregar código IBGE se cidade e estado estiverem preenchidos
-        if (empresaData.endereco?.cidade && (empresaData.endereco?.estado || empresaData.endereco?.uf)) {
-          const cidade = empresaData.endereco.cidade
-          const estado = empresaData.endereco.estado || empresaData.endereco.uf || ''
+        // Carregar código IBGE se cidade e UF estiverem preenchidos (UF já normalizada acima)
+        const ufParaIbge = normalizarSiglaUf(
+          empresaData.endereco?.estado || empresaData.endereco?.uf || ''
+        )
+        if (empresaData.endereco?.cidade && ufParaIbge) {
+          const cidade = maiusculasPt(String(empresaData.endereco.cidade))
           ultimaCidadeBuscada.current = cidade
-          buscarCodigoIbge(cidade, estado)
+          buscarCodigoIbge(cidade, ufParaIbge)
         } else {
           atualizarCodigoIbge(null)
           ultimaCidadeBuscada.current = ''
@@ -534,95 +604,92 @@ export function ConfiguracaoEmpresaCompleta() {
               Dados da Empresa
             </h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-              <div className="space-y-2">
-                <Label htmlFor="cnpj">CNPJ *</Label>
-                <Input
-                  id="cnpj"
-                  inputProps={{ inputMode: 'numeric', autoComplete: 'off' }}
-                  value={formDataEmpresa.cnpj}
-                  onChange={e => {
-                    const mascarado = formatarCnpjMascara(e.target.value)
-                    setFormDataEmpresa(prev => ({ ...prev, cnpj: mascarado }))
-                  }}
-                  placeholder="00.000.000/0000-00"
-                  required
-                  size="small"
-                />
-              </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <Input
+                label="CNPJ"
+                inputProps={{ inputMode: 'numeric', autoComplete: 'off' }}
+                value={formDataEmpresa.cnpj}
+                onChange={e => {
+                  const mascarado = formatarCnpjMascara(e.target.value)
+                  setFormDataEmpresa(prev => ({ ...prev, cnpj: mascarado }))
+                }}
+                placeholder="00.000.000/0000-00"
+                required
+                size="small"
+                sx={sxEntradaConfig}
+                InputLabelProps={{ required: true }}
+              />
 
-              <div className="space-y-2">
-                <Label htmlFor="razaoSocial">Razão Social *</Label>
-                <Input
-                  id="razaoSocial"
-                  value={formDataEmpresa.razaoSocial}
-                  onChange={(e) =>
-                    setFormDataEmpresa({ ...formDataEmpresa, razaoSocial: e.target.value })
-                  }
-                  placeholder="Nome da empresa"
-                  required
-                  size="small"
-                />
-              </div>
+              <Input
+                label="Razão Social"
+                value={formDataEmpresa.razaoSocial}
+                onChange={e =>
+                  setFormDataEmpresa(prev => ({
+                    ...prev,
+                    razaoSocial: maiusculasPt(e.target.value),
+                  }))
+                }
+                placeholder="Nome da empresa"
+                required
+                size="small"
+                sx={sxEntradaConfig}
+                InputLabelProps={{ required: true }}
+              />
 
-              <div className="space-y-2">
-                <Label htmlFor="nomeFantasia">Nome Fantasia</Label>
-                <Input
-                  id="nomeFantasia"
-                  value={formDataEmpresa.nomeFantasia}
-                  onChange={(e) =>
-                    setFormDataEmpresa({ ...formDataEmpresa, nomeFantasia: e.target.value })
-                  }
-                  placeholder="Nome fantasia"
-                  size="small"
-                />
-              </div>
+              <Input
+                label="Nome Fantasia"
+                value={formDataEmpresa.nomeFantasia}
+                onChange={e =>
+                  setFormDataEmpresa(prev => ({
+                    ...prev,
+                    nomeFantasia: maiusculasPt(e.target.value),
+                  }))
+                }
+                placeholder="Nome fantasia"
+                size="small"
+                sx={sxEntradaConfig}
+              />
 
-              <div className="space-y-2">
-                <Label htmlFor="email">E-mail</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formDataEmpresa.email}
-                  onChange={(e) =>
-                    setFormDataEmpresa({ ...formDataEmpresa, email: e.target.value })
-                  }
-                  placeholder="email@empresa.com"
-                  size="small"
-                />
-              </div>
+              <Input
+                type="email"
+                label="E-mail"
+                value={formDataEmpresa.email}
+                onChange={e =>
+                  setFormDataEmpresa(prev => ({ ...prev, email: e.target.value }))
+                }
+                placeholder="email@empresa.com"
+                size="small"
+                sx={sxEntradaConfig}
+              />
 
-              <div className="space-y-2">
-                <Label htmlFor="telefone">Telefone</Label>
-                <Input
-                  id="telefone"
-                  inputProps={{ inputMode: 'numeric', autoComplete: 'tel' }}
-                  value={formDataEmpresa.telefone}
-                  onChange={e => {
-                    const raw = e.target.value
-                    const newDigits = raw.replace(/\D/g, '').slice(0, 11)
-                    setFormDataEmpresa(prev => {
-                      const prevMasked = prev.telefone
-                      const prevDigits = prevMasked.replace(/\D/g, '')
-                      // Apagou só ), espaço ou - no fim: dígitos iguais mas texto mais curto — remove 1 dígito
-                      const apagouPontuacaoNoFim =
-                        raw.length < prevMasked.length &&
-                        newDigits === prevDigits &&
-                        prevDigits.length > 0 &&
-                        raw === prevMasked.slice(0, raw.length)
-                      if (apagouPontuacaoNoFim) {
-                        return {
-                          ...prev,
-                          telefone: formatarTelefoneMascara(prevDigits.slice(0, -1)),
-                        }
+              <Input
+                label="Telefone"
+                inputProps={{ inputMode: 'numeric', autoComplete: 'tel' }}
+                value={formDataEmpresa.telefone}
+                onChange={e => {
+                  const raw = e.target.value
+                  const newDigits = raw.replace(/\D/g, '').slice(0, 11)
+                  setFormDataEmpresa(prev => {
+                    const prevMasked = prev.telefone
+                    const prevDigits = prevMasked.replace(/\D/g, '')
+                    const apagouPontuacaoNoFim =
+                      raw.length < prevMasked.length &&
+                      newDigits === prevDigits &&
+                      prevDigits.length > 0 &&
+                      raw === prevMasked.slice(0, raw.length)
+                    if (apagouPontuacaoNoFim) {
+                      return {
+                        ...prev,
+                        telefone: formatarTelefoneMascara(prevDigits.slice(0, -1)),
                       }
-                      return { ...prev, telefone: formatarTelefoneMascara(newDigits) }
-                    })
-                  }}
-                  placeholder="(00) 00000-0000"
-                  size="small"
-                />
-              </div>
+                    }
+                    return { ...prev, telefone: formatarTelefoneMascara(newDigits) }
+                  })
+                }}
+                placeholder="(00) 00000-0000"
+                size="small"
+                sx={sxEntradaConfig}
+              />
             </div>
           </div>
 
@@ -632,142 +699,146 @@ export function ConfiguracaoEmpresaCompleta() {
               Endereço
             </h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="cep">CEP</Label>
-                <Input
-                  id="cep"
-                  inputProps={{ inputMode: 'numeric', autoComplete: 'postal-code' }}
-                  value={formDataEmpresa.cep}
-                  onChange={e => {
-                    const mascarado = formatarCepMascara(e.target.value)
-                    setFormDataEmpresa(prev => ({ ...prev, cep: mascarado }))
-                  }}
-                  placeholder="00000-000"
-                  size="small"
-                />
-              </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-4">
+              <Input
+                label="CEP"
+                inputProps={{ inputMode: 'numeric', autoComplete: 'postal-code' }}
+                value={formDataEmpresa.cep}
+                onChange={e => {
+                  const mascarado = formatarCepMascara(e.target.value)
+                  setFormDataEmpresa(prev => ({ ...prev, cep: mascarado }))
+                }}
+                placeholder="00000-000"
+                size="small"
+                sx={sxEntradaConfig}
+              />
 
-              <div className="md:col-span-2 space-y-2">
-                <Label htmlFor="rua">Rua</Label>
+              <div className="md:col-span-2">
                 <Input
-                  id="rua"
+                  label="Rua"
                   value={formDataEmpresa.rua}
-                  onChange={(e) =>
-                    setFormDataEmpresa({ ...formDataEmpresa, rua: e.target.value })
+                  onChange={e =>
+                    setFormDataEmpresa(prev => ({
+                      ...prev,
+                      rua: maiusculasPt(e.target.value),
+                    }))
                   }
                   placeholder="Nome da rua"
                   size="small"
+                  sx={sxEntradaConfig}
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="numero">Número</Label>
-                <Input
-                  id="numero"
-                  value={formDataEmpresa.numero}
-                  onChange={(e) =>
-                    setFormDataEmpresa({ ...formDataEmpresa, numero: e.target.value })
-                  }
-                  placeholder="123"
-                  size="small"
-                />
-              </div>
+              <Input
+                label="Número"
+                value={formDataEmpresa.numero}
+                onChange={e =>
+                  setFormDataEmpresa(prev => ({
+                    ...prev,
+                    numero: maiusculasPt(e.target.value),
+                  }))
+                }
+                placeholder="123"
+                size="small"
+                sx={sxEntradaConfig}
+              />
 
-              <div className="space-y-2">
-                <Label htmlFor="complemento">Complemento</Label>
-                <Input
-                  id="complemento"
-                  value={formDataEmpresa.complemento}
-                  onChange={(e) =>
-                    setFormDataEmpresa({ ...formDataEmpresa, complemento: e.target.value })
-                  }
-                  placeholder="Apto, Sala, etc."
-                  size="small"
-                />
-              </div>
+              <Input
+                label="Complemento"
+                value={formDataEmpresa.complemento}
+                onChange={e =>
+                  setFormDataEmpresa(prev => ({
+                    ...prev,
+                    complemento: maiusculasPt(e.target.value),
+                  }))
+                }
+                placeholder="Apto, Sala, etc."
+                size="small"
+                sx={sxEntradaConfig}
+              />
 
-              <div className="space-y-2">
-                <Label htmlFor="bairro">Bairro</Label>
-                <Input
-                  id="bairro"
-                  value={formDataEmpresa.bairro}
-                  onChange={(e) =>
-                    setFormDataEmpresa({ ...formDataEmpresa, bairro: e.target.value })
-                  }
-                  placeholder="Nome do bairro"
-                  size="small"
-                />
-              </div>
+              <Input
+                label="Bairro"
+                value={formDataEmpresa.bairro}
+                onChange={e =>
+                  setFormDataEmpresa(prev => ({
+                    ...prev,
+                    bairro: maiusculasPt(e.target.value),
+                  }))
+                }
+                placeholder="Nome do bairro"
+                size="small"
+                sx={sxEntradaConfig}
+              />
 
-              <div className="space-y-2">
-                <Label htmlFor="estado">Estado (UF) *</Label>
-                <Select
-                  value={formDataEmpresa.estado}
-                  onValueChange={async (value) => {
-                    // Limpa código IBGE ao trocar o estado
-                    const cidadeAnterior = formDataEmpresa.cidade
-                    atualizarCodigoIbge(null) // Limpar estado e ref
-                    ultimaCidadeBuscada.current = ''
-                    setCidadeValida(null)
-                    
-                    // Se havia uma cidade preenchida antes, tentar buscar código IBGE para o novo estado
-                    // Se encontrar, manter a cidade; se não encontrar, limpar
-                    if (cidadeAnterior && cidadeAnterior.trim()) {
-                      // Aguardar um pouco para garantir que o estado foi atualizado
-                      await new Promise(resolve => setTimeout(resolve, 100))
-                      // Tentar buscar código IBGE da cidade no novo estado
-                      const encontrou = await buscarCodigoIbge(cidadeAnterior.trim(), value)
-                      if (encontrou) {
-                        // Cidade existe no novo estado, manter ela
-                        setFormDataEmpresa({ ...formDataEmpresa, estado: value })
-                        setCidadeValida(true)
-                      } else {
-                        // Cidade não existe no novo estado, limpar
-                        setFormDataEmpresa({ ...formDataEmpresa, estado: value, cidade: '' })
-                      }
+              <Input
+                select
+                label="Estado (UF)"
+                value={formDataEmpresa.estado}
+                onChange={async e => {
+                  const value = e.target.value
+                  const cidadeAnterior = formDataEmpresa.cidade
+                  atualizarCodigoIbge(null)
+                  ultimaCidadeBuscada.current = ''
+                  setCidadeValida(null)
+
+                  if (cidadeAnterior && cidadeAnterior.trim()) {
+                    await new Promise(resolve => setTimeout(resolve, 100))
+                    const encontrou = await buscarCodigoIbge(cidadeAnterior.trim(), value)
+                    if (encontrou) {
+                      setFormDataEmpresa(prev => ({ ...prev, estado: value }))
+                      setCidadeValida(true)
                     } else {
-                      // Não havia cidade, apenas atualizar estado
-                      setFormDataEmpresa({ ...formDataEmpresa, estado: value })
+                      setFormDataEmpresa(prev => ({
+                        ...prev,
+                        estado: value,
+                        cidade: '',
+                      }))
                     }
-                  }}
-                  required
-                >
-                  <SelectTrigger id="estado" className="h-10">
-                    <SelectValue placeholder="Selecione o estado" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ESTADOS_BRASILEIROS.map((estado) => (
-                      <SelectItem key={estado.sigla} value={estado.sigla}>
-                        {estado.sigla} - {estado.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                  } else {
+                    setFormDataEmpresa(prev => ({ ...prev, estado: value }))
+                  }
+                }}
+                required
+                size="small"
+                sx={sxEntradaConfig}
+                InputLabelProps={{ required: true, shrink: true }}
+                SelectProps={{ displayEmpty: true }}
+              >
+                <MenuItem value="">
+                  <em>Selecione o estado</em>
+                </MenuItem>
+                {ESTADOS_BRASILEIROS.map(est => (
+                  <MenuItem key={est.sigla} value={est.sigla}>
+                    {est.sigla} - {est.nome}
+                  </MenuItem>
+                ))}
+              </Input>
 
-              <div className="space-y-2">
+              {/* Uma coluna — mesma largura de Número / Complemento / Bairro; terceira coluna fica vazia */}
+              <div className="min-w-0">
                 <CidadeAutocomplete
                   value={formDataEmpresa.cidade}
-                  onChange={(cidade) => {
-                    // Atualizar estado quando cidade é alterada (digitada ou selecionada)
-                    // IMPORTANTE: Se a cidade corresponde a ultimaCidadeBuscada, significa que
-                    // foi selecionada da lista e não devemos limpar o código IBGE
-                    const foiSelecionadaDaLista = ultimaCidadeBuscada.current && 
-                      ultimaCidadeBuscada.current.trim().toLowerCase() === cidade.trim().toLowerCase()
-                    
-                    console.log('onChange chamado:', cidade, 'foiSelecionadaDaLista:', foiSelecionadaDaLista, 'codigoCidadeIbge atual:', codigoCidadeIbge)
-                    
-                    setFormDataEmpresa({ ...formDataEmpresa, cidade })
+                  sx={sxEntradaConfig}
+                  onChange={cidade => {
+                    const cidadeFmt = maiusculasPt(cidade)
+                    const foiSelecionadaDaLista =
+                      ultimaCidadeBuscada.current &&
+                      ultimaCidadeBuscada.current.trim().toLowerCase() ===
+                        cidadeFmt.trim().toLowerCase()
+
+                    console.log('onChange chamado:', cidadeFmt, 'foiSelecionadaDaLista:', foiSelecionadaDaLista, 'codigoCidadeIbge atual:', codigoCidadeIbge)
+
+                    setFormDataEmpresa(prev => ({ ...prev, cidade: cidadeFmt }))
                     
                     // Se a cidade foi apenas digitada (não selecionada da lista) ou foi limpa,
                     // limpar código IBGE para forçar busca quando for validada/selecionada
-                    if (!cidade) {
+                    if (!cidadeFmt) {
                       // Campo foi limpo
                       console.log('Campo limpo, removendo código IBGE')
                       atualizarCodigoIbge(null)
                       ultimaCidadeBuscada.current = ''
-                    } else if (!foiSelecionadaDaLista && cidade.trim().toLowerCase() !== ultimaCidadeBuscada.current?.trim().toLowerCase()) {
+                    } else if (!foiSelecionadaDaLista && cidadeFmt.trim().toLowerCase() !== ultimaCidadeBuscada.current?.trim().toLowerCase()) {
                       // Se o usuário está digitando algo diferente do nome oficial,
                       // E não temos código IBGE ainda (ou seja, não foi selecionado da lista),
                       // limpar código IBGE (será buscado novamente quando validar/selecionar)
@@ -801,7 +872,10 @@ export function ConfiguracaoEmpresaCompleta() {
                     setCidadeValida(true)
                     // Atualizar o estado do formulário com o nome oficial da cidade selecionada
                     // Isso garante que formDataEmpresa.cidade tenha o valor correto IMEDIATAMENTE
-                    setFormDataEmpresa((prev) => ({ ...prev, cidade: nomeCidade }))
+                    setFormDataEmpresa(prev => ({
+                      ...prev,
+                      cidade: maiusculasPt(nomeCidade),
+                    }))
                   }}
                   onValidationChange={async (isValid) => {
                     // IMPORTANTE: Se já temos código IBGE, significa que uma cidade foi selecionada
@@ -824,6 +898,9 @@ export function ConfiguracaoEmpresaCompleta() {
                   }}
                 />
               </div>
+
+              {/* Coluna 3 intencionalmente vazia no desktop (grid 3 colunas) */}
+              <div className="hidden min-h-0 md:block" aria-hidden />
             </div>
           </div>
 
@@ -853,65 +930,67 @@ export function ConfiguracaoEmpresaCompleta() {
               </Label>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Inscrição Estadual — sempre visível, desabilitado quando isento */}
-              <div className="space-y-2">
-                <Label htmlFor="inscricaoEstadual">
-                  Inscrição Estadual (IE){!formDataFiscal.isento && ' *'}
-                </Label>
-                <Input
-                  id="inscricaoEstadual"
-                  value={formDataFiscal.inscricaoEstadual}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/\D/g, '')
-                    setFormDataFiscal({ ...formDataFiscal, inscricaoEstadual: value })
-                  }}
-                  placeholder={formDataFiscal.isento ? 'Isento de IE' : '123456789012'}
-                  inputProps={{ maxLength: 15 }}
-                  disabled={formDataFiscal.isento}
-                  required={!formDataFiscal.isento}
-                  size="small"
-                />
-              </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4">
+              <Input
+                label="Inscrição Estadual (IE)"
+                value={formDataFiscal.inscricaoEstadual}
+                onChange={e => {
+                  const value = e.target.value.replace(/\D/g, '')
+                  setFormDataFiscal(prev => ({ ...prev, inscricaoEstadual: value }))
+                }}
+                placeholder={formDataFiscal.isento ? 'Isento de IE' : '123456789012'}
+                inputProps={{ maxLength: 15 }}
+                disabled={formDataFiscal.isento}
+                required={!formDataFiscal.isento}
+                size="small"
+                sx={sxEntradaConfig}
+                InputLabelProps={{
+                  required: !formDataFiscal.isento,
+                  shrink: true,
+                }}
+              />
 
-              {/* Inscrição Municipal */}
-              <div className="space-y-2">
-                <Label htmlFor="inscricaoMunicipal">Inscrição Municipal (IM)</Label>
-                <Input
-                  id="inscricaoMunicipal"
-                  value={formDataFiscal.inscricaoMunicipal}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/\D/g, '')
-                    setFormDataFiscal({ ...formDataFiscal, inscricaoMunicipal: value })
-                  }}
-                  placeholder="987654"
-                  size="small"
-                />
-              </div>
+              <Input
+                label="Inscrição Municipal (IM)"
+                value={formDataFiscal.inscricaoMunicipal}
+                onChange={e => {
+                  const value = e.target.value.replace(/\D/g, '')
+                  setFormDataFiscal(prev => ({ ...prev, inscricaoMunicipal: value }))
+                }}
+                placeholder="987654"
+                size="small"
+                sx={sxEntradaConfig}
+              />
 
-              {/* Regime Tributário */}
-              <div className="space-y-2">
-                <Label htmlFor="codigoRegimeTributario">Regime Tributário *</Label>
-                <Select
+              <div className="md:col-span-2">
+                <Input
+                  select
+                  label="Regime Tributário"
                   value={formDataFiscal.codigoRegimeTributario}
-                  onValueChange={(value) =>
-                    setFormDataFiscal({ ...formDataFiscal, codigoRegimeTributario: value as '1' | '2' | '3' })
+                  onChange={e =>
+                    setFormDataFiscal(prev => ({
+                      ...prev,
+                      codigoRegimeTributario: e.target.value as '1' | '2' | '3',
+                    }))
                   }
+                  required
+                  size="small"
+                  sx={sxEntradaConfig}
+                  InputLabelProps={{ required: true, shrink: true }}
+                  SelectProps={{ displayEmpty: false }}
                 >
-                  <SelectTrigger className="h-10">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">1 - Simples Nacional</SelectItem>
-                    <SelectItem value="2">2 - Simples Nacional - Excesso de Sublimite</SelectItem>
-                    <SelectItem value="3">3 - Regime Normal (Presumido/Real)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-secondary-text/70">
+                  <MenuItem value="1">1 - SIMPLES NACIONAL</MenuItem>
+                  <MenuItem value="2">
+                    2 - SIMPLES NACIONAL — EXCESSO DE SUBLIMITE
+                  </MenuItem>
+                  <MenuItem value="3">
+                    3 - REGIME NORMAL (PRESUMIDO / REAL)
+                  </MenuItem>
+                </Input>
+                <p className="mt-1 text-xs text-secondary-text/70">
                   {getRegimeLabel(formDataFiscal.codigoRegimeTributario)}
                 </p>
               </div>
-
             </div>
           </div>
 

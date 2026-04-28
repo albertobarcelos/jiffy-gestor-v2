@@ -580,7 +580,7 @@ export const NovoUsuario = forwardRef<NovoUsuarioHandle, NovoUsuarioProps>(funct
                         renderValue: (selected: unknown) => {
                           if (selected === '' || selected == null) {
                             return (
-                              <span className="font-nunito text-sm font-normal normal-case not-italic text-secondary-text">
+                              <span className="text-sm font-normal text-secondary-text">
                                 Selecione um perfil...
                               </span>
                             )
@@ -589,7 +589,7 @@ export const NovoUsuario = forwardRef<NovoUsuarioHandle, NovoUsuarioProps>(funct
                           const p = perfisPDV.find((x) => x.id === id)
                           return (
                             <span className="font-nunito">
-                              {p ? p.role.toUpperCase() : id}
+                              {p ? p.role : id}
                             </span>
                           )
                         },
@@ -599,16 +599,13 @@ export const NovoUsuario = forwardRef<NovoUsuarioHandle, NovoUsuarioProps>(funct
                         name: 'usuario-perfil-pdv',
                       }}
                     >
-                      <MenuItem value="">
-                        <em>Selecione um perfil...</em>
-                      </MenuItem>
+                      
                       {perfisPDV.map((perfil) => (
                         <MenuItem
                           key={perfil.id}
                           value={perfil.id}
-                          sx={{ textTransform: 'uppercase' }}
                         >
-                          {perfil.role.toUpperCase()}
+                          {perfil.role}
                         </MenuItem>
                       ))}
                     </Input>

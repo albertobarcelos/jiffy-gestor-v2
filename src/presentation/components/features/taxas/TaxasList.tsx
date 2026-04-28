@@ -120,7 +120,7 @@ const TaxaRow = memo(function TaxaRow({
       className={`${bgClass} rounded-lg md:px-4 px-1 py-3 flex items-center md:gap-[10px] gap-1 hover:bg-secondary-bg/15 ${onEdit ? 'cursor-pointer' : ''}`}
     >
       <div className="md:flex-[3] flex-[2] font-normal md:text-sm text-[10px] text-primary-text flex items-center gap-1 min-w-0">
-        <span className="truncate uppercase"># {taxa.getNome()}</span>
+        <span className="truncate"># {taxa.getNome()}</span>
       </div>
 
       <div className="flex-[2] md:text-sm text-[10px] font-medium tabular-nums text-primary-text">

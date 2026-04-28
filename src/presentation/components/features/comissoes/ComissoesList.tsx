@@ -311,7 +311,7 @@ export function ComissoesList() {
           <div className="min-w-0 xl:max-w-[280px] xl:flex-[1_1_220px]">
             <label
               htmlFor="comissoes-taxa"
-              className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-secondary-text"
+              className="mb-0.5 block text-[10px] uppercase font-semibold tracking-wide text-secondary-text"
             >
               Taxa %
             </label>
@@ -626,7 +626,7 @@ export function ComissoesList() {
                       index % 2 === 0 ? 'bg-gray-50/80' : 'bg-white'
                     )}
                   >
-                    <div className="min-w-0 font-medium uppercase text-primary-text md:flex-[2]">
+                    <div className="min-w-0 font-medium text-primary-text md:flex-[2]">
                       {row.nomeUsuarioPdv}
                     </div>
                     <div className="text-sm tabular-nums text-primary-text md:flex-1 md:text-right">

@@ -134,19 +134,18 @@ export function ClientesTabsModal({
     const saving = embedFormState.isSubmitting
     const disabled = !embedFormState.canSubmit || embedFormState.isSubmitting
     return {
-      barActionOrder: ['cancel', 'saveAndClose'],
+      barActionOrder: ['cancel', 'save'],
       showCancel: true,
       cancelLabel: 'Fechar',
       cancelVariant: 'primaryTint10',
       onCancel: handleRequestClose,
-      showSave: false,
-      showSaveAndClose: true,
-      saveAndCloseLabel: 'Salvar e fechar',
-      onSaveAndClose: () => {
-        void clienteRef.current?.saveClienteAndClose?.()
+      showSave: true,
+      saveLabel: 'Salvar',
+      onSave: () => {
+        void clienteRef.current?.saveCliente?.()
       },
-      saveAndCloseLoading: saving,
-      saveAndCloseDisabled: disabled,
+      saveLoading: saving,
+      saveDisabled: disabled,
     }
   }, [state.tab, embedFormState, handleRequestClose, handleEdit])
 

@@ -597,7 +597,7 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
                 onClick={handleUsuarioRowClick}
                 className="hidden md:flex h-[50px] md:px-4 items-center md:gap-[10px] relative overflow-visible cursor-pointer"
               >
-                <div className="md:flex-[2] font-normal uppercase text-left md:text-sm text-primary-text">
+                <div className="md:flex-[2] font-normal text-left md:text-sm text-primary-text">
                   {usuario.getNome()}
                 </div>
                 <div className="md:flex-[1.5] font-nunito md:text-sm text-secondary-text">
@@ -640,7 +640,7 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
                         const perfil = allPerfis.find((p) => p.id === selected)
                         const texto = perfil ? perfil.role : perfilNome
                         return (
-                          <span className="uppercase font-nunito">
+                          <span className=" font-nunito">
                             {typeof texto === 'string' ? texto : String(texto)}
                           </span>
                         )
@@ -655,7 +655,6 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
                           <MenuItem
                             key={perfil.id}
                             value={perfil.id}
-                            sx={{ textTransform: 'uppercase' }}
                           >
                             {perfil.role}
                           </MenuItem>
@@ -761,7 +760,7 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
                           const perfil = allPerfis.find((p) => p.id === selected)
                           const texto = perfil ? perfil.role : perfilNome
                           return (
-                            <span className="text-xs uppercase">
+                            <span className="text-xs ">
                               {typeof texto === 'string' ? texto : String(texto)}
                             </span>
                           )
@@ -776,7 +775,6 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
                             <MenuItem
                               key={perfil.id}
                               value={perfil.id}
-                              sx={{ textTransform: 'uppercase' }}
                             >
                               {perfil.role}
                             </MenuItem>

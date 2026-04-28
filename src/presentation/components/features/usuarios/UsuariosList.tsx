@@ -669,7 +669,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
             className={`${bgClass} rounded-lg mb-2 hover:bg-primary/10 transition-colors cursor-pointer`}
           >
             <div className="h-[50px] md:px-4 flex items-center md:gap-[10px] gap-1">
-              <div className="md:flex-[3] flex-[2] font-normal md:text-sm text-[10px] text-primary-text flex items-center gap-2 uppercase">
+              <div className="md:flex-[3] flex-[2] font-normal md:text-sm text-[10px] text-primary-text flex items-center gap-2">
                 {usuario.getNome()}
               </div>
               <div className="md:flex-[2] flex-[1] font-nunito md:text-sm text-[10px] text-secondary-text hidden md:flex">
@@ -685,7 +685,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
                     disabled={!!updatingPerfil[usuario.getId()]}
                   >
                     <SelectTrigger
-                      className={`w-full px-2 md:py-1 h-auto rounded-lg border border-gray-300 bg-info md:text-sm text-[10px] text-primary-text uppercase focus:outline-none focus:border-primary ${
+                      className={`w-full px-2 md:py-1 h-auto rounded-lg border border-gray-300 bg-info md:text-sm text-[10px] text-primary-text focus:outline-none focus:border-primary ${
                         updatingPerfil[usuario.getId()]
                           ? 'opacity-60 cursor-not-allowed'
                           : 'cursor-pointer hover:border-primary'
@@ -712,7 +712,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
                               <SelectItem
                                 key={perfilAtual.id}
                                 value={perfilAtual.id}
-                                className="uppercase md:min-h-[32px] min-h-[28px] md:max-h-[40px] max-h-[36px] data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary transition-colors"
+                                className="md:min-h-[32px] min-h-[28px] md:max-h-[40px] max-h-[36px] data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary transition-colors"
                               >
                                 {perfilAtual.role}
                               </SelectItem>
@@ -721,7 +721,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
                               <SelectItem
                                 key={perfil.id}
                                 value={perfil.id}
-                                className="uppercase md:min-h-[32px] min-h-[28px] md:max-h-[40px] max-h-[36px] data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary transition-colors"
+                                className="md:min-h-[32px] min-h-[28px] md:max-h-[40px] max-h-[36px] data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary transition-colors"
                               >
                                 {perfil.role}
                               </SelectItem>

@@ -571,7 +571,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
           >
             <div className="md:px-4 px-1 py-1 flex items-center">
               <div className="flex-[3] font-normal md:text-sm text-xs text-primary-text flex items-center gap-2">
-                # <span className="uppercase">{meioPagamento.getNome()}</span>
+                # <span className="">{meioPagamento.getNome()}</span>
               </div>
               <div className="flex-[2] font-normal text-sm text-secondary-text hidden md:flex">
                 {formatarFormaPagamentoFiscal(meioPagamento.getFormaPagamentoFiscal())}

@@ -57,6 +57,9 @@ const sxEntradaCompactaTaxa = {
   '& .MuiSelect-select': entradaCompactaSelect,
 } as const
 
+/** Nome da taxa em maiúsculas (pt-BR). */
+const maiusculasPt = (valor: string) => valor.toLocaleUpperCase('pt-BR')
+
 /** Grid desktop: checkbox | terminal | quatro flags (alinhado ao padrão NovaImpressora). */
 const DESKTOP_TAXA_TERMINAL_GRID =
   'grid grid-cols-[auto_minmax(0,1fr)_repeat(4,minmax(4.5rem,1fr))] items-center gap-2 px-2'
@@ -404,7 +407,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
 
         const tipoNorm = normalizeTipoTaxaApi(detalhe.tipo)
         setTipo(tipoNorm)
-        setNome(String(detalhe.nome ?? ''))
+        setNome(maiusculasPt(String(detalhe.nome ?? '')))
         setAtivo(detalhe.ativo === true || detalhe.ativo === 'true')
         setTributado(detalhe.tributado === true || detalhe.tributado === 'true')
         setNcm(detalhe.ncm != null && detalhe.ncm !== '' ? String(detalhe.ncm) : '')
@@ -771,7 +774,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
               <Input
                 label="Nome"
                 value={nome}
-                onChange={e => setNome(e.target.value)}
+                onChange={e => setNome(maiusculasPt(e.target.value))}
                 required
                 size="small"
                 placeholder="Nome da taxa"
@@ -808,9 +811,9 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
                     value={tipo}
                     onChange={e => setTipo(e.target.value as TipoTaxaForm)}
                   >
-                    <MenuItem value="percentual">Percentual</MenuItem>
-                    <MenuItem value="fixo">Fixo (R$)</MenuItem>
-                    <MenuItem value="entrega">Entrega</MenuItem>
+                    <MenuItem value="percentual">PERCENTUAL</MenuItem>
+                    <MenuItem value="fixo">FIXO (R$)</MenuItem>
+                    <MenuItem value="entrega">ENTREGA</MenuItem>
                   </Select>
                 </FormControl>
 
