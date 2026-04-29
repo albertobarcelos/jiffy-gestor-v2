@@ -97,6 +97,7 @@ interface TerminalPreferences {
   }
   compartilharMesas: boolean
   fiscalAtivo?: boolean
+  leitorHabilitado?: boolean
 }
 
 /**
@@ -124,6 +125,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
   const [versaoApk, setVersaoApk] = useState('')
   const [compartilhaValue, setCompartilhaValue] = useState(false)
   const [fiscalAtivoValue, setFiscalAtivoValue] = useState(false)
+  const [leitorCodigoBarrasValue, setLeitorCodigoBarrasValue] = useState(false)
   const [impressoraSelecionadaId, setImpressoraSelecionadaId] = useState<string>('')
 
   // Estados de UI
@@ -139,6 +141,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
       versaoApk: (versaoApk || '').trim(),
       compartilhaValue,
       fiscalAtivoValue,
+      leitorCodigoBarrasValue,
       impressoraSelecionadaId: impressoraSelecionadaId || '',
     })
   }, [
@@ -147,6 +150,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
     versaoApk,
     compartilhaValue,
     fiscalAtivoValue,
+    leitorCodigoBarrasValue,
     impressoraSelecionadaId,
   ])
 
@@ -288,6 +292,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
       // Preenche preferências
       setCompartilhaValue(data.compartilharMesas || false)
       setFiscalAtivoValue(!!data.fiscalAtivo)
+      setLeitorCodigoBarrasValue(!!data.leitorHabilitado)
       if (data.impressoraFinalizacao?.id) {
         setImpressoraSelecionadaId(data.impressoraFinalizacao.id)
       }
@@ -374,6 +379,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
       const fields: Record<string, unknown> = {
         compartilharMesas: compartilhaValue,
         fiscalAtivo: fiscalAtivoValue,
+        leitorHabilitado: leitorCodigoBarrasValue,
       }
       if (impressoraSelecionadaId) {
         fields.impressoraFinalizacaoId = impressoraSelecionadaId
@@ -527,7 +533,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                 <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
               </div>
 
-              <div className="flex flex-col gap-6 md:flex-row md:items-start">
+              <div className="flex flex-col gap-2 md:flex-row md:items-start">
                 <div className="flex-1 space-y-2">
                   <div className="rounded-lg p-2">
                     <JiffyIconSwitch
@@ -557,8 +563,8 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                         p: 1.5,
                       }}
                     >
-                      <p className="font-nunito text-sm font-medium text-warning">
-                        Ao marcar o compartilhamento, este terminal só funcionará com internet.
+                      <p className="font-nunito text-xs font-medium text-warning">
+                        O compartilhamento de mesas só funcionará com internet.
                       </p>
                     </Box>
                   ) : null}
@@ -581,6 +587,26 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                     size="sm"
                     className="w-full flex-row items-start justify-between gap-3"
                     inputProps={{ 'aria-label': 'Fiscal ativo no terminal PDV' }}
+                  />
+                </div>
+
+                <div className="flex-1 rounded-lg p-2">
+                  <JiffyIconSwitch
+                    checked={leitorCodigoBarrasValue}
+                    onChange={e => setLeitorCodigoBarrasValue(e.target.checked)}
+                    label={
+                      <span className="flex max-w-[min(100%,20rem)] flex-col gap-0.5 text-left">
+                        <span className="font-exo text-sm font-semibold text-primary-text">
+                          Leitor Código de Barras
+                        </span>
+                        <span className="font-nunito text-xs font-normal text-secondary-text">
+                          Habilita o leitor de código de barras neste terminal
+                        </span>
+                      </span>
+                    }
+                    size="sm"
+                    className="w-full flex-row items-start justify-between gap-3"
+                    inputProps={{ 'aria-label': 'Leitor de código de barras no terminal' }}
                   />
                 </div>
               </div>
