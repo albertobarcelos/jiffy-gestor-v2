@@ -24,6 +24,10 @@ import { calculatePeriodo } from '@/src/shared/utils/dateFilters' // Importar ca
 import { startOfDay } from 'date-fns'
 import type { DateRange } from 'react-day-picker'
 import {
+  abrirDocumentoFiscalPdf,
+  tipoDocFiscalFromModelo,
+} from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
+import {
   primeiroMesQuadroDuploCalendario,
   periodoFetchFaturamentoCalendarioDoisMeses,
 } from '@/src/shared/utils/calendarioIntervaloFaturamento'
@@ -79,6 +83,38 @@ interface Terminal {
 interface VendasListProps {
   initialPeriodo?: string // Período inicial vindo da URL (ex: "Hoje", "Últimos 7 Dias")
   initialStatus?: string | null // Status inicial vindo da URL
+}
+
+type ResumoFiscalMin = {
+  documentoFiscalId?: string | null
+  modelo?: number | null
+  status?: string | null
+}
+
+function normalizarResumoFiscalMin(raw: unknown): ResumoFiscalMin | null {
+  if (raw == null) return null
+  if (Array.isArray(raw)) {
+    const primeiro = raw.find(item => item != null && typeof item === 'object')
+    return primeiro ? normalizarResumoFiscalMin(primeiro) : null
+  }
+  if (typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  return {
+    documentoFiscalId:
+      (r.documentoFiscalId as string | null | undefined) ??
+      (r.DocumentoFiscalId as string | null | undefined) ??
+      null,
+    modelo:
+      (typeof r.modelo === 'number' ? r.modelo : r.Modelo != null ? Number(r.Modelo) : null) ?? null,
+    status: (r.status as string | null | undefined) ?? (r.Status as string | null | undefined) ?? null,
+  }
+}
+
+function statusFiscalEhEmitida(resumoStatus: string | null | undefined, statusVenda: string | null | undefined): boolean {
+  const r = resumoStatus != null ? String(resumoStatus).trim() : ''
+  const u = statusVenda != null ? String(statusVenda).trim() : ''
+  const s = (r !== '' ? r : u).toUpperCase()
+  return s === 'EMITIDA'
 }
 
 /** Mesmas opções do dropdown do dashboard (sem "Datas Personalizadas"). */
@@ -519,6 +555,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   const [isMobileViewport, setIsMobileViewport] = useState(false)
   const [isGraficoVendasPorUsuarioOpen, setIsGraficoVendasPorUsuarioOpen] = useState(false)
   const [isGraficoVendasCanceladasOpen, setIsGraficoVendasCanceladasOpen] = useState(false)
+  const [isAbrindoNfce, setIsAbrindoNfce] = useState<Record<string, boolean>>({})
   /** Há mais páginas na API para os filtros atuais (scroll / “Carregar mais”). */
   const [hasMoreVendas, setHasMoreVendas] = useState(false)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
@@ -1161,6 +1198,59 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     filtersRef.current.periodoFinal = null
   }
 
+  const handleVerNfce = useCallback(
+    async (vendaId: string) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      setIsAbrindoNfce(prev => ({ ...prev, [vendaId]: true }))
+      try {
+        const queryFiscal = new URLSearchParams({ incluirFiscal: 'true' }).toString()
+        const response = await fetch(`/api/vendas/${encodeURIComponent(vendaId)}?${queryFiscal}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error((errorData as { error?: string }).error || 'Erro ao buscar fiscal da venda')
+        }
+
+        const data = (await response.json()) as Record<string, unknown>
+        const resumo = normalizarResumoFiscalMin(data.resumoFiscal ?? data.ResumoFiscal ?? data.resumo_fiscal)
+        const statusVenda = (data.statusFiscal as string | null | undefined) ?? null
+
+        const documentoFiscalId = resumo?.documentoFiscalId ? String(resumo.documentoFiscalId).trim() : ''
+        if (!documentoFiscalId) {
+          showToast.error('Documento fiscal não encontrado para esta venda.')
+          return
+        }
+
+        if (!statusFiscalEhEmitida(resumo?.status, statusVenda)) {
+          showToast.error('Documento fiscal ainda não está emitido.')
+          return
+        }
+
+        await abrirDocumentoFiscalPdf(documentoFiscalId, tipoDocFiscalFromModelo(resumo?.modelo ?? null))
+      } catch (error: unknown) {
+        console.error('Erro ao abrir NFCe:', error)
+        const msg = error instanceof Error ? error.message : 'Erro ao abrir NFCe'
+        showToast.error(msg)
+      } finally {
+        setIsAbrindoNfce(prev => {
+          const { [vendaId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [auth]
+  )
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex w-full flex-col py-1">
@@ -1665,11 +1755,11 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                     <button
                       onClick={e => {
                         e.stopPropagation() // Impede que o clique no botão acione o clique da linha
-                        setSelectedVendaId(venda.id)
-                        setDetalhesVendaAberta(true)
+                        void handleVerNfce(venda.id)
                       }}
                       className="flex h-10 w-10 items-center justify-center rounded text-primary transition-colors hover:bg-primary/10"
-                      title="Comprovante de Venda"
+                      title="Ver NFCe"
+                      disabled={!!isAbrindoNfce[venda.id]}
                     >
                       <MdReceiptLong size={25} />
                     </button>
