@@ -27,6 +27,7 @@ interface TerminalPreferenceData {
   impressoraFinalizacaoNome: string
   impressoraFinalizacaoId?: string
   fiscalAtivo: boolean
+  leitorHabilitado: boolean
 }
 
 /** Normaliza resposta de GET único ou item da lista de preferências */
@@ -48,6 +49,7 @@ function rawToPreferenceData(data: any): TerminalPreferenceData {
     impressoraFinalizacaoNome: impressoraNome,
     impressoraFinalizacaoId: impressoraId,
     fiscalAtivo: !!data.fiscalAtivo,
+    leitorHabilitado: !!data.leitorHabilitado,
   }
 }
 
@@ -57,6 +59,7 @@ const DEFAULT_TERMINAL_PREFERENCES: TerminalPreferenceData = {
   impressoraFinalizacaoNome: 'Nenhuma',
   impressoraFinalizacaoId: undefined,
   fiscalAtivo: false,
+  leitorHabilitado: false,
 }
 
 /** Após carregar preferências, terminais sem registro usam o padrão (evita “Carregando...” infinito) */
@@ -79,6 +82,7 @@ export function TerminaisTab() {
   const [preferencesLoaded, setPreferencesLoaded] = useState(false)
   const [updatingShare, setUpdatingShare] = useState<Record<string, boolean>>({})
   const [updatingFiscal, setUpdatingFiscal] = useState<Record<string, boolean>>({})
+  const [updatingLeitor, setUpdatingLeitor] = useState<Record<string, boolean>>({})
   const [updatingPrinter, setUpdatingPrinter] = useState<Record<string, boolean>>({})
   const [impressoras, setImpressoras] = useState<Array<{ id: string; nome: string }>>([])
   const [loadingImpressoras, setLoadingImpressoras] = useState(false)
@@ -437,6 +441,7 @@ export function TerminaisTab() {
           impressoraFinalizacaoNome: prev[terminalId]?.impressoraFinalizacaoNome || 'Nenhuma',
           impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId, // Preserva o ID da impressora
           fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
+          leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
         },
       }))
 
@@ -471,28 +476,10 @@ export function TerminaisTab() {
 
           if (prefsResponse.ok) {
             const prefsData = await prefsResponse.json()
-            const impressoraId =
-              prefsData.impressoraFinalizacaoId ||
-              prefsData.impressoraFinalizacao?.id ||
-              prefsData.impressoraFinalizacao?.impressoraId ||
-              prefsData.impressoraFinalizacao?.impressora?.id
-            const impressoraNome =
-              prefsData.impressoraFinalizacao?.name ||
-              prefsData.impressoraFinalizacao?.nome ||
-              prefsData.impressoraFinalizacaoNome ||
-              prefsData.impressoraFinalizacao?.impressora?.nome ||
-              prefsData.impressoraFinalizacao?.impressora?.name ||
-              'Nenhuma'
-
             // Atualiza o estado com os dados confirmados do backend
             setPreferencesMap((prev) => ({
               ...prev,
-              [terminalId]: {
-                compartilharMesas: !!prefsData.compartilharMesas,
-                impressoraFinalizacaoNome: impressoraNome,
-                impressoraFinalizacaoId: impressoraId,
-                fiscalAtivo: !!prefsData.fiscalAtivo,
-              },
+              [terminalId]: rawToPreferenceData(prefsData),
             }))
           }
         } catch (prefsError) {
@@ -511,6 +498,7 @@ export function TerminaisTab() {
             impressoraFinalizacaoNome: prev[terminalId]?.impressoraFinalizacaoNome || 'Nenhuma',
             impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId, // Preserva o ID da impressora
             fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
+            leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
           },
         }))
       } finally {
@@ -539,6 +527,7 @@ export function TerminaisTab() {
           impressoraFinalizacaoNome: prev[terminalId]?.impressoraFinalizacaoNome || 'Nenhuma',
           impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId,
           fiscalAtivo: novoValor,
+          leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
         },
       }))
 
@@ -572,27 +561,9 @@ export function TerminaisTab() {
 
           if (prefsResponse.ok) {
             const prefsData = await prefsResponse.json()
-            const impressoraId =
-              prefsData.impressoraFinalizacaoId ||
-              prefsData.impressoraFinalizacao?.id ||
-              prefsData.impressoraFinalizacao?.impressoraId ||
-              prefsData.impressoraFinalizacao?.impressora?.id
-            const impressoraNome =
-              prefsData.impressoraFinalizacao?.name ||
-              prefsData.impressoraFinalizacao?.nome ||
-              prefsData.impressoraFinalizacaoNome ||
-              prefsData.impressoraFinalizacao?.impressora?.nome ||
-              prefsData.impressoraFinalizacao?.impressora?.name ||
-              'Nenhuma'
-
             setPreferencesMap((prev) => ({
               ...prev,
-              [terminalId]: {
-                compartilharMesas: !!prefsData.compartilharMesas,
-                impressoraFinalizacaoNome: impressoraNome,
-                impressoraFinalizacaoId: impressoraId,
-                fiscalAtivo: !!prefsData.fiscalAtivo,
-              },
+              [terminalId]: rawToPreferenceData(prefsData),
             }))
           }
         } catch (prefsError) {
@@ -610,10 +581,94 @@ export function TerminaisTab() {
             impressoraFinalizacaoNome: prev[terminalId]?.impressoraFinalizacaoNome || 'Nenhuma',
             impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId,
             fiscalAtivo: !novoValor,
+            leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
           },
         }))
       } finally {
         setUpdatingFiscal((prev) => {
+          const { [terminalId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [auth]
+  )
+
+  const handleToggleLeitorCodigoBarras = useCallback(
+    async (terminalId: string, novoValor: boolean) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      setUpdatingLeitor((prev) => ({ ...prev, [terminalId]: true }))
+      setPreferencesMap((prev) => ({
+        ...prev,
+        [terminalId]: {
+          compartilharMesas: prev[terminalId]?.compartilharMesas ?? false,
+          impressoraFinalizacaoNome: prev[terminalId]?.impressoraFinalizacaoNome || 'Nenhuma',
+          impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId,
+          fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
+          leitorHabilitado: novoValor,
+        },
+      }))
+
+      try {
+        const response = await fetch(`/api/preferencias-terminal`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            terminaisId: terminalId,
+            fields: {
+              leitorHabilitado: novoValor,
+            },
+          }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Erro ao atualizar preferências')
+        }
+
+        try {
+          const prefsResponse = await fetch(`/api/preferencias-terminal/${terminalId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          })
+
+          if (prefsResponse.ok) {
+            const prefsData = await prefsResponse.json()
+            setPreferencesMap((prev) => ({
+              ...prev,
+              [terminalId]: rawToPreferenceData(prefsData),
+            }))
+          }
+        } catch (prefsError) {
+          console.warn('Erro ao buscar preferências atualizadas:', prefsError)
+        }
+
+        showToast.success('Preferência do leitor atualizada!')
+      } catch (error: any) {
+        console.error('Erro ao atualizar leitor habilitado:', error)
+        showToast.error(error.message || 'Erro ao atualizar leitor habilitado')
+        setPreferencesMap((prev) => ({
+          ...prev,
+          [terminalId]: {
+            compartilharMesas: prev[terminalId]?.compartilharMesas ?? false,
+            impressoraFinalizacaoNome: prev[terminalId]?.impressoraFinalizacaoNome || 'Nenhuma',
+            impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId,
+            fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
+            leitorHabilitado: !novoValor,
+          },
+        }))
+      } finally {
+        setUpdatingLeitor((prev) => {
           const { [terminalId]: _, ...rest } = prev
           return rest
         })
@@ -642,6 +697,7 @@ export function TerminaisTab() {
           impressoraFinalizacaoNome: impressoraNome,
           impressoraFinalizacaoId: impressoraId || undefined,
           fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
+          leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
         },
       }))
 
@@ -680,6 +736,7 @@ export function TerminaisTab() {
               'Nenhuma',
             impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId,
             fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
+            leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
           },
         }))
       } finally {
@@ -762,6 +819,9 @@ export function TerminaisTab() {
             <div className="flex-[1.5] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Fiscal ativo
             </div>
+            <div className="flex-[1.5] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
+              Leitor C. Barras
+            </div>
             <div className="md:flex-[1.5] flex-[1] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Status
             </div>
@@ -792,6 +852,7 @@ export function TerminaisTab() {
           const prefs = resolvePreferencesForTerminal(terminal.getId(), preferencesMap)
           const compartilhamentoAtivo = prefs.compartilharMesas
           const fiscalAtivo = prefs.fiscalAtivo
+          const leitorHabilitado = prefs.leitorHabilitado
 
           return (
               <div
@@ -885,6 +946,26 @@ export function TerminaisTab() {
                   inputProps={{
                     'aria-label': `Fiscal ativo — ${nome}`,
                     title: fiscalAtivo ? 'Fiscal ativo' : 'Fiscal inativo',
+                  }}
+                />
+              </div>
+              <div
+                className="flex-[1.5] flex justify-center"
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <JiffyIconSwitch
+                  checked={leitorHabilitado}
+                  onChange={(e) => {
+                    e.stopPropagation()
+                    handleToggleLeitorCodigoBarras(terminal.getId(), e.target.checked)
+                  }}
+                  disabled={!!updatingLeitor[terminal.getId()]}
+                  size="sm"
+                  className="justify-center gap-0 px-0 py-0"
+                  inputProps={{
+                    'aria-label': `Leitor código de barras — ${nome}`,
+                    title: leitorHabilitado ? 'Leitor habilitado' : 'Leitor desabilitado',
                   }}
                 />
               </div>
