@@ -9,9 +9,7 @@ export function parseBRLToNumber(value: number | string): number | null {
   const trimmed = value.replace(/\s/g, '').replace(/[^\d.,-]/g, '')
   if (!trimmed) return null
   const hasComma = trimmed.includes(',')
-  const normalized = hasComma
-    ? trimmed.replace(/\./g, '').replace(',', '.')
-    : trimmed
+  const normalized = hasComma ? trimmed.replace(/\./g, '').replace(',', '.') : trimmed
   const parsed = Number(normalized)
   return Number.isNaN(parsed) ? null : parsed
 }
@@ -21,13 +19,9 @@ export function parseBRLToNumber(value: number | string): number | null {
  * Trata o valor como centavos inteiros (ex.: "1234" → "R$ 12,34").
  */
 export function formatBRLFromMaskedInput(value: number | string): string {
-  const raw = typeof value === 'number'
-    ? value
-    : Number(String(value).replace(/\D/g, '')) / 100
+  const raw = typeof value === 'number' ? value : Number(String(value).replace(/\D/g, '')) / 100
 
-  const numberValue = typeof value === 'number'
-    ? value
-    : raw
+  const numberValue = typeof value === 'number' ? value : raw
 
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -37,8 +31,8 @@ export function formatBRLFromMaskedInput(value: number | string): string {
 }
 
 /**
- * Formata valor para Real (R$)
- * Replica exatamente a função transformarParaReal do Flutter
+ * Formata valor para exibição em Real (BRL): milhar com ponto e decimais com vírgula.
+ * Aceita número ou string (inclui formato pt-BR, ex.: "1.234,56").
  */
 export function transformarParaReal(valor: number | string | null | undefined): string {
   if (valor === null || valor === undefined) return 'R$ 0,00'
@@ -46,14 +40,27 @@ export function transformarParaReal(valor: number | string | null | undefined): 
   let numero: number
 
   if (typeof valor === 'string') {
-    numero = parseFloat(valor.replace(',', '.')) || 0.0
+    const cleaned = valor.replace(/R\$\s*/gi, '').trim()
+    if (cleaned === '') return 'R$ 0,00'
+    const parsed = parseBRLToNumber(cleaned)
+    numero =
+      parsed !== null
+        ? parsed
+        : Number.parseFloat(cleaned.replace(/\./g, '').replace(',', '.')) || 0
   } else if (typeof valor === 'number') {
     numero = valor
   } else {
     return 'R$ 0,00'
   }
 
-  return `R$ ${numero.toFixed(2).replace('.', ',')}`
+  if (Number.isNaN(numero) || !Number.isFinite(numero)) return 'R$ 0,00'
+
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(numero)
 }
 
 /**
@@ -105,19 +112,19 @@ export function formatElapsedTime(initialDate: Date | string): string {
   const startMs = parseAsLocalWallTime(initialDate)
   const nowMs = Date.now()
   const diffMs = nowMs - startMs
-  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffMinutes = Math.floor(diffMs / (1000 * 60))
 
   if (diffMinutes <= 10) {
-    return 'agora';
+    return 'agora'
   } else if (diffMinutes < 60) {
     // Exibe minutos exatos (sem arredondar para cima)
-    return `${diffMinutes} min`;
+    return `${diffMinutes} min`
   } else if (diffMinutes < 24 * 60) {
-    const hours = Math.floor(diffMinutes / 60);
-    const remainingMinutes = diffMinutes % 60;
+    const hours = Math.floor(diffMinutes / 60)
+    const remainingMinutes = diffMinutes % 60
     // Exibe minutos restantes exatos (sem arredondar para cima)
-    if (remainingMinutes === 0) return `${hours}h`;
-    return `${hours}h ${remainingMinutes} min`;
+    if (remainingMinutes === 0) return `${hours}h`
+    return `${hours}h ${remainingMinutes} min`
   }
 
   // 24h ou mais: calcula dias completos + horas/minutos restantes (sem arredondar)

@@ -1,12 +1,7 @@
 'use client'
 
-import {
-  useState,
-  useMemo,
-  useRef,
-  useCallback,
-  useEffect,
-} from 'react'
+import dynamic from 'next/dynamic'
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -15,19 +10,11 @@ import {
   DialogDescription,
 } from '@/src/presentation/components/ui/dialog'
 import { Button } from '@/src/presentation/components/ui/button'
-import { Label } from '@/src/presentation/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/src/presentation/components/ui/select'
-import { Input } from '@/src/presentation/components/ui/input'
 import { Textarea } from '@/src/presentation/components/ui/textarea'
-import { useQuery } from '@tanstack/react-query'
-import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
-import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
+import { useNovoPedidoArrasteListas } from '@/src/presentation/hooks/useNovoPedidoArrasteListas'
+import { useNovoPedidoCatalogoQueries } from '@/src/presentation/hooks/useNovoPedidoCatalogoQueries'
+import { useNovoPedidoFinanceiro } from '@/src/presentation/hooks/useNovoPedidoFinanceiro'
+import { useFormatarUsuarioPedido } from '@/src/presentation/hooks/useFormatarUsuarioPedido'
 import { Produto } from '@/src/domain/entities/Produto'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -39,38 +26,14 @@ import {
 } from '@/src/presentation/hooks/useVendas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
-import { extractTokenInfo } from '@/src/shared/utils/validateToken'
-import {
-  MdLaunch,
-  MdDelete,
-  MdClear,
-  MdSearch,
-  MdArrowForward,
-  MdArrowBack,
-  MdCheckCircle,
-  MdAttachMoney,
-  MdCreditCard,
-  MdQrCode,
-  MdPerson,
-  MdStore,
-  MdPersonOutline,
-  MdInfo,
-  MdEdit,
-  MdExpandLess,
-  MdExpandMore,
-  MdCancel,
-} from 'react-icons/md'
+import { MdArrowForward, MdArrowBack, MdPerson, MdCancel } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
-import {
-  abrirDocumentoFiscalPdf,
-  tipoDocFiscalFromModelo,
-} from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
-import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { SeletorClienteModal } from './SeletorClienteModal'
 import {
   ModalLancamentoProdutoPainel,
   type ModalLancamentoProdutoPainelConfirmPayload,
 } from './ModalLancamentoProdutoPainel'
+import { ModalBuscaProdutosPedido } from './ModalBuscaProdutosPedido'
 import { PainelEdicaoProdutoLinhaPedido } from './PainelEdicaoProdutoLinhaPedido'
 import {
   ProdutosTabsModal,
@@ -83,6 +46,91 @@ import {
   footerBarPrimaryMutedSx,
   footerSavePrimaryBarSx,
 } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
+import type {
+  AbaDetalhesPedido,
+  ComplementoSelecionado,
+  DetalhesPedidoMeta,
+  OrigemVenda,
+  PagamentoSelecionado,
+  ProdutoSelecionado,
+  ResumoFinanceiroDetalhes,
+  ResumoFiscalVenda,
+  StatusVenda,
+} from '@/src/presentation/components/features/nfe/NovoPedidoModal/novoPedidoModal.types'
+import {
+  mapearPagamentoDetalheVenda,
+  statusFiscalPermiteAbaNotaFiscal,
+  statusFiscalPermiteCancelarNota,
+} from '@/src/presentation/components/features/nfe/NovoPedidoModal/novoPedidoModal.utils'
+import {
+  calcularTotalProduto,
+  formatarDataDetalhePedido,
+  formatarDataHoraResumoFiscal,
+  formatarDescontoAcrescimo,
+  formatarNumeroComMilhar,
+  formatarValorComplemento,
+  formatarValorRecebido,
+  rotuloModeloNfe,
+} from '@/src/presentation/components/features/nfe/NovoPedidoModal/novoPedidoModal.calculos'
+import { obterIconeMeioPagamento } from '@/src/presentation/components/features/nfe/NovoPedidoModal/novoPedidoModal.meioPagamentoIcon'
+
+/** Fallback ao carregar o indicador de passos (faixa compacta). */
+function NovoPedidoStepIndicatorFallback() {
+  return (
+    <div className="mt-2 flex h-10 items-center justify-center">
+      <JiffyLoading />
+    </div>
+  )
+}
+
+/** Fallback ao carregar o conteúdo de cada passo (área rolável). */
+function NovoPedidoStepFallback() {
+  return (
+    <div className="flex min-h-[160px] flex-1 items-center justify-center py-8">
+      <JiffyLoading />
+    </div>
+  )
+}
+
+const NovoPedidoStepIndicator = dynamic(
+  () =>
+    import(
+      '@/src/presentation/components/features/nfe/NovoPedidoModal/NovoPedidoStepIndicator'
+    ).then(m => m.NovoPedidoStepIndicator),
+  { loading: NovoPedidoStepIndicatorFallback, ssr: false }
+)
+
+const InformacoesPedidoStep = dynamic(
+  () =>
+    import('@/src/presentation/components/features/nfe/NovoPedidoModal/InformacoesPedidoStep').then(
+      m => m.InformacoesPedidoStep
+    ),
+  { loading: NovoPedidoStepFallback, ssr: false }
+)
+
+const ProdutosPedidoStep = dynamic(
+  () =>
+    import('@/src/presentation/components/features/nfe/NovoPedidoModal/ProdutosPedidoStep').then(
+      m => m.ProdutosPedidoStep
+    ),
+  { loading: NovoPedidoStepFallback, ssr: false }
+)
+
+const PagamentoPedidoStep = dynamic(
+  () =>
+    import('@/src/presentation/components/features/nfe/NovoPedidoModal/PagamentoPedidoStep').then(
+      m => m.PagamentoPedidoStep
+    ),
+  { loading: NovoPedidoStepFallback, ssr: false }
+)
+
+const DetalhesPedidoStep = dynamic(
+  () =>
+    import('@/src/presentation/components/features/nfe/NovoPedidoModal/DetalhesPedidoStep').then(
+      m => m.DetalhesPedidoStep
+    ),
+  { loading: NovoPedidoStepFallback, ssr: false }
+)
 
 interface NovoPedidoModalProps {
   open: boolean
@@ -100,242 +148,6 @@ interface NovoPedidoModalProps {
    * use-o para saber se a nota está EMITIDA antes/sem depender só do `resumoFiscal`.
    */
   statusFiscalUnificado?: string | null
-}
-
-/** Trecho retornado pela API quando `incluirFiscal=true` */
-interface ResumoFiscalVenda {
-  status?: string | null
-  numero?: number | null
-  retornoSefaz?: string | null
-  serie?: string | null
-  dataEmissao?: string | null
-  modelo?: number | null
-  chaveFiscal?: string | null
-  dataCriacao?: string | null
-  dataUltimaModificacao?: string | null
-  /** Id do documento fiscal — mesmo usado em GET `/api/nfe/[id]` (Kanban “Ver NFCe/NFe”) */
-  documentoFiscalId?: string | null
-}
-
-interface ComplementoSelecionado {
-  id: string
-  grupoId: string
-  nome: string
-  valor: number
-  quantidade: number
-  tipoImpactoPreco?: 'aumenta' | 'diminui' | 'nenhum'
-}
-
-interface ProdutoSelecionado {
-  produtoId: string
-  nome: string
-  quantidade: number
-  valorUnitario: number
-  complementos: ComplementoSelecionado[]
-  tipoDesconto?: 'fixo' | 'porcentagem' | null
-  valorDesconto?: number | null
-  tipoAcrescimo?: 'fixo' | 'porcentagem' | null
-  valorAcrescimo?: number | null
-  valorFinal?: number | null // Valor final do produto quando carregado do backend (já calculado)
-  lancadoPorId?: string
-  removido?: boolean
-  removidoPorId?: string
-  dataLancamento?: string
-  dataRemocao?: string
-  ncm?: string
-}
-
-interface PagamentoSelecionado {
-  meioPagamentoId: string
-  valor: number
-  realizadoPorId?: string
-  cancelado?: boolean
-  canceladoPorId?: string
-  dataCriacao?: string
-  dataCancelamento?: string
-  isTefUsed?: boolean
-  isTefConfirmed?: boolean
-  tefIdentifier?: string
-  tefAdquirente?: string
-  cnpjAdquirente?: string
-  codigoAutorizacao?: string
-  tipoIntegracao?: string
-  bandeiraCartao?: string
-}
-
-/**
- * Mesma regra de DetalhesVendas: cancelado pela flag ou por dataCancelamento preenchida.
- */
-function pagamentoEstaCancelado(p: PagamentoSelecionado): boolean {
-  return (
-    p.cancelado === true ||
-    (p.dataCancelamento !== null && p.dataCancelamento !== undefined)
-  )
-}
-
-/**
- * Pagamentos que entram no total pago e no troco (equivale a `trocoCalculado` / pagamentos válidos em DetalhesVendas).
- * Exclui cancelados; se usa TEF, exige isTefConfirmed === true.
- */
-function pagamentoContaComoEfetivo(p: PagamentoSelecionado): boolean {
-  if (pagamentoEstaCancelado(p)) return false
-
-  const usaTef = p.isTefUsed === true
-  if (usaTef) {
-    const tefConfirmado = p.isTefConfirmed === true
-    if (!tefConfirmado) return false
-  }
-  return true
-}
-
-/**
- * Lista exibida no passo 4: oculta TEF não confirmado apenas em pagamento ainda ativo (cancelados seguem visíveis).
- * Igual ao `.filter` de Pagamentos Realizados em DetalhesVendas.
- */
-function pagamentoDeveAparecerNosDetalhesPedido(p: PagamentoSelecionado): boolean {
-  const isCancelado = pagamentoEstaCancelado(p)
-  const usaTef = p.isTefUsed === true
-  if (usaTef && !isCancelado) {
-    if (p.isTefConfirmed !== true) return false
-  }
-  return true
-}
-
-/** Destaque vermelho: somente pagamentos cancelados (TEF pendente ativo não é renderizado na lista). */
-function pagamentoComDestaqueCanceladoDetalhes(p: PagamentoSelecionado): boolean {
-  return pagamentoEstaCancelado(p)
-}
-
-/**
- * Mapeia item de pagamento do GET venda (PDV ou Gestor) para o estado do modal.
- * Garante as mesmas regras de DetalhesVendas: cancelado explícito ou com dataCancelamento; TEF só quando isTefUsed.
- */
-function mapearPagamentoDetalheVenda(pag: Record<string, unknown>): PagamentoSelecionado {
-  const p = pag as Record<string, any>
-  const dataCancelamentoRaw = p.dataCancelamento ?? p.data_cancelamento
-  const temDataCancelamento =
-    dataCancelamentoRaw != null &&
-    dataCancelamentoRaw !== undefined &&
-    String(dataCancelamentoRaw).trim() !== ''
-  const canceladoExplicito =
-    p.cancelado === true || p.cancelado === 'true' || p.cancelado === 1 || p.cancelado === '1'
-  const cancelado = canceladoExplicito || temDataCancelamento
-
-  const isTefUsed = p.isTefUsed === true || p.is_tef_used === true
-  let isTefConfirmed: boolean | undefined
-  if (isTefUsed) {
-    if (p.isTefConfirmed === true || p.is_tef_confirmed === true) isTefConfirmed = true
-    else if (p.isTefConfirmed === false || p.is_tef_confirmed === false) isTefConfirmed = false
-  }
-
-  return {
-    meioPagamentoId: String(p.meioPagamentoId ?? p.id ?? ''),
-    valor: typeof p.valor === 'number' ? p.valor : Number(p.valor) || 0,
-    realizadoPorId: p.realizadoPorId ?? p.realizado_por_id ?? undefined,
-    cancelado,
-    canceladoPorId: p.canceladoPorId ?? p.cancelado_por_id ?? undefined,
-    dataCriacao: p.dataCriacao ?? p.data_criacao ?? undefined,
-    dataCancelamento: temDataCancelamento ? String(dataCancelamentoRaw) : undefined,
-    isTefUsed,
-    isTefConfirmed,
-    tefIdentifier: p.tefIdentifier ?? p.tef_identifier ?? undefined,
-    tefAdquirente: p.tefAdquirente ?? p.tef_adquirente ?? undefined,
-    cnpjAdquirente: p.cnpjAdquirente ?? p.cnpj_adquirente ?? undefined,
-    codigoAutorizacao: p.codigoAutorizacao ?? p.codigo_autorizacao ?? undefined,
-    tipoIntegracao: p.tipoIntegracao ?? p.tipo_integracao ?? undefined,
-    bandeiraCartao: p.bandeiraCartao ?? p.bandeira_cartao ?? undefined,
-  }
-}
-
-type OrigemVenda = 'GESTOR' | 'IFOOD' | 'RAPPI' | 'OUTROS'
-type StatusVenda = 'ABERTA' | 'FINALIZADA' | 'PENDENTE_EMISSAO'
-
-/** Abas em Detalhes do Pedido (passo 4) */
-type AbaDetalhesPedido = 'infoPedido' | 'listaProdutos' | 'pagamentos' | 'notaFiscal'
-
-interface DetalhesPedidoMeta {
-  numeroVenda?: number | null
-  codigoVenda?: string | null
-  tipoVenda?: string | null
-  numeroMesa?: string | number | null
-  statusMesa?: string | null
-  abertoPorId?: string | null
-  ultimoResponsavelId?: string | null
-  canceladoPorId?: string | null
-  codigoTerminal?: string | null
-  terminalId?: string | null
-  identificacao?: string | null
-  solicitarEmissaoFiscal?: boolean | null
-  dataCriacao?: string | null
-  dataFinalizacao?: string | null
-  dataCancelamento?: string | null
-  dataUltimaModificacao?: string | null
-  dataUltimoProdutoLancado?: string | null
-}
-
-interface ResumoFinanceiroDetalhes {
-  totalItensLancados: number
-  totalItensCancelados: number
-  totalDosItens: number
-  totalDescontosConta: number
-  totalAcrescimosConta: number
-}
-
-/**
- * Texto do campo Origem no painel de detalhes (abas Dados / contexto visualização).
- * O GET de detalhe do PDV não retorna `origem`; nesse caso a venda é tratada como PDV.
- */
-function rotuloOrigemParaExibicao(origemBrutaApi: string | null): string {
-  if (origemBrutaApi == null || String(origemBrutaApi).trim() === '') {
-    return 'PDV'
-  }
-  const o = String(origemBrutaApi).trim().toUpperCase()
-  if (o === 'GESTOR') return 'Gestor'
-  if (o === 'PDV') return 'PDV'
-  if (o === 'IFOOD' || o === 'DELIVERY_IFOOD') return 'iFood'
-  if (o === 'RAPPI' || o === 'DELIVERY_UBER') return 'Rappi'
-  if (o === 'OUTROS') return 'Outros'
-  return String(origemBrutaApi).trim()
-}
-
-/**
- * Status em que a aba Nota Fiscal e o resumo fazem sentido (incl. aguardando SEFAZ).
- * Alinhado ao Kanban e ao `StatusFiscalBadge` ("Aguardando SEFAZ..." para PENDENTE / PENDENTE_AUTORIZACAO).
- */
-const STATUS_FISCAL_ABA_NOTA_FISCAL = new Set([
-  'EMITIDA',
-  'REJEITADA',
-  'PENDENTE',
-  'PENDENTE_AUTORIZACAO',
-])
-
-function statusFiscalPermiteAbaNotaFiscal(s: string | null | undefined): boolean {
-  if (s == null || String(s).trim() === '') return false
-  return STATUS_FISCAL_ABA_NOTA_FISCAL.has(String(s).trim().toUpperCase())
-}
-
-/** PDF DANFE/DANFCE só existe após autorização — mesmo critério do Kanban */
-function statusFiscalEhEmitida(
-  resumoStatus: string | null | undefined,
-  statusUnificado: string | null | undefined
-): boolean {
-  const r = resumoStatus != null ? String(resumoStatus).trim() : ''
-  const u = statusUnificado != null ? String(statusUnificado).trim() : ''
-  const s = (r !== '' ? r : u).toUpperCase()
-  return s === 'EMITIDA'
-}
-
-function statusFiscalPermiteCancelarNota(
-  resumoStatus: string | null | undefined,
-  statusUnificado: string | null | undefined,
-  statusDetalhe: string | null | undefined
-): boolean {
-  const r = resumoStatus != null ? String(resumoStatus).trim() : ''
-  const u = statusUnificado != null ? String(statusUnificado).trim() : ''
-  const d = statusDetalhe != null ? String(statusDetalhe).trim() : ''
-  const s = (r !== '' ? r : u !== '' ? u : d).toUpperCase()
-  // Só é possível cancelar nota já emitida
-  return s === 'EMITIDA'
 }
 
 export function NovoPedidoModal({
@@ -452,6 +264,7 @@ export function NovoPedidoModal({
 
   /** Fluxo no grid / lista: painel único (slide) com preço e/ou complementos antes de lançar ou editar linha */
   const [modalLancamentoProdutoPainelOpen, setModalLancamentoProdutoPainelOpen] = useState(false)
+  const [modalBuscaProdutosOpen, setModalBuscaProdutosOpen] = useState(false)
   const [produtoParaLancamentoPainel, setProdutoParaLancamentoPainel] = useState<Produto | null>(
     null
   )
@@ -474,18 +287,6 @@ export function NovoPedidoModal({
   // Estado interno para controlar o Dialog (para impedir fechamento quando houver dados)
   const [internalDialogOpen, setInternalDialogOpen] = useState(open)
 
-  // Estados para arrastar a lista horizontal
-  const gruposScrollRef = useRef<HTMLDivElement>(null)
-  const [isDragging, setIsDragging] = useState(false)
-  const startXRef = useRef(0)
-  const scrollLeftRef = useRef(0)
-  const hasMovedRef = useRef(false) // Rastreia se houve movimento significativo durante o arraste
-
-  // Estados para arrastar a lista horizontal de formas de pagamento
-  const meiosPagamentoScrollRef = useRef<HTMLDivElement>(null)
-  const [isDraggingMeiosPagamento, setIsDraggingMeiosPagamento] = useState(false)
-  const startXMeiosPagamentoRef = useRef(0)
-  const scrollLeftMeiosPagamentoRef = useRef(0)
   const nomeUsuarioCarregadoNoCicloRef = useRef(false)
 
   // Refs para long press na linha do produto
@@ -495,81 +296,63 @@ export function NovoPedidoModal({
   // Refs para long press na linha do complemento
   const longPressComplementoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressComplementoIndexRef = useRef<number | null>(null)
-  const hasMovedMeiosPagamentoRef = useRef(false)
   // Evita POST duplicado quando o usuário clica duas vezes rápido em "Criar Pedido" (isPending não bloqueia a tempo)
   const criacaoVendaGestorEmAndamentoRef = useRef(false)
   /** Ignora clique fantasma no backdrop logo após abrir (ex.: mouse com bounce duplo) */
   const ignorarBackdropAteRef = useRef(0)
 
-  // Buscar grupos de produtos
-  const { data: gruposData, isLoading: isLoadingGrupos } = useGruposProdutos({
-    ativo: true,
-    limit: 100,
-    // Step 2 usa grupos de produtos; evita carregar no step 1.
-    enabled: open && !modoVisualizacao && currentStep >= 2,
-    // Evita refetch ao voltar o foco da aba (não deve recarregar o modal inteiro)
-    refetchOnWindowFocus: false,
-  })
-
-  // Buscar produtos do grupo selecionado usando endpoint específico
   const {
-    data: produtosPorGrupoData,
-    isLoading: isLoadingProdutos,
-    error: produtosError,
-  } = useQuery({
-    queryKey: ['produtos-por-grupo', grupoSelecionadoId],
-    queryFn: async () => {
-      if (!grupoSelecionadoId || !auth?.getAccessToken()) {
-        return { produtos: [], count: 0 }
-      }
+    gruposScrollRef,
+    isDragging,
+    hasMovedRef,
+    handleMouseDown,
+    handleMouseMove,
+    handleMouseUp,
+    handleMouseLeave,
+    meiosPagamentoScrollRef,
+    isDraggingMeiosPagamento,
+    hasMovedMeiosPagamentoRef,
+    handleMouseDownMeiosPagamento,
+  } = useNovoPedidoArrasteListas()
 
-      const token = auth.getAccessToken()
-      const response = await fetch(
-        `/api/grupos-produtos/${grupoSelecionadoId}/produtos?limit=100&offset=0`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          cache: 'no-store',
-        }
-      )
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || 'Erro ao carregar produtos do grupo')
-      }
-
-      const data = await response.json()
-
-      // Verificar se data.items existe e é um array
-      const items = Array.isArray(data.items) ? data.items : []
-      const produtos = items.map((item: any) => Produto.fromJSON(item))
-
-      return {
-        produtos,
-        count: data.count || produtos.length,
-      }
-    },
-    enabled: open && !!grupoSelecionadoId && !!auth?.getAccessToken(),
-    staleTime: 0,
-    gcTime: 1000 * 60 * 1,
-    retry: 1,
-    refetchOnWindowFocus: false,
-  })
-
-  // Buscar meios de pagamento
   const {
-    data: meiosPagamentoData,
-    isPending: isPendingMeiosPagamento,
-    isFetching: isFetchingMeiosPagamento,
-  } = useMeiosPagamentoInfinite({
-    limit: 100,
-    ativo: true,
-    // Step 3 usa meios de pagamento; em visualizacao/edicao pode ser usado para resolver nomes.
-    enabled: open && (currentStep >= 3 || modoVisualizacao || !!vendaId),
-    refetchOnWindowFocus: false,
+    grupos,
+    isLoadingGrupos,
+    produtosList,
+    isLoadingProdutos,
+    produtosError,
+    meiosPagamento,
+    mostrarLoadingFormasPagamento,
+  } = useNovoPedidoCatalogoQueries({
+    open,
+    modoVisualizacao,
+    currentStep,
+    grupoSelecionadoId,
+    vendaId,
+    token: auth?.getAccessToken() ?? null,
   })
+
+  /** Produtos incluídos pela busca global ficam aqui até existirem em `produtosList` do grupo. */
+  const produtosExtrasPorIdRef = useRef<Map<string, Produto>>(new Map())
+  const [catalogoExtrasVersao, setCatalogoExtrasVersao] = useState(0)
+
+  const produtosCatalogoUnificado = useMemo(() => {
+    const map = new Map<string, Produto>()
+    for (const p of produtosList) {
+      map.set(p.getId(), p)
+    }
+    produtosExtrasPorIdRef.current.forEach((p, id) => {
+      if (!map.has(id)) map.set(id, p)
+    })
+    return Array.from(map.values())
+  }, [produtosList, catalogoExtrasVersao])
+
+  const obterProdutoPorId = useCallback(
+    (produtoId: string): Produto | undefined =>
+      produtosList.find(p => p.getId() === produtoId) ??
+      produtosExtrasPorIdRef.current.get(produtoId),
+    [produtosList]
+  )
 
   // Handler para seleção de cliente
   const handleSelectCliente = (cliente: Cliente) => {
@@ -581,167 +364,6 @@ export function NovoPedidoModal({
     setClienteId('')
     setClienteNome('')
   }
-
-  // Handlers para arrastar a lista horizontal de grupos
-  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!gruposScrollRef.current) return
-    hasMovedRef.current = false // Reset flag de movimento
-    setIsDragging(true)
-
-    const startXValue = e.pageX - gruposScrollRef.current.offsetLeft
-    const scrollLeftValue = gruposScrollRef.current.scrollLeft
-    startXRef.current = startXValue
-    scrollLeftRef.current = scrollLeftValue
-
-    gruposScrollRef.current.style.cursor = 'grabbing'
-    gruposScrollRef.current.style.userSelect = 'none'
-
-    // Adicionar listeners globais para capturar movimento mesmo fora do elemento
-    const handleGlobalMouseMove = (e: MouseEvent) => {
-      if (!gruposScrollRef.current) return
-
-      const x = e.pageX - gruposScrollRef.current.offsetLeft
-      const walk = (x - startXRef.current) * 2 // Velocidade do scroll (ajustável)
-
-      // Verificar se houve movimento significativo (mais de 5px)
-      if (Math.abs(walk) > 5) {
-        hasMovedRef.current = true
-        e.preventDefault()
-        e.stopPropagation()
-      }
-
-      if (hasMovedRef.current) {
-        gruposScrollRef.current.scrollLeft = scrollLeftRef.current - walk
-      }
-    }
-
-    const handleGlobalMouseUp = () => {
-      if (!gruposScrollRef.current) return
-      setIsDragging(false)
-      gruposScrollRef.current.style.cursor = 'grab'
-      gruposScrollRef.current.style.userSelect = 'auto'
-
-      // Remover listeners globais
-      document.removeEventListener('mousemove', handleGlobalMouseMove)
-      document.removeEventListener('mouseup', handleGlobalMouseUp)
-
-      // Reset após um pequeno delay para permitir que o onClick do botão seja processado
-      setTimeout(() => {
-        hasMovedRef.current = false
-      }, 100)
-    }
-
-    // Adicionar listeners globais
-    document.addEventListener('mousemove', handleGlobalMouseMove)
-    document.addEventListener('mouseup', handleGlobalMouseUp)
-  }, [])
-
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    // Este handler não é mais necessário, mas mantemos para compatibilidade
-    // O movimento real é tratado pelos listeners globais
-  }, [])
-
-  const handleMouseUp = useCallback(() => {
-    // Este handler não é mais necessário, mas mantemos para compatibilidade
-    // O mouseup real é tratado pelos listeners globais
-  }, [])
-
-  const handleMouseLeave = useCallback(() => {
-    // Não resetar o dragging ao sair do elemento, pois o arraste pode continuar
-    // O reset só acontece no mouseup global
-  }, [])
-
-  // Handlers para arrastar a lista horizontal de formas de pagamento
-  const handleMouseDownMeiosPagamento = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!meiosPagamentoScrollRef.current) return
-    hasMovedMeiosPagamentoRef.current = false
-    setIsDraggingMeiosPagamento(true)
-
-    const startXValue = e.pageX - meiosPagamentoScrollRef.current.offsetLeft
-    const scrollLeftValue = meiosPagamentoScrollRef.current.scrollLeft
-    startXMeiosPagamentoRef.current = startXValue
-    scrollLeftMeiosPagamentoRef.current = scrollLeftValue
-
-    meiosPagamentoScrollRef.current.style.cursor = 'grabbing'
-    meiosPagamentoScrollRef.current.style.userSelect = 'none'
-
-    const handleGlobalMouseMove = (e: MouseEvent) => {
-      if (!meiosPagamentoScrollRef.current) return
-
-      const x = e.pageX - meiosPagamentoScrollRef.current.offsetLeft
-      const walk = (x - startXMeiosPagamentoRef.current) * 2
-
-      if (Math.abs(walk) > 5) {
-        hasMovedMeiosPagamentoRef.current = true
-        e.preventDefault()
-        e.stopPropagation()
-      }
-
-      if (hasMovedMeiosPagamentoRef.current) {
-        meiosPagamentoScrollRef.current.scrollLeft = scrollLeftMeiosPagamentoRef.current - walk
-      }
-    }
-
-    const handleGlobalMouseUp = () => {
-      if (!meiosPagamentoScrollRef.current) return
-      setIsDraggingMeiosPagamento(false)
-      meiosPagamentoScrollRef.current.style.cursor = 'grab'
-      meiosPagamentoScrollRef.current.style.userSelect = 'auto'
-
-      document.removeEventListener('mousemove', handleGlobalMouseMove)
-      document.removeEventListener('mouseup', handleGlobalMouseUp)
-
-      setTimeout(() => {
-        hasMovedMeiosPagamentoRef.current = false
-      }, 100)
-    }
-
-    document.addEventListener('mousemove', handleGlobalMouseMove)
-    document.addEventListener('mouseup', handleGlobalMouseUp)
-  }, [])
-
-  // Ordenar grupos por ordem (campo ordem da API)
-  const grupos = useMemo(() => {
-    if (!gruposData) return []
-    return [...gruposData].sort((a, b) => {
-      const ordemA = a.getOrdem()
-      const ordemB = b.getOrdem()
-
-      // Se ambos têm ordem, ordenar numericamente
-      if (ordemA !== undefined && ordemB !== undefined) {
-        return ordemA - ordemB
-      }
-
-      // Se apenas A tem ordem, A vem primeiro
-      if (ordemA !== undefined && ordemB === undefined) {
-        return -1
-      }
-
-      // Se apenas B tem ordem, B vem primeiro
-      if (ordemA === undefined && ordemB !== undefined) {
-        return 1
-      }
-
-      // Se nenhum tem ordem, usar ordem alfabética como fallback
-      return a.getNome().localeCompare(b.getNome())
-    })
-  }, [gruposData])
-
-  // Grade do grupo: só produtos ativos; ordenação por nome
-  const produtosList = useMemo(() => {
-    if (!produtosPorGrupoData?.produtos) return []
-    return [...produtosPorGrupoData.produtos]
-      .filter(p => p.isAtivo())
-      .sort((a, b) => a.getNome().localeCompare(b.getNome()))
-  }, [produtosPorGrupoData])
-  const meiosPagamento = useMemo(() => {
-    if (!meiosPagamentoData?.pages) return []
-    return meiosPagamentoData.pages.flatMap(page => page.meiosPagamento || [])
-  }, [meiosPagamentoData])
-
-  /** Primeira carga ou fetch sem cache ainda — evita área vazia sem feedback */
-  const mostrarLoadingFormasPagamento =
-    isPendingMeiosPagamento || (isFetchingMeiosPagamento && meiosPagamentoData === undefined)
 
   // Refs estáveis: evitam que `carregarVendaExistente` mude quando queries atualizam ao focar a aba
   const meiosPagamentoRef = useRef(meiosPagamento)
@@ -758,200 +380,15 @@ export function NovoPedidoModal({
     { value: 'PENDENTE_EMISSAO', label: 'Finalizada + Emitir NFe' },
   ]
 
-  // Função para formatar número com separadores de milhar
-  const formatarNumeroComMilhar = (valor: number): string => {
-    if (valor === 0) return '0,00'
-    const partes = valor.toFixed(2).split('.')
-    const parteInteira = partes[0]
-    const parteDecimal = partes[1]
+  const { totalProdutos, totalPagamentos, valorAPagar, troco, pagamentosVisiveisNaAbaDetalhes } =
+    useNovoPedidoFinanceiro({
+      produtos,
+      pagamentos,
+      valorFinalVenda,
+      meiosPagamento,
+    })
 
-    // Adiciona separadores de milhar
-    const parteInteiraFormatada = parteInteira.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
-
-    return `${parteInteiraFormatada},${parteDecimal}`
-  }
-
-  // Função para formatar valor do complemento conforme tipoImpactoPreco (para o modal)
-  const formatarValorComplemento = (
-    valor: number,
-    tipoImpactoPreco?: 'aumenta' | 'diminui' | 'nenhum'
-  ): string => {
-    const valorFormatado = formatarNumeroComMilhar(valor)
-    const tipo = tipoImpactoPreco || 'nenhum'
-
-    switch (tipo) {
-      case 'aumenta':
-        return `+ ${valorFormatado}`
-      case 'diminui':
-        return `- ${valorFormatado}`
-      case 'nenhum':
-      default:
-        return `( ${valorFormatado} )`
-    }
-  }
-
-  // Função para obter total do complemento a exibir na lista (0,00 se nenhum)
-  const obterTotalComplemento = (complemento: ComplementoSelecionado): number => {
-    const tipo = complemento.tipoImpactoPreco || 'nenhum'
-    if (tipo === 'nenhum') {
-      return 0
-    }
-    return complemento.valor * complemento.quantidade
-  }
-
-  // Função para calcular o total de um produto (sem complementos) com desconto e acréscimo
-  const calcularTotalProduto = (produto: ProdutoSelecionado): number => {
-    const valorProduto = produto.valorUnitario * produto.quantidade
-
-    // Calcular total dos complementos primeiro
-    const valorComplementos = produto.complementos.reduce((sum, comp) => {
-      const tipo = comp.tipoImpactoPreco || 'nenhum'
-      const valorTotal = comp.valor * comp.quantidade * produto.quantidade
-      if (tipo === 'aumenta') {
-        return sum + valorTotal
-      } else if (tipo === 'diminui') {
-        return sum - valorTotal
-      }
-      return sum
-    }, 0)
-
-    // Subtotal = produto + complementos (igual ao modal)
-    const subtotal = valorProduto + valorComplementos
-
-    // Calcular desconto sobre o subtotal (produto + complementos)
-    let valorDesconto = 0
-    if (produto.tipoDesconto && produto.valorDesconto) {
-      if (produto.tipoDesconto === 'porcentagem') {
-        valorDesconto = subtotal * (produto.valorDesconto / 100)
-      } else {
-        valorDesconto = produto.valorDesconto
-      }
-    }
-
-    // Calcular acréscimo sobre o subtotal (produto + complementos)
-    let valorAcrescimo = 0
-    if (produto.tipoAcrescimo && produto.valorAcrescimo) {
-      if (produto.tipoAcrescimo === 'porcentagem') {
-        valorAcrescimo = subtotal * (produto.valorAcrescimo / 100)
-      } else {
-        valorAcrescimo = produto.valorAcrescimo
-      }
-    }
-
-    return subtotal - valorDesconto + valorAcrescimo
-  }
-
-  // Função para calcular o total dos complementos de um produto
-  const calcularTotalComplementos = (produto: ProdutoSelecionado): number => {
-    return produto.complementos.reduce((sum, comp) => {
-      const tipo = comp.tipoImpactoPreco || 'nenhum'
-      // Multiplicar o valor do complemento pela quantidade do complemento E pela quantidade do produto
-      const valorTotal = comp.valor * comp.quantidade * produto.quantidade
-
-      if (tipo === 'aumenta') {
-        return sum + valorTotal
-      } else if (tipo === 'diminui') {
-        return sum - valorTotal
-      }
-      return sum
-    }, 0)
-  }
-
-  // Função para formatar desconto/acréscimo para exibição
-  // Em tipo porcentagem exibe "Desc. X%" ou "Acres. X%"; em tipo fixo exibe o valor em R$
-  const formatarDescontoAcrescimo = (produto: ProdutoSelecionado): string => {
-    const valorProduto = produto.valorUnitario * produto.quantidade
-    const valorComplementos = calcularTotalComplementos(produto)
-    const subtotal = valorProduto + valorComplementos
-
-    // Verificar desconto
-    if (produto.tipoDesconto && produto.valorDesconto) {
-      if (produto.tipoDesconto === 'porcentagem') {
-        const pct = produto.valorDesconto
-        return `Desc. ${Number.isInteger(pct) ? pct : formatarNumeroComMilhar(pct)}%`
-      }
-      const valorDesconto = produto.valorDesconto
-      if (valorDesconto > 0) {
-        return `Desc. -${formatarNumeroComMilhar(valorDesconto)}`
-      }
-    }
-
-    // Verificar acréscimo
-    if (produto.tipoAcrescimo && produto.valorAcrescimo) {
-      if (produto.tipoAcrescimo === 'porcentagem') {
-        const pct = produto.valorAcrescimo
-        return `Acres. ${Number.isInteger(pct) ? pct : formatarNumeroComMilhar(pct)}%`
-      }
-      const valorAcrescimo = produto.valorAcrescimo
-      if (valorAcrescimo > 0) {
-        return `Acres. +${formatarNumeroComMilhar(valorAcrescimo)}`
-      }
-    }
-
-    return ''
-  }
-
-  // Calcular totais do pedido
-  // Se estiver carregando um pedido existente, usar valorFinal do backend
-  // Caso contrário, calcular a partir dos produtos
-  const totalProdutos = useMemo(() => {
-    // Se temos valorFinal da venda (pedido existente), usar ele diretamente
-    if (valorFinalVenda !== null) {
-      return valorFinalVenda
-    }
-    // Para novo pedido, calcular a partir dos produtos
-    return produtos.reduce((sum, p) => {
-      // calcularTotalProduto já inclui complementos e aplica desconto/acréscimo sobre o total
-      const totalProduto = calcularTotalProduto(p)
-      return sum + totalProduto
-    }, 0)
-  }, [produtos, valorFinalVenda])
-
-  const totalPagamentos = useMemo(() => {
-    return pagamentos.reduce((sum, p) => {
-      return sum + (pagamentoContaComoEfetivo(p) ? p.valor : 0)
-    }, 0)
-  }, [pagamentos])
-
-  // Calcular valor a pagar (restante)
-  const valorAPagar = useMemo(() => {
-    return Math.max(0, totalProdutos - totalPagamentos)
-  }, [totalProdutos, totalPagamentos])
-
-  // Troco: só pagamentos efetivos entram; procura o último dinheiro efetivo na ordem original
-  const troco = useMemo(() => {
-    if (pagamentos.length === 0) return 0
-
-    for (let i = pagamentos.length - 1; i >= 0; i--) {
-      const p = pagamentos[i]
-      if (!pagamentoContaComoEfetivo(p)) continue
-
-      const meioUltimoPagamento = meiosPagamento.find(m => m.getId() === p.meioPagamentoId)
-      if (!meioUltimoPagamento) continue
-
-      const nomeMeio = meioUltimoPagamento.getNome().toLowerCase()
-      const isDinheiro = nomeMeio.includes('dinheiro') || nomeMeio.includes('cash')
-      if (!isDinheiro) continue
-
-      const totalAntes = pagamentos.slice(0, i).reduce((acc, x) => {
-        return acc + (pagamentoContaComoEfetivo(x) ? x.valor : 0)
-      }, 0)
-      const valorFaltavaPagar = totalProdutos - totalAntes
-
-      if (p.valor > valorFaltavaPagar) {
-        return p.valor - valorFaltavaPagar
-      }
-      return 0
-    }
-
-    return 0
-  }, [totalProdutos, pagamentos, meiosPagamento])
-
-  /** Lista do passo 4 (aba Pagamentos): igual ao filtro de exibição em DetalhesVendas */
-  const pagamentosVisiveisNaAbaDetalhes = useMemo(
-    () => pagamentos.filter(pagamentoDeveAparecerNosDetalhesPedido),
-    [pagamentos]
-  )
+  const formatarUsuarioPorId = useFormatarUsuarioPedido(nomesUsuariosPedido)
 
   // Passo 4: exibir cancelamento só para venda gestor carregada, finalizada e não cancelada
   const podeExibirCancelarVendaGestor = useMemo(
@@ -984,87 +421,6 @@ export function NovoPedidoModal({
       statusVendaTextoApiDetalhe,
     ]
   )
-
-  /** Datas do resumo fiscal (API ISO) */
-  const formatarDataHoraResumoFiscal = (valor: string | null | undefined): string => {
-    if (valor == null || String(valor).trim() === '') return '—'
-    try {
-      const d = new Date(valor)
-      if (Number.isNaN(d.getTime())) return String(valor)
-      return d.toLocaleString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    } catch {
-      return String(valor)
-    }
-  }
-
-  const formatarDataDetalhePedido = (valor: string | null | undefined): string => {
-    if (!valor || String(valor).trim() === '') return '—'
-    try {
-      const d = new Date(valor)
-      if (Number.isNaN(d.getTime())) return '—'
-      return d.toLocaleString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    } catch {
-      return '—'
-    }
-  }
-
-  const formatarUsuarioPorId = (usuarioId: string | null | undefined): string => {
-    const id = String(usuarioId || '').trim()
-    if (!id) return '—'
-    return nomesUsuariosPedido[id] || 'Usuário não identificado'
-  }
-
-  const rotuloModeloNfe = (modelo: number | null | undefined): string => {
-    if (modelo === 55) return 'NF-e'
-    if (modelo === 65) return 'NFC-e'
-    if (modelo == null || modelo === undefined) return '—'
-    return String(modelo)
-  }
-
-  // Função para obter ícone do meio de pagamento
-  const obterIconeMeioPagamento = (nome: string) => {
-    const nomeLower = nome.toLowerCase()
-    if (nomeLower.includes('dinheiro') || nomeLower.includes('cash')) {
-      return MdAttachMoney
-    }
-    if (nomeLower.includes('pix')) {
-      return MdQrCode
-    }
-    if (
-      nomeLower.includes('credito') ||
-      nomeLower.includes('debito') ||
-      nomeLower.includes('cartão') ||
-      nomeLower.includes('cartao')
-    ) {
-      return MdCreditCard
-    }
-    return MdCreditCard // Ícone padrão
-  }
-
-  // Função para formatar valor recebido
-  const formatarValorRecebido = (valor: string): string => {
-    // Remove tudo exceto números
-    const apenasNumeros = valor.replace(/\D/g, '')
-    if (apenasNumeros === '') return ''
-
-    // Converte para número (centavos) e divide por 100
-    const valorCentavos = parseInt(apenasNumeros, 10)
-    const valorReais = valorCentavos / 100
-
-    return formatarNumeroComMilhar(valorReais)
-  }
 
   // Função para verificar se é meio de pagamento em dinheiro
   const isMeioPagamentoDinheiro = (meioPagamentoId: string): boolean => {
@@ -1132,12 +488,11 @@ export function NovoPedidoModal({
   }
 
   const adicionarProduto = (produtoId: string) => {
-    const produto = produtosList.find(p => p.getId() === produtoId)
+    const produto = obterProdutoPorId(produtoId)
     if (!produto) return
 
     const mostrarAlterarPreco = produto.permiteAlterarPrecoAtivo()
-    const mostrarComplementos =
-      produto.abreComplementosAtivo() && produtoTemComplementos(produto)
+    const mostrarComplementos = produto.abreComplementosAtivo() && produtoTemComplementos(produto)
 
     if (!mostrarAlterarPreco && !mostrarComplementos) {
       setProdutos(prev => [
@@ -1171,9 +526,7 @@ export function NovoPedidoModal({
     const complementosLinha: ComplementoSelecionado[] = complementos.map(c => {
       if (idxLinha !== null) {
         const atual = produtos[idxLinha]
-        const antigo = atual?.complementos.find(
-          x => x.grupoId === c.grupoId && x.id === c.id
-        )
+        const antigo = atual?.complementos.find(x => x.grupoId === c.grupoId && x.id === c.id)
         return {
           id: c.id,
           grupoId: c.grupoId,
@@ -1224,10 +577,34 @@ export function NovoPedidoModal({
     // Fechamento e limpeza de `produtoParaLancamentoPainel` ficam no painel (onOpenChange + onAfterClose)
   }
 
+  /** Adiciona ao pedido todas as linhas marcadas na busca (quantidade + valor do cadastro). */
+  const confirmarBuscaProdutosPedido = (itens: Array<{ produto: Produto; quantidade: number }>) => {
+    if (itens.length === 0) return
+
+    for (const { produto } of itens) {
+      produtosExtrasPorIdRef.current.set(produto.getId(), produto)
+    }
+
+    const novasLinhas: ProdutoSelecionado[] = itens.map(({ produto, quantidade }) => ({
+      produtoId: produto.getId(),
+      nome: produto.getNome(),
+      quantidade: Math.max(1, Math.floor(quantidade)),
+      valorUnitario: produto.getValor(),
+      complementos: [],
+      tipoDesconto: null,
+      valorDesconto: null,
+      tipoAcrescimo: null,
+      valorAcrescimo: null,
+    }))
+
+    setCatalogoExtrasVersao(v => v + 1)
+    setProdutos(prev => [...prev, ...novasLinhas])
+  }
+
   /** Abre o painel de lançamento para ajustar complementos/preço em linha já na lista */
   const abrirModalComplementosProdutoExistente = (index: number) => {
     const produtoSelecionado = produtos[index]
-    const produto = produtosList.find(p => p.getId() === produtoSelecionado.produtoId)
+    const produto = obterProdutoPorId(produtoSelecionado.produtoId)
 
     if (!produto) return
 
@@ -1240,7 +617,7 @@ export function NovoPedidoModal({
   const abrirModalEdicaoProduto = (index: number) => {
     const produto = produtos[index]
     // Buscar o produto atualizado da lista de produtos para verificar permiteDesconto e permiteAcrescimo
-    const produtoEntity = produtosList.find(p => p.getId() === produto.produtoId)
+    const produtoEntity = obterProdutoPorId(produto.produtoId)
     const permiteDesconto = produtoEntity?.permiteDescontoAtivo() || false
     const permiteAcrescimo = produtoEntity?.permiteAcrescimoAtivo() || false
 
@@ -1288,7 +665,7 @@ export function NovoPedidoModal({
     const produtoAtual = novosProdutos[produtoIndexEdicao]
 
     // Buscar o produto atualizado da lista para verificar permiteDesconto e permiteAcrescimo
-    const produtoEntity = produtosList.find(p => p.getId() === produtoAtual.produtoId)
+    const produtoEntity = obterProdutoPorId(produtoAtual.produtoId)
     const permiteDesconto = produtoEntity?.permiteDescontoAtivo() || false
     const permiteAcrescimo = produtoEntity?.permiteAcrescimoAtivo() || false
     const permiteAlterarPreco = produtoEntity?.permiteAlterarPrecoAtivo() ?? false
@@ -1297,11 +674,7 @@ export function NovoPedidoModal({
     if (permiteAlterarPreco) {
       const limpo = valorUnitarioEdicaoPainel.replace(/\./g, '').replace(',', '.').trim()
       const v = parseFloat(limpo)
-      if (
-        valorUnitarioEdicaoPainel.trim() === '' ||
-        !Number.isFinite(v) ||
-        v <= 0
-      ) {
+      if (valorUnitarioEdicaoPainel.trim() === '' || !Number.isFinite(v) || v <= 0) {
         showToast.error('Informe um valor unitário válido (maior que zero).')
         return
       }
@@ -1578,6 +951,9 @@ export function NovoPedidoModal({
     setClienteId('')
     setClienteNome('')
     setProdutos([])
+    produtosExtrasPorIdRef.current.clear()
+    setCatalogoExtrasVersao(v => v + 1)
+    setModalBuscaProdutosOpen(false)
     setPagamentos([])
     setMeioPagamentoId('')
     setValorRecebido('')
@@ -2436,7 +1812,11 @@ export function NovoPedidoModal({
             // Mesma escala de largura que `GruposComplementosTabsModal` (panelClassName responsivo)
             width: { xs: '95vw', sm: '90vw', md: 'min(900px, 45vw)' },
             maxWidth: '100vw',
-            borderRadius: 0,
+            // Painel desliza pela direita: cantos arredondados só no lado esquerdo (borda interna)
+            borderTopLeftRadius: 12,
+            borderBottomLeftRadius: 12,
+            borderTopRightRadius: 0,
+            borderBottomRightRadius: 0,
           },
         }}
       >
@@ -2452,7 +1832,7 @@ export function NovoPedidoModal({
             flexDirection: 'column',
           }}
         >
-          <div className="px-4 py-2">
+          <div className="px-3 py-1.5">
             <div className="flex items-center justify-between">
               <h1 className="text-2xl font-semibold">
                 {modoVisualizacao ? 'Detalhes do Pedido' : 'Novo Pedido'}
@@ -2538,100 +1918,7 @@ export function NovoPedidoModal({
 
             {/* Detalhes do Pedido (venda existente): sem stepper no passo 4. Novo pedido: mantém stepper em todos os passos */}
             {!(modoVisualizacao && currentStep === 4) && (
-              <div className="mt-2 flex items-center justify-center gap-2">
-                {/* Step 1 */}
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-full border-2 ${
-                      currentStep >= 1
-                        ? 'border-primary bg-primary text-white'
-                        : 'border-gray-300 bg-white text-gray-400'
-                    }`}
-                  >
-                    {currentStep > 1 ? (
-                      <MdCheckCircle className="h-5 w-5" />
-                    ) : (
-                      <span className="text-sm font-semibold">1</span>
-                    )}
-                  </div>
-                  <span
-                    className={`text-sm font-medium ${currentStep >= 1 ? 'text-primary' : 'text-gray-400'}`}
-                  >
-                    Informações
-                  </span>
-                </div>
-
-                {/* Linha */}
-                <div className={`h-0.5 w-12 ${currentStep >= 2 ? 'bg-primary' : 'bg-gray-300'}`} />
-
-                {/* Step 2 */}
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-full border-2 ${
-                      currentStep >= 2
-                        ? 'border-primary bg-primary text-white'
-                        : 'border-gray-300 bg-white text-gray-400'
-                    }`}
-                  >
-                    {currentStep > 2 ? (
-                      <MdCheckCircle className="h-5 w-5" />
-                    ) : (
-                      <span className="text-sm font-semibold">2</span>
-                    )}
-                  </div>
-                  <span
-                    className={`text-sm font-medium ${currentStep >= 2 ? 'text-primary' : 'text-gray-400'}`}
-                  >
-                    Produtos
-                  </span>
-                </div>
-
-                {/* Linha */}
-                <div className={`h-0.5 w-12 ${currentStep >= 3 ? 'bg-primary' : 'bg-gray-300'}`} />
-
-                {/* Step 3 */}
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-full border-2 ${
-                      currentStep >= 3
-                        ? 'border-primary bg-primary text-white'
-                        : 'border-gray-300 bg-white text-gray-400'
-                    }`}
-                  >
-                    {currentStep > 3 ? (
-                      <MdCheckCircle className="h-5 w-5" />
-                    ) : (
-                      <span className="text-sm font-semibold">3</span>
-                    )}
-                  </div>
-                  <span
-                    className={`text-sm font-medium ${currentStep >= 3 ? 'text-primary' : 'text-gray-400'}`}
-                  >
-                    Pagamento
-                  </span>
-                </div>
-
-                {/* Linha */}
-                <div className={`h-0.5 w-12 ${currentStep >= 4 ? 'bg-primary' : 'bg-gray-300'}`} />
-
-                {/* Step 4 */}
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-full border-2 ${
-                      currentStep >= 4
-                        ? 'border-primary bg-primary text-white'
-                        : 'border-gray-300 bg-white text-gray-400'
-                    }`}
-                  >
-                    <span className="text-sm font-semibold">4</span>
-                  </div>
-                  <span
-                    className={`text-sm font-medium ${currentStep >= 4 ? 'text-primary' : 'text-gray-400'}`}
-                  >
-                    Detalhes
-                  </span>
-                </div>
-              </div>
+              <NovoPedidoStepIndicator currentStep={currentStep as 1 | 2 | 3 | 4} />
             )}
           </div>
 
@@ -2640,7 +1927,7 @@ export function NovoPedidoModal({
               flex: 1,
               overflowY: 'auto',
               overflowX: 'hidden',
-              padding: '0 24px',
+              padding: '0 16px',
               minHeight: 0,
             }}
             className="scrollbar-thin"
@@ -2654,1524 +1941,122 @@ export function NovoPedidoModal({
 
             {/* STEP 1: Informações do Pedido */}
             {!modoVisualizacao && currentStep === 1 && (
-              <div className="space-y-3 py-2">
-                {/* Cliente */}
-                <div className="rounded-lg border-2 border-primary/20 bg-gray-50 p-2">
-                  <div className="mb-3 flex items-center gap-2">
-                    <div className="rounded-lg bg-primary/10 p-2">
-                      <MdPersonOutline className="h-5 w-5 text-primary" />
-                    </div>
-                    <span className="text-lg font-semibold text-primary">Cliente (Opcional)</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      type="text"
-                      value={clienteNome}
-                      placeholder="Nenhum cliente selecionado"
-                      inputProps={{ readOnly: true }}
-                      className="flex-1 cursor-pointer border-primary/30 bg-white"
-                      onClick={() => setSeletorClienteOpen(true)}
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          padding: '4px 8px',
-                          '& input': {
-                            padding: '4px 8px',
-                          },
-                        },
-                      }}
-                    />
-                    {clienteNome && (
-                      <Button
-                        type="button"
-                        variant="outlined"
-                        size="sm"
-                        onClick={handleRemoveCliente}
-                        className="flex-shrink-0 border-primary/30 hover:border-red-300 hover:bg-red-50"
-                      >
-                        <MdDelete className="h-4 w-4 text-red-600" />
-                      </Button>
-                    )}
-                    <Button
-                      type="button"
-                      variant="outlined"
-                      onClick={() => setSeletorClienteOpen(true)}
-                      className="flex-shrink-0 border-primary/30 hover:bg-primary/10"
-                    >
-                      <MdSearch className="h-4 w-4 text-primary" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Origem */}
-                <div className="rounded-lg border-2 border-primary/20 bg-gray-50 p-2">
-                  <div className="mb-3 flex items-center gap-2">
-                    <div className="rounded-lg bg-primary/10 p-2">
-                      <MdStore className="h-5 w-5 text-primary" />
-                    </div>
-                    <span className="text-lg font-semibold text-primary">Origem do Pedido</span>
-                  </div>
-                  <Select value={origem} onValueChange={value => setOrigem(value as OrigemVenda)}>
-                    <SelectTrigger className="border-primary/30 bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="GESTOR">Gestor (Manual)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Status */}
-                <div className="rounded-lg border-2 border-primary/20 bg-gray-50 p-2">
-                  <div className="mb-3 flex items-center gap-2">
-                    <div className="rounded-lg bg-primary/10 p-2">
-                      <MdInfo className="h-5 w-5 text-primary" />
-                    </div>
-                    <span className="text-lg font-semibold text-primary">Status do Pedido</span>
-                  </div>
-                  <Select value={status} onValueChange={value => setStatus(value as StatusVenda)}>
-                    <SelectTrigger className="border-primary/30 bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {statusDisponiveis.map(st => (
-                        <SelectItem
-                          key={st.value}
-                          value={st.value}
-                          disabled={st.value === 'ABERTA'}
-                        >
-                          {st.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              <InformacoesPedidoStep
+                clienteNome={clienteNome}
+                onOpenSeletorCliente={() => setSeletorClienteOpen(true)}
+                onRemoveCliente={handleRemoveCliente}
+                origem={origem}
+                onOrigemChange={v => setOrigem(v)}
+                status={status}
+                onStatusChange={v => setStatus(v)}
+                statusDisponiveis={statusDisponiveis}
+              />
             )}
 
             {/* STEP 2: Seleção de Produtos */}
             {!modoVisualizacao && currentStep === 2 && (
-              <div className="flex min-h-0 flex-1 flex-col gap-2 py-2">
-                {/* Área de Edição de Produtos Selecionados: altura fixa quando grupos visíveis, cresce quando grupos ocultos */}
-                <div
-                  className={`scrollbar-thin overflow-y-auto rounded-lg border bg-gray-50 ${
-                    gruposExpandido ? 'h-48 flex-shrink-0' : 'min-h-64 flex-1'
-                  }`}
-                >
-                  {produtos.length > 0 ? (
-                    <div className="p-2">
-                      {/* Cabeçalho da tabela */}
-                      <div className="mb-2 flex gap-2 border-b border-gray-300 pb-2">
-                        <div className="flex w-[60px] flex-shrink-0 items-center justify-center">
-                          <span className="text-center text-xs font-semibold text-gray-700">
-                            Qtd
-                          </span>
-                        </div>
-                        <div className="flex-[4]">
-                          <span className="text-xs font-semibold text-gray-700">Produto</span>
-                        </div>
-                        <div className="flex flex-1 justify-end">
-                          <span className="text-right text-xs font-semibold text-gray-700">
-                            Desc./Acres.
-                          </span>
-                        </div>
-                        <div className="flex flex-1 justify-end">
-                          <span className="text-right text-xs font-semibold text-gray-700">
-                            Val Unit.
-                          </span>
-                        </div>
-                        <div className="flex flex-1 justify-end">
-                          <span className="text-right text-xs font-semibold text-gray-700">
-                            Total
-                          </span>
-                        </div>
-                        <div className="flex flex-1 justify-end">
-                          <span className="mr-2 text-xs font-semibold text-gray-700">Ações</span>
-                        </div>
-                      </div>
-                      {/* Linhas de produtos */}
-                      <div className="space-y-1">
-                        {produtos.map((produto, index) => {
-                          // calcularTotalProduto já inclui complementos e desconto/acréscimo
-                          const totalProdutoComComplementos = calcularTotalProduto(produto)
-                          const produtoEntityAcoes = produtosList.find(
-                            p => p.getId() === produto.produtoId
-                          )
-                          // Botão sempre que o produto estiver na lista do grupo (modal permite vincular complementos ao produto)
-                          const exibirBotaoComplementos = !!produtoEntityAcoes
-
-                          return (
-                            <div key={index} className="space-y-0">
-                              {/* Linha do Produto Principal */}
-                              <div
-                                className={`flex items-center gap-1 rounded ${
-                                  index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                                } cursor-pointer hover:bg-gray-100`}
-                                onMouseDown={e => {
-                                  // Iniciar long press apenas se não for em um input ou button
-                                  const target = e.target as HTMLElement
-                                  if (
-                                    target.tagName === 'INPUT' ||
-                                    target.tagName === 'BUTTON' ||
-                                    target.closest('button') ||
-                                    target.closest('input')
-                                  ) {
-                                    return
-                                  }
-
-                                  longPressIndexRef.current = index
-                                  longPressTimeoutRef.current = setTimeout(() => {
-                                    if (longPressIndexRef.current === index) {
-                                      abrirModalEdicaoProduto(index)
-                                    }
-                                  }, 800) // 800ms para long press
-                                }}
-                                onMouseUp={() => {
-                                  // Limpar timeout se soltar antes do tempo
-                                  if (longPressTimeoutRef.current) {
-                                    clearTimeout(longPressTimeoutRef.current)
-                                    longPressTimeoutRef.current = null
-                                  }
-                                  longPressIndexRef.current = null
-                                }}
-                                onMouseLeave={() => {
-                                  // Limpar timeout se sair da área
-                                  if (longPressTimeoutRef.current) {
-                                    clearTimeout(longPressTimeoutRef.current)
-                                    longPressTimeoutRef.current = null
-                                  }
-                                  longPressIndexRef.current = null
-                                }}
-                              >
-                                {/* Quantidade */}
-                                <div className="w-[60px] flex-shrink-0">
-                                  <input
-                                    type="number"
-                                    min={1}
-                                    value={Math.floor(produto.quantidade)}
-                                    onChange={e => {
-                                      const valor = parseInt(e.target.value) || 1
-                                      atualizarProduto(index, 'quantidade', Math.max(1, valor))
-                                    }}
-                                    style={{
-                                      MozAppearance: 'textfield',
-                                      WebkitAppearance: 'none',
-                                      appearance: 'none',
-                                    }}
-                                    className="h-7 w-full border-0 bg-transparent p-1 text-center text-xs focus:bg-white focus:ring-1 focus:ring-primary [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                                  />
-                                </div>
-                                {/* Nome do Produto */}
-                                <div className="min-w-0 flex-[4]">
-                                  <span className="block truncate text-xs text-gray-900">
-                                    {produto.nome}
-                                  </span>
-                                </div>
-                                {/* Desconto/Acréscimo */}
-                                <div className="flex-1">
-                                  <span className="block text-right text-xs text-gray-600">
-                                    {formatarDescontoAcrescimo(produto)}
-                                  </span>
-                                </div>
-                                {/* Valor Unitário */}
-                                <div className="flex-1">
-                                  <input
-                                    type="text"
-                                    value={
-                                      valoresEmEdicao[index] !== undefined
-                                        ? valoresEmEdicao[index]
-                                        : produto.valorUnitario > 0
-                                          ? formatarNumeroComMilhar(produto.valorUnitario)
-                                          : ''
-                                    }
-                                    onChange={e => {
-                                      let valorStr = e.target.value
-
-                                      // Se vazio, limpa o campo
-                                      if (valorStr === '') {
-                                        setValoresEmEdicao(prev => ({ ...prev, [index]: '' }))
-                                        atualizarProduto(index, 'valorUnitario', 0)
-                                        return
-                                      }
-
-                                      // Remove pontos (separadores de milhar) e vírgula, mantém apenas números
-                                      valorStr = valorStr
-                                        .replace(/\./g, '')
-                                        .replace(',', '')
-                                        .replace(/\D/g, '')
-
-                                      // Se vazio após limpeza, limpa o campo
-                                      if (valorStr === '') {
-                                        setValoresEmEdicao(prev => ({ ...prev, [index]: '' }))
-                                        atualizarProduto(index, 'valorUnitario', 0)
-                                        return
-                                      }
-
-                                      // Converte para número (centavos) e divide por 100 para obter reais
-                                      const valorCentavos = parseInt(valorStr, 10)
-                                      const valorReais = valorCentavos / 100
-
-                                      // Formata com separadores de milhar
-                                      const valorFormatado = formatarNumeroComMilhar(valorReais)
-
-                                      // Atualiza o estado de edição com o valor formatado
-                                      setValoresEmEdicao(prev => ({
-                                        ...prev,
-                                        [index]: valorFormatado,
-                                      }))
-
-                                      // Atualiza o valor do produto
-                                      atualizarProduto(index, 'valorUnitario', valorReais)
-                                    }}
-                                    onFocus={e => {
-                                      // Ao focar, mantém o valor formatado (ex: "8,00" ou "1.000.000,00")
-                                      const valorAtual = produto.valorUnitario
-                                      if (valorAtual > 0) {
-                                        const valorFormatado = formatarNumeroComMilhar(valorAtual)
-                                        setValoresEmEdicao(prev => ({
-                                          ...prev,
-                                          [index]: valorFormatado,
-                                        }))
-                                      } else {
-                                        setValoresEmEdicao(prev => ({ ...prev, [index]: '' }))
-                                      }
-                                      // Seleciona todo o texto para facilitar substituição
-                                      setTimeout(() => e.target.select(), 0)
-                                    }}
-                                    onBlur={e => {
-                                      // Garante formatação correta ao perder o foco
-                                      const valor = produto.valorUnitario
-                                      if (valor > 0) {
-                                        const valorFormatado = formatarNumeroComMilhar(valor)
-                                        setValoresEmEdicao(prev => ({
-                                          ...prev,
-                                          [index]: valorFormatado,
-                                        }))
-                                        // Remove do estado após um pequeno delay para mostrar formato final
-                                        setTimeout(() => {
-                                          setValoresEmEdicao(prev => {
-                                            const novo = { ...prev }
-                                            delete novo[index]
-                                            return novo
-                                          })
-                                        }, 100)
-                                      } else {
-                                        // Remove do estado se vazio
-                                        setValoresEmEdicao(prev => {
-                                          const novo = { ...prev }
-                                          delete novo[index]
-                                          return novo
-                                        })
-                                      }
-                                    }}
-                                    placeholder="0,00"
-                                    style={{
-                                      MozAppearance: 'textfield',
-                                      WebkitAppearance: 'none',
-                                      appearance: 'none',
-                                    }}
-                                    className="h-7 w-full border-0 bg-transparent p-1 text-right text-xs focus:bg-white focus:ring-1 focus:ring-primary"
-                                  />
-                                </div>
-                                {/* Total */}
-                                <div className="flex-1">
-                                  <span className="block text-right text-xs font-semibold text-gray-900">
-                                    R$ {formatarNumeroComMilhar(totalProdutoComComplementos)}
-                                  </span>
-                                </div>
-                                {/* Ações: colunas fixas (editar | complementos | excluir) */}
-                                <div
-                                  className="flex w-[76px] flex-shrink-0 items-center justify-end gap-0"
-                                  role="group"
-                                  aria-label="Ações do produto"
-                                >
-                                  <div className="flex h-6 w-6 shrink-0 items-center justify-center">
-                                    <button
-                                      onClick={() => abrirModalEdicaoProduto(index)}
-                                      type="button"
-                                      title="Editar produto"
-                                      className="flex h-5 w-5 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-gray-200"
-                                    >
-                                      <MdEdit className="h-4 w-4 text-primary" />
-                                    </button>
-                                  </div>
-                                  <div className="flex h-6 w-6 shrink-0 items-center justify-center">
-                                    {exibirBotaoComplementos ? (
-                                      <button
-                                        onClick={() =>
-                                          abrirModalComplementosProdutoExistente(index)
-                                        }
-                                        type="button"
-                                        className="flex h-5 w-5 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-gray-200"
-                                        title="Complementos (editar ou vincular)"
-                                      >
-                                        <MdLaunch className="h-4 w-4 text-primary" />
-                                      </button>
-                                    ) : (
-                                      <span className="block h-6 w-6 shrink-0" aria-hidden />
-                                    )}
-                                  </div>
-                                  <div className="flex h-5 w-5 shrink-0 items-center justify-center">
-                                    <button
-                                      onClick={() => removerProduto(index)}
-                                      type="button"
-                                      title="Remover produto"
-                                      className="flex h-6 w-6 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-red-100"
-                                    >
-                                      <MdDelete className="h-4 w-4 text-red-500" />
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Linhas dos Complementos */}
-                              {produto.complementos.map((complemento, compIndex) => {
-                                const compKey = `comp-${index}-${complemento.grupoId}-${complemento.id}`
-                                const valorEmEdicao = valoresEmEdicao[compKey]
-
-                                return (
-                                  <div
-                                    key={compKey}
-                                    className={`-mt-0.5 flex items-center gap-1 rounded ${
-                                      index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                                    } cursor-pointer hover:bg-gray-100`}
-                                    style={{ minHeight: '24px' }}
-                                    onMouseDown={e => {
-                                      // Iniciar long press apenas se não for em um input ou button
-                                      const target = e.target as HTMLElement
-                                      if (
-                                        target.tagName === 'INPUT' ||
-                                        target.tagName === 'BUTTON' ||
-                                        target.closest('button') ||
-                                        target.closest('input')
-                                      ) {
-                                        return
-                                      }
-
-                                      // Verificar se o produto permite editar complementos
-                                      const produtoEntity = produtosList.find(
-                                        p => p.getId() === produto.produtoId
-                                      )
-                                      if (!produtoEntity) return
-
-                                      longPressComplementoIndexRef.current = index
-                                      longPressComplementoTimeoutRef.current = setTimeout(() => {
-                                        if (longPressComplementoIndexRef.current === index) {
-                                          abrirModalComplementosProdutoExistente(index)
-                                        }
-                                      }, 800) // 800ms para long press
-                                    }}
-                                    onMouseUp={() => {
-                                      // Limpar timeout se soltar antes do tempo
-                                      if (longPressComplementoTimeoutRef.current) {
-                                        clearTimeout(longPressComplementoTimeoutRef.current)
-                                        longPressComplementoTimeoutRef.current = null
-                                      }
-                                      longPressComplementoIndexRef.current = null
-                                    }}
-                                    onMouseLeave={() => {
-                                      // Limpar timeout se sair da área
-                                      if (longPressComplementoTimeoutRef.current) {
-                                        clearTimeout(longPressComplementoTimeoutRef.current)
-                                        longPressComplementoTimeoutRef.current = null
-                                      }
-                                      longPressComplementoIndexRef.current = null
-                                    }}
-                                  >
-                                    {/* Quantidade do Complemento */}
-                                    <div className="w-[60px] flex-shrink-0 pl-4">
-                                      <input
-                                        type="number"
-                                        min={1}
-                                        value={complemento.quantidade}
-                                        onChange={e => {
-                                          const valor = parseInt(e.target.value) || 1
-                                          atualizarComplemento(
-                                            index,
-                                            compIndex,
-                                            'quantidade',
-                                            Math.max(1, valor)
-                                          )
-                                        }}
-                                        style={{
-                                          MozAppearance: 'textfield',
-                                          WebkitAppearance: 'none',
-                                          appearance: 'none',
-                                        }}
-                                        className="h-5 w-full border-0 bg-transparent px-1 text-right text-xs focus:bg-white focus:ring-1 focus:ring-primary [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                                      />
-                                    </div>
-                                    {/* Nome do Complemento com indentação */}
-                                    <div className="min-w-0 flex-[4] pl-4">
-                                      <span className="block truncate text-xs leading-tight text-gray-600">
-                                        {complemento.nome}
-                                      </span>
-                                    </div>
-                                    {/* Espaço vazio para Desconto/Acréscimo (complementos não têm) */}
-                                    <div className="flex-1"></div>
-                                    {/* Valor Unitário do Complemento - Apenas exibição */}
-                                    <div className="flex-1">
-                                      <span className="block text-right text-xs leading-tight text-gray-600">
-                                        {formatarValorComplemento(
-                                          complemento.valor,
-                                          complemento.tipoImpactoPreco
-                                        )}
-                                      </span>
-                                    </div>
-                                    {/* Espaço vazio onde seria o Total (complementos não têm total próprio) */}
-                                    <div className="flex-1"></div>
-                                    {/* Mesma grade de ações da linha do produto: remove alinhado à coluna Exc. */}
-                                    <div className="flex w-[76px] flex-shrink-0 items-center justify-end gap-0.5">
-                                      <span className="block h-6 w-6 shrink-0" aria-hidden />
-                                      <span className="block h-6 w-6 shrink-0" aria-hidden />
-                                      <div className="flex h-6 w-6 shrink-0 items-center justify-center">
-                                        <button
-                                          onClick={() => removerComplemento(index, compIndex)}
-                                          type="button"
-                                          title="Remover complemento"
-                                          className="flex h-6 w-6 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-red-50"
-                                        >
-                                          <MdClear className="h-3.5 w-3.5 text-red-500" />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex h-full items-center justify-center">
-                      <p className="text-sm text-gray-500">Nenhum produto selecionado</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Total do Pedido */}
-                <div className="flex flex-shrink-0 items-center justify-end gap-2">
-                  <span className="text-sm font-semibold text-gray-700">Total do Pedido:</span>
-                  <span className="text-lg font-semibold text-primary">
-                    {transformarParaReal(totalProdutos)}
-                  </span>
-                </div>
-
-                {/* Seção recolhível: Grupos de produtos — ao ocultar, a área de produtos selecionados acima ganha mais altura */}
-                <div className="flex-shrink-0 overflow-hidden rounded-lg border bg-gray-50">
-                  <button
-                    type="button"
-                    onClick={() => setGruposExpandido(!gruposExpandido)}
-                    className="flex w-full items-center justify-between gap-2 border-b border-gray-200/50 px-3 py-2 text-left transition-colors hover:bg-gray-100/80"
-                    aria-expanded={gruposExpandido}
-                  >
-                    <span className="text-sm font-semibold text-gray-700">Grupos de produtos</span>
-                    <span className="ml-auto flex items-center gap-2">
-                      {gruposExpandido ? (
-                        <>
-                          <span className="text-xs text-gray-500">Ocultar</span>
-                          <MdExpandLess className="h-5 w-5 flex-shrink-0 text-gray-600" />
-                        </>
-                      ) : (
-                        <>
-                          <span className="text-xs text-gray-500">Mostrar grupos</span>
-                          <MdExpandMore className="h-5 w-5 flex-shrink-0 text-gray-600" />
-                        </>
-                      )}
-                    </span>
-                  </button>
-                  {gruposExpandido && (
-                    <div className="space-y-2 px-3 pb-3 pt-1">
-                      {/* Grid ou Lista Horizontal de Grupos */}
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          {!grupoSelecionadoId ? (
-                            <Label className="text-sm text-gray-600">Selecione um grupo:</Label>
-                          ) : (
-                            <Button
-                              variant="outlined"
-                              size="sm"
-                              onClick={() => setGrupoSelecionadoId(null)}
-                              type="button"
-                              className="flex h-7 min-h-[28px] min-w-[28px] items-center justify-center p-0"
-                            >
-                              <MdArrowBack className="h-4 w-4" /> Voltar aos grupos
-                            </Button>
-                          )}
-                        </div>
-                        {isLoadingGrupos ? (
-                          <div className="py-4 text-center text-gray-500">
-                            <JiffyLoading />
-                          </div>
-                        ) : grupos.length === 0 ? (
-                          <div className="py-4 text-center text-gray-500">
-                            Nenhum grupo encontrado
-                          </div>
-                        ) : !grupoSelecionadoId ? (
-                          // Grid de Grupos (quando nenhum grupo está selecionado)
-                          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
-                            {grupos.map(grupo => {
-                              const corHex = grupo.getCorHex()
-                              const iconName = grupo.getIconName()
-                              return (
-                                <div key={grupo.getId()} className="relative">
-                                  <button
-                                    onClick={() => setGrupoSelecionadoId(grupo.getId())}
-                                    className="flex aspect-square w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border-2 p-2 text-center transition-all hover:opacity-80"
-                                    style={{
-                                      borderColor: corHex,
-                                      backgroundColor: `${corHex}15`,
-                                    }}
-                                  >
-                                    <div
-                                      className="flex h-[40px] w-[40px] flex-shrink-0 items-center justify-center"
-                                      style={{
-                                        borderColor: corHex,
-                                      }}
-                                    >
-                                      <DinamicIcon iconName={iconName} color={corHex} size={34} />
-                                    </div>
-                                    <div className="line-clamp-2 w-full overflow-hidden text-ellipsis px-1 text-[10px] font-medium text-gray-900">
-                                      {grupo.getNome()}
-                                    </div>
-                                  </button>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        ) : (
-                          // Lista Horizontal de Grupos (quando um grupo está selecionado)
-                          <div
-                            ref={gruposScrollRef}
-                            className="scrollbar-thin flex cursor-grab select-none gap-3 overflow-x-auto pb-2 active:cursor-grabbing"
-                            style={{ scrollbarWidth: 'thin' }}
-                            onMouseDown={handleMouseDown}
-                            onMouseMove={handleMouseMove}
-                            onMouseUp={handleMouseUp}
-                            onMouseLeave={handleMouseLeave}
-                          >
-                            {grupos.map(grupo => {
-                              const corHex = grupo.getCorHex()
-                              const iconName = grupo.getIconName()
-                              const isSelected = grupoSelecionadoId === grupo.getId()
-                              return (
-                                <div
-                                  key={grupo.getId()}
-                                  className="relative flex-shrink-0"
-                                  style={{ width: '100px' }}
-                                >
-                                  <button
-                                    onClick={e => {
-                                      // Só executar o clique se não houve movimento significativo durante o arraste
-                                      if (!hasMovedRef.current && !isDragging) {
-                                        setGrupoSelecionadoId(grupo.getId())
-                                      }
-                                    }}
-                                    onMouseDown={e => {
-                                      // Permitir que o evento propague para o container para iniciar o arraste
-                                      // O onClick só será executado se não houver movimento
-                                    }}
-                                    className="pointer-events-auto flex aspect-square h-full w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border-2 p-2 text-center transition-all"
-                                    style={{
-                                      borderColor: corHex,
-                                      backgroundColor: isSelected ? corHex : `${corHex}15`,
-                                      color: isSelected ? '#ffffff' : '#1f2937',
-                                    }}
-                                  >
-                                    <div className="flex h-[40px] w-[40px] flex-shrink-0 items-center justify-center">
-                                      <DinamicIcon
-                                        iconName={iconName}
-                                        color={isSelected ? '#ffffff' : corHex}
-                                        size={34}
-                                      />
-                                    </div>
-                                    <div className="line-clamp-2 w-full overflow-hidden text-ellipsis px-1 text-[10px] font-medium">
-                                      {grupo.getNome()}
-                                    </div>
-                                  </button>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Grid de Produtos do Grupo Selecionado */}
-                      {grupoSelecionadoId &&
-                        (() => {
-                          const grupoSelecionado = grupos.find(
-                            g => g.getId() === grupoSelecionadoId
-                          )
-                          const corHexGrupo = grupoSelecionado?.getCorHex() || '#6b7280'
-                          return (
-                            <div className="space-y-2">
-                              <Label className="text-sm text-gray-600">
-                                Produtos do grupo:{' '}
-                                <span className="font-semibold">{grupoSelecionado?.getNome()}</span>
-                              </Label>
-                              {isLoadingProdutos ? (
-                                <div className="py-4 text-center text-gray-500">
-                                  <JiffyLoading />
-                                </div>
-                              ) : produtosError ? (
-                                <div className="py-4 text-center text-red-500">
-                                  Erro ao carregar produtos:{' '}
-                                  {produtosError instanceof Error
-                                    ? produtosError.message
-                                    : 'Erro desconhecido'}
-                                </div>
-                              ) : produtosList.length === 0 ? (
-                                <div className="py-4 text-center text-gray-500">
-                                  Nenhum produto encontrado neste grupo
-                                </div>
-                              ) : (
-                                <div
-                                  className="grid max-h-60 grid-cols-3 gap-2 overflow-y-auto rounded-lg border p-2 sm:grid-cols-4 md:grid-cols-7"
-                                  style={{
-                                    backgroundColor: `${corHexGrupo}15`,
-                                  }}
-                                >
-                                  {produtosList.map(produto => {
-                                    return (
-                                      <div key={produto.getId()} className="relative">
-                                        <button
-                                          onClick={() => adicionarProduto(produto.getId())}
-                                          onMouseEnter={e => {
-                                            e.currentTarget.style.borderColor = corHexGrupo
-                                            e.currentTarget.style.backgroundColor = '#ffffff'
-                                          }}
-                                          onMouseLeave={e => {
-                                            e.currentTarget.style.borderColor = corHexGrupo
-                                            e.currentTarget.style.backgroundColor = '#ffffff'
-                                          }}
-                                          className="relative flex aspect-square w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 text-center transition-all"
-                                          style={{
-                                            borderColor: corHexGrupo,
-                                            backgroundColor: '#ffffff',
-                                          }}
-                                        >
-                                          <div className="mb-1 break-words text-[10px] font-medium text-gray-900">
-                                            {produto.getNome()}
-                                          </div>
-                                          <div className="text-[10px] font-semibold text-primary-text">
-                                            {transformarParaReal(produto.getValor())}
-                                          </div>
-                                        </button>
-                                      </div>
-                                    )
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })()}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <ProdutosPedidoStep
+                produtos={produtos}
+                gruposExpandido={gruposExpandido}
+                setGruposExpandido={setGruposExpandido}
+                totalProdutos={totalProdutos}
+                grupos={grupos}
+                isLoadingGrupos={isLoadingGrupos}
+                grupoSelecionadoId={grupoSelecionadoId}
+                setGrupoSelecionadoId={setGrupoSelecionadoId}
+                gruposScrollRef={gruposScrollRef}
+                handleMouseDown={handleMouseDown}
+                handleMouseMove={handleMouseMove}
+                handleMouseUp={handleMouseUp}
+                handleMouseLeave={handleMouseLeave}
+                hasMovedRef={hasMovedRef}
+                isDragging={isDragging}
+                isLoadingProdutos={isLoadingProdutos}
+                produtosError={produtosError}
+                produtosList={produtosCatalogoUnificado}
+                adicionarProduto={adicionarProduto}
+                valoresEmEdicao={valoresEmEdicao}
+                setValoresEmEdicao={setValoresEmEdicao}
+                atualizarProduto={atualizarProduto}
+                longPressIndexRef={longPressIndexRef}
+                longPressTimeoutRef={longPressTimeoutRef}
+                abrirModalEdicaoProduto={abrirModalEdicaoProduto}
+                formatarDescontoAcrescimo={formatarDescontoAcrescimo}
+                formatarNumeroComMilhar={formatarNumeroComMilhar}
+                calcularTotalProduto={calcularTotalProduto}
+                removerProduto={removerProduto}
+                atualizarComplemento={atualizarComplemento}
+                removerComplemento={removerComplemento}
+                abrirModalComplementosProdutoExistente={abrirModalComplementosProdutoExistente}
+                formatarValorComplemento={formatarValorComplemento}
+                longPressComplementoIndexRef={longPressComplementoIndexRef}
+                longPressComplementoTimeoutRef={longPressComplementoTimeoutRef}
+                onAbrirBuscaProdutos={() => setModalBuscaProdutosOpen(true)}
+              />
             )}
 
             {/* STEP 3: Pagamento */}
             {!modoVisualizacao && currentStep === 3 && (
-              <div className="space-y-2">
-                {/* Informações do Pedido */}
-                <div className="rounded-lg border bg-gray-50 px-4">
-                  <h3 className="text-lg font-semibold">Informações do Pedido</h3>
-                  <div className="text-sm">
-                    <div className="flex justify-between rounded-lg bg-white px-1">
-                      <span className="text-gray-600">Data:</span>
-                      <span className="font-medium">
-                        {new Date().toLocaleString('pt-BR', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </span>
-                    </div>
-                    <div className="flex justify-between px-1">
-                      <span className="text-gray-600">Origem:</span>
-                      <span className="font-medium">{origem}</span>
-                    </div>
-                    <div className="flex justify-between rounded-lg bg-white px-1">
-                      <span className="text-gray-600">Status:</span>
-                      <span className="font-medium">
-                        {statusDisponiveis.find(s => s.value === status)?.label}
-                      </span>
-                    </div>
-                    {clienteNome && (
-                      <div className="flex justify-between px-1">
-                        <span className="text-gray-600">Cliente:</span>
-                        <span className="font-medium">{clienteNome}</span>
-                      </div>
-                    )}
-
-                    <div className="flex justify-between rounded-lg bg-white px-1">
-                      <span className="text-gray-600">Total de Itens:</span>
-                      <span className="font-medium">
-                        {produtos.length} {produtos.length === 1 ? 'produto' : 'produtos'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Pagamento (se status finalizada ou pendente emissão) */}
-                {(status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') && (
-                  <div className="space-y-4">
-                    <div className="rounded-lg border bg-white px-4">
-                      <h3 className="text-lg font-semibold">Pagamento</h3>
-
-                      {/* Total do Pedido e A pagar */}
-                      <div className="mb-2 space-y-2 text-sm">
-                        <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
-                          <span className="font-medium text-gray-700">Total do Pedido:</span>
-                          <span className="text-base font-semibold text-primary">
-                            {transformarParaReal(totalProdutos)}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
-                          <span className="font-medium text-gray-700">A pagar:</span>
-                          <span
-                            className={`text-base font-semibold ${
-                              valorAPagar > 0 ? 'text-red-600' : 'text-green-600'
-                            }`}
-                          >
-                            {transformarParaReal(valorAPagar)}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-primary-text">Valor Recebido:</span>
-                          <input
-                            type="text"
-                            value={valorRecebido}
-                            onChange={e => {
-                              const valorFormatado = formatarValorRecebido(e.target.value)
-                              setValorRecebido(valorFormatado)
-                            }}
-                            placeholder="0,00"
-                            className="rounded-lg border-2 p-1 text-right font-semibold transition-colors hover:border-primary-text"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Formas de Pagamento - Cards */}
-                      <div className="mb-2">
-                        <Label className="mb-2 block text-base font-semibold">
-                          Forma de Pagamento
-                        </Label>
-                        <div
-                          ref={meiosPagamentoScrollRef}
-                          className={`scrollbar-thin flex gap-3 overflow-x-auto pb-2 ${mostrarLoadingFormasPagamento ? 'min-h-[120px] cursor-default' : 'cursor-grab select-none active:cursor-grabbing'}`}
-                          style={{ scrollbarWidth: 'thin' }}
-                          onMouseDown={
-                            mostrarLoadingFormasPagamento
-                              ? undefined
-                              : handleMouseDownMeiosPagamento
-                          }
-                        >
-                          {mostrarLoadingFormasPagamento ? (
-                            <div className="flex w-full flex-1 items-center justify-center py-2">
-                              <JiffyLoading />
-                            </div>
-                          ) : (
-                            meiosPagamento.map(meio => {
-                              const Icone = obterIconeMeioPagamento(meio.getNome())
-
-                              return (
-                                <button
-                                  key={meio.getId()}
-                                  type="button"
-                                  onClick={e => {
-                                    // Só executar o clique se não houve movimento significativo durante o arraste
-                                    if (
-                                      !hasMovedMeiosPagamentoRef.current &&
-                                      !isDraggingMeiosPagamento
-                                    ) {
-                                      adicionarPagamentoPorCard(meio.getId())
-                                    }
-                                  }}
-                                  onMouseDown={e => {
-                                    // Permitir que o evento propague para o container para iniciar o arraste
-                                  }}
-                                  disabled={valorAPagar <= 0}
-                                  className={`flex min-w-[100px] flex-shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-primary bg-white p-2 transition-all hover:bg-primary hover:text-white ${valorAPagar <= 0 ? 'cursor-not-allowed opacity-50' : ''} `}
-                                >
-                                  <Icone className="h-8 w-8" />
-                                  <span className="text-center text-xs font-medium">
-                                    {meio.getNome()}
-                                  </span>
-                                </button>
-                              )
-                            })
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Total Pago e Troco */}
-                      <div className="border-t pt-2 text-sm">
-                        <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
-                          <span className="font-semibold text-gray-700">Total Pago:</span>
-                          <span className="text-base font-semibold text-gray-900">
-                            {transformarParaReal(totalPagamentos)}
-                          </span>
-                        </div>
-                        {troco > 0 && (
-                          <div className="flex items-center justify-between">
-                            <span className="font-semibold text-gray-700">Troco:</span>
-                            <span className="text-base font-semibold text-green-600">
-                              {transformarParaReal(troco)}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Detalhes dos Pagamentos Aplicados */}
-                      {pagamentos.length > 0 && (
-                        <div className="mt-2 border-t pt-2">
-                          <Label className="mb-2 block text-sm font-semibold">Detalhes:</Label>
-                          <div className="flex flex-wrap gap-2">
-                            {pagamentos.map((pagamento, index) => {
-                              const meio = meiosPagamento.find(
-                                m => m.getId() === pagamento.meioPagamentoId
-                              )
-                              const Icone = meio
-                                ? obterIconeMeioPagamento(meio.getNome())
-                                : MdCreditCard
-
-                              return (
-                                <div
-                                  key={index}
-                                  className="flex items-center gap-2 rounded-lg border border-green-300 bg-green-100 p-2"
-                                >
-                                  <Icone className="h-6 w-6 text-green-700" />
-                                  <div className="flex flex-col">
-                                    <span className="text-xs font-medium text-green-900">
-                                      {meio?.getNome() || 'Meio de pagamento'}
-                                    </span>
-                                    <span className="text-xs font-semibold text-green-900">
-                                      {transformarParaReal(pagamento.valor)}
-                                    </span>
-                                  </div>
-                                  <button
-                                    onClick={() => removerPagamento(index)}
-                                    type="button"
-                                    className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-green-100 p-0 hover:bg-green-200"
-                                  >
-                                    <MdDelete className="h-4 w-4 text-green-700" />
-                                  </button>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <PagamentoPedidoStep
+                status={status}
+                clienteNome={clienteNome}
+                origem={origem}
+                statusDisponiveis={statusDisponiveis}
+                produtos={produtos}
+                totalProdutos={totalProdutos}
+                valorAPagar={valorAPagar}
+                valorRecebido={valorRecebido}
+                setValorRecebido={setValorRecebido}
+                formatarValorRecebido={formatarValorRecebido}
+                meiosPagamentoScrollRef={meiosPagamentoScrollRef}
+                mostrarLoadingFormasPagamento={mostrarLoadingFormasPagamento}
+                handleMouseDownMeiosPagamento={handleMouseDownMeiosPagamento}
+                hasMovedMeiosPagamentoRef={hasMovedMeiosPagamentoRef}
+                isDraggingMeiosPagamento={isDraggingMeiosPagamento}
+                meiosPagamento={meiosPagamento}
+                obterIconeMeioPagamento={obterIconeMeioPagamento}
+                adicionarPagamentoPorCard={adicionarPagamentoPorCard}
+                totalPagamentos={totalPagamentos}
+                troco={troco}
+                pagamentos={pagamentos}
+                removerPagamento={removerPagamento}
+                transformarParaReal={transformarParaReal}
+              />
             )}
 
             {/* STEP 4: Detalhes da Venda (visualização ou após criar pedido) */}
             {currentStep === 4 && !isLoadingVenda && (
-              <div className="space-y-4 py-2">
-                {abaDetalhesPedido === 'notaFiscal' && podeExibirAbaNotaFiscal ? (
-                  <div
-                    className="space-y-3"
-                    role="tabpanel"
-                    aria-labelledby="tab-detalhes-nota-fiscal"
-                  >
-                    <div className="flex flex-col gap-3 rounded-lg border-2 border-primary/20 bg-gray-50/90 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                      <h3 className="font-nunito text-lg font-semibold text-primary">
-                        Resumo da Nota Fiscal modelo: {rotuloModeloNfe(resumoFiscal?.modelo)}
-                      </h3>
-                      {resumoFiscal?.documentoFiscalId &&
-                        statusFiscalEhEmitida(resumoFiscal.status, statusFiscalUnificado) && (
-                          <Button
-                            type="button"
-                            variant="outlined"
-                            className="shrink-0 !border-primary !text-primary hover:!bg-primary/5"
-                            onClick={() => {
-                              void abrirDocumentoFiscalPdf(
-                                resumoFiscal.documentoFiscalId!,
-                                tipoDocFiscalFromModelo(resumoFiscal.modelo)
-                              )
-                            }}
-                          >
-                            Ver{' '}
-                            {tipoDocFiscalFromModelo(resumoFiscal.modelo) === 'NFE'
-                              ? 'NFe'
-                              : 'NFCe'}
-                          </Button>
-                        )}
-                    </div>
-
-                    {!resumoFiscal ? (
-                      <div className="rounded-lg border border-dashed border-amber-300/80 bg-amber-50/90 px-6 py-10 text-center">
-                        <p className="font-nunito text-sm leading-relaxed text-amber-950/90">
-                          Nenhum resumo fiscal disponível para esta venda. Isso pode ocorrer se
-                          ainda não houver nota emitida ou se o backend não retornou o objeto{' '}
-                          <span className="font-semibold">resumoFiscal</span>.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-                        <div className="divide-y divide-gray-100">
-                          {(
-                            [
-                              {
-                                label: 'Status',
-                                value: resumoFiscal.status ?? '—',
-                              },
-                              {
-                                label: 'Retorno SEFAZ',
-                                value: resumoFiscal.retornoSefaz ?? '—',
-                                multiline: true,
-                              },
-                              {
-                                label: 'Código retorno',
-                                value: (resumoFiscal as any).codigoRetorno ?? '—',
-                              },
-                              {
-                                label: 'Número ' + rotuloModeloNfe(resumoFiscal.modelo ?? null),
-                                value:
-                                  resumoFiscal.numero != null ? String(resumoFiscal.numero) : '—',
-                              },
-                              {
-                                label: 'Série',
-                                value: resumoFiscal.serie ?? '—',
-                              },
-                              {
-                                label: 'Data de emissão',
-                                value: formatarDataHoraResumoFiscal(resumoFiscal.dataEmissao),
-                              },
-                              {
-                                label: 'Modelo',
-                                value: rotuloModeloNfe(resumoFiscal.modelo ?? null),
-                              },
-                              {
-                                label: 'Chave fiscal',
-                                value: resumoFiscal.chaveFiscal ?? '—',
-                                monospace: true,
-                              },
-                              {
-                                label: 'Data de criação',
-                                value: formatarDataHoraResumoFiscal(resumoFiscal.dataCriacao),
-                              },
-                              {
-                                label: 'Última modificação',
-                                value: formatarDataHoraResumoFiscal(
-                                  resumoFiscal.dataUltimaModificacao
-                                ),
-                              },
-                            ] as const
-                          ).map((row, idx) => (
-                            <div
-                              key={row.label}
-                              className={`flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 ${
-                                idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/80'
-                              }`}
-                            >
-                              <span className="shrink-0 text-xs font-semibold text-gray-600 sm:text-sm">
-                                {row.label}
-                              </span>
-                              <span
-                                className={`font-nunito break-words text-right text-sm text-gray-900 sm:max-w-[min(100%,28rem)] sm:text-left ${
-                                  'monospace' in row && row.monospace ? 'font-mono text-sm' : ''
-                                } ${
-                                  'multiline' in row && row.multiline ? 'whitespace-pre-wrap' : ''
-                                }`}
-                              >
-                                {row.value}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <>
-                    {abaDetalhesPedido === 'infoPedido' && (
-                      <div
-                        className="rounded-lg border bg-gray-50 px-4"
-                        role="tabpanel"
-                        aria-labelledby="tab-detalhes-info-pedido"
-                      >
-                        <h3 className="text-lg font-semibold">Informações do Pedido</h3>
-                        <div className="flex flex-col gap-3 text-sm">
-                          <div className="flex justify-between rounded-lg bg-white px-1">
-                            <span className="text-gray-600">Data:</span>
-                            <span className="font-medium">
-                              {(dataVenda ? new Date(dataVenda) : new Date()).toLocaleString(
-                                'pt-BR',
-                                {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  year: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                }
-                              )}
-                            </span>
-                          </div>
-                          <div className="flex justify-between px-1">
-                            <span className="text-gray-600">Origem:</span>
-                            <span className="font-medium">
-                              {rotuloOrigemParaExibicao(origemTextoApiDetalhe)}
-                            </span>
-                          </div>
-                          <div className="flex justify-between rounded-lg bg-white px-1">
-                            <span className="text-gray-600">Status:</span>
-                            <span className="font-medium">
-                              {statusDisponiveis.find(s => s.value === status)?.label}
-                            </span>
-                          </div>
-                          {clienteNome && (
-                            <div className="flex justify-between px-1">
-                              <span className="text-gray-600">Cliente:</span>
-                              <span className="font-medium">{clienteNome}</span>
-                            </div>
-                          )}
-
-                          <div className="flex justify-between rounded-lg bg-white px-1">
-                            <span className="text-gray-600">Total de Itens:</span>
-                            <span className="font-medium">
-                              {produtos.length} {produtos.length === 1 ? 'produto' : 'produtos'}
-                            </span>
-                          </div>
-                          <div className="flex justify-between px-1">
-                            <span className="text-gray-600">Aberto por:</span>
-                            <span className="font-medium">
-                              {formatarUsuarioPorId(detalhesPedidoMeta?.abertoPorId)}
-                            </span>
-                          </div>
-                          {detalhesPedidoMeta?.ultimoResponsavelId && (
-                            <div className="flex justify-between rounded-lg bg-white px-1">
-                              <span className="text-gray-600">Última alteração por:</span>
-                              <span className="font-medium">
-                                {formatarUsuarioPorId(detalhesPedidoMeta.ultimoResponsavelId)}
-                              </span>
-                            </div>
-                          )}
-                          {detalhesPedidoMeta?.canceladoPorId && (
-                            <div className="flex justify-between px-1">
-                              <span className="text-gray-600">Cancelado por:</span>
-                              <span className="font-medium text-red-600">
-                                {formatarUsuarioPorId(detalhesPedidoMeta.canceladoPorId)}
-                              </span>
-                            </div>
-                          )}
-                          {detalhesPedidoMeta?.codigoTerminal && (
-                            <div className="flex justify-between rounded-lg bg-white px-1">
-                              <span className="text-gray-600">Código do terminal:</span>
-                              <span className="font-medium">
-                                {detalhesPedidoMeta.codigoTerminal}
-                              </span>
-                            </div>
-                          )}
-                          {detalhesPedidoMeta?.identificacao && (
-                            <div className="flex justify-between px-1">
-                              <span className="text-gray-600">Identificação:</span>
-                              <span className="font-medium">
-                                {detalhesPedidoMeta.identificacao}
-                              </span>
-                            </div>
-                          )}
-                          <div className="flex justify-between rounded-lg bg-white px-1">
-                            <span className="text-gray-600">Solicitar emissão fiscal:</span>
-                            <span className="font-medium">
-                              {detalhesPedidoMeta?.solicitarEmissaoFiscal ? 'Sim' : 'Não'}
-                            </span>
-                          </div>
-                          {detalhesPedidoMeta?.dataUltimaModificacao && (
-                            <div className="flex justify-between px-1">
-                              <span className="text-gray-600">Última modificação:</span>
-                              <span className="font-medium">
-                                {formatarDataDetalhePedido(
-                                  detalhesPedidoMeta.dataUltimaModificacao
-                                )}
-                              </span>
-                            </div>
-                          )}
-                          {detalhesPedidoMeta?.dataUltimoProdutoLancado && (
-                            <div className="flex justify-between rounded-lg bg-white px-1">
-                              <span className="text-gray-600">Último produto lançado:</span>
-                              <span className="font-medium">
-                                {formatarDataDetalhePedido(
-                                  detalhesPedidoMeta.dataUltimoProdutoLancado
-                                )}
-                              </span>
-                            </div>
-                          )}
-                          {detalhesPedidoMeta?.dataFinalizacao && (
-                            <div className="flex justify-between px-1">
-                              <span className="text-gray-600">Data finalização:</span>
-                              <span className="font-medium">
-                                {formatarDataDetalhePedido(detalhesPedidoMeta.dataFinalizacao)}
-                              </span>
-                            </div>
-                          )}
-                          {detalhesPedidoMeta?.dataCancelamento && (
-                            <div className="flex justify-between rounded-lg bg-white px-1">
-                              <span className="text-gray-600">Data cancelamento:</span>
-                              <span className="font-medium text-red-600">
-                                {formatarDataDetalhePedido(detalhesPedidoMeta.dataCancelamento)}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Lista de Produtos (Visualização) */}
-                    {abaDetalhesPedido === 'listaProdutos' && (
-                      <div
-                        className="overflow-hidden rounded-lg border bg-gray-50"
-                        role="tabpanel"
-                        aria-labelledby="tab-detalhes-lista-produtos"
-                      >
-                        <div className="p-2">
-                          <h3 className="mb-2 text-lg font-semibold">Produtos do Pedido</h3>
-                          {produtos.length > 0 ? (
-                            <div className="space-y-1">
-                              {/* Cabeçalho da tabela */}
-                              <div className="mb-2 flex gap-2 border-b border-gray-300 pb-2">
-                                <div className="flex w-[60px] flex-shrink-0 items-center justify-center">
-                                  <span className="text-center text-xs font-semibold text-gray-700">
-                                    Qtd
-                                  </span>
-                                </div>
-                                <div className="flex-[4]">
-                                  <span className="text-xs font-semibold text-gray-700">
-                                    Produto
-                                  </span>
-                                </div>
-                                <div className="flex flex-1 justify-end">
-                                  <span className="text-right text-xs font-semibold text-gray-700">
-                                    Desc./Acres.
-                                  </span>
-                                </div>
-                                <div className="flex flex-1 justify-end">
-                                  <span className="text-right text-xs font-semibold text-gray-700">
-                                    Val Unit.
-                                  </span>
-                                </div>
-                                <div className="flex flex-1 justify-end">
-                                  <span className="text-right text-xs font-semibold text-gray-700">
-                                    Total
-                                  </span>
-                                </div>
-                              </div>
-                              {/* Linhas de produtos */}
-                              <div className="space-y-1">
-                                {produtos.map((produto, index) => {
-                                  // Total do produto: usar valorFinal vindo do backend (já calculado com desconto/acréscimo)
-                                  const totalProdutoComComplementos =
-                                    produto.valorFinal !== null && produto.valorFinal !== undefined
-                                      ? produto.valorFinal
-                                      : calcularTotalProduto(produto)
-
-                                  return (
-                                    <div key={index} className="space-y-0">
-                                      {/* Linha do Produto Principal */}
-                                      <div
-                                        className={`flex items-center gap-1 rounded ${
-                                          index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                                        } cursor-pointer`}
-                                        onDoubleClick={() =>
-                                          handleAbrirEdicaoProdutoDetalhes(produto.produtoId)
-                                        }
-                                        title="Duplo clique para editar este produto"
-                                      >
-                                        {/* Quantidade */}
-                                        <div className="w-[60px] flex-shrink-0">
-                                          <span className="block text-center text-xs text-gray-900">
-                                            {Math.floor(produto.quantidade)}
-                                          </span>
-                                        </div>
-                                        {/* Nome do Produto */}
-                                        <div className="min-w-0 flex-[4]">
-                                          <span className="block truncate text-xs text-gray-900">
-                                            {produto.nome}
-                                          </span>
-                                        </div>
-                                        {/* Desconto/Acréscimo */}
-                                        <div className="flex-1">
-                                          <span className="block text-right text-xs text-gray-600">
-                                            {formatarDescontoAcrescimo(produto)}
-                                          </span>
-                                        </div>
-                                        {/* Valor Unitário */}
-                                        <div className="flex-1">
-                                          <span className="block text-right text-xs text-gray-900">
-                                            {formatarNumeroComMilhar(produto.valorUnitario)}
-                                          </span>
-                                        </div>
-                                        {/* Total */}
-                                        <div className="flex-1">
-                                          <span className="block text-right text-xs font-semibold text-gray-900">
-                                            R${' '}
-                                            {formatarNumeroComMilhar(totalProdutoComComplementos)}
-                                          </span>
-                                        </div>
-                                      </div>
-
-                                      {/* Linhas dos Complementos */}
-                                      {produto.complementos.map((complemento, compIndex) => {
-                                        const compKey = `comp-${index}-${complemento.grupoId}-${complemento.id}`
-
-                                        return (
-                                          <div
-                                            key={compKey}
-                                            className={`-mt-0.5 flex items-center gap-1 rounded ${
-                                              index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                                            }`}
-                                            style={{ minHeight: '24px' }}
-                                          >
-                                            {/* Quantidade do Complemento */}
-                                            <div className="w-[60px] flex-shrink-0 pl-4">
-                                              <span className="block text-right text-xs text-gray-600">
-                                                {complemento.quantidade}
-                                              </span>
-                                            </div>
-                                            {/* Nome do Complemento com indentação */}
-                                            <div className="min-w-0 flex-[4] pl-4">
-                                              <span className="block truncate text-xs leading-tight text-gray-600">
-                                                {complemento.nome}
-                                              </span>
-                                            </div>
-                                            {/* Espaço vazio para Desconto/Acréscimo (complementos não têm) */}
-                                            <div className="flex-1"></div>
-                                            {/* Valor Unitário do Complemento - Apenas exibição */}
-                                            <div className="flex-1">
-                                              <span className="block text-right text-xs leading-tight text-gray-600">
-                                                {formatarValorComplemento(
-                                                  complemento.valor,
-                                                  complemento.tipoImpactoPreco
-                                                )}
-                                              </span>
-                                            </div>
-                                            {/* Espaço vazio onde seria o Total (complementos não têm total próprio) */}
-                                            <div className="flex-1"></div>
-                                          </div>
-                                        )
-                                      })}
-                                      <div className="flex justify-start px-6 pb-1 text-[11px] text-gray-500">
-                                        <span>
-                                          Por: {formatarUsuarioPorId(produto.lancadoPorId)} -{' '}
-                                          {formatarDataDetalhePedido(
-                                            produto.dataLancamento || null
-                                          )}
-                                        </span>
-                                      </div>
-                                      {produto.removido && (
-                                        <div className="flex justify-between px-1 pb-1 text-[11px] text-red-600">
-                                          <span>
-                                            Removido por:{' '}
-                                            {formatarUsuarioPorId(produto.removidoPorId)}
-                                          </span>
-                                          <span>
-                                            {formatarDataDetalhePedido(produto.dataRemocao || null)}
-                                          </span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-center py-4">
-                              <p className="text-sm text-gray-500">Nenhum produto selecionado</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Total do Pedido */}
-                    {abaDetalhesPedido === 'listaProdutos' && (
-                      <div className="flex items-center justify-end gap-2">
-                        <span className="text-sm font-semibold text-gray-700">
-                          Total do Pedido:
-                        </span>
-                        <span className="text-lg font-semibold text-primary">
-                          {transformarParaReal(totalProdutos)}
-                        </span>
-                      </div>
-                    )}
-
-                    {abaDetalhesPedido === 'listaProdutos' && resumoFinanceiroDetalhes && (
-                      <div className="rounded-lg border bg-white px-4 py-3">
-                        <h3 className="mb-2 text-lg font-semibold">Resumo Financeiro</h3>
-                        <div className="space-y-1.5 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-gray-700">A - Total de itens lançados (+)</span>
-                            <span className="font-semibold text-gray-900">
-                              {formatarNumeroComMilhar(resumoFinanceiroDetalhes.totalItensLancados)}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-700">B - Total de itens cancelados (-)</span>
-                            <span className="font-semibold text-gray-900 line-through">
-                              {formatarNumeroComMilhar(
-                                resumoFinanceiroDetalhes.totalItensCancelados
-                              )}
-                            </span>
-                          </div>
-                          <div className="mt-1 flex justify-between border-t pt-1.5">
-                            <span className="text-gray-700">C - Total dos itens (A - B)</span>
-                            <span className="font-semibold text-gray-900">
-                              {formatarNumeroComMilhar(resumoFinanceiroDetalhes.totalDosItens)}
-                            </span>
-                          </div>
-                          <div className="mt-3 flex justify-between">
-                            <span className="text-gray-700">Total de descontos na conta</span>
-                            <span className="font-semibold text-gray-900">
-                              {formatarNumeroComMilhar(
-                                resumoFinanceiroDetalhes.totalDescontosConta
-                              )}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-700">Total de acréscimos na conta</span>
-                            <span className="font-semibold text-gray-900">
-                              {formatarNumeroComMilhar(
-                                resumoFinanceiroDetalhes.totalAcrescimosConta
-                              )}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Pagamentos (se status finalizada ou pendente emissão) */}
-                    {abaDetalhesPedido === 'pagamentos' && (
-                      <div
-                        className="rounded-lg border bg-white px-4"
-                        role="tabpanel"
-                        aria-labelledby="tab-detalhes-pagamentos"
-                      >
-                        <h3 className="mb-2 text-lg font-semibold">Pagamentos</h3>
-
-                        {/* Total Pago e Troco */}
-                        <div className="mb-2 border-t pt-2 text-sm">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-sm font-semibold text-gray-700">
-                              Total do Pedido:
-                            </span>
-                            <span className="text-lg font-semibold text-primary">
-                              {transformarParaReal(totalProdutos)}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
-                            <span className="font-semibold text-gray-700">Total Pago:</span>
-                            <span className="text-base font-semibold text-gray-900">
-                              {transformarParaReal(totalPagamentos)}
-                            </span>
-                          </div>
-                          {troco > 0 && (
-                            <div className="mt-2 flex items-center justify-between">
-                              <span className="font-semibold text-gray-700">Troco:</span>
-                              <span className="text-base font-semibold text-green-600">
-                                {transformarParaReal(troco)}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Cards das Formas de Pagamento */}
-                        <div className="mb-2">
-                          <Label className="mb-2 block text-base font-semibold">
-                            Formas de Pagamento Utilizadas
-                          </Label>
-                          <div className="flex flex-wrap gap-3">
-                            {pagamentosVisiveisNaAbaDetalhes.map((pagamento, index) => {
-                              const meio = meiosPagamento.find(
-                                m => m.getId() === pagamento.meioPagamentoId
-                              )
-                              const nomeMeio =
-                                meio?.getNome() ||
-                                nomesMeiosPagamentoPedido[pagamento.meioPagamentoId] ||
-                                'Meio de pagamento'
-                              const Icone = meio
-                                ? obterIconeMeioPagamento(meio.getNome())
-                                : MdCreditCard
-                              const emCancelado = pagamentoComDestaqueCanceladoDetalhes(pagamento)
-
-                              return (
-                                <div
-                                  key={index}
-                                  className={`flex min-w-[120px] flex-col items-center justify-center gap-1 rounded-lg border-2 p-3 ${
-                                    emCancelado
-                                      ? 'border-red-400 bg-red-50'
-                                      : 'border-primary bg-white'
-                                  }`}
-                                >
-                                  <Icone
-                                    className={`h-8 w-8 ${emCancelado ? 'text-red-600' : 'text-primary'}`}
-                                  />
-                                  <span
-                                    className={`text-center text-xs font-medium ${emCancelado ? 'text-red-900' : ''}`}
-                                  >
-                                    {nomeMeio}
-                                  </span>
-                                  <span
-                                    className={`text-sm font-semibold ${emCancelado ? 'text-red-700' : 'text-primary'}`}
-                                  >
-                                    {transformarParaReal(pagamento.valor)}
-                                  </span>
-                                  {emCancelado && (
-                                    <span className="text-center text-[11px] font-semibold text-red-600">
-                                      Pagamento Cancelado
-                                    </span>
-                                  )}
-                                  <span
-                                    className={`text-center text-[11px] ${emCancelado ? 'text-red-800/80' : 'text-gray-500'}`}
-                                  >
-                                    Por: {formatarUsuarioPorId(pagamento.realizadoPorId)}
-                                  </span>
-                                  {pagamento.dataCriacao && (
-                                    <span
-                                      className={`text-center text-[11px] ${emCancelado ? 'text-red-800/80' : 'text-gray-500'}`}
-                                    >
-                                      {formatarDataDetalhePedido(pagamento.dataCriacao)}
-                                    </span>
-                                  )}
-                                  {pagamento.isTefUsed && (
-                                    <span
-                                      className={`text-center text-[11px] ${emCancelado ? 'text-red-700' : 'text-gray-500'}`}
-                                    >
-                                      TEF:{' '}
-                                      {pagamento.isTefConfirmed === true
-                                        ? 'Confirmado'
-                                        : pagamento.isTefConfirmed === false
-                                          ? 'Não confirmado'
-                                          : '—'}
-                                    </span>
-                                  )}
-                                </div>
-                              )
-                            })}
-                          </div>
-                          {pagamentos.length === 0 && (
-                            <p className="py-4 text-sm text-gray-500">
-                              Nenhum pagamento registrado.
-                            </p>
-                          )}
-                          {pagamentos.length > 0 && pagamentosVisiveisNaAbaDetalhes.length === 0 && (
-                            <p className="py-4 text-sm text-gray-500">
-                              Nenhum pagamento efetivo para exibir (ex.: tentativas TEF pendentes de
-                              confirmação).
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
+              <DetalhesPedidoStep
+                abaDetalhesPedido={abaDetalhesPedido}
+                podeExibirAbaNotaFiscal={podeExibirAbaNotaFiscal}
+                resumoFiscal={resumoFiscal}
+                statusFiscalUnificado={statusFiscalUnificado}
+                rotuloModeloNfe={rotuloModeloNfe}
+                formatarDataHoraResumoFiscal={formatarDataHoraResumoFiscal}
+                dataVenda={dataVenda}
+                origemTextoApiDetalhe={origemTextoApiDetalhe}
+                status={status}
+                statusDisponiveis={statusDisponiveis}
+                clienteNome={clienteNome}
+                produtos={produtos}
+                detalhesPedidoMeta={detalhesPedidoMeta}
+                formatarUsuarioPorId={formatarUsuarioPorId}
+                formatarDataDetalhePedido={formatarDataDetalhePedido}
+                handleAbrirEdicaoProdutoDetalhes={handleAbrirEdicaoProdutoDetalhes}
+                calcularTotalProduto={calcularTotalProduto}
+                formatarDescontoAcrescimo={formatarDescontoAcrescimo}
+                formatarNumeroComMilhar={formatarNumeroComMilhar}
+                formatarValorComplemento={formatarValorComplemento}
+                totalProdutos={totalProdutos}
+                resumoFinanceiroDetalhes={resumoFinanceiroDetalhes}
+                pagamentosVisiveisNaAbaDetalhes={pagamentosVisiveisNaAbaDetalhes}
+                meiosPagamento={meiosPagamento}
+                nomesMeiosPagamentoPedido={nomesMeiosPagamentoPedido}
+                obterIconeMeioPagamento={obterIconeMeioPagamento}
+                totalPagamentos={totalPagamentos}
+                troco={troco}
+                pagamentos={pagamentos}
+              />
             )}
           </div>
 
@@ -4194,195 +2079,189 @@ export function NovoPedidoModal({
             }}
           >
             {/* Rodapé em faixa (mesmo padrão visual de `JiffySidePanelModal` footerVariant="bar") */}
-            {currentStep === 4 ? (
-              (() => {
-                type ChaveRodape4 = 'cancelVenda' | 'cancelNota' | 'fechar'
-                const chaves: ChaveRodape4[] = []
-                if (podeExibirCancelarVendaGestor) chaves.push('cancelVenda')
-                if (podeExibirCancelarNotaFiscal) chaves.push('cancelNota')
-                chaves.push('fechar')
-                const n = chaves.length
-                const painelRaioEsqInf = '0.75rem'
-                return (
-                  <div className="shrink-0 bg-white">
-                    <div
-                      className="grid w-full"
-                      style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}
-                    >
-                      {chaves.map((key, i) => (
-                        <div
-                          key={key}
-                          className={
-                            i < n - 1 ? 'min-w-0 border-r border-gray-200' : 'min-w-0'
-                          }
-                        >
-                          {key === 'cancelVenda' ? (
-                            <Button
-                              type="button"
-                              variant="contained"
-                              color="error"
-                              disabled={
-                                cancelarVendaGestor.isPending ||
-                                cancelarNotaFiscalVendaPdv.isPending ||
-                                cancelarNotaFiscalVendaGestor.isPending
-                              }
-                              onClick={() => {
-                                setTipoCancelamentoSelecionado('venda')
-                                setModalCancelarVendaOpen(true)
-                              }}
-                              className="h-12 min-h-12 w-full font-semibold shadow-none"
-                              sx={{
-                                borderRadius: 0,
-                                boxShadow: 'none',
-                                ...(i === 0 ? { borderBottomLeftRadius: painelRaioEsqInf } : {}),
-                              }}
-                            >
-                              <span className="inline-flex w-full items-center justify-center gap-2">
-                                <MdCancel className="h-5 w-5 shrink-0" aria-hidden />
-                                Cancelar Venda
-                              </span>
-                            </Button>
-                          ) : null}
-                          {key === 'cancelNota' ? (
-                            <Button
-                              type="button"
-                              variant="contained"
-                              color="error"
-                              disabled={
-                                cancelarVendaGestor.isPending ||
-                                cancelarNotaFiscalVendaPdv.isPending ||
-                                cancelarNotaFiscalVendaGestor.isPending
-                              }
-                              onClick={() => {
-                                setTipoCancelamentoSelecionado('nota')
-                                setModalCancelarVendaOpen(true)
-                              }}
-                              className="h-12 min-h-12 w-full font-semibold shadow-none"
-                              sx={{
-                                borderRadius: 0,
-                                boxShadow: 'none',
-                                ...(i === 0 ? { borderBottomLeftRadius: painelRaioEsqInf } : {}),
-                              }}
-                            >
-                              <span className="inline-flex w-full items-center justify-center gap-2">
-                                <MdCancel className="h-5 w-5 shrink-0" aria-hidden />
-                                Cancelar Nota
-                              </span>
-                            </Button>
-                          ) : null}
-                          {key === 'fechar' ? (
-                            <Button
-                              type="button"
-                              variant="contained"
-                              color="primary"
-                              onClick={() => {
-                                onSuccess()
-                                onClose()
-                              }}
-                              className="h-12 min-h-12 w-full font-semibold shadow-none"
-                              sx={footerSavePrimaryBarSx(i === 0)}
-                            >
-                              {modoVisualizacao ? 'Fechar' : 'Concluir'}
-                            </Button>
-                          ) : null}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })()
-            ) : (
-              (() => {
-                type ChaveWizard = 'cancelar' | 'anterior' | 'proximo' | 'criar'
-                const chaves: ChaveWizard[] = ['cancelar']
-                if (currentStep > 1) chaves.push('anterior')
-                if (currentStep < 3) chaves.push('proximo')
-                else chaves.push('criar')
-                const n = chaves.length
-                return (
-                  <div className="shrink-0 bg-white">
-                    <div
-                      className="grid w-full"
-                      style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}
-                    >
-                      {chaves.map((key, i) => {
-                        const isPrimeiraColuna = i === 0
-                        return (
+            {currentStep === 4
+              ? (() => {
+                  type ChaveRodape4 = 'cancelVenda' | 'cancelNota' | 'fechar'
+                  const chaves: ChaveRodape4[] = []
+                  if (podeExibirCancelarVendaGestor) chaves.push('cancelVenda')
+                  if (podeExibirCancelarNotaFiscal) chaves.push('cancelNota')
+                  chaves.push('fechar')
+                  const n = chaves.length
+                  const painelRaioEsqInf = '0.75rem'
+                  return (
+                    <div className="shrink-0 bg-white">
+                      <div
+                        className="grid w-full"
+                        style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}
+                      >
+                        {chaves.map((key, i) => (
                           <div
                             key={key}
-                            className={
-                              i < n - 1 ? 'min-w-0 border-r border-gray-200' : 'min-w-0'
-                            }
+                            className={i < n - 1 ? 'min-w-0 border-r border-gray-200' : 'min-w-0'}
                           >
-                            {key === 'cancelar' ? (
-                              <Button
-                                type="button"
-                                variant="outlined"
-                                color="inherit"
-                                onClick={handleClose}
-                                disabled={createVendaGestor.isPending}
-                                className="h-12 min-h-12 w-full font-semibold shadow-none"
-                                sx={footerBarGrayBarSx(isPrimeiraColuna)}
-                              >
-                                Cancelar
-                              </Button>
-                            ) : null}
-                            {key === 'anterior' ? (
-                              <Button
-                                type="button"
-                                variant="outlined"
-                                color="inherit"
-                                onClick={handlePreviousStep}
-                                disabled={createVendaGestor.isPending}
-                                className="h-12 min-h-12 w-full font-semibold shadow-none"
-                                sx={footerBarPrimaryMutedSx(isPrimeiraColuna)}
-                              >
-                                <span className="inline-flex w-full items-center justify-center gap-1.5">
-                                  <MdArrowBack className="h-5 w-5 shrink-0" aria-hidden />
-                                  Anterior
-                                </span>
-                              </Button>
-                            ) : null}
-                            {key === 'proximo' ? (
+                            {key === 'cancelVenda' ? (
                               <Button
                                 type="button"
                                 variant="contained"
-                                color="primary"
-                                onClick={handleNextStep}
+                                color="error"
                                 disabled={
-                                  createVendaGestor.isPending ||
-                                  (currentStep === 2 && !canGoToStep3())
+                                  cancelarVendaGestor.isPending ||
+                                  cancelarNotaFiscalVendaPdv.isPending ||
+                                  cancelarNotaFiscalVendaGestor.isPending
                                 }
+                                onClick={() => {
+                                  setTipoCancelamentoSelecionado('venda')
+                                  setModalCancelarVendaOpen(true)
+                                }}
                                 className="h-12 min-h-12 w-full font-semibold shadow-none"
-                                sx={footerSavePrimaryBarSx(isPrimeiraColuna)}
+                                sx={{
+                                  borderRadius: 0,
+                                  boxShadow: 'none',
+                                  ...(i === 0 ? { borderBottomLeftRadius: painelRaioEsqInf } : {}),
+                                }}
                               >
-                                <span className="inline-flex w-full items-center justify-center gap-1.5">
-                                  Próximo
-                                  <MdArrowForward className="h-5 w-5 shrink-0" aria-hidden />
+                                <span className="inline-flex w-full items-center justify-center gap-2">
+                                  <MdCancel className="h-5 w-5 shrink-0" aria-hidden />
+                                  Cancelar Venda
                                 </span>
                               </Button>
                             ) : null}
-                            {key === 'criar' ? (
+                            {key === 'cancelNota' ? (
+                              <Button
+                                type="button"
+                                variant="contained"
+                                color="error"
+                                disabled={
+                                  cancelarVendaGestor.isPending ||
+                                  cancelarNotaFiscalVendaPdv.isPending ||
+                                  cancelarNotaFiscalVendaGestor.isPending
+                                }
+                                onClick={() => {
+                                  setTipoCancelamentoSelecionado('nota')
+                                  setModalCancelarVendaOpen(true)
+                                }}
+                                className="h-12 min-h-12 w-full font-semibold shadow-none"
+                                sx={{
+                                  borderRadius: 0,
+                                  boxShadow: 'none',
+                                  ...(i === 0 ? { borderBottomLeftRadius: painelRaioEsqInf } : {}),
+                                }}
+                              >
+                                <span className="inline-flex w-full items-center justify-center gap-2">
+                                  <MdCancel className="h-5 w-5 shrink-0" aria-hidden />
+                                  Cancelar Nota
+                                </span>
+                              </Button>
+                            ) : null}
+                            {key === 'fechar' ? (
                               <Button
                                 type="button"
                                 variant="contained"
                                 color="primary"
-                                onClick={handleSubmit}
-                                disabled={createVendaGestor.isPending || !canSubmit()}
+                                onClick={() => {
+                                  onSuccess()
+                                  onClose()
+                                }}
                                 className="h-12 min-h-12 w-full font-semibold shadow-none"
-                                sx={footerSavePrimaryBarSx(isPrimeiraColuna)}
+                                sx={footerSavePrimaryBarSx(i === 0)}
                               >
-                                {createVendaGestor.isPending ? 'Criando...' : 'Criar Pedido'}
+                                {modoVisualizacao ? 'Fechar' : 'Concluir'}
                               </Button>
                             ) : null}
                           </div>
-                        )
-                      })}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )
-              })()
-            )}
+                  )
+                })()
+              : (() => {
+                  type ChaveWizard = 'cancelar' | 'anterior' | 'proximo' | 'criar'
+                  const chaves: ChaveWizard[] = ['cancelar']
+                  if (currentStep > 1) chaves.push('anterior')
+                  if (currentStep < 3) chaves.push('proximo')
+                  else chaves.push('criar')
+                  const n = chaves.length
+                  return (
+                    <div className="shrink-0 bg-white">
+                      <div
+                        className="grid w-full"
+                        style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}
+                      >
+                        {chaves.map((key, i) => {
+                          const isPrimeiraColuna = i === 0
+                          return (
+                            <div
+                              key={key}
+                              className={i < n - 1 ? 'min-w-0 border-r border-gray-200' : 'min-w-0'}
+                            >
+                              {key === 'cancelar' ? (
+                                <Button
+                                  type="button"
+                                  variant="outlined"
+                                  color="inherit"
+                                  onClick={handleClose}
+                                  disabled={createVendaGestor.isPending}
+                                  className="h-12 min-h-12 w-full font-semibold shadow-none"
+                                  sx={footerBarGrayBarSx(isPrimeiraColuna)}
+                                >
+                                  Cancelar
+                                </Button>
+                              ) : null}
+                              {key === 'anterior' ? (
+                                <Button
+                                  type="button"
+                                  variant="outlined"
+                                  color="inherit"
+                                  onClick={handlePreviousStep}
+                                  disabled={createVendaGestor.isPending}
+                                  className="h-12 min-h-12 w-full font-semibold shadow-none"
+                                  sx={footerBarPrimaryMutedSx(isPrimeiraColuna)}
+                                >
+                                  <span className="inline-flex w-full items-center justify-center gap-1.5">
+                                    <MdArrowBack className="h-5 w-5 shrink-0" aria-hidden />
+                                    Anterior
+                                  </span>
+                                </Button>
+                              ) : null}
+                              {key === 'proximo' ? (
+                                <Button
+                                  type="button"
+                                  variant="contained"
+                                  color="primary"
+                                  onClick={handleNextStep}
+                                  disabled={
+                                    createVendaGestor.isPending ||
+                                    (currentStep === 2 && !canGoToStep3())
+                                  }
+                                  className="h-12 min-h-12 w-full font-semibold shadow-none"
+                                  sx={footerSavePrimaryBarSx(isPrimeiraColuna)}
+                                >
+                                  <span className="inline-flex w-full items-center justify-center gap-1.5">
+                                    Próximo
+                                    <MdArrowForward className="h-5 w-5 shrink-0" aria-hidden />
+                                  </span>
+                                </Button>
+                              ) : null}
+                              {key === 'criar' ? (
+                                <Button
+                                  type="button"
+                                  variant="contained"
+                                  color="primary"
+                                  onClick={handleSubmit}
+                                  disabled={createVendaGestor.isPending || !canSubmit()}
+                                  className="h-12 min-h-12 w-full font-semibold shadow-none"
+                                  sx={footerSavePrimaryBarSx(isPrimeiraColuna)}
+                                >
+                                  {createVendaGestor.isPending ? 'Criando...' : 'Criar Pedido'}
+                                </Button>
+                              ) : null}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })()}
           </DialogFooter>
         </DialogContent>
 
@@ -4409,9 +2288,7 @@ export function NovoPedidoModal({
               produtoTemComplementos(produtoParaLancamentoPainel)
             }
             tituloBarra={
-              indiceLinhaPainelProduto !== null
-                ? 'Ajustar produto no pedido'
-                : 'Lançar na venda'
+              indiceLinhaPainelProduto !== null ? 'Ajustar produto no pedido' : 'Lançar na venda'
             }
             valorUnitarioInicial={
               indiceLinhaPainelProduto !== null
@@ -4420,14 +2297,19 @@ export function NovoPedidoModal({
             }
             chavesComplementosIniciais={
               indiceLinhaPainelProduto !== null
-                ? produtos[indiceLinhaPainelProduto]?.complementos?.map(
-                    c => `${c.grupoId}-${c.id}`
-                  )
+                ? produtos[indiceLinhaPainelProduto]?.complementos?.map(c => `${c.grupoId}-${c.id}`)
                 : undefined
             }
             onConfirm={confirmarLancamentoProdutoPainel}
           />
         ) : null}
+
+        <ModalBuscaProdutosPedido
+          open={modalBuscaProdutosOpen}
+          onOpenChange={setModalBuscaProdutosOpen}
+          token={auth?.getAccessToken() ?? null}
+          onConfirm={confirmarBuscaProdutosPedido}
+        />
 
         {modalEdicaoProdutoOpen && produtoIndexEdicao !== null ? (
           <PainelEdicaoProdutoLinhaPedido
@@ -4441,18 +2323,19 @@ export function NovoPedidoModal({
             title={produtos[produtoIndexEdicao].nome}
             produtoLinha={produtos[produtoIndexEdicao]}
             permiteAlterarPreco={
-              produtosList.find(p => p.getId() === produtos[produtoIndexEdicao].produtoId)
-                ?.permiteAlterarPrecoAtivo() ?? false
+              obterProdutoPorId(
+                produtos[produtoIndexEdicao].produtoId
+              )?.permiteAlterarPrecoAtivo() ?? false
             }
             valorUnitarioInput={valorUnitarioEdicaoPainel}
             onValorUnitarioInputChange={setValorUnitarioEdicaoPainel}
             permiteDesconto={
-              produtosList.find(p => p.getId() === produtos[produtoIndexEdicao].produtoId)
-                ?.permiteDescontoAtivo() ?? false
+              obterProdutoPorId(produtos[produtoIndexEdicao].produtoId)?.permiteDescontoAtivo() ??
+              false
             }
             permiteAcrescimo={
-              produtosList.find(p => p.getId() === produtos[produtoIndexEdicao].produtoId)
-                ?.permiteAcrescimoAtivo() ?? false
+              obterProdutoPorId(produtos[produtoIndexEdicao].produtoId)?.permiteAcrescimoAtivo() ??
+              false
             }
             quantidadeEdicao={quantidadeEdicao}
             onQuantidadeEdicaoChange={setQuantidadeEdicao}
