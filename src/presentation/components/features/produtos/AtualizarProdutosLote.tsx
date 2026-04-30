@@ -11,10 +11,71 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Checkbox } from '@/src/presentation/components/ui/checkbox'
+import {
+  FormControl,
+  InputAdornment,
+  InputLabel,
+  MenuItem,
+  Select,
+  type SelectChangeEvent,
+} from '@mui/material'
+import type { SxProps, Theme } from '@mui/material/styles'
 import Link from 'next/link'
+import {
+  sxEntradaCompactaProduto,
+  sxEntradaCompactaProdutoSelect,
+} from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
+import { ProdutoActionIconsDisplay } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoActionIconsDisplay'
 import { MdSearch, MdExpandMore, MdExpandLess } from 'react-icons/md'
+
+/** Chaves de permissão PDV no PATCH (alinhado a NovoProduto / cardápio). */
+type PermissaoCampoChave =
+  | 'favorito'
+  | 'permiteDesconto'
+  | 'permiteAcrescimo'
+  | 'permiteAlterarPreco'
+  | 'incideTaxa'
+  | 'abreComplementos'
+
+const CAMPOS_PERMISSAO_PDV: { chave: PermissaoCampoChave; label: string }[] = [
+  { chave: 'favorito', label: 'Favorito' },
+  { chave: 'permiteDesconto', label: 'Permite Desconto' },
+  { chave: 'permiteAcrescimo', label: 'Permite Acréscimo' },
+  { chave: 'permiteAlterarPreco', label: 'Permitir Alterar Preço' },
+  { chave: 'incideTaxa', label: 'Incide Taxa' },
+  { chave: 'abreComplementos', label: 'Abre Complementos' },
+]
+
+/** Checkbox MUI nas grades (impressoras / complementos / permissões): padding mínimo e hover em rounded-lg. */
+const sxCheckboxListaLote: SxProps<Theme> = {
+  p: 0,
+  m: 0,
+  borderRadius: '8px',
+  '&:hover': {
+    borderRadius: '8px',
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
+  },
+  '& .MuiSvgIcon-root': {
+    fontSize: '1.125rem',
+  },
+}
+
+function montarBodyPermissoesParcial(
+  campos: Set<PermissaoCampoChave>,
+  valor: boolean
+): Record<string, boolean> {
+  const body: Record<string, boolean> = {}
+  if (campos.has('favorito')) body.favorito = valor
+  if (campos.has('permiteDesconto')) body.permiteDesconto = valor
+  if (campos.has('permiteAcrescimo')) body.permiteAcrescimo = valor
+  if (campos.has('permiteAlterarPreco')) body.permiteAlterarPreco = valor
+  if (campos.has('incideTaxa')) body.incideTaxa = valor
+  if (campos.has('abreComplementos')) body.abreComplementos = valor
+  return body
+}
+
 /**
  * Componente para atualizar preço de múltiplos produtos em lote
  * Replica a funcionalidade do Flutter update_price_produtos_widget.dart
@@ -33,13 +94,23 @@ export function AtualizarPrecoLote() {
   const [adjustMode, setAdjustMode] = useState<'valor' | 'percentual'>('valor')
   const [adjustAmount, setAdjustAmount] = useState('')
   const [adjustDirection, setAdjustDirection] = useState<'increase' | 'decrease'>('increase')
-  const [filtersExpanded, setFiltersExpanded] = useState(false)
   const [produtosExpandidos, setProdutosExpandidos] = useState<Set<string>>(new Set())
   const [impressorasSelecionadas, setImpressorasSelecionadas] = useState<Set<string>>(new Set())
   const [impressorasDisponiveis, setImpressorasDisponiveis] = useState<Impressora[]>([])
   const [isLoadingImpressoras, setIsLoadingImpressoras] = useState(false)
   const [gruposComplementosSelecionados, setGruposComplementosSelecionados] = useState<Set<string>>(new Set())
-  const [activeTab, setActiveTab] = useState<'precos' | 'impressoras' | 'gruposComplementos'>('precos')
+  const [activeTab, setActiveTab] = useState<
+    'precos' | 'impressoras' | 'gruposComplementos' | 'permissoes'
+  >('precos')
+  const [modoPermissao, setModoPermissao] = useState<'ativar' | 'desativar'>('ativar')
+  const [permissoesCamposSelecionados, setPermissoesCamposSelecionados] = useState<
+    Set<PermissaoCampoChave>
+  >(new Set())
+  const [isSalvandoPermissoes, setIsSalvandoPermissoes] = useState(false)
+  const [salvandoPermissoesProgresso, setSalvandoPermissoesProgresso] = useState<{
+    atual: number
+    total: number
+  } | null>(null)
   const [modoImpressora, setModoImpressora] = useState<'adicionar' | 'remover'>('adicionar')
   const [modoGrupoComplemento, setModoGrupoComplemento] = useState<'adicionar' | 'remover'>('adicionar')
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
@@ -206,6 +277,18 @@ export function AtualizarPrecoLote() {
         novo.delete(impressoraId)
       } else {
         novo.add(impressoraId)
+      }
+      return novo
+    })
+  }
+
+  const togglePermissaoCampo = (chave: PermissaoCampoChave) => {
+    setPermissoesCamposSelecionados((prev) => {
+      const novo = new Set(prev)
+      if (novo.has(chave)) {
+        novo.delete(chave)
+      } else {
+        novo.add(chave)
       }
       return novo
     })
@@ -634,12 +717,91 @@ export function AtualizarPrecoLote() {
     }
   }
 
+  /** PATCH sequencial por produto (sem bulk-update); mesmo contrato que NovoProduto em edição. */
+  const vincularPermissoesEmLote = async () => {
+    if (produtosSelecionados.size === 0) {
+      showToast.error('Selecione pelo menos um produto')
+      return
+    }
+
+    if (permissoesCamposSelecionados.size === 0) {
+      showToast.error('Selecione ao menos uma permissão')
+      return
+    }
+
+    const token = auth?.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado')
+      return
+    }
+
+    const ids = Array.from(produtosSelecionados)
+    const total = ids.length
+    const valorAlvo = modoPermissao === 'ativar'
+    const body = montarBodyPermissoesParcial(permissoesCamposSelecionados, valorAlvo)
+
+    setIsSalvandoPermissoes(true)
+    setSalvandoPermissoesProgresso({ atual: 0, total })
+
+    let sucesso = 0
+    let falhas = 0
+
+    try {
+      for (let i = 0; i < ids.length; i++) {
+        const produtoId = ids[i]
+        setSalvandoPermissoesProgresso({ atual: i + 1, total })
+
+        const response = await fetch(`/api/produtos/${produtoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(body),
+        })
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}))
+          const msg =
+            typeof error.message === 'string' && error.message.trim() !== ''
+              ? error.message
+              : `Erro ${response.status}`
+          console.error(`Permissões produto ${produtoId}:`, msg)
+          falhas += 1
+        } else {
+          sucesso += 1
+        }
+      }
+
+      await buscarProdutos()
+      setProdutosSelecionados(new Set())
+
+      if (falhas === 0) {
+        const acao = modoPermissao === 'ativar' ? 'ativadas' : 'desativadas'
+        showToast.success(`Permissões ${acao} com sucesso! (${sucesso} produto(s))`)
+      } else {
+        showToast.warning(
+          `${sucesso} atualizado(s) com sucesso. ${falhas} falhou(ram). Verifique o console para detalhes.`
+        )
+      }
+    } catch (error: any) {
+      console.error('Erro ao vincular permissões em lote', error)
+      showToast.error(error.message || 'Erro ao vincular permissões')
+    } finally {
+      setIsSalvandoPermissoes(false)
+      setSalvandoPermissoesProgresso(null)
+    }
+  }
+
   const todosSelecionados = produtos.length > 0 && produtosSelecionados.size === produtos.length
   const algunsSelecionados = produtosSelecionados.size > 0 && produtosSelecionados.size < produtos.length
   const todasImpressorasSelecionadas = impressorasDisponiveis.length > 0 && impressorasSelecionadas.size === impressorasDisponiveis.length
   const algumasImpressorasSelecionadas = impressorasSelecionadas.size > 0 && impressorasSelecionadas.size < impressorasDisponiveis.length
   const todosGruposComplementosSelecionados = gruposComplementos.length > 0 && gruposComplementosSelecionados.size === gruposComplementos.length
   const algunsGruposComplementosSelecionados = gruposComplementosSelecionados.size > 0 && gruposComplementosSelecionados.size < gruposComplementos.length
+  const todasPermissoesSelecionadas =
+    CAMPOS_PERMISSAO_PDV.length > 0 &&
+    permissoesCamposSelecionados.size === CAMPOS_PERMISSAO_PDV.length
 
   const handleClearFilters = useCallback(() => {
     setSearchText('')
@@ -660,7 +822,9 @@ export function AtualizarPrecoLote() {
                 ? 'Atualizar Preços em Lote'
                 : activeTab === 'impressoras'
                   ? 'Atualizar Impressoras em Lote'
-                  : 'Atualizar Grupos de Complementos em Lote'}
+                  : activeTab === 'gruposComplementos'
+                    ? 'Atualizar Grupos de Complementos em Lote'
+                    : 'Atualizar Permissões em Lote'}
             </h1>
             <p className="md:text-sm text-xs text-secondary-text">
               Total de itens: {total} | Selecionados: {produtosSelecionados.size}
@@ -716,6 +880,26 @@ export function AtualizarPrecoLote() {
               }`}
             >
               Grupos Complementos
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAdjustAmount('')
+                setImpressorasSelecionadas(new Set())
+                setGruposComplementosSelecionados(new Set())
+                if (activeTab !== 'permissoes') {
+                  setPermissoesCamposSelecionados(new Set())
+                  setModoPermissao('ativar')
+                }
+                setActiveTab('permissoes')
+              }}
+              className={`md:px-4 px-1 py-1 rounded text-sm font-semibold transition-colors ${
+                activeTab === 'permissoes'
+                  ? 'bg-primary text-info'
+                  : 'text-secondary-text hover:bg-primary/10'
+              }`}
+            >
+              Permissões
             </button>
           </div>
           <Link
@@ -933,23 +1117,27 @@ export function AtualizarPrecoLote() {
                 </div>
               ) : (
                 <div className="w-full">
-                  <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-1 bg-white ">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <div className="max-h-36 overflow-y-auto border border-gray-200 rounded-lg bg-white p-1">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-1">
                       {impressorasDisponiveis.map((impressora) => {
                         const isSelected = impressorasSelecionadas.has(impressora.getId())
                         return (
                           <label
                             key={impressora.getId()}
-                            className={`flex items-center rounded-lg border cursor-pointer transition-colors min-h-[40px] ${
+                            className={`flex min-h-0 items-center gap-0.5 rounded-lg border p-1 cursor-pointer transition-colors ${
                               isSelected
                                 ? 'bg-primary/10 border-primary'
                                 : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                             }`}
                           >
                             <Checkbox
+                              size="small"
+                              disableRipple
+                              disableFocusRipple
                               checked={isSelected}
                               onChange={() => toggleImpressora(impressora.getId())}
                               className="data-[state=checked]:bg-primary data-[state=checked]:border-primary flex-shrink-0"
+                              sx={sxCheckboxListaLote}
                             />
                             <span className="md:text-sm text-xs font-medium text-primary-text truncate">
                               {impressora.getNome()}
@@ -965,7 +1153,7 @@ export function AtualizarPrecoLote() {
             </div>
             
           </>
-        ) : (
+        ) : activeTab === 'gruposComplementos' ? (
           <>
             <div className="flex flex-col gap-1">
               {/* Modo de operação: Adicionar ou Remover */}
@@ -1059,23 +1247,27 @@ export function AtualizarPrecoLote() {
                 </div>
               ) : (
                 <div className="w-full">
-                  <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-1 bg-white">
+                  <div className="max-h-36 overflow-y-auto border border-gray-200 rounded-lg bg-white p-1">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-1">
                       {gruposComplementos.map((grupo) => {
                         const isSelected = gruposComplementosSelecionados.has(grupo.getId())
                         return (
                           <label
                             key={grupo.getId()}
-                            className={`flex items-center rounded-lg border cursor-pointer transition-colors min-h-[40px] ${
+                            className={`flex min-h-0 items-center gap-0.5 rounded-lg border p-1 cursor-pointer transition-colors ${
                               isSelected
                                 ? 'bg-primary/10 border-primary'
                                 : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                             }`}
                           >
                             <Checkbox
+                              size="small"
+                              disableRipple
+                              disableFocusRipple
                               checked={isSelected}
                               onChange={() => toggleGrupoComplemento(grupo.getId())}
                               className="data-[state=checked]:bg-primary data-[state=checked]:border-primary flex-shrink-0"
+                              sx={sxCheckboxListaLote}
                             />
                             <span className="md:text-sm text-xs font-medium text-primary-text truncate">
                               {grupo.getNome()}
@@ -1091,115 +1283,251 @@ export function AtualizarPrecoLote() {
             </div>
             
           </>
+        ) : (
+          <>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <label className="block text-xs font-semibold text-secondary-text">
+                  Modo de operação:
+                </label>
+                <div className="flex gap-1 bg-info rounded-lg p-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModoPermissao('ativar')
+                      setPermissoesCamposSelecionados(new Set())
+                    }}
+                    className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                      modoPermissao === 'ativar'
+                        ? 'bg-primary text-info'
+                        : 'text-secondary-text hover:bg-primary/10'
+                    }`}
+                  >
+                    Ativar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModoPermissao('desativar')
+                      setPermissoesCamposSelecionados(new Set())
+                    }}
+                    className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                      modoPermissao === 'desativar'
+                        ? 'bg-primary text-info'
+                        : 'text-secondary-text hover:bg-primary/10'
+                    }`}
+                  >
+                    Desativar
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                <label className="block text-xs font-semibold text-secondary-text">
+                  {modoPermissao === 'ativar'
+                    ? 'Selecionar Permissões'
+                    : 'Selecionar Permissões para Desativar'}{' '}
+                  ({permissoesCamposSelecionados.size} selecionada
+                  {permissoesCamposSelecionados.size !== 1 ? 's' : ''})
+                </label>
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (todasPermissoesSelecionadas) {
+                        setPermissoesCamposSelecionados(new Set())
+                      } else {
+                        setPermissoesCamposSelecionados(
+                          new Set(CAMPOS_PERMISSAO_PDV.map((c) => c.chave))
+                        )
+                      }
+                    }}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    {todasPermissoesSelecionadas ? 'Desmarcar todas' : 'Selecionar todas'}
+                  </button>
+                  <div className="flex justify-end max-w-4xl">
+                    <Button
+                      type="button"
+                      onClick={vincularPermissoesEmLote}
+                      disabled={
+                        isUpdating ||
+                        isSalvandoPermissoes ||
+                        produtosSelecionados.size === 0 ||
+                        permissoesCamposSelecionados.size === 0
+                      }
+                      className="md:min-w-[180px] h-8 hover:bg-primary/90"
+                      sx={{
+                        color: 'var(--color-info)',
+                        backgroundColor: 'var(--color-primary)',
+                      }}
+                    >
+                      {isSalvandoPermissoes
+                        ? modoPermissao === 'ativar'
+                          ? 'Ativando...'
+                          : 'Desativando...'
+                        : modoPermissao === 'ativar'
+                          ? `Ativar em ${produtosSelecionados.size} produto(s)`
+                          : `Desativar em ${produtosSelecionados.size} produto(s)`}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <div className="w-full">
+                <div className="max-h-36 overflow-y-auto border border-gray-200 rounded-lg bg-white p-1">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-1">
+                    {CAMPOS_PERMISSAO_PDV.map(({ chave, label }) => {
+                      const isSelected = permissoesCamposSelecionados.has(chave)
+                      return (
+                        <label
+                          key={chave}
+                          className={`flex min-h-0 items-center gap-0.5 rounded-lg border px-1 py-1 cursor-pointer transition-colors ${
+                            isSelected
+                              ? 'bg-primary/10 border-primary'
+                              : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                          }`}
+                        >
+                          <Checkbox
+                            size="small"
+                            disableRipple
+                            disableFocusRipple
+                            checked={isSelected}
+                            onChange={() => togglePermissaoCampo(chave)}
+                            className="data-[state=checked]:bg-primary data-[state=checked]:border-primary flex-shrink-0"
+                            sx={sxCheckboxListaLote}
+                          />
+                          <span className="md:text-sm text-xs font-medium text-primary-text truncate">
+                            {label}
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
         )}
       </div>
 
 
       <div className="h-[4px] border-t-2 border-primary/70"></div>
       <div className="bg-white md:px-[20px] py-2 border-b border-gray-100">
-        <div className="flex flex-col gap-2">
-          {/* Primeira linha: Busca e botão de expandir (mobile) */}
-          <div className="flex items-end gap-2">
-            <div className="flex-1 min-w-0">
-              <label htmlFor="precos-search" className="text-xs font-semibold text-secondary-text mb-1 block">
-                Buscar produto...
-              </label>
-              <div className="relative h-8">
-                <MdSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text" size={18} />
-                <input
-                  id="precos-search"
-                  type="text"
-                  placeholder="Pesquisar produto..."
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
-                />
-              </div>
-            </div>
-            {/* Botão para expandir/ocultar filtros (apenas mobile) */}
-            <button
-              type="button"
-              onClick={() => setFiltersExpanded(!filtersExpanded)}
-              className="md:hidden h-8 px-3 rounded-lg border border-gray-300 text-sm font-semibold text-primary-text bg-white hover:bg-gray-50 transition-colors flex items-center gap-1"
-            >
-              {filtersExpanded ? (
-                <>
-                  <span className="text-xs">Ocultar</span>
-                  <MdExpandLess size={20} />
-                </>
-              ) : (
-                <>
-                  <span className="text-xs">Filtros</span>
-                  <MdExpandMore size={20} />
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* Filtros - ocultos em mobile por padrão, visíveis quando expandidos */}
-          <div className={`flex flex-wrap items-end gap-2 ${filtersExpanded ? 'block' : 'hidden'} md:flex`}>
-            <div className="w-full sm:w-[160px]">
-              <label className="text-xs font-semibold text-secondary-text mb-1 block">Status</label>
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')}
-                className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
-              >
-                <option value="Todos">Todos</option>
-                <option value="Ativo">Ativo</option>
-                <option value="Desativado">Desativado</option>
-              </select>
+        <div className="-mx-1 overflow-x-auto px-1 md:mx-0 md:overflow-x-visible md:px-0">
+          <div className="flex min-w-max flex-nowrap items-end gap-2 md:min-w-0 md:flex-wrap md:gap-3">
+            <div className="w-[min(250px,48vw)] min-w-[152px] shrink-0">
+              <Input
+                id="precos-search"
+                label="Pesquisar"
+                size="small"
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                placeholder="Nome ou código"
+                className="bg-info"
+                sx={{
+                  ...sxEntradaCompactaProduto,
+                  '& .MuiOutlinedInput-root': {
+                    backgroundColor: 'var(--color-info)',
+                  },
+                }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <MdSearch size={18} className="text-secondary-text" aria-hidden />
+                    </InputAdornment>
+                  ),
+                }}
+              />
             </div>
 
-            <div className="w-full sm:w-[160px]">
-              <label className="text-xs font-semibold text-secondary-text mb-1 block">Ativo no local</label>
-              <select
-                value={ativoLocalFilter}
-                onChange={(e) => setAtivoLocalFilter(e.target.value as 'Todos' | 'Sim' | 'Não')}
-                className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
-              >
-                <option value="Todos">Todos</option>
-                <option value="Sim">Sim</option>
-                <option value="Não">Não</option>
-              </select>
+            <div className="w-[118px] shrink-0 min-w-[108px]">
+              <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
+                <InputLabel id="lote-filter-status-label">Status</InputLabel>
+                <Select
+                  labelId="lote-filter-status-label"
+                  label="Status"
+                  value={filterStatus}
+                  onChange={(e: SelectChangeEvent<string>) =>
+                    setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
+                  }
+                >
+                  <MenuItem value="Todos">Todos</MenuItem>
+                  <MenuItem value="Ativo">Ativo</MenuItem>
+                  <MenuItem value="Desativado">Desativado</MenuItem>
+                </Select>
+              </FormControl>
             </div>
 
-            <div className="w-full sm:w-[160px]">
-              <label className="text-xs font-semibold text-secondary-text mb-1 block">Ativo no delivery</label>
-              <select
-                value={ativoDeliveryFilter}
-                onChange={(e) => setAtivoDeliveryFilter(e.target.value as 'Todos' | 'Sim' | 'Não')}
-                className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
-              >
-                <option value="Todos">Todos</option>
-                <option value="Sim">Sim</option>
-                <option value="Não">Não</option>
-              </select>
+            <div className="w-[132px] shrink-0 min-w-[120px]">
+              <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
+                <InputLabel id="lote-filter-local-label">Ativo no local</InputLabel>
+                <Select
+                  labelId="lote-filter-local-label"
+                  label="Ativo no local"
+                  value={ativoLocalFilter}
+                  onChange={(e: SelectChangeEvent<string>) =>
+                    setAtivoLocalFilter(e.target.value as 'Todos' | 'Sim' | 'Não')
+                  }
+                >
+                  <MenuItem value="Todos">Todos</MenuItem>
+                  <MenuItem value="Sim">Sim</MenuItem>
+                  <MenuItem value="Não">Não</MenuItem>
+                </Select>
+              </FormControl>
             </div>
 
-            <div className="w-full sm:w-[220px]">
-              <label className="text-xs font-semibold text-secondary-text mb-1 block">Grupo de produtos</label>
-              <select
-                value={grupoProdutoFilter}
-                onChange={(e) => setGrupoProdutoFilter(e.target.value)}
+            <div className="w-[148px] shrink-0 min-w-[136px]">
+              <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
+                <InputLabel id="lote-filter-delivery-label">Ativo no delivery</InputLabel>
+                <Select
+                  labelId="lote-filter-delivery-label"
+                  label="Ativo no delivery"
+                  value={ativoDeliveryFilter}
+                  onChange={(e: SelectChangeEvent<string>) =>
+                    setAtivoDeliveryFilter(e.target.value as 'Todos' | 'Sim' | 'Não')
+                  }
+                >
+                  <MenuItem value="Todos">Todos</MenuItem>
+                  <MenuItem value="Sim">Sim</MenuItem>
+                  <MenuItem value="Não">Não</MenuItem>
+                </Select>
+              </FormControl>
+            </div>
+
+            <div className="w-[min(220px,38vw)] min-w-[160px] shrink-0 md:max-w-[260px] md:flex-1">
+              <FormControl
+                fullWidth
+                size="small"
+                variant="outlined"
+                sx={sxEntradaCompactaProdutoSelect}
                 disabled={isLoadingGruposProdutos}
-                className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <option value="">{isLoadingGruposProdutos ? 'Carregando...' : 'Todos'}</option>
-                {!isLoadingGruposProdutos &&
-                  gruposProdutos.map((grupo) => (
-                    <option key={grupo.getId()} value={grupo.getId()}>
-                      {grupo.getNome()}
-                    </option>
-                  ))}
-              </select>
+                <InputLabel id="lote-filter-grupo-label">Grupo de produtos</InputLabel>
+                <Select
+                  labelId="lote-filter-grupo-label"
+                  label="Grupo de produtos"
+                  value={grupoProdutoFilter}
+                  onChange={(e: SelectChangeEvent<string>) => setGrupoProdutoFilter(e.target.value)}
+                >
+                  <MenuItem value="">
+                    <span className="text-secondary-text">
+                      {isLoadingGruposProdutos ? 'Carregando...' : 'Todos'}
+                    </span>
+                  </MenuItem>
+                  {!isLoadingGruposProdutos &&
+                    gruposProdutos.map((grupo) => (
+                      <MenuItem key={grupo.getId()} value={grupo.getId()}>
+                        {grupo.getNome()}
+                      </MenuItem>
+                    ))}
+                </Select>
+              </FormControl>
             </div>
 
-            <div className="w-full sm:w-auto">
+            <div className="shrink-0">
               <button
                 type="button"
                 onClick={handleClearFilters}
-                className="h-8 px-5 rounded-lg border border-gray-300 text-sm font-semibold text-primary-text bg-white hover:bg-gray-50 transition-colors"
+                className="h-10 rounded-lg border border-gray-300 bg-white px-4 text-sm font-semibold text-primary-text hover:bg-gray-50"
               >
                 Limpar filtros
               </button>
@@ -1279,8 +1607,11 @@ export function AtualizarPrecoLote() {
                       <div className="flex-1 md:w-24 font-mono text-xs text-secondary-text">
                         {produto.getCodigoProduto() || '-'}
                       </div>
-                      <div className="md:flex-[1.5] flex-[2] md:text-sm text-xs font-semibold text-primary-text break-words md:pr-4">
-                        {produto.getNome()}
+                      <div className="md:flex-[1.5] flex-[2] min-w-0 md:pr-4">
+                        <p className="break-words text-xs font-semibold text-primary-text md:text-sm">
+                          {produto.getNome()}
+                        </p>
+                        <ProdutoActionIconsDisplay produto={produto} />
                       </div>
                       {/* Colunas de impressoras e grupos (apenas desktop) */}
                       <div className="flex-[1.2] justify-center hidden md:flex">
@@ -1412,7 +1743,21 @@ export function AtualizarPrecoLote() {
         )}
       </div>
 
-      
+      {isSalvandoPermissoes ? (
+        <div
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-3 bg-black/50 px-4"
+          role="alert"
+          aria-busy="true"
+          aria-live="polite"
+        >
+          <JiffyLoading />
+          <p className="text-center font-nunito text-sm font-medium text-white">
+            {salvandoPermissoesProgresso
+              ? `Salvando permissões (${salvandoPermissoesProgresso.atual}/${salvandoPermissoesProgresso.total})...`
+              : 'Salvando permissões...'}
+          </p>
+        </div>
+      ) : null}
     </div>
   )
 }
