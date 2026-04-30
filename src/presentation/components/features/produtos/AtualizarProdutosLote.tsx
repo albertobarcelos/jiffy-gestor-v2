@@ -25,10 +25,15 @@ import {
   sxEntradaCompactaProduto,
   sxEntradaCompactaProdutoSelect,
 } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
+import {
+  indicadoresProducao,
+  origensMercadoria,
+  tiposProduto,
+} from '@/src/presentation/components/features/produtos/NovoProduto/fiscalSelectOptions'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
 import { ProdutoActionIconsDisplay } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoActionIconsDisplay'
-import { MdSearch, MdExpandMore, MdExpandLess } from 'react-icons/md'
+import { MdSearch, MdExpandMore, MdExpandLess, MdCheckCircle, MdError } from 'react-icons/md'
 
 /** Chaves de permissão PDV no PATCH (alinhado a NovoProduto / cardápio). */
 type PermissaoCampoChave =
@@ -76,6 +81,69 @@ function montarBodyPermissoesParcial(
   return body
 }
 
+/** Rascunho fiscal aplicado em lote (PATCH parcial, objeto `fiscal` + `ncm` legado). */
+type FiscalLoteDraft = {
+  ncm: string
+  cest: string
+  origemMercadoria: string
+  tipoProduto: string
+  indicadorProducaoEscala: string
+}
+
+const FISCAL_LOTE_VAZIO: FiscalLoteDraft = {
+  ncm: '',
+  cest: '',
+  origemMercadoria: '',
+  tipoProduto: '',
+  indicadorProducaoEscala: '',
+}
+
+/** Resultado da validação do NCM (API fiscal). */
+interface NcmValidationResult {
+  codigo: string
+  valido: boolean
+  descricao?: string
+  mensagem: string
+}
+
+/** Resultado da validação do CEST (API fiscal). */
+interface CestValidationResult {
+  codigo: string
+  valido: boolean
+  descricao?: string
+  segmento?: string
+  mensagem: string
+}
+
+/** Item retornado por CESTs por NCM. */
+interface CestPorNcmItem {
+  codigo: string
+  descricao: string
+  segmento: string
+  numeroAnexo?: string
+}
+
+function montarBodyFiscalLote(d: FiscalLoteDraft): Record<string, unknown> | null {
+  const fiscal: Record<string, unknown> = {}
+  const ncmT = d.ncm.replace(/\D/g, '').slice(0, 8)
+  const cestT = d.cest.replace(/\D/g, '').slice(0, 7)
+  // Só envia NCM/CEST completos (evita PATCH com código parcial)
+  if (ncmT.length === 8) fiscal.ncm = ncmT
+  if (cestT.length === 7) fiscal.cest = cestT
+  if (d.origemMercadoria !== '') {
+    const om = parseInt(d.origemMercadoria, 10)
+    if (!Number.isNaN(om)) fiscal.origemMercadoria = om
+  }
+  const tipoT = d.tipoProduto.trim()
+  if (tipoT) fiscal.tipoProduto = tipoT
+  const indT = d.indicadorProducaoEscala.trim()
+  if (indT) fiscal.indicadorProducaoEscala = indT
+  if (Object.keys(fiscal).length === 0) return null
+  const body: Record<string, unknown> = { fiscal }
+  if (ncmT.length === 8) body.ncm = ncmT
+  return body
+}
+
 /**
  * Componente para atualizar preço de múltiplos produtos em lote
  * Replica a funcionalidade do Flutter update_price_produtos_widget.dart
@@ -100,7 +168,7 @@ export function AtualizarPrecoLote() {
   const [isLoadingImpressoras, setIsLoadingImpressoras] = useState(false)
   const [gruposComplementosSelecionados, setGruposComplementosSelecionados] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState<
-    'precos' | 'impressoras' | 'gruposComplementos' | 'permissoes'
+    'precos' | 'impressoras' | 'gruposComplementos' | 'permissoes' | 'fiscal'
   >('precos')
   const [modoPermissao, setModoPermissao] = useState<'ativar' | 'desativar'>('ativar')
   const [permissoesCamposSelecionados, setPermissoesCamposSelecionados] = useState<
@@ -111,6 +179,21 @@ export function AtualizarPrecoLote() {
     atual: number
     total: number
   } | null>(null)
+  const [fiscalLoteDraft, setFiscalLoteDraft] = useState<FiscalLoteDraft>(FISCAL_LOTE_VAZIO)
+  const [isSalvandoFiscal, setIsSalvandoFiscal] = useState(false)
+  const [salvandoFiscalProgresso, setSalvandoFiscalProgresso] = useState<{
+    atual: number
+    total: number
+  } | null>(null)
+  const [ncmValidation, setNcmValidation] = useState<NcmValidationResult | null>(null)
+  const [isValidatingNcm, setIsValidatingNcm] = useState(false)
+  const ncmValidationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastValidatedNcmRef = useRef<string>('')
+  const [cestsDisponiveis, setCestsDisponiveis] = useState<CestPorNcmItem[]>([])
+  const [isLoadingCests, setIsLoadingCests] = useState(false)
+  const [cestValidation, setCestValidation] = useState<CestValidationResult | null>(null)
+  const [isValidatingCest, setIsValidatingCest] = useState(false)
+  const lastFetchedNcmForCestsRef = useRef<string>('')
   const [modoImpressora, setModoImpressora] = useState<'adicionar' | 'remover'>('adicionar')
   const [modoGrupoComplemento, setModoGrupoComplemento] = useState<'adicionar' | 'remover'>('adicionar')
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
@@ -369,6 +452,265 @@ export function AtualizarPrecoLote() {
       loadAllImpressoras()
     }
   }, [activeTab, loadAllImpressoras, impressorasDisponiveis.length])
+
+  // Validação NCM (debounce 600ms) — igual NovoProduto, só na aba Fiscal
+  useEffect(() => {
+    if (activeTab !== 'fiscal') return
+
+    if (ncmValidationTimerRef.current) {
+      clearTimeout(ncmValidationTimerRef.current)
+    }
+
+    const ncmTrimmed = fiscalLoteDraft.ncm.trim()
+
+    if (!ncmTrimmed) {
+      setNcmValidation(null)
+      setIsValidatingNcm(false)
+      lastValidatedNcmRef.current = ''
+      return
+    }
+
+    if (!/^\d{8}$/.test(ncmTrimmed)) {
+      setNcmValidation(null)
+      setIsValidatingNcm(false)
+      lastValidatedNcmRef.current = ''
+      return
+    }
+
+    if (lastValidatedNcmRef.current === ncmTrimmed) {
+      if (ncmValidation && ncmValidation.codigo !== ncmTrimmed) {
+        setNcmValidation(null)
+        lastValidatedNcmRef.current = ''
+      } else if (ncmValidation && ncmValidation.codigo === ncmTrimmed) {
+        return
+      }
+    }
+
+    setIsValidatingNcm(true)
+    ncmValidationTimerRef.current = setTimeout(async () => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        setIsValidatingNcm(false)
+        return
+      }
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+      try {
+        const response = await fetch(`/api/v1/fiscal/configuracoes/ncms/validar/${ncmTrimmed}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
+        })
+
+        clearTimeout(timeoutId)
+
+        if (response.ok) {
+          const result = (await response.json()) as NcmValidationResult
+          setNcmValidation(result)
+          lastValidatedNcmRef.current = ncmTrimmed
+        } else {
+          setNcmValidation(null)
+          lastValidatedNcmRef.current = ''
+        }
+      } catch (error) {
+        clearTimeout(timeoutId)
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          console.warn('Timeout ao validar NCM - microserviço fiscal pode estar indisponível')
+        }
+        setNcmValidation(null)
+        lastValidatedNcmRef.current = ''
+      } finally {
+        setIsValidatingNcm(false)
+      }
+    }, 600)
+
+    return () => {
+      if (ncmValidationTimerRef.current) {
+        clearTimeout(ncmValidationTimerRef.current)
+      }
+    }
+  }, [fiscalLoteDraft.ncm, auth, activeTab])
+
+  // Lista de CESTs compatíveis com o NCM validado
+  useEffect(() => {
+    if (activeTab !== 'fiscal') return
+
+    const ncmTrimmed = fiscalLoteDraft.ncm.trim()
+
+    if (
+      !ncmValidation ||
+      !ncmValidation.valido ||
+      ncmTrimmed.length !== 8 ||
+      ncmValidation.codigo !== ncmTrimmed
+    ) {
+      setCestsDisponiveis([])
+      setCestValidation(null)
+      lastFetchedNcmForCestsRef.current = ''
+      return
+    }
+
+    if (lastFetchedNcmForCestsRef.current === ncmTrimmed) {
+      return
+    }
+
+    const fetchCests = async () => {
+      const token = auth?.getAccessToken()
+      if (!token) return
+
+      setIsLoadingCests(true)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+      try {
+        const response = await fetch(`/api/v1/fiscal/configuracoes/cests/por-ncm/${ncmTrimmed}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
+        })
+
+        clearTimeout(timeoutId)
+
+        if (response.ok) {
+          const result = await response.json()
+          setCestsDisponiveis(Array.isArray(result) ? result : [])
+          lastFetchedNcmForCestsRef.current = ncmTrimmed
+        } else {
+          setCestsDisponiveis([])
+          lastFetchedNcmForCestsRef.current = ''
+        }
+      } catch (error) {
+        clearTimeout(timeoutId)
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          console.warn('Timeout ao buscar CESTs - microserviço fiscal pode estar indisponível')
+        }
+        setCestsDisponiveis([])
+        lastFetchedNcmForCestsRef.current = ''
+      } finally {
+        setIsLoadingCests(false)
+      }
+    }
+
+    void fetchCests()
+  }, [ncmValidation, fiscalLoteDraft.ncm, auth, activeTab])
+
+  // Validação CEST (debounce 400ms) — igual NovoProduto
+  useEffect(() => {
+    if (activeTab !== 'fiscal') return
+
+    const cestTrimmed = fiscalLoteDraft.cest.trim()
+    const ncmTrimmed = fiscalLoteDraft.ncm.trim()
+
+    if (!cestTrimmed) {
+      setCestValidation(null)
+      setIsValidatingCest(false)
+      return
+    }
+
+    if (!/^\d{7}$/.test(cestTrimmed)) {
+      setCestValidation(null)
+      setIsValidatingCest(false)
+      return
+    }
+
+    const cestDisponivel = cestsDisponiveis.find((c) => c.codigo === cestTrimmed)
+    if (cestDisponivel) {
+      setCestValidation({
+        codigo: cestTrimmed,
+        valido: true,
+        descricao: cestDisponivel.descricao,
+        segmento: cestDisponivel.segmento,
+        mensagem: 'CEST válido (compatível com o NCM informado)',
+      })
+      setIsValidatingCest(false)
+      return
+    }
+
+    const abortController = new AbortController()
+    setIsValidatingCest(true)
+
+    const timer = setTimeout(async () => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        setIsValidatingCest(false)
+        return
+      }
+
+      const timeoutId = setTimeout(() => abortController.abort(), 5000)
+
+      try {
+        const hasValidNcm = /^\d{8}$/.test(ncmTrimmed) && ncmValidation?.valido
+        const url = hasValidNcm
+          ? `/api/v1/fiscal/configuracoes/cests/validar/${cestTrimmed}/ncm/${ncmTrimmed}`
+          : `/api/v1/fiscal/configuracoes/cests/validar/${cestTrimmed}`
+
+        const response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          signal: abortController.signal,
+        })
+
+        clearTimeout(timeoutId)
+
+        if (abortController.signal.aborted) return
+
+        if (response.ok) {
+          const result = await response.json()
+
+          if (hasValidNcm) {
+            setCestValidation({
+              codigo: result.cestCodigo || cestTrimmed,
+              valido: result.compativel ?? false,
+              descricao: result.descricaoCest,
+              mensagem:
+                result.mensagem ||
+                (result.compativel
+                  ? 'CEST compatível com o NCM informado'
+                  : 'CEST não é compatível com o NCM informado'),
+            })
+          } else {
+            setCestValidation(result as CestValidationResult)
+          }
+        } else {
+          setCestValidation(null)
+        }
+      } catch (error) {
+        clearTimeout(timeoutId)
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          console.warn('Timeout ao validar CEST - microserviço fiscal pode estar indisponível')
+          return
+        }
+        setCestValidation(null)
+      } finally {
+        if (!abortController.signal.aborted) {
+          setIsValidatingCest(false)
+        }
+      }
+    }, 400)
+
+    return () => {
+      clearTimeout(timer)
+      abortController.abort()
+    }
+  }, [fiscalLoteDraft.cest, fiscalLoteDraft.ncm, ncmValidation, cestsDisponiveis, auth, activeTab])
+
+  // Com CEST preenchido, sugere indicador de escala (igual NovoProduto — só reage ao CEST)
+  useEffect(() => {
+    if (activeTab !== 'fiscal') return
+    setFiscalLoteDraft((d) => {
+      if (d.cest.trim() !== '' && !d.indicadorProducaoEscala) {
+        return { ...d, indicadorProducaoEscala: '1' }
+      }
+      return d
+    })
+  }, [fiscalLoteDraft.cest, activeTab])
 
   // Atualizar preços
   const atualizarPrecos = async () => {
@@ -793,6 +1135,125 @@ export function AtualizarPrecoLote() {
     }
   }
 
+  /** PATCH sequencial com objeto `fiscal` (sem bulk-update). */
+  const aplicarFiscalEmLote = async () => {
+    if (produtosSelecionados.size === 0) {
+      showToast.error('Selecione pelo menos um produto')
+      return
+    }
+
+    const body = montarBodyFiscalLote(fiscalLoteDraft)
+    if (!body) {
+      showToast.error('Preencha ao menos um campo fiscal')
+      return
+    }
+
+    const ncmTrimmed = fiscalLoteDraft.ncm.trim()
+    if (ncmTrimmed !== '') {
+      if (!/^\d{8}$/.test(ncmTrimmed)) {
+        showToast.error('O código NCM deve conter exatamente 8 dígitos numéricos.')
+        return
+      }
+      if (ncmValidation && !ncmValidation.valido) {
+        showToast.error(ncmValidation.mensagem || 'O código NCM informado não é válido.')
+        return
+      }
+      if (isValidatingNcm) {
+        showToast.error('Aguarde a validação do NCM antes de salvar.')
+        return
+      }
+    }
+
+    const cestTrimmed = fiscalLoteDraft.cest.trim()
+    if (cestTrimmed !== '') {
+      if (!/^\d{7}$/.test(cestTrimmed)) {
+        showToast.error('O código CEST deve conter exatamente 7 dígitos numéricos.')
+        return
+      }
+      if (cestValidation && !cestValidation.valido) {
+        showToast.error(cestValidation.mensagem || 'O código CEST informado não é válido.')
+        return
+      }
+      if (isValidatingCest) {
+        showToast.error('Aguarde a validação do CEST antes de salvar.')
+        return
+      }
+    }
+
+    const indTrimmed = fiscalLoteDraft.indicadorProducaoEscala.trim()
+    if (indTrimmed !== '' && cestTrimmed === '') {
+      showToast.error(
+        'A informação sobre a "Produção em Escala Relevante" foi preenchida sem preencher o código CEST'
+      )
+      return
+    }
+
+    const token = auth?.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado')
+      return
+    }
+
+    const ids = Array.from(produtosSelecionados)
+    const totalIds = ids.length
+
+    setIsSalvandoFiscal(true)
+    setSalvandoFiscalProgresso({ atual: 0, total: totalIds })
+
+    let sucesso = 0
+    let falhas = 0
+
+    try {
+      for (let i = 0; i < ids.length; i++) {
+        const produtoId = ids[i]
+        setSalvandoFiscalProgresso({ atual: i + 1, total: totalIds })
+
+        const response = await fetch(`/api/produtos/${produtoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(body),
+        })
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}))
+          const msg =
+            typeof error.message === 'string' && error.message.trim() !== ''
+              ? error.message
+              : `Erro ${response.status}`
+          console.error(`Fiscal produto ${produtoId}:`, msg)
+          falhas += 1
+        } else {
+          sucesso += 1
+        }
+      }
+
+      await buscarProdutos()
+      setProdutosSelecionados(new Set())
+
+      if (falhas === 0) {
+        showToast.success(`Dados fiscais atualizados! (${sucesso} produto(s))`)
+      } else {
+        showToast.warning(
+          `${sucesso} atualizado(s) com sucesso. ${falhas} falhou(ram). Verifique o console para detalhes.`
+        )
+      }
+    } catch (error: any) {
+      console.error('Erro ao aplicar fiscal em lote', error)
+      showToast.error(error.message || 'Erro ao aplicar dados fiscais')
+    } finally {
+      setIsSalvandoFiscal(false)
+      setSalvandoFiscalProgresso(null)
+    }
+  }
+
+  const isNcmInvalidFiscal = ncmValidation != null && !ncmValidation.valido
+  const isCestInvalidFiscal = cestValidation != null && !cestValidation.valido
+  const isNcmValidFiscal = ncmValidation != null && ncmValidation.valido
+  const hasCestsDisponiveisFiscal = cestsDisponiveis.length > 0
+
   const todosSelecionados = produtos.length > 0 && produtosSelecionados.size === produtos.length
   const algunsSelecionados = produtosSelecionados.size > 0 && produtosSelecionados.size < produtos.length
   const todasImpressorasSelecionadas = impressorasDisponiveis.length > 0 && impressorasSelecionadas.size === impressorasDisponiveis.length
@@ -824,7 +1285,9 @@ export function AtualizarPrecoLote() {
                   ? 'Atualizar Impressoras em Lote'
                   : activeTab === 'gruposComplementos'
                     ? 'Atualizar Grupos de Complementos em Lote'
-                    : 'Atualizar Permissões em Lote'}
+                    : activeTab === 'permissoes'
+                      ? 'Atualizar Permissões em Lote'
+                      : 'Atualizar Dados Fiscais em Lote'}
             </h1>
             <p className="md:text-sm text-xs text-secondary-text">
               Total de itens: {total} | Selecionados: {produtosSelecionados.size}
@@ -833,7 +1296,7 @@ export function AtualizarPrecoLote() {
         </div>
         <div className="flex flex-col md:flex-row md:items-center gap-2">
           {/* Tabs */}
-          <div className="flex flex-row gap-1 bg-info rounded-lg p-1">
+          <div className="flex flex-row flex-wrap gap-1 bg-info rounded-lg p-1">
             <button
               type="button"
               onClick={() => {
@@ -900,6 +1363,33 @@ export function AtualizarPrecoLote() {
               }`}
             >
               Permissões
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAdjustAmount('')
+                setImpressorasSelecionadas(new Set())
+                setGruposComplementosSelecionados(new Set())
+                if (activeTab !== 'fiscal') {
+                  setFiscalLoteDraft(FISCAL_LOTE_VAZIO)
+                  setNcmValidation(null)
+                  setIsValidatingNcm(false)
+                  lastValidatedNcmRef.current = ''
+                  setCestsDisponiveis([])
+                  setIsLoadingCests(false)
+                  setCestValidation(null)
+                  setIsValidatingCest(false)
+                  lastFetchedNcmForCestsRef.current = ''
+                }
+                setActiveTab('fiscal')
+              }}
+              className={`md:px-4 px-1 py-1 rounded text-sm font-semibold transition-colors ${
+                activeTab === 'fiscal'
+                  ? 'bg-primary text-info'
+                  : 'text-secondary-text hover:bg-primary/10'
+              }`}
+            >
+              Fiscal
             </button>
           </div>
           <Link
@@ -1002,7 +1492,11 @@ export function AtualizarPrecoLote() {
                   <Button
                     onClick={atualizarPrecos}
                     disabled={
-                      isUpdating || produtosSelecionados.size === 0 || !adjustAmount.trim()
+                      isUpdating ||
+                      isSalvandoPermissoes ||
+                      isSalvandoFiscal ||
+                      produtosSelecionados.size === 0 ||
+                      !adjustAmount.trim()
                     }
                     className="md:min-w-[180px] h-8 hover:bg-primary/90"
                     sx={{
@@ -1089,6 +1583,8 @@ export function AtualizarPrecoLote() {
                       onClick={atualizarImpressoras}
                       disabled={
                         isUpdating ||
+                        isSalvandoPermissoes ||
+                        isSalvandoFiscal ||
                         produtosSelecionados.size === 0 ||
                         impressorasSelecionadas.size === 0
                       }
@@ -1219,6 +1715,8 @@ export function AtualizarPrecoLote() {
                       onClick={atualizarGruposComplementos}
                       disabled={
                         isUpdating ||
+                        isSalvandoPermissoes ||
+                        isSalvandoFiscal ||
                         produtosSelecionados.size === 0 ||
                         gruposComplementosSelecionados.size === 0
                       }
@@ -1283,7 +1781,7 @@ export function AtualizarPrecoLote() {
             </div>
             
           </>
-        ) : (
+        ) : activeTab === 'permissoes' ? (
           <>
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
@@ -1352,6 +1850,7 @@ export function AtualizarPrecoLote() {
                       disabled={
                         isUpdating ||
                         isSalvandoPermissoes ||
+                        isSalvandoFiscal ||
                         produtosSelecionados.size === 0 ||
                         permissoesCamposSelecionados.size === 0
                       }
@@ -1403,6 +1902,252 @@ export function AtualizarPrecoLote() {
                     })}
                   </div>
                 </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex flex-col gap-3 rounded-[10px] bg-info p-2 md:p-3">
+              <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <h2 className="font-exo text-base font-semibold text-primary md:text-lg">
+                      Configuração Fiscal
+                    </h2>
+                    <div className="h-px min-w-[40px] flex-1 bg-primary/70" />
+                  </div>
+                  <p className="font-nunito text-xs text-secondary-text md:text-sm">
+                    Preencha as informações fiscais. Serão aplicadas aos produtos selecionados na lista
+                    abaixo (um PATCH por produto).
+                  </p>
+                </div>
+                <div className="shrink-0">
+                  <Button
+                    type="button"
+                    onClick={aplicarFiscalEmLote}
+                    disabled={
+                      isUpdating ||
+                      isSalvandoPermissoes ||
+                      isSalvandoFiscal ||
+                      produtosSelecionados.size === 0 ||
+                      isNcmInvalidFiscal ||
+                      isCestInvalidFiscal ||
+                      isValidatingNcm ||
+                      isValidatingCest
+                    }
+                    className="md:min-w-[180px] h-8 hover:bg-primary/90"
+                    sx={{
+                      color: 'var(--color-info)',
+                      backgroundColor: 'var(--color-primary)',
+                    }}
+                  >
+                    {isSalvandoFiscal
+                      ? 'Salvando...'
+                      : `Alterar (${produtosSelecionados.size})`}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <Input
+                    label="NCM"
+                    size="small"
+                    type="text"
+                    value={fiscalLoteDraft.ncm}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, '').slice(0, 8)
+                      setFiscalLoteDraft((d) => ({ ...d, ncm: v }))
+                    }}
+                    placeholder="8 dígitos"
+                    className="bg-white"
+                    sx={sxEntradaCompactaProduto}
+                    inputProps={{ maxLength: 8 }}
+                    InputProps={{
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          {isValidatingNcm && (
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                          )}
+                          {!isValidatingNcm && ncmValidation &&
+                            (ncmValidation.valido ? (
+                              <MdCheckCircle className="h-5 w-5 text-green-500" />
+                            ) : (
+                              <MdError className="h-5 w-5 text-red-500" />
+                            ))}
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                  {isValidatingNcm && (
+                    <p className="mt-1 font-nunito text-xs text-secondary-text">Validando NCM...</p>
+                  )}
+                  {!isValidatingNcm && ncmValidation && (
+                    <p
+                      className={`mt-1 font-nunito text-xs ${ncmValidation.valido ? 'text-green-600' : 'text-red-600'}`}
+                    >
+                      {ncmValidation.valido && ncmValidation.descricao
+                        ? ncmValidation.descricao
+                        : ncmValidation.mensagem}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  {hasCestsDisponiveisFiscal ? (
+                    <FormControl
+                      fullWidth
+                      size="small"
+                      variant="outlined"
+                      sx={sxEntradaCompactaProdutoSelect}
+                      disabled={!isNcmValidFiscal}
+                    >
+                      <InputLabel id="lote-fiscal-cest-label">CEST</InputLabel>
+                      <Select
+                        labelId="lote-fiscal-cest-label"
+                        label="CEST"
+                        value={fiscalLoteDraft.cest}
+                        onChange={(e: SelectChangeEvent<string>) =>
+                          setFiscalLoteDraft((d) => ({ ...d, cest: e.target.value }))
+                        }
+                      >
+                        <MenuItem value="">
+                          <span className="text-secondary-text">Selecione o CEST</span>
+                        </MenuItem>
+                        {cestsDisponiveis.map((item) => (
+                          <MenuItem key={item.codigo} value={item.codigo}>
+                            {item.codigo} — {item.descricao}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  ) : (
+                    <Input
+                      label="CEST"
+                      size="small"
+                      type="text"
+                      value={fiscalLoteDraft.cest}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/\D/g, '').slice(0, 7)
+                        setFiscalLoteDraft((d) => ({ ...d, cest: v }))
+                      }}
+                      placeholder={
+                        isLoadingCests
+                          ? 'Carregando...'
+                          : !isNcmValidFiscal
+                            ? 'Informe um NCM válido primeiro'
+                            : '7 dígitos'
+                      }
+                      disabled={isLoadingCests || !isNcmValidFiscal}
+                      className="bg-white"
+                      sx={sxEntradaCompactaProduto}
+                      inputProps={{ maxLength: 7 }}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            {(isValidatingCest || isLoadingCests) && (
+                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                            )}
+                            {!isValidatingCest && !isLoadingCests && cestValidation &&
+                              (cestValidation.valido ? (
+                                <MdCheckCircle className="h-5 w-5 text-green-500" />
+                              ) : (
+                                <MdError className="h-5 w-5 text-red-500" />
+                              ))}
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  )}
+                  {isLoadingCests && (
+                    <p className="mt-1 font-nunito text-xs text-secondary-text">
+                      Carregando CESTs compatíveis...
+                    </p>
+                  )}
+                  {isValidatingCest && (
+                    <p className="mt-1 font-nunito text-xs text-secondary-text">Validando CEST...</p>
+                  )}
+                  {!isValidatingCest && !isLoadingCests && cestValidation && (
+                    <p
+                      className={`mt-1 font-nunito text-xs ${cestValidation.valido ? 'text-green-600' : 'text-red-600'}`}
+                    >
+                      {cestValidation.valido && cestValidation.descricao
+                        ? cestValidation.descricao
+                        : cestValidation.mensagem}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
+                  <InputLabel id="lote-fiscal-origem-label">Origem da Mercadoria</InputLabel>
+                  <Select
+                    labelId="lote-fiscal-origem-label"
+                    label="Origem da Mercadoria"
+                    value={fiscalLoteDraft.origemMercadoria}
+                    onChange={(e: SelectChangeEvent<string>) =>
+                      setFiscalLoteDraft((d) => ({ ...d, origemMercadoria: e.target.value }))
+                    }
+                  >
+                    <MenuItem value="">
+                      <span className="text-secondary-text">Selecione a origem</span>
+                    </MenuItem>
+                    {origensMercadoria.map((o) => (
+                      <MenuItem key={o.value} value={o.value}>
+                        {o.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
+                  <InputLabel id="lote-fiscal-tipo-label">Tipo do Produto</InputLabel>
+                  <Select
+                    labelId="lote-fiscal-tipo-label"
+                    label="Tipo do Produto"
+                    value={fiscalLoteDraft.tipoProduto}
+                    onChange={(e: SelectChangeEvent<string>) =>
+                      setFiscalLoteDraft((d) => ({ ...d, tipoProduto: e.target.value }))
+                    }
+                  >
+                    <MenuItem value="">
+                      <span className="text-secondary-text">Selecione o tipo</span>
+                    </MenuItem>
+                    {tiposProduto.map((t) => (
+                      <MenuItem key={t.value} value={t.value}>
+                        {t.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </div>
+
+              <div>
+                <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
+                  <InputLabel id="lote-fiscal-indicador-label">
+                    Indicador de Produção em Escala Relevante
+                  </InputLabel>
+                  <Select
+                    labelId="lote-fiscal-indicador-label"
+                    label="Indicador de Produção em Escala Relevante"
+                    value={fiscalLoteDraft.indicadorProducaoEscala}
+                    onChange={(e: SelectChangeEvent<string>) =>
+                      setFiscalLoteDraft((d) => ({ ...d, indicadorProducaoEscala: e.target.value }))
+                    }
+                  >
+                    <MenuItem value="">
+                      <span className="text-secondary-text">Selecione o indicador</span>
+                    </MenuItem>
+                    {indicadoresProducao.map((i) => (
+                      <MenuItem key={i.value} value={i.value}>
+                        {i.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <p className="mt-1 font-nunito text-xs text-secondary-text">
+                  Obrigatório para produtos no Anexo XXVII (52/2017)
+                </p>
               </div>
             </div>
           </>
@@ -1743,7 +2488,7 @@ export function AtualizarPrecoLote() {
         )}
       </div>
 
-      {isSalvandoPermissoes ? (
+      {isSalvandoPermissoes || isSalvandoFiscal ? (
         <div
           className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-3 bg-black/50 px-4"
           role="alert"
@@ -1752,9 +2497,13 @@ export function AtualizarPrecoLote() {
         >
           <JiffyLoading />
           <p className="text-center font-nunito text-sm font-medium text-white">
-            {salvandoPermissoesProgresso
-              ? `Salvando permissões (${salvandoPermissoesProgresso.atual}/${salvandoPermissoesProgresso.total})...`
-              : 'Salvando permissões...'}
+            {isSalvandoFiscal
+              ? salvandoFiscalProgresso
+                ? `Salvando dados fiscais (${salvandoFiscalProgresso.atual}/${salvandoFiscalProgresso.total})...`
+                : 'Salvando dados fiscais...'
+              : salvandoPermissoesProgresso
+                ? `Salvando permissões (${salvandoPermissoesProgresso.atual}/${salvandoPermissoesProgresso.total})...`
+                : 'Salvando permissões...'}
           </p>
         </div>
       ) : null}
