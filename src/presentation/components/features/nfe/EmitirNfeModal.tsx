@@ -7,7 +7,10 @@ import { Input } from '@/src/presentation/components/ui/input'
 import { useEmitirNfe, useEmitirNfeGestor } from '@/src/presentation/hooks/useVendas'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdClose, MdEdit } from 'react-icons/md'
-import { NovoCliente } from '@/src/presentation/components/features/clientes/NovoCliente'
+import {
+  ClientesTabsModal,
+  type ClientesTabsModalState,
+} from '@/src/presentation/components/features/clientes/ClientesTabsModal'
 
 /** Aplica máscara de CPF (000.000.000-00) durante a digitação — apenas UI. */
 function formatarCpfMascara(valor: string): string {
@@ -57,14 +60,22 @@ export function EmitirNfeModal({
   const [modeloEmitindo, setModeloEmitindo] = useState<55 | 65 | null>(null)
   /** CPF do consumidor para NFC-e (UI preparada; envio ao backend pendente). */
   const [cpfNfce, setCpfNfce] = useState('')
-  const [editarClienteModalOpen, setEditarClienteModalOpen] = useState(false)
-  const [editarClienteId, setEditarClienteId] = useState<string | null>(null)
+  const [clientesTabsState, setClientesTabsState] = useState<ClientesTabsModalState>({
+    open: false,
+    tab: 'cliente',
+    mode: 'edit',
+    clienteId: undefined,
+  })
 
   useEffect(() => {
     if (!open) {
       setCpfNfce('')
-      setEditarClienteModalOpen(false)
-      setEditarClienteId(null)
+      setClientesTabsState({
+        open: false,
+        tab: 'cliente',
+        mode: 'edit',
+        clienteId: undefined,
+      })
     }
   }, [open])
 
@@ -76,13 +87,16 @@ export function EmitirNfeModal({
   const nomeClienteExibicao = clienteNome?.trim() || 'Sem cliente'
 
   const handleFecharEdicaoCliente = useCallback(() => {
-    setEditarClienteModalOpen(false)
-    setEditarClienteId(null)
+    setClientesTabsState(prev => (prev.open ? { ...prev, open: false } : prev))
   }, [])
 
   const handleAbrirEdicaoCliente = useCallback((id: string) => {
-    setEditarClienteId(id)
-    setEditarClienteModalOpen(true)
+    setClientesTabsState({
+      open: true,
+      tab: 'cliente',
+      mode: 'edit',
+      clienteId: id,
+    })
   }, [])
 
   const emitirPorModelo = useCallback(
@@ -160,30 +174,10 @@ export function EmitirNfeModal({
                   </span>
                 )}
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-gray-800">
-                <p className="mb-0 flex min-w-0 flex-1 items-center gap-1.5">
-                  <span className="font-medium text-gray-600">Cliente:</span>
-                  <span className="truncate">{nomeClienteExibicao}</span>
-                </p>
-                {temClienteCadastrado && clienteId && (
-                  <button
-                    type="button"
-                    onClick={e => {
-                      e.stopPropagation()
-                      handleAbrirEdicaoCliente(clienteId)
-                    }}
-                    className="flex-shrink-0 rounded p-1 text-primary transition-colors hover:bg-primary/10"
-                    title="Editar dados do cliente"
-                    aria-label="Editar dados do cliente"
-                  >
-                    <MdEdit className="h-5 w-5" />
-                  </button>
-                )}
-              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="flex min-h-[160px] flex-col rounded-xl border-2 border-primary bg-primary p-4 text-center shadow-sm sm:p-5">
+              <div className="flex min-h-[160px] flex-col rounded-xl border-2 border-primary bg-primary p-2 text-center shadow-sm sm:p-3">
                 <div className="flex flex-1 flex-col items-center justify-center">
                   <span className="text-3xl font-extrabold tracking-tight text-info sm:text-4xl">
                     NF-e
@@ -192,6 +186,28 @@ export function EmitirNfeModal({
                     Nota Fiscal eletrônica
                   </span>
                 </div>
+                {temClienteCadastrado && clienteId ? (
+                  <div className="mt-2 w-full text-left border rounded-lg border-gray-200 p-1">
+                    <div className="flex items-center justify-start gap-1 text-gray-100">
+                      <span className="text-sm font-semibold">Cliente</span>
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation()
+                          handleAbrirEdicaoCliente(clienteId)
+                        }}
+                        className="flex-shrink-0 rounded p-1 text-gray-100 transition-colors hover:bg-primary/10"
+                        title="Editar dados do cliente"
+                        aria-label="Editar dados do cliente"
+                      >
+                        <MdEdit className="h-2.5 w-2.5" />
+                      </button>
+                    </div>
+                    <p className="mb-0 break-words text-sm leading-snug text-gray-100">
+                      {nomeClienteExibicao}
+                    </p>
+                  </div>
+                ) : null}
                 {!temClienteCadastrado && (
                   <div className="mt-4 w-full text-left">
                     <p className="mb-0 text-center text-xs leading-relaxed text-gray-200">
@@ -214,7 +230,7 @@ export function EmitirNfeModal({
                   {bloqueado && modeloEmitindo === 55 ? 'Emitindo...' : 'Emitir NF-e'}
                 </button>
               </div>
-              <div className="flex min-h-[160px] flex-col rounded-xl border-2 border-primary bg-white p-4 text-center shadow-sm sm:p-5">
+              <div className="flex min-h-[160px] flex-col rounded-xl border-2 border-primary bg-white p-2 text-center shadow-sm sm:p-3">
                 <div className="flex flex-1 flex-col items-center justify-center">
                   <span className="text-3xl font-extrabold tracking-tight text-primary sm:text-4xl">
                     NFC-e
@@ -223,16 +239,40 @@ export function EmitirNfeModal({
                     Nota Fiscal de Consumidor Eletrônica
                   </span>
                 </div>
-                <div className="mt-4 w-full text-left">
-                  <Input
-                    label="CPF do consumidor"
-                    placeholder="000.000.000-00"
-                    size="small"
-                    value={cpfNfce}
-                    onChange={e => setCpfNfce(formatarCpfMascara(e.target.value))}
-                    inputProps={{ inputMode: 'numeric', autoComplete: 'off' }}
-                    disabled={bloqueado}
-                  />
+                <div className="mt-2 w-full text-left">
+                  {temClienteCadastrado && clienteId ? (
+                    <div className="text-primary border rounded-lg border-primary p-1">
+                      <div className="flex items-center justify-start gap-1">
+                        <span className="text-sm font-semibold text-primary">Cliente</span>
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation()
+                            handleAbrirEdicaoCliente(clienteId)
+                          }}
+                          className="flex-shrink-0 rounded p-1 text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+                          title="Editar dados do cliente"
+                          aria-label="Editar dados do cliente"
+                          disabled={bloqueado}
+                        >
+                          <MdEdit className="h-2.5 w-2.5" />
+                        </button>
+                      </div>
+                      <p className="mb-0 break-words text-sm leading-snug">
+                        {nomeClienteExibicao}
+                      </p>
+                    </div>
+                  ) : (
+                    <Input
+                      label="CPF do consumidor"
+                      placeholder="000.000.000-00"
+                      size="small"
+                      value={cpfNfce}
+                      onChange={e => setCpfNfce(formatarCpfMascara(e.target.value))}
+                      inputProps={{ inputMode: 'numeric', autoComplete: 'off' }}
+                      disabled={bloqueado}
+                    />
+                  )}
                 </div>
                 <button
                   type="button"
@@ -255,54 +295,12 @@ export function EmitirNfeModal({
         </DialogContent>
       </Dialog>
 
-      {editarClienteModalOpen && Boolean(editarClienteId) && (
-        <Dialog
-          open={editarClienteModalOpen && Boolean(editarClienteId)}
-          onOpenChange={nextOpen => {
-            if (!nextOpen) handleFecharEdicaoCliente()
-          }}
-          fullWidth
-          maxWidth="xl"
-          sx={{
-            '& .MuiDialog-container': {
-              zIndex: 1500,
-              justifyContent: { xs: 'center', md: 'flex-end' },
-              alignItems: 'stretch',
-              margin: 0,
-            },
-            '& .MuiBackdrop-root': { zIndex: 1500 },
-            '& .MuiDialog-paper': { zIndex: 1500 },
-          }}
-          PaperProps={{
-            sx: {
-              height: '100vh',
-              maxHeight: '100vh',
-              width: { xs: '95vw', sm: '90vw', md: 'min(900px, 60vw)' },
-              margin: { xs: 'auto', md: 0 },
-              borderRadius: 0,
-              display: 'flex',
-              flexDirection: 'column',
-            },
-          }}
-        >
-          <DialogContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {editarClienteId && (
-              <div className="h-full overflow-y-auto">
-                <NovoCliente
-                  key={editarClienteId}
-                  clienteId={editarClienteId}
-                  isEmbedded
-                  onClose={handleFecharEdicaoCliente}
-                  onSaved={() => {
-                    onClienteSalvo?.()
-                    handleFecharEdicaoCliente()
-                  }}
-                />
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      )}
+      <ClientesTabsModal
+        state={clientesTabsState}
+        onClose={handleFecharEdicaoCliente}
+        onReload={onClienteSalvo}
+        onTabChange={tab => setClientesTabsState(prev => ({ ...prev, tab }))}
+      />
     </>
   )
 }
