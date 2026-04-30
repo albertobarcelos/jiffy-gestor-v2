@@ -21,7 +21,12 @@ import { ProdutoListItem } from './ProdutoListItem'
 
 import { Produto } from '@/src/domain/entities/Produto'
 import type { ToggleField } from '@/src/shared/types/produto'
-import { sortProdutosAlphabetically, normalizeGroupName } from './utils'
+import {
+  sortProdutosAlphabetically,
+  sortProdutosWithinGroup,
+  normalizeGroupName,
+  buildProdutoGroupKey,
+} from './utils'
 
 // ---------------------------------------------------------------------------
 // Tipos auxiliares para o cache do React Query
@@ -91,35 +96,67 @@ export function ProdutosList() {
   const produtosAgrupados = useMemo(() => {
     const map = new Map<string, Produto[]>()
     produtosSorted.forEach((p) => {
-      const grupo = normalizeGroupName(p.getNomeGrupo())
-      if (!map.has(grupo)) map.set(grupo, [])
-      map.get(grupo)!.push(p)
+      const key = buildProdutoGroupKey(p)
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(p)
     })
-    return Array.from(map.entries())
+    return Array.from(map.entries()).map(([groupKey, items]) => ({
+      groupKey,
+      grupoLabel: normalizeGroupName(items[0]?.getNomeGrupo()),
+      items: sortProdutosWithinGroup(items),
+    }))
   }, [produtosSorted])
 
   // Map consolidado: visual + ativo por grupoId. Evita lookup O(N) por render.
   const grupoProdutoMap = useMemo(() => {
-    const map = new Map<string, { corHex: string; iconName: string; ativo: boolean }>()
+    const map = new Map<string, { corHex: string; iconName: string; ativo: boolean; ordem: number }>()
     gruposProdutos.forEach((g) =>
-      map.set(g.getId(), { corHex: g.getCorHex(), iconName: g.getIconName(), ativo: g.isAtivo() })
+      map.set(g.getId(), {
+        corHex: g.getCorHex(),
+        iconName: g.getIconName(),
+        ativo: g.isAtivo(),
+        ordem: g.getOrdem() ?? Number.MAX_SAFE_INTEGER,
+      })
     )
     return map
   }, [gruposProdutos])
+
+  /** Grupos ordenados por `ordem` (API), fallback por nome do grupo. */
+  const produtosAgrupadosOrdenados = useMemo(() => {
+    return [...produtosAgrupados].sort((a, b) => {
+      const grupoIdA = a.items[0]?.getGrupoId()
+      const grupoIdB = b.items[0]?.getGrupoId()
+
+      // "Sem grupo" sempre por último
+      const semGrupoA = !grupoIdA
+      const semGrupoB = !grupoIdB
+      if (semGrupoA && !semGrupoB) return 1
+      if (!semGrupoA && semGrupoB) return -1
+
+      const ordemA = grupoIdA ? (grupoProdutoMap.get(grupoIdA)?.ordem ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER
+      const ordemB = grupoIdB ? (grupoProdutoMap.get(grupoIdB)?.ordem ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER
+      if (ordemA !== ordemB) return ordemA - ordemB
+
+      const labelCmp = a.grupoLabel.localeCompare(b.grupoLabel, 'pt-BR', { sensitivity: 'base' })
+      if (labelCmp !== 0) return labelCmp
+      return a.groupKey.localeCompare(b.groupKey)
+    })
+  }, [produtosAgrupados, grupoProdutoMap])
 
   // Inicializar grupos expandidos quando novos grupos aparecem
   useEffect(() => {
     setExpandedGroups((prev) => {
       let changed = false
       const next: Record<string, boolean> = {}
-      produtosAgrupados.forEach(([, items]) => {
-        const groupKey = items[0]?.getGrupoId() ?? '__sem_grupo__'
-        if (typeof prev[groupKey] === 'undefined') { changed = true; next[groupKey] = true }
-        else next[groupKey] = prev[groupKey]
+      produtosAgrupadosOrdenados.forEach(({ groupKey }) => {
+        if (typeof prev[groupKey] === 'undefined') {
+          changed = true
+          next[groupKey] = true
+        } else next[groupKey] = prev[groupKey]
       })
       return changed ? next : prev
     })
-  }, [produtosAgrupados])
+  }, [produtosAgrupadosOrdenados])
 
   // Scroll infinito: carrega próxima página quando o usuário chega perto do fim
   useEffect(() => {
@@ -298,11 +335,10 @@ export function ProdutosList() {
         )}
 
         {/* Lista agrupada */}
-        {produtosAgrupados.length > 0 && (
+        {produtosAgrupadosOrdenados.length > 0 && (
           <div role="list" aria-label="Lista de produtos" className="space-y-4 pb-4">
-            {produtosAgrupados.map(([grupo, items]) => {
+            {produtosAgrupadosOrdenados.map(({ groupKey, grupoLabel, items }) => {
               const grupoId = items[0]?.getGrupoId()
-              const groupKey = grupoId ?? '__sem_grupo__'
               const info = grupoId ? grupoProdutoMap.get(grupoId) : undefined
               const grupoVisual = info ? { corHex: info.corHex, iconName: info.iconName } : undefined
               const grupoAtivo = info?.ativo ?? true
@@ -313,7 +349,7 @@ export function ProdutosList() {
                   {/* sticky top-0 z-20: CSS nativo, sem JS, sem complexidade */}
                   <div className="sticky top-0 z-20 -mx-1 bg-gray-50">
                     <ProdutosGroupHeader
-                      grupo={grupo}
+                      grupo={grupoLabel}
                       grupoId={grupoId}
                       groupKey={groupKey}
                       grupoVisual={grupoVisual}
