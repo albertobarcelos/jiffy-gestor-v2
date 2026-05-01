@@ -565,11 +565,12 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           permiteDesconto: !!(produto.permiteDesconto || false),
           permiteAcrescimo: !!(produto.permiteAcrescimo || false),
           abreComplementos: !!(produto.abreComplementos || false),
-          permiteAlterarPreco: produto.permiteAlterarPreco ?? false,
-          incideTaxa: produto.incideTaxa ?? false,
-          ativo: produto.ativo ?? true,
-          grupoComplementosIds: [...gruposIds].sort(),
-          impressorasIds: [...impressorasIdsArr].sort(),
+          permiteAlterarPreco: !!(produto.permiteAlterarPreco ?? false),
+          incideTaxa: !!(produto.incideTaxa ?? false),
+          // Mesma semântica que `setAtivo(produto.ativo ?? true)` — unknown precisa virar boolean explícito
+          ativo: produto.ativo === false ? false : true,
+          grupoComplementosIds: [...gruposIds].map(id => String(id)).sort(),
+          impressorasIds: [...impressorasIdsArr].map(id => String(id)).sort(),
           // Antes do passo 3: igual ao estado inicial do formulário (alinhado a `getFormSnapshot` pós-load)
           ncm: '',
           cest: '',
@@ -1476,7 +1477,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         if (onSuccess) {
           // Passar dados do produto para atualização otimista do cache
           onSuccess(
-            isEditMode && produtoAtualizado
+            isEditMode && produtoAtualizado && effectiveProdutoId
               ? { produtoId: effectiveProdutoId, produtoData: produtoAtualizado }
               : undefined
           )
