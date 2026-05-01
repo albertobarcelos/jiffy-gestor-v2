@@ -59,6 +59,7 @@ import { EscolheDatasModal } from '@/src/presentation/components/features/vendas
 import { showToast } from '@/src/shared/utils/toast'
 import { abrirDocumentoFiscalPdf } from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
 import { FormControl, Select, MenuItem } from '@mui/material'
+import type { SxProps, Theme } from '@mui/material/styles'
 import {
   ClientesTabsModal,
   ClientesTabsModalState,
@@ -248,6 +249,48 @@ function vendaBloqueadaParaEmissaoInterativa(
   if (s === 'EMITIDA' || s === 'PENDENTE_EMISSAO') return true
   if (statusFiscalAguardandoSefaz(v)) return true
   return false
+}
+
+/**
+ * Exibe o botão Emitir/Reemitir (mesmo de Pendente emissão) em Pendente, em Finalizadas para entrega gestor,
+ * ou enquanto reemissão/emissão direta estiver em andamento (qualquer coluna visível).
+ */
+function deveExibirBotaoEmitirNotaNoKanban(
+  columnId: ColunaKanbanId,
+  venda: VendaUnificadaDTO,
+  acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
+): boolean {
+  const acao = acaoFiscalEmAndamentoPorVenda[venda.id]
+  if (acao === 'reemitindo' || acao === 'emitindo') return true
+  if (columnId === 'PENDENTE_EMISSAO') return true
+  if (columnId === 'FINALIZADAS' && venda.isPedidoEntregaGestor()) return true
+  return false
+}
+
+/** Botão Emitir/Reemitir nota nos cards — alinhado ao layout (General Sans 13px/500, altura 28.75px, raio 8px). */
+const SX_BOTAO_EMITIR_NOTA_KANBAN: SxProps<Theme> = {
+  fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
+  fontSize: '13px',
+  fontWeight: 500,
+  lineHeight: '22.75px',
+  height: '28.75px',
+  minHeight: '28.75px',
+  borderRadius: '8px',
+  px: 1,
+  py: 0,
+  textTransform: 'none',
+  boxShadow: 'none',
+  backgroundColor: 'rgb(0, 51, 102)',
+  color: 'rgb(255, 255, 255)',
+  '&:hover': {
+    backgroundColor: 'rgb(0, 62, 118)',
+    boxShadow: 'none',
+  },
+  '&.MuiButton-contained.Mui-disabled': {
+    color: 'rgba(255,255,255,0.96)',
+    WebkitTextFillColor: 'rgba(255,255,255,0.96)',
+    backgroundColor: 'rgba(0, 51, 102, 0.55)',
+  },
 }
 
 const KANBAN_PRIMEIRO_POR_COLUNA_KEY = 'jiffy-gestor-v2:kanban-primeiro-por-coluna'
@@ -928,7 +971,7 @@ export function FiscalFlowKanban() {
   const todasColunasKanban = getColumns()
   const columns =
     modoKanbanVendas === 'delivery'
-      ? todasColunasKanban
+      ? todasColunasKanban.filter(c => c.id !== 'PENDENTE_EMISSAO')
       : todasColunasKanban.filter(
           c => !COLUNAS_ENTREGA_OPERACIONAIS.includes(c.id as ColunaKanbanId)
         )
@@ -1380,9 +1423,16 @@ export function FiscalFlowKanban() {
         )
         break
       case 'FINALIZADAS':
-        vendas = vendasParaFiltrar.filter(
-          (v: Venda) => getEtapaKanbanParaExibicao(v) === 'FINALIZADAS'
-        )
+        if (modoKanbanVendas === 'delivery') {
+          vendas = vendasParaFiltrar.filter((v: Venda) => {
+            const etapa = getEtapaKanbanParaExibicao(v)
+            return etapa === 'FINALIZADAS' || etapa === 'PENDENTE_EMISSAO'
+          })
+        } else {
+          vendas = vendasParaFiltrar.filter(
+            (v: Venda) => getEtapaKanbanParaExibicao(v) === 'FINALIZADAS'
+          )
+        }
         break
       case 'PENDENTE_EMISSAO':
         vendas = vendasParaFiltrar.filter(
@@ -1741,9 +1791,18 @@ export function FiscalFlowKanban() {
                             ? 'Entrega'
                             : venda.origem
 
+                        const etapaKanbanCard = getEtapaKanbanParaExibicao(venda)
+                        /** No modo Delivery, pendente emissão aparece na coluna Finalizadas — borda/cores da etapa real. */
+                        const colunaIdParaEstiloCard: ColunaKanbanId =
+                          modoKanbanVendas === 'delivery' &&
+                          column.id === 'FINALIZADAS' &&
+                          etapaKanbanCard === 'PENDENTE_EMISSAO'
+                            ? 'PENDENTE_EMISSAO'
+                            : (column.id as ColunaKanbanId)
+
                         const { borderClass: cardBorderClass, cardBgClass } =
                           getCardBorderEFundoKanban(
-                            column.id as ColunaKanbanId,
+                            colunaIdParaEstiloCard,
                             venda,
                             acaoFiscalEmAndamentoPorVenda
                           )
@@ -1902,24 +1961,17 @@ export function FiscalFlowKanban() {
                                     </Button>
                                   )}
 
-                                {/* Emitir / Reemitir: Pendente ou card temporário em Com nota durante reemissão ou emissão direta */}
-                                {(column.id === 'PENDENTE_EMISSAO' ||
-                                  acaoFiscalEmAndamentoPorVenda[venda.id] === 'reemitindo' ||
-                                  acaoFiscalEmAndamentoPorVenda[venda.id] === 'emitindo') && (
+                                {/* Emitir / Reemitir: Pendente; Finalizadas (entrega gestor); ou durante reemissão/emissão direta */}
+                                {deveExibirBotaoEmitirNotaNoKanban(
+                                  column.id as ColunaKanbanId,
+                                  venda,
+                                  acaoFiscalEmAndamentoPorVenda
+                                ) && (
                                   <Button
                                     size="sm"
                                     variant="contained"
-                                    className="flex-1 !bg-primary hover:!bg-primary/90"
-                                    sx={{
-                                      py: 0.375,
-                                      px: 1,
-                                      minHeight: 'auto',
-                                      // Só esta venda usa acaoFiscalEmAndamentoPorVenda; não usar isPending global dos hooks (afetava todos os cards)
-                                      '&.MuiButton-contained.Mui-disabled': {
-                                        color: 'rgba(255,255,255,0.96)',
-                                        WebkitTextFillColor: 'rgba(255,255,255,0.96)',
-                                      },
-                                    }}
+                                    className="flex-1"
+                                    sx={SX_BOTAO_EMITIR_NOTA_KANBAN}
                                     onClick={() => handleEmitirNfe(venda)}
                                     disabled={vendaBloqueadaParaEmissaoInterativa(
                                       venda,
