@@ -20,6 +20,249 @@ import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { MdImage } from 'react-icons/md'
 import { cn } from '@/src/shared/utils/cn'
 
+/** Snapshot serializado por `getFormSnapshot` — deve permanecer alinhado a esse método. */
+interface BaselineSnapshotProduto {
+  nomeProduto: string
+  descricaoProduto: string
+  precoVenda: string
+  unidadeProduto: string | null
+  grupoProduto: string | null
+  codigoEanBarras: string
+  favorito: boolean
+  permiteDesconto: boolean
+  permiteAcrescimo: boolean
+  abreComplementos: boolean
+  permiteAlterarPreco: boolean
+  incideTaxa: boolean
+  ativo: boolean
+  grupoComplementosIds: string[]
+  impressorasIds: string[]
+  ncm: string
+  cest: string
+  origemMercadoria: string | null
+  tipoProduto: string | null
+  indicadorProducaoEscala: string | null
+}
+
+function parsePrecoFormParaNumero(preco: string): number {
+  return parseFloat(preco.replace(/[^\d,]/g, '').replace(',', '.')) || 0
+}
+
+/** Compara listas de ids ignorando string vs número (cardápio pode mandar id como número). */
+function arraysIdsIguais(a: unknown[] | undefined, b: unknown[] | undefined): boolean {
+  const norm = (arr: unknown[] | undefined) =>
+    JSON.stringify([...(arr ?? [])].map(x => String(x)).sort())
+  return norm(a) === norm(b)
+}
+
+/** Unidade vinda vazia/null/undefined deve bater com o estado normalizado no load (`x || null`). */
+function unidadeMedidaIguaisParaPatch(a: unknown, b: unknown): boolean {
+  const n = (x: unknown): string | null =>
+    x === undefined || x === null || x === '' ? null : String(x)
+  return n(a) === n(b)
+}
+
+/** Booleans da API podem vir como truthy numérico; o formulário usa boolean coerente com `|| false`. */
+function booleanIguaisParaPatch(a: unknown, b: unknown): boolean {
+  return Boolean(a) === Boolean(b)
+}
+
+/**
+ * Cardápio pode expor o grupo só em `grupo.id` (sem `grupoId` no root). Baseline e estado precisam usar a mesma origem.
+ */
+function extrairGrupoProdutoIdDoJsonProduto(produto: Record<string, unknown>): string | null {
+  const direto = produto.grupoId
+  if (typeof direto === 'string' && direto.trim() !== '') return direto.trim()
+  if (typeof direto === 'number' && Number.isFinite(direto)) return String(direto)
+  const grupo = produto.grupo
+  if (grupo && typeof grupo === 'object') {
+    const id = (grupo as Record<string, unknown>).id
+    if (typeof id === 'string' && id.trim() !== '') return id.trim()
+    if (typeof id === 'number' && Number.isFinite(id)) return String(id)
+  }
+  return null
+}
+
+/** Compara ids de grupo para o PATCH parcial (null, undefined e string vazia tratados como ausência). */
+function grupoProdutoIdsIguaisParaPatch(a: unknown, b: unknown): boolean {
+  const norm = (v: unknown): string | null => {
+    if (v === undefined || v === null) return null
+    const s = String(v).trim()
+    return s === '' ? null : s
+  }
+  return norm(a) === norm(b)
+}
+
+/** Evita enviar grupoId quando ainda é o mesmo do GET (backend pode incrementar ordem ao receber grupoId). */
+function omitGrupoIdSeIgualAoCarregado(
+  bodyCompleto: Record<string, unknown>,
+  grupoIdReferenciaCarregamento: string | null
+): Record<string, unknown> {
+  if (!grupoProdutoIdsIguaisParaPatch(bodyCompleto.grupoId, grupoIdReferenciaCarregamento)) {
+    return bodyCompleto
+  }
+  const out = { ...bodyCompleto }
+  delete out.grupoId
+  return out
+}
+
+/** Monta objeto fiscal “de referência” a partir do baseline (mesma lógica do bloco fiscal em handleSave). */
+function montarFiscalReferenciaBaseline(
+  base: BaselineSnapshotProduto,
+  salvarSomenteDadosGerais: boolean,
+  fiscalRef: {
+    ncm?: string
+    cest?: string
+    origemMercadoria?: string
+    tipoProduto?: string
+    indicadorProducaoEscala?: string | null
+  } | null,
+  hasLoadedFiscal: boolean
+): Record<string, unknown> {
+  const fiscal: Record<string, unknown> = {}
+  if (salvarSomenteDadosGerais && !hasLoadedFiscal && fiscalRef) {
+    const ref = fiscalRef
+    if (ref.ncm) fiscal.ncm = String(ref.ncm).trim()
+    if (ref.cest) fiscal.cest = String(ref.cest).trim()
+    if (
+      ref.origemMercadoria !== undefined &&
+      ref.origemMercadoria !== null &&
+      String(ref.origemMercadoria) !== ''
+    ) {
+      fiscal.origemMercadoria =
+        typeof ref.origemMercadoria === 'number'
+          ? ref.origemMercadoria
+          : parseInt(String(ref.origemMercadoria), 10)
+    }
+    if (ref.tipoProduto) fiscal.tipoProduto = ref.tipoProduto
+    if (ref.indicadorProducaoEscala) fiscal.indicadorProducaoEscala = ref.indicadorProducaoEscala
+  } else {
+    if (base.ncm?.trim()) fiscal.ncm = base.ncm.trim()
+    if (base.cest?.trim()) fiscal.cest = base.cest.trim()
+    if (base.origemMercadoria) fiscal.origemMercadoria = parseInt(base.origemMercadoria, 10)
+    if (base.tipoProduto) fiscal.tipoProduto = base.tipoProduto
+    if (base.indicadorProducaoEscala) fiscal.indicadorProducaoEscala = base.indicadorProducaoEscala
+  }
+  return fiscal
+}
+
+/** Retorna apenas chaves do objeto fiscal que mudaram em relação ao baseline. */
+function diffFiscalParcial(
+  atual: Record<string, unknown>,
+  referencia: Record<string, unknown>
+): Record<string, unknown> | undefined {
+  const keys = new Set([...Object.keys(atual), ...Object.keys(referencia)])
+  const out: Record<string, unknown> = {}
+  for (const k of keys) {
+    if (JSON.stringify(atual[k]) !== JSON.stringify(referencia[k])) {
+      out[k] = atual[k]
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
+/**
+ * PATCH de edição com apenas campos alterados em relação ao último baseline (carregar/salvar).
+ * POST de criação continua com body completo — chamador só usa isto quando `isEditMode`.
+ */
+function montarPatchParcialEdicaoProduto(
+  baselineSerialized: string | null,
+  grupoIdReferenciaCarregamento: string | null,
+  bodyCompleto: Record<string, unknown>,
+  fiscalAtual: Record<string, unknown>,
+  salvarSomenteDadosGerais: boolean,
+  fiscalRef: {
+    ncm?: string
+    cest?: string
+    origemMercadoria?: string
+    tipoProduto?: string
+    indicadorProducaoEscala?: string | null
+  } | null,
+  hasLoadedFiscal: boolean,
+  incluirAtivo: boolean
+): Record<string, unknown> {
+  if (!baselineSerialized) {
+    return omitGrupoIdSeIgualAoCarregado(bodyCompleto, grupoIdReferenciaCarregamento)
+  }
+
+  let base: BaselineSnapshotProduto
+  try {
+    base = JSON.parse(baselineSerialized) as BaselineSnapshotProduto
+  } catch {
+    return omitGrupoIdSeIgualAoCarregado(bodyCompleto, grupoIdReferenciaCarregamento)
+  }
+
+  const delta: Record<string, unknown> = {}
+
+  if (String(bodyCompleto.nome ?? '') !== String(base.nomeProduto ?? '')) delta.nome = bodyCompleto.nome
+  if (String(bodyCompleto.descricao ?? '') !== String(base.descricaoProduto ?? '')) {
+    delta.descricao = bodyCompleto.descricao
+  }
+
+  const valorNovo = bodyCompleto.valor as number
+  if (parsePrecoFormParaNumero(base.precoVenda) !== valorNovo) {
+    delta.valor = valorNovo
+  }
+
+  if (!grupoProdutoIdsIguaisParaPatch(bodyCompleto.grupoId, grupoIdReferenciaCarregamento)) {
+    delta.grupoId = bodyCompleto.grupoId
+  }
+  if (!unidadeMedidaIguaisParaPatch(bodyCompleto.unidadeMedida, base.unidadeProduto)) {
+    delta.unidadeMedida = bodyCompleto.unidadeMedida
+  }
+
+  const eanAtual = String(bodyCompleto.codigoEan ?? '').trim()
+  const eanBase = String(base.codigoEanBarras ?? '').trim()
+  if (eanAtual !== eanBase) delta.codigoEan = bodyCompleto.codigoEan
+
+  if (!booleanIguaisParaPatch(bodyCompleto.favorito, base.favorito)) delta.favorito = bodyCompleto.favorito
+  if (!booleanIguaisParaPatch(bodyCompleto.permiteDesconto, base.permiteDesconto)) {
+    delta.permiteDesconto = bodyCompleto.permiteDesconto
+  }
+  if (!booleanIguaisParaPatch(bodyCompleto.permiteAcrescimo, base.permiteAcrescimo)) {
+    delta.permiteAcrescimo = bodyCompleto.permiteAcrescimo
+  }
+  if (!booleanIguaisParaPatch(bodyCompleto.abreComplementos, base.abreComplementos)) {
+    delta.abreComplementos = bodyCompleto.abreComplementos
+  }
+  if (!booleanIguaisParaPatch(bodyCompleto.permiteAlterarPreco, base.permiteAlterarPreco)) {
+    delta.permiteAlterarPreco = bodyCompleto.permiteAlterarPreco
+  }
+  if (!booleanIguaisParaPatch(bodyCompleto.incideTaxa, base.incideTaxa)) {
+    delta.incideTaxa = bodyCompleto.incideTaxa
+  }
+
+  if (!arraysIdsIguais(bodyCompleto.gruposComplementosIds as unknown[], base.grupoComplementosIds)) {
+    delta.gruposComplementosIds = bodyCompleto.gruposComplementosIds
+  }
+  if (!arraysIdsIguais(bodyCompleto.impressorasIds as unknown[], base.impressorasIds)) {
+    delta.impressorasIds = bodyCompleto.impressorasIds
+  }
+
+  const ncmCompatAtual = bodyCompleto.ncm as string | undefined
+  const ncmCompatBase = base.ncm?.trim() ? base.ncm.trim() : undefined
+  if (ncmCompatAtual !== ncmCompatBase) delta.ncm = ncmCompatAtual
+
+  if (
+    incluirAtivo &&
+    bodyCompleto.ativo !== undefined &&
+    !booleanIguaisParaPatch(bodyCompleto.ativo, base.ativo)
+  ) {
+    delta.ativo = bodyCompleto.ativo
+  }
+
+  const fiscalRefBaseline = montarFiscalReferenciaBaseline(
+    base,
+    salvarSomenteDadosGerais,
+    fiscalRef,
+    hasLoadedFiscal
+  )
+  const fiscalDelta = diffFiscalParcial(fiscalAtual, fiscalRefBaseline)
+  if (fiscalDelta) delta.fiscal = fiscalDelta
+
+  return delta
+}
+
 /** API imperativa para o rodapé do `JiffySidePanelModal` (wizard 3 passos). */
 export interface NovoProdutoHandle {
   goNext: () => void
@@ -143,6 +386,8 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
     /** Snapshot JSON do formulário no último “ponto salvo” (carregar ou salvar com sucesso) */
     const baselineSerializedRef = useRef<string | null>(null)
     const createBaselineCommittedRef = useRef(false)
+    /** grupoId do último GET bem-sucedido (ou após salvar) — diff de grupo não usa só o snapshot JSON. */
+    const grupoProdutoIdCarregadoRef = useRef<string | null>(null)
 
     // Verificar se é modo cópia via query param
     // Extrair o valor uma vez e usar como string estável
@@ -277,6 +522,66 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       }).format(numericValue)
     }, [])
 
+    /**
+     * Baseline imediato após GET do produto — mesmo conteúdo que `getFormSnapshot()` após hidratar o estado,
+     * sem esperar o flush do React nem o `setTimeout(100)`. Evita PATCH completo quando o usuário salva rápido
+     * (baseline ainda null → `montarPatchParcialEdicaoProduto` devolvia `bodyCompleto`).
+     */
+    const baselineSerializedFromProdutoApi = useCallback(
+      (produto: Record<string, unknown>, effectiveIsCopyMode: boolean): string => {
+        // Espelha exatamente as expressões usadas em loadProduto ao hidratar o estado (evita diff falso no PATCH).
+        const nomeProduto = effectiveIsCopyMode
+          ? (produto.nome || '')
+            ? `${produto.nome} - Cópia`
+            : 'Cópia '
+          : produto.nome || ''
+        const descricaoProduto = produto.descricao || ''
+        const precoVenda = produto.valor ? formatCurrency(produto.valor as number | string) : ''
+        const unidadeProduto = (produto.unidadeMedida || null) as string | null
+        const grupoProduto = extrairGrupoProdutoIdDoJsonProduto(produto)
+        const eanRaw =
+          produto.codigoEan ?? produto.codigoBarras ?? produto.ean ?? produto.codigoEanBarras
+        const codigoEanBarras =
+          typeof eanRaw === 'string' || typeof eanRaw === 'number'
+            ? String(eanRaw).replace(/\D/g, '').slice(0, 14)
+            : ''
+        const gruposComp = produto.gruposComplementos
+        const gruposIds = Array.isArray(gruposComp)
+          ? gruposComp.map((g: { id?: unknown }) => (g as { id: unknown }).id)
+          : []
+        const impressorasRaw = produto.impressoras
+        const impressorasIdsArr = Array.isArray(impressorasRaw)
+          ? impressorasRaw.map((i: { id?: unknown }) => (i as { id: unknown }).id)
+          : []
+
+        const snapshot: BaselineSnapshotProduto = {
+          nomeProduto: String(nomeProduto),
+          descricaoProduto: String(descricaoProduto),
+          precoVenda,
+          unidadeProduto,
+          grupoProduto,
+          codigoEanBarras,
+          favorito: !!(produto.favorito || false),
+          permiteDesconto: !!(produto.permiteDesconto || false),
+          permiteAcrescimo: !!(produto.permiteAcrescimo || false),
+          abreComplementos: !!(produto.abreComplementos || false),
+          permiteAlterarPreco: produto.permiteAlterarPreco ?? false,
+          incideTaxa: produto.incideTaxa ?? false,
+          ativo: produto.ativo ?? true,
+          grupoComplementosIds: [...gruposIds].sort(),
+          impressorasIds: [...impressorasIdsArr].sort(),
+          // Antes do passo 3: igual ao estado inicial do formulário (alinhado a `getFormSnapshot` pós-load)
+          ncm: '',
+          cest: '',
+          origemMercadoria: '0',
+          tipoProduto: '00',
+          indicadorProducaoEscala: null,
+        }
+        return JSON.stringify(snapshot)
+      },
+      [formatCurrency]
+    )
+
     const { data: grupos = [], isLoading: isLoadingGrupos } = useGruposProdutos({
       limit: 100,
       /** Painel lateral: evita refetch ao voltar o foco ao browser (mantém lista estável durante edição). */
@@ -298,6 +603,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           loadedProdutoIdRef.current = null
           lastProdutoIdRef.current = null
           lastIsCopyModeRef.current = false
+          grupoProdutoIdCarregadoRef.current = null
         }
         return
       }
@@ -335,6 +641,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           // Se não tem token, reseta as flags
           hasLoadedProdutoRef.current = false
           loadedProdutoIdRef.current = null
+          grupoProdutoIdCarregadoRef.current = null
           return
         }
 
@@ -353,7 +660,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             // Preenche os campos com os dados do produto
             setPrecoVenda(produto.valor ? formatCurrency(produto.valor) : '')
             setUnidadeProduto(produto.unidadeMedida || null)
-            setGrupoProduto(produto.grupoId || null)
+            setGrupoProduto(extrairGrupoProdutoIdDoJsonProduto(produto as Record<string, unknown>))
             const eanRaw =
               produto.codigoEan ?? produto.codigoBarras ?? produto.ean ?? produto.codigoEanBarras
             setCodigoEanBarras(
@@ -392,6 +699,14 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             // Resetar flag de carregamento fiscal quando produto muda
             hasLoadedFiscalDataRef.current = false
 
+            baselineSerializedRef.current = baselineSerializedFromProdutoApi(
+              produto as Record<string, unknown>,
+              currentEffectiveIsCopyMode
+            )
+            grupoProdutoIdCarregadoRef.current = extrairGrupoProdutoIdDoJsonProduto(
+              produto as Record<string, unknown>
+            )
+
             if (currentEffectiveIsCopyMode) {
               const nomeOriginal = produto.nome || ''
               setNomeProduto(nomeOriginal ? `${nomeOriginal} - Cópia` : 'Cópia ')
@@ -409,12 +724,14 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             // Se a requisição falhou, reseta as flags para permitir nova tentativa
             hasLoadedProdutoRef.current = false
             loadedProdutoIdRef.current = null
+            grupoProdutoIdCarregadoRef.current = null
           }
         } catch (error) {
           console.error('Erro ao carregar produto:', error)
           // Se houve erro, reseta as flags para permitir nova tentativa
           hasLoadedProdutoRef.current = false
           loadedProdutoIdRef.current = null
+          grupoProdutoIdCarregadoRef.current = null
         } finally {
           setIsLoadingProduto(false)
         }
@@ -1005,6 +1322,8 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           ncmCompatBody = ncm || undefined
         }
 
+        const isEditMode = Boolean(effectiveProdutoId && !effectiveIsCopyMode)
+
         const body: any = {
           nome: nomeProduto,
           descricao: descricaoProduto,
@@ -1030,14 +1349,25 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           body.fiscal = fiscalData
         }
 
+        const patchParcialEdicao = isEditMode
+          ? montarPatchParcialEdicaoProduto(
+              baselineSerializedRef.current,
+              grupoProdutoIdCarregadoRef.current,
+              body,
+              fiscalData,
+              salvarSomenteDadosGerais,
+              fiscalDataFromProductRef.current,
+              hasLoadedFiscalDataRef.current,
+              Boolean(effectiveProdutoId)
+            )
+          : body
+
         const url =
           effectiveProdutoId && !effectiveIsCopyMode
             ? `/api/produtos/${effectiveProdutoId}`
             : '/api/produtos'
 
         const method = effectiveProdutoId && !effectiveIsCopyMode ? 'PATCH' : 'POST'
-
-        const isEditMode = effectiveProdutoId && !effectiveIsCopyMode
 
         // Se for edição e gruposComplementosIds estiver vazio, precisamos remover
         // os grupos individualmente usando DELETE, pois a API externa não processa array vazio
@@ -1047,10 +1377,23 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           grupoComplementosIds.length === 0 &&
           originalGrupoComplementosIds.length > 0
 
-        // Primeiro, salvar o produto (sem gruposComplementosIds se for remoção individual)
+        const precisaSalvarProduto =
+          !isEditMode ||
+          shouldRemoveGruposIndividually ||
+          Object.keys(patchParcialEdicao).length > 0
+
         const bodyToSend = shouldRemoveGruposIndividually
-          ? { ...body, gruposComplementosIds: undefined }
-          : body
+          ? { ...patchParcialEdicao, gruposComplementosIds: undefined }
+          : patchParcialEdicao
+
+        if (isEditMode && !precisaSalvarProduto) {
+          showToast.successLoading(toastId, 'Nenhuma alteração para salvar.')
+          commitBaselineLatestRef.current()
+          if (onSuccess) {
+            onSuccess(undefined)
+          }
+          return true
+        }
 
         const response = await fetch(url, {
           method,
@@ -1099,9 +1442,9 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           }
         }
 
-        // Buscar o produto atualizado para atualizar o cache
+        // Buscar o produto atualizado para atualizar o cache (apenas quando houve PATCH)
         let produtoAtualizado = null
-        if (isEditMode) {
+        if (isEditMode && precisaSalvarProduto) {
           try {
             const produtoResponse = await fetch(`/api/produtos/${effectiveProdutoId}`, {
               headers: {
@@ -1124,6 +1467,11 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             ? 'Produto atualizado com sucesso!'
             : 'Produto cadastrado com sucesso!'
         )
+        grupoProdutoIdCarregadoRef.current = produtoAtualizado
+          ? extrairGrupoProdutoIdDoJsonProduto(produtoAtualizado as Record<string, unknown>)
+          : extrairGrupoProdutoIdDoJsonProduto({
+              grupoId: grupoProduto ?? undefined,
+            } as Record<string, unknown>)
         commitBaselineLatestRef.current()
         if (onSuccess) {
           // Passar dados do produto para atualização otimista do cache
