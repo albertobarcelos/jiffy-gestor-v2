@@ -26,6 +26,7 @@ import {
   sortProdutosWithinGroup,
   normalizeGroupName,
   buildProdutoGroupKey,
+  produtoFromApiPreservandoOrdem,
 } from './utils'
 
 // ---------------------------------------------------------------------------
@@ -203,7 +204,11 @@ export function ProdutosList() {
             ...page,
             produtos: page.produtos.map((p) => {
               if (p.getId() !== produtoId) return p
-              try { return Produto.fromJSON(produtoData) } catch { return p }
+              try {
+                return produtoFromApiPreservandoOrdem(p, produtoData)
+              } catch {
+                return p
+              }
             }),
           })),
         }

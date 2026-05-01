@@ -37,6 +37,41 @@ export const sortProdutosWithinGroup = (lista: Produto[]): Produto[] =>
     return collator.compare(a.getNome(), b.getNome())
   })
 
+/**
+ * Monta `Produto` a partir da resposta da API mantendo `ordem` do item já em cache
+ * quando o payload não envia o campo (evita o produto ir para o fim da lista após salvar).
+ */
+export function produtoFromApiPreservandoOrdem(anterior: Produto, raw: unknown): Produto {
+  const parsed = Produto.fromJSON(raw)
+  const ordemApi = parsed.getOrdem()
+  if (typeof ordemApi === 'number' && Number.isFinite(ordemApi)) {
+    return parsed
+  }
+  const ordemAnt = anterior.getOrdem()
+  if (typeof ordemAnt !== 'number' || !Number.isFinite(ordemAnt)) {
+    return parsed
+  }
+  return Produto.create(
+    parsed.getId(),
+    parsed.getCodigoProduto(),
+    parsed.getNome(),
+    parsed.getValor(),
+    parsed.isAtivo(),
+    parsed.getNomeGrupo(),
+    parsed.getGrupoId(),
+    parsed.getEstoque(),
+    parsed.isFavorito(),
+    parsed.abreComplementosAtivo(),
+    parsed.permiteAcrescimoAtivo(),
+    parsed.permiteDescontoAtivo(),
+    parsed.permiteAlterarPrecoAtivo(),
+    parsed.incideTaxaAtivo(),
+    ordemAnt,
+    parsed.getGruposComplementos(),
+    parsed.getImpressoras()
+  )
+}
+
 export const cloneProdutoWithPatch = (produto: Produto, patch: ProdutoPatch): Produto =>
   Produto.create(
     produto.getId(),
