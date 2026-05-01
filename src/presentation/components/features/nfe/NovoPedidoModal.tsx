@@ -1733,6 +1733,8 @@ export function NovoPedidoModal({
     setValorDescontoAcrescimo('0')
     setValorUnitarioEdicaoPainel('')
     setValorFinalVenda(null) // Limpar valor final ao resetar
+    setSeletorClienteOpen(false)
+    setModalConfirmacaoSaidaOpen(false)
     setDataFinalizacaoCarregada(null)
     setVendaGestorJaCancelada(false)
     setModalCancelarVendaOpen(false)

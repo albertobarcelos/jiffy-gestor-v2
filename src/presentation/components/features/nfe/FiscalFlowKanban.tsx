@@ -54,7 +54,7 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { StatusFiscalBadge } from './StatusFiscalBadge'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 import { NovoPedidoModal } from './NovoPedidoModal'
-import { EscolhaTipoPedidoModal, type TipoPedido } from './EscolhaTipoPedidoModal'
+import type { TipoPedido } from './EscolhaTipoPedidoModal'
 import { EscolheDatasModal } from '@/src/presentation/components/features/vendas/EscolheDatasModal'
 import { showToast } from '@/src/shared/utils/toast'
 import { abrirDocumentoFiscalPdf } from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
@@ -590,8 +590,9 @@ export function FiscalFlowKanban() {
   })
 
   const [novoPedidoModalOpen, setNovoPedidoModalOpen] = useState(false)
+  /** Incrementa a cada "Novo Pedido" — nova instância do modal, evita reaproveitar estado do fluxo/tipo anterior. */
+  const [novoPedidoInstanciaKey, setNovoPedidoInstanciaKey] = useState(0)
   const [novoPedidoModalVisualizacaoOpen, setNovoPedidoModalVisualizacaoOpen] = useState(false)
-  const [escolhaTipoPedidoOpen, setEscolhaTipoPedidoOpen] = useState(false)
   const [tipoPedidoEscolhido, setTipoPedidoEscolhido] = useState<TipoPedido>('balcao')
   /** Venda aberta no modal de detalhes (step 4): id, tabela e statusFiscal do unificado (PDV não repete no GET detalhe) */
   const [pedidoVisualizacaoContext, setPedidoVisualizacaoContext] = useState<{
@@ -1387,6 +1388,13 @@ export function FiscalFlowKanban() {
     setIsDatasModalOpen(false)
   }, [])
 
+  /** Novo pedido: tipo alinhado ao modo do quadro (Delivery → entrega, Balcão → balcão); nova instância limpa o formulário. */
+  const handleAbrirNovoPedido = useCallback(() => {
+    setTipoPedidoEscolhido(modoKanbanVendas === 'delivery' ? 'entrega' : 'balcao')
+    setNovoPedidoInstanciaKey(k => k + 1)
+    setNovoPedidoModalOpen(true)
+  }, [modoKanbanVendas])
+
   // Obter vendas de delivery por status — COMENTADO: delivery não utilizado por enquanto
   // NOTA: Para delivery, o backend retorna vendas finalizadas OU com status '4' sem dataFinalizacao (COM_ENTREGADOR)
   const getVendasDeliveryPorStatus = (_status: string | number): Venda[] => {
@@ -1646,7 +1654,8 @@ export function FiscalFlowKanban() {
             </button>
             <KanbanModoVendasToggle value={modoKanbanVendas} onChange={setModoKanbanVendas} />
             <button
-              onClick={() => setEscolhaTipoPedidoOpen(true)}
+              type="button"
+              onClick={handleAbrirNovoPedido}
               className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary/90"
             >
               <MdAdd className="h-4 w-4" />
@@ -2067,19 +2076,9 @@ export function FiscalFlowKanban() {
         />
       )}
 
-      {/* Dialog de escolha do tipo de pedido: abre antes do NovoPedidoModal */}
-      <EscolhaTipoPedidoModal
-        open={escolhaTipoPedidoOpen}
-        onClose={() => setEscolhaTipoPedidoOpen(false)}
-        onSelect={tipo => {
-          setTipoPedidoEscolhido(tipo)
-          setEscolhaTipoPedidoOpen(false)
-          setNovoPedidoModalOpen(true)
-        }}
-      />
-
-      {/* Modal de Novo Pedido — sempre montado para o Slide de saída completar */}
+      {/* Modal de Novo Pedido — key nova por abertura para estado inicial consistente com tipoInicioPedido */}
       <NovoPedidoModal
+        key={novoPedidoInstanciaKey}
         open={novoPedidoModalOpen}
         tipoInicioPedido={tipoPedidoEscolhido}
         onClose={() => {
