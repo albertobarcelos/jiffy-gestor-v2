@@ -2363,20 +2363,17 @@ export function AtualizarPrecoLote() {
                 const impressorasDoProduto = produto.getImpressoras()
                 // Usar diretamente os grupos de complementos que vêm do produto
                 const gruposComplementosDoProduto = produto.getGruposComplementos()
-                // Cor: selecionado > alterado nesta sessão (cinza mais escuro) > zebra
+                // Cor: selecionado > alterado nesta aba (mesmo tom do hover da lista) > zebra
                 const bgColor = isSelected
                   ? foiAlteradoNaSessao
                     ? 'bg-primary/25'
                     : 'bg-primary/20'
                   : foiAlteradoNaSessao
-                    ? 'bg-gray-300'
+                    ? 'bg-primary-bg'
                     : index % 2 === 0
                       ? 'bg-gray-50'
                       : 'bg-white'
-                const hoverRow =
-                  !isSelected && foiAlteradoNaSessao
-                    ? 'hover:bg-gray-400'
-                    : 'hover:bg-primary-bg'
+                const hoverRow = 'hover:bg-primary-bg'
                 const isExpanded = produtosExpandidos.has(produto.getId())
                 return (
                   <div key={produto.getId()} className="flex flex-col">
@@ -2476,7 +2473,7 @@ export function AtualizarPrecoLote() {
                     {isExpanded && (
                       <div
                         className={`md:hidden px-2 pb-2 pt-1 border-b border-gray-200 ${
-                          foiAlteradoNaSessao ? 'bg-gray-200' : 'bg-gray-50'
+                          foiAlteradoNaSessao ? 'bg-primary-bg' : 'bg-gray-50'
                         }`}
                       >
                         <div className="flex flex-col gap-3">
