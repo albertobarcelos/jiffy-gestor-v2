@@ -63,6 +63,7 @@ import {
   ClientesTabsModal,
   ClientesTabsModalState,
 } from '@/src/presentation/components/features/clientes/ClientesTabsModal'
+import { KanbanModoVendasToggle, type ModoKanbanVendas } from './KanbanModoVendasToggle'
 
 type Priority = 'high' | 'medium' | 'low'
 
@@ -250,6 +251,18 @@ function vendaBloqueadaParaEmissaoInterativa(
 }
 
 const KANBAN_PRIMEIRO_POR_COLUNA_KEY = 'jiffy-gestor-v2:kanban-primeiro-por-coluna'
+const KANBAN_MODO_VENDAS_STORAGE_KEY = 'jiffy-gestor-v2:kanban-modo-vendas'
+
+function lerModoKanbanVendasDoStorage(): ModoKanbanVendas {
+  if (typeof window === 'undefined') return 'delivery'
+  try {
+    const raw = localStorage.getItem(KANBAN_MODO_VENDAS_STORAGE_KEY)
+    if (raw === 'balcao' || raw === 'delivery') return raw
+  } catch {
+    /* storage indisponível */
+  }
+  return 'delivery'
+}
 
 /** Lê mapa colunaId → vendaId que deve aparecer primeiro (localStorage). */
 function lerPrimeiroPorColunaDoStorage(): Record<string, string> {
@@ -550,9 +563,21 @@ export function FiscalFlowKanban() {
   /** vendaId fixado no topo por coluna (Finalizadas / Pendente emissão), persistido em localStorage */
   const [primeiroPorColuna, setPrimeiroPorColuna] = useState<Record<string, string>>({})
 
+  const [modoKanbanVendas, setModoKanbanVendas] = useState<ModoKanbanVendas>(() =>
+    lerModoKanbanVendasDoStorage()
+  )
+
   useEffect(() => {
     setPrimeiroPorColuna(lerPrimeiroPorColunaDoStorage())
   }, [])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(KANBAN_MODO_VENDAS_STORAGE_KEY, modoKanbanVendas)
+    } catch {
+      /* quota / modo privado */
+    }
+  }, [modoKanbanVendas])
 
   /** Evita PATCH duplicado ao reativar solicitarEmissaoFiscal para REJEITADA (Strict Mode / re-renders) */
   const rejeitadaReativacaoEmAndamentoRef = useRef(false)
@@ -833,6 +858,13 @@ export function FiscalFlowKanban() {
 
   const vendasFiltradasPorTipo: Venda[] = filtrarPorBusca(todasVendas, searchQuery)
 
+  const vendasFiltradasPorModoKanban = useMemo((): Venda[] => {
+    if (modoKanbanVendas === 'delivery') {
+      return vendasFiltradasPorTipo.filter(v => v.isPedidoEntregaGestor())
+    }
+    return vendasFiltradasPorTipo.filter(v => !v.isPedidoEntregaGestor())
+  }, [modoKanbanVendas, vendasFiltradasPorTipo])
+
   // Colunas fixas do Kanban (entrega → fiscal)
   const getColumns = (): KanbanColumn[] => [
     {
@@ -893,7 +925,13 @@ export function FiscalFlowKanban() {
     },
   ]
 
-  const columns = getColumns()
+  const todasColunasKanban = getColumns()
+  const columns =
+    modoKanbanVendas === 'delivery'
+      ? todasColunasKanban
+      : todasColunasKanban.filter(
+          c => !COLUNAS_ENTREGA_OPERACIONAIS.includes(c.id as ColunaKanbanId)
+        )
 
   // Função para determinar prioridade baseada no valor
   const getPriority = (valor: number): Priority => {
@@ -1317,7 +1355,7 @@ export function FiscalFlowKanban() {
   }
 
   const getVendasByColumn = (columnId: string): Venda[] => {
-    const vendasParaFiltrar = vendasFiltradasPorTipo
+    const vendasParaFiltrar = vendasFiltradasPorModoKanban
     let vendas: Venda[] = []
 
     switch (columnId) {
@@ -1548,7 +1586,7 @@ export function FiscalFlowKanban() {
             <MdFilterAltOff size={18} />
             Limpar filtros
           </button>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             <button
               onClick={() => refetch()}
               className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
@@ -1556,6 +1594,7 @@ export function FiscalFlowKanban() {
             >
               <MdRefresh className="h-5 w-5" />
             </button>
+            <KanbanModoVendasToggle value={modoKanbanVendas} onChange={setModoKanbanVendas} />
             <button
               onClick={() => setEscolhaTipoPedidoOpen(true)}
               className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary/90"
