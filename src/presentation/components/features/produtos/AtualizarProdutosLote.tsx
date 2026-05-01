@@ -123,6 +123,9 @@ interface CestPorNcmItem {
   numeroAnexo?: string
 }
 
+/** Abas do painel de lote — usado para guardar destaque de linhas alteradas por aba. */
+type TabPainelLote = 'precos' | 'impressoras' | 'gruposComplementos' | 'permissoes' | 'fiscal'
+
 function montarBodyFiscalLote(d: FiscalLoteDraft): Record<string, unknown> | null {
   const fiscal: Record<string, unknown> = {}
   const ncmT = d.ncm.replace(/\D/g, '').slice(0, 8)
@@ -167,9 +170,7 @@ export function AtualizarPrecoLote() {
   const [impressorasDisponiveis, setImpressorasDisponiveis] = useState<Impressora[]>([])
   const [isLoadingImpressoras, setIsLoadingImpressoras] = useState(false)
   const [gruposComplementosSelecionados, setGruposComplementosSelecionados] = useState<Set<string>>(new Set())
-  const [activeTab, setActiveTab] = useState<
-    'precos' | 'impressoras' | 'gruposComplementos' | 'permissoes' | 'fiscal'
-  >('precos')
+  const [activeTab, setActiveTab] = useState<TabPainelLote>('precos')
   const [modoPermissao, setModoPermissao] = useState<'ativar' | 'desativar'>('ativar')
   const [permissoesCamposSelecionados, setPermissoesCamposSelecionados] = useState<
     Set<PermissaoCampoChave>
@@ -196,8 +197,27 @@ export function AtualizarPrecoLote() {
   const lastFetchedNcmForCestsRef = useRef<string>('')
   const [modoImpressora, setModoImpressora] = useState<'adicionar' | 'remover'>('adicionar')
   const [modoGrupoComplemento, setModoGrupoComplemento] = useState<'adicionar' | 'remover'>('adicionar')
+  /** Por aba: IDs alterados com sucesso naquela guia (persiste ao trocar de aba; zera só ao sair/recarregar a página). */
+  const [produtosAlteradosPorAba, setProdutosAlteradosPorAba] = useState<
+    Record<TabPainelLote, Set<string>>
+  >(() => ({
+    precos: new Set(),
+    impressoras: new Set(),
+    gruposComplementos: new Set(),
+    permissoes: new Set(),
+    fiscal: new Set(),
+  }))
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const { auth } = useAuthStore()
+
+  const marcarProdutosAlteradosNaSessao = useCallback((ids: string[], aba: TabPainelLote) => {
+    if (ids.length === 0) return
+    setProdutosAlteradosPorAba((prev) => {
+      const novoSet = new Set(prev[aba])
+      for (const id of ids) novoSet.add(id)
+      return { ...prev, [aba]: novoSet }
+    })
+  }, [])
   const {
     data: gruposProdutos = [],
     isLoading: isLoadingGruposProdutos,
@@ -215,7 +235,7 @@ export function AtualizarPrecoLote() {
     const limit = 50
     setIsLoading(true)
     setProdutos([])
-    setProdutosSelecionados(new Set())
+    // Mantém produtosSelecionados: a seleção persiste entre buscas até ação manual ou após salvar em lote
 
     try {
       let hasMorePages = true
@@ -797,6 +817,8 @@ export function AtualizarPrecoLote() {
         throw new Error(errorData.message || `Erro ${response.status}`)
       }
 
+      marcarProdutosAlteradosNaSessao(payload.map((p) => p.produtoId), 'precos')
+
       // Delay de 800ms após sucesso
       await new Promise((resolve) => setTimeout(resolve, 800))
 
@@ -865,6 +887,8 @@ export function AtualizarPrecoLote() {
         throw new Error(errorData.message || `Erro ${response.status}`)
       }
 
+      marcarProdutosAlteradosNaSessao(Array.from(produtosSelecionados), 'impressoras')
+
       await buscarProdutos()
       showToast.success(`Impressoras vinculadas com sucesso!`)
       setImpressorasSelecionadas(new Set())
@@ -917,6 +941,8 @@ export function AtualizarPrecoLote() {
         const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.message || `Erro ${response.status}`)
       }
+
+      marcarProdutosAlteradosNaSessao(Array.from(produtosSelecionados), 'impressoras')
 
       await buscarProdutos()
       showToast.success(`Impressoras desvinculadas com sucesso!`)
@@ -986,6 +1012,8 @@ export function AtualizarPrecoLote() {
         throw new Error(errorData.message || `Erro ${response.status}`)
       }
 
+      marcarProdutosAlteradosNaSessao(Array.from(produtosSelecionados), 'gruposComplementos')
+
       await buscarProdutos()
       showToast.success(`Grupos de complementos vinculados com sucesso!`)
       setGruposComplementosSelecionados(new Set())
@@ -1039,6 +1067,8 @@ export function AtualizarPrecoLote() {
         throw new Error(errorData.message || `Erro ${response.status}`)
       }
 
+      marcarProdutosAlteradosNaSessao(Array.from(produtosSelecionados), 'gruposComplementos')
+
       await buscarProdutos()
       showToast.success(`Grupos de complementos desvinculados com sucesso!`)
       setGruposComplementosSelecionados(new Set())
@@ -1087,6 +1117,7 @@ export function AtualizarPrecoLote() {
 
     let sucesso = 0
     let falhas = 0
+    const idsPermissaoComSucesso: string[] = []
 
     try {
       for (let i = 0; i < ids.length; i++) {
@@ -1112,8 +1143,11 @@ export function AtualizarPrecoLote() {
           falhas += 1
         } else {
           sucesso += 1
+          idsPermissaoComSucesso.push(produtoId)
         }
       }
+
+      marcarProdutosAlteradosNaSessao(idsPermissaoComSucesso, 'permissoes')
 
       await buscarProdutos()
       setProdutosSelecionados(new Set())
@@ -1202,6 +1236,7 @@ export function AtualizarPrecoLote() {
 
     let sucesso = 0
     let falhas = 0
+    const idsFiscalComSucesso: string[] = []
 
     try {
       for (let i = 0; i < ids.length; i++) {
@@ -1227,8 +1262,11 @@ export function AtualizarPrecoLote() {
           falhas += 1
         } else {
           sucesso += 1
+          idsFiscalComSucesso.push(produtoId)
         }
       }
+
+      marcarProdutosAlteradosNaSessao(idsFiscalComSucesso, 'fiscal')
 
       await buscarProdutos()
       setProdutosSelecionados(new Set())
@@ -1396,7 +1434,7 @@ export function AtualizarPrecoLote() {
             href="/produtos"
             className="h-8 px-8 rounded-lg bg-info text-primary justify-center font-semibold font-exo text-sm border border-primary shadow-sm hover:bg-primary/20 transition-colors flex items-center"
           >
-            Voltar
+            Fechar
           </Link>
         </div>
       </div>
@@ -2320,22 +2358,31 @@ export function AtualizarPrecoLote() {
                 .sort((a, b) => a.getNome().localeCompare(b.getNome(), 'pt-BR'))
                 .map((produto, index) => {
                 const isSelected = produtosSelecionados.has(produto.getId())
+                const foiAlteradoNaSessao = produtosAlteradosPorAba[activeTab].has(produto.getId())
                 // Usar diretamente as impressoras que vêm do produto (já têm id, nome e ativo)
                 const impressorasDoProduto = produto.getImpressoras()
                 // Usar diretamente os grupos de complementos que vêm do produto
                 const gruposComplementosDoProduto = produto.getGruposComplementos()
-                // Cor de fundo alternada: se selecionado usa primary/20, senão alterna entre gray-50 e white
-                const bgColor = isSelected 
-                  ? 'bg-primary/20' 
-                  : index % 2 === 0 
-                    ? 'bg-gray-50' 
-                    : 'bg-white'
+                // Cor: selecionado > alterado nesta sessão (cinza mais escuro) > zebra
+                const bgColor = isSelected
+                  ? foiAlteradoNaSessao
+                    ? 'bg-primary/25'
+                    : 'bg-primary/20'
+                  : foiAlteradoNaSessao
+                    ? 'bg-gray-300'
+                    : index % 2 === 0
+                      ? 'bg-gray-50'
+                      : 'bg-white'
+                const hoverRow =
+                  !isSelected && foiAlteradoNaSessao
+                    ? 'hover:bg-gray-400'
+                    : 'hover:bg-primary-bg'
                 const isExpanded = produtosExpandidos.has(produto.getId())
                 return (
                   <div key={produto.getId()} className="flex flex-col">
                     {/* Linha principal do produto */}
                     <div
-                      className={`flex rounded-lg items-center md:px-4 px-2 gap-2 ${bgColor} hover:bg-primary-bg transition-colors cursor-default`}
+                      className={`flex rounded-lg items-center md:px-4 px-2 gap-2 ${bgColor} ${hoverRow} transition-colors cursor-default`}
                       style={{ minHeight: '36px' }}
                     >
                       <div className="flex-none md:w-10 w-6 flex justify-center">
@@ -2427,7 +2474,11 @@ export function AtualizarPrecoLote() {
                     </div>
                     {/* Área expansível com impressoras e grupos (apenas mobile) */}
                     {isExpanded && (
-                      <div className="md:hidden px-2 pb-2 pt-1 bg-gray-50 border-b border-gray-200">
+                      <div
+                        className={`md:hidden px-2 pb-2 pt-1 border-b border-gray-200 ${
+                          foiAlteradoNaSessao ? 'bg-gray-200' : 'bg-gray-50'
+                        }`}
+                      >
                         <div className="flex flex-col gap-3">
                           <div className="flex flex-col gap-1">
                             <label className="text-xs font-semibold text-secondary-text">Impressoras</label>
