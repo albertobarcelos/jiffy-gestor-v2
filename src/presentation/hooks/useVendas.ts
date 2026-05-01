@@ -1317,12 +1317,77 @@ export function useExcluirVendaGestor() {
   })
 }
 
+/** Ações do POST /gestor/vendas/{id}/transicoes (Swagger operacional). */
+export type AcaoTransicaoGestor =
+  | 'iniciar_preparo'
+  | 'marcar_pronto'
+  | 'despachar'
+  | 'finalizar'
+  | 'cancelar'
+
 /**
- * Hook para finalizar a etapa operacional de uma venda gestor.
- * O novo contrato do backend cria vendas como "pendente" e requer esta chamada explícita
- * para mover para "finalizado" e preencher dataFinalizacao.
- * Chamado automaticamente em NovoPedidoModal quando o usuário escolhe statusVenda FINALIZADA
- * ou PENDENTE_EMISSAO, logo após o POST de criação.
+ * Transição operacional da venda gestor (entrega / etapas).
+ * Para `cancelar`, enviar `motivo` obrigatório conforme API.
+ */
+export function useTransicaoVendaGestor() {
+  const { auth } = useAuthStore()
+  const queryClient = useQueryClient()
+  const token = auth?.getAccessToken()
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      acao,
+      motivo,
+    }: {
+      id: string
+      acao: AcaoTransicaoGestor
+      motivo?: string
+    }) => {
+      if (!token) {
+        throw new Error('Token não encontrado')
+      }
+
+      const payload: Record<string, unknown> = { acao }
+      if (motivo != null && String(motivo).trim() !== '') {
+        payload.motivo = String(motivo).trim()
+      }
+
+      const response = await fetch(`/api/vendas/gestor/${id}/transicoes`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = resolveDomainErrorMessage(
+          errorData,
+          `Erro ${response.status}: ${response.statusText}`
+        )
+        throw new Error(errorMessage)
+      }
+
+      return await response.json()
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['vendas'] })
+      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id] })
+    },
+    onError: (error: Error) => {
+      showToast.error(error.message || 'Erro ao atualizar etapa do pedido')
+    },
+  })
+}
+
+/**
+ * Hook para finalizar a etapa operacional de uma venda gestor (via BFF → POST …/transicoes com acao finalizar).
+ * O contrato do backend cria a venda pendente e esta chamada aplica a transição operacional de finalização.
+ * Usado em NovoPedidoModal após criar pedido balcão com FINALIZADA ou PENDENTE_EMISSAO.
  */
 export function useFinalzarVendaGestor() {
   const { auth } = useAuthStore()

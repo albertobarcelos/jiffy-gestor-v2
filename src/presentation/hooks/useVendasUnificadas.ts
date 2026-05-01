@@ -71,6 +71,20 @@ function extrairStatusEtapaOperacional(item: Record<string, unknown>): string | 
   return null
 }
 
+/** Última alteração na venda (ex.: após transição de etapa), se o GET unificado expuser. */
+function extrairDataUltimaModificacao(item: Record<string, unknown>): string | null {
+  const keys = [
+    'dataUltimaModificacao',
+    'DataUltimaModificacao',
+    'data_ultima_modificacao',
+  ] as const
+  for (const k of keys) {
+    const v = item[k]
+    if (v != null && String(v).trim() !== '') return String(v).trim()
+  }
+  return null
+}
+
 /**
  * DTO unificado para vendas do PDV e do Gestor (TypeScript)
  * Deve corresponder à classe VendaUnificadaDTO do backend
@@ -118,7 +132,9 @@ export class VendaUnificadaDTO {
     public readonly modelo?: 55 | 65 | null,
     public readonly retornoSefaz?: string | null,
     /** Etapa da logística (entrega Gestor); opcional até o backend expor no unificado. */
-    public readonly statusEtapaOperacional?: string | null
+    public readonly statusEtapaOperacional?: string | null,
+    /** Última modificação na venda (útil para “quando entrou na etapa” quando a API atualiza ao transicionar). */
+    public readonly dataUltimaModificacao?: string | null
   ) {}
 
   private possuiDocumentoFiscal(): boolean {
@@ -297,7 +313,8 @@ function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): VendaUnif
     v.tipoDocFiscal as VendaUnificadaDTO['tipoDocFiscal'],
     parseModeloFiscalApi(v.modelo),
     v.retornoSefaz as string | null | undefined,
-    extrairStatusEtapaOperacional(v)
+    extrairStatusEtapaOperacional(v),
+    extrairDataUltimaModificacao(v)
   )
 }
 

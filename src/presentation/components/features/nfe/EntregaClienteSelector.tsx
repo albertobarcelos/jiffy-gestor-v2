@@ -16,6 +16,7 @@ import {
   useMoradasPorTelefone,
   useCriarMoradaTelefone,
   useAtualizarMoradaTelefone,
+  useRegistrarUsoMoradaTelefone,
   type MoradaTelefone,
   type EnderecoMorada,
 } from '@/src/presentation/hooks/useMoradaTelefone'
@@ -205,8 +206,25 @@ export function EntregaClienteSelector({
   const { data: moradas, isLoading: buscando } = useMoradasPorTelefone(telefoneBuscado)
   const criarMorada = useCriarMoradaTelefone()
   const atualizarMorada = useAtualizarMoradaTelefone()
+  const registrarUsoMorada = useRegistrarUsoMoradaTelefone()
   const buscarCliente = useBuscarClientePorTelefone()
   const criarCliente = useCriarClienteRapido()
+
+  /**
+   * Atualiza a morada no estado do pai e regista uso na API para ordenar como mais recente.
+   * `telefoneDigitosOverride` — após criar morada o estado `telefoneBuscado` pode ainda não refletir os dígitos.
+   */
+  const definirMoradaSelecionada = useCallback(
+    (morada: MoradaTelefone | null, telefoneDigitosOverride?: string | null) => {
+      onMoradaSelecionada(morada)
+      if (!morada) return
+      const tel = telefoneDigitosOverride ?? telefoneBuscado
+      if (tel) {
+        registrarUsoMorada.mutate({ id: morada.id, telefoneDigitos: tel })
+      }
+    },
+    [onMoradaSelecionada, telefoneBuscado, registrarUsoMorada]
+  )
 
   const abrirPainelNovo = useCallback(() => {
     setMoradaEditando(null)
@@ -349,7 +367,7 @@ export function EntregaClienteSelector({
       fecharPainelMorada()
       setTelefoneBuscado(digitos)
       if (moradaSelecionada?.id === moradaEditando.id) {
-        onMoradaSelecionada(atualizada)
+        definirMoradaSelecionada(atualizada, digitos)
       }
       return
     }
@@ -357,7 +375,7 @@ export function EntregaClienteSelector({
     const nova = await criarMorada.mutateAsync(dto)
     fecharPainelMorada()
     setTelefoneBuscado(digitos)
-    onMoradaSelecionada(nova)
+    definirMoradaSelecionada(nova, digitos)
   }, [
     telefoneInput,
     formNova,
@@ -366,7 +384,8 @@ export function EntregaClienteSelector({
     criarMorada,
     atualizarMorada,
     fecharPainelMorada,
-    onMoradaSelecionada,
+    definirMoradaSelecionada,
+    setTelefoneBuscado,
   ])
 
   const handleSalvarClienteRapido = useCallback(async () => {
@@ -533,7 +552,7 @@ export function EntregaClienteSelector({
                   morada={morada}
                   selecionada={moradaSelecionada?.id === morada.id}
                   onSelecionar={() =>
-                    onMoradaSelecionada(
+                    definirMoradaSelecionada(
                       moradaSelecionada?.id === morada.id ? null : morada
                     )
                   }

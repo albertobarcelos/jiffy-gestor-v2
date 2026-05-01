@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
@@ -19,6 +19,8 @@ import {
   useReemitirNfeGestor,
   useEmitirNfe,
   useEmitirNfeGestor,
+  useTransicaoVendaGestor,
+  type AcaoTransicaoGestor,
 } from '@/src/presentation/hooks/useVendas'
 import {
   useVendasUnificadas,
@@ -44,6 +46,7 @@ import {
   MdRestaurant,
   MdLocalShipping,
   MdRoute,
+  MdArrowForward,
 } from 'react-icons/md'
 import { EmitirNfeModal } from './EmitirNfeModal'
 import { Button } from '@/src/presentation/components/ui/button'
@@ -83,6 +86,61 @@ type ColunaKanbanId =
   | 'FINALIZADAS'
   | 'PENDENTE_EMISSAO'
   | 'COM_NFE'
+
+const COLUNAS_ENTREGA_OPERACIONAIS: ColunaKanbanId[] = [
+  'NOVOS_PEDIDOS',
+  'EM_PREPARO',
+  'PRONTO_ENTREGA',
+  'EM_ROTA',
+]
+
+/**
+ * Data/hora exibida no card de entrega (gestor) nas colunas operacionais, no mesmo estilo de “Finalizada: …”.
+ * - Novos pedidos: quando o pedido entrou (criação).
+ * - Demais etapas: `dataUltimaModificacao` da API quando existir (proxy de transição); senão data de criação.
+ */
+function getLinhaTempoPedidoEntregaKanban(
+  columnId: ColunaKanbanId,
+  v: VendaUnificadaDTO,
+  /** Timestamp local de transição (DnD ou botão), tem prioridade sobre `dataUltimaModificacao` da API. */
+  isoLocalTransicao?: string
+): { prefixo: string; iso: string } | null {
+  const entregaGestor =
+    v.tabelaOrigem === 'venda_gestor' &&
+    String(v.tipoVenda ?? '').trim().toLowerCase() === 'entrega'
+  if (!entregaGestor || !COLUNAS_ENTREGA_OPERACIONAIS.includes(columnId)) return null
+
+  if (columnId === 'NOVOS_PEDIDOS') {
+    return { prefixo: 'Recebido em:', iso: v.dataCriacao }
+  }
+
+  const ultimaApi = v.dataUltimaModificacao?.trim()
+  const escolhida =
+    isoLocalTransicao && (!ultimaApi || isoLocalTransicao > ultimaApi)
+      ? isoLocalTransicao
+      : ultimaApi
+  if (escolhida) {
+    return { prefixo: 'Na etapa desde:', iso: escolhida }
+  }
+  return { prefixo: 'Pedido em:', iso: v.dataCriacao }
+}
+
+type AcaoAvancoEntrega = Extract<
+  AcaoTransicaoGestor,
+  'iniciar_preparo' | 'marcar_pronto' | 'despachar'
+>
+
+/** Encadeia transiões ao soltar à direita (ex.: Novos → Em rota = preparo + pronto + despacho). */
+function acoesTransicaoEntregaAvanco(origIdx: number, destIdx: number): AcaoAvancoEntrega[] {
+  if (destIdx <= origIdx) return []
+  const acoes: AcaoAvancoEntrega[] = []
+  for (let i = origIdx; i < destIdx; i++) {
+    if (i === 0) acoes.push('iniciar_preparo')
+    else if (i === 1) acoes.push('marcar_pronto')
+    else if (i === 2) acoes.push('despachar')
+  }
+  return acoes
+}
 
 /** Status em que a UI trata como aguardando resposta da SEFAZ (até o backend refletir rejeição/códigos). */
 const STATUS_FISCAL_AGUARDANDO_SEFAZ = new Set([
@@ -169,8 +227,10 @@ function getCardBorderEFundoKanban(
 /** Exibido quando o nome do cliente está vazio (Kanban e arraste) */
 const LABEL_SEM_CLIENTE = 'SEM CLIENTE'
 
-/** Colunas de onde o card pode ser arrastado (Com Nota Solicitada não arrasta para trás) */
-const COLUNAS_KANBAN_ORIGEM_DRAG = new Set(['FINALIZADAS', 'PENDENTE_EMISSAO'])
+/** Fiscal: arrastar entre Finalizadas ↔ Pendente emissão (e para Com nota). */
+const COLUNAS_KANBAN_DRAG_FISCAL = new Set<string>(['FINALIZADAS', 'PENDENTE_EMISSAO'])
+/** Entrega manual gestor: arrastar entre as 4 colunas operacionais. */
+const COLUNAS_KANBAN_DRAG_ENTREGA = new Set<string>(COLUNAS_ENTREGA_OPERACIONAIS)
 
 /** Colunas onde o “primeiro da lista” é persistido no localStorage ao soltar */
 const COLUNAS_KANBAN_DESTINO_PIN = new Set(['FINALIZADAS', 'PENDENTE_EMISSAO', 'COM_NFE'])
@@ -301,7 +361,7 @@ function ordenarVendasKanbanPorCriterio(
   })
 }
 
-/** Área droppable da coluna: slots visuais ao arrastar (Finalizadas, Pendente emissão, Com nota solicitada). */
+/** Área droppable da coluna: slots visuais ao arrastar (entrega operacional + fiscal). */
 function DroppableColumnContent({
   columnId,
   children,
@@ -315,13 +375,25 @@ function DroppableColumnContent({
   const showDropSlotPendente = columnId === 'PENDENTE_EMISSAO' && isOver
   const showDropSlotFinalizadas = columnId === 'FINALIZADAS' && isOver
   const showDropSlotComNfe = columnId === 'COM_NFE' && isOver
+  const showDropSlotNovos = columnId === 'NOVOS_PEDIDOS' && isOver
+  const showDropSlotPreparo = columnId === 'EM_PREPARO' && isOver
+  const showDropSlotPronto = columnId === 'PRONTO_ENTREGA' && isOver
+  const showDropSlotRota = columnId === 'EM_ROTA' && isOver
   const isOverClass = showDropSlotPendente
     ? 'ring-2 ring-yellow-400 ring-inset bg-yellow-50/50'
     : showDropSlotFinalizadas
       ? 'ring-2 ring-blue-400 ring-inset bg-blue-50/50'
       : showDropSlotComNfe
         ? 'ring-2 ring-green-400 ring-inset bg-green-50/50'
-        : ''
+        : showDropSlotNovos
+          ? 'ring-2 ring-sky-400 ring-inset bg-sky-50/50'
+          : showDropSlotPreparo
+            ? 'ring-2 ring-amber-400 ring-inset bg-amber-50/50'
+            : showDropSlotPronto
+              ? 'ring-2 ring-teal-400 ring-inset bg-teal-50/50'
+              : showDropSlotRota
+                ? 'ring-2 ring-indigo-400 ring-inset bg-indigo-50/50'
+                : ''
   return (
     <div ref={setNodeRef} className={`${className ?? ''} ${isOverClass}`}>
       {showDropSlotPendente && (
@@ -337,6 +409,26 @@ function DroppableColumnContent({
       {showDropSlotComNfe && (
         <div className="mb-2 flex min-h-[72px] items-center justify-center rounded-lg border-2 border-dashed border-green-500 bg-green-50/90 px-2 text-center text-sm font-medium text-green-800 transition-all">
           Solte aqui para emitir ou reemitir nota
+        </div>
+      )}
+      {showDropSlotNovos && (
+        <div className="mb-2 flex min-h-[72px] items-center justify-center rounded-lg border-2 border-dashed border-sky-400 bg-sky-50/90 px-2 text-center text-sm font-medium text-sky-800 transition-all">
+          Solte aqui para mover para Novos pedidos
+        </div>
+      )}
+      {showDropSlotPreparo && (
+        <div className="mb-2 flex min-h-[72px] items-center justify-center rounded-lg border-2 border-dashed border-amber-400 bg-amber-50/90 px-2 text-center text-sm font-medium text-amber-900 transition-all">
+          Solte aqui para mover para Em preparo
+        </div>
+      )}
+      {showDropSlotPronto && (
+        <div className="mb-2 flex min-h-[72px] items-center justify-center rounded-lg border-2 border-dashed border-teal-400 bg-teal-50/90 px-2 text-center text-sm font-medium text-teal-900 transition-all">
+          Solte aqui para mover para Pronto para entrega
+        </div>
+      )}
+      {showDropSlotRota && (
+        <div className="mb-2 flex min-h-[72px] items-center justify-center rounded-lg border-2 border-dashed border-indigo-400 bg-indigo-50/90 px-2 text-center text-sm font-medium text-indigo-900 transition-all">
+          Solte aqui para mover para Em rota
         </div>
       )}
       {children}
@@ -366,9 +458,8 @@ function VendaCardDragPreview({ venda }: { venda: VendaUnificadaDTO }) {
 }
 
 /**
- * Card draggable em Finalizadas e Pendente Emissão (incl. arrastar para Com nota solicitada).
+ * Card draggable: fiscal (Finalizadas / Pendente emissão) ou entrega gestor (4 colunas operacionais).
  * Coluna Com nota solicitada: cards não arrastam (não voltam às colunas anteriores via DnD).
- * PDV e Gestor.
  */
 function DraggableVendaCard({
   venda,
@@ -380,8 +471,9 @@ function DraggableVendaCard({
   children: React.ReactNode
 }) {
   const isDraggable =
-    COLUNAS_KANBAN_ORIGEM_DRAG.has(column.id) &&
-    (venda.tabelaOrigem === 'venda' || venda.tabelaOrigem === 'venda_gestor')
+    (venda.tabelaOrigem === 'venda' || venda.tabelaOrigem === 'venda_gestor') &&
+    (COLUNAS_KANBAN_DRAG_FISCAL.has(column.id) ||
+      (COLUNAS_KANBAN_DRAG_ENTREGA.has(column.id) && venda.isPedidoEntregaGestor()))
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `venda-${venda.id}`,
     data: { venda },
@@ -413,6 +505,12 @@ export function FiscalFlowKanban() {
     clienteNome?: string | null
   } | null>(null)
   const [emitirNfeModalOpen, setEmitirNfeModalOpen] = useState(false)
+  /** IDs de pedidos com avanço de etapa em andamento (botão "Avançar etapa"). */
+  const [avancandoEtapaIds, setAvancandoEtapaIds] = useState<Record<string, boolean>>({})
+  /** ISO da última transição bem-sucedida por vendaId (DnD ou botão), enquanto o GET unificado não reflete. */
+  const [timestampsEtapaEntregaLocal, setTimestampsEtapaEntregaLocal] = useState<
+    Record<string, string>
+  >({})
   // Estados dos filtros (alinhados à API GET /vendas/unificado)
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -589,6 +687,7 @@ export function FiscalFlowKanban() {
   const reemitirNfeGestor = useReemitirNfeGestor()
   const emitirNotaPdv = useEmitirNfe()
   const emitirNotaGestor = useEmitirNfeGestor()
+  const transicaoVendaGestor = useTransicaoVendaGestor()
 
   // REJEITADA com solicitarEmissaoFiscal false: reativa com o mesmo PATCH de "marcar emissão" (useMarcarEmissaoFiscal)
   useEffect(() => {
@@ -872,6 +971,59 @@ export function FiscalFlowKanban() {
     return tipo.charAt(0).toUpperCase() + tipo.slice(1).toLowerCase()
   }
 
+  /**
+   * Avança o pedido de entrega para a próxima etapa operacional via botão "Avançar etapa".
+   * Novos → Em preparo → Pronto → Em rota usam iniciar_preparo / marcar_pronto / despachar;
+   * Em rota → Finalizadas usa POST …/transicoes com acao `finalizar`.
+   */
+  const handleAvancarEtapa = async (venda: Venda, colunaAtual: ColunaKanbanId) => {
+    if (avancandoEtapaIds[venda.id]) return
+    const origIdx = COLUNAS_ENTREGA_OPERACIONAIS.indexOf(colunaAtual)
+    if (origIdx < 0) return
+
+    // Última coluna do fluxo operacional na UI: "Em rota" → próximo passo é finalizar (coluna Finalizadas).
+    if (colunaAtual === 'EM_ROTA') {
+      setAvancandoEtapaIds(prev => ({ ...prev, [venda.id]: true }))
+      try {
+        await transicaoVendaGestor.mutateAsync({ id: venda.id, acao: 'finalizar' })
+        const agoraIso = new Date().toISOString()
+        setTimestampsEtapaEntregaLocal(prev => ({ ...prev, [venda.id]: agoraIso }))
+        showToast.success('Etapa do pedido atualizada.')
+        await refetch()
+      } catch {
+        /* toast em onError do hook */
+      } finally {
+        setAvancandoEtapaIds(prev => {
+          const { [venda.id]: _, ...rest } = prev
+          return rest
+        })
+      }
+      return
+    }
+
+    if (origIdx >= COLUNAS_ENTREGA_OPERACIONAIS.length - 1) return
+    const acoes = acoesTransicaoEntregaAvanco(origIdx, origIdx + 1)
+    if (acoes.length === 0) return
+
+    setAvancandoEtapaIds(prev => ({ ...prev, [venda.id]: true }))
+    try {
+      for (const acao of acoes) {
+        await transicaoVendaGestor.mutateAsync({ id: venda.id, acao })
+      }
+      const agoraIso = new Date().toISOString()
+      setTimestampsEtapaEntregaLocal(prev => ({ ...prev, [venda.id]: agoraIso }))
+      showToast.success('Etapa do pedido atualizada.')
+      await refetch()
+    } catch {
+      /* toast em onError do hook */
+    } finally {
+      setAvancandoEtapaIds(prev => {
+        const { [venda.id]: _, ...rest } = prev
+        return rest
+      })
+    }
+  }
+
   const handleMarcarEmissaoFiscal = async (
     vendaId: string,
     tabelaOrigem: 'venda' | 'venda_gestor'
@@ -893,6 +1045,45 @@ export function FiscalFlowKanban() {
     if (!over) return
     const venda = active.data.current?.venda as Venda | undefined
     if (!venda) return
+
+    const overIdStr = String(over.id)
+
+    if (COLUNAS_ENTREGA_OPERACIONAIS.includes(overIdStr as ColunaKanbanId)) {
+      if (!venda.isPedidoEntregaGestor()) {
+        showToast.info('Estas colunas são apenas para pedidos de entrega.')
+        return
+      }
+      const origemEtapa = getEtapaKanbanParaExibicao(venda)
+      if (!COLUNAS_ENTREGA_OPERACIONAIS.includes(origemEtapa as ColunaKanbanId)) {
+        showToast.info('Arraste apenas pedidos que estão nas etapas de entrega.')
+        return
+      }
+      const origIdx = COLUNAS_ENTREGA_OPERACIONAIS.indexOf(origemEtapa as ColunaKanbanId)
+      const destIdx = COLUNAS_ENTREGA_OPERACIONAIS.indexOf(overIdStr as ColunaKanbanId)
+      if (origIdx < 0 || destIdx < 0) return
+      if (destIdx === origIdx) return
+      if (destIdx < origIdx) {
+        showToast.info('Não é possível voltar uma etapa arrastando o card.')
+        return
+      }
+      const acoes = acoesTransicaoEntregaAvanco(origIdx, destIdx)
+      if (acoes.length === 0) return
+      void (async () => {
+        try {
+          for (const acao of acoes) {
+            await transicaoVendaGestor.mutateAsync({ id: venda.id, acao })
+          }
+          const agoraIso = new Date().toISOString()
+          setTimestampsEtapaEntregaLocal(prev => ({ ...prev, [venda.id]: agoraIso }))
+          showToast.success('Etapa do pedido atualizada.')
+          await refetch()
+        } catch {
+          /* toast em onError do hook */
+        }
+      })()
+      return
+    }
+
     if (over.id === 'PENDENTE_EMISSAO') {
       if (venda.solicitarEmissaoFiscal !== true) {
         handleMarcarEmissaoFiscal(venda.id, venda.tabelaOrigem)
@@ -909,7 +1100,22 @@ export function FiscalFlowKanban() {
         )
         return
       }
-      if (venda.solicitarEmissaoFiscal === true) {
+      const emRotaGestor =
+        venda.isPedidoEntregaGestor() &&
+        getEtapaKanbanParaExibicao(venda) === 'EM_ROTA'
+      if (emRotaGestor) {
+        void (async () => {
+          try {
+            await transicaoVendaGestor.mutateAsync({ id: venda.id, acao: 'finalizar' })
+            const agoraIso = new Date().toISOString()
+            setTimestampsEtapaEntregaLocal(prev => ({ ...prev, [venda.id]: agoraIso }))
+            showToast.success('Etapa do pedido atualizada.')
+            await refetch()
+          } catch {
+            /* toast em onError do hook */
+          }
+        })()
+      } else if (venda.solicitarEmissaoFiscal === true) {
         handleDesmarcarEmissaoFiscal(venda.id, venda.tabelaOrigem)
       }
     } else if (over.id === 'COM_NFE') {
@@ -1483,9 +1689,18 @@ export function FiscalFlowKanban() {
                           colunaPermiteEditarCliente &&
                           !vendaSemNomeCliente(venda) &&
                           Boolean(venda.cliente?.id?.trim())
-                        // Vendas da origem Gestor usam ícone/rótulo próprios (não confundir com balcão do PDV)
+                        // Venda_gestor: entrega → ícone/rótulo Entrega; demais → Gestor (balcão manual no gestor)
+                        const tipoVendaStr = String(venda.tipoVenda ?? '').trim().toLowerCase()
                         const tipoVendaExibicao =
-                          venda.tabelaOrigem === 'venda_gestor' ? 'gestor' : venda.tipoVenda
+                          venda.tabelaOrigem === 'venda_gestor'
+                            ? tipoVendaStr === 'entrega'
+                              ? 'entrega'
+                              : 'gestor'
+                            : venda.tipoVenda
+                        const prefixoLinhaOrigemCard =
+                          venda.tabelaOrigem === 'venda_gestor' && tipoVendaStr === 'entrega'
+                            ? 'Entrega'
+                            : venda.origem
 
                         const { borderClass: cardBorderClass, cardBgClass } =
                           getCardBorderEFundoKanban(
@@ -1507,7 +1722,7 @@ export function FiscalFlowKanban() {
                               >
                                 <div className="min-w-0 flex-1 border-b border-gray-100 pb-1.5">
                                   <p className="mb-0.5 text-xs text-gray-500">
-                                    {venda.origem} | Venda {venda.numeroVenda}
+                                    {prefixoLinhaOrigemCard} | Venda {venda.numeroVenda}
                                     {venda.codigoVenda ? ` - #${venda.codigoVenda}` : ''}
                                   </p>
                                   <div className="flex min-w-0 items-start gap-1">
@@ -1557,11 +1772,16 @@ export function FiscalFlowKanban() {
                                 {tipoVendaExibicao &&
                                   (tipoVendaExibicao === 'balcao' ||
                                     tipoVendaExibicao === 'mesa' ||
-                                    tipoVendaExibicao === 'gestor') && (
+                                    tipoVendaExibicao === 'gestor' ||
+                                    tipoVendaExibicao === 'entrega') && (
                                     <div className="flex flex-shrink-0 items-center justify-center">
                                       <TipoVendaIcon
                                         tipoVenda={
-                                          tipoVendaExibicao as 'balcao' | 'mesa' | 'gestor'
+                                          tipoVendaExibicao as
+                                            | 'balcao'
+                                            | 'mesa'
+                                            | 'gestor'
+                                            | 'entrega'
                                         }
                                         numeroMesa="M"
                                         size={56}
@@ -1570,14 +1790,28 @@ export function FiscalFlowKanban() {
                                         corTexto="var(--color-info)"
                                         corBalcao="var(--color-primary)"
                                         corGestor="var(--color-primary)"
+                                        corEntrega="var(--color-primary)"
                                         corBorda="var(--color-primary)"
                                       />
                                     </div>
                                   )}
                               </div>
 
-                              {/* Novos campos: Data finalização, Aberto por; Origem */}
                               <div className="space-y-0.5">
+                                {(() => {
+                                  const linhaTempo = getLinhaTempoPedidoEntregaKanban(
+                                    column.id as ColunaKanbanId,
+                                    venda,
+                                    timestampsEtapaEntregaLocal[venda.id]
+                                  )
+                                  if (!linhaTempo) return null
+                                  return (
+                                    <p className="text-xs text-gray-500">
+                                      {linhaTempo.prefixo}{' '}
+                                      {formatarDataCard(linhaTempo.iso)}
+                                    </p>
+                                  )
+                                })()}
                                 {venda.dataFinalizacao && (
                                   <p className="text-xs text-gray-500">
                                     Finalizada: {formatarDataCard(venda.dataFinalizacao)}
@@ -1591,12 +1825,43 @@ export function FiscalFlowKanban() {
                                 onClick={e => e.stopPropagation()}
                                 onDoubleClick={e => e.stopPropagation()}
                               >
-                                {/* Ações para colunas de delivery — COMENTADO: colunas não utilizadas por enquanto */}
-                                {/* {['EM_ANALISE', 'EM_PRODUCAO', 'PRONTOS_ENTREGA', 'COM_ENTREGADOR'].includes(column.id) && (
-                              <div className="text-xs text-gray-500 italic w-full text-center py-1">
-                                Em andamento
-                              </div>
-                            )} */}
+                                {/* Avançar etapa: colunas operacionais de entrega, exceto a última (Com entregador) */}
+                                {venda.isPedidoEntregaGestor() &&
+                                  COLUNAS_ENTREGA_OPERACIONAIS.includes(
+                                    column.id as ColunaKanbanId
+                                  ) &&
+                                  column.id !== 'COM_ENTREGADOR' && (
+                                    <Button
+                                      size="sm"
+                                      variant="contained"
+                                      className="flex-1 !bg-primary hover:!bg-primary/90"
+                                      sx={{
+                                        py: 0.375,
+                                        px: 1,
+                                        minHeight: 'auto',
+                                        '&.MuiButton-contained.Mui-disabled': {
+                                          color: 'rgba(255,255,255,0.96)',
+                                          WebkitTextFillColor: 'rgba(255,255,255,0.96)',
+                                        },
+                                      }}
+                                      startIcon={
+                                        !avancandoEtapaIds[venda.id] ? (
+                                          <MdArrowForward size={14} />
+                                        ) : undefined
+                                      }
+                                      onClick={() =>
+                                        void handleAvancarEtapa(
+                                          venda,
+                                          column.id as ColunaKanbanId
+                                        )
+                                      }
+                                      disabled={!!avancandoEtapaIds[venda.id]}
+                                    >
+                                      {avancandoEtapaIds[venda.id]
+                                        ? 'Avançando...'
+                                        : 'Avançar etapa'}
+                                    </Button>
+                                  )}
 
                                 {/* Emitir / Reemitir: Pendente ou card temporário em Com nota durante reemissão ou emissão direta */}
                                 {(column.id === 'PENDENTE_EMISSAO' ||

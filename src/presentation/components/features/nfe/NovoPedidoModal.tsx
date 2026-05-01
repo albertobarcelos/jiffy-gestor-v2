@@ -263,6 +263,14 @@ function mapearPagamentoDetalheVenda(pag: Record<string, unknown>): PagamentoSel
 type OrigemVenda = 'GESTOR' | 'IFOOD' | 'RAPPI' | 'OUTROS'
 type StatusVenda = 'ABERTA' | 'FINALIZADA' | 'PENDENTE_EMISSAO'
 
+/**
+ * Pedidos entrega devem nascer abertos (triagem / Novos Pedidos no Kanban).
+ * Balcão mantém finalização imediata como padrão — o operador pode mudar no passo Informações.
+ */
+function statusPadraoNovoPedido(tipoInicio: 'balcao' | 'entrega'): StatusVenda {
+  return tipoInicio === 'entrega' ? 'ABERTA' : 'FINALIZADA'
+}
+
 /** Abas em Detalhes do Pedido (passo 4) */
 type AbaDetalhesPedido = 'infoPedido' | 'listaProdutos' | 'pagamentos' | 'notaFiscal'
 
@@ -370,7 +378,7 @@ export function NovoPedidoModal({
   const finalizarVendaGestor = useFinalzarVendaGestor()
 
   const [origem, setOrigem] = useState<OrigemVenda>('GESTOR')
-  const [status, setStatus] = useState<StatusVenda>('FINALIZADA')
+  const [status, setStatus] = useState<StatusVenda>(() => statusPadraoNovoPedido(tipoInicioPedido))
   const [clienteId, setClienteId] = useState<string>('')
   const [clienteNome, setClienteNome] = useState<string>('')
   const [produtos, setProdutos] = useState<ProdutoSelecionado[]>([])
@@ -838,6 +846,27 @@ export function NovoPedidoModal({
     { value: 'FINALIZADA', label: 'Finalizada' },
     { value: 'PENDENTE_EMISSAO', label: 'Finalizada + Emitir NFe' },
   ]
+
+  const rotuloStatusResumoModal = useMemo(() => {
+    if (tipoInicioPedido === 'entrega' && status === 'ABERTA') {
+      return 'Pendente (novos pedidos)'
+    }
+    return statusDisponiveis.find(s => s.value === status)?.label ?? String(status)
+  }, [tipoInicioPedido, status])
+
+  /**
+   * Balcão finalizado / emitir NFe, ou entrega em triagem (ABERTA): passo 3 exibe meios de pagamento e valida total.
+   */
+  const pedidoGestorComPagamentoNoPasso3 =
+    status === 'FINALIZADA' ||
+    status === 'PENDENTE_EMISSAO' ||
+    (tipoInicioPedido === 'entrega' && status === 'ABERTA')
+
+  // Novo pedido (sem venda carregada): alinhar status ao tipo de fluxo ao abrir o painel
+  useEffect(() => {
+    if (!open || vendaId || modoVisualizacao) return
+    setStatus(statusPadraoNovoPedido(tipoInicioPedido))
+  }, [open, vendaId, modoVisualizacao, tipoInicioPedido])
 
   // Função para formatar número com separadores de milhar
   const formatarNumeroComMilhar = (valor: number): string => {
@@ -1503,14 +1532,13 @@ export function NovoPedidoModal({
       return
     }
 
-    // Se status é FINALIZADA ou PENDENTE_EMISSAO, precisa de pagamento
-    if ((status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') && pagamentos.length === 0) {
-      showToast.error('Adicione pelo menos uma forma de pagamento para vendas finalizadas')
+    if (pedidoGestorComPagamentoNoPasso3 && pagamentos.length === 0) {
+      showToast.error('Adicione pelo menos uma forma de pagamento')
       return
     }
 
     // Validar se pagamentos cobrem o total
-    if (status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') {
+    if (pedidoGestorComPagamentoNoPasso3) {
       const diferenca = totalProdutos - totalPagamentos
 
       // Aceitar quando os pagamentos cobrem exatamente o total (diferença <= 0.01)
@@ -1596,15 +1624,17 @@ export function NovoPedidoModal({
         vendaData.enderecoEntrega = moradaEntregaSelecionada.endereco
       }
 
-      // Se finalizada, adicionar dataFinalizacao e pagamentos
+      const pagamentosPayload = pagamentos.map(p => ({
+        meioPagamentoId: p.meioPagamentoId,
+        valor: p.valor,
+      }))
+
       if (status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') {
         vendaData.dataFinalizacao = new Date().toISOString()
-        vendaData.pagamentos = pagamentos.map(p => ({
-          meioPagamentoId: p.meioPagamentoId,
-          valor: p.valor,
-        }))
+        vendaData.pagamentos = pagamentosPayload
+      } else if (tipoInicioPedido === 'entrega' && status === 'ABERTA') {
+        vendaData.pagamentos = pagamentosPayload
       } else {
-        // Venda aberta não tem pagamentos
         vendaData.pagamentos = []
       }
 
@@ -1627,8 +1657,7 @@ export function NovoPedidoModal({
       if (idCriado) {
         setVendaIdCriada(idCriado)
 
-        // O novo contrato do backend cria vendas como "pendente" e requer chamada
-        // explícita a /finalizar para pedidos que nasceram finalizados (balcão/gestor).
+        // Backend cria a venda pendente; balcão finalizado exige transição operacional (BFF → …/transicoes acao finalizar).
         if (status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') {
           try {
             await finalizarVendaGestor.mutateAsync({ id: idCriado })
@@ -1675,7 +1704,7 @@ export function NovoPedidoModal({
     longPressComplementoIndexRef.current = null
 
     setOrigem('GESTOR')
-    setStatus('FINALIZADA')
+    setStatus(statusPadraoNovoPedido(tipoInicioPedido))
     setClienteId('')
     setClienteNome('')
     setMoradaEntregaSelecionada(null)
@@ -2464,8 +2493,7 @@ export function NovoPedidoModal({
   }
 
   const canSubmit = () => {
-    // Step 3 precisa validar pagamentos se status for FINALIZADA ou PENDENTE_EMISSAO
-    if (status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') {
+    if (pedidoGestorComPagamentoNoPasso3) {
       if (pagamentos.length === 0) return false
 
       // Aceitar quando os pagamentos cobrem o total (com tolerância de 0.01)
@@ -3551,9 +3579,7 @@ export function NovoPedidoModal({
                     </div>
                     <div className="flex justify-between rounded-lg bg-white px-1">
                       <span className="text-gray-600">Status:</span>
-                      <span className="font-medium">
-                        {statusDisponiveis.find(s => s.value === status)?.label}
-                      </span>
+                      <span className="font-medium">{rotuloStatusResumoModal}</span>
                     </div>
                     {clienteNome && (
                       <div className="flex justify-between px-1">
@@ -3571,8 +3597,8 @@ export function NovoPedidoModal({
                   </div>
                 </div>
 
-                {/* Pagamento (se status finalizada ou pendente emissão) */}
-                {(status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') && (
+                {/* Pagamento: balcão finalizado/NFe ou entrega em triagem (ABERTA) */}
+                {pedidoGestorComPagamentoNoPasso3 && (
                   <div className="space-y-4">
                     <div className="rounded-lg border bg-white px-4">
                       <h3 className="text-lg font-semibold">Pagamento</h3>
@@ -3878,9 +3904,7 @@ export function NovoPedidoModal({
                           </div>
                           <div className="flex justify-between rounded-lg bg-white px-1">
                             <span className="text-gray-600">Status:</span>
-                            <span className="font-medium">
-                              {statusDisponiveis.find(s => s.value === status)?.label}
-                            </span>
+                            <span className="font-medium">{rotuloStatusResumoModal}</span>
                           </div>
                           {clienteNome && (
                             <div className="flex justify-between px-1">

@@ -1326,7 +1326,13 @@ export function DetalhesVendas({
           <div className="flex flex-1 items-center justify-center gap-2">
             {venda && (
               <TipoVendaIcon
-                tipoVenda={tabelaOrigem === 'venda_gestor' ? 'gestor' : venda.tipoVenda}
+                tipoVenda={
+                  tabelaOrigem === 'venda_gestor'
+                    ? String(venda.tipoVenda ?? '').trim().toLowerCase() === 'entrega'
+                      ? 'entrega'
+                      : 'gestor'
+                    : (venda.tipoVenda as 'mesa' | 'balcao' | 'gestor' | 'entrega')
+                }
                 numeroMesa={venda.numeroMesa}
                 containerScale={0.9}
                 className="flex-shrink-0"
@@ -1337,6 +1343,7 @@ export function DetalhesVendas({
                 corFundo="var(--color-primary-background)"
                 corBalcao="var(--color-info)"
                 corGestor="var(--color-info)"
+                corEntrega="var(--color-info)"
               />
             )}
             <div className="flex flex-col" id="detalhes-vendas-titulo-appbar">

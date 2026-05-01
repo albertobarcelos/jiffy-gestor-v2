@@ -3,10 +3,8 @@ import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 
 /**
- * POST /api/vendas/gestor/[id]/finalizar
- * Proxies para a transição operacional `acao: finalizar` no backend.
- * O endpoint legado `/gestor/vendas/{id}/finalizar` foi substituído por POST `/gestor/vendas/{id}/transicoes`.
- * Chamado após criar pedido balcão com FINALIZADA/PENDENTE_EMISSAO quando o POST apenas registra a venda.
+ * POST /api/vendas/gestor/[id]/transicoes
+ * Encaminha para POST /api/v1/gestor/vendas/{id}/transicoes (ações operacionais do fluxo entrega).
  */
 export async function POST(
   request: NextRequest,
@@ -24,8 +22,10 @@ export async function POST(
       return NextResponse.json({ error: 'ID da venda é obrigatório' }, { status: 400 })
     }
 
+    const body = await request.json()
+
     const apiClient = new ApiClient()
-    const response = await apiClient.request<any>(
+    const response = await apiClient.request<unknown>(
       `/api/v1/gestor/vendas/${id}/transicoes`,
       {
         method: 'POST',
@@ -33,22 +33,19 @@ export async function POST(
           Authorization: `Bearer ${tokenInfo.token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ acao: 'finalizar' }),
+        body: JSON.stringify(body),
       }
     )
 
-    return NextResponse.json(response.data || {})
+    return NextResponse.json(response.data ?? {})
   } catch (error) {
-    console.error('Erro ao finalizar venda gestor:', error)
+    console.error('Erro na transição operacional gestor:', error)
     if (error instanceof ApiError) {
       return NextResponse.json(
-        { error: error.message || 'Erro ao finalizar venda gestor' },
+        { error: error.message || 'Erro na transição operacional' },
         { status: error.status }
       )
     }
-    return NextResponse.json(
-      { error: 'Erro interno do servidor' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
   }
 }

@@ -306,3 +306,52 @@ export function useAtualizarMoradaTelefone() {
     },
   })
 }
+
+/**
+ * Regista utilização da morada (POST …/registrar-uso) para ordenar como mais recente no catálogo.
+ * Deve ser chamado ao selecionar um endereço; não está acoplado ao POST da venda.
+ */
+export function useRegistrarUsoMoradaTelefone() {
+  const { auth } = useAuthStore()
+  const queryClient = useQueryClient()
+  const token = auth?.getAccessToken()
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      telefoneDigitos,
+    }: {
+      id: string
+      /** Mesmo valor da query `moradas-telefone` — dígitos do telefone usados na busca. */
+      telefoneDigitos: string
+    }) => {
+      if (!token) throw new Error('Token não encontrado')
+
+      const response = await fetch(
+        `/api/gestor/morada-telefone/${encodeURIComponent(id)}/registrar-uso`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(
+          mensagemErroResposta(errorData, response.status, 'Erro ao registrar uso do endereço')
+        )
+      }
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ['moradas-telefone', variables.telefoneDigitos],
+      })
+    },
+    onError: (error: Error) => {
+      showToast.error(error.message || 'Não foi possível atualizar o endereço recente')
+    },
+  })
+}
