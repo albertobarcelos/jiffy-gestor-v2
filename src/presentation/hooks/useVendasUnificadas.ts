@@ -54,6 +54,23 @@ function parseSolicitarEmissaoFiscal(raw: unknown): boolean {
   return Boolean(raw)
 }
 
+/** Etapa logística no GET unificado (nomes variam conforme backend). */
+function extrairStatusEtapaOperacional(item: Record<string, unknown>): string | null {
+  const keys = [
+    'statusEtapaOperacional',
+    'status_etapa_operacional',
+    'etapaOperacional',
+    'etapa_operacional',
+    'statusOperacional',
+    'status_operacional',
+  ] as const
+  for (const k of keys) {
+    const v = item[k]
+    if (v != null && String(v).trim() !== '') return String(v).trim()
+  }
+  return null
+}
+
 /**
  * DTO unificado para vendas do PDV e do Gestor (TypeScript)
  * Deve corresponder à classe VendaUnificadaDTO do backend
@@ -99,7 +116,9 @@ export class VendaUnificadaDTO {
     public readonly tipoDocFiscal?: 'NFE' | 'NFCE' | null,
     /** Modelo SEFAZ (55 NF-e, 65 NFC-e) quando a API envia explícito */
     public readonly modelo?: 55 | 65 | null,
-    public readonly retornoSefaz?: string | null
+    public readonly retornoSefaz?: string | null,
+    /** Etapa da logística (entrega Gestor); opcional até o backend expor no unificado. */
+    public readonly statusEtapaOperacional?: string | null
   ) {}
 
   private possuiDocumentoFiscal(): boolean {
@@ -142,6 +161,47 @@ export class VendaUnificadaDTO {
     return !!this.dataCancelamento || this.statusFiscal === 'CANCELADA'
   }
 
+  /** `tipoVenda === 'entrega'` vendido pelo Gestor (Kanban operacional). */
+  isPedidoEntregaGestor(): boolean {
+    if (!this.isVendaGestor() || this.isCancelada()) return false
+    return (this.tipoVenda ?? '').trim().toLowerCase() === 'entrega'
+  }
+
+  /**
+   * Mapeia etapa operacional da API para id de coluna do Kanban.
+   * `null`: etapa encerrada na logística → usa regras fiscais / Finalizadas abaixo.
+   */
+  private resolverEtapaKanbanOperacionalEntrega(): string | null {
+    const raw = (this.statusEtapaOperacional ?? '').trim().toUpperCase()
+    if (
+      raw === 'ENTREGUE' ||
+      raw === 'CONCLUIDO' ||
+      raw === 'FINALIZADO' ||
+      raw === 'FINALIZADA'
+    ) {
+      return null
+    }
+
+    const map: Record<string, string> = {
+      NOVOS_PEDIDOS: 'NOVOS_PEDIDOS',
+      NOVO: 'NOVOS_PEDIDOS',
+      RECEBIDO: 'NOVOS_PEDIDOS',
+      PENDENTE_TRIAGEM: 'NOVOS_PEDIDOS',
+      PENDENTE: 'NOVOS_PEDIDOS',
+      EM_PREPARO: 'EM_PREPARO',
+      PREPARO: 'EM_PREPARO',
+      COZINHA: 'EM_PREPARO',
+      PRONTO_ENTREGA: 'PRONTO_ENTREGA',
+      PRONTO: 'PRONTO_ENTREGA',
+      EM_ROTA: 'EM_ROTA',
+      ROTA: 'EM_ROTA',
+    }
+
+    if (raw && map[raw]) return map[raw]
+    // Sem etapa na API: pedido recém-criado permanece em Novos Pedidos (mesmo com pagamento registrado)
+    return 'NOVOS_PEDIDOS'
+  }
+
   getEtapaKanban(): string {
     if (this.temNFeEmitida()) return 'COM_NFE'
     // Rejeitada: coluna "Pendente Emissão Fiscal" para reenvio/reemissão (botão vira "Reemitir NFe/NFCe")
@@ -151,6 +211,12 @@ export class VendaUnificadaDTO {
       return 'COM_NFE'
     }
     if (this.isPendenteEmissao()) return 'PENDENTE_EMISSAO'
+
+    if (this.isPedidoEntregaGestor()) {
+      const colunaOp = this.resolverEtapaKanbanOperacionalEntrega()
+      if (colunaOp !== null) return colunaOp
+    }
+
     if (this.dataFinalizacao) return 'FINALIZADAS'
     return 'ABERTA'
   }
@@ -230,7 +296,8 @@ function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): VendaUnif
     v.dataEmissaoFiscal as string | null | undefined,
     v.tipoDocFiscal as VendaUnificadaDTO['tipoDocFiscal'],
     parseModeloFiscalApi(v.modelo),
-    v.retornoSefaz as string | null | undefined
+    v.retornoSefaz as string | null | undefined,
+    extrairStatusEtapaOperacional(v)
   )
 }
 

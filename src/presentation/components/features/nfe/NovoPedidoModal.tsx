@@ -68,6 +68,8 @@ import {
 } from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { SeletorClienteModal } from './SeletorClienteModal'
+import { EntregaClienteSelector } from './EntregaClienteSelector'
+import type { MoradaTelefone } from '@/src/presentation/hooks/useMoradaTelefone'
 import {
   ModalLancamentoProdutoPainel,
   type ModalLancamentoProdutoPainelConfirmPayload,
@@ -77,6 +79,10 @@ import {
   ProdutosTabsModal,
   ProdutosTabsModalState,
 } from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
+import {
+  ClientesTabsModal,
+  type ClientesTabsModalState,
+} from '@/src/presentation/components/features/clientes/ClientesTabsModal'
 import {
   PainelPedidoBackdrop,
   JiffyPainelSlide,
@@ -101,6 +107,12 @@ interface NovoPedidoModalProps {
    * use-o para saber se a nota está EMITIDA antes/sem depender só do `resumoFiscal`.
    */
   statusFiscalUnificado?: string | null
+  /**
+   * Tipo de pedido escolhido no EscolhaTipoPedidoModal.
+   * 'balcao' (padrão): step inicial = Informações.
+   * 'entrega': step inicial = Produtos (step 1 é pulado); tipoVenda enviado como 'entrega'.
+   */
+  tipoInicioPedido?: 'balcao' | 'entrega'
 }
 
 /** Trecho retornado pela API quando `incluirFiscal=true` */
@@ -348,6 +360,7 @@ export function NovoPedidoModal({
   modoVisualizacao,
   tabelaOrigemVenda = 'venda_gestor',
   statusFiscalUnificado = null,
+  tipoInicioPedido = 'balcao',
 }: NovoPedidoModalProps) {
   const { auth } = useAuthStore()
   const createVendaGestor = useCreateVendaGestor()
@@ -371,6 +384,21 @@ export function NovoPedidoModal({
   const [tooltipGrupoId, setTooltipGrupoId] = useState<string | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null)
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1)
+  /** Morada de entrega selecionada via telefone (fluxo entrega) */
+  const [moradaEntregaSelecionada, setMoradaEntregaSelecionada] = useState<MoradaTelefone | null>(null)
+  /**
+   * Telefone + última busca ficam no pai: o passo Informações desmonta ao avançar e o filho perdia estado local.
+   */
+  const [telefoneBuscaEntrega, setTelefoneBuscaEntrega] = useState('')
+  const [telefoneBuscadoEntrega, setTelefoneBuscadoEntrega] = useState<string | null>(null)
+  /**
+   * Cliente vinculado encontrado ou criado no fluxo entrega.
+   * Elevado ao pai para persistir entre etapas.
+   */
+  const [clienteEntregaVinculado, setClienteEntregaVinculado] = useState<{
+    id: string
+    nome: string
+  } | null>(null)
   const [nomeUsuario, setNomeUsuario] = useState<string>('')
   const [isLoadingUsuario, setIsLoadingUsuario] = useState(false)
 
@@ -393,6 +421,13 @@ export function NovoPedidoModal({
     produto: undefined,
     initialStepProduto: 0,
   })
+  /** Mesmo painel de edição da página Cadastros → Clientes (fluxo entrega). */
+  const [clienteTabsModalEntregaState, setClienteTabsModalEntregaState] =
+    useState<ClientesTabsModalState>({
+      open: false,
+      tab: 'cliente',
+      mode: 'edit',
+    })
   const [abaDetalhesPedido, setAbaDetalhesPedido] = useState<AbaDetalhesPedido>('infoPedido')
   const [detalhesPedidoMeta, setDetalhesPedidoMeta] = useState<DetalhesPedidoMeta | null>(null)
   const [nomesUsuariosPedido, setNomesUsuariosPedido] = useState<Record<string, string>>({})
@@ -507,8 +542,12 @@ export function NovoPedidoModal({
   const { data: gruposData, isLoading: isLoadingGrupos } = useGruposProdutos({
     ativo: true,
     limit: 100,
-    // Step 2 usa grupos de produtos; evita carregar no step 1.
-    enabled: open && !modoVisualizacao && currentStep >= 2,
+    // Balcão: produtos no step 2. Entrega: produtos no step 1. Fora da etapa de produtos, não consulta.
+    enabled:
+      open &&
+      !modoVisualizacao &&
+      (currentStep >= 2 ||
+        (tipoInicioPedido === 'entrega' && currentStep === 1)),
     // Evita refetch ao voltar o foco da aba (não deve recarregar o modal inteiro)
     refetchOnWindowFocus: false,
   })
@@ -583,6 +622,46 @@ export function NovoPedidoModal({
     setClienteId('')
     setClienteNome('')
   }
+
+  const handleAbrirEdicaoClienteEntrega = useCallback(() => {
+    const id = clienteEntregaVinculado?.id?.trim()
+    if (!id) return
+    setClienteTabsModalEntregaState({
+      open: true,
+      tab: 'cliente',
+      mode: 'edit',
+      clienteId: id,
+    })
+  }, [clienteEntregaVinculado?.id])
+
+  const handleFecharClienteTabsModalEntrega = useCallback(() => {
+    setClienteTabsModalEntregaState(prev => ({ ...prev, open: false }))
+  }, [])
+
+  const handleTabChangeClienteTabsModalEntrega = useCallback(
+    (tab: 'cliente' | 'visualizar') => {
+      setClienteTabsModalEntregaState(prev => ({ ...prev, tab }))
+    },
+    []
+  )
+
+  const handleReloadClienteEntregaAposEdicao = useCallback(async () => {
+    const id = clienteEntregaVinculado?.id?.trim()
+    if (!id) return
+    const token = auth?.getAccessToken()
+    if (!token) return
+    try {
+      const res = await fetch(`/api/clientes/${encodeURIComponent(id)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      const c = Cliente.fromJSON(data)
+      setClienteEntregaVinculado({ id: c.getId(), nome: c.getNome() })
+    } catch {
+      /* silencioso */
+    }
+  }, [auth, clienteEntregaVinculado?.id])
 
   // Handlers para arrastar a lista horizontal de grupos
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -1488,7 +1567,7 @@ export function NovoPedidoModal({
       // Payload: valorFinal (raiz) = total da venda; produtosLancados = array com valorFinal por produto
       // statusVenda = valor escolhido no passo 1 (ABERTA | FINALIZADA | PENDENTE_EMISSAO)
       const vendaData: any = {
-        tipoVenda: 'balcao',
+        tipoVenda: tipoInicioPedido === 'entrega' ? 'entrega' : 'balcao',
         origem,
         statusVenda: status,
         valorFinal: totalProdutos,
@@ -1504,9 +1583,17 @@ export function NovoPedidoModal({
       // Log para debug
       console.log('📤 Payload sendo enviado:', JSON.stringify(vendaData, null, 2))
 
-      // Adicionar clienteId se selecionado
-      if (clienteId) {
-        vendaData.clienteId = clienteId
+      // Adicionar clienteId: fluxo entrega usa o cliente vinculado; balcão usa o seletor convencional
+      const clienteIdParaVenda = tipoInicioPedido === 'entrega'
+        ? clienteEntregaVinculado?.id
+        : clienteId
+      if (clienteIdParaVenda) {
+        vendaData.clienteId = clienteIdParaVenda
+      }
+
+      // Adicionar endereço de entrega quando fluxo entrega e morada selecionada
+      if (tipoInicioPedido === 'entrega' && moradaEntregaSelecionada?.endereco) {
+        vendaData.enderecoEntrega = moradaEntregaSelecionada.endereco
       }
 
       // Se finalizada, adicionar dataFinalizacao e pagamentos
@@ -1591,6 +1678,15 @@ export function NovoPedidoModal({
     setStatus('FINALIZADA')
     setClienteId('')
     setClienteNome('')
+    setMoradaEntregaSelecionada(null)
+    setTelefoneBuscaEntrega('')
+    setTelefoneBuscadoEntrega(null)
+    setClienteEntregaVinculado(null)
+    setClienteTabsModalEntregaState({
+      open: false,
+      tab: 'cliente',
+      mode: 'edit',
+    })
     setProdutos([])
     setPagamentos([])
     setMeioPagamentoId('')
@@ -2222,6 +2318,13 @@ export function NovoPedidoModal({
     }
   }, [open])
 
+  // Ao abrir um novo pedido (sem vendaId), define o step inicial como 1
+  useEffect(() => {
+    if (open && !vendaId) {
+      setCurrentStep(1)
+    }
+  }, [open, vendaId])
+
   // Carregar venda existente quando modal abrir com vendaId
   useEffect(() => {
     if (open && vendaId) {
@@ -2347,12 +2450,16 @@ export function NovoPedidoModal({
 
   // Validação dos steps
   const canGoToStep2 = () => {
-    // Step 1 sempre pode avançar (origem e status têm valores padrão)
+    // entrega: step 1 = Produtos → precisa de pelo menos um produto para avançar
+    if (tipoInicioPedido === 'entrega') return produtos.length > 0
+    // balcão: step 1 = Informações → sempre pode avançar
     return true
   }
 
   const canGoToStep3 = () => {
-    // Step 2 precisa ter pelo menos um produto
+    // entrega: step 2 = Informações → sempre pode avançar
+    if (tipoInicioPedido === 'entrega') return true
+    // balcão: step 2 = Produtos → precisa de pelo menos um produto
     return produtos.length > 0
   }
 
@@ -2387,6 +2494,8 @@ export function NovoPedidoModal({
 
     if (currentStep === 1 && canGoToStep2()) {
       setCurrentStep(2)
+    } else if (currentStep === 1 && !canGoToStep2()) {
+      showToast.error('Adicione pelo menos um produto antes de continuar')
     } else if (currentStep === 2 && canGoToStep3()) {
       setCurrentStep(3)
     } else if (currentStep === 2 && !canGoToStep3()) {
@@ -2395,7 +2504,6 @@ export function NovoPedidoModal({
   }
 
   const handlePreviousStep = () => {
-    // Não permitir navegação em modo visualização
     if (vendaId && modoVisualizacao) {
       return
     }
@@ -2571,7 +2679,7 @@ export function NovoPedidoModal({
                   <span
                     className={`text-sm font-medium ${currentStep >= 1 ? 'text-primary' : 'text-gray-400'}`}
                   >
-                    Informações
+                    {tipoInicioPedido === 'entrega' ? 'Produtos' : 'Informações'}
                   </span>
                 </div>
 
@@ -2596,7 +2704,7 @@ export function NovoPedidoModal({
                   <span
                     className={`text-sm font-medium ${currentStep >= 2 ? 'text-primary' : 'text-gray-400'}`}
                   >
-                    Produtos
+                    {tipoInicioPedido === 'entrega' ? 'Informações' : 'Produtos'}
                   </span>
                 </div>
 
@@ -2666,104 +2774,137 @@ export function NovoPedidoModal({
               </div>
             )}
 
-            {/* STEP 1: Informações do Pedido */}
-            {!modoVisualizacao && currentStep === 1 && (
+            {/* STEP 1: Informações do Pedido (balcão) | Seleção de Produtos (entrega) */}
+            {!modoVisualizacao &&
+              ((tipoInicioPedido !== 'entrega' && currentStep === 1) ||
+                (tipoInicioPedido === 'entrega' && currentStep === 2)) && (
               <div className="space-y-3 py-2">
-                {/* Cliente */}
-                <div className="rounded-lg border-2 border-primary/20 bg-gray-50 p-2">
-                  <div className="mb-3 flex items-center gap-2">
-                    <div className="rounded-lg bg-primary/10 p-2">
-                      <MdPersonOutline className="h-5 w-5 text-primary" />
+                {/* Fluxo entrega: campo de telefone + seleção de morada */}
+                {tipoInicioPedido === 'entrega' ? (
+                  <div className="rounded-lg border-2 border-primary/20 bg-gray-50 p-3">
+                    <div className="mb-3 flex items-center gap-2">
+                      <div className="rounded-lg bg-primary/10 p-2">
+                        <MdPersonOutline className="h-5 w-5 text-primary" />
+                      </div>
+                      <span className="text-lg font-semibold text-primary">Endereço de entrega</span>
                     </div>
-                    <span className="text-lg font-semibold text-primary">Cliente (Opcional)</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      type="text"
-                      value={clienteNome}
-                      placeholder="Nenhum cliente selecionado"
-                      inputProps={{ readOnly: true }}
-                      className="flex-1 cursor-pointer border-primary/30 bg-white"
-                      onClick={() => setSeletorClienteOpen(true)}
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          padding: '4px 8px',
-                          '& input': {
-                            padding: '4px 8px',
-                          },
-                        },
-                      }}
+                    <EntregaClienteSelector
+                      moradaSelecionada={moradaEntregaSelecionada}
+                      onMoradaSelecionada={setMoradaEntregaSelecionada}
+                      clienteVinculado={clienteEntregaVinculado}
+                      onClienteVinculado={setClienteEntregaVinculado}
+                      onEditarClientePorDuploClique={handleAbrirEdicaoClienteEntrega}
+                      telefoneExibicaoExterno={telefoneBuscaEntrega}
+                      onTelefoneExibicaoExternoChange={setTelefoneBuscaEntrega}
+                      digitosUltimaBuscaExterno={telefoneBuscadoEntrega}
+                      onDigitosUltimaBuscaExternoChange={setTelefoneBuscadoEntrega}
                     />
-                    {clienteNome && (
+                  </div>
+                ) : (
+                  /* Fluxo balcão: seletor de cliente convencional */
+                  <div className="rounded-lg border-2 border-primary/20 bg-gray-50 p-2">
+                    <div className="mb-3 flex items-center gap-2">
+                      <div className="rounded-lg bg-primary/10 p-2">
+                        <MdPersonOutline className="h-5 w-5 text-primary" />
+                      </div>
+                      <span className="text-lg font-semibold text-primary">Cliente (Opcional)</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        value={clienteNome}
+                        placeholder="Nenhum cliente selecionado"
+                        inputProps={{ readOnly: true }}
+                        className="flex-1 cursor-pointer border-primary/30 bg-white"
+                        onClick={() => setSeletorClienteOpen(true)}
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            padding: '4px 8px',
+                            '& input': {
+                              padding: '4px 8px',
+                            },
+                          },
+                        }}
+                      />
+                      {clienteNome && (
+                        <Button
+                          type="button"
+                          variant="outlined"
+                          size="sm"
+                          onClick={handleRemoveCliente}
+                          className="flex-shrink-0 border-primary/30 hover:border-red-300 hover:bg-red-50"
+                        >
+                          <MdDelete className="h-4 w-4 text-red-600" />
+                        </Button>
+                      )}
                       <Button
                         type="button"
                         variant="outlined"
-                        size="sm"
-                        onClick={handleRemoveCliente}
-                        className="flex-shrink-0 border-primary/30 hover:border-red-300 hover:bg-red-50"
+                        onClick={() => setSeletorClienteOpen(true)}
+                        className="flex-shrink-0 border-primary/30 hover:bg-primary/10"
                       >
-                        <MdDelete className="h-4 w-4 text-red-600" />
+                        <MdSearch className="h-4 w-4 text-primary" />
                       </Button>
-                    )}
-                    <Button
-                      type="button"
-                      variant="outlined"
-                      onClick={() => setSeletorClienteOpen(true)}
-                      className="flex-shrink-0 border-primary/30 hover:bg-primary/10"
-                    >
-                      <MdSearch className="h-4 w-4 text-primary" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Origem */}
-                <div className="rounded-lg border-2 border-primary/20 bg-gray-50 p-2">
-                  <div className="mb-3 flex items-center gap-2">
-                    <div className="rounded-lg bg-primary/10 p-2">
-                      <MdStore className="h-5 w-5 text-primary" />
                     </div>
-                    <span className="text-lg font-semibold text-primary">Origem do Pedido</span>
                   </div>
-                  <Select value={origem} onValueChange={value => setOrigem(value as OrigemVenda)}>
-                    <SelectTrigger className="border-primary/30 bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="GESTOR">Gestor (Manual)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                )}
 
-                {/* Status */}
-                <div className="rounded-lg border-2 border-primary/20 bg-gray-50 p-2">
-                  <div className="mb-3 flex items-center gap-2">
-                    <div className="rounded-lg bg-primary/10 p-2">
-                      <MdInfo className="h-5 w-5 text-primary" />
+                {/* Origem e Status: apenas no fluxo balcão (entrega usa apenas cliente nesta etapa) */}
+                {tipoInicioPedido !== 'entrega' && (
+                  <>
+                    {/* Origem */}
+                    <div className="rounded-lg border-2 border-primary/20 bg-gray-50 p-2">
+                      <div className="mb-3 flex items-center gap-2">
+                        <div className="rounded-lg bg-primary/10 p-2">
+                          <MdStore className="h-5 w-5 text-primary" />
+                        </div>
+                        <span className="text-lg font-semibold text-primary">Origem do Pedido</span>
+                      </div>
+                      <Select value={origem} onValueChange={value => setOrigem(value as OrigemVenda)}>
+                        <SelectTrigger className="border-primary/30 bg-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="GESTOR">Gestor (Manual)</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <span className="text-lg font-semibold text-primary">Status do Pedido</span>
-                  </div>
-                  <Select value={status} onValueChange={value => setStatus(value as StatusVenda)}>
-                    <SelectTrigger className="border-primary/30 bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {statusDisponiveis.map(st => (
-                        <SelectItem
-                          key={st.value}
-                          value={st.value}
-                          disabled={st.value === 'ABERTA'}
-                        >
-                          {st.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+
+                    {/* Status */}
+                    <div className="rounded-lg border-2 border-primary/20 bg-gray-50 p-2">
+                      <div className="mb-3 flex items-center gap-2">
+                        <div className="rounded-lg bg-primary/10 p-2">
+                          <MdInfo className="h-5 w-5 text-primary" />
+                        </div>
+                        <span className="text-lg font-semibold text-primary">Status do Pedido</span>
+                      </div>
+                      <Select value={status} onValueChange={value => setStatus(value as StatusVenda)}>
+                        <SelectTrigger className="border-primary/30 bg-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {statusDisponiveis.map(st => (
+                            <SelectItem
+                              key={st.value}
+                              value={st.value}
+                              disabled={st.value === 'ABERTA'}
+                            >
+                              {st.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
-            {/* STEP 2: Seleção de Produtos */}
-            {!modoVisualizacao && currentStep === 2 && (
+            {/* STEP 2: Seleção de Produtos (balcão) | Informações do Pedido (entrega) */}
+            {/* Conteúdo Produtos: step 2 no balcão, step 1 na entrega */}
+            {!modoVisualizacao &&
+              ((tipoInicioPedido !== 'entrega' && currentStep === 2) ||
+                (tipoInicioPedido === 'entrega' && currentStep === 1)) && (
               <div className="flex min-h-0 flex-1 flex-col gap-2 py-2">
                 {/* Área de Edição de Produtos Selecionados: altura fixa quando grupos visíveis, cresce quando grupos ocultos */}
                 <div
@@ -4365,6 +4506,7 @@ export function NovoPedidoModal({
                                 onClick={handleNextStep}
                                 disabled={
                                   createVendaGestor.isPending ||
+                                  (currentStep === 1 && !canGoToStep2()) ||
                                   (currentStep === 2 && !canGoToStep3())
                                 }
                                 className="h-12 min-h-12 w-full font-semibold shadow-none"
@@ -4603,6 +4745,13 @@ export function NovoPedidoModal({
         state={produtoTabsModalState}
         onClose={handleFecharProdutoTabsModal}
         onTabChange={handleTabChangeProdutoModal}
+      />
+      <ClientesTabsModal
+        state={clienteTabsModalEntregaState}
+        onClose={handleFecharClienteTabsModalEntrega}
+        onReload={handleReloadClienteEntregaAposEdicao}
+        onTabChange={handleTabChangeClienteTabsModalEntrega}
+        zIndex={1700}
       />
     </>
   )

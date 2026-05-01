@@ -26,6 +26,11 @@ interface ClientesTabsModalProps {
   onClose: () => void
   onReload?: () => void
   onTabChange: (tab: TabKey) => void
+  /**
+   * Empilha acima de outros painéis (ex.: Novo Pedido ~1400, moradas ~1500–1600).
+   * @default 1300
+   */
+  zIndex?: number
 }
 
 export function ClientesTabsModal({
@@ -33,6 +38,7 @@ export function ClientesTabsModal({
   onClose,
   onReload,
   onTabChange,
+  zIndex = 1300,
 }: ClientesTabsModalProps) {
   const clienteId = state.clienteId
   const clienteRef = useRef<NovoClienteHandle>(null)
@@ -155,6 +161,7 @@ export function ClientesTabsModal({
         open={state.open}
         onClose={handleRequestClose}
         title={title}
+        zIndex={zIndex}
         scrollableBody={false}
         footerVariant="bar"
         panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]"
@@ -221,7 +228,8 @@ export function ClientesTabsModal({
       {confirmExitOpen && typeof document !== 'undefined'
         ? createPortal(
             <div
-              className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/50 md:p-4"
+              className="fixed inset-0 flex items-center justify-center bg-black/50 md:p-4"
+              style={{ zIndex: zIndex + 100 }}
               role="presentation"
             >
               <div

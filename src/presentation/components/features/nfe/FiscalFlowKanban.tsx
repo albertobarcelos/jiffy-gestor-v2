@@ -51,6 +51,7 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { StatusFiscalBadge } from './StatusFiscalBadge'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 import { NovoPedidoModal } from './NovoPedidoModal'
+import { EscolhaTipoPedidoModal, type TipoPedido } from './EscolhaTipoPedidoModal'
 import { EscolheDatasModal } from '@/src/presentation/components/features/vendas/EscolheDatasModal'
 import { showToast } from '@/src/shared/utils/toast'
 import { abrirDocumentoFiscalPdf } from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
@@ -436,6 +437,8 @@ export function FiscalFlowKanban() {
 
   const [novoPedidoModalOpen, setNovoPedidoModalOpen] = useState(false)
   const [novoPedidoModalVisualizacaoOpen, setNovoPedidoModalVisualizacaoOpen] = useState(false)
+  const [escolhaTipoPedidoOpen, setEscolhaTipoPedidoOpen] = useState(false)
+  const [tipoPedidoEscolhido, setTipoPedidoEscolhido] = useState<TipoPedido>('balcao')
   /** Venda aberta no modal de detalhes (step 4): id, tabela e statusFiscal do unificado (PDV não repete no GET detalhe) */
   const [pedidoVisualizacaoContext, setPedidoVisualizacaoContext] = useState<{
     id: string
@@ -1113,10 +1116,24 @@ export function FiscalFlowKanban() {
 
     switch (columnId) {
       case 'NOVOS_PEDIDOS':
+        vendas = vendasParaFiltrar.filter(
+          (v: Venda) => getEtapaKanbanParaExibicao(v) === 'NOVOS_PEDIDOS'
+        )
+        break
       case 'EM_PREPARO':
+        vendas = vendasParaFiltrar.filter(
+          (v: Venda) => getEtapaKanbanParaExibicao(v) === 'EM_PREPARO'
+        )
+        break
       case 'PRONTO_ENTREGA':
+        vendas = vendasParaFiltrar.filter(
+          (v: Venda) => getEtapaKanbanParaExibicao(v) === 'PRONTO_ENTREGA'
+        )
+        break
       case 'EM_ROTA':
-        vendas = []
+        vendas = vendasParaFiltrar.filter(
+          (v: Venda) => getEtapaKanbanParaExibicao(v) === 'EM_ROTA'
+        )
         break
       case 'FINALIZADAS':
         vendas = vendasParaFiltrar.filter(
@@ -1334,7 +1351,7 @@ export function FiscalFlowKanban() {
               <MdRefresh className="h-5 w-5" />
             </button>
             <button
-              onClick={() => setNovoPedidoModalOpen(true)}
+              onClick={() => setEscolhaTipoPedidoOpen(true)}
               className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary/90"
             >
               <MdAdd className="h-4 w-4" />
@@ -1694,9 +1711,21 @@ export function FiscalFlowKanban() {
         />
       )}
 
+      {/* Dialog de escolha do tipo de pedido: abre antes do NovoPedidoModal */}
+      <EscolhaTipoPedidoModal
+        open={escolhaTipoPedidoOpen}
+        onClose={() => setEscolhaTipoPedidoOpen(false)}
+        onSelect={tipo => {
+          setTipoPedidoEscolhido(tipo)
+          setEscolhaTipoPedidoOpen(false)
+          setNovoPedidoModalOpen(true)
+        }}
+      />
+
       {/* Modal de Novo Pedido — sempre montado para o Slide de saída completar */}
       <NovoPedidoModal
         open={novoPedidoModalOpen}
+        tipoInicioPedido={tipoPedidoEscolhido}
         onClose={() => {
           setNovoPedidoModalOpen(false)
         }}

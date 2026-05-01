@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import localFont from 'next/font/local'
+import { AppRouterCacheProvider } from '@mui/material-nextjs/v15-appRouter'
 import { Toaster } from 'react-hot-toast'
 import { ThemeProvider } from '@/src/presentation/providers/ThemeProvider'
 import { QueryProvider } from '@/src/presentation/providers/QueryProvider'
@@ -30,34 +31,36 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       {/* suppressHydrationWarning: extensões (ex. ColorZilla) injetam atributos no body e disparam falso positivo de hidratação */}
       <body className={`${generalSans.className} antialiased`} suppressHydrationWarning>
         <QueryProvider>
-          <ThemeProvider>
-            {children}
-            <DocumentoFiscalPdfRetryModal />
-            <Toaster
-              position="top-right"
-              toastOptions={{
-                duration: 4000,
-                style: {
-                  background: '#fff',
-                  color: '#333',
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                },
-                success: {
-                  iconTheme: {
-                    primary: '#10b981',
-                    secondary: '#fff',
+          <AppRouterCacheProvider options={{ enableCssLayer: true }}>
+            <ThemeProvider>
+              {children}
+              <DocumentoFiscalPdfRetryModal />
+              <Toaster
+                position="top-right"
+                toastOptions={{
+                  duration: 4000,
+                  style: {
+                    background: '#fff',
+                    color: '#333',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                   },
-                },
-                error: {
-                  iconTheme: {
-                    primary: '#ef4444',
-                    secondary: '#fff',
+                  success: {
+                    iconTheme: {
+                      primary: '#10b981',
+                      secondary: '#fff',
+                    },
                   },
-                },
-              }}
-            />
-          </ThemeProvider>
+                  error: {
+                    iconTheme: {
+                      primary: '#ef4444',
+                      secondary: '#fff',
+                    },
+                  },
+                }}
+              />
+            </ThemeProvider>
+          </AppRouterCacheProvider>
         </QueryProvider>
       </body>
     </html>
