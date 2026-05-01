@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Terminal } from '@/src/domain/entities/Terminal'
-import { MdPhone, MdSearch } from 'react-icons/md'
+import { MdDelete, MdPhone, MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
@@ -92,7 +92,6 @@ export function TerminaisTab() {
     mode: 'edit',
     terminalId: undefined,
   })
-
   const searchQueryRef = useRef('')
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
 
@@ -756,6 +755,14 @@ export function TerminaisTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  /** Lista só terminais não bloqueados (ativos); API não filtra por status. */
+  const terminaisFiltrados = useMemo(() => {
+    return terminais.filter(({ terminal, rawData }) => {
+      const bloqueado = rawData?.bloqueado ?? terminal.getBloqueado()
+      return !bloqueado
+    })
+  }, [terminais])
+
   return (
     <div className="flex flex-col h-full overflow-hidden py-1">
       {/* Header fixo */}
@@ -766,7 +773,8 @@ export function TerminaisTab() {
               Terminais Cadastrados
             </span>
             <span className="text-tertiary text-sm md:text-[20px] font-medium font-nunito">
-              Total {terminais.length} de {totalItems}
+              Total {terminaisFiltrados.length}
+              {totalItems > 0 ? ` de ${terminaisFiltrados.length}` : ''}
             </span>
           </div>
           
@@ -796,7 +804,7 @@ export function TerminaisTab() {
       {/* Lista de terminais com scroll */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden md:px-[20px] px-1 scrollbar-hide">
         {/* Barra de títulos das colunas - sticky dentro do scroll */}
-        {terminais.length > 0 && (
+        {terminaisFiltrados.length > 0 && (
           <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px] sticky top-0 z-10 mb-2">
             <div className="flex-[2] font-nunito font-semibold text-xs text-primary-text uppercase hidden md:block">
               Código do Terminal
@@ -823,7 +831,7 @@ export function TerminaisTab() {
               Leitor C. Barras
             </div>
             <div className="md:flex-[1.5] flex-[1] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
-              Status
+              Remover
             </div>
           </div>
         )}
@@ -840,15 +848,25 @@ export function TerminaisTab() {
           </div>
         )}
 
-        {terminais.map(({ terminal, rawData }, index) => {
+        {terminais.length > 0 && terminaisFiltrados.length === 0 && !isLoading && (
+          <div className="flex flex-col items-center justify-center py-12">
+            <MdPhone className="text-secondary-text mb-4" size={48} />
+            <p className="text-primary-text font-semibold text-lg mb-2">
+              Nenhum terminal ativo
+            </p>
+            <p className="text-secondary-text text-sm text-center max-w-md">
+              Esta lista mostra apenas terminais ativos. Os desativados permanecem no cadastro, mas
+              não aparecem aqui.
+            </p>
+          </div>
+        )}
+
+        {terminaisFiltrados.map(({ terminal, rawData }, index) => {
           // Extrai campos dos dados brutos conforme documentação da API
           const codigo = rawData?.codigoInterno || rawData?.codigo || rawData?.code || terminal.getName() || 'N/A'
           const nome = rawData?.nome || terminal.getName() || codigo
           const modelo = rawData?.modeloDispositivo || rawData?.modelo || rawData?.deviceModel || 'Unknown'
           const versao = rawData?.versaoApk || rawData?.versao || rawData?.apkVersion || rawData?.version || '1.0.0'
-          // Status: bloqueado = false significa ATIVO, bloqueado = true significa BLOQUEADO/INATIVO
-          const bloqueado = rawData?.bloqueado ?? terminal.getBloqueado()
-          const ativo = !bloqueado
           const prefs = resolvePreferencesForTerminal(terminal.getId(), preferencesMap)
           const compartilhamentoAtivo = prefs.compartilharMesas
           const fiscalAtivo = prefs.fiscalAtivo
@@ -974,20 +992,19 @@ export function TerminaisTab() {
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
               >
-                <JiffyIconSwitch
-                  checked={ativo}
-                  onChange={(e) => {
+                <button
+                  type="button"
+                  onClick={(e) => {
                     e.stopPropagation()
-                    handleToggleTerminalStatus(terminal.getId(), !e.target.checked)
+                    void handleToggleTerminalStatus(terminal.getId(), true)
                   }}
                   disabled={!!togglingStatus[terminal.getId()]}
-                  size="sm"
-                  className="justify-center gap-0 px-0 py-0"
-                  inputProps={{
-                    'aria-label': `Status do terminal — ${nome}`,
-                    title: ativo ? 'Terminal ativo' : 'Terminal bloqueado',
-                  }}
-                />
+                  className="rounded-lg p-1.5 text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Desativar terminal"
+                  aria-label={`Desativar terminal — ${nome}`}
+                >
+                  <MdDelete className="h-6 w-6" />
+                </button>
               </div>
             </div>
           )
