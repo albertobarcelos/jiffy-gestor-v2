@@ -40,6 +40,10 @@ import {
   MdAdd,
   MdArrowDownward,
   MdArrowUpward,
+  MdPostAdd,
+  MdRestaurant,
+  MdLocalShipping,
+  MdRoute,
 } from 'react-icons/md'
 import { EmitirNfeModal } from './EmitirNfeModal'
 import { Button } from '@/src/presentation/components/ui/button'
@@ -70,7 +74,14 @@ interface KanbanColumn {
 // Usar VendaUnificadaDTO do hook
 type Venda = VendaUnificadaDTO
 
-type ColunaKanbanId = 'FINALIZADAS' | 'PENDENTE_EMISSAO' | 'COM_NFE'
+type ColunaKanbanId =
+  | 'NOVOS_PEDIDOS'
+  | 'EM_PREPARO'
+  | 'PRONTO_ENTREGA'
+  | 'EM_ROTA'
+  | 'FINALIZADAS'
+  | 'PENDENTE_EMISSAO'
+  | 'COM_NFE'
 
 /** Status em que a UI trata como aguardando resposta da SEFAZ (até o backend refletir rejeição/códigos). */
 const STATUS_FISCAL_AGUARDANDO_SEFAZ = new Set([
@@ -99,6 +110,19 @@ function getCardBorderEFundoKanban(
 ): { borderClass: string; cardBgClass: string } {
   if (columnId === 'FINALIZADAS') {
     return { borderClass: 'border-l-primary', cardBgClass: 'bg-white' }
+  }
+
+  if (columnId === 'NOVOS_PEDIDOS') {
+    return { borderClass: 'border-l-sky-500', cardBgClass: 'bg-white' }
+  }
+  if (columnId === 'EM_PREPARO') {
+    return { borderClass: 'border-l-amber-500', cardBgClass: 'bg-white' }
+  }
+  if (columnId === 'PRONTO_ENTREGA') {
+    return { borderClass: 'border-l-teal-500', cardBgClass: 'bg-white' }
+  }
+  if (columnId === 'EM_ROTA') {
+    return { borderClass: 'border-l-indigo-500', cardBgClass: 'bg-white' }
   }
 
   const acao = acaoFiscalEmAndamentoPorVenda[v.id]
@@ -434,19 +458,26 @@ export function FiscalFlowKanban() {
   /** IDs já reativados com sucesso — evita loop infinito se o GET ainda vier inconsistente (base de testes). */
   const rejeitadaReativacaoJaTentadaIdsRef = useRef<Set<string>>(new Set())
 
-  type ColunaId = 'FINALIZADAS' | 'PENDENTE_EMISSAO' | 'COM_NFE'
   /** Ordenação individual por coluna: padrão sempre por data (reset ao recarregar a página). */
   const [criterioOrdenacaoPorColuna, setCriterioOrdenacaoPorColuna] = useState<
-    Record<ColunaId, CriterioOrdenacaoKanban>
+    Record<ColunaKanbanId, CriterioOrdenacaoKanban>
   >({
+    NOVOS_PEDIDOS: 'data',
+    EM_PREPARO: 'data',
+    PRONTO_ENTREGA: 'data',
+    EM_ROTA: 'data',
     FINALIZADAS: 'data',
     PENDENTE_EMISSAO: 'data',
     COM_NFE: 'data',
   })
   /** Direção (crescente/decrescente) individual por coluna — reset ao recarregar. */
   const [direcaoOrdenacaoPorColuna, setDirecaoOrdenacaoPorColuna] = useState<
-    Record<ColunaId, DirecaoOrdenacaoKanban>
+    Record<ColunaKanbanId, DirecaoOrdenacaoKanban>
   >({
+    NOVOS_PEDIDOS: 'desc',
+    EM_PREPARO: 'desc',
+    PRONTO_ENTREGA: 'desc',
+    EM_ROTA: 'desc',
     FINALIZADAS: 'desc',
     PENDENTE_EMISSAO: 'desc',
     COM_NFE: 'desc',
@@ -700,8 +731,40 @@ export function FiscalFlowKanban() {
 
   const vendasFiltradasPorTipo: Venda[] = filtrarPorBusca(todasVendas, searchQuery)
 
-  // Colunas fixas do Kanban (Finalizadas, Pendente Emissão, Com NFe)
+  // Colunas fixas do Kanban (entrega → fiscal)
   const getColumns = (): KanbanColumn[] => [
+    {
+      id: 'NOVOS_PEDIDOS',
+      title: 'Novos Pedidos',
+      color: 'bg-sky-50',
+      borderColor: 'border-sky-300',
+      icon: <MdPostAdd className="h-4 w-4 text-sky-700" />,
+      placeholder: 'Pedidos recém-criados aguardando triagem',
+    },
+    {
+      id: 'EM_PREPARO',
+      title: 'Em Preparo',
+      color: 'bg-amber-50',
+      borderColor: 'border-amber-300',
+      icon: <MdRestaurant className="h-4 w-4 text-amber-700" />,
+      placeholder: 'Pedidos em preparação na cozinha ou separação',
+    },
+    {
+      id: 'PRONTO_ENTREGA',
+      title: 'Pronto para entrega',
+      color: 'bg-teal-50',
+      borderColor: 'border-teal-300',
+      icon: <MdLocalShipping className="h-4 w-4 text-teal-700" />,
+      placeholder: 'Pedidos prontos para retirada ou envio',
+    },
+    {
+      id: 'EM_ROTA',
+      title: 'Em Rota',
+      color: 'bg-indigo-50',
+      borderColor: 'border-indigo-300',
+      icon: <MdRoute className="h-4 w-4 text-indigo-700" />,
+      placeholder: 'Pedidos a caminho do cliente',
+    },
     {
       id: 'FINALIZADAS',
       title: 'Finalizadas',
@@ -1049,6 +1112,12 @@ export function FiscalFlowKanban() {
     let vendas: Venda[] = []
 
     switch (columnId) {
+      case 'NOVOS_PEDIDOS':
+      case 'EM_PREPARO':
+      case 'PRONTO_ENTREGA':
+      case 'EM_ROTA':
+        vendas = []
+        break
       case 'FINALIZADAS':
         vendas = vendasParaFiltrar.filter(
           (v: Venda) => getEtapaKanbanParaExibicao(v) === 'FINALIZADAS'
@@ -1075,9 +1144,11 @@ export function FiscalFlowKanban() {
     })
 
     const criterio =
-      criterioOrdenacaoPorColuna[columnId as ColunaId] ?? ('data' as CriterioOrdenacaoKanban)
+      criterioOrdenacaoPorColuna[columnId as ColunaKanbanId] ??
+      ('data' as CriterioOrdenacaoKanban)
     const direcao =
-      direcaoOrdenacaoPorColuna[columnId as ColunaId] ?? ('desc' as DirecaoOrdenacaoKanban)
+      direcaoOrdenacaoPorColuna[columnId as ColunaKanbanId] ??
+      ('desc' as DirecaoOrdenacaoKanban)
     let ordenadas = ordenarVendasKanbanPorCriterio(
       Array.from(vendasUnicas.values()),
       criterio,
@@ -1306,12 +1377,12 @@ export function FiscalFlowKanban() {
                       <span className="text-[11px] font-medium text-gray-700">Ordem</span>
                       <FormControl size="small" sx={{ minWidth: 80 }}>
                         <Select
-                          value={criterioOrdenacaoPorColuna[column.id as ColunaId] ?? 'data'}
+                          value={criterioOrdenacaoPorColuna[column.id as ColunaKanbanId] ?? 'data'}
                           onChange={e => {
                             const next = e.target.value as CriterioOrdenacaoKanban
                             setCriterioOrdenacaoPorColuna(prev => ({
                               ...prev,
-                              [column.id as ColunaId]: next,
+                              [column.id as ColunaKanbanId]: next,
                             }))
                           }}
                           MenuProps={{
@@ -1350,7 +1421,7 @@ export function FiscalFlowKanban() {
                         type="button"
                         className="flex h-6 w-5 items-center justify-center rounded bg-white/70 text-gray-700 hover:bg-white"
                         onClick={() => {
-                          const colId = column.id as ColunaId
+                          const colId = column.id as ColunaKanbanId
                           setDirecaoOrdenacaoPorColuna(prev => ({
                             ...prev,
                             [colId]: prev[colId] === 'asc' ? 'desc' : 'asc',
@@ -1359,7 +1430,7 @@ export function FiscalFlowKanban() {
                         aria-label="Alternar direção da ordenação"
                         title="Alternar: crescente/decrescente"
                       >
-                        {direcaoOrdenacaoPorColuna[column.id as ColunaId] === 'asc' ? (
+                        {direcaoOrdenacaoPorColuna[column.id as ColunaKanbanId] === 'asc' ? (
                           <MdArrowUpward className="h-4 w-4" />
                         ) : (
                           <MdArrowDownward className="h-4 w-4" />

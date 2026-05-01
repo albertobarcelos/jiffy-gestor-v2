@@ -36,6 +36,7 @@ import {
   useCancelarVendaGestor,
   useCancelarNotaFiscalVendaPdv,
   useCancelarNotaFiscalVendaGestor,
+  useFinalzarVendaGestor,
 } from '@/src/presentation/hooks/useVendas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
@@ -353,6 +354,7 @@ export function NovoPedidoModal({
   const cancelarVendaGestor = useCancelarVendaGestor()
   const cancelarNotaFiscalVendaPdv = useCancelarNotaFiscalVendaPdv()
   const cancelarNotaFiscalVendaGestor = useCancelarNotaFiscalVendaGestor()
+  const finalizarVendaGestor = useFinalzarVendaGestor()
 
   const [origem, setOrigem] = useState<OrigemVenda>('GESTOR')
   const [status, setStatus] = useState<StatusVenda>('FINALIZADA')
@@ -1537,6 +1539,18 @@ export function NovoPedidoModal({
 
       if (idCriado) {
         setVendaIdCriada(idCriado)
+
+        // O novo contrato do backend cria vendas como "pendente" e requer chamada
+        // explícita a /finalizar para pedidos que nasceram finalizados (balcão/gestor).
+        if (status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') {
+          try {
+            await finalizarVendaGestor.mutateAsync({ id: idCriado })
+          } catch {
+            // Falha silenciosa: a venda foi criada; o detalhe mostrará o statusOperacional
+            // correto ao carregar, e o usuário pode tentar novamente se necessário.
+          }
+        }
+
         await carregarVendaExistente(idCriado)
       }
     } catch (error: any) {

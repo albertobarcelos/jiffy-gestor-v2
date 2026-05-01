@@ -1316,3 +1316,51 @@ export function useExcluirVendaGestor() {
     },
   })
 }
+
+/**
+ * Hook para finalizar a etapa operacional de uma venda gestor.
+ * O novo contrato do backend cria vendas como "pendente" e requer esta chamada explícita
+ * para mover para "finalizado" e preencher dataFinalizacao.
+ * Chamado automaticamente em NovoPedidoModal quando o usuário escolhe statusVenda FINALIZADA
+ * ou PENDENTE_EMISSAO, logo após o POST de criação.
+ */
+export function useFinalzarVendaGestor() {
+  const { auth } = useAuthStore()
+  const queryClient = useQueryClient()
+  const token = auth?.getAccessToken()
+
+  return useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      if (!token) {
+        throw new Error('Token não encontrado')
+      }
+
+      const response = await fetch(`/api/vendas/gestor/${id}/finalizar`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = resolveDomainErrorMessage(
+          errorData,
+          `Erro ${response.status}: ${response.statusText}`
+        )
+        throw new Error(errorMessage)
+      }
+
+      return await response.json()
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['vendas'] })
+      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id] })
+    },
+    onError: (error: Error) => {
+      showToast.error(error.message || 'Erro ao finalizar venda gestor')
+    },
+  })
+}
