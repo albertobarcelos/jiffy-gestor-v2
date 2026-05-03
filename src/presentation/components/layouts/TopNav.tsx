@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useQueryClient } from '@tanstack/react-query'
-import { MdDashboard, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose } from 'react-icons/md'
+import { MdDashboard, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose, MdDeliveryDining } from 'react-icons/md'
 import { 
   MdInventory2, 
   MdShoppingBag, 
@@ -157,6 +157,7 @@ export function TopNav() {
       children: [
         { name: 'Perfis PDV', path: '/cadastros/perfis-usuarios-pdv', icon: MdGroup },
         { name: 'Usuários PDV', path: '/cadastros/usuarios', icon: MdPerson },
+        { name: 'Entregadores', path: '/cadastros/entregadores', icon: MdDeliveryDining },
         { name: 'Perfis Gestor', path: '/cadastros/perfis-gestor', icon: MdAccountBalance },
         { name: 'Usuários Gestor', path: '/cadastros/usuarios-gestor', icon: MdPerson },
         { name: 'Clientes', path: '/cadastros/clientes', icon: MdPeople },

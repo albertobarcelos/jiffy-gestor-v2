@@ -9,6 +9,7 @@ export const AtualizarUsuarioSchema = z.object({
   ativo: z.boolean().optional(),
   password: z.string().min(4, 'Senha deve ter no mínimo 4 caracteres').max(4, 'Senha deve ter exatamente 4 caracteres').optional(),
   perfilPdvId: z.string().optional(),
+  tipoUsuarioPdv: z.string().optional(),
 })
 
 export type AtualizarUsuarioDTO = z.infer<typeof AtualizarUsuarioSchema>

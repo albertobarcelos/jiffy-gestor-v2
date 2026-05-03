@@ -8,6 +8,7 @@ interface UsuariosQueryParams {
   q?: string
   name?: string
   perfilPdvId?: string
+  tipoUsuarioPdv?: string
   ativo?: boolean | null
   limit?: number
   offset?: number
@@ -37,6 +38,7 @@ export function useUsuariosInfinite(params: Omit<UsuariosQueryParams, 'offset'> 
       if (params.q) searchParams.append('q', params.q)
       if (params.name) searchParams.append('name', params.name)
       if (params.perfilPdvId) searchParams.append('perfilPdvId', params.perfilPdvId)
+      if (params.tipoUsuarioPdv) searchParams.append('tipoUsuarioPdv', params.tipoUsuarioPdv)
       if (params.ativo !== undefined && params.ativo !== null) {
         searchParams.append('ativo', params.ativo.toString())
       }

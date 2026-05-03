@@ -40,6 +40,8 @@ interface EntregaClienteSelectorProps {
   onClienteVinculado: (cliente: ClienteEntrega | null) => void
   /** Duplo clique no campo nome com cliente já encontrado — abre o mesmo modal de edição da página de clientes. */
   onEditarClientePorDuploClique?: () => void
+  /** Abre o seletor completo de clientes quando a busca por telefone não for possível. */
+  onAbrirSeletorCliente?: () => void
   /**
    * Modo controlado: telefone exibido + últimos dígitos usados na busca (ex.: wizard com troca de etapa).
    * Se os quatro forem passados, o estado local de telefone não é usado.
@@ -166,6 +168,7 @@ export function EntregaClienteSelector({
   clienteVinculado,
   onClienteVinculado,
   onEditarClientePorDuploClique,
+  onAbrirSeletorCliente,
   telefoneExibicaoExterno,
   onTelefoneExibicaoExternoChange,
   digitosUltimaBuscaExterno,
@@ -246,7 +249,10 @@ export function EntregaClienteSelector({
 
   const handleBuscar = useCallback(async () => {
     const digitos = extrairDigitosTelefone(telefoneInput)
-    if (digitos.length < 8) return
+    if (digitos.length < 8) {
+      onAbrirSeletorCliente?.()
+      return
+    }
 
     setClienteNaoEncontrado(false)
     onClienteVinculado(null)
@@ -263,7 +269,14 @@ export function EntregaClienteSelector({
     } catch {
       setClienteNaoEncontrado(true)
     }
-  }, [telefoneInput, buscarCliente, onClienteVinculado, onMoradaSelecionada, setTelefoneBuscado])
+  }, [
+    telefoneInput,
+    buscarCliente,
+    onClienteVinculado,
+    onMoradaSelecionada,
+    setTelefoneBuscado,
+    onAbrirSeletorCliente,
+  ])
 
   const handleTelefoneKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -413,7 +426,7 @@ export function EntregaClienteSelector({
   }, [nomeDigitado])
 
   const moradasEncontradas = moradas ?? []
-  const buscaRealizada = telefoneBuscado !== null
+  const buscaRealizada = telefoneBuscado !== null || clienteVinculado !== null
   const buscandoCliente = buscarCliente.isPending
 
   return (
@@ -431,17 +444,24 @@ export function EntregaClienteSelector({
               />
               <input
                 type="text"
-                value={clienteVinculado ? clienteVinculado.nome : nomeDigitado}
+                value={
+                  buscandoCliente
+                    ? 'Buscando cliente...'
+                    : clienteVinculado
+                      ? clienteVinculado.nome
+                      : nomeDigitado
+                }
                 onChange={e => {
+                  if (buscandoCliente) return
                   if (clienteVinculado) {
                     onClienteVinculado(null)
                     setClienteNaoEncontrado(false)
                   }
                   setNomeDigitado(e.target.value)
                 }}
-                readOnly={!!clienteVinculado}
+                readOnly={!!clienteVinculado || buscandoCliente}
                 placeholder="Ex.: João Silva"
-                autoFocus
+                autoFocus={!buscandoCliente}
                 title={
                   clienteVinculado?.id
                     ? 'Para editar precisa clicar duas vezes neste campo.'
@@ -450,6 +470,8 @@ export function EntregaClienteSelector({
                 className={`w-full rounded-md border py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-0 ${
                   clienteVinculado
                     ? 'cursor-pointer select-none border-green-400 bg-green-50 text-green-800'
+                    : buscandoCliente
+                      ? 'cursor-wait border-primary/30 bg-gray-50 text-secondary-text'
                     : 'border-primary/30 bg-white'
                 }`}
                 onMouseDown={e => {
@@ -469,6 +491,9 @@ export function EntregaClienteSelector({
                   }
                 }}
               />
+              {buscandoCliente && (
+                <span className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              )}
             </div>
             {clienteVinculado && (
               <p className="mt-1 flex items-center gap-1 text-xs text-green-700">
@@ -523,7 +548,9 @@ export function EntregaClienteSelector({
               variant="outlined"
               onClick={() => void handleBuscar()}
               disabled={
-                extrairDigitosTelefone(telefoneInput).length < 8 || buscando || buscandoCliente
+                (!onAbrirSeletorCliente && extrairDigitosTelefone(telefoneInput).length < 8) ||
+                buscando ||
+                buscandoCliente
               }
               className="flex-shrink-0 border-primary/30 hover:bg-primary/10"
               title="Buscar cliente e endereços"
@@ -539,7 +566,7 @@ export function EntregaClienteSelector({
       </div>
 
       {/* Resultado da busca */}
-      {buscaRealizada && !buscando && (
+      {telefoneBuscado !== null && !buscando && (
         <div className="space-y-2">
           {moradasEncontradas.length > 0 ? (
             <>

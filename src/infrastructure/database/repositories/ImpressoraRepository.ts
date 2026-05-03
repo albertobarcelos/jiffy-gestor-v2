@@ -1,6 +1,28 @@
 import { IImpressoraRepository, BuscarImpressorasParams, CriarImpressoraDTO, AtualizarImpressoraDTO } from '@/src/domain/repositories/IImpressoraRepository'
 import { Impressora } from '@/src/domain/entities/Impressora'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
+import { logImpressao, warnImpressao } from '@/src/shared/utils/logImpressaoDelivery'
+
+function extrairListaImpressoras(payload: unknown): { items: any[]; count: number } {
+  if (Array.isArray(payload)) {
+    return { items: payload, count: payload.length }
+  }
+
+  if (!payload || typeof payload !== 'object') {
+    return { items: [], count: 0 }
+  }
+
+  const o = payload as Record<string, unknown>
+  const candidates = [o.items, o.data, o.results, o.impressoras]
+  const items = candidates.find(Array.isArray) as any[] | undefined
+  const countRaw = o.count ?? o.total ?? o.totalItems ?? o.totalCount
+  const count = Number(countRaw)
+
+  return {
+    items: items ?? [],
+    count: Number.isFinite(count) ? count : items?.length ?? 0,
+  }
+}
 
 /**
  * Implementação do repositório de impressoras
@@ -31,10 +53,7 @@ export class ImpressoraRepository implements IImpressoraRepository {
         url += `&q=${encodeURIComponent(q)}`
       }
 
-      const response = await this.apiClient.request<{
-        items: any[]
-        count: number
-      }>(url, {
+      const response = await this.apiClient.request<unknown>(url, {
         method: 'GET',
         headers: this.token
           ? {
@@ -43,13 +62,35 @@ export class ImpressoraRepository implements IImpressoraRepository {
           : {},
       })
 
-      const impressoras = (response.data.items || []).map((item) =>
-        Impressora.fromJSON(item)
-      )
+      const normalizado = extrairListaImpressoras(response.data)
+      logImpressao('repo.impressoras.buscar.resposta_upstream', {
+        url,
+        status: response.status,
+        qItemsNormalizados: normalizado.items.length,
+        countNormalizado: normalizado.count,
+        chavesPayload:
+          response.data && typeof response.data === 'object'
+            ? Object.keys(response.data as Record<string, unknown>)
+            : [],
+      })
+
+      const impressoras = normalizado.items
+        .map((item) => {
+          try {
+            return Impressora.fromJSON(item)
+          } catch (error) {
+            warnImpressao('repo.impressoras.item_invalido', {
+              motivo: error instanceof Error ? error.message : String(error),
+              chaves: item && typeof item === 'object' ? Object.keys(item) : [],
+            })
+            return null
+          }
+        })
+        .filter((item): item is Impressora => item !== null)
 
       return {
         impressoras,
-        total: response.data.count || 0,
+        total: normalizado.count,
       }
     } catch (error) {
       if (error instanceof ApiError) {

@@ -31,6 +31,36 @@ interface AuthStorage {
   isAuthenticated: boolean
 }
 
+function authToStorageShape(auth: Auth | AuthStorage['auth'] | null): AuthStorage['auth'] | null {
+  if (auth == null) return null
+  if (typeof (auth as Auth).toJSON === 'function') {
+    return (auth as Auth).toJSON() as AuthStorage['auth']
+  }
+  const plain = auth as AuthStorage['auth']
+  if (
+    plain &&
+    typeof plain.accessToken === 'string' &&
+    plain.user &&
+    typeof plain.user.id === 'string' &&
+    typeof plain.user.email === 'string'
+  ) {
+    const expiresAt =
+      typeof plain.expiresAt === 'string'
+        ? plain.expiresAt
+        : new Date(plain.expiresAt as unknown as string).toISOString()
+    return {
+      accessToken: plain.accessToken,
+      user: {
+        id: plain.user.id,
+        email: plain.user.email,
+        name: plain.user.name,
+      },
+      expiresAt,
+    }
+  }
+  return null
+}
+
 /**
  * Store de autenticação usando Zustand
  * Gerencia o estado de autenticação do usuário
@@ -103,7 +133,7 @@ export const useAuthStore = create<AuthState>()(
       name: 'auth-storage',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        auth: state.auth ? (state.auth.toJSON() as unknown as AuthStorage['auth']) : null,
+        auth: authToStorageShape(state.auth),
         isAuthenticated: state.isAuthenticated,
       }),
       onRehydrateStorage: () => (state) => {

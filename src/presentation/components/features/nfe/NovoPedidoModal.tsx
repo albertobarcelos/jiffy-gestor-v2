@@ -28,6 +28,7 @@ import { Textarea } from '@/src/presentation/components/ui/textarea'
 import { useQuery } from '@tanstack/react-query'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
+import { useTaxasInfinite } from '@/src/presentation/hooks/useTaxas'
 import { Produto } from '@/src/domain/entities/Produto'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -39,6 +40,8 @@ import {
   useFinalzarVendaGestor,
 } from '@/src/presentation/hooks/useVendas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import { useImpressaoDelivery } from '@/src/presentation/hooks/useImpressaoDelivery'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { extractTokenInfo } from '@/src/shared/utils/validateToken'
 import {
@@ -60,6 +63,8 @@ import {
   MdExpandLess,
   MdExpandMore,
   MdCancel,
+  MdAccessTime,
+  MdDeliveryDining,
 } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import {
@@ -159,8 +164,10 @@ interface ProdutoSelecionado {
 }
 
 interface PagamentoSelecionado {
+  id?: string
   meioPagamentoId: string
   valor: number
+  cobrarNaEntrega?: boolean
   realizadoPorId?: string
   cancelado?: boolean
   canceladoPorId?: string
@@ -192,6 +199,7 @@ function pagamentoEstaCancelado(p: PagamentoSelecionado): boolean {
  */
 function pagamentoContaComoEfetivo(p: PagamentoSelecionado): boolean {
   if (pagamentoEstaCancelado(p)) return false
+  if (p.cobrarNaEntrega === true) return false
 
   const usaTef = p.isTefUsed === true
   if (usaTef) {
@@ -242,8 +250,16 @@ function mapearPagamentoDetalheVenda(pag: Record<string, unknown>): PagamentoSel
   }
 
   return {
-    meioPagamentoId: String(p.meioPagamentoId ?? p.id ?? ''),
+    id: p.id != null ? String(p.id) : p.pagamentoId != null ? String(p.pagamentoId) : undefined,
+    meioPagamentoId: String(
+      p.meioPagamentoId ?? p.meio_pagamento_id ?? p.meioPagamento?.id ?? ''
+    ),
     valor: typeof p.valor === 'number' ? p.valor : Number(p.valor) || 0,
+    cobrarNaEntrega:
+      p.cobrarNaEntrega === true ||
+      p.cobrar_na_entrega === true ||
+      p.cobrarNaEntrega === 'true' ||
+      p.cobrar_na_entrega === 'true',
     realizadoPorId: p.realizadoPorId ?? p.realizado_por_id ?? undefined,
     cancelado,
     canceladoPorId: p.canceladoPorId ?? p.cancelado_por_id ?? undefined,
@@ -262,6 +278,30 @@ function mapearPagamentoDetalheVenda(pag: Record<string, unknown>): PagamentoSel
 
 type OrigemVenda = 'GESTOR' | 'IFOOD' | 'RAPPI' | 'OUTROS'
 type StatusVenda = 'ABERTA' | 'FINALIZADA' | 'PENDENTE_EMISSAO'
+type FluxoPagamentoEntrega = 'cobrar_entregador' | 'ja_pago'
+
+const TEMPOS_PREVISTOS_ENTREGA = [30, 45, 60, 75, 90, 120]
+const SEM_ENTREGADOR_VALUE = '__sem_entregador__'
+const SEM_TAXA_ENTREGA_VALUE = '__sem_taxa_entrega__'
+const ULTIMO_ENTREGADOR_STORAGE_KEY = 'jiffy:delivery:last-entregador-id'
+
+interface UsuarioPdvEntregadorOption {
+  id: string
+  nome: string
+  telefone?: string
+}
+
+function getUltimoEntregadorSelecionado(): string {
+  if (typeof window === 'undefined') return ''
+  return window.localStorage.getItem(ULTIMO_ENTREGADOR_STORAGE_KEY) ?? ''
+}
+
+function setUltimoEntregadorSelecionado(entregadorId: string): void {
+  if (typeof window === 'undefined') return
+  if (entregadorId) {
+    window.localStorage.setItem(ULTIMO_ENTREGADOR_STORAGE_KEY, entregadorId)
+  }
+}
 
 /**
  * Pedidos entrega devem nascer abertos (triagem / Novos Pedidos no Kanban).
@@ -371,6 +411,8 @@ export function NovoPedidoModal({
   tipoInicioPedido = 'balcao',
 }: NovoPedidoModalProps) {
   const { auth } = useAuthStore()
+  const { preferenciasImpressaoDelivery } = useEmpresaMe()
+  const { processarAposTransicaoVendaGestorId } = useImpressaoDelivery()
   const createVendaGestor = useCreateVendaGestor()
   const cancelarVendaGestor = useCancelarVendaGestor()
   const cancelarNotaFiscalVendaPdv = useCancelarNotaFiscalVendaPdv()
@@ -385,6 +427,8 @@ export function NovoPedidoModal({
   const [pagamentos, setPagamentos] = useState<PagamentoSelecionado[]>([])
   const [meioPagamentoId, setMeioPagamentoId] = useState<string>('')
   const [valorRecebido, setValorRecebido] = useState<string>('')
+  const [fluxoPagamentoEntrega, setFluxoPagamentoEntrega] =
+    useState<FluxoPagamentoEntrega>('cobrar_entregador')
   const [grupoSelecionadoId, setGrupoSelecionadoId] = useState<string | null>(null)
   // Lista de grupos recolhível no passo 2: quando oculta, a área de produtos selecionados aumenta
   const [gruposExpandido, setGruposExpandido] = useState(true)
@@ -399,6 +443,9 @@ export function NovoPedidoModal({
    */
   const [telefoneBuscaEntrega, setTelefoneBuscaEntrega] = useState('')
   const [telefoneBuscadoEntrega, setTelefoneBuscadoEntrega] = useState<string | null>(null)
+  const [tempoPrevistoMinutos, setTempoPrevistoMinutos] = useState<number>(45)
+  const [entregadorId, setEntregadorId] = useState<string>('')
+  const [taxaEntregaId, setTaxaEntregaId] = useState<string>('')
   /**
    * Cliente vinculado encontrado ou criado no fluxo entrega.
    * Elevado ao pai para persistir entre etapas.
@@ -412,6 +459,7 @@ export function NovoPedidoModal({
 
   // Estados para carregamento de venda existente
   const [isLoadingVenda, setIsLoadingVenda] = useState(false)
+  const [isSavingPagamentoEntrega, setIsSavingPagamentoEntrega] = useState(false)
   const [dataVenda, setDataVenda] = useState<string>('') // Data da venda para exibição
   const [valorFinalVenda, setValorFinalVenda] = useState<number | null>(null) // Valor final da venda do backend (quando carregando pedido existente)
   // Metadados da venda gestor carregada (cancelamento — ver docs/CANCELAR_VENDA_GESTOR.md)
@@ -622,6 +670,19 @@ export function NovoPedidoModal({
 
   // Handler para seleção de cliente
   const handleSelectCliente = (cliente: Cliente) => {
+    if (tipoInicioPedido === 'entrega') {
+      const telefone = cliente.getTelefone()?.trim() ?? ''
+      const telefoneDigitos = telefone.replace(/\D/g, '')
+
+      setClienteEntregaVinculado({ id: cliente.getId(), nome: cliente.getNome() })
+      if (telefone) {
+        setTelefoneBuscaEntrega(telefone)
+        setTelefoneBuscadoEntrega(telefoneDigitos.length >= 8 ? telefoneDigitos : null)
+      }
+      setMoradaEntregaSelecionada(null)
+      return
+    }
+
     setClienteId(cliente.getId())
     setClienteNome(cliente.getNome())
   }
@@ -828,6 +889,74 @@ export function NovoPedidoModal({
     return meiosPagamentoData.pages.flatMap(page => page.meiosPagamento || [])
   }, [meiosPagamentoData])
 
+  const entregadoresQuery = useQuery({
+    queryKey: ['usuarios-pdv-entregadores', { tipoUsuarioPdv: 'entregador' }],
+    queryFn: async (): Promise<UsuarioPdvEntregadorOption[]> => {
+      const token = auth?.getAccessToken()
+      if (!token) return []
+
+      const response = await fetch('/api/usuarios-pdv/entregadores?limit=100&offset=0', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+        cache: 'no-store',
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Erro ao carregar entregadores')
+      }
+
+      const data = await response.json()
+      const items = Array.isArray(data.items) ? data.items : []
+      return items
+        .filter((item: any) => {
+          const tipo = String(item.tipoUsuarioPdv ?? '')
+            .trim()
+            .toLowerCase()
+          return tipo === 'entregador'
+        })
+        .map((item: any) => ({
+          id: String(item.id ?? item.usuarioId ?? ''),
+          nome: String(item.nome ?? item.name ?? '').trim(),
+          telefone: item.telefone != null ? String(item.telefone) : undefined,
+        }))
+        .filter((item: UsuarioPdvEntregadorOption) => item.id && item.nome)
+    },
+    enabled: open && !modoVisualizacao && tipoInicioPedido === 'entrega',
+    staleTime: 1000 * 60 * 5,
+    retry: 1,
+    refetchOnWindowFocus: false,
+  })
+
+  const entregadores = entregadoresQuery.data ?? []
+  const taxasEntregaQuery = useTaxasInfinite({ limit: 100 })
+  const refetchTaxasEntrega = taxasEntregaQuery.refetch
+  const taxasEntrega = useMemo(() => {
+    return (taxasEntregaQuery.data?.pages.flatMap(page => page.taxas) ?? []).filter(taxa => {
+      return taxa.isAtivo() && taxa.getTipo().trim().toLowerCase() === 'entrega'
+    })
+  }, [taxasEntregaQuery.data])
+
+  useEffect(() => {
+    if (!open || modoVisualizacao || tipoInicioPedido !== 'entrega') return
+    void refetchTaxasEntrega()
+  }, [open, modoVisualizacao, tipoInicioPedido, refetchTaxasEntrega])
+
+  useEffect(() => {
+    if (!open || vendaId || modoVisualizacao || tipoInicioPedido !== 'entrega' || entregadorId) return
+    if (entregadores.length === 0) return
+
+    const ultimoEntregadorId = getUltimoEntregadorSelecionado()
+    if (!ultimoEntregadorId) return
+
+    const entregadorAindaDisponivel = entregadores.some(entregador => entregador.id === ultimoEntregadorId)
+    if (entregadorAindaDisponivel) {
+      setEntregadorId(ultimoEntregadorId)
+    }
+  }, [open, vendaId, modoVisualizacao, tipoInicioPedido, entregadorId, entregadores])
+
   /** Primeira carga ou fetch sem cache ainda — evita área vazia sem feedback */
   const mostrarLoadingFormasPagamento =
     isPendingMeiosPagamento || (isFetchingMeiosPagamento && meiosPagamentoData === undefined)
@@ -861,6 +990,13 @@ export function NovoPedidoModal({
     status === 'FINALIZADA' ||
     status === 'PENDENTE_EMISSAO' ||
     (tipoInicioPedido === 'entrega' && status === 'ABERTA')
+  const pedidoEntregaAceitaPagamentoPendente = tipoInicioPedido === 'entrega' && status === 'ABERTA'
+  const entregaComCobrancaPeloEntregador =
+    pedidoEntregaAceitaPagamentoPendente && fluxoPagamentoEntrega === 'cobrar_entregador'
+  const pagamentoModoCobranca =
+    fluxoPagamentoEntrega === 'cobrar_entregador' &&
+    (pedidoEntregaAceitaPagamentoPendente ||
+      (currentStep === 4 && tabelaOrigemVenda === 'venda_gestor' && !dataFinalizacaoCarregada))
 
   // Novo pedido (sem venda carregada): alinhar status ao tipo de fluxo ao abrir o painel
   useEffect(() => {
@@ -1004,7 +1140,7 @@ export function NovoPedidoModal({
   // Calcular totais do pedido
   // Se estiver carregando um pedido existente, usar valorFinal do backend
   // Caso contrário, calcular a partir dos produtos
-  const totalProdutos = useMemo(() => {
+  const subtotalProdutos = useMemo(() => {
     // Se temos valorFinal da venda (pedido existente), usar ele diretamente
     if (valorFinalVenda !== null) {
       return valorFinalVenda
@@ -1017,9 +1153,35 @@ export function NovoPedidoModal({
     }, 0)
   }, [produtos, valorFinalVenda])
 
+  const taxaEntregaSelecionada = useMemo(
+    () => taxasEntrega.find(taxa => taxa.getId() === taxaEntregaId) ?? null,
+    [taxaEntregaId, taxasEntrega]
+  )
+
+  const valorTaxaEntrega = useMemo(() => {
+    if (!taxaEntregaSelecionada || valorFinalVenda !== null) return 0
+    const valor = taxaEntregaSelecionada.getValor()
+    return valor
+  }, [subtotalProdutos, taxaEntregaSelecionada, valorFinalVenda])
+
+  const totalProdutos = useMemo(
+    () => subtotalProdutos + valorTaxaEntrega,
+    [subtotalProdutos, valorTaxaEntrega]
+  )
+
+  const totalItensPedido = useMemo(() => {
+    return produtos.reduce((total, produto) => total + Math.max(0, Number(produto.quantidade) || 0), 0)
+  }, [produtos])
+
   const totalPagamentos = useMemo(() => {
     return pagamentos.reduce((sum, p) => {
       return sum + (pagamentoContaComoEfetivo(p) ? p.valor : 0)
+    }, 0)
+  }, [pagamentos])
+
+  const totalPagamentosLancados = useMemo(() => {
+    return pagamentos.reduce((sum, p) => {
+      return sum + (!pagamentoEstaCancelado(p) ? p.valor : 0)
     }, 0)
   }, [pagamentos])
 
@@ -1027,6 +1189,32 @@ export function NovoPedidoModal({
   const valorAPagar = useMemo(() => {
     return Math.max(0, totalProdutos - totalPagamentos)
   }, [totalProdutos, totalPagamentos])
+
+  const valorAPagarLancamento = useMemo(() => {
+    if (pagamentoModoCobranca) {
+      return Math.max(0, totalProdutos - totalPagamentosLancados)
+    }
+    return valorAPagar
+  }, [pagamentoModoCobranca, totalProdutos, totalPagamentosLancados, valorAPagar])
+
+  const statusPagamentoPedido = useMemo<'pendente' | 'parcial' | 'pago'>(() => {
+    if (totalPagamentos <= 0) return 'pendente'
+    if (valorAPagar > 0.01) return 'parcial'
+    return 'pago'
+  }, [totalPagamentos, valorAPagar])
+
+  const rotuloStatusPagamento = useMemo(() => {
+    if (statusPagamentoPedido === 'pago') return 'Pago'
+    if (statusPagamentoPedido === 'parcial') return 'Parcial'
+    return 'Pendente'
+  }, [statusPagamentoPedido])
+
+  const statusPagamentoExibicao = pagamentoModoCobranca
+    ? 'pendente'
+    : statusPagamentoPedido
+  const rotuloStatusPagamentoExibicao = pagamentoModoCobranca
+    ? 'Pendente'
+    : rotuloStatusPagamento
 
   // Troco: só pagamentos efetivos entram; procura o último dinheiro efetivo na ordem original
   const troco = useMemo(() => {
@@ -1056,6 +1244,35 @@ export function NovoPedidoModal({
 
     return 0
   }, [totalProdutos, pagamentos, meiosPagamento])
+
+  const trocoLancamento = useMemo(() => {
+    if (!pagamentoModoCobranca) return troco
+    if (pagamentos.length === 0) return 0
+
+    for (let i = pagamentos.length - 1; i >= 0; i--) {
+      const p = pagamentos[i]
+      if (pagamentoEstaCancelado(p)) continue
+
+      const meioUltimoPagamento = meiosPagamento.find(m => m.getId() === p.meioPagamentoId)
+      if (!meioUltimoPagamento) continue
+
+      const nomeMeio = meioUltimoPagamento.getNome().toLowerCase()
+      const isDinheiro = nomeMeio.includes('dinheiro') || nomeMeio.includes('cash')
+      if (!isDinheiro) continue
+
+      const totalAntes = pagamentos.slice(0, i).reduce((acc, x) => {
+        return acc + (!pagamentoEstaCancelado(x) ? x.valor : 0)
+      }, 0)
+      const valorFaltavaPagar = totalProdutos - totalAntes
+
+      if (p.valor > valorFaltavaPagar) {
+        return p.valor - valorFaltavaPagar
+      }
+      return 0
+    }
+
+    return 0
+  }, [pagamentoModoCobranca, troco, pagamentos, meiosPagamento, totalProdutos])
 
   /** Lista do passo 4 (aba Pagamentos): igual ao filtro de exibição em DetalhesVendas */
   const pagamentosVisiveisNaAbaDetalhes = useMemo(
@@ -1092,6 +1309,24 @@ export function NovoPedidoModal({
       resumoFiscal?.status,
       statusFiscalUnificado,
       statusVendaTextoApiDetalhe,
+    ]
+  )
+
+  const podeEditarPagamentoEntregaEmAberto = useMemo(
+    () =>
+      modoVisualizacao === true &&
+      tabelaOrigemVenda === 'venda_gestor' &&
+      Boolean(vendaId) &&
+      !dataFinalizacaoCarregada &&
+      !vendaGestorJaCancelada &&
+      currentStep === 4,
+    [
+      modoVisualizacao,
+      tabelaOrigemVenda,
+      vendaId,
+      dataFinalizacaoCarregada,
+      vendaGestorJaCancelada,
+      currentStep,
     ]
   )
 
@@ -1186,6 +1421,7 @@ export function NovoPedidoModal({
 
   // Função para adicionar pagamento ao clicar no card
   const adicionarPagamentoPorCard = (meioPagamentoIdSelecionado: string) => {
+    const saldoParaLancar = pagamentoModoCobranca ? valorAPagarLancamento : valorAPagar
     // Se não houver valor digitado, usar o valor a pagar
     let valorParaUsar = 0
 
@@ -1195,7 +1431,7 @@ export function NovoPedidoModal({
       valorParaUsar = parseFloat(valorLimpo) || 0
     } else {
       // Se não digitou valor, usar o valor a pagar
-      valorParaUsar = valorAPagar
+      valorParaUsar = saldoParaLancar
     }
 
     if (valorParaUsar <= 0) {
@@ -1207,7 +1443,7 @@ export function NovoPedidoModal({
     const isDinheiro = isMeioPagamentoDinheiro(meioPagamentoIdSelecionado)
 
     // Se não for dinheiro, limitar ao valor a pagar exato
-    if (!isDinheiro && valorParaUsar > valorAPagar) {
+    if (!isDinheiro && valorParaUsar > saldoParaLancar) {
       showToast.error(`Este meio de pagamento não pode ultrapassar o valor a pagar.`)
       return
     }
@@ -1225,6 +1461,7 @@ export function NovoPedidoModal({
       {
         meioPagamentoId: meioPagamentoIdSelecionado,
         valor: valorParaUsar,
+        cobrarNaEntrega: pagamentoModoCobranca,
       },
     ])
 
@@ -1512,8 +1749,11 @@ export function NovoPedidoModal({
     setMeioPagamentoId('')
   }
 
-  const removerPagamento = (index: number) => {
-    setPagamentos(pagamentos.filter((_, i) => i !== index))
+  const removerPagamento = (index: number, pagamentoId?: string) => {
+    setPagamentos(prev => {
+      if (pagamentoId) return prev.filter(p => p.id !== pagamentoId)
+      return prev.filter((_, i) => i !== index)
+    })
   }
 
   const atualizarPagamento = (index: number, valor: number) => {
@@ -1521,6 +1761,117 @@ export function NovoPedidoModal({
     novosPagamentos[index] = { ...novosPagamentos[index], valor }
     setPagamentos(novosPagamentos)
   }
+
+  const buildMeiosCobrancaPayload = useCallback(
+    (pagamentosBase: PagamentoSelecionado[]) =>
+      pagamentosBase.map(p => {
+        const meio = meiosPagamento.find(m => m.getId() === p.meioPagamentoId)
+        return {
+          meioPagamentoId: p.meioPagamentoId,
+          nome:
+            meio?.getNome?.() ||
+            nomesMeiosPagamentoPedido[p.meioPagamentoId] ||
+            'Meio de pagamento',
+          valor: p.valor,
+        }
+      }),
+    [meiosPagamento, nomesMeiosPagamentoPedido]
+  )
+
+  const buildPagamentosPayload = useCallback(
+    (
+      pagamentosBase: PagamentoSelecionado[],
+      cobrarNaEntrega: boolean,
+      incluirIdFormaPagamento = false
+    ) =>
+      pagamentosBase.map(p => ({
+        ...(incluirIdFormaPagamento ? { id: p.meioPagamentoId } : {}),
+        meioPagamentoId: p.meioPagamentoId,
+        valor: p.valor,
+        cobrarNaEntrega,
+      })),
+    []
+  )
+
+  const buildPagamentosPatchMeiosPayload = useCallback(
+    (pagamentosBase: PagamentoSelecionado[]) =>
+      pagamentosBase.map(p => ({
+        meioPagamentoId: p.meioPagamentoId,
+        valor: p.valor,
+      })),
+    []
+  )
+
+  const handleSalvarPagamentoEntregaEmAberto = useCallback(async () => {
+    if (!vendaId || tabelaOrigemVenda !== 'venda_gestor') return
+    if (pagamentos.length === 0) {
+      showToast.error('Informe pelo menos uma forma de pagamento para cobrança.')
+      return
+    }
+
+    const token = auth?.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado. Faça login novamente.')
+      return
+    }
+
+    const pagamentosPayload = buildPagamentosPatchMeiosPayload(pagamentos)
+    const diferencaPagamentoEntrega = totalProdutos - totalPagamentosLancados
+    const pagamentoEntregaQuitado = diferencaPagamentoEntrega <= 0.01
+    const pagamentoEntregaComTrocoValido =
+      totalPagamentosLancados > totalProdutos && trocoLancamento > 0
+
+    if (!pagamentoEntregaQuitado && !pagamentoEntregaComTrocoValido) {
+      showToast.error(
+        `Valor das formas de pagamento (${transformarParaReal(totalPagamentosLancados)}) não cobre o total do pedido (${transformarParaReal(totalProdutos)}).`
+      )
+      return
+    }
+
+    setIsSavingPagamentoEntrega(true)
+    try {
+      const response = await fetch(`/api/vendas/gestor/${vendaId}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          pagamentos: pagamentosPayload,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || errorData.message || 'Erro ao atualizar pagamento')
+      }
+
+      setPagamentos(prev =>
+        prev.map(p => ({
+          ...p,
+          cobrarNaEntrega: fluxoPagamentoEntrega === 'cobrar_entregador',
+        }))
+      )
+      showToast.success('Cobrança da entrega atualizada.')
+      onSuccess()
+    } catch (error) {
+      console.error('Erro ao atualizar pagamento da entrega:', error)
+      showToast.error(error instanceof Error ? error.message : 'Erro ao atualizar pagamento')
+    } finally {
+      setIsSavingPagamentoEntrega(false)
+    }
+  }, [
+    vendaId,
+    tabelaOrigemVenda,
+    pagamentos,
+    auth,
+    fluxoPagamentoEntrega,
+    trocoLancamento,
+    totalPagamentosLancados,
+    buildPagamentosPatchMeiosPayload,
+    totalProdutos,
+    onSuccess,
+  ])
 
   const handleSubmit = async () => {
     if (criacaoVendaGestorEmAndamentoRef.current || createVendaGestor.isPending) {
@@ -1532,13 +1883,22 @@ export function NovoPedidoModal({
       return
     }
 
-    if (pedidoGestorComPagamentoNoPasso3 && pagamentos.length === 0) {
+    if (
+      pedidoGestorComPagamentoNoPasso3 &&
+      !pedidoEntregaAceitaPagamentoPendente &&
+      pagamentos.length === 0
+    ) {
       showToast.error('Adicione pelo menos uma forma de pagamento')
       return
     }
 
+    if (entregaComCobrancaPeloEntregador && pagamentos.length === 0) {
+      showToast.error('Informe como o cliente irá pagar na entrega.')
+      return
+    }
+
     // Validar se pagamentos cobrem o total
-    if (pedidoGestorComPagamentoNoPasso3) {
+    if (pedidoGestorComPagamentoNoPasso3 && !pedidoEntregaAceitaPagamentoPendente) {
       const diferenca = totalProdutos - totalPagamentos
 
       // Aceitar quando os pagamentos cobrem exatamente o total (diferença <= 0.01)
@@ -1605,6 +1965,23 @@ export function NovoPedidoModal({
         produtos: produtosLancados, // alias para compatibilidade
       }
 
+      if (tipoInicioPedido === 'entrega') {
+        vendaData.tempoPrevistoMinutos = tempoPrevistoMinutos
+        if (taxaEntregaSelecionada && valorTaxaEntrega > 0) {
+          vendaData.taxaEntregaId = taxaEntregaSelecionada.getId()
+          vendaData.taxaEntregaValor = valorTaxaEntrega
+          vendaData.taxasLancadas = [
+            {
+              taxaId: taxaEntregaSelecionada.getId(),
+              valorCalculado: valorTaxaEntrega,
+            },
+          ]
+        }
+        if (entregadorId) {
+          vendaData.entregadorId = entregadorId
+        }
+      }
+
       // solicitarEmissaoFiscal: true apenas quando status é PENDENTE_EMISSAO, false nos demais casos
       vendaData.solicitarEmissaoFiscal = status === 'PENDENTE_EMISSAO'
 
@@ -1624,16 +2001,47 @@ export function NovoPedidoModal({
         vendaData.enderecoEntrega = moradaEntregaSelecionada.endereco
       }
 
-      const pagamentosPayload = pagamentos.map(p => ({
-        meioPagamentoId: p.meioPagamentoId,
-        valor: p.valor,
-      }))
+      const pagamentosPayload = buildPagamentosPayload(
+        pagamentos,
+        tipoInicioPedido === 'entrega' && status === 'ABERTA' && entregaComCobrancaPeloEntregador
+      )
+      const meiosCobrancaPayload = buildMeiosCobrancaPayload(pagamentos)
 
       if (status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') {
         vendaData.dataFinalizacao = new Date().toISOString()
         vendaData.pagamentos = pagamentosPayload
       } else if (tipoInicioPedido === 'entrega' && status === 'ABERTA') {
-        vendaData.pagamentos = pagamentosPayload
+        const trocoPara =
+          valorRecebido.trim() !== ''
+            ? Number(valorRecebido.replace(/\./g, '').replace(',', '.')) || 0
+            : 0
+
+        if (entregaComCobrancaPeloEntregador) {
+          vendaData.pagamentos = pagamentosPayload
+          vendaData.pagamento = {
+            status: 'pendente',
+            cobrarCliente: true,
+            meioPagamentoId: pagamentosPayload[0]?.meioPagamentoId,
+            meioPagamento:
+              meiosPagamento.find(m => m.getId() === pagamentosPayload[0]?.meioPagamentoId)?.getNome?.() ??
+              null,
+            valorReceber: totalProdutos,
+            valorRecebido: 0,
+            valorFaltante: totalProdutos,
+            trocoPara: trocoLancamento > 0 ? totalPagamentosLancados : trocoPara > 0 ? trocoPara : undefined,
+            meios: meiosCobrancaPayload,
+          }
+        } else {
+          vendaData.pagamentos = pagamentosPayload
+          vendaData.pagamento = {
+            status: statusPagamentoPedido,
+            cobrarCliente: statusPagamentoPedido !== 'pago',
+            meioPagamentoId: pagamentosPayload[0]?.meioPagamentoId,
+            valorReceber: valorAPagar,
+            valorRecebido: Math.min(totalPagamentos, totalProdutos),
+            valorFaltante: valorAPagar,
+          }
+        }
       } else {
         vendaData.pagamentos = []
       }
@@ -1665,6 +2073,14 @@ export function NovoPedidoModal({
             // Falha silenciosa: a venda foi criada; o detalhe mostrará o statusOperacional
             // correto ao carregar, e o usuário pode tentar novamente se necessário.
           }
+        }
+
+        if (
+          tipoInicioPedido === 'entrega' &&
+          status === 'ABERTA' &&
+          preferenciasImpressaoDelivery.autoIniciarPreparoNovosPedidos
+        ) {
+          await processarAposTransicaoVendaGestorId(idCriado, 'iniciar_preparo')
         }
 
         await carregarVendaExistente(idCriado)
@@ -1710,6 +2126,9 @@ export function NovoPedidoModal({
     setMoradaEntregaSelecionada(null)
     setTelefoneBuscaEntrega('')
     setTelefoneBuscadoEntrega(null)
+    setTempoPrevistoMinutos(45)
+    setEntregadorId('')
+    setTaxaEntregaId('')
     setClienteEntregaVinculado(null)
     setClienteTabsModalEntregaState({
       open: false,
@@ -1720,6 +2139,7 @@ export function NovoPedidoModal({
     setPagamentos([])
     setMeioPagamentoId('')
     setValorRecebido('')
+    setFluxoPagamentoEntrega('cobrar_entregador')
     setGrupoSelecionadoId(null)
     setCurrentStep(1)
     setModalLancamentoProdutoPainelOpen(false)
@@ -2239,12 +2659,45 @@ export function NovoPedidoModal({
           setResumoFinanceiroDetalhes(null)
         }
 
-        // Pagamentos (PDV e Gestor: mesmo contrato visual; Gestor pode usar snake_case no payload)
-        if (vendaData.pagamentos && Array.isArray(vendaData.pagamentos)) {
-          const pagamentosMapeados: PagamentoSelecionado[] = vendaData.pagamentos.map(
+        // Pagamentos efetivos ou cobrança prevista da entrega.
+        const pagamentosApi = Array.isArray(vendaData.pagamentos) ? vendaData.pagamentos : []
+        const pagamentoEntregaApi =
+          vendaData.pagamento && typeof vendaData.pagamento === 'object'
+            ? (vendaData.pagamento as Record<string, any>)
+            : null
+        const meiosCobrancaApi = Array.isArray(pagamentoEntregaApi?.meios)
+          ? pagamentoEntregaApi.meios
+          : []
+
+        if (pagamentosApi.length > 0) {
+          const pagamentosMapeados: PagamentoSelecionado[] = pagamentosApi.map(
             (pag: Record<string, unknown>) => mapearPagamentoDetalheVenda(pag)
           )
           setPagamentos(pagamentosMapeados)
+          setFluxoPagamentoEntrega(
+            pagamentosMapeados.some(pag => pag.cobrarNaEntrega)
+              ? 'cobrar_entregador'
+              : 'ja_pago'
+          )
+        } else if (meiosCobrancaApi.length > 0) {
+          const pagamentosPrevistos: PagamentoSelecionado[] = meiosCobrancaApi
+            .map((meio: Record<string, any>) => ({
+              id: meio.id != null ? String(meio.id) : undefined,
+              meioPagamentoId: String(meio.meioPagamentoId ?? meio.id ?? '').trim(),
+              valor: Number(meio.valor ?? 0) || 0,
+              cobrarNaEntrega: true,
+            }))
+            .filter((pag: PagamentoSelecionado) => pag.meioPagamentoId && pag.valor > 0)
+          setPagamentos(pagamentosPrevistos)
+          setFluxoPagamentoEntrega('cobrar_entregador')
+        } else {
+          setPagamentos([])
+          if (
+            pagamentoEntregaApi?.cobrarCliente === true ||
+            String(pagamentoEntregaApi?.status ?? '').toLowerCase() === 'pendente'
+          ) {
+            setFluxoPagamentoEntrega('cobrar_entregador')
+          }
         }
 
         // Resolver nomes de usuários em lote (sem exibir IDs)
@@ -2299,6 +2752,13 @@ export function NovoPedidoModal({
         ;(vendaData.pagamentos || []).forEach((pag: any) => {
           const meioId = String(pag?.meioPagamentoId || '').trim()
           if (meioId) idsMeios.add(meioId)
+        })
+        meiosCobrancaApi.forEach((meio: any) => {
+          const meioId = String(meio?.meioPagamentoId || meio?.id || '').trim()
+          if (meioId) idsMeios.add(meioId)
+          if (meioId && typeof meio?.nome === 'string' && meio.nome.trim()) {
+            mapMeios[meioId] = meio.nome.trim()
+          }
         })
 
         await Promise.all(
@@ -2495,6 +2955,12 @@ export function NovoPedidoModal({
   }
 
   const canSubmit = () => {
+    if (pedidoEntregaAceitaPagamentoPendente) {
+      if (entregaComCobrancaPeloEntregador) return produtos.length > 0 && pagamentos.length > 0
+      if (pagamentos.length === 0) return false
+      return Math.abs(totalProdutos - totalPagamentos) <= 0.01 || (totalPagamentos > totalProdutos && troco > 0)
+    }
+
     if (pedidoGestorComPagamentoNoPasso3) {
       if (pagamentos.length === 0) return false
 
@@ -2824,11 +3290,122 @@ export function NovoPedidoModal({
                       clienteVinculado={clienteEntregaVinculado}
                       onClienteVinculado={setClienteEntregaVinculado}
                       onEditarClientePorDuploClique={handleAbrirEdicaoClienteEntrega}
+                      onAbrirSeletorCliente={() => setSeletorClienteOpen(true)}
                       telefoneExibicaoExterno={telefoneBuscaEntrega}
                       onTelefoneExibicaoExternoChange={setTelefoneBuscaEntrega}
                       digitosUltimaBuscaExterno={telefoneBuscadoEntrega}
                       onDigitosUltimaBuscaExternoChange={setTelefoneBuscadoEntrega}
                     />
+                    <div className="mt-3 grid gap-3 md:grid-cols-3">
+                      <div className="rounded-lg border border-primary/15 bg-white p-3">
+                        <div className="mb-2 flex items-center gap-2">
+                          <MdAccessTime className="h-4 w-4 text-primary" />
+                          <Label className="text-sm font-semibold text-primary-text">
+                            Tempo previsto
+                          </Label>
+                        </div>
+                        <Select
+                          value={String(tempoPrevistoMinutos)}
+                          onValueChange={value => setTempoPrevistoMinutos(Number(value) || 30)}
+                        >
+                          <SelectTrigger className="border-primary/30 bg-white">
+                            <SelectValue placeholder="Selecione o tempo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TEMPOS_PREVISTOS_ENTREGA.map(minutos => (
+                              <SelectItem key={minutos} value={String(minutos)}>
+                                {minutos} minutos
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="mt-1 text-xs text-secondary-text">
+                          Enviado como <code>tempoPrevistoMinutos</code>; o backend calcula a previsão.
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg border border-primary/15 bg-white p-3">
+                        <div className="mb-2 flex items-center gap-2">
+                          <MdDeliveryDining className="h-4 w-4 text-primary" />
+                          <Label className="text-sm font-semibold text-primary-text">
+                            Entregador
+                          </Label>
+                        </div>
+                        <Select
+                          value={entregadorId || SEM_ENTREGADOR_VALUE}
+                          onValueChange={value => {
+                            const novoEntregadorId = value === SEM_ENTREGADOR_VALUE ? '' : value
+                            setEntregadorId(novoEntregadorId)
+                            setUltimoEntregadorSelecionado(novoEntregadorId)
+                          }}
+                          disabled={entregadoresQuery.isLoading}
+                        >
+                          <SelectTrigger className="border-primary/30 bg-white">
+                            <SelectValue
+                              placeholder={
+                                entregadoresQuery.isLoading
+                                  ? 'Carregando entregadores...'
+                                  : 'Selecionar entregador'
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={SEM_ENTREGADOR_VALUE}>
+                              Sem entregador definido
+                            </SelectItem>
+                            {entregadores.map(entregador => (
+                              <SelectItem key={entregador.id} value={entregador.id}>
+                                {entregador.nome}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="mt-1 text-xs text-secondary-text">
+                          Somente usuários PDV ativos do tipo entregador.
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg border border-primary/15 bg-white p-3">
+                        <div className="mb-2 flex items-center gap-2">
+                          <MdAttachMoney className="h-4 w-4 text-primary" />
+                          <Label className="text-sm font-semibold text-primary-text">
+                            Taxa de entrega
+                          </Label>
+                        </div>
+                        <Select
+                          value={taxaEntregaId || SEM_TAXA_ENTREGA_VALUE}
+                          onValueChange={value =>
+                            setTaxaEntregaId(value === SEM_TAXA_ENTREGA_VALUE ? '' : value)
+                          }
+                          disabled={taxasEntregaQuery.isLoading}
+                        >
+                          <SelectTrigger className="border-primary/30 bg-white">
+                            <SelectValue
+                              placeholder={
+                                taxasEntregaQuery.isLoading
+                                  ? 'Carregando taxas...'
+                                  : 'Selecionar taxa'
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={SEM_TAXA_ENTREGA_VALUE}>
+                              Sem taxa de entrega
+                            </SelectItem>
+                            {taxasEntrega.map(taxa => (
+                              <SelectItem key={taxa.getId()} value={taxa.getId()}>
+                                {taxa.getNome()} - {transformarParaReal(taxa.getValor())}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="mt-1 text-xs text-secondary-text">
+                          {taxaEntregaSelecionada
+                            ? `Produtos ${transformarParaReal(subtotalProdutos)} + taxa ${transformarParaReal(valorTaxaEntrega)} = ${transformarParaReal(totalProdutos)}.`
+                            : 'Selecione uma taxa cadastrada do tipo entrega.'}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   /* Fluxo balcão: seletor de cliente convencional */
@@ -3593,9 +4170,17 @@ export function NovoPedidoModal({
                     <div className="flex justify-between rounded-lg bg-white px-1">
                       <span className="text-gray-600">Total de Itens:</span>
                       <span className="font-medium">
-                        {produtos.length} {produtos.length === 1 ? 'produto' : 'produtos'}
+                        {totalItensPedido} {totalItensPedido === 1 ? 'produto' : 'produtos'}
                       </span>
                     </div>
+                    {pedidoEntregaAceitaPagamentoPendente && valorTaxaEntrega > 0 && (
+                      <div className="flex justify-between rounded-lg bg-white px-1">
+                        <span className="text-gray-600">Taxa de entrega:</span>
+                        <span className="font-medium text-primary">
+                          + {transformarParaReal(valorTaxaEntrega)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -3607,6 +4192,58 @@ export function NovoPedidoModal({
 
                       {/* Total do Pedido e A pagar */}
                       <div className="mb-2 space-y-2 text-sm">
+                        {pedidoEntregaAceitaPagamentoPendente && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFluxoPagamentoEntrega('cobrar_entregador')
+                                setPagamentos(prev =>
+                                  prev.map(pagamento => ({ ...pagamento, cobrarNaEntrega: true }))
+                                )
+                              }}
+                              className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
+                                fluxoPagamentoEntrega === 'cobrar_entregador'
+                                  ? 'border-primary bg-primary text-white'
+                                  : 'border-gray-200 bg-white text-primary-text'
+                              }`}
+                            >
+                              Entregador vai cobrar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFluxoPagamentoEntrega('ja_pago')
+                                setPagamentos(prev =>
+                                  prev.map(pagamento => ({ ...pagamento, cobrarNaEntrega: false }))
+                                )
+                              }}
+                              className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
+                                fluxoPagamentoEntrega === 'ja_pago'
+                                  ? 'border-primary bg-primary text-white'
+                                  : 'border-gray-200 bg-white text-primary-text'
+                              }`}
+                            >
+                              Já foi pago
+                            </button>
+                          </div>
+                        )}
+                        {pedidoEntregaAceitaPagamentoPendente && valorTaxaEntrega > 0 && (
+                          <>
+                            <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
+                              <span className="font-medium text-gray-700">Produtos:</span>
+                              <span className="text-base font-semibold text-gray-900">
+                                {transformarParaReal(subtotalProdutos)}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
+                              <span className="font-medium text-gray-700">Taxa de entrega:</span>
+                              <span className="text-base font-semibold text-gray-900">
+                                + {transformarParaReal(valorTaxaEntrega)}
+                              </span>
+                            </div>
+                          </>
+                        )}
                         <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
                           <span className="font-medium text-gray-700">Total do Pedido:</span>
                           <span className="text-base font-semibold text-primary">
@@ -3623,8 +4260,26 @@ export function NovoPedidoModal({
                             {transformarParaReal(valorAPagar)}
                           </span>
                         </div>
+                        {pedidoEntregaAceitaPagamentoPendente && (
+                          <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
+                            <span className="font-medium text-gray-700">Status pagamento:</span>
+                            <span
+                              className={`text-base font-semibold ${
+                                statusPagamentoExibicao === 'pago'
+                                  ? 'text-green-600'
+                                  : statusPagamentoExibicao === 'parcial'
+                                    ? 'text-amber-600'
+                                    : 'text-red-600'
+                              }`}
+                            >
+                              {rotuloStatusPagamentoExibicao}
+                            </span>
+                          </div>
+                        )}
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-primary-text">Valor Recebido:</span>
+                          <span className="font-medium text-primary-text">
+                            {pagamentoModoCobranca ? 'Valor a receber:' : 'Valor Recebido:'}
+                          </span>
                           <input
                             type="text"
                             value={valorRecebido}
@@ -3677,8 +4332,8 @@ export function NovoPedidoModal({
                                   onMouseDown={e => {
                                     // Permitir que o evento propague para o container para iniciar o arraste
                                   }}
-                                  disabled={valorAPagar <= 0}
-                                  className={`flex min-w-[100px] flex-shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-primary bg-white p-2 transition-all hover:bg-primary hover:text-white ${valorAPagar <= 0 ? 'cursor-not-allowed opacity-50' : ''} `}
+                                  disabled={valorAPagarLancamento <= 0 && !valorRecebido.trim()}
+                                  className={`flex min-w-[100px] flex-shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-primary bg-white p-2 transition-all hover:bg-primary hover:text-white ${valorAPagarLancamento <= 0 && !valorRecebido.trim() ? 'cursor-not-allowed opacity-50' : ''} `}
                                 >
                                   <Icone className="h-8 w-8" />
                                   <span className="text-center text-xs font-medium">
@@ -3694,16 +4349,20 @@ export function NovoPedidoModal({
                       {/* Total Pago e Troco */}
                       <div className="border-t pt-2 text-sm">
                         <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
-                          <span className="font-semibold text-gray-700">Total Pago:</span>
+                          <span className="font-semibold text-gray-700">
+                            {pagamentoModoCobranca ? 'Total a receber:' : 'Total Pago:'}
+                          </span>
                           <span className="text-base font-semibold text-gray-900">
-                            {transformarParaReal(totalPagamentos)}
+                            {transformarParaReal(
+                              pagamentoModoCobranca ? totalPagamentosLancados : totalPagamentos
+                            )}
                           </span>
                         </div>
-                        {troco > 0 && (
+                        {trocoLancamento > 0 && (
                           <div className="flex items-center justify-between">
                             <span className="font-semibold text-gray-700">Troco:</span>
                             <span className="text-base font-semibold text-green-600">
-                              {transformarParaReal(troco)}
+                              {transformarParaReal(trocoLancamento)}
                             </span>
                           </div>
                         )}
@@ -3918,7 +4577,7 @@ export function NovoPedidoModal({
                           <div className="flex justify-between rounded-lg bg-white px-1">
                             <span className="text-gray-600">Total de Itens:</span>
                             <span className="font-medium">
-                              {produtos.length} {produtos.length === 1 ? 'produto' : 'produtos'}
+                              {totalItensPedido} {totalItensPedido === 1 ? 'produto' : 'produtos'}
                             </span>
                           </div>
                           <div className="flex justify-between px-1">
@@ -4247,25 +4906,119 @@ export function NovoPedidoModal({
                             </span>
                           </div>
                           <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
-                            <span className="font-semibold text-gray-700">Total Pago:</span>
+                            <span className="font-semibold text-gray-700">
+                              {pagamentoModoCobranca ? 'Total a receber:' : 'Total Pago:'}
+                            </span>
                             <span className="text-base font-semibold text-gray-900">
-                              {transformarParaReal(totalPagamentos)}
+                              {transformarParaReal(
+                                pagamentoModoCobranca ? totalPagamentosLancados : totalPagamentos
+                              )}
                             </span>
                           </div>
-                          {troco > 0 && (
+                          {trocoLancamento > 0 && (
                             <div className="mt-2 flex items-center justify-between">
                               <span className="font-semibold text-gray-700">Troco:</span>
                               <span className="text-base font-semibold text-green-600">
-                                {transformarParaReal(troco)}
+                                {transformarParaReal(trocoLancamento)}
                               </span>
                             </div>
                           )}
                         </div>
 
+                        {podeEditarPagamentoEntregaEmAberto && (
+                          <div className="mb-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
+                            <div className="mb-2">
+                              <div>
+                                <p className="text-sm font-semibold text-primary-text">
+                                  Ajustar cobrança do entregador
+                                </p>
+                                <p className="text-xs text-secondary-text">
+                                  Altere a forma, o valor a receber ou o troco antes de finalizar o pedido.
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="mb-2 grid grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  showToast.warning(
+                                    'Tipo de cobrança bloqueado em venda já criada. Edite apenas forma, valor ou troco.'
+                                  )
+                                }}
+                                aria-disabled="true"
+                                className={`cursor-not-allowed rounded-lg border px-3 py-2 text-sm font-semibold opacity-80 ${
+                                  fluxoPagamentoEntrega === 'cobrar_entregador'
+                                    ? 'border-primary bg-primary text-white'
+                                    : 'border-gray-200 bg-white text-primary-text'
+                                }`}
+                              >
+                                Cobrar na entrega
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  showToast.warning(
+                                    'Tipo de cobrança bloqueado em venda já criada. Edite apenas forma, valor ou troco.'
+                                  )
+                                }}
+                                aria-disabled="true"
+                                className={`cursor-not-allowed rounded-lg border px-3 py-2 text-sm font-semibold opacity-80 ${
+                                  fluxoPagamentoEntrega === 'ja_pago'
+                                    ? 'border-primary bg-primary text-white'
+                                    : 'border-gray-200 bg-white text-primary-text'
+                                }`}
+                              >
+                                Recebido pelo entregador
+                              </button>
+                            </div>
+
+                            <div className="mb-2 flex items-center gap-2">
+                              <span className="font-medium text-primary-text">Valor a receber:</span>
+                              <input
+                                type="text"
+                                value={valorRecebido}
+                                onChange={e => {
+                                  const valorFormatado = formatarValorRecebido(e.target.value)
+                                  setValorRecebido(valorFormatado)
+                                }}
+                                placeholder="0,00"
+                                className="rounded-lg border-2 bg-white p-1 text-right font-semibold transition-colors hover:border-primary-text"
+                              />
+                            </div>
+
+                            <div className="scrollbar-thin flex gap-3 overflow-x-auto pb-2">
+                              {meiosPagamento.map(meio => {
+                                const Icone = obterIconeMeioPagamento(meio.getNome())
+                                const semSaldoParaAdicionar =
+                                  valorAPagarLancamento <= 0 && !valorRecebido.trim()
+                                return (
+                                  <button
+                                    key={meio.getId()}
+                                    type="button"
+                                    onClick={() => adicionarPagamentoPorCard(meio.getId())}
+                                    disabled={semSaldoParaAdicionar}
+                                    className={`flex min-w-[100px] flex-shrink-0 flex-col items-center justify-center gap-1 rounded-lg border-2 border-primary bg-white p-2 transition-all hover:bg-primary hover:text-white ${
+                                      semSaldoParaAdicionar ? 'cursor-not-allowed opacity-50' : ''
+                                    }`}
+                                  >
+                                    <Icone className="h-8 w-8" />
+                                    <span className="text-center text-xs font-medium">
+                                      {meio.getNome()}
+                                    </span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+
                         {/* Cards das Formas de Pagamento */}
                         <div className="mb-2">
                           <Label className="mb-2 block text-base font-semibold">
-                            Formas de Pagamento Utilizadas
+                            {pagamentoModoCobranca
+                              ? 'Formas previstas para cobrança'
+                              : 'Formas de Pagamento Utilizadas'}
                           </Label>
                           <div className="flex flex-wrap gap-3">
                             {pagamentosVisiveisNaAbaDetalhes.map((pagamento, index) => {
@@ -4280,6 +5033,12 @@ export function NovoPedidoModal({
                                 ? obterIconeMeioPagamento(meio.getNome())
                                 : MdCreditCard
                               const emCancelado = pagamentoComDestaqueCanceladoDetalhes(pagamento)
+                              const usuarioPagamento = emCancelado
+                                ? pagamento.canceladoPorId || pagamento.realizadoPorId
+                                : pagamento.realizadoPorId
+                              const dataPagamento = emCancelado
+                                ? pagamento.dataCancelamento || pagamento.dataCriacao
+                                : pagamento.dataCriacao
 
                               return (
                                 <div
@@ -4303,6 +5062,16 @@ export function NovoPedidoModal({
                                   >
                                     {transformarParaReal(pagamento.valor)}
                                   </span>
+                                  {podeEditarPagamentoEntregaEmAberto && (
+                                    <button
+                                      type="button"
+                                      onClick={() => removerPagamento(index, pagamento.id)}
+                                      className="mt-1 inline-flex items-center gap-1 rounded border border-red-200 px-2 py-0.5 text-[11px] font-semibold text-red-600 hover:bg-red-50"
+                                    >
+                                      <MdDelete className="h-3.5 w-3.5" />
+                                      Remover
+                                    </button>
+                                  )}
                                   {emCancelado && (
                                     <span className="text-center text-[11px] font-semibold text-red-600">
                                       Pagamento Cancelado
@@ -4311,13 +5080,14 @@ export function NovoPedidoModal({
                                   <span
                                     className={`text-center text-[11px] ${emCancelado ? 'text-red-800/80' : 'text-gray-500'}`}
                                   >
-                                    Por: {formatarUsuarioPorId(pagamento.realizadoPorId)}
+                                    {emCancelado ? 'Cancelado por' : 'Por'}:{' '}
+                                    {formatarUsuarioPorId(usuarioPagamento)}
                                   </span>
-                                  {pagamento.dataCriacao && (
+                                  {dataPagamento && (
                                     <span
                                       className={`text-center text-[11px] ${emCancelado ? 'text-red-800/80' : 'text-gray-500'}`}
                                     >
-                                      {formatarDataDetalhePedido(pagamento.dataCriacao)}
+                                      {formatarDataDetalhePedido(dataPagamento)}
                                     </span>
                                   )}
                                   {pagamento.isTefUsed && (
@@ -4377,10 +5147,13 @@ export function NovoPedidoModal({
             {/* Rodapé em faixa (mesmo padrão visual de `JiffySidePanelModal` footerVariant="bar") */}
             {currentStep === 4 ? (
               (() => {
-                type ChaveRodape4 = 'cancelVenda' | 'cancelNota' | 'fechar'
+                type ChaveRodape4 = 'cancelVenda' | 'cancelNota' | 'salvarCobranca' | 'fechar'
                 const chaves: ChaveRodape4[] = []
                 if (podeExibirCancelarVendaGestor) chaves.push('cancelVenda')
                 if (podeExibirCancelarNotaFiscal) chaves.push('cancelNota')
+                if (podeEditarPagamentoEntregaEmAberto && abaDetalhesPedido === 'pagamentos') {
+                  chaves.push('salvarCobranca')
+                }
                 chaves.push('fechar')
                 const n = chaves.length
                 const painelRaioEsqInf = '0.75rem'
@@ -4449,6 +5222,19 @@ export function NovoPedidoModal({
                                 <MdCancel className="h-5 w-5 shrink-0" aria-hidden />
                                 Cancelar Nota
                               </span>
+                            </Button>
+                          ) : null}
+                          {key === 'salvarCobranca' ? (
+                            <Button
+                              type="button"
+                              variant="contained"
+                              color="primary"
+                              onClick={handleSalvarPagamentoEntregaEmAberto}
+                              disabled={isSavingPagamentoEntrega || pagamentos.length === 0}
+                              className="h-12 min-h-12 w-full font-semibold shadow-none"
+                              sx={footerSavePrimaryBarSx(i === 0)}
+                            >
+                              {isSavingPagamentoEntrega ? 'Salvando...' : 'Salvar cobrança'}
                             </Button>
                           ) : null}
                           {key === 'fechar' ? (
@@ -4573,6 +5359,7 @@ export function NovoPedidoModal({
             open={seletorClienteOpen}
             onClose={() => setSeletorClienteOpen(false)}
             onSelect={handleSelectCliente}
+            title={tipoInicioPedido === 'entrega' ? 'Selecionar cliente da entrega' : undefined}
           />
         )}
 

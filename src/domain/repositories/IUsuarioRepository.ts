@@ -5,6 +5,7 @@ export interface BuscarUsuariosParams {
   offset: number
   q?: string
   perfilPdvId?: string
+  tipoUsuarioPdv?: string
   name?: string
   ativo?: boolean | null
 }
@@ -16,6 +17,7 @@ export interface CriarUsuarioDTO {
   ativo?: boolean
   password?: string
   perfilPdvId?: string
+  tipoUsuarioPdv?: string
 }
 
 export interface AtualizarUsuarioDTO {
@@ -24,6 +26,7 @@ export interface AtualizarUsuarioDTO {
   ativo?: boolean
   password?: string
   perfilPdvId?: string
+  tipoUsuarioPdv?: string
 }
 
 /**
