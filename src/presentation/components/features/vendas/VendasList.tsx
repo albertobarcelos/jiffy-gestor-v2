@@ -1427,6 +1427,8 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               <MenuItem value="balcao">Balcão</MenuItem>
               <MenuItem value="mesa">Mesa</MenuItem>
               <MenuItem value="gestor">Gestor</MenuItem>
+              <MenuItem value="entrega">Entrega</MenuItem>
+              <MenuItem value="retirada">Retirada</MenuItem>
             </Select>
           </FormControl>
 

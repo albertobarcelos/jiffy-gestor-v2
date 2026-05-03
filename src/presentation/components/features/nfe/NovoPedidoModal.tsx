@@ -25,8 +25,9 @@ import {
 } from '@/src/presentation/components/ui/select'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Textarea } from '@/src/presentation/components/ui/textarea'
-import { useQuery } from '@tanstack/react-query'
+import { useQueries, useQuery } from '@tanstack/react-query'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
+import { useProdutos } from '@/src/presentation/hooks/useProdutos'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
 import { useTaxasInfinite } from '@/src/presentation/hooks/useTaxas'
 import { Produto } from '@/src/domain/entities/Produto'
@@ -168,6 +169,7 @@ interface PagamentoSelecionado {
   meioPagamentoId: string
   valor: number
   cobrarNaEntrega?: boolean
+  naoEfetivo?: boolean
   realizadoPorId?: string
   cancelado?: boolean
   canceladoPorId?: string
@@ -199,7 +201,7 @@ function pagamentoEstaCancelado(p: PagamentoSelecionado): boolean {
  */
 function pagamentoContaComoEfetivo(p: PagamentoSelecionado): boolean {
   if (pagamentoEstaCancelado(p)) return false
-  if (p.cobrarNaEntrega === true) return false
+  if (p.cobrarNaEntrega === true || p.naoEfetivo === true) return false
 
   const usaTef = p.isTefUsed === true
   if (usaTef) {
@@ -260,6 +262,13 @@ function mapearPagamentoDetalheVenda(pag: Record<string, unknown>): PagamentoSel
       p.cobrar_na_entrega === true ||
       p.cobrarNaEntrega === 'true' ||
       p.cobrar_na_entrega === 'true',
+    naoEfetivo: 
+      p.efetivado === false || 
+      p.efetivado === 'false' || 
+      p.cobrarNaEntrega === true ||
+      p.cobrar_na_entrega === true ||
+      p.cobrarNaEntrega === 'true' ||
+      p.cobrar_na_entrega === 'true',
     realizadoPorId: p.realizadoPorId ?? p.realizado_por_id ?? undefined,
     cancelado,
     canceladoPorId: p.canceladoPorId ?? p.cancelado_por_id ?? undefined,
@@ -279,6 +288,7 @@ function mapearPagamentoDetalheVenda(pag: Record<string, unknown>): PagamentoSel
 type OrigemVenda = 'GESTOR' | 'IFOOD' | 'RAPPI' | 'OUTROS'
 type StatusVenda = 'ABERTA' | 'FINALIZADA' | 'PENDENTE_EMISSAO'
 type FluxoPagamentoEntrega = 'cobrar_entregador' | 'ja_pago'
+type TipoAtendimentoDelivery = 'entrega' | 'retirada'
 
 const TEMPOS_PREVISTOS_ENTREGA = [30, 45, 60, 75, 90, 120]
 const SEM_ENTREGADOR_VALUE = '__sem_entregador__'
@@ -411,7 +421,7 @@ export function NovoPedidoModal({
   tipoInicioPedido = 'balcao',
 }: NovoPedidoModalProps) {
   const { auth } = useAuthStore()
-  const { preferenciasImpressaoDelivery } = useEmpresaMe()
+  const { empresa, preferenciasImpressaoDelivery } = useEmpresaMe()
   const { processarAposTransicaoVendaGestorId } = useImpressaoDelivery()
   const createVendaGestor = useCreateVendaGestor()
   const cancelarVendaGestor = useCancelarVendaGestor()
@@ -429,7 +439,10 @@ export function NovoPedidoModal({
   const [valorRecebido, setValorRecebido] = useState<string>('')
   const [fluxoPagamentoEntrega, setFluxoPagamentoEntrega] =
     useState<FluxoPagamentoEntrega>('cobrar_entregador')
+  const [tipoAtendimentoDelivery, setTipoAtendimentoDelivery] =
+    useState<TipoAtendimentoDelivery>('entrega')
   const [grupoSelecionadoId, setGrupoSelecionadoId] = useState<string | null>(null)
+  const [buscaProdutoTexto, setBuscaProdutoTexto] = useState<string>('')
   // Lista de grupos recolhível no passo 2: quando oculta, a área de produtos selecionados aumenta
   const [gruposExpandido, setGruposExpandido] = useState(true)
   const [seletorClienteOpen, setSeletorClienteOpen] = useState(false)
@@ -498,6 +511,10 @@ export function NovoPedidoModal({
   const [origemTextoApiDetalhe, setOrigemTextoApiDetalhe] = useState<string | null>(null)
   /** Texto bruto de `statusVenda` no GET de detalhe (Gestor pode vir null) */
   const [statusVendaTextoApiDetalhe, setStatusVendaTextoApiDetalhe] = useState<string | null>(null)
+
+  const pedidoDeliveryGestor = tipoInicioPedido === 'entrega'
+  const pedidoComEntrega = pedidoDeliveryGestor && tipoAtendimentoDelivery === 'entrega'
+  const pedidoComRetirada = pedidoDeliveryGestor && tipoAtendimentoDelivery === 'retirada'
 
   /**
    * Aba Nota Fiscal quando o status fiscal indica nota (emitida, rejeitada, aguardando SEFAZ, etc.) e origem coerente:
@@ -606,6 +623,32 @@ export function NovoPedidoModal({
         (tipoInicioPedido === 'entrega' && currentStep === 1)),
     // Evita refetch ao voltar o foco da aba (não deve recarregar o modal inteiro)
     refetchOnWindowFocus: false,
+  })
+
+  const buscaProdutoFiltrada = buscaProdutoTexto.trim().toLowerCase()
+  const token = auth?.getAccessToken()
+  const { data: produtosBuscadosData, isLoading: isLoadingBuscaProdutos } = useQuery({
+    queryKey: ['produtos-busca', buscaProdutoFiltrada],
+    queryFn: async () => {
+      if (!token) throw new Error('Token não encontrado')
+      const response = await fetch(`/api/produtos?name=${encodeURIComponent(buscaProdutoFiltrada)}&ativo=true&limit=50`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+      if (!response.ok) throw new Error('Erro ao buscar produtos')
+      const data = await response.json()
+      const produtos = (data.items || []).map((item: any) => Produto.fromJSON(item))
+      return { produtos }
+    },
+    enabled:
+      !!token &&
+      open &&
+      !modoVisualizacao &&
+      buscaProdutoFiltrada.length >= 2 &&
+      (currentStep >= 2 || (tipoInicioPedido === 'entrega' && currentStep === 1)),
+    staleTime: 1000 * 60 * 5,
   })
 
   // Buscar produtos do grupo selecionado usando endpoint específico
@@ -851,7 +894,7 @@ export function NovoPedidoModal({
   }, [])
 
   // Ordenar grupos por ordem (campo ordem da API)
-  const grupos = useMemo(() => {
+  const gruposOrdenados = useMemo(() => {
     if (!gruposData) return []
     return [...gruposData].sort((a, b) => {
       const ordemA = a.getOrdem()
@@ -877,13 +920,64 @@ export function NovoPedidoModal({
     })
   }, [gruposData])
 
+  const gruposComProdutosQueries = useQueries({
+    queries: gruposOrdenados.map(grupo => ({
+      queryKey: ['grupo-produtos-tem-produto-ativo', grupo.getId()],
+      queryFn: async () => {
+        const token = auth?.getAccessToken()
+        if (!token) return false
+
+        const response = await fetch(
+          `/api/grupos-produtos/${grupo.getId()}/produtos?limit=100&offset=0`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            cache: 'no-store',
+          }
+        )
+
+        if (!response.ok) return false
+
+        const data = await response.json()
+        const items = Array.isArray(data.items) ? data.items : []
+        return items.some((item: any) => Produto.fromJSON(item).isAtivo())
+      },
+      enabled:
+        open &&
+        !modoVisualizacao &&
+        !!auth?.getAccessToken() &&
+        (currentStep >= 2 || (tipoInicioPedido === 'entrega' && currentStep === 1)),
+      staleTime: 1000 * 60 * 3,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    })),
+  })
+
+  const grupos = useMemo(() => {
+    return gruposOrdenados.filter((grupo, index) => gruposComProdutosQueries[index]?.data === true)
+  }, [gruposOrdenados, gruposComProdutosQueries])
+
+  const isLoadingGruposVenda =
+    isLoadingGrupos || gruposComProdutosQueries.some(query => query.isPending)
+
   // Grade do grupo: só produtos ativos; ordenação por nome
+  // Se houver busca com pelo menos 2 caracteres, usamos o resultado da busca (todos os grupos)
+  // Caso contrário, usamos os produtos do grupo selecionado.
   const produtosList = useMemo(() => {
+    if (buscaProdutoFiltrada.length >= 2) {
+      if (!produtosBuscadosData?.produtos) return []
+      return [...produtosBuscadosData.produtos]
+        .filter(p => p.isAtivo())
+        .sort((a, b) => a.getNome().localeCompare(b.getNome()))
+    }
+
     if (!produtosPorGrupoData?.produtos) return []
     return [...produtosPorGrupoData.produtos]
       .filter(p => p.isAtivo())
       .sort((a, b) => a.getNome().localeCompare(b.getNome()))
-  }, [produtosPorGrupoData])
+  }, [buscaProdutoFiltrada, produtosBuscadosData, produtosPorGrupoData])
   const meiosPagamento = useMemo(() => {
     if (!meiosPagamentoData?.pages) return []
     return meiosPagamentoData.pages.flatMap(page => page.meiosPagamento || [])
@@ -924,7 +1018,7 @@ export function NovoPedidoModal({
         }))
         .filter((item: UsuarioPdvEntregadorOption) => item.id && item.nome)
     },
-    enabled: open && !modoVisualizacao && tipoInicioPedido === 'entrega',
+    enabled: open && !modoVisualizacao && pedidoComEntrega,
     staleTime: 1000 * 60 * 5,
     retry: 1,
     refetchOnWindowFocus: false,
@@ -940,12 +1034,12 @@ export function NovoPedidoModal({
   }, [taxasEntregaQuery.data])
 
   useEffect(() => {
-    if (!open || modoVisualizacao || tipoInicioPedido !== 'entrega') return
+    if (!open || modoVisualizacao || !pedidoComEntrega) return
     void refetchTaxasEntrega()
-  }, [open, modoVisualizacao, tipoInicioPedido, refetchTaxasEntrega])
+  }, [open, modoVisualizacao, pedidoComEntrega, refetchTaxasEntrega])
 
   useEffect(() => {
-    if (!open || vendaId || modoVisualizacao || tipoInicioPedido !== 'entrega' || entregadorId) return
+    if (!open || vendaId || modoVisualizacao || !pedidoComEntrega || entregadorId) return
     if (entregadores.length === 0) return
 
     const ultimoEntregadorId = getUltimoEntregadorSelecionado()
@@ -955,7 +1049,7 @@ export function NovoPedidoModal({
     if (entregadorAindaDisponivel) {
       setEntregadorId(ultimoEntregadorId)
     }
-  }, [open, vendaId, modoVisualizacao, tipoInicioPedido, entregadorId, entregadores])
+  }, [open, vendaId, modoVisualizacao, pedidoComEntrega, entregadorId, entregadores])
 
   /** Primeira carga ou fetch sem cache ainda — evita área vazia sem feedback */
   const mostrarLoadingFormasPagamento =
@@ -997,6 +1091,8 @@ export function NovoPedidoModal({
     fluxoPagamentoEntrega === 'cobrar_entregador' &&
     (pedidoEntregaAceitaPagamentoPendente ||
       (currentStep === 4 && tabelaOrigemVenda === 'venda_gestor' && !dataFinalizacaoCarregada))
+  const rotuloCobrancaPendente =
+    pedidoComRetirada ? 'Cobrança na Retirada' : 'Entregador vai cobrar'
 
   // Novo pedido (sem venda carregada): alinhar status ao tipo de fluxo ao abrir o painel
   useEffect(() => {
@@ -1159,10 +1255,11 @@ export function NovoPedidoModal({
   )
 
   const valorTaxaEntrega = useMemo(() => {
+    if (!pedidoComEntrega) return 0
     if (!taxaEntregaSelecionada || valorFinalVenda !== null) return 0
     const valor = taxaEntregaSelecionada.getValor()
     return valor
-  }, [subtotalProdutos, taxaEntregaSelecionada, valorFinalVenda])
+  }, [pedidoComEntrega, taxaEntregaSelecionada, valorFinalVenda])
 
   const totalProdutos = useMemo(
     () => subtotalProdutos + valorTaxaEntrega,
@@ -1461,7 +1558,8 @@ export function NovoPedidoModal({
       {
         meioPagamentoId: meioPagamentoIdSelecionado,
         valor: valorParaUsar,
-        cobrarNaEntrega: pagamentoModoCobranca,
+        cobrarNaEntrega: fluxoPagamentoEntrega === 'cobrar_entregador',
+        naoEfetivo: fluxoPagamentoEntrega === 'cobrar_entregador',
       },
     ])
 
@@ -1756,6 +1854,15 @@ export function NovoPedidoModal({
     })
   }
 
+  const handleTipoAtendimentoDeliveryChange = (tipo: TipoAtendimentoDelivery) => {
+    setTipoAtendimentoDelivery(tipo)
+    if (tipo === 'retirada') {
+      setEntregadorId('')
+      setTaxaEntregaId('')
+      setMoradaEntregaSelecionada(null)
+    }
+  }
+
   const atualizarPagamento = (index: number, valor: number) => {
     const novosPagamentos = [...pagamentos]
     novosPagamentos[index] = { ...novosPagamentos[index], valor }
@@ -1883,6 +1990,11 @@ export function NovoPedidoModal({
       return
     }
 
+    if (!validarInformacoesPedido(true)) {
+      setCurrentStep(pedidoDeliveryGestor ? 2 : 1)
+      return
+    }
+
     if (
       pedidoGestorComPagamentoNoPasso3 &&
       !pedidoEntregaAceitaPagamentoPendente &&
@@ -1893,7 +2005,11 @@ export function NovoPedidoModal({
     }
 
     if (entregaComCobrancaPeloEntregador && pagamentos.length === 0) {
-      showToast.error('Informe como o cliente irá pagar na entrega.')
+      showToast.error(
+        pedidoComRetirada
+          ? 'Informe como o cliente irá pagar na retirada.'
+          : 'Informe como o cliente irá pagar na entrega.'
+      )
       return
     }
 
@@ -1966,8 +2082,10 @@ export function NovoPedidoModal({
       }
 
       if (tipoInicioPedido === 'entrega') {
+        vendaData.tipoAtendimento = tipoAtendimentoDelivery
+        vendaData.modalidadeEntrega = tipoAtendimentoDelivery
         vendaData.tempoPrevistoMinutos = tempoPrevistoMinutos
-        if (taxaEntregaSelecionada && valorTaxaEntrega > 0) {
+        if (pedidoComEntrega && taxaEntregaSelecionada && valorTaxaEntrega > 0) {
           vendaData.taxaEntregaId = taxaEntregaSelecionada.getId()
           vendaData.taxaEntregaValor = valorTaxaEntrega
           vendaData.taxasLancadas = [
@@ -1977,7 +2095,7 @@ export function NovoPedidoModal({
             },
           ]
         }
-        if (entregadorId) {
+        if (pedidoComEntrega && entregadorId) {
           vendaData.entregadorId = entregadorId
         }
       }
@@ -1997,7 +2115,7 @@ export function NovoPedidoModal({
       }
 
       // Adicionar endereço de entrega quando fluxo entrega e morada selecionada
-      if (tipoInicioPedido === 'entrega' && moradaEntregaSelecionada?.endereco) {
+      if (pedidoComEntrega && moradaEntregaSelecionada?.endereco) {
         vendaData.enderecoEntrega = moradaEntregaSelecionada.endereco
       }
 
@@ -2005,11 +2123,38 @@ export function NovoPedidoModal({
         pagamentos,
         tipoInicioPedido === 'entrega' && status === 'ABERTA' && entregaComCobrancaPeloEntregador
       )
+      
+      // Validação crucial: no passo 3, se o pagamento tem parcelas "naoEfetivo",
+      // precisamos repassar para a API que ela NÃO deve considerar como valor recebido.
+      // Isso se aplica especialmente a vendas tipo balcão finalizadas.
+      pagamentosPayload.forEach((p: any) => {
+        // Encontra o pagamento equivalente no array de UI
+        const pgUI = pagamentos.find(ui => ui.meioPagamentoId === p.meioPagamentoId && ui.valor === p.valor)
+        if (pgUI && pgUI.naoEfetivo) {
+          // Garante que é enviado como pendente/não pago, dependendo do backend
+          p.efetivado = false
+        } else {
+          // Se for pagamento parcial efetivo
+          p.efetivado = true
+        }
+      })
+
       const meiosCobrancaPayload = buildMeiosCobrancaPayload(pagamentos)
 
       if (status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') {
         vendaData.dataFinalizacao = new Date().toISOString()
         vendaData.pagamentos = pagamentosPayload
+        
+        // Em vendas FINALIZADA com pagamento parcial EFETIVO
+        if (totalPagamentos < totalProdutos) {
+           vendaData.pagamento = {
+             status: 'pendente',
+             cobrarCliente: true,
+             valorReceber: totalProdutos,
+             valorRecebido: totalPagamentos,
+             valorFaltante: totalProdutos - totalPagamentos,
+           }
+        }
       } else if (tipoInicioPedido === 'entrega' && status === 'ABERTA') {
         const trocoPara =
           valorRecebido.trim() !== ''
@@ -2140,6 +2285,7 @@ export function NovoPedidoModal({
     setMeioPagamentoId('')
     setValorRecebido('')
     setFluxoPagamentoEntrega('cobrar_entregador')
+    setTipoAtendimentoDelivery('entrega')
     setGrupoSelecionadoId(null)
     setCurrentStep(1)
     setModalLancamentoProdutoPainelOpen(false)
@@ -2940,21 +3086,44 @@ export function NovoPedidoModal({
   }
 
   // Validação dos steps
+  function validarInformacoesPedido(exibirToast = false): boolean {
+    if (!pedidoDeliveryGestor) return true
+
+    if (!clienteEntregaVinculado?.id) {
+      if (exibirToast) showToast.error('Informe o cliente do pedido antes de continuar.')
+      return false
+    }
+
+    if (pedidoComEntrega && !moradaEntregaSelecionada?.endereco) {
+      if (exibirToast) showToast.error('Selecione ou cadastre o endereço de entrega.')
+      return false
+    }
+
+    if (pedidoComEntrega && !entregadorId) {
+      if (exibirToast) showToast.error('Selecione o entregador antes de continuar.')
+      return false
+    }
+
+    return true
+  }
+
   const canGoToStep2 = () => {
     // entrega: step 1 = Produtos → precisa de pelo menos um produto para avançar
     if (tipoInicioPedido === 'entrega') return produtos.length > 0
     // balcão: step 1 = Informações → sempre pode avançar
-    return true
+    return validarInformacoesPedido(false)
   }
 
   const canGoToStep3 = () => {
-    // entrega: step 2 = Informações → sempre pode avançar
-    if (tipoInicioPedido === 'entrega') return true
+    // entrega: step 2 = Informações → exige cliente/endereço/entregador conforme modalidade
+    if (tipoInicioPedido === 'entrega') return validarInformacoesPedido(false)
     // balcão: step 2 = Produtos → precisa de pelo menos um produto
     return produtos.length > 0
   }
 
   const canSubmit = () => {
+    if (!validarInformacoesPedido(false)) return false
+
     if (pedidoEntregaAceitaPagamentoPendente) {
       if (entregaComCobrancaPeloEntregador) return produtos.length > 0 && pagamentos.length > 0
       if (pagamentos.length === 0) return false
@@ -2962,6 +3131,21 @@ export function NovoPedidoModal({
     }
 
     if (pedidoGestorComPagamentoNoPasso3) {
+      // Se for FINALIZADA ou PENDENTE_EMISSAO, o pagamento TEM QUE estar completo (só dinheiro permite troco).
+      if (status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') {
+        if (pagamentos.length === 0) return false
+        
+        // Se houver algum pagamento não efetivo, não pode finalizar a venda
+        // Pagamento não efetivo é aquele que precisa ser cobrado do cliente posteriormente
+        if (pagamentos.some(p => p.naoEfetivo)) return false
+
+        const diferenca = totalProdutos - totalPagamentos
+        if (Math.abs(diferenca) <= 0.01) return true
+        if (totalPagamentos > totalProdutos && troco > 0) return true
+        return false
+      }
+
+      // Se for ABERTA, apenas permitir sem pagamentos se NÃO tiver cobrança pelo entregador e a UI permitir salvar aberta
       if (pagamentos.length === 0) return false
 
       // Aceitar quando os pagamentos cobrem o total (com tolerância de 0.01)
@@ -2975,7 +3159,7 @@ export function NovoPedidoModal({
       // (significa que foi um pagamento em dinheiro que gerou troco)
       if (totalPagamentos > totalProdutos && troco > 0) return true
 
-      // Caso contrário, ainda falta pagar
+      // Caso contrário, ainda falta pagar (e o status indica que o pagamento deve ser integral)
       return false
     }
     return true
@@ -2991,11 +3175,19 @@ export function NovoPedidoModal({
     if (currentStep === 1 && canGoToStep2()) {
       setCurrentStep(2)
     } else if (currentStep === 1 && !canGoToStep2()) {
-      showToast.error('Adicione pelo menos um produto antes de continuar')
+      if (tipoInicioPedido === 'entrega') {
+        showToast.error('Adicione pelo menos um produto antes de continuar')
+      } else {
+        validarInformacoesPedido(true)
+      }
     } else if (currentStep === 2 && canGoToStep3()) {
       setCurrentStep(3)
     } else if (currentStep === 2 && !canGoToStep3()) {
-      showToast.error('Adicione pelo menos um produto antes de continuar')
+      if (tipoInicioPedido === 'entrega') {
+        validarInformacoesPedido(true)
+      } else {
+        showToast.error('Adicione pelo menos um produto antes de continuar')
+      }
     }
   }
 
@@ -3275,6 +3467,43 @@ export function NovoPedidoModal({
               ((tipoInicioPedido !== 'entrega' && currentStep === 1) ||
                 (tipoInicioPedido === 'entrega' && currentStep === 2)) && (
               <div className="space-y-3 py-2">
+                {pedidoDeliveryGestor && (
+                  <div className="rounded-lg border-2 border-primary/20 bg-gray-50 p-3">
+                    <div className="mb-3 flex items-center gap-2">
+                      <div className="rounded-lg bg-primary/10 p-2">
+                        <MdStore className="h-5 w-5 text-primary" />
+                      </div>
+                      <span className="text-lg font-semibold text-primary">
+                        Tipo de atendimento
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleTipoAtendimentoDeliveryChange('entrega')}
+                        className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
+                          pedidoComEntrega
+                            ? 'border-primary bg-primary text-white'
+                            : 'border-gray-200 bg-white text-primary-text hover:border-primary/50'
+                        }`}
+                      >
+                        Entrega
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleTipoAtendimentoDeliveryChange('retirada')}
+                        className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
+                          pedidoComRetirada
+                            ? 'border-primary bg-primary text-white'
+                            : 'border-gray-200 bg-white text-primary-text hover:border-primary/50'
+                        }`}
+                      >
+                        Retirada
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Fluxo entrega: campo de telefone + seleção de morada */}
                 {tipoInicioPedido === 'entrega' ? (
                   <div className="rounded-lg border-2 border-primary/20 bg-gray-50 p-3">
@@ -3282,7 +3511,9 @@ export function NovoPedidoModal({
                       <div className="rounded-lg bg-primary/10 p-2">
                         <MdPersonOutline className="h-5 w-5 text-primary" />
                       </div>
-                      <span className="text-lg font-semibold text-primary">Endereço de entrega</span>
+                      <span className="text-lg font-semibold text-primary">
+                        {pedidoComEntrega ? 'Cliente e endereço de entrega' : 'Cliente da retirada'}
+                      </span>
                     </div>
                     <EntregaClienteSelector
                       moradaSelecionada={moradaEntregaSelecionada}
@@ -3295,7 +3526,19 @@ export function NovoPedidoModal({
                       onTelefoneExibicaoExternoChange={setTelefoneBuscaEntrega}
                       digitosUltimaBuscaExterno={telefoneBuscadoEntrega}
                       onDigitosUltimaBuscaExternoChange={setTelefoneBuscadoEntrega}
+                      enderecoPadrao={{
+                        cidade: empresa?.cidade,
+                        estado: empresa?.estado,
+                      }}
+                      mostrarEnderecos={pedidoComEntrega}
                     />
+                    {pedidoComRetirada ? (
+                      <div className="mt-3 rounded-lg border border-primary/15 bg-white p-3 text-sm text-secondary-text">
+                        Pedido configurado para retirada no balcão. Entregador e taxa de entrega não
+                        são necessários.
+                      </div>
+                    ) : null}
+                    {pedidoComEntrega && (
                     <div className="mt-3 grid gap-3 md:grid-cols-3">
                       <div className="rounded-lg border border-primary/15 bg-white p-3">
                         <div className="mb-2 flex items-center gap-2">
@@ -3406,6 +3649,7 @@ export function NovoPedidoModal({
                         </p>
                       </div>
                     </div>
+                    )}
                   </div>
                 ) : (
                   /* Fluxo balcão: seletor de cliente convencional */
@@ -3513,6 +3757,29 @@ export function NovoPedidoModal({
               ((tipoInicioPedido !== 'entrega' && currentStep === 2) ||
                 (tipoInicioPedido === 'entrega' && currentStep === 1)) && (
               <div className="flex min-h-0 flex-1 flex-col gap-2 py-2">
+                {/* Campo de pesquisa de produtos */}
+                <div className="flex-shrink-0">
+                  <div className="relative">
+                    <MdSearch className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Pesquisar produto pelo nome..."
+                      value={buscaProdutoTexto}
+                      onChange={(e) => setBuscaProdutoTexto(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                    {buscaProdutoTexto.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setBuscaProdutoTexto('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        <MdClear className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 {/* Área de Edição de Produtos Selecionados: altura fixa quando grupos visíveis, cresce quando grupos ocultos */}
                 <div
                   className={`scrollbar-thin overflow-y-auto rounded-lg border bg-gray-50 ${
@@ -3944,138 +4211,151 @@ export function NovoPedidoModal({
                   </button>
                   {gruposExpandido && (
                     <div className="space-y-2 px-3 pb-3 pt-1">
-                      {/* Grid ou Lista Horizontal de Grupos */}
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          {!grupoSelecionadoId ? (
-                            <Label className="text-sm text-gray-600">Selecione um grupo:</Label>
-                          ) : (
-                            <Button
-                              variant="outlined"
-                              size="sm"
-                              onClick={() => setGrupoSelecionadoId(null)}
-                              type="button"
-                              className="flex h-7 min-h-[28px] min-w-[28px] items-center justify-center p-0"
-                            >
-                              <MdArrowBack className="h-4 w-4" /> Voltar aos grupos
-                            </Button>
-                          )}
-                        </div>
-                        {isLoadingGrupos ? (
-                          <div className="py-4 text-center text-gray-500">
-                            <JiffyLoading />
+                      {/* Grid ou Lista Horizontal de Grupos - Ocultar durante busca */}
+                      {buscaProdutoTexto.length < 2 && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            {!grupoSelecionadoId ? (
+                              <Label className="text-sm text-gray-600">Selecione um grupo:</Label>
+                            ) : (
+                              <Button
+                                variant="outlined"
+                                size="sm"
+                                onClick={() => setGrupoSelecionadoId(null)}
+                                type="button"
+                                className="flex h-7 min-h-[28px] min-w-[28px] items-center justify-center p-0"
+                              >
+                                <MdArrowBack className="h-4 w-4" /> Voltar aos grupos
+                              </Button>
+                            )}
                           </div>
-                        ) : grupos.length === 0 ? (
-                          <div className="py-4 text-center text-gray-500">
-                            Nenhum grupo encontrado
-                          </div>
-                        ) : !grupoSelecionadoId ? (
-                          // Grid de Grupos (quando nenhum grupo está selecionado)
-                          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
-                            {grupos.map(grupo => {
-                              const corHex = grupo.getCorHex()
-                              const iconName = grupo.getIconName()
-                              return (
-                                <div key={grupo.getId()} className="relative">
-                                  <button
-                                    onClick={() => setGrupoSelecionadoId(grupo.getId())}
-                                    className="flex aspect-square w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border-2 p-2 text-center transition-all hover:opacity-80"
-                                    style={{
-                                      borderColor: corHex,
-                                      backgroundColor: `${corHex}15`,
-                                    }}
-                                  >
-                                    <div
-                                      className="flex h-[40px] w-[40px] flex-shrink-0 items-center justify-center"
+                          {isLoadingGruposVenda ? (
+                            <div className="py-4 text-center text-gray-500">
+                              <JiffyLoading />
+                            </div>
+                          ) : grupos.length === 0 ? (
+                            <div className="py-4 text-center text-gray-500">
+                              Nenhum grupo encontrado
+                            </div>
+                          ) : !grupoSelecionadoId ? (
+                            // Grid de Grupos (quando nenhum grupo está selecionado)
+                            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
+                              {grupos.map(grupo => {
+                                const corHex = grupo.getCorHex()
+                                const iconName = grupo.getIconName()
+                                return (
+                                  <div key={grupo.getId()} className="relative">
+                                    <button
+                                      onClick={() => setGrupoSelecionadoId(grupo.getId())}
+                                      className="flex aspect-square w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border-2 p-2 text-center transition-all hover:opacity-80"
                                       style={{
                                         borderColor: corHex,
+                                        backgroundColor: `${corHex}15`,
                                       }}
                                     >
-                                      <DinamicIcon iconName={iconName} color={corHex} size={34} />
-                                    </div>
-                                    <div className="line-clamp-2 w-full overflow-hidden text-ellipsis px-1 text-[10px] font-medium text-gray-900">
-                                      {grupo.getNome()}
-                                    </div>
-                                  </button>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        ) : (
-                          // Lista Horizontal de Grupos (quando um grupo está selecionado)
-                          <div
-                            ref={gruposScrollRef}
-                            className="scrollbar-thin flex cursor-grab select-none gap-3 overflow-x-auto pb-2 active:cursor-grabbing"
-                            style={{ scrollbarWidth: 'thin' }}
-                            onMouseDown={handleMouseDown}
-                            onMouseMove={handleMouseMove}
-                            onMouseUp={handleMouseUp}
-                            onMouseLeave={handleMouseLeave}
-                          >
-                            {grupos.map(grupo => {
-                              const corHex = grupo.getCorHex()
-                              const iconName = grupo.getIconName()
-                              const isSelected = grupoSelecionadoId === grupo.getId()
-                              return (
-                                <div
-                                  key={grupo.getId()}
-                                  className="relative flex-shrink-0"
-                                  style={{ width: '100px' }}
-                                >
-                                  <button
-                                    onClick={e => {
-                                      // Só executar o clique se não houve movimento significativo durante o arraste
-                                      if (!hasMovedRef.current && !isDragging) {
-                                        setGrupoSelecionadoId(grupo.getId())
-                                      }
-                                    }}
-                                    onMouseDown={e => {
-                                      // Permitir que o evento propague para o container para iniciar o arraste
-                                      // O onClick só será executado se não houver movimento
-                                    }}
-                                    className="pointer-events-auto flex aspect-square h-full w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border-2 p-2 text-center transition-all"
-                                    style={{
-                                      borderColor: corHex,
-                                      backgroundColor: isSelected ? corHex : `${corHex}15`,
-                                      color: isSelected ? '#ffffff' : '#1f2937',
-                                    }}
+                                      <div
+                                        className="flex h-[40px] w-[40px] flex-shrink-0 items-center justify-center"
+                                        style={{
+                                          borderColor: corHex,
+                                        }}
+                                      >
+                                        <DinamicIcon iconName={iconName} color={corHex} size={34} />
+                                      </div>
+                                      <div className="line-clamp-2 w-full overflow-hidden text-ellipsis px-1 text-[10px] font-medium text-gray-900">
+                                        {grupo.getNome()}
+                                      </div>
+                                    </button>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          ) : (
+                            // Lista Horizontal de Grupos (quando um grupo está selecionado)
+                            <div
+                              ref={gruposScrollRef}
+                              className="scrollbar-thin flex cursor-grab select-none gap-3 overflow-x-auto pb-2 active:cursor-grabbing"
+                              style={{ scrollbarWidth: 'thin' }}
+                              onMouseDown={handleMouseDown}
+                              onMouseMove={handleMouseMove}
+                              onMouseUp={handleMouseUp}
+                              onMouseLeave={handleMouseLeave}
+                            >
+                              {grupos.map(grupo => {
+                                const corHex = grupo.getCorHex()
+                                const iconName = grupo.getIconName()
+                                const isSelected = grupoSelecionadoId === grupo.getId()
+                                return (
+                                  <div
+                                    key={grupo.getId()}
+                                    className="relative flex-shrink-0"
+                                    style={{ width: '100px' }}
                                   >
-                                    <div className="flex h-[40px] w-[40px] flex-shrink-0 items-center justify-center">
-                                      <DinamicIcon
-                                        iconName={iconName}
-                                        color={isSelected ? '#ffffff' : corHex}
-                                        size={34}
-                                      />
-                                    </div>
-                                    <div className="line-clamp-2 w-full overflow-hidden text-ellipsis px-1 text-[10px] font-medium">
-                                      {grupo.getNome()}
-                                    </div>
-                                  </button>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
-                      </div>
+                                    <button
+                                      onClick={e => {
+                                        // Só executar o clique se não houve movimento significativo durante o arraste
+                                        if (!hasMovedRef.current && !isDragging) {
+                                          setGrupoSelecionadoId(grupo.getId())
+                                        }
+                                      }}
+                                      onMouseDown={e => {
+                                        // Permitir que o evento propague para o container para iniciar o arraste
+                                        // O onClick só será executado se não houver movimento
+                                      }}
+                                      className="pointer-events-auto flex aspect-square h-full w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border-2 p-2 text-center transition-all"
+                                      style={{
+                                        borderColor: corHex,
+                                        backgroundColor: isSelected ? corHex : `${corHex}15`,
+                                        color: isSelected ? '#ffffff' : '#1f2937',
+                                      }}
+                                    >
+                                      <div className="flex h-[40px] w-[40px] flex-shrink-0 items-center justify-center">
+                                        <DinamicIcon
+                                          iconName={iconName}
+                                          color={isSelected ? '#ffffff' : corHex}
+                                          size={34}
+                                        />
+                                      </div>
+                                      <div className="line-clamp-2 w-full overflow-hidden text-ellipsis px-1 text-[10px] font-medium">
+                                        {grupo.getNome()}
+                                      </div>
+                                    </button>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
-                      {/* Grid de Produtos do Grupo Selecionado */}
-                      {grupoSelecionadoId &&
+                      {/* Grid de Produtos do Grupo Selecionado ou Resultado da Busca */}
+                      {(grupoSelecionadoId || buscaProdutoTexto.length >= 2) &&
                         (() => {
                           const grupoSelecionado = grupos.find(
                             g => g.getId() === grupoSelecionadoId
                           )
                           const corHexGrupo = grupoSelecionado?.getCorHex() || '#6b7280'
+                          const tituloGrade =
+                            buscaProdutoTexto.length >= 2
+                              ? `Resultados para "${buscaProdutoTexto}"`
+                              : `Produtos do grupo: `
+                          const isLoadingAtual =
+                            buscaProdutoTexto.length >= 2
+                              ? isLoadingBuscaProdutos
+                              : isLoadingProdutos
+
                           return (
                             <div className="space-y-2">
                               <Label className="text-sm text-gray-600">
-                                Produtos do grupo:{' '}
-                                <span className="font-semibold">{grupoSelecionado?.getNome()}</span>
+                                {tituloGrade}
+                                {buscaProdutoTexto.length < 2 && (
+                                  <span className="font-semibold">{grupoSelecionado?.getNome()}</span>
+                                )}
                               </Label>
-                              {isLoadingProdutos ? (
+                              {isLoadingAtual ? (
                                 <div className="py-4 text-center text-gray-500">
                                   <JiffyLoading />
                                 </div>
-                              ) : produtosError ? (
+                              ) : buscaProdutoTexto.length < 2 && produtosError ? (
                                 <div className="py-4 text-center text-red-500">
                                   Erro ao carregar produtos:{' '}
                                   {produtosError instanceof Error
@@ -4208,7 +4488,7 @@ export function NovoPedidoModal({
                                   : 'border-gray-200 bg-white text-primary-text'
                               }`}
                             >
-                              Entregador vai cobrar
+                              {rotuloCobrancaPendente}
                             </button>
                             <button
                               type="button"
@@ -4346,23 +4626,41 @@ export function NovoPedidoModal({
                         </div>
                       </div>
 
-                      {/* Total Pago e Troco */}
+                      {/* Totais de Pagamento */}
                       <div className="border-t pt-2 text-sm">
                         <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
                           <span className="font-semibold text-gray-700">
-                            {pagamentoModoCobranca ? 'Total a receber:' : 'Total Pago:'}
+                            Total Recebido (Efetivo):
                           </span>
-                          <span className="text-base font-semibold text-gray-900">
-                            {transformarParaReal(
-                              pagamentoModoCobranca ? totalPagamentosLancados : totalPagamentos
-                            )}
+                          <span className="text-base font-semibold text-green-700">
+                            {transformarParaReal(totalPagamentos)}
                           </span>
                         </div>
+                        {(totalPagamentosLancados - totalPagamentos) > 0 && (
+                          <div className="mt-1 flex items-center justify-between rounded-lg bg-amber-50 p-1">
+                            <span className="font-semibold text-gray-700">
+                              A receber na entrega:
+                            </span>
+                            <span className="text-base font-semibold text-amber-700">
+                              {transformarParaReal(totalPagamentosLancados - totalPagamentos)}
+                            </span>
+                          </div>
+                        )}
                         {trocoLancamento > 0 && (
-                          <div className="flex items-center justify-between">
-                            <span className="font-semibold text-gray-700">Troco:</span>
+                          <div className="mt-1 flex items-center justify-between rounded-lg bg-gray-50 p-1">
+                            <span className="font-semibold text-gray-700">Troco previsto:</span>
                             <span className="text-base font-semibold text-green-600">
                               {transformarParaReal(trocoLancamento)}
+                            </span>
+                          </div>
+                        )}
+                        {valorAPagarLancamento > 0 && (
+                          <div className="mt-1 flex items-center justify-between rounded-lg bg-red-50 p-1">
+                            <span className="font-semibold text-gray-700">
+                              Restante a lançar:
+                            </span>
+                            <span className="text-base font-semibold text-red-600">
+                              {transformarParaReal(valorAPagarLancamento)}
                             </span>
                           </div>
                         )}
@@ -4907,14 +5205,22 @@ export function NovoPedidoModal({
                           </div>
                           <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
                             <span className="font-semibold text-gray-700">
-                              {pagamentoModoCobranca ? 'Total a receber:' : 'Total Pago:'}
+                              Total Recebido (Efetivo):
                             </span>
-                            <span className="text-base font-semibold text-gray-900">
-                              {transformarParaReal(
-                                pagamentoModoCobranca ? totalPagamentosLancados : totalPagamentos
-                              )}
+                            <span className="text-base font-semibold text-green-700">
+                              {transformarParaReal(totalPagamentos)}
                             </span>
                           </div>
+                          {(totalPagamentosLancados - totalPagamentos) > 0 && (
+                            <div className="mt-1 flex items-center justify-between rounded-lg bg-amber-50 p-1">
+                              <span className="font-semibold text-gray-700">
+                                A receber na entrega:
+                              </span>
+                              <span className="text-base font-semibold text-amber-700">
+                                {transformarParaReal(totalPagamentosLancados - totalPagamentos)}
+                              </span>
+                            </div>
+                          )}
                           {trocoLancamento > 0 && (
                             <div className="mt-2 flex items-center justify-between">
                               <span className="font-semibold text-gray-700">Troco:</span>
@@ -5075,6 +5381,16 @@ export function NovoPedidoModal({
                                   {emCancelado && (
                                     <span className="text-center text-[11px] font-semibold text-red-600">
                                       Pagamento Cancelado
+                                    </span>
+                                  )}
+                                  {!emCancelado && (pagamento.cobrarNaEntrega || pagamento.naoEfetivo) && (
+                                    <span className="text-center text-[11px] font-semibold text-amber-600">
+                                      A cobrar na entrega
+                                    </span>
+                                  )}
+                                  {!emCancelado && !pagamento.cobrarNaEntrega && !pagamento.naoEfetivo && (
+                                    <span className="text-center text-[11px] font-semibold text-green-600">
+                                      Efetivo / Pago
                                     </span>
                                   )}
                                   <span
@@ -5316,11 +5632,7 @@ export function NovoPedidoModal({
                                 variant="contained"
                                 color="primary"
                                 onClick={handleNextStep}
-                                disabled={
-                                  createVendaGestor.isPending ||
-                                  (currentStep === 1 && !canGoToStep2()) ||
-                                  (currentStep === 2 && !canGoToStep3())
-                                }
+                                disabled={createVendaGestor.isPending}
                                 className="h-12 min-h-12 w-full font-semibold shadow-none"
                                 sx={footerSavePrimaryBarSx(isPrimeiraColuna)}
                               >

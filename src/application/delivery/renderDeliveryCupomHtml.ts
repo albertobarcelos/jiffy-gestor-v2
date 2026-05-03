@@ -351,6 +351,33 @@ function renderWhatsappQr(telefone: string): string {
 
 function renderResumoExpedicao(root: VendaGestorTicketsResponse, ticket: VendaGestorTicket): string {
   const resumo = resumoPedido(root, ticket)
+  const p = root.pagamento
+  const total = numeroFinito(root.resumoPedido?.valorTotal) ?? numeroFinito(root.valorFinal) ?? 0
+  const status = String(p?.status || '').toLowerCase()
+  const faltante = numeroFinito(p?.valorFaltante) ?? (status === 'pago' ? 0 : total)
+  const recebido = numeroFinito(p?.valorRecebido) ?? 0
+
+  let pagamentosHtml = ''
+  if (recebido > 0) {
+    const meios = p?.meios?.length
+      ? p.meios
+          .map(m => {
+            const nome = m.nome || m.tipo || 'PAGO'
+            const valor = numeroFinito(m.valor) ?? recebido
+            return `<div><span>Pago em ${escapeHtml(nome.toUpperCase())}:</span> ${fmtBrl(valor)}</div>`
+          })
+          .join('')
+      : `<div><span>Valor Pago:</span> ${fmtBrl(recebido)}</div>`
+
+    pagamentosHtml = `
+    ${meios}
+    ${
+      faltante > 0
+        ? `<div><strong>Falta Pagar:</strong> <strong>${fmtBrl(faltante)}</strong></div>`
+        : ''
+    }`
+  }
+
   return `<div class="separator"></div>
   <div class="summary-section">
     <div class="items-title">RESUMO PEDIDO</div>
@@ -358,6 +385,7 @@ function renderResumoExpedicao(root: VendaGestorTicketsResponse, ticket: VendaGe
     <div><span>Adicionais:</span> ${fmtBrl(resumo.valorAdicionais)}</div>
     <div><span>Taxa de Entrega:</span> ${fmtBrl(resumo.taxaEntrega)}</div>
     <div><strong>Total do Pedido:</strong> ${fmtBrl(resumo.valorTotal)}</div>
+    ${pagamentosHtml}
   </div>`
 }
 
@@ -366,13 +394,13 @@ function renderPagamento(root: VendaGestorTicketsResponse): string {
   const total = numeroFinito(root.resumoPedido?.valorTotal) ?? numeroFinito(root.valorFinal) ?? 0
   const status = String(p?.status || '').toLowerCase()
   const faltante = numeroFinito(p?.valorFaltante) ?? (status === 'pago' ? 0 : total)
-  const recebido = numeroFinito(p?.valorRecebido)
+  const recebido = numeroFinito(p?.valorRecebido) ?? 0
   const receber = numeroFinito(p?.valorCobrarNaEntrega) ?? 0
   const meio = p?.meioPagamento || p?.formaPagamento || p?.meios?.[0]?.nome || p?.meios?.[0]?.tipo || ''
   const trocoCalculado = numeroFinito(p?.trocoParaLevar) ?? 0
   const trocoHtml =
     trocoCalculado > 0
-      ? `<div><strong>Levar troco:</strong> ${fmtBrl(trocoCalculado)}</div>`
+      ? `<div style="display: block; word-wrap: break-word; text-align: right;"><strong>Levar troco:</strong> ${fmtBrl(trocoCalculado)}</div>`
       : ''
   const deveCobrar = p?.cobrarCliente === true || status === 'pendente' || (!status && receber > 0)
 
@@ -380,7 +408,10 @@ function renderPagamento(root: VendaGestorTicketsResponse): string {
     return `<div class="double-separator"></div>
     <div class="payment-section">
       <div class="charge">COBRAR DO CLIENTE</div>
-      <div><strong>Cobrar na entrega:</strong> ${fmtBrl(receber)}${meio ? ` no ${escapeHtml(meio.toUpperCase())}` : ''}</div>
+      <div style="display: block; word-wrap: break-word; text-align: center; margin-top: 4px;">
+        <strong>Cobrar na entrega:</strong><br/>
+        ${fmtBrl(receber)}${meio ? ` no ${escapeHtml(meio.toUpperCase())}` : ''}
+      </div>
       ${trocoHtml}
     </div>`
   }
@@ -390,16 +421,16 @@ function renderPagamento(root: VendaGestorTicketsResponse): string {
         .map(m => {
           const nome = m.nome || m.tipo || 'PAGO'
           const valor = numeroFinito(m.valor) ?? recebido ?? total
-          return `<div>${escapeHtml(nome.toUpperCase())}: ${fmtBrl(valor)}</div>`
+          return `<div><span>${escapeHtml(nome.toUpperCase())}:</span> ${fmtBrl(valor)}</div>`
         })
         .join('')
-    : `<div>${escapeHtml((meio || 'PAGO').toUpperCase())}: ${fmtBrl(recebido ?? total - faltante)}</div>`
+    : `<div><span>${escapeHtml((meio || 'PAGO').toUpperCase())}:</span> ${fmtBrl(recebido ?? total - faltante)}</div>`
 
   return `<div class="double-separator"></div>
   <div class="payment-section">
     <div class="paid">PEDIDO PAGO</div>
     ${meios}
-    <div><strong>FALTA:</strong> ${fmtBrl(Math.max(0, faltante))}</div>
+    ${faltante > 0 ? `<div><strong>FALTA:</strong> ${fmtBrl(Math.max(0, faltante))}</div>` : ''}
     ${trocoHtml}
   </div>
   <div class="separator"></div>`

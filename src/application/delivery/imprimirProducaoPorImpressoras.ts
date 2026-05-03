@@ -1,7 +1,6 @@
 import { buildCupomDelivery } from '@/src/application/delivery/buildCupomDelivery'
 import {
   agruparItensProducaoPorImpressora,
-  FALLBACK_IMPRESSORA_AGRUPAMENTO,
   montarVendaCupomComSubconjunto,
 } from '@/src/application/delivery/agruparProducaoPorImpressora'
 import type {
@@ -12,15 +11,6 @@ import type {
 import { fetchImpressorasIdsDoProduto } from '@/src/infrastructure/api/fetchProdutoImpressorasIds'
 import { fetchNomeImpressoraPorId } from '@/src/infrastructure/api/fetchNomeImpressoraPorId'
 import { printDeliveryCupom } from '@/src/infrastructure/printing/printDeliveryCupom'
-
-function padraoQz(prefs: PreferenciasImpressaoDelivery): string | null {
-  return (
-    prefs.impressoraPadraoNome ||
-    (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_QZ_PRINTER_DEFAULT?.trim()
-      ? process.env.NEXT_PUBLIC_QZ_PRINTER_DEFAULT.trim()
-      : null)
-  )
-}
 
 /**
  * Modo **separado**, ticket de **produção**: uma folha por impressora lógica,
@@ -35,7 +25,7 @@ export async function imprimirProducaoSeparadoPorImpressora(params: {
   accessToken: string
   onMensagem?: (mensagem: string) => void
 }): Promise<void> {
-  const { dto, modo, prefs, nomeEmpresa, accessToken, onMensagem } = params
+  const { dto, modo, nomeEmpresa, accessToken, onMensagem } = params
 
   const produtoIds = [
     ...new Set(dto.produtos.map(p => p.produtoId).filter((x): x is string => Boolean(x?.trim()))),
@@ -57,15 +47,8 @@ export async function imprimirProducaoSeparadoPorImpressora(params: {
 
     const partial = montarVendaCupomComSubconjunto(dto, itens)
 
-    let nomeQz: string | null
-    let rotulo: string
-    if (impressoraIdBucket === FALLBACK_IMPRESSORA_AGRUPAMENTO) {
-      nomeQz = padraoQz(prefs)
-      rotulo = 'Impressora padrão'
-    } else {
-      nomeQz = await fetchNomeImpressoraPorId(impressoraIdBucket, accessToken)
-      rotulo = nomeQz ?? impressoraIdBucket
-    }
+    const nomeQz = await fetchNomeImpressoraPorId(impressoraIdBucket, accessToken)
+    const rotulo = nomeQz ?? impressoraIdBucket
 
     const html = buildCupomDelivery(partial, modo, 'producao_cozinha', {
       nomeEmpresa,

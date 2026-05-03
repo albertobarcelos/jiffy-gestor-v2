@@ -18,6 +18,20 @@ export interface EstacaoImpressaoMapeamento {
   nomeImpressoraWindows: string
 }
 
+export class EstacaoImpressaoApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number
+  ) {
+    super(message)
+    this.name = 'EstacaoImpressaoApiError'
+  }
+}
+
+export function isEstacaoImpressaoNotFoundError(error: unknown): boolean {
+  return error instanceof EstacaoImpressaoApiError && error.status === 404
+}
+
 async function requestJson<T>(
   url: string,
   token: string,
@@ -41,7 +55,7 @@ async function requestJson<T>(
       (typeof asObj.error === 'string' ? asObj.error : '') ||
       (typeof asObj.message === 'string' ? asObj.message : '')
     const msg = (msgRaw || `Erro HTTP ${res.status}`).trim()
-    throw new Error(msg)
+    throw new EstacaoImpressaoApiError(msg, res.status)
   }
 
   return (await res.json()) as T

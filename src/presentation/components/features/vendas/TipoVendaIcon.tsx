@@ -5,7 +5,7 @@ import { MdDeliveryDining, MdPointOfSale } from 'react-icons/md'
 import { RiBeerFill } from 'react-icons/ri'
 
 interface TipoVendaIconProps {
-  tipoVenda: 'mesa' | 'balcao' | 'gestor' | 'entrega'
+  tipoVenda: 'mesa' | 'balcao' | 'gestor' | 'entrega' | 'retirada'
   numeroMesa?: number | string | null
   className?: string
   size?: number // Adicionado a prop size
@@ -204,7 +204,7 @@ export function TipoVendaIcon({
     )
   }
 
-  if (tipoVenda === 'entrega') {
+  if (tipoVenda === 'entrega' || tipoVenda === 'retirada') {
     return (
       <div
         className={`flex flex-col items-center justify-center ${title ? 'tooltip-hover' : ''} ${className}`}
@@ -229,7 +229,7 @@ export function TipoVendaIcon({
           className="mt-1 whitespace-nowrap font-medium"
           style={{ color: corEntrega, fontSize: `${entregaTextSize}px`, lineHeight: 1 }}
         >
-          Entrega
+          {tipoVenda === 'retirada' ? 'Retirada' : 'Entrega'}
         </span>
       </div>
     )

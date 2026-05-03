@@ -6,12 +6,14 @@ import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import {
   getEstacaoImpressaoId,
+  limparEstacaoImpressaoId,
   salvarEstacaoImpressaoId,
 } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
 import {
   buscarImpressorasLogicas,
   buscarMapeamentosEstacao,
   criarEstacaoImpressao,
+  isEstacaoImpressaoNotFoundError,
   listarEstacoesImpressao,
   salvarMapeamentosEstacao,
   type ImpressoraLogica,
@@ -220,37 +222,55 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
       setImpressoraExpedicaoId(prefs.impressoraExpedicaoId ?? '')
       setCupomTemplate(getDeliveryCupomTemplateLocal(idEmp) ?? parseDeliveryCupomTemplate(dataEmpresa))
 
+      const criarOuReaproveitarEstacao = async (): Promise<string> => {
+        try {
+          const estacao = await criarEstacaoImpressao(token, nomeEstacaoPadrao())
+          salvarEstacaoImpressaoId(estacao.id)
+          return estacao.id
+        } catch (createError) {
+          const estacoes = await listarEstacoesImpressao(token).catch(() => [])
+          const existente = estacoes.find(e => e.ativo) ?? estacoes[0]
+          if (existente) {
+            salvarEstacaoImpressaoId(existente.id)
+            return existente.id
+          }
+
+          throw createError
+        }
+      }
+
       let estacaoId = getEstacaoImpressaoId()
       const logicas = await buscarImpressorasLogicas(token)
       setImpressorasLogicas(logicas)
 
       if (!estacaoId) {
         try {
-          const estacao = await criarEstacaoImpressao(token, nomeEstacaoPadrao())
-          estacaoId = estacao.id
-          salvarEstacaoImpressaoId(estacao.id)
+          estacaoId = await criarOuReaproveitarEstacao()
         } catch (createError) {
-          const estacoes = await listarEstacoesImpressao(token).catch(() => [])
-          const existente = estacoes.find(e => e.ativo) ?? estacoes[0]
-          if (existente) {
-            estacaoId = existente.id
-            salvarEstacaoImpressaoId(existente.id)
-          } else {
-            const msg =
-              createError instanceof Error
-                ? createError.message
-                : 'Não foi possível criar estação de impressão.'
-            setErroConfiguracao(msg)
-            showToast.error(msg)
-            setMapeamentos({})
-            setEstacaoImpressaoId(null)
-            return
-          }
+          const msg =
+            createError instanceof Error
+              ? createError.message
+              : 'Não foi possível criar estação de impressão.'
+          setErroConfiguracao(msg)
+          showToast.error(msg)
+          setMapeamentos({})
+          setEstacaoImpressaoId(null)
+          return
         }
       }
       setEstacaoImpressaoId(estacaoId)
 
-      const salvos = await buscarMapeamentosEstacao(token, estacaoId)
+      let salvos = []
+      try {
+        salvos = await buscarMapeamentosEstacao(token, estacaoId)
+      } catch (error) {
+        if (!isEstacaoImpressaoNotFoundError(error)) throw error
+
+        limparEstacaoImpressaoId()
+        estacaoId = await criarOuReaproveitarEstacao()
+        setEstacaoImpressaoId(estacaoId)
+        salvos = await buscarMapeamentosEstacao(token, estacaoId)
+      }
       const next: MapeamentosDraft = {}
       for (const item of salvos) {
         next[item.impressoraId] = item.nomeImpressoraWindows

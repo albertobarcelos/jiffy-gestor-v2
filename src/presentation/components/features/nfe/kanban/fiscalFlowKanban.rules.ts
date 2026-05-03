@@ -56,9 +56,10 @@ export function getLinhaTempoPedidoEntregaKanban(
   /** Timestamp local de transição (DnD ou botão), tem prioridade sobre `dataUltimaModificacao` da API. */
   isoLocalTransicao?: string
 ): { prefixo: string; iso: string } | null {
+  const tipoVendaLower = String(v.tipoVenda ?? '').trim().toLowerCase()
   const entregaGestor =
     v.tabelaOrigem === 'venda_gestor' &&
-    String(v.tipoVenda ?? '').trim().toLowerCase() === 'entrega'
+    (tipoVendaLower === 'entrega' || tipoVendaLower === 'retirada')
   if (!entregaGestor || !COLUNAS_ENTREGA_OPERACIONAIS.includes(columnId)) return null
 
   if (columnId === 'NOVOS_PEDIDOS') {

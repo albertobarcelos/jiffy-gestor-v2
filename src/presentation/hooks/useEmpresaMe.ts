@@ -17,6 +17,8 @@ import { getDeliveryCupomTemplateLocal } from '@/src/infrastructure/printing/del
 export interface EmpresaMeResumo {
   id: string
   nomeExibicao: string
+  cidade?: string
+  estado?: string
 }
 
 /**
@@ -77,6 +79,19 @@ export function useEmpresaMe() {
         (v): v is string => typeof v === 'string' && v.trim().length > 0
       )
       const nomeExibicao = nomeBruto?.trim() ?? 'Empresa'
+      const endereco =
+        data.endereco && typeof data.endereco === 'object' && !Array.isArray(data.endereco)
+          ? (data.endereco as Record<string, unknown>)
+          : {}
+      const cidade =
+        typeof endereco.cidade === 'string' && endereco.cidade.trim()
+          ? endereco.cidade.trim()
+          : undefined
+      const estadoRaw = endereco.estado ?? endereco.uf
+      const estado =
+        typeof estadoRaw === 'string' && estadoRaw.trim()
+          ? estadoRaw.trim().toUpperCase().slice(0, 2)
+          : undefined
 
       const tzAgg = resolverTimezoneAgregacaoEmpresa(data)
       if (process.env.NODE_ENV === 'development') {
@@ -86,7 +101,7 @@ export function useEmpresaMe() {
         })
       }
       setTimezoneAgregacao(tzAgg)
-      setEmpresa({ id, nomeExibicao })
+      setEmpresa({ id, nomeExibicao, cidade, estado })
       setPreferenciasImpressaoDelivery(parsePreferenciasImpressaoDelivery(data))
       setDeliveryCupomTemplate(getDeliveryCupomTemplateLocal(id) ?? parseDeliveryCupomTemplate(data))
     } catch (e) {

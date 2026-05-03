@@ -69,15 +69,18 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
     Boolean(venda.cliente?.id?.trim())
 
   const tipoVendaStr = String(venda.tipoVenda ?? '').trim().toLowerCase()
+  const isDeliveryOuRetirada = tipoVendaStr === 'entrega' || tipoVendaStr === 'retirada'
+
   const tipoVendaExibicao =
     venda.tabelaOrigem === 'venda_gestor'
-      ? tipoVendaStr === 'entrega'
-        ? 'entrega'
+      ? isDeliveryOuRetirada
+        ? tipoVendaStr
         : 'gestor'
       : venda.tipoVenda
+  
   const prefixoLinhaOrigemCard =
-    venda.tabelaOrigem === 'venda_gestor' && tipoVendaStr === 'entrega'
-      ? 'Entrega'
+    venda.tabelaOrigem === 'venda_gestor' && isDeliveryOuRetirada
+      ? (tipoVendaStr === 'retirada' ? 'Retirada' : 'Entrega')
       : venda.origem
 
   const etapaKanbanCard =
@@ -157,10 +160,11 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
             (tipoVendaExibicao === 'balcao' ||
               tipoVendaExibicao === 'mesa' ||
               tipoVendaExibicao === 'gestor' ||
-              tipoVendaExibicao === 'entrega') && (
+              tipoVendaExibicao === 'entrega' ||
+              tipoVendaExibicao === 'retirada') && (
               <div className="flex flex-shrink-0 items-center justify-center">
                 <TipoVendaIcon
-                  tipoVenda={tipoVendaExibicao as 'balcao' | 'mesa' | 'gestor' | 'entrega'}
+                  tipoVenda={tipoVendaExibicao as 'balcao' | 'mesa' | 'gestor' | 'entrega' | 'retirada'}
                   numeroMesa="M"
                   size={56}
                   containerScale={0.9}

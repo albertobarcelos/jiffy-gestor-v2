@@ -15,9 +15,19 @@ const AVISO_TEXTO: Record<string, string> = {
   IMPRESSORA_EXPEDICAO_NAO_CONFIGURADA:
     'Impressora de expedição não configurada na empresa (considere configurar em parâmetros).',
   PRODUTO_SEM_IMPRESSORA_FALLBACK_EXPEDICAO:
-    'Algum produto sem impressora mapeada — linha enviada para a impressora de expedição.',
+    'Algum produto sem impressora mapeada — verifique a configuração de impressão do pedido.',
   PRODUTO_SEM_IMPRESSORA_SEM_FALLBACK:
     'Algum produto sem impressora e sem fallback de expedição — linha omitida dos tickets.',
+}
+
+function ticketProducaoEhFallbackSemImpressoraProduto(ticket: VendaGestorTicket): boolean {
+  // Regra restrita ao cupom de produção: unificado e expedição continuam seguindo o ticket da API.
+  if (ticket.tipoCupom !== 'producao') return false
+  const origem = String(ticket.impressora?.origem ?? '')
+    .trim()
+    .toLowerCase()
+  if (!origem) return false
+  return origem.includes('fallback') || origem.includes('expedicao') || origem.includes('padr')
 }
 
 export function notificarWarningsTickets(
@@ -66,8 +76,20 @@ export async function imprimirTicketsApiGestor(params: {
   let impressosBrowser = 0
   let ignoradosSemItens = 0
   let ignoradosSemImpressora = 0
+  let ignoradosFallbackProdutoSemImpressora = 0
 
   for (const ticket of ticketsAImprimir) {
+    if (ticketProducaoEhFallbackSemImpressoraProduto(ticket)) {
+      ignoradosFallbackProdutoSemImpressora += 1
+      warnImpressao('ticket.producao_fallback_produto_sem_impressora_pulado', {
+        tipoCupom: ticket.tipoCupom,
+        impressoraId: ticket.impressoraId,
+        impressoraOrigem: ticket.impressora?.origem ?? null,
+        qItens: ticket.itens?.length ?? 0,
+      })
+      continue
+    }
+
     if (!ticket.itens?.length) {
       ignoradosSemItens += 1
       warnImpressao('ticket.pulado', {
@@ -134,5 +156,6 @@ export async function imprimirTicketsApiGestor(params: {
     impressosBrowser,
     ignoradosSemItens,
     ignoradosSemImpressora,
+    ignoradosFallbackProdutoSemImpressora,
   })
 }

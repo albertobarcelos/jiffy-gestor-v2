@@ -1328,10 +1328,11 @@ export function DetalhesVendas({
               <TipoVendaIcon
                 tipoVenda={
                   tabelaOrigem === 'venda_gestor'
-                    ? String(venda.tipoVenda ?? '').trim().toLowerCase() === 'entrega'
-                      ? 'entrega'
+                    ? (String(venda.tipoVenda ?? '').trim().toLowerCase() === 'entrega' ||
+                      String(venda.tipoVenda ?? '').trim().toLowerCase() === 'retirada')
+                      ? (String(venda.tipoVenda ?? '').trim().toLowerCase() as 'entrega' | 'retirada')
                       : 'gestor'
-                    : (venda.tipoVenda as 'mesa' | 'balcao' | 'gestor' | 'entrega')
+                    : (venda.tipoVenda as 'mesa' | 'balcao' | 'gestor' | 'entrega' | 'retirada')
                 }
                 numeroMesa={venda.numeroMesa}
                 containerScale={0.9}

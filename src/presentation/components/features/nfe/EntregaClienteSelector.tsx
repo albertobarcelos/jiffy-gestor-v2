@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { MdSearch, MdAddLocation, MdVisibility, MdLocationOn, MdPhone, MdPerson, MdPersonAdd, MdCheckCircle } from 'react-icons/md'
+import { useState, useCallback, useEffect } from 'react'
+import { MdSearch, MdAddLocation, MdEdit, MdLocationOn, MdPhone, MdPerson, MdCheckCircle } from 'react-icons/md'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Label } from '@/src/presentation/components/ui/label'
 import { showToast } from '@/src/shared/utils/toast'
@@ -50,6 +50,11 @@ interface EntregaClienteSelectorProps {
   onTelefoneExibicaoExternoChange?: (valor: string) => void
   digitosUltimaBuscaExterno?: string | null
   onDigitosUltimaBuscaExternoChange?: (digitos: string | null) => void
+  enderecoPadrao?: {
+    cidade?: string
+    estado?: string
+  }
+  mostrarEnderecos?: boolean
 }
 
 interface FormNovasMorada {
@@ -65,9 +70,25 @@ interface FormNovasMorada {
   referencia: string
 }
 
+const ETIQUETAS_MORADA = ['Casa', 'Trabalho', 'Outro'] as const
+type TipoEtiquetaMorada = (typeof ETIQUETAS_MORADA)[number]
+
+function normalizarTipoEtiqueta(valor: string | undefined | null): TipoEtiquetaMorada {
+  const raw = String(valor ?? '').trim().toLowerCase()
+  if (raw === 'trabalho') return 'Trabalho'
+  if (raw === 'outro') return 'Outro'
+  return 'Casa'
+}
+
+function nomePadraoMorada(tipoEtiqueta: TipoEtiquetaMorada): string {
+  if (tipoEtiqueta === 'Casa') return 'Casa Principal'
+  if (tipoEtiqueta === 'Trabalho') return 'Trabalho'
+  return 'Outro'
+}
+
 const FORM_INICIAL: FormNovasMorada = {
-  nomeMorada: '',
-  tipoEtiqueta: 'casa',
+  nomeMorada: 'Casa Principal',
+  tipoEtiqueta: 'Casa',
   cep: '',
   rua: '',
   numero: '',
@@ -76,6 +97,16 @@ const FORM_INICIAL: FormNovasMorada = {
   estado: '',
   complemento: '',
   referencia: '',
+}
+
+function formInicialComEnderecoPadrao(
+  enderecoPadrao?: EntregaClienteSelectorProps['enderecoPadrao']
+): FormNovasMorada {
+  return {
+    ...FORM_INICIAL,
+    cidade: enderecoPadrao?.cidade?.trim().toLocaleUpperCase('pt-BR') ?? '',
+    estado: enderecoPadrao?.estado?.trim().toUpperCase().slice(0, 2) ?? '',
+  }
 }
 
 /** Formata telefone para exibição: (XX) XXXXX-XXXX */
@@ -95,9 +126,10 @@ function extrairDigitosTelefone(valor: string): string {
 
 function moradaParaForm(m: MoradaTelefone): FormNovasMorada {
   const e = m.endereco
+  const tipoEtiqueta = normalizarTipoEtiqueta(m.tipoEtiqueta)
   return {
-    nomeMorada: m.nomeMorada ?? '',
-    tipoEtiqueta: m.tipoEtiqueta ?? 'casa',
+    nomeMorada: m.nomeMorada ?? nomePadraoMorada(tipoEtiqueta),
+    tipoEtiqueta,
     cep: e?.cep ? formatarCepMascara(e.cep) : '',
     rua: e?.rua ?? '',
     numero: e?.numero ?? '',
@@ -156,7 +188,7 @@ function MoradaCard({
         title="Editar endereço"
         className="flex-shrink-0 rounded-full p-1.5 text-gray-400 transition-colors hover:bg-primary/10 hover:text-primary"
       >
-        <MdVisibility className="h-4 w-4" />
+        <MdEdit className="h-4 w-4" />
       </button>
     </div>
   )
@@ -173,6 +205,8 @@ export function EntregaClienteSelector({
   onTelefoneExibicaoExternoChange,
   digitosUltimaBuscaExterno,
   onDigitosUltimaBuscaExternoChange,
+  enderecoPadrao,
+  mostrarEnderecos = true,
 }: EntregaClienteSelectorProps) {
   const telefoneControlado =
     telefoneExibicaoExterno !== undefined &&
@@ -231,9 +265,9 @@ export function EntregaClienteSelector({
 
   const abrirPainelNovo = useCallback(() => {
     setMoradaEditando(null)
-    setFormNova(FORM_INICIAL)
+    setFormNova(formInicialComEnderecoPadrao(enderecoPadrao))
     setPainelMoradaAberto(true)
-  }, [])
+  }, [enderecoPadrao])
 
   const abrirPainelEditar = useCallback((m: MoradaTelefone) => {
     setMoradaEditando(m)
@@ -244,8 +278,8 @@ export function EntregaClienteSelector({
   const fecharPainelMorada = useCallback(() => {
     setPainelMoradaAberto(false)
     setMoradaEditando(null)
-    setFormNova(FORM_INICIAL)
-  }, [])
+    setFormNova(formInicialComEnderecoPadrao(enderecoPadrao))
+  }, [enderecoPadrao])
 
   const handleBuscar = useCallback(async () => {
     const digitos = extrairDigitosTelefone(telefoneInput)
@@ -295,6 +329,19 @@ export function EntregaClienteSelector({
     []
   )
 
+  const handleTipoEtiquetaChange = useCallback((valor: string) => {
+    const tipoEtiqueta = normalizarTipoEtiqueta(valor)
+    setFormNova(prev => ({
+      ...prev,
+      tipoEtiqueta,
+      nomeMorada:
+        prev.nomeMorada.trim() === '' ||
+        ETIQUETAS_MORADA.some(etiqueta => prev.nomeMorada === nomePadraoMorada(etiqueta))
+          ? nomePadraoMorada(tipoEtiqueta)
+          : prev.nomeMorada,
+    }))
+  }, [])
+
   const handleCepInputChange = useCallback((valor: string) => {
     setFormNova(prev => ({ ...prev, cep: formatarCepMascara(valor) }))
   }, [])
@@ -343,8 +390,8 @@ export function EntregaClienteSelector({
     }
 
     const cepDigits = normalizarDigitosCep(formNova.cep)
-    if (cepDigits.length !== 8) {
-      showToast.warning('Informe um CEP válido com 8 dígitos (use a lupa para buscar o endereço).')
+    if (cepDigits.length > 0 && cepDigits.length !== 8) {
+      showToast.warning('Informe um CEP válido com 8 dígitos ou deixe o campo em branco.')
       return
     }
 
@@ -429,6 +476,19 @@ export function EntregaClienteSelector({
   const buscaRealizada = telefoneBuscado !== null || clienteVinculado !== null
   const buscandoCliente = buscarCliente.isPending
 
+  useEffect(() => {
+    if (!mostrarEnderecos || !clienteVinculado || moradaSelecionada || moradasEncontradas.length === 0) {
+      return
+    }
+    definirMoradaSelecionada(moradasEncontradas[0])
+  }, [
+    mostrarEnderecos,
+    clienteVinculado,
+    moradaSelecionada,
+    moradasEncontradas,
+    definirMoradaSelecionada,
+  ])
+
   return (
     <div className="space-y-3">
       {/* Antes da validação: só telefone (linha inteira). Depois: nome à esquerda, telefone à direita */}
@@ -464,7 +524,7 @@ export function EntregaClienteSelector({
                 autoFocus={!buscandoCliente}
                 title={
                   clienteVinculado?.id
-                    ? 'Para editar precisa clicar duas vezes neste campo.'
+                    ? 'Clique para editar o cadastro do cliente.'
                     : undefined
                 }
                 className={`w-full rounded-md border py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-0 ${
@@ -475,9 +535,15 @@ export function EntregaClienteSelector({
                     : 'border-primary/30 bg-white'
                 }`}
                 onMouseDown={e => {
-                  /** Evita seleção de palavra no 2.º clique (readOnly + duplo clique abre edição). */
+                  /** Evita seleção de palavra ao abrir edição de cliente pelo campo readOnly. */
                   if (clienteVinculado?.id && e.detail >= 2) {
                     e.preventDefault()
+                  }
+                }}
+                onClick={e => {
+                  if (clienteVinculado?.id) {
+                    e.preventDefault()
+                    onEditarClientePorDuploClique?.()
                   }
                 }}
                 onDoubleClick={e => {
@@ -566,7 +632,7 @@ export function EntregaClienteSelector({
       </div>
 
       {/* Resultado da busca */}
-      {telefoneBuscado !== null && !buscando && (
+      {mostrarEnderecos && telefoneBuscado !== null && !buscando && (
         <div className="space-y-2">
           {moradasEncontradas.length > 0 ? (
             <>
@@ -579,9 +645,7 @@ export function EntregaClienteSelector({
                   morada={morada}
                   selecionada={moradaSelecionada?.id === morada.id}
                   onSelecionar={() =>
-                    definirMoradaSelecionada(
-                      moradaSelecionada?.id === morada.id ? null : morada
-                    )
+                    definirMoradaSelecionada(morada)
                   }
                   onVerDetalhes={() => abrirPainelEditar(morada)}
                 />
@@ -704,12 +768,17 @@ export function EntregaClienteSelector({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="mb-1 block text-xs font-medium text-gray-600">Etiqueta</Label>
-              <input
+              <select
                 value={formNova.tipoEtiqueta}
-                onChange={e => handleFormChange('tipoEtiqueta', e.target.value)}
-                placeholder="casa, trabalho..."
+                onChange={e => handleTipoEtiquetaChange(e.target.value)}
                 className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-              />
+              >
+                {ETIQUETAS_MORADA.map(etiqueta => (
+                  <option key={etiqueta} value={etiqueta}>
+                    {etiqueta}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <Label className="mb-1 block text-xs font-medium text-gray-600">CEP</Label>
@@ -740,6 +809,9 @@ export function EntregaClienteSelector({
                   )}
                 </Button>
               </div>
+              <p className="mt-1 text-[11px] text-gray-400">
+                Opcional. Use a lupa apenas se quiser preencher o endereço pelo CEP.
+              </p>
             </div>
           </div>
 

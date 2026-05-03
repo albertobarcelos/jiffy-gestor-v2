@@ -177,10 +177,11 @@ export class VendaUnificadaDTO {
     return !!this.dataCancelamento || this.statusFiscal === 'CANCELADA'
   }
 
-  /** `tipoVenda === 'entrega'` vendido pelo Gestor (Kanban operacional). */
+  /** `tipoVenda === 'entrega' || tipoVenda === 'retirada'` vendido pelo Gestor (Kanban operacional). */
   isPedidoEntregaGestor(): boolean {
     if (!this.isVendaGestor() || this.isCancelada()) return false
-    return (this.tipoVenda ?? '').trim().toLowerCase() === 'entrega'
+    const tipo = (this.tipoVenda ?? '').trim().toLowerCase()
+    return tipo === 'entrega' || tipo === 'retirada'
   }
 
   /**
