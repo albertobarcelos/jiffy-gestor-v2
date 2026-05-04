@@ -1,23 +1,43 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { Dialog, DialogContent, DialogTitle, DialogFooter } from '@/src/presentation/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogFooter,
+} from '@/src/presentation/components/ui/dialog'
+import {
+  PainelPedidoBackdrop,
+  JiffyPainelSlide,
+  footerBarPrimaryMutedSx,
+} from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Label } from '@/src/presentation/components/ui/label'
 import { useClientesInfinite } from '@/src/presentation/hooks/useClientes'
 import { Cliente } from '@/src/domain/entities/Cliente'
-import { MdSearch, MdClose, MdAdd } from 'react-icons/md'
-import { ClientesTabsModal, ClientesTabsModalState } from '@/src/presentation/components/features/clientes/ClientesTabsModal'
+import { MdSearch, MdAdd } from 'react-icons/md'
+import {
+  ClientesTabsModal,
+  ClientesTabsModalState,
+} from '@/src/presentation/components/features/clientes/ClientesTabsModal'
 import { useQueryClient } from '@tanstack/react-query'
-
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 interface SeletorClienteModalProps {
   open: boolean
   onClose: () => void
   onSelect: (cliente: Cliente) => void
+  /** Título do modal (ex.: fluxo de venda no Kanban) */
+  title?: string
 }
 
-export function SeletorClienteModal({ open, onClose, onSelect }: SeletorClienteModalProps) {
+export function SeletorClienteModal({
+  open,
+  onClose,
+  onSelect,
+  title = 'Selecionar Cliente',
+}: SeletorClienteModalProps) {
   const queryClient = useQueryClient()
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -54,25 +74,36 @@ export function SeletorClienteModal({ open, onClose, onSelect }: SeletorClienteM
     return filterStatus === 'Ativo' ? true : filterStatus === 'Desativado' ? false : null
   }, [filterStatus])
 
-  // Hook com paginação infinita - limit 100 para carregar mais clientes por página
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetching,
-    isFetchingNextPage,
-    isLoading,
-    error,
-  } = useClientesInfinite({
-    q: debouncedSearch || undefined,
-    ativo: ativoFilter,
-    limit: 100, // Máximo permitido pela API
-  })
+  // Objeto estável para queryKey do React Query (evita refetch desnecessário a cada render)
+  const clientesQueryParams = useMemo(
+    () => ({
+      q: debouncedSearch.trim() || undefined,
+      ativo: ativoFilter,
+      limit: 100 as const,
+    }),
+    [debouncedSearch, ativoFilter]
+  )
 
-  // Lista de clientes achatada
+  // Hook com paginação infinita - limit 100 para carregar mais clientes por página
+  const { data, fetchNextPage, hasNextPage, isFetching, isFetchingNextPage, isLoading, error } =
+    useClientesInfinite(clientesQueryParams)
+
+  // Achata páginas, remove duplicatas por id (se a API repetir offset) e aplica filtro local no nome
+  // quando há texto — defesa se o backend ignorar o parâmetro `q`.
   const clientes = useMemo(() => {
-    return data?.pages.flatMap((page) => page.clientes) || []
-  }, [data])
+    const flat = data?.pages.flatMap(page => page.clientes) || []
+    const porId = new Map<string, Cliente>()
+    for (const c of flat) {
+      const id = c.getId()
+      if (!porId.has(id)) porId.set(id, c)
+    }
+    let lista = Array.from(porId.values())
+    const termo = debouncedSearch.trim().toLowerCase()
+    if (termo) {
+      lista = lista.filter(c => c.getNome().toLowerCase().includes(termo))
+    }
+    return lista
+  }, [data, debouncedSearch])
 
   const totalClientes = useMemo(() => {
     return data?.pages[0]?.count || 0
@@ -84,7 +115,7 @@ export function SeletorClienteModal({ open, onClose, onSelect }: SeletorClienteM
     if (!loadMoreElement || !hasNextPage || isFetchingNextPage || isFetching) return
 
     const observer = new IntersectionObserver(
-      (entries) => {
+      entries => {
         const [entry] = entries
         if (entry.isIntersecting && hasNextPage && !isFetchingNextPage && !isFetching) {
           fetchNextPage()
@@ -131,7 +162,7 @@ export function SeletorClienteModal({ open, onClose, onSelect }: SeletorClienteM
   }, [])
 
   const handleCloseClienteTabsModal = useCallback(() => {
-    setClienteTabsModalState((prev) => ({
+    setClienteTabsModalState(prev => ({
       ...prev,
       open: false,
     }))
@@ -143,7 +174,7 @@ export function SeletorClienteModal({ open, onClose, onSelect }: SeletorClienteM
   }, [queryClient])
 
   const handleClienteTabsModalTabChange = useCallback((tab: 'cliente' | 'visualizar') => {
-    setClienteTabsModalState((prev) => ({
+    setClienteTabsModalState(prev => ({
       ...prev,
       tab,
     }))
@@ -152,47 +183,61 @@ export function SeletorClienteModal({ open, onClose, onSelect }: SeletorClienteM
   return (
     <Dialog
       open={open}
-      onOpenChange={handleClose}
+      onOpenChange={isOpen => {
+        if (!isOpen) handleClose()
+      }}
       maxWidth={false}
+      TransitionComponent={JiffyPainelSlide}
+      transitionDuration={{ enter: 420, exit: 380 }}
+      slots={{ backdrop: PainelPedidoBackdrop }}
       sx={{
         '& .MuiDialog-container': {
           zIndex: 1400,
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: 'stretch',
+          justifyContent: 'flex-end',
         },
-        '& .MuiBackdrop-root': { zIndex: 1400, backgroundColor: 'rgba(0, 0, 0, 0.5)' },
+        '& .MuiBackdrop-root': {
+          zIndex: 1400,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          transition: 'none',
+        },
         '& .MuiDialog-paper': {
           zIndex: 1400,
-          backgroundColor: '#f9fafb', // gray-50
+          backgroundColor: '#ffffff',
           opacity: 1,
-          maxHeight: '90vh',
-          margin: '32px',
-          width: 'auto',
-          maxWidth: 'calc(100% - 64px)',
+          height: '100vh',
+          maxHeight: '100vh',
+          margin: 0,
+          marginLeft: 'auto',
+          width: { xs: '95vw', sm: '90vw', md: 'min(900px, 35vw)' },
+          maxWidth: '100vw',
+          borderRadius: 0,
         },
       }}
     >
       <DialogContent
         sx={{
-          width: '42rem',
-          maxWidth: '100%',
-          height: '600px',
-          maxHeight: '90vh',
+          width: '100%',
+          height: '100%',
+          maxHeight: '100vh',
           overflow: 'hidden',
-          backgroundColor: '#f9fafb', // gray-50
+          backgroundColor: '#ffffff',
           padding: 0,
           display: 'flex',
           flexDirection: 'column',
         }}
       >
-        <div style={{ padding: '24px 24px 16px 24px', flexShrink: 0 }}>
-          <div className="flex items-center justify-between">
-            <DialogTitle>Selecionar Cliente</DialogTitle>
+        <div
+          style={{ padding: '24px 24px 16px 24px', flexShrink: 0 }}
+          className="bg-gray-50"
+        >
+          <div className="flex items-center justify-between border-b border-gray-200 pb-4">
+            <DialogTitle>{title}</DialogTitle>
             <Button
               type="button"
               onClick={handleOpenNovoCliente}
-              className="h-8 px-4 rounded-lg font-semibold font-nunito text-sm flex items-center gap-2"
+              className="font-nunito flex h-8 items-center gap-2 rounded-lg px-4 text-sm font-semibold"
               sx={{
                 backgroundColor: 'var(--color-primary)',
                 color: 'white',
@@ -209,31 +254,42 @@ export function SeletorClienteModal({ open, onClose, onSelect }: SeletorClienteM
         </div>
 
         <div
-          style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 24px', minHeight: 0 }}
-          className="scrollbar-thin"
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            padding: '0 24px',
+            minHeight: 0,
+          }}
+          className="scrollbar-thin bg-gray-50"
         >
+          <div className="flex flex-col border-b border-primary/70">
+            <span className="text-xl font-semibold text-primary">Clientes</span>
+          </div>
           {/* Total de clientes */}
           {!isLoading && clientes.length > 0 && (
-            <div className="mb-4">
+            <div className="mb-2 mt-2">
               <p className="text-sm text-secondary-text">
-                Mostrando {clientes.length} de {totalClientes} clientes
+                {debouncedSearch.trim()
+                  ? `Encontrados ${clientes.length} cliente(s) para "${debouncedSearch.trim()}"`
+                  : `Mostrando ${clientes.length} de ${totalClientes} clientes`}
               </p>
             </div>
           )}
 
           {/* Filtros */}
-          <div className="flex gap-3 mb-4">
-            <div className="flex-1 min-w-[180px] max-w-[360px]">
-              <Label className="text-xs font-semibold text-secondary-text mb-1 block">
+          <div className="mb-4 flex gap-3">
+            <div className="min-w-[180px] max-w-[360px] flex-1">
+              <Label className="mb-1 block text-xs font-semibold text-secondary-text">
                 Buscar cliente...
               </Label>
               <div className="relative">
                 <Input
                   type="text"
                   value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
+                  onChange={e => setSearchText(e.target.value)}
                   placeholder="Pesquisar por nome..."
-                  className="w-full rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+                  className="font-nunito w-full rounded-lg border border-gray-200 bg-info text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       height: '32px',
@@ -247,22 +303,18 @@ export function SeletorClienteModal({ open, onClose, onSelect }: SeletorClienteM
                     },
                   }}
                 />
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text pointer-events-none z-10">
+                <span className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-secondary-text">
                   <MdSearch size={18} />
                 </span>
               </div>
             </div>
 
             <div className="w-full sm:w-[160px]">
-              <Label className="text-xs font-semibold text-secondary-text mb-1 block">
-                Status
-              </Label>
+              <Label className="mb-1 block text-xs font-semibold text-secondary-text">Status</Label>
               <select
                 value={filterStatus}
-                onChange={(e) =>
-                  setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
-                }
-                className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+                onChange={e => setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')}
+                className="font-nunito h-8 w-full rounded-lg border border-gray-200 bg-info px-5 text-sm text-primary-text focus:border-primary focus:outline-none"
               >
                 <option value="Todos">Todos</option>
                 <option value="Ativo">Ativo</option>
@@ -274,26 +326,21 @@ export function SeletorClienteModal({ open, onClose, onSelect }: SeletorClienteM
           {/* Lista de clientes */}
           <div
             ref={scrollContainerRef}
-            className="space-y-0 flex-1 overflow-y-auto bg-white rounded-lg p-2"
+            className="flex-1 space-y-0 overflow-y-auto rounded-lg bg-white p-2"
             style={{ minHeight: 0 }}
           >
             {/* Barra de título */}
             {!isLoading && !error && (
-              <div className="bg-primary/15 px-4 py-2 rounded-lg mb-2">
-                <p className="text-sm font-semibold text-primary-text font-nunito">
+              <div className="mb-2 rounded-lg bg-primary/15 px-4 py-2">
+                <p className="font-nunito text-sm font-semibold text-primary-text">
                   Nome do Cliente
                 </p>
               </div>
             )}
-            
+
             {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="flex flex-col items-center gap-2">
-                  <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                  <span className="text-sm font-medium text-primary-text font-nunito">
-                    Carregando...
-                  </span>
-                </div>
+              <div className="flex h-full items-center justify-center bg-gray-50">
+                <JiffyLoading />
               </div>
             ) : error ? (
               <div className="flex items-center justify-center py-8">
@@ -309,26 +356,24 @@ export function SeletorClienteModal({ open, onClose, onSelect }: SeletorClienteM
                   <button
                     key={cliente.getId()}
                     onClick={() => handleSelect(cliente)}
-                    className={`w-full p-3 transition-colors text-left rounded-lg ${
+                    className={`w-full rounded-lg p-3 text-left transition-colors ${
                       index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
                     } hover:bg-custom-2`}
                   >
-                    <div className="font-medium text-sm text-primary-text">
-                      {cliente.getNome()}
-                    </div>
+                    <div className="text-sm font-medium text-primary-text uppercase">{cliente.getNome()}</div>
                   </button>
                 ))}
 
                 {/* Elemento sentinela para Intersection Observer */}
                 {hasNextPage && !isFetchingNextPage && (
-                  <div ref={loadMoreRef} className="h-20 flex items-center justify-center">
+                  <div ref={loadMoreRef} className="flex h-20 items-center justify-center">
                     {/* Espaço para trigger do observer */}
                   </div>
                 )}
 
                 {isFetchingNextPage && (
                   <div className="flex justify-center py-4">
-                    <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                   </div>
                 )}
               </>
@@ -336,8 +381,32 @@ export function SeletorClienteModal({ open, onClose, onSelect }: SeletorClienteM
           </div>
         </div>
 
-        <DialogFooter sx={{ padding: '16px 24px 24px 24px', flexShrink: 0, borderTop: '1px solid #e5e7eb', marginTop: 0 }}>
-          <Button variant="outlined" onClick={handleClose}>
+        <DialogFooter
+          sx={{
+            padding: 0,
+            flexShrink: 0,
+            borderTop: '1px solid #e5e7eb',
+            marginTop: 0,
+            // DialogActions alinha à direita por padrão — uma coluna deve ocupar toda a largura
+            justifyContent: 'flex-start',
+            alignItems: 'stretch',
+            width: '100%',
+            boxSizing: 'border-box',
+            '& > *': {
+              flex: '1 1 100%',
+              maxWidth: '100%',
+              minWidth: 0,
+            },
+          }}
+        >
+          <Button
+            type="button"
+            variant="outlined"
+            color="inherit"
+            onClick={handleClose}
+            className="h-12 min-h-12 w-full font-semibold shadow-none"
+            sx={footerBarPrimaryMutedSx(true)}
+          >
             Cancelar
           </Button>
         </DialogFooter>

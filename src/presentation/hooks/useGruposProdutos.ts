@@ -11,6 +11,9 @@ interface GruposProdutosQueryParams {
   ativo?: boolean | null
   limit?: number
   offset?: number
+  enabled?: boolean
+  /** Padrão true; use false em modais longos para não refetch ao voltar o foco da aba */
+  refetchOnWindowFocus?: boolean
 }
 
 interface GruposProdutosResponse {
@@ -28,6 +31,7 @@ interface GruposProdutosResponse {
 export function useGruposProdutos(params: GruposProdutosQueryParams = {}) {
   const { auth, isAuthenticated } = useAuthStore()
   const token = auth?.getAccessToken()
+  const queryEnabled = isAuthenticated && !!token && (params.enabled ?? true)
 
   return useQuery<GrupoProduto[], ApiError>({
     queryKey: ['grupos-produtos', params.name, params.ativo],
@@ -67,10 +71,10 @@ export function useGruposProdutos(params: GruposProdutosQueryParams = {}) {
 
       return grupos
     },
-    enabled: isAuthenticated && !!token,
+    enabled: queryEnabled,
     staleTime: 1000 * 60 * 3, // 3 minutos (balance entre performance e atualização)
     refetchOnMount: true, // Sempre refetch ao montar para garantir dados atualizados
-    refetchOnWindowFocus: true, // Refetch ao focar na janela para manter dados atualizados
+    refetchOnWindowFocus: params.refetchOnWindowFocus ?? true, // Alinhado ao uso; modais podem passar false
   })
 }
 

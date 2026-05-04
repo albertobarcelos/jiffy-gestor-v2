@@ -4,10 +4,13 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { PerfilUsuario } from '@/src/domain/entities/PerfilUsuario'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { MdSearch, MdKeyboardArrowRight, MdPerson, MdEdit, MdAdd } from 'react-icons/md'
+import { MdSearch, MdKeyboardArrowRight, MdPerson, MdEdit, MdAdd, MdPersonAdd } from 'react-icons/md'
 import {
   PerfisUsuariosTabsModal,
+  PerfisUsuariosTabKey,
   PerfisUsuariosTabsModalState,
 } from './PerfisUsuariosTabsModal'
 import {
@@ -25,6 +28,8 @@ interface PerfisUsuariosListProps {
  * Replica exatamente o design e lógica do Flutter
  */
 export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
+  const PERFIS_PAGE_LIMIT = 25
+  const USUARIOS_PAGE_LIMIT = 25
   const [perfis, setPerfis] = useState<PerfilUsuario[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
@@ -74,12 +79,15 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
         const contagens = await Promise.all(
           perfilIds.map(async (perfilId) => {
             try {
-              const response = await fetch(`/api/usuarios?perfilPdvId=${perfilId}&limit=1&offset=0`, {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                  'Content-Type': 'application/json',
-                },
-              })
+              const response = await fetch(
+                `/api/usuarios?perfilPdvId=${perfilId}&limit=${USUARIOS_PAGE_LIMIT}&offset=0`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                }
+              )
 
               if (response.ok) {
                 const data = await response.json()
@@ -129,7 +137,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
         // Loop para carregar todas as páginas
         while (hasMore) {
           const params = new URLSearchParams({
-            limit: '10',
+            limit: PERFIS_PAGE_LIMIT.toString(),
             offset: currentOffset.toString(),
           })
 
@@ -164,8 +172,8 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
           }
 
           // Verifica se há mais páginas
-          // Se retornou menos de 10 itens, não há mais páginas
-          hasMore = newPerfis.length === 10
+          // Se retornou menos do limit, não há mais páginas
+          hasMore = newPerfis.length === PERFIS_PAGE_LIMIT
           currentOffset += newPerfis.length
         }
 
@@ -193,12 +201,15 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
       if (!token || usuariosPorPerfil[perfilId]) return
 
       try {
-        const response = await fetch(`/api/usuarios?perfilPdvId=${perfilId}&limit=100&offset=0`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
+        const response = await fetch(
+          `/api/usuarios?perfilPdvId=${perfilId}&limit=${USUARIOS_PAGE_LIMIT}&offset=0`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        )
 
         if (response.ok) {
           const data = await response.json()
@@ -275,12 +286,15 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
         showToast.error(error.message || 'Erro ao atualizar status do usuário')
 
         // Reverte a atualização otimista em caso de erro
-        const response = await fetch(`/api/usuarios?perfilPdvId=${perfilId}&limit=100&offset=0`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
+        const response = await fetch(
+          `/api/usuarios?perfilPdvId=${perfilId}&limit=${USUARIOS_PAGE_LIMIT}&offset=0`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        )
 
         if (response.ok) {
           const data = await response.json()
@@ -343,6 +357,8 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
       tab: config.tab ?? 'perfil',
       mode: config.mode ?? 'create',
       perfilId: config.perfilId,
+      initialPerfilPdvId: config.initialPerfilPdvId,
+      usuarioId: config.usuarioId,
     }))
 
     // Adicionar um parâmetro na URL para forçar o recarregamento ao fechar o modal
@@ -355,7 +371,10 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
     setTabsModalState((prev) => ({
       ...prev,
       open: false,
+      tab: 'perfil',
       perfilId: undefined,
+      usuarioId: undefined,
+      initialPerfilPdvId: undefined,
     }))
 
     // Remover o parâmetro da URL para forçar o recarregamento da rota
@@ -367,9 +386,29 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
     onReload?.()
   }, [router, searchParams, pathname, loadAllPerfis, onReload])
 
-  const handleTabChange = useCallback((tab: 'perfil') => {
+  const handleTabChange = useCallback((tab: PerfisUsuariosTabKey) => {
     setTabsModalState((prev) => ({ ...prev, tab }))
   }, [])
+
+  /** Perfil embutido: após criar mantém o modal aberto e libera a aba Usuário */
+  const handlePerfilEmbeddedSaved = useCallback(
+    (payload?: { perfilIdCriado?: string }) => {
+      if (payload?.perfilIdCriado) {
+        handleStatusChange()
+        setTabsModalState((prev) => ({
+          ...prev,
+          mode: 'edit',
+          perfilId: payload.perfilIdCriado,
+          initialPerfilPdvId: payload.perfilIdCriado,
+        }))
+        showToast.success('Perfil criado com sucesso!')
+        return
+      }
+      // "Salvar" em edição: só atualiza dados; fechar o painel é só por Fechar / Salvar e fechar.
+      handleStatusChange()
+    },
+    [handleStatusChange]
+  )
 
   const openUsuariosTabsModal = useCallback((config: Partial<UsuariosTabsModalState> = {}) => {
     setUsuariosTabsModalState(() => ({
@@ -421,12 +460,12 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
       <div className="md:px-[30px] px-1 pt-1 flex-shrink-0">
-        <div className="flex items-start justify-between">
+        <div className="flex items-center justify-between">
           <div className="flex flex-col w-1/2 md:pl-5">
             <span className="text-primary md:text-lg text-sm font-semibold font-nunito">
               Perfis Cadastrados
             </span>
-            <span className="text-tertiary md:text-[22px] text-sm font-medium font-nunito">
+            <span className="text-tertiary md:text-[22px] text-sm font-normal font-nunito">
               Total {perfis.length} de {totalPerfis}
             </span>
           </div>
@@ -440,41 +479,35 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
         </div>
       </div>
 
-      <div className="h-[4px] border-t-2 border-primary/70 flex-shrink-0"></div>
-      <div className="flex gap-3 md:px-[20px] px-1 pb-2 flex-shrink-0">
+      <div className="h-[1px] border-t-2 border-primary/70 flex-shrink-0" aria-hidden />
+      <div className="flex gap-3 px-2 flex-shrink-0 py-1">
         <div className="flex-1 min-w-[180px] max-w-[360px]">
-            <label
-              htmlFor="complementos-search"
-              className="text-xs font-semibold text-secondary-text mb-1 block"
-            >
-              Buscar Perfil de Usuário...
-            </label>
-            <div className="relative h-8">
-              <MdSearch
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
-                size={18}
-              />
-              <input
-                id="complementos-search"
-                type="text"
-                placeholder="Pesquisar perfil de usuário..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
-              />
-            </div>
+          <div className="relative h-8">
+            <MdSearch
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
+              size={18}
+            />
+            <input
+              id="complementos-search"
+              type="text"
+              placeholder="Pesquisar perfil de usuário..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+            />
           </div>
+        </div>
       </div>
 
       {/* Cabeçalho da tabela */}
       {perfis.length > 0 && (
-        <div className="md:px-[30px] px-1 flex-shrink-0">
-          <div className="h-10 bg-custom-2 rounded-lg md:px-4 pr-1 flex items-center gap-2">
+        <div className="px-1 flex-shrink-0">
+          <div className="h-10 bg-custom-2 rounded-lg pr-1 flex items-center gap-2">
             <div className="w-8"></div>
-            <div className="md:flex-[3] flex-[2] font-nunito font-semibold text-left md:text-sm text-xs text-primary-text uppercase">
+            <div className="md:flex-[3] flex-[2] font-nunito font-semibold text-left md:text-sm text-xs text-primary-text ">
               Perfil
             </div>
-            <div className="md:flex-[2] flex-[1] md:text-center mr-3 text-right font-nunito font-semibold md:text-sm text-xs text-primary-text uppercase">
+            <div className="md:flex-[2] flex-[1] md:text-center mr-3 text-right font-nunito font-semibold md:text-sm text-xs text-primary-text ">
               Qtd Usuários
             </div>
           </div>
@@ -484,18 +517,13 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
       {/* Lista de perfis com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto md:px-[30px] px-1 scrollbar-hide"
+        className="flex-1 overflow-y-auto px-1 scrollbar-hide"
         style={{ maxHeight: 'calc(100vh - 250px)' }}
       >
         {/* Mostrar loading quando está carregando ou ainda não houve tentativa de carregamento */}
         {(isLoading || !hasLoadedInitialRef.current) && perfis.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 gap-2">
-            <img
-              src="/images/jiffy-loading.gif"
-              alt="Carregando..."
-              className="w-20 h-20"
-            />
-            <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
+            <JiffyLoading />
           </div>
         )}
 
@@ -526,33 +554,45 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
               className={`${bgClass} rounded-lg my-2 overflow-visible hover:bg-primary/10 transition-colors`}
             >
               {/* Cabeçalho do perfil */}
-              <div 
+              <div
                 onClick={handlePerfilRowClick}
-                className="h-[50px] md:px-4 px-1 flex items-center md:gap-[10px] gap-1 relative overflow-visible cursor-pointer"
+                className="h-[50px] px-1 flex items-center md:gap-[10px] gap-1 relative overflow-visible cursor-pointer"
               >
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation()
                     toggleExpand(perfil.getId())
                   }}
-                  className="md:w-8 w-6 md:h-8 h-6 flex items-center justify-center text-primary-text hover:bg-secondary-bg/20 rounded transition-colors"
+                  className="tooltip-hover-below tooltip-hover-below-icon flex h-6 w-6 shrink-0 items-center justify-center rounded text-primary-text transition-colors hover:bg-secondary-bg/20 md:h-8 md:w-8"
+                  data-tooltip="Exibir usuários do perfil"
+                  aria-label="Exibir usuários do perfil"
+                  aria-expanded={isExpanded}
                 >
-                  <span title="Exibir usuários do perfil" 
-                  className={`text-lg transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
+                  <span
+                    className={`text-lg transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                  >
                     <MdKeyboardArrowRight size={18} />
                   </span>
                 </button>
-                <div className="md:flex-[3] flex-[2] font-nunito font-semibold text-left md:text-sm text-xs text-primary-text flex items-center gap-2">
+                <div className="md:flex-[3] flex-[2] font-normal text-left md:text-sm text-xs text-primary-text flex items-center gap-2">
                   {perfil.getRole()}
                   <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation()
-                      openUsuariosTabsModal({ mode: 'create', initialPerfilPdvId: perfil.getId() })
+                      openTabsModal({
+                        mode: 'edit',
+                        perfilId: perfil.getId(),
+                        tab: 'usuario',
+                        initialPerfilPdvId: perfil.getId(),
+                      })
                     }}
-                    className="w-5 h-5 flex items-center justify-center border border-primary/70 text-primary hover:bg-primary/20 rounded-full transition-colors"
-                    title="Adicionar novo usuário ao perfil"
+                    className="tooltip-hover-below flex h-5 w-5 shrink-0 items-center justify-center text-primary transition-colors hover:bg-primary/20 hover:rounded-full"
+                    data-tooltip="Adicionar novo usuário ao perfil"
+                    aria-label="Adicionar novo usuário ao perfil"
                   >
-                    <MdAdd />
+                    <MdPersonAdd size={16} />
                   </button>
                 </div>
                 <div className="md:flex-[2] flex-[1] mr-3 md:text-center text-right font-nunito md:text-sm text-xs text-secondary-text">
@@ -574,18 +614,28 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
                           key={usuario.id}
                           className="flex items-center gap-4 p-3 bg-primary-bg rounded-lg"
                         >
+                        
                           <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
                             <span className="text-primary"><MdPerson size={22} /></span>
                           </div>
-                          <div className="flex-1">
+                        <div className="flex items-center justify-start gap-2 w-full">
+                          <div className="flex flex-col">
                             <div className="flex items-center gap-2">
-                              <p className="font-nunito font-semibold text-sm text-primary-text">
+                              <p className=" font-normal text-sm text-primary-text">
                                 {usuario.nome}
                               </p>
                               <button
-                                onClick={() => openUsuariosTabsModal({ mode: 'edit', usuarioId: usuario.id })}
-                                className="w-5 h-5 flex items-center justify-center text-primary hover:bg-primary/20 rounded-full transition-colors"
-                                title="Editar usuário"
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  openUsuariosTabsModal({
+                                    mode: 'edit',
+                                    usuarioId: usuario.id,
+                                  })
+                                }}
+                                className="tooltip-hover-below tooltip-hover-below-icon flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/20"
+                                data-tooltip="Editar usuário"
+                                aria-label="Editar usuário"
                               >
                                 <MdEdit size={14} />
                               </button>
@@ -594,31 +644,37 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
                               {usuario.telefone || 'Sem telefone'}
                             </p>
                           </div>
-                          <div className="flex items-center">
-                            <label
-                              className={`relative inline-flex h-5 w-12 items-center ${
-                                togglingStatus[usuario.id]
-                                  ? 'cursor-not-allowed opacity-60'
-                                  : 'cursor-pointer'
-                              }`}
-                              title={usuario.ativo ? 'Usuário Ativo' : 'Usuário Desativado'}
-                            >
-                              <input
-                                type="checkbox"
-                                className="sr-only peer"
-                                checked={usuario.ativo}
-                                onChange={(event) =>
-                                  handleToggleUsuarioStatus(
-                                    usuario.id,
-                                    event.target.checked,
-                                    perfil.getId()
-                                  )
-                                }
-                                disabled={!!togglingStatus[usuario.id]}
-                              />
-                              <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                              <span className="absolute left-[2px] top-1/2 block h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[28px]" />
-                            </label>
+                          <div
+                            className="tooltip-hover-below flex items-center"
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            data-tooltip={
+                              usuario.ativo ? 'Usuário ativo' : 'Usuário desativado'
+                            }
+                          >
+                            <JiffyIconSwitch
+                              checked={usuario.ativo}
+                              onChange={(e) => {
+                                e.stopPropagation()
+                                handleToggleUsuarioStatus(
+                                  usuario.id,
+                                  e.target.checked,
+                                  perfil.getId()
+                                )
+                              }}
+                              disabled={!!togglingStatus[usuario.id]}
+                              bordered={false}
+                              size="sm"
+                              className="shrink-0 px-0 py-0"
+                              inputProps={{
+                                'aria-label': usuario.ativo
+                                  ? 'Desativar usuário'
+                                  : 'Ativar usuário',
+                                onClick: (e) => e.stopPropagation(),
+                              }}
+                            />
+                          </div>
                           </div>
                         </div>
                       ))}
@@ -636,6 +692,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
         onClose={closeTabsModal}
         onTabChange={handleTabChange}
         onReload={handleStatusChange}
+        onPerfilEmbeddedSaved={handlePerfilEmbeddedSaved}
       />
 
       <UsuariosTabsModal

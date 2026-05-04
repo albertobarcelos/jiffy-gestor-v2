@@ -67,24 +67,71 @@
     transform: translate(-50%, -50%);
   }
 
-  /* Efeito visual ao arrastar card no Kanban: inclinado + leve tremor como se estivesse sendo puxado */
-  @keyframes drag-card-shake {
-    0%,
-    100% {
-      transform: scale(1.05) rotate(-5deg) translateY(0);
-    }
-    25% {
-      transform: scale(1.05) rotate(-6deg) translateY(-2px);
-    }
-    50% {
-      transform: scale(1.05) rotate(-4deg) translateY(0);
-    }
-    75% {
-      transform: scale(1.05) rotate(-6deg) translateY(-2px);
-    }
+  /* Tooltip abaixo do gatilho (ex.: switch em listas) */
+  .tooltip-hover-below {
+    position: relative;
   }
+  .tooltip-hover-below::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: max-content;
+    max-width: 220px;
+    background: #ffffff;
+    color: #000000;
+    padding: 6px 10px;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    white-space: pre-line;
+    font-size: 10px;
+    line-height: 1.3;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease-out, transform 120ms ease-out;
+    z-index: 20;
+  }
+  .tooltip-hover-below:hover::after {
+    opacity: 1;
+    transform: translateX(-50%);
+  }
+
+  /*
+   * Tooltip abaixo, âncora deslocada à direita (centro do balão ~eixo do ícone da seta em botão estreito)
+   */
+  .tooltip-hover-below.tooltip-hover-below-icon::after {
+    left: 58%;
+    transform: translateX(-50%);
+  }
+  .tooltip-hover-below.tooltip-hover-below-icon:hover::after {
+    transform: translateX(-50%);
+  }
+
+  /*
+   * Tooltip abaixo: borda direita do balão alinhada à borda direita do gatilho (ex.: switch em linha).
+   */
+  .tooltip-hover-below.tooltip-hover-below-align-end::after {
+    left: auto;
+    right: 0;
+    transform: none;
+  }
+  .tooltip-hover-below.tooltip-hover-below-align-end:hover::after {
+    opacity: 1;
+    transform: none;
+  }
+  .tooltip-hover-below.tooltip-hover-below-icon.tooltip-hover-below-align-end::after {
+    left: auto;
+    right: 0;
+    transform: none;
+  }
+  .tooltip-hover-below.tooltip-hover-below-icon.tooltip-hover-below-align-end:hover::after {
+    transform: none;
+  }
+
+  /* Preview do card no Kanban ao arrastar: leve inclinação fixa (sem animação — evita tremor visual) */
   .drag-preview-card {
-    animation: drag-card-shake 0.18s ease-in-out infinite;
+    transform: rotate(-4deg) scale(1.04);
     box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05);
   }
 }
@@ -194,13 +241,25 @@
 body {
   color: var(--color-primary-text);
   background: var(--color-primary-background);
-  /* Exo 2 aplicada automaticamente via Next.js font optimization */
+  font-family: var(--font-general-sans), system-ui, sans-serif;
+  /* Texto corrido: peso regular (400) — mínimo legível padrão na web */
+  font-weight: 400;
 }
 
-/* Títulos usam Manrope */
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-manrope), sans-serif;
+/* Títulos principais */
+h1,
+h2 {
+  font-family: var(--font-general-sans), system-ui, sans-serif;
   font-weight: 600;
+}
+
+/* Subtítulos e cabeçalhos de apoio */
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-general-sans), system-ui, sans-serif;
+  font-weight: 400;
 }
 
 @layer utilities {

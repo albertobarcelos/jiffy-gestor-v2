@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
-import { Input } from './input'
-import { Label } from './label'
+import { Input, type InputProps } from './input'
 
 interface Municipio {
   codigoCidadeIbge: string
@@ -26,6 +25,9 @@ interface CidadeAutocompleteProps {
   useNativeInput?: boolean
   // Classes customizadas para o input nativo
   inputClassName?: string
+  /** Repassados ao `Input` interno (MUI TextField), quando não é `useNativeInput` */
+  size?: InputProps['size']
+  sx?: InputProps['sx']
 }
 
 // Limite de itens exibidos no dropdown quando não há filtro ativo (Infinity = sem limite)
@@ -60,10 +62,14 @@ export function CidadeAutocomplete({
   className = '',
   useNativeInput = false,
   inputClassName = '',
+  size = 'small',
+  sx,
 }: CidadeAutocompleteProps) {
   const [isValidating, setIsValidating] = useState(false)
   const [isValid, setIsValid] = useState<boolean | null>(null)
   const [erro, setErro] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   // Lista completa de municípios do estado selecionado
   const [allMunicipios, setAllMunicipios] = useState<Municipio[]>([])
@@ -86,6 +92,14 @@ export function CidadeAutocomplete({
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const valorNoBlurRef = useRef<string>('')
   const cidadeSelecionadaDuranteBlurRef = useRef<boolean>(false)
+
+  // Callbacks do pai em refs — evita loop infinito quando os useEffects dependem de funções inline.
+  const onValidationChangeRef = useRef(onValidationChange)
+  const onCidadeSelecionadaRef = useRef(onCidadeSelecionada)
+  useEffect(() => {
+    onValidationChangeRef.current = onValidationChange
+    onCidadeSelecionadaRef.current = onCidadeSelecionada
+  })
 
   // Altura máxima aproximada do dropdown (max-h-52 = 208px + botões de scroll)
   const DROPDOWN_HEIGHT = 260
@@ -124,16 +138,51 @@ export function CidadeAutocomplete({
     setErro(null)
     setShowDropdown(false)
     setSelectedFromList(false)
+    setSearchTerm('')
     setAllMunicipios([])
     setCanScrollUp(false)
     setCanScrollDown(false)
 
     // Notifica o pai que a validação foi invalidada pela troca de UF
     if (estado) {
-      onValidationChange?.(false)
+      // Ainda não validado: a validação acontece após os municípios carregarem.
+      onValidationChangeRef.current?.(null)
       carregarMunicipios(estado)
     }
   }, [estado])
+
+  /**
+   * Validação automática quando:
+   * - a cidade já vem preenchida (ex.: retorno do CEP)
+   * - os municípios do estado terminaram de carregar
+   */
+  useEffect(() => {
+    if (!estado) return
+    if (isLoadingMunicipios) return
+    if (allMunicipios.length === 0) return
+    if (!value || value.trim().length < 2) return
+
+    const municipioEncontrado = allMunicipios.find(
+      (m) => normalizar(m.nomeCidade) === normalizar(value)
+    )
+
+    if (municipioEncontrado) {
+      if (isValid !== true) setIsValid(true)
+      setErro(null)
+      onCidadeSelecionadaRef.current?.(
+        municipioEncontrado.nomeCidade.toLocaleUpperCase('pt-BR'),
+        municipioEncontrado.codigoCidadeIbge
+      )
+      onValidationChangeRef.current?.(true)
+      return
+    }
+
+    // Não encontrou na lista: marca como inválido (cidade não pertence ao UF)
+    if (isValid !== false) setIsValid(false)
+    setErro(`Cidade "${value}" não encontrada no estado ${estado}`)
+    onValidationChangeRef.current?.(false)
+    // isValid fora das deps: senão, ao setIsValid o efeito reexecuta e chama o pai de novo (loop).
+  }, [estado, value, allMunicipios, isLoadingMunicipios, normalizar])
 
   // Validar automaticamente APENAS quando receber um valor inicial (ao carregar dados)
   // NÃO validar durante a digitação - validação acontece apenas no blur
@@ -165,7 +214,11 @@ export function CidadeAutocomplete({
         // Se encontrou na lista, marca como válido imediatamente
         setIsValid(true)
         setErro(null)
-        onValidationChange?.(true)
+        onCidadeSelecionadaRef.current?.(
+          municipioEncontrado.nomeCidade.toLocaleUpperCase('pt-BR'),
+          municipioEncontrado.codigoCidadeIbge
+        )
+        onValidationChangeRef.current?.(true)
       } else {
         // IMPORTANTE: Não validar via API automaticamente durante digitação
         // A validação via API acontece apenas no blur (handleBlur)
@@ -173,10 +226,10 @@ export function CidadeAutocomplete({
         // Apenas resetar o estado de validação
         setIsValid(null)
         setErro(null)
-        onValidationChange?.(null)
+        onValidationChangeRef.current?.(null)
       }
     }
-  }, [value, estado, allMunicipios, isLoadingMunicipios, isValid, selectedFromList, onValidationChange, normalizar])
+  }, [value, estado, allMunicipios, isLoadingMunicipios, isValid, selectedFromList, normalizar])
 
   /**
    * Verifica se a lista pode rolar para cima ou para baixo
@@ -188,6 +241,14 @@ export function CidadeAutocomplete({
     setCanScrollUp(el.scrollTop > 0)
     setCanScrollDown(el.scrollTop + el.clientHeight < el.scrollHeight - 1)
   }, [])
+
+  // Ao abrir o dropdown, foca automaticamente o campo de pesquisa interno
+  useEffect(() => {
+    if (!showDropdown) return
+    requestAnimationFrame(() => {
+      searchInputRef.current?.focus()
+    })
+  }, [showDropdown])
 
   // Atualiza o estado dos botões quando o dropdown abre ou a lista muda
   useEffect(() => {
@@ -248,10 +309,10 @@ export function CidadeAutocomplete({
    * Normaliza acentos e maiúsculas/minúsculas para comparação.
    */
   const municipiosFiltrados = (() => {
-    if (!value || value.trim() === '') {
+    if (!searchTerm || searchTerm.trim() === '') {
       return allMunicipios.slice(0, MAX_ITENS_SEM_FILTRO)
     }
-    const termo = normalizar(value)
+    const termo = normalizar(searchTerm)
     return allMunicipios.filter((m) => normalizar(m.nomeCidade).includes(termo))
   })()
 
@@ -278,6 +339,7 @@ export function CidadeAutocomplete({
     
     // Fechar dropdown imediatamente
     setShowDropdown(false)
+    setSearchTerm('')
     
     // Primeiro limpar o campo para evitar que validação use texto digitado
     // Isso garante que qualquer validação pendente não use o texto parcial digitado
@@ -291,19 +353,22 @@ export function CidadeAutocomplete({
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         // Agora definir o nome oficial da cidade
-        onChange(municipio.nomeCidade)
+        onChange(municipio.nomeCidade.toLocaleUpperCase('pt-BR'))
         setIsValid(true)
         setErro(null)
         setSelectedFromList(true)
-        valorNoBlurRef.current = municipio.nomeCidade // Atualizar valor de referência
+        valorNoBlurRef.current = municipio.nomeCidade.toLocaleUpperCase('pt-BR') // Atualizar valor de referência
         
         // IMPORTANTE: Chamar onCidadeSelecionada ANTES de onValidationChange
         // Isso garante que o componente pai atualize o estado antes da validação
-        onCidadeSelecionada?.(municipio.nomeCidade, municipio.codigoCidadeIbge)
+        onCidadeSelecionadaRef.current?.(
+          municipio.nomeCidade.toLocaleUpperCase('pt-BR'),
+          municipio.codigoCidadeIbge
+        )
         
         // Chamar onValidationChange por último, após tudo estar atualizado
         // O componente pai deve verificar se já tem código IBGE antes de fazer qualquer validação
-        onValidationChange?.(true)
+        onValidationChangeRef.current?.(true)
       })
     })
   }
@@ -321,14 +386,11 @@ export function CidadeAutocomplete({
   }
 
   /**
-   * Ao digitar: filtra localmente, recalcula direção e reseta a validação anterior
+   * Busca interna do dropdown: filtra localmente (sem alterar o valor selecionado)
    */
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value
-    onChange(newValue)
-    setIsValid(null)
-    setErro(null)
-    setSelectedFromList(false)
+    setSearchTerm(newValue)
     setDropdownDirection(calcularDirecao())
     setShowDropdown(true)
     
@@ -354,7 +416,14 @@ export function CidadeAutocomplete({
    * apenas se o usuário não selecionou da lista
    * Validação acontece APENAS no blur, não durante a digitação
    */
-  const handleBlur = () => {
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    // Se o foco está indo para dentro do próprio componente (ex.: campo "Pesquisar cidade..." no dropdown),
+    // não fechar nem validar agora.
+    const nextFocusedEl = e.relatedTarget as Node | null
+    if (nextFocusedEl && containerRef.current?.contains(nextFocusedEl)) {
+      return
+    }
+
     // NÃO resetar a flag aqui - ela será verificada dentro do timeout
     // Se resetarmos aqui, perdemos a informação de que uma cidade foi selecionada
     
@@ -375,7 +444,13 @@ export function CidadeAutocomplete({
     blurTimeoutRef.current = setTimeout(async () => {
       blurTimeoutRef.current = null
       
-      setShowDropdown(false)
+        // Se o usuário trouxe o foco para dentro do dropdown (ex.: campo de pesquisa),
+        // não fechar a lista.
+        if (containerRef.current?.contains(document.activeElement)) {
+          return
+        }
+
+        setShowDropdown(false)
 
       // PRIORIDADE 1: Se uma cidade foi selecionada durante o delay, NÃO VALIDAR
       // Esta é a verificação mais importante - se uma cidade foi selecionada,
@@ -394,7 +469,7 @@ export function CidadeAutocomplete({
         if (!value || value.trim() === '') {
           setIsValid(null)
           setErro(null)
-          onValidationChange?.(null)
+          onValidationChangeRef.current?.(null)
           return
         }
         
@@ -412,8 +487,8 @@ export function CidadeAutocomplete({
           // Marcar como válida SEM chamar API
           setIsValid(true)
           setErro(null)
-          onValidationChange?.(true)
-          onCidadeSelecionada?.(cidadeEncontrada.nomeCidade, cidadeEncontrada.codigoCidadeIbge)
+          onValidationChangeRef.current?.(true)
+          onCidadeSelecionadaRef.current?.(cidadeEncontrada.nomeCidade, cidadeEncontrada.codigoCidadeIbge)
           return // SAIR - não validar via API
         }
         
@@ -437,9 +512,9 @@ export function CidadeAutocomplete({
         // Cidade encontrada na lista, marcar como válida sem chamar API
         setIsValid(true)
         setErro(null)
-        onValidationChange?.(true)
+        onValidationChangeRef.current?.(true)
         // Passar código IBGE se disponível
-        onCidadeSelecionada?.(cidadeEncontrada.nomeCidade, cidadeEncontrada.codigoCidadeIbge)
+        onCidadeSelecionadaRef.current?.(cidadeEncontrada.nomeCidade, cidadeEncontrada.codigoCidadeIbge)
         return // SAIR - não validar via API
       }
 
@@ -449,7 +524,7 @@ export function CidadeAutocomplete({
       // - O valor tem pelo menos 2 caracteres (evita requisições desnecessárias)
       if (!value || !estado) {
         setIsValid(null)
-        onValidationChange?.(null)
+        onValidationChangeRef.current?.(null)
         return
       }
 
@@ -458,7 +533,7 @@ export function CidadeAutocomplete({
       if (value.trim().length < 2) {
         setIsValid(null) // null = não validado ainda (não é erro, apenas aguardando mais caracteres)
         setErro(null)
-        onValidationChange?.(null)
+        onValidationChangeRef.current?.(null)
         return
       }
 
@@ -502,7 +577,7 @@ export function CidadeAutocomplete({
 
         setIsValid(valido)
         setErro(valido ? null : `Cidade "${nomeCidade}" não encontrada no estado ${estado}`)
-        onValidationChange?.(valido)
+        onValidationChangeRef.current?.(valido)
       } else {
         // Verificar novamente antes de atualizar o estado
         if (cidadeSelecionadaDuranteBlurRef.current || selectedFromList) {
@@ -510,7 +585,7 @@ export function CidadeAutocomplete({
         }
         setIsValid(false)
         setErro('Erro ao validar cidade')
-        onValidationChange?.(false)
+        onValidationChangeRef.current?.(false)
       }
     } catch (error) {
       console.error('Erro ao validar cidade:', error)
@@ -520,10 +595,30 @@ export function CidadeAutocomplete({
       }
       setIsValid(false)
       setErro('Erro ao validar cidade')
-      onValidationChange?.(false)
+      onValidationChangeRef.current?.(false)
     } finally {
       setIsValidating(false)
     }
+  }
+
+  /**
+   * Remove a cidade selecionada e limpa validações/código IBGE no componente pai.
+   */
+  const handleLimparCidade = () => {
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current)
+      blurTimeoutRef.current = null
+    }
+    cidadeSelecionadaDuranteBlurRef.current = false
+    valorNoBlurRef.current = ''
+    setShowDropdown(false)
+    setSearchTerm('')
+    setIsValid(null)
+    setErro(null)
+    setSelectedFromList(false)
+    onChange('')
+    onCidadeSelecionadaRef.current?.('', '')
+    onValidationChangeRef.current?.(null)
   }
 
   const inputClasses = `
@@ -540,12 +635,7 @@ export function CidadeAutocomplete({
           {label}
           {required && <span className="text-red-500 ml-1">*</span>}
         </label>
-      ) : (
-        <Label htmlFor="cidade">
-          {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
-        </Label>
-      )}
+      ) : null}
 
       <div ref={inputWrapperRef} className="relative">
         {useNativeInput ? (
@@ -553,7 +643,7 @@ export function CidadeAutocomplete({
             id="cidade"
             type="text"
             value={value}
-            onChange={handleInputChange}
+            readOnly
             onFocus={handleFocus}
             onBlur={handleBlur}
             placeholder={placeholder}
@@ -565,22 +655,34 @@ export function CidadeAutocomplete({
         ) : (
           <Input
             id="cidade"
+            label={label}
+            required={required}
+            InputLabelProps={required ? { required: true } : undefined}
             value={value}
-            onChange={handleInputChange}
+            inputProps={{ readOnly: true }}
             onFocus={handleFocus}
             onBlur={handleBlur}
             placeholder={isLoadingMunicipios ? 'Carregando cidades...' : placeholder}
-            required={required}
             disabled={disabled || !estado || isLoadingMunicipios}
             autoComplete="off"
-            size="small"
-            className={
-              isValid === false
-                ? 'border-red-500 focus:border-red-500'
-                : isValid === true
-                  ? 'border-green-500 focus:border-green-500'
-                  : ''
-            }
+            size={size}
+            sx={{
+              ...(sx && typeof sx === 'object' ? sx : {}),
+              ...(isValid === false
+                ? {
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#ef4444',
+                    },
+                  }
+                : {}),
+              ...(isValid === true
+                ? {
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#22c55e',
+                    },
+                  }
+                : {}),
+            }}
           />
         )}
 
@@ -604,6 +706,19 @@ export function CidadeAutocomplete({
               dropdownDirection === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'
             }`}
           >
+            {/* Busca dentro da lista */}
+            <div className="shrink-0 bg-white border-b border-gray-100 p-2">
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchTerm}
+                onChange={handleSearchChange}
+                onFocus={() => setShowDropdown(true)}
+                placeholder="Pesquisar cidade..."
+                className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-primary"
+                autoComplete="off"
+              />
+            </div>
 
             {/* Botão scroll para cima */}
             {canScrollUp && (
@@ -617,7 +732,7 @@ export function CidadeAutocomplete({
             )}
 
             {/* Contador de resultados quando há filtro ativo */}
-            {value && value.trim() !== '' && (
+            {searchTerm && searchTerm.trim() !== '' && (
               <div className="px-4 py-1 text-xs text-gray-400 border-b border-gray-100 bg-white">
                 {municipiosFiltrados.length} cidade{municipiosFiltrados.length !== 1 ? 's' : ''}{' '}
                 encontrada{municipiosFiltrados.length !== 1 ? 's' : ''}
@@ -636,7 +751,7 @@ export function CidadeAutocomplete({
                   onMouseDown={() => handleSelectSuggestion(municipio)}
                   className="px-4 py-2 text-sm text-gray-800 cursor-pointer hover:bg-gray-100"
                 >
-                  {municipio.nomeCidade}
+                  {municipio.nomeCidade.toLocaleUpperCase('pt-BR')}
                 </li>
               ))}
             </ul>
@@ -655,20 +770,50 @@ export function CidadeAutocomplete({
         )}
 
         {/* Dropdown vazio com filtro ativo */}
-        {showDropdown && value && value.trim() !== '' && municipiosFiltrados.length === 0 && !isLoadingMunicipios && (
+        {showDropdown && searchTerm && searchTerm.trim() !== '' && municipiosFiltrados.length === 0 && !isLoadingMunicipios && (
           <div
             className={`absolute z-50 w-full bg-white border border-gray-200 rounded-lg shadow-lg px-4 py-3 text-sm text-gray-500 ${
               dropdownDirection === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'
             }`}
           >
-            Nenhuma cidade encontrada para &quot;{value}&quot;
+            Nenhuma cidade encontrada para &quot;{searchTerm}&quot;
           </div>
         )}
       </div>
 
       {/* Mensagens de erro/validação */}
-      {erro && <p className="text-sm text-red-500">{erro}</p>}
-      {isValid === true && !erro && <p className="text-sm text-green-500">Cidade válida</p>}
+      {erro && (
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm text-red-500 flex-1">{erro}</p>
+          {value.trim() && !disabled && (
+            <button
+              type="button"
+              onClick={handleLimparCidade}
+              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50"
+              aria-label="Remover cidade selecionada"
+              title="Remover cidade"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      )}
+      {isValid === true && !erro && (
+        <div className="flex items-center justify-end gap-2">
+          <p className="text-sm text-green-500">Cidade válida</p>
+          {value.trim() && !disabled && (
+            <button
+              type="button"
+              onClick={handleLimparCidade}
+              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50"
+              aria-label="Remover cidade selecionada"
+              title="Remover cidade"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      )}
       {!estado && <p className="text-sm text-yellow-500">Selecione o estado primeiro</p>}
     </div>
   )

@@ -1,27 +1,78 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHandle } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { MdClose, MdPhone, MdPrint } from 'react-icons/md'
-import {
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  FormControlLabel,
-  Switch,
-  CircularProgress,
-  Box,
-} from '@mui/material'
+import { MenuItem, CircularProgress, Box } from '@mui/material'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
+
+/** Labels outlined — alinhado a NovoMeioPagamento / NovoComplemento */
+const sxOutlinedLabelTextoEscuro = {
+  '& .MuiInputLabel-root': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiInputLabel-root.Mui-focused': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiInputLabel-root.MuiInputLabel-shrink': {
+    color: 'var(--color-primary-text)',
+  },
+} as const
+
+const entradaCompactaInput = {
+  padding: '12px 10px',
+  fontSize: '0.875rem',
+} as const
+
+const entradaCompactaSelect = {
+  padding: '12px 10px',
+  fontSize: '0.875rem',
+  minHeight: '1.5em',
+  lineHeight: 1.4,
+  display: 'flex',
+  alignItems: 'center',
+} as const
+
+/** Sem fundo cinza no campo — só borda */
+const sxEntradaTerminal = {
+  ...sxOutlinedLabelTextoEscuro,
+  '& .MuiOutlinedInput-root': {
+    backgroundColor: 'transparent',
+    borderRadius: '8px',
+  },
+  '& .MuiOutlinedInput-notchedOutline': {
+    borderColor: 'rgba(0, 0, 0, 0.23)',
+  },
+  '& .MuiOutlinedInput-input': entradaCompactaInput,
+  '& .MuiOutlinedInput-input.Mui-disabled': {
+    WebkitTextFillColor: 'var(--color-primary-text)',
+    opacity: 0.85,
+  },
+  '& .MuiSelect-select': entradaCompactaSelect,
+} as const
+
+/** Nome do terminal digitado em maiúsculas. */
+const maiusculasPt = (valor: string) => valor.toLocaleUpperCase('pt-BR')
 
 interface EditarTerminaisProps {
   terminalId: string
   isEmbedded?: boolean
+  /** `id` do `<form>` para o rodapé do `JiffySidePanelModal` (botão Salvar externo) */
+  embeddedFormId?: string
+  onEmbedFormStateChange?: (state: { isSubmitting: boolean; canSubmit: boolean }) => void
   onSaved?: () => void
-  onCancel?: () => void
+  /** Embutido: fechar o painel após "Salvar e fechar" com sucesso. */
+  onCloseAfterSave?: () => void
+}
+
+/** API imperativa — confirmação ao fechar o painel (`PADRAO_MODAL_SAIR_SEM_SALVAR`). */
+export interface EditarTerminaisHandle {
+  isDirty: () => boolean
+  saveTerminalAndClose: () => void
 }
 
 interface Impressora {
@@ -45,25 +96,36 @@ interface TerminalPreferences {
     name: string
   }
   compartilharMesas: boolean
+  fiscalAtivo?: boolean
+  leitorHabilitado?: boolean
 }
 
 /**
  * Componente para editar terminal
  * Replica o design e funcionalidades do Flutter
  */
-export function EditarTerminais({
-  terminalId,
-  isEmbedded = false,
-  onSaved,
-  onCancel,
-}: EditarTerminaisProps) {
+export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminaisProps>(
+  function EditarTerminais(
+    {
+      terminalId,
+      isEmbedded = false,
+      embeddedFormId,
+      onEmbedFormStateChange,
+      onSaved,
+      onCloseAfterSave,
+    },
+    ref
+  ) {
   const { auth } = useAuthStore()
+  const formId = embeddedFormId ?? 'editar-terminal-form'
 
   // Estados do formulário
   const [nomeTerminal, setNomeTerminal] = useState('')
   const [modeloDispositivo, setModeloDispositivo] = useState('')
   const [versaoApk, setVersaoApk] = useState('')
   const [compartilhaValue, setCompartilhaValue] = useState(false)
+  const [fiscalAtivoValue, setFiscalAtivoValue] = useState(false)
+  const [leitorCodigoBarrasValue, setLeitorCodigoBarrasValue] = useState(false)
   const [impressoraSelecionadaId, setImpressoraSelecionadaId] = useState<string>('')
 
   // Estados de UI
@@ -71,6 +133,36 @@ export function EditarTerminais({
   const [impressoras, setImpressoras] = useState<Impressora[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoadingTerminal, setIsLoadingTerminal] = useState(false)
+
+  const getFormSnapshot = useCallback(() => {
+    return JSON.stringify({
+      nomeTerminal: (nomeTerminal || '').trim(),
+      modeloDispositivo: (modeloDispositivo || '').trim(),
+      versaoApk: (versaoApk || '').trim(),
+      compartilhaValue,
+      fiscalAtivoValue,
+      leitorCodigoBarrasValue,
+      impressoraSelecionadaId: impressoraSelecionadaId || '',
+    })
+  }, [
+    nomeTerminal,
+    modeloDispositivo,
+    versaoApk,
+    compartilhaValue,
+    fiscalAtivoValue,
+    leitorCodigoBarrasValue,
+    impressoraSelecionadaId,
+  ])
+
+  const baselineSerializedRef = useRef('')
+  const embeddedCloseAfterSaveRef = useRef(false)
+
+  const commitBaseline = useCallback(() => {
+    baselineSerializedRef.current = getFormSnapshot()
+  }, [getFormSnapshot])
+
+  const commitBaselineLatestRef = useRef(commitBaseline)
+  commitBaselineLatestRef.current = commitBaseline
 
   /**
    * Carrega todas as impressoras com paginação completa
@@ -109,10 +201,12 @@ export function EditarTerminais({
         }
 
         const data = await response.json()
-        const newImpressoras = (data.items || []).map((i: any) => ({
-          id: i.id,
-          nome: i.nome || 'Sem nome',
-        }))
+        const newImpressoras = (data.items || []).map(
+          (i: { id: string; nome?: string | null }) => ({
+            id: i.id,
+            nome: i.nome || 'Sem nome',
+          })
+        )
 
         allImpressoras.push(...newImpressoras)
 
@@ -157,7 +251,7 @@ export function EditarTerminais({
       const data: TerminalData = await response.json()
 
       // Preenche campos do formulário
-      setNomeTerminal(data.nome || '')
+      setNomeTerminal(maiusculasPt(data.nome || ''))
       setModeloDispositivo(data.modeloDispositivo || '')
       setVersaoApk(data.versaoApk || '')
     } catch (error) {
@@ -165,6 +259,9 @@ export function EditarTerminais({
       showToast.error('Erro ao carregar dados do terminal')
     } finally {
       setIsLoadingTerminal(false)
+      window.setTimeout(() => {
+        commitBaselineLatestRef.current()
+      }, 120)
     }
   }, [auth, terminalId])
 
@@ -194,9 +291,14 @@ export function EditarTerminais({
 
       // Preenche preferências
       setCompartilhaValue(data.compartilharMesas || false)
+      setFiscalAtivoValue(!!data.fiscalAtivo)
+      setLeitorCodigoBarrasValue(!!data.leitorHabilitado)
       if (data.impressoraFinalizacao?.id) {
         setImpressoraSelecionadaId(data.impressoraFinalizacao.id)
       }
+      window.setTimeout(() => {
+        commitBaselineLatestRef.current()
+      }, 120)
     } catch (error) {
       console.error('Erro ao carregar preferências:', error)
       showToast.error('Erro ao carregar preferências do terminal')
@@ -209,6 +311,17 @@ export function EditarTerminais({
     loadTerminalDetails()
     loadTerminalPreferences()
   }, [loadAllImpressoras, loadTerminalDetails, loadTerminalPreferences])
+
+  const emitEmbedFormState = useCallback(() => {
+    onEmbedFormStateChange?.({
+      isSubmitting: isSubmitting,
+      canSubmit: nomeTerminal.trim().length > 0 && !isLoadingTerminal,
+    })
+  }, [isSubmitting, nomeTerminal, isLoadingTerminal, onEmbedFormStateChange])
+
+  useEffect(() => {
+    emitEmbedFormState()
+  }, [emitEmbedFormState])
 
   /**
    * Valida o formulário
@@ -224,7 +337,11 @@ export function EditarTerminais({
   /**
    * Submete o formulário
    */
-  const handleSubmit = async () => {
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault()
+    const shouldClosePanel = embeddedCloseAfterSaveRef.current
+    embeddedCloseAfterSaveRef.current = false
+
     if (!validateForm()) {
       return
     }
@@ -259,11 +376,14 @@ export function EditarTerminais({
       }
 
       // 2. Atualizar preferências
-      const fields: any = {}
+      const fields: Record<string, unknown> = {
+        compartilharMesas: compartilhaValue,
+        fiscalAtivo: fiscalAtivoValue,
+        leitorHabilitado: leitorCodigoBarrasValue,
+      }
       if (impressoraSelecionadaId) {
         fields.impressoraFinalizacaoId = impressoraSelecionadaId
       }
-      fields.compartilharMesas = compartilhaValue
 
       const preferencesResponse = await fetch(`/api/preferencias-terminal`, {
         method: 'PUT',
@@ -283,277 +403,281 @@ export function EditarTerminais({
       }
 
       showToast.success('Terminal atualizado com sucesso!')
-      onSaved?.()
-    } catch (error: any) {
+
+      window.setTimeout(() => {
+        commitBaselineLatestRef.current()
+      }, 0)
+
+      if (isEmbedded) {
+        onSaved?.()
+        if (shouldClosePanel) {
+          onCloseAfterSave?.()
+        }
+      } else {
+        onSaved?.()
+      }
+    } catch (error: unknown) {
       console.error('Erro ao atualizar terminal:', error)
-      showToast.error(error.message || 'Erro ao atualizar terminal')
+      const msg = error instanceof Error ? error.message : 'Erro ao atualizar terminal'
+      showToast.error(msg)
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      isDirty: () => {
+        if (isLoadingTerminal) return false
+        return getFormSnapshot() !== baselineSerializedRef.current
+      },
+      saveTerminalAndClose: () => {
+        embeddedCloseAfterSaveRef.current = true
+        const el = document.getElementById(formId)
+        if (el instanceof HTMLFormElement) {
+          el.requestSubmit()
+        }
+      },
+    }),
+    [formId, getFormSnapshot, isLoadingTerminal]
+  )
+
   return (
-    <div className="flex flex-col h-[calc(95vh-80px)] bg-info">
-      {/* Cabeçalho */}
+    <div
+      className={
+        isEmbedded
+          ? 'flex min-h-0 flex-1 flex-col bg-info'
+          : 'flex h-[calc(95vh-80px)] flex-col bg-info'
+      }
+    >
+      {/* Cabeçalho — fluxo em página cheia */}
       {!isEmbedded && (
-        <div className="px-[30px] pt-[30px] pb-4 flex items-start justify-between border-b border-[#B9CCD8]">
-          <div>
-            <h2 className="text-primary text-2xl font-bold font-exo">Editar Terminal</h2>
-            <p className="text-[#57636C] text-sm font-nunito mt-1">
-              Atualize os dados do Terminal PDV
-            </p>
-          </div>
-          <button
-            onClick={onCancel}
-            className="w-8 h-8 flex items-center justify-center text-secondary-text hover:bg-gray-200 rounded-full transition-colors"
-            title="Fechar"
-          >
-            <MdClose size={20} />
-          </button>
+        <div className="flex items-start justify-between border-b border-[#B9CCD8] px-[30px] pb-4 pt-[30px]">
+          
         </div>
       )}
 
-      {/* Conteúdo com scroll */}
-      <div className="flex-1 overflow-y-auto px-[30px] pt-2 pb-0">
-          {isLoadingTerminal ? (
-            <div className="flex flex-col justify-center items-center py-6">
-              <img
-                src="/images/jiffy-loading.gif"
-                alt="Carregando"
-                className="w-16 h-16 object-contain"
-              />
-              <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
-            </div>
-          ) : (
-            <>
-              {/* Seção 1: Informações Gerais */}
-              <div className="mb-4">
-                <h3 className="text-primary text-base font-bold font-nunito mb-4">
+      {isLoadingTerminal ? (
+        <div className="flex min-h-[200px] flex-col items-center justify-center py-6">
+          <JiffyLoading />
+        </div>
+      ) : (
+        <form
+          id={formId}
+          className="flex min-h-0 flex-1 flex-col"
+          onSubmit={e => void handleSubmit(e)}
+        >
+          {/* Conteúdo com scroll */}
+          <div className="flex-1 overflow-y-auto px-[20px]">
+            {/* Informações gerais — título com linha à direita (padrão NovoMeioPagamento) */}
+            <div className="mb-2 rounded-[12px] bg-info px-2 md:p-5">
+              <div className="mb-2 flex items-center gap-5">
+                <h2 className="shrink-0 text-sm font-semibold text-primary md:text-xl">
                   Informações Gerais
-                </h3>
+                </h2>
+                <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
+              </div>
 
-                {/* Header Visual com ícone */}
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="w-10 h-10 rounded-full bg-custom-2 flex items-center justify-center">
-                    <MdPhone className="text-primary" size={20} />
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-custom-2">
+                  <MdPhone className="text-primary" size={20} />
+                </div>
+                <span className="font-nunito text-base font-semibold text-primary-text">
+                  {nomeTerminal || 'Nome do Terminal'}
+                </span>
+              </div>
+
+              <div className="space-y-5">
+                <Input
+                  label="Nome do Terminal"
+                  value={nomeTerminal}
+                  onChange={e => setNomeTerminal(maiusculasPt(e.target.value))}
+                  placeholder="Digite o nome do Terminal"
+                  size="small"
+                  required
+                  className="bg-info"
+                  sx={sxEntradaTerminal}
+                  InputLabelProps={{ required: true }}
+                />
+
+                <div className="flex flex-col gap-6 md:flex-row">
+                  <Input
+                    label="Modelo do Dispositivo"
+                    value={modeloDispositivo}
+                    disabled
+                    placeholder="—"
+                    size="small"
+                    className="bg-info flex-1"
+                    sx={sxEntradaTerminal}
+                  />
+                  <Input
+                    label="Versão APK"
+                    value={versaoApk}
+                    disabled
+                    placeholder="—"
+                    size="small"
+                    className="bg-info flex-1"
+                    sx={sxEntradaTerminal}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Preferências — mesmo padrão de título + linha */}
+            <div className="mb-2 rounded-[12px] bg-info p-2 md:px-5">
+              <div className="mb-2 flex items-center gap-5">
+                <h2 className="shrink-0 text-sm font-semibold text-primary md:text-xl">
+                  Preferências do Terminal
+                </h2>
+                <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
+              </div>
+
+              <div className="flex flex-col gap-2 md:flex-row md:items-start">
+                <div className="flex-1 space-y-2">
+                  <div className="rounded-lg p-2">
+                    <JiffyIconSwitch
+                      checked={compartilhaValue}
+                      onChange={e => setCompartilhaValue(e.target.checked)}
+                      label={
+                        <span className="flex max-w-[min(100%,20rem)] flex-col gap-0.5 text-left">
+                          <span className="font-exo text-sm font-semibold text-primary-text">
+                            Compartilhamento
+                          </span>
+                          <span className="font-nunito text-xs font-normal text-secondary-text">
+                            Habilita o compartilhamento de mesas
+                          </span>
+                        </span>
+                      }
+                      size="sm"
+                      className="w-full flex-row items-start justify-between gap-3"
+                      inputProps={{ 'aria-label': 'Compartilhamento de mesas' }}
+                    />
                   </div>
-                  <span className="text-base font-semibold font-nunito text-primary-text">
-                    {nomeTerminal || 'Nome do Terminal'}
-                  </span>
+                  {compartilhaValue ? (
+                    <Box
+                      sx={{
+                        backgroundColor: '#FFF9C4',
+                        border: '1px solid #FFD54F',
+                        borderRadius: '8px',
+                        p: 1.5,
+                      }}
+                    >
+                      <p className="font-nunito text-xs font-medium text-warning">
+                        O compartilhamento de mesas só funcionará com internet.
+                      </p>
+                    </Box>
+                  ) : null}
                 </div>
 
-                {/* Campo Nome do Terminal */}
-                <div className="mb-5">
-                  <label className="block text-sm font-semibold text-primary-text mb-2 font-nunito">
-                    Nome do Terminal
-                  </label>
-                  <Input
-                    value={nomeTerminal}
-                    onChange={(e) => setNomeTerminal(e.target.value)}
-                    placeholder="Digite o nome do Terminal"
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        backgroundColor: '#F5F5F5',
-                        borderRadius: '8px',
-                        '& fieldset': {
-                          borderColor: '#CCCCCC',
-                        },
-                      },
-                    }}
+                <div className="flex-1 rounded-lg p-2">
+                  <JiffyIconSwitch
+                    checked={fiscalAtivoValue}
+                    onChange={e => setFiscalAtivoValue(e.target.checked)}
+                    label={
+                      <span className="flex max-w-[min(100%,20rem)] flex-col gap-0.5 text-left">
+                        <span className="font-exo text-sm font-semibold text-primary-text">
+                          Fiscal ativo
+                        </span>
+                        <span className="font-nunito text-xs font-normal text-secondary-text">
+                          Habilita operações fiscais neste terminal PDV
+                        </span>
+                      </span>
+                    }
+                    size="sm"
+                    className="w-full flex-row items-start justify-between gap-3"
+                    inputProps={{ 'aria-label': 'Fiscal ativo no terminal PDV' }}
                   />
                 </div>
 
-                {/* Campos lado a lado: Modelo e Versão APK */}
-                <div className="flex flex-col md:flex-row gap-4">
-                  <div className="flex-1">
-                    <label className="block text-sm font-semibold text-primary-text mb-2 font-nunito">
-                      Modelo do Dispositivo
-                    </label>
-                    <Input
-                      value={modeloDispositivo}
-                      disabled
-                      placeholder="Digite o modelo do dispositivo"
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          backgroundColor: '#F5F5F5',
-                          borderRadius: '8px',
-                          '& fieldset': {
-                            borderColor: '#CCCCCC',
-                          },
-                        },
-                      }}
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-sm font-semibold text-primary-text mb-2 font-nunito">
-                      Versão APK
-                    </label>
-                    <Input
-                      value={versaoApk}
-                      disabled
-                      placeholder="Digite a versão do APK"
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          backgroundColor: '#F5F5F5',
-                          borderRadius: '8px',
-                          '& fieldset': {
-                            borderColor: '#CCCCCC',
-                          },
-                        },
-                      }}
-                    />
-                  </div>
+                <div className="flex-1 rounded-lg p-2">
+                  <JiffyIconSwitch
+                    checked={leitorCodigoBarrasValue}
+                    onChange={e => setLeitorCodigoBarrasValue(e.target.checked)}
+                    label={
+                      <span className="flex max-w-[min(100%,20rem)] flex-col gap-0.5 text-left">
+                        <span className="font-exo text-sm font-semibold text-primary-text">
+                          Leitor Código de Barras
+                        </span>
+                        <span className="font-nunito text-xs font-normal text-secondary-text">
+                          Habilita o leitor de código de barras neste terminal
+                        </span>
+                      </span>
+                    }
+                    size="sm"
+                    className="w-full flex-row items-start justify-between gap-3"
+                    inputProps={{ 'aria-label': 'Leitor de código de barras no terminal' }}
+                  />
                 </div>
               </div>
 
-              {/* Divisor */}
-              <div className="h-[1px] bg-[#B9CCD8] mb-2" />
-
-              {/* Seção 2: Preferências do Terminal */}
-              <div className="mb-0">
-                <h3 className="text-secondary-text text-sm font-bold font-nunito mb-4">
-                  Preferências do Terminal
-                </h3>
-
-                <div className="flex flex-col md:flex-row gap-6">
-                  {/* Switch de Compartilhamento (Lado Esquerdo) */}
-                  <div className="flex-1">
-                    <Box
-                      sx={{
-                        backgroundColor: 'rgba(238, 238, 245, 1)',
-                        borderRadius: '8px',
-                        p: 2,
-                      }}
-                    >
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={compartilhaValue}
-                            onChange={(e) => setCompartilhaValue(e.target.checked)}
-                            sx={{
-                              '& .MuiSwitch-switchBase.Mui-checked': {
-                                color: '#F5F5F5',
-                              },
-                              '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                                backgroundColor: '#003366', // Cor primary direta (sem variável CSS)
-                                opacity: 1, // Garante opacidade total
-                              },
-                            }}
-                          />
-                        }
-                        label={
-                          <div>
-                            <div className="text-sm font-semibold font-exo text-primary-text">
-                              Compartilhamento
-                            </div>
-                            <div className="text-xs font-nunito text-secondary-text">
-                              Habilita o compartilhamento de mesas
-                            </div>
-                          </div>
-                        }
-                        sx={{ margin: 0 }}
-                      />
-                    </Box>
-
-                    {/* Mensagem de Aviso Condicional */}
-                    {compartilhaValue && (
-                      <Box
-                        sx={{
-                          backgroundColor: '#FFF9C4',
-                          border: '1px solid #FFD54F',
-                          borderRadius: '8px',
-                          p: 1.5,
-                          mt: 2,
-                        }}
-                      >
-                        <p className="text-sm font-medium font-nunito text-warning">
-                          Ao marcar o compartilhamento, este terminal só funcionará com internet.
-                        </p>
-                      </Box>
-                    )}
-                  </div>
-
-                  {/* Dropdown de Impressora (Lado Direito) */}
-                  <div className="flex-1">
-                    <FormControl fullWidth>
-                      <InputLabel id="impressora-label">Impressora de Finalização</InputLabel>
-                      {loadingImpressoras ? (
-                        <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
-                          <CircularProgress size={24} />
-                        </Box>
-                      ) : (
-                        <Select
-                          labelId="impressora-label"
-                          value={impressoraSelecionadaId}
-                          onChange={(e) => setImpressoraSelecionadaId(e.target.value)}
-                          label="Impressora de Finalização"
-                          MenuProps={{
-                            PaperProps: {
-                              sx: {
-                                maxHeight: '250px',
-                              },
-                            },
-                          }}
-                          sx={{
-                            '& .MuiOutlinedInput-notchedOutline': {
-                              borderColor: '#CCCCCC',
-                            },
-                          }}
-                        >
-                          <MenuItem value="">
-                            <em>Nenhuma</em>
-                          </MenuItem>
-                          {impressoras.map((impressora) => (
-                            <MenuItem key={impressora.id} value={impressora.id}>
-                              <div className="flex items-center gap-2">
-                                <MdPrint className="text-primary" size={18} />
-                                <span>{impressora.nome}</span>
-                              </div>
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      )}
-                    </FormControl>
-                  </div>
-                </div>
+              <div className="mt-6 w-full">
+                {loadingImpressoras ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                    <CircularProgress size={24} />
+                  </Box>
+                ) : (
+                  <Input
+                    select
+                    label="Impressora de Finalização"
+                    value={impressoraSelecionadaId}
+                    onChange={e => setImpressoraSelecionadaId(e.target.value)}
+                    size="small"
+                    className="bg-info"
+                    sx={sxEntradaTerminal}
+                    /* Com `value=""` + `displayEmpty`, o MUI não encolhe o label — sobrepõe ao texto */
+                    InputLabelProps={{ shrink: true }}
+                    SelectProps={{
+                      displayEmpty: true,
+                      MenuProps: {
+                        PaperProps: {
+                          sx: { maxHeight: '250px' },
+                        },
+                      },
+                    }}
+                  >
+                    <MenuItem value="">
+                      <em>Nenhuma</em>
+                    </MenuItem>
+                    {impressoras.map(impressora => (
+                      <MenuItem key={impressora.id} value={impressora.id}>
+                        <div className="flex items-center gap-2">
+                          <MdPrint className="text-primary" size={18} />
+                          <span>{impressora.nome}</span>
+                        </div>
+                      </MenuItem>
+                    ))}
+                  </Input>
+                )}
               </div>
-            </>
-          )}
-        </div>
+            </div>
+          </div>
 
-      {/* Rodapé com botões */}
-      <div className="px-[30px] py-3 border-t border-[#B9CCD8] flex justify-end gap-3 flex-shrink-0">
-        <Button
-          onClick={onCancel}
-          variant="outlined"
-          disabled={isSubmitting}
-          className="h-8 px-[26px] rounded-lg hover:bg-primary/15"
-          sx={{
-            textTransform: 'none',
-            fontFamily: 'Nunito, sans-serif',
-            color: 'var(--color-primary)',
-            borderColor: 'var(--color-primary)',
-          }}
-        >
-          Cancelar
-        </Button>
-        <Button
-          onClick={handleSubmit}
-          variant="contained"
-          disabled={isSubmitting || isLoadingTerminal}
-          className="h-8 px-[26px] rounded-lg hover:bg-primary/90"
-          sx={{
-            textTransform: 'none',
-            fontFamily: 'Nunito, sans-serif',
-            color: 'var(--color-info)',
-            borderColor: 'var(--color-primary)',
-            backgroundColor: 'var(--color-primary)',
-          }}
-        >
-          {isSubmitting ? 'Salvando...' : 'Salvar'}
-        </Button>
-      </div>
+          {/* Rodapé — só Salvar; no painel lateral o shell fornece o botão */}
+          {!isEmbedded ? (
+            <div className="flex flex-shrink-0 justify-end border-t border-[#B9CCD8] px-[30px] py-3">
+              <Button
+                type="submit"
+                variant="contained"
+                disabled={isSubmitting || isLoadingTerminal}
+                className="h-8 rounded-lg px-[26px] hover:bg-primary/90"
+                sx={{
+                  textTransform: 'none',
+                  fontFamily: 'Nunito, sans-serif',
+                  color: 'var(--color-info)',
+                  borderColor: 'var(--color-primary)',
+                  backgroundColor: 'var(--color-primary)',
+                }}
+              >
+                {isSubmitting ? 'Salvando...' : 'Salvar'}
+              </Button>
+            </div>
+          ) : null}
+        </form>
+      )}
     </div>
   )
-}
+})
+
+EditarTerminais.displayName = 'EditarTerminais'
 

@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect, useCallback } from 'react'
-import { createPortal } from 'react-dom'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -12,11 +11,14 @@ import {
 import { Complemento } from '@/src/domain/entities/Complemento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
-import { Skeleton } from '@/src/presentation/components/ui/skeleton'
-import { transformarParaReal } from '@/src/shared/utils/formatters'
-import { MdClose, MdSearch, MdKeyboardArrowDown, MdDelete, MdAdd, MdAddCircle, MdAddShoppingCart, MdGroupAdd, MdAddAPhoto, MdCheck, MdEdit } from 'react-icons/md'
-import { GruposComplementosTabsModal, GruposComplementosTabsModalState } from '../grupos-complementos/GruposComplementosTabsModal'
-import { GrupoComplemento as GrupoComplementoEntity } from '@/src/domain/entities/GrupoComplemento'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { MdClose, MdSearch, MdAdd, MdKeyboardArrowDown } from 'react-icons/md'
+import {
+  GruposComplementosTabsModal,
+  GruposComplementosTabsModalState,
+} from '../grupos-complementos/GruposComplementosTabsModal'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
+import { cn } from '@/src/shared/utils/cn'
 
 interface GrupoComplemento {
   id: string
@@ -25,6 +27,91 @@ interface GrupoComplemento {
   obrigatorio: boolean
   qtdMinima: number
   qtdMaxima: number
+}
+
+/** Catálogo completo (mesmo endpoint do passo Configurações Gerais) */
+interface GrupoCatalogoItem {
+  id: string
+  nome: string
+  obrigatorio: boolean
+}
+
+/** Máximo permitido pela API (`GrupoComplementoRepository` / schema: limit ≤ 100). */
+const LISTAGEM_PAGE_SIZE = 100
+
+/** Mesmo shape do GET produto e do GET grupo — evita duplicar lógica de parse */
+function mapApiGrupoToGrupoComplemento(grupo: any): GrupoComplemento {
+  return {
+    id: grupo.id?.toString() || '',
+    nome: grupo.nome?.toString() || '',
+    complementos: (grupo.complementos || []).map((item: any) => Complemento.fromJSON(item)),
+    obrigatorio: Boolean(grupo.obrigatorio),
+    qtdMinima: typeof grupo.qtdMinima === 'number' ? grupo.qtdMinima : grupo.obrigatorio ? 1 : 0,
+    qtdMaxima: typeof grupo.qtdMaxima === 'number' && grupo.qtdMaxima > 0 ? grupo.qtdMaxima : 0,
+  }
+}
+
+function formatarValorComplemento(valor: number): string {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
+}
+
+/** Ordenação alinhada ao modal de grupo (ordem explícita, depois nome) */
+function ordenarComplementosParaExibicao(lista: Complemento[]): Complemento[] {
+  return [...lista].sort((a, b) => {
+    const oa = a.getOrdem()
+    const ob = b.getOrdem()
+    if (oa != null && ob != null && oa !== ob) return oa - ob
+    if (oa != null && ob == null) return -1
+    if (oa == null && ob != null) return 1
+    return (a.getNome() || '').localeCompare(b.getNome() || '', 'pt-BR', { sensitivity: 'base' })
+  })
+}
+
+/** Atualiza apenas o flag ativo para refletir o PATCH sem recarregar o grupo inteiro */
+function atualizarAtivoNaLista(
+  complementos: Complemento[],
+  complementoId: string,
+  ativo: boolean
+): Complemento[] {
+  return complementos.map(c =>
+    c.getId() !== complementoId
+      ? c
+      : Complemento.create(
+          c.getId(),
+          c.getNome(),
+          c.getDescricao(),
+          c.getValor(),
+          ativo,
+          c.getTipoImpactoPreco(),
+          c.getOrdem()
+        )
+  )
+}
+
+/** Vinculados primeiro; depois ordem alfabética por nome */
+function ordenarVinculadosPrimeiro<T extends { id: string; nome?: string }>(
+  itens: T[],
+  idsVinculados: string[]
+): T[] {
+  const set = new Set(idsVinculados)
+  return [...itens].sort((a, b) => {
+    const va = set.has(a.id) ? 1 : 0
+    const vb = set.has(b.id) ? 1 : 0
+    if (va !== vb) return vb - va
+    return (a.nome || '').localeCompare(b.nome || '', 'pt-BR', { sensitivity: 'base' })
+  })
+}
+
+/**
+ * Garante pelo menos um grupo de complementos vinculado ao produto.
+ * Não há validação equivalente neste repositório na rota PATCH (`app/api/produtos/[id]`) —
+ * o payload segue para o cardápio; convém confirmar no Swagger/API externa se lá existe regra.
+ */
+function mensagemSeRemoverTodosGruposComplementos(idsPropostos: string[]): string | null {
+  if (idsPropostos.length === 0) {
+    return 'Não é possível remover todos os grupos de complementos. Mantenha pelo menos um grupo vinculado ao produto.'
+  }
+  return null
 }
 
 interface ComplementosMultiSelectDialogProps {
@@ -43,86 +130,85 @@ export function ComplementosMultiSelectDialog({
   isEmbedded = false,
 }: ComplementosMultiSelectDialogProps) {
   const { auth } = useAuthStore()
-  const [searchQuery, setSearchQuery] = useState('')
   const [groups, setGroups] = useState<GrupoComplemento[]>([])
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [isUpdating, setIsUpdating] = useState(false)
-  const [abreComplementos, setAbreComplementos] = useState<boolean>(false)
-  const [isSelectDialogOpen, setIsSelectDialogOpen] = useState(false)
-  const [allSelectableGroups, setAllSelectableGroups] = useState<Array<{ id: string; nome: string }>>(
-    []
-  )
+  /** Só o switch deste grupo fica desabilitado durante o PATCH (evita “congelar” toda a lista). */
+  const [salvandoGrupoId, setSalvandoGrupoId] = useState<string | null>(null)
+  const [allSelectableGroups, setAllSelectableGroups] = useState<GrupoCatalogoItem[]>([])
   const [isLoadingSelectableGroups, setIsLoadingSelectableGroups] = useState(false)
-  const [selectSearch, setSelectSearch] = useState('')
-  const [tempSelection, setTempSelection] = useState<string[]>([])
-  const [isSavingSelection, setIsSavingSelection] = useState(false)
-  const [gruposTabsModalState, setGruposTabsModalState] = useState<GruposComplementosTabsModalState>({
-    open: false,
-    tab: 'grupo',
-    mode: 'create',
-    grupo: undefined,
-  })
+  const [catalogSearch, setCatalogSearch] = useState('')
+  /** IDs de grupos com a lista de complementos expandida na UI */
+  const [expandedGrupoIds, setExpandedGrupoIds] = useState<Set<string>>(() => new Set())
+  /** Complementos carregados sob demanda (grupos ainda não vinculados ao produto) */
+  const [detalhesComplementosCache, setDetalhesComplementosCache] = useState<
+    Record<string, Complemento[]>
+  >({})
+  const [loadingDetalheGrupoId, setLoadingDetalheGrupoId] = useState<string | null>(null)
+  const [togglingComplementoId, setTogglingComplementoId] = useState<string | null>(null)
+  const [gruposTabsModalState, setGruposTabsModalState] =
+    useState<GruposComplementosTabsModalState>({
+      open: false,
+      tab: 'grupo',
+      mode: 'create',
+      grupo: undefined,
+    })
 
-  const loadGroups = useCallback(async () => {
-    if (!open || !produtoId) return
+  /**
+   * Ordem das linhas do catálogo enquanto o painel está aberto (evita reordenar a cada toggle).
+   * Ao fechar o modal, zera — na próxima abertura volta a ordenar “vinculados primeiro”.
+   */
+  const sessionCatalogOrderRef = useRef<string[] | null>(null)
+  /** Incrementa quando a ordem estável da sessão é definida (ref sozinha não dispara render). */
+  const [sessionOrderTick, setSessionOrderTick] = useState(0)
 
-    const token = auth?.getAccessToken()
-    if (!token) {
-      setGroups([])
-      return
-    }
+  const loadGroups = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!open || !produtoId) return
 
-    setIsLoading(true)
-    setError(null)
-    try {
-      const response = await fetch(`/api/produtos/${produtoId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        cache: 'no-store',
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || 'Erro ao carregar complementos do produto')
+      const token = auth?.getAccessToken()
+      if (!token) {
+        setGroups([])
+        return
       }
 
-      const produto = await response.json()
-      const grupos: GrupoComplemento[] = (produto.gruposComplementos || []).map((grupo: any) => ({
-        id: grupo.id,
-        nome: grupo.nome,
-        complementos: (grupo.complementos || []).map((item: any) => Complemento.fromJSON(item)),
-        obrigatorio: Boolean(grupo.obrigatorio),
-        qtdMinima:
-          typeof grupo.qtdMinima === 'number'
-            ? grupo.qtdMinima
-            : grupo.obrigatorio
-              ? 1
-              : 0,
-        qtdMaxima: typeof grupo.qtdMaxima === 'number' && grupo.qtdMaxima > 0 ? grupo.qtdMaxima : 0,
-      }))
+      /** Evita que um PATCH recoloque a lista inteira em modo loading (todos os switches “somem”). */
+      const silent = options?.silent === true
+      if (!silent) {
+        setIsLoading(true)
+      }
+      setError(null)
+      try {
+        const response = await fetch(`/api/produtos/${produtoId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          cache: 'no-store',
+        })
 
-      // Captura o valor de abreComplementos do produto
-      setAbreComplementos(Boolean(produto.abreComplementos))
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || 'Erro ao carregar complementos do produto')
+        }
 
-      setGroups(grupos)
-      setExpandedGroups(
-        grupos.reduce((acc, grupo) => {
-          acc[grupo.id] = false
-          return acc
-        }, {} as Record<string, boolean>)
-      )
+        const produto = await response.json()
+        const grupos: GrupoComplemento[] = (produto.gruposComplementos || []).map((grupo: any) =>
+          mapApiGrupoToGrupoComplemento(grupo)
+        )
 
-    } catch (err) {
-      console.error(err)
-      setError(err instanceof Error ? err.message : 'Erro ao carregar complementos')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [open, produtoId, auth])
+        setGroups(grupos)
+      } catch (err) {
+        console.error(err)
+        setError(err instanceof Error ? err.message : 'Erro ao carregar complementos')
+      } finally {
+        if (!silent) {
+          setIsLoading(false)
+        }
+      }
+    },
+    [open, produtoId, auth]
+  )
 
   const loadSelectableGroups = useCallback(async () => {
     const token = auth?.getAccessToken()
@@ -133,10 +219,10 @@ export function ComplementosMultiSelectDialog({
 
     setIsLoadingSelectableGroups(true)
     try {
-      const limit = 25
+      const limit = LISTAGEM_PAGE_SIZE
       let offset = 0
       let hasMore = true
-      const collected: Array<{ id: string; nome: string }> = []
+      const collected: GrupoCatalogoItem[] = []
 
       while (hasMore) {
         const response = await fetch(
@@ -160,15 +246,22 @@ export function ComplementosMultiSelectDialog({
           .map((item: any) => ({
             id: item.id?.toString() || '',
             nome: item.nome?.toString() || 'Grupo',
+            obrigatorio: Boolean(item.obrigatorio),
           }))
-          .filter((item: { id: string }) => Boolean(item.id))
+          .filter((item: GrupoCatalogoItem) => Boolean(item.id))
 
         collected.push(...mapped)
 
         const fetchedCount = items.length
         const totalCount = data.count ?? collected.length
         offset += fetchedCount
-        hasMore = fetchedCount === limit && collected.length < totalCount
+
+        const apiHasNext =
+          typeof data.hasNext === 'boolean'
+            ? data.hasNext
+            : fetchedCount === limit && collected.length < totalCount
+
+        hasMore = apiHasNext
       }
 
       setAllSelectableGroups(collected)
@@ -184,44 +277,153 @@ export function ComplementosMultiSelectDialog({
 
   useEffect(() => {
     if (open) {
-      setSearchQuery('')
-      loadGroups()
+      setCatalogSearch('')
+      void Promise.all([loadGroups(), loadSelectableGroups()])
     }
-  }, [open, loadGroups])
+  }, [open, loadGroups, loadSelectableGroups])
 
   useEffect(() => {
-    setTempSelection(groups.map((grupo) => grupo.id))
-  }, [groups])
-
-  const filteredGroups = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return groups
+    if (!open) {
+      setExpandedGrupoIds(new Set())
+      setDetalhesComplementosCache({})
+      setLoadingDetalheGrupoId(null)
+      setTogglingComplementoId(null)
+      sessionCatalogOrderRef.current = null
+      setSessionOrderTick(0)
     }
+  }, [open])
 
-    const normalized = searchQuery.trim().toLowerCase()
-    return groups
-      .map((grupo) => ({
-        ...grupo,
-        complementos: grupo.complementos.filter((complemento) =>
-          complemento.getNome().toLowerCase().includes(normalized)
-        ),
-      }))
-      .filter((grupo) => grupo.complementos.length > 0)
-  }, [groups, searchQuery])
+  /** Captura ordem inicial (“vinculados primeiro”) uma vez por abertura, após catálogo e vínculos estarem carregados */
+  useEffect(() => {
+    if (!open || isLoading || allSelectableGroups.length === 0) return
+    if (sessionCatalogOrderRef.current !== null) return
 
-  const filteredSelectableGroups = useMemo(() => {
-    if (!selectSearch.trim()) {
-      return allSelectableGroups
-    }
+    const term = catalogSearch.trim().toLowerCase()
+    const filtrados = !term
+      ? allSelectableGroups
+      : allSelectableGroups.filter(item => (item.nome || '').toLowerCase().includes(term))
 
-    const normalized = selectSearch.trim().toLowerCase()
-    return allSelectableGroups.filter((grupo) =>
-      grupo.nome.toLowerCase().includes(normalized)
+    sessionCatalogOrderRef.current = ordenarVinculadosPrimeiro(filtrados, groups.map(g => g.id)).map(
+      g => g.id
     )
-  }, [allSelectableGroups, selectSearch])
+    setSessionOrderTick(t => t + 1)
+  }, [open, isLoading, allSelectableGroups, catalogSearch, groups])
+
+  const gruposVinculadosIds = useMemo(() => groups.map(g => g.id), [groups])
+
+  /** Um único GET por grupo — reutilizado ao expandir catálogo e após vínculo (substitui GET produto inteiro). */
+  const fetchGrupoComplementoPorId = useCallback(
+    async (grupoId: string): Promise<GrupoComplemento | null> => {
+      const token = auth?.getAccessToken()
+      if (!token) return null
+      try {
+        const response = await fetch(`/api/grupos-complementos/${grupoId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          cache: 'no-store',
+        })
+        if (!response.ok) return null
+        const data = await response.json()
+        return mapApiGrupoToGrupoComplemento(data)
+      } catch {
+        return null
+      }
+    },
+    [auth]
+  )
+
+  const carregarComplementosDoGrupo = useCallback(
+    async (grupoId: string) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+      setLoadingDetalheGrupoId(grupoId)
+      try {
+        const grupo = await fetchGrupoComplementoPorId(grupoId)
+        if (!grupo?.id) {
+          throw new Error('Erro ao carregar complementos do grupo')
+        }
+        setDetalhesComplementosCache(prev => ({ ...prev, [grupoId]: grupo.complementos }))
+      } catch (err) {
+        console.error(err)
+        showToast.error(
+          err instanceof Error ? err.message : 'Erro ao carregar complementos do grupo.'
+        )
+        setDetalhesComplementosCache(prev => ({ ...prev, [grupoId]: [] }))
+      } finally {
+        setLoadingDetalheGrupoId(null)
+      }
+    },
+    [fetchGrupoComplementoPorId, auth]
+  )
+
+  const toggleGrupoExpanded = useCallback((grupoId: string) => {
+    setExpandedGrupoIds(prev => {
+      const next = new Set(prev)
+      if (next.has(grupoId)) {
+        next.delete(grupoId)
+      } else {
+        next.add(grupoId)
+      }
+      return next
+    })
+  }, [])
+
+  /** Complementos de grupos não vinculados: carrega sob demanda (inclui após desvincular com painel aberto). */
+  useEffect(() => {
+    for (const grupoId of expandedGrupoIds) {
+      const vinculado = groups.some(g => g.id === grupoId)
+      if (vinculado) continue
+      if (Object.hasOwn(detalhesComplementosCache, grupoId)) continue
+      if (loadingDetalheGrupoId === grupoId) continue
+      void carregarComplementosDoGrupo(grupoId)
+    }
+  }, [
+    expandedGrupoIds,
+    groups,
+    detalhesComplementosCache,
+    loadingDetalheGrupoId,
+    carregarComplementosDoGrupo,
+  ])
+
+  const gruposCatalogoParaLista = useMemo(() => {
+    const term = catalogSearch.trim().toLowerCase()
+    const filtrados = !term
+      ? allSelectableGroups
+      : allSelectableGroups.filter(item => (item.nome || '').toLowerCase().includes(term))
+
+    const ordemSessao = sessionCatalogOrderRef.current
+    if (!open || ordemSessao === null) {
+      return ordenarVinculadosPrimeiro(filtrados, gruposVinculadosIds)
+    }
+
+    const ordemMap = new Map(ordemSessao.map((id, idx) => [id, idx]))
+    return [...filtrados].sort((a, b) => {
+      const ia = ordemMap.get(a.id)
+      const ib = ordemMap.get(b.id)
+      if (ia !== undefined && ib !== undefined) return ia - ib
+      if (ia !== undefined) return -1
+      if (ib !== undefined) return 1
+      return (a.nome || '').localeCompare(b.nome || '', 'pt-BR', { sensitivity: 'base' })
+    })
+  }, [allSelectableGroups, catalogSearch, gruposVinculadosIds, open, sessionOrderTick])
 
   const persistGruposSelection = useCallback(
-    async (ids: string[], successMessage?: string) => {
+    async (
+      ids: string[],
+      successMessage?: string,
+      options?: {
+        silentSuccess?: boolean
+        /** Estado local já atualizado antes do PATCH (switch otimista). */
+        optimisticPreApplied?: boolean
+        /** IDs antes do otimismo — obrigatório se `optimisticPreApplied`. */
+        antesIdsSnapshot?: string[]
+      }
+    ) => {
       if (!produtoId) {
         showToast.error('Produto não encontrado.')
         return false
@@ -233,7 +435,14 @@ export function ComplementosMultiSelectDialog({
         return false
       }
 
-      setIsUpdating(true)
+      const minMsg = mensagemSeRemoverTodosGruposComplementos(ids)
+      if (minMsg) {
+        showToast.error(minMsg)
+        return false
+      }
+
+      const antesIds = options?.antesIdsSnapshot ?? groups.map(g => g.id)
+
       try {
         const response = await fetch(`/api/produtos/${produtoId}`, {
           method: 'PATCH',
@@ -249,120 +458,202 @@ export function ComplementosMultiSelectDialog({
           throw new Error(errorData.message || 'Erro ao atualizar grupos de complementos')
         }
 
-        await loadGroups()
-        setTempSelection(ids)
-        showToast.success(successMessage ?? 'Grupos atualizados com sucesso!')
+        const removedIds = antesIds.filter(id => !ids.includes(id))
+        const addedIds = ids.filter(id => !antesIds.includes(id))
+
+        if (options?.optimisticPreApplied) {
+          if (addedIds.length > 0) {
+            const carregados = await Promise.all(addedIds.map(gid => fetchGrupoComplementoPorId(gid)))
+            const novos = carregados.filter((g): g is GrupoComplemento => g !== null)
+            if (novos.length === addedIds.length) {
+              setGroups(prev =>
+                prev.map(g => {
+                  const rich = novos.find(n => n.id === g.id)
+                  return rich ?? g
+                })
+              )
+            } else {
+              await loadGroups({ silent: true })
+            }
+          }
+        } else {
+          if (removedIds.length > 0) {
+            setGroups(prev => prev.filter(g => !removedIds.includes(g.id)))
+            setDetalhesComplementosCache(prev => {
+              const next = { ...prev }
+              for (const id of removedIds) {
+                delete next[id]
+              }
+              return next
+            })
+          }
+
+          if (addedIds.length > 0) {
+            const carregados = await Promise.all(addedIds.map(gid => fetchGrupoComplementoPorId(gid)))
+            const novos = carregados.filter((g): g is GrupoComplemento => g !== null)
+            if (novos.length === addedIds.length) {
+              setGroups(prev => [...prev, ...novos])
+            } else {
+              await loadGroups({ silent: true })
+            }
+          }
+        }
+
+        if (!options?.silentSuccess) {
+          showToast.success(successMessage ?? 'Grupos atualizados com sucesso!')
+        }
         return true
       } catch (err) {
         console.error(err)
         showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar grupos.')
         return false
-      } finally {
-        setIsUpdating(false)
       }
     },
-    [produtoId, auth, loadGroups]
+    [produtoId, auth, groups, fetchGrupoComplementoPorId, loadGroups]
+  )
+
+  /** Liga/desliga vínculo: estado otimista + ordem da lista estável até fechar o painel */
+  const handleToggleCatalogGrupo = useCallback(
+    async (id: string) => {
+      if (salvandoGrupoId !== null || !produtoId) return
+
+      const antesSnapshot = groups
+      const antesIds = groups.map(g => g.id)
+      const catalogOrderBefore = sessionCatalogOrderRef.current
+        ? [...sessionCatalogOrderRef.current]
+        : null
+      const newIds = antesIds.includes(id) ? antesIds.filter(x => x !== id) : [...antesIds, id]
+
+      const minMsg = mensagemSeRemoverTodosGruposComplementos(newIds)
+      if (minMsg) {
+        showToast.error(minMsg)
+        return
+      }
+
+      const removedIds = antesIds.filter(x => !newIds.includes(x))
+      const addedIds = newIds.filter(x => !antesIds.includes(x))
+
+      if (removedIds.length > 0) {
+        setGroups(prev => prev.filter(g => !removedIds.includes(g.id)))
+        setDetalhesComplementosCache(prev => {
+          const next = { ...prev }
+          for (const rid of removedIds) delete next[rid]
+          return next
+        })
+        if (sessionCatalogOrderRef.current) {
+          sessionCatalogOrderRef.current = sessionCatalogOrderRef.current.filter(x => !removedIds.includes(x))
+          setSessionOrderTick(t => t + 1)
+        }
+      }
+
+      if (addedIds.length > 0) {
+        setGroups(prev => {
+          let next = prev
+          for (const gid of addedIds) {
+            if (next.some(g => g.id === gid)) continue
+            const meta = allSelectableGroups.find(g => g.id === gid)
+            next = [
+              ...next,
+              {
+                id: gid,
+                nome: meta?.nome ?? 'Grupo',
+                complementos: [],
+                obrigatorio: Boolean(meta?.obrigatorio),
+                qtdMinima: meta?.obrigatorio ? 1 : 0,
+                qtdMaxima: 0,
+              },
+            ]
+          }
+          return next
+        })
+        if (sessionCatalogOrderRef.current) {
+          for (const gid of addedIds) {
+            if (!sessionCatalogOrderRef.current.includes(gid)) {
+              sessionCatalogOrderRef.current = [...sessionCatalogOrderRef.current, gid]
+            }
+          }
+          setSessionOrderTick(t => t + 1)
+        }
+      }
+
+      setSalvandoGrupoId(id)
+      try {
+        const ok = await persistGruposSelection(newIds, undefined, {
+          silentSuccess: true,
+          optimisticPreApplied: true,
+          antesIdsSnapshot: antesIds,
+        })
+        if (!ok) {
+          setGroups(antesSnapshot)
+          sessionCatalogOrderRef.current = catalogOrderBefore
+          setSessionOrderTick(t => t + 1)
+        }
+      } finally {
+        setSalvandoGrupoId(null)
+      }
+    },
+    [salvandoGrupoId, produtoId, groups, allSelectableGroups, persistGruposSelection]
+  )
+
+  const handleToggleComplementoAtivo = useCallback(
+    async (grupoListaId: string, comp: Complemento, novoAtivo: boolean) => {
+      const complementoId = comp.getId()
+      if (comp.isAtivo() === novoAtivo) return
+
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      setTogglingComplementoId(complementoId)
+      try {
+        const response = await fetch(`/api/complementos/${complementoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ ativo: novoAtivo }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || errorData.error || 'Erro ao atualizar complemento')
+        }
+
+        setGroups(prev =>
+          prev.map(g =>
+            g.id === grupoListaId
+              ? {
+                  ...g,
+                  complementos: atualizarAtivoNaLista(g.complementos, complementoId, novoAtivo),
+                }
+              : g
+          )
+        )
+        setDetalhesComplementosCache(prev =>
+          Object.hasOwn(prev, grupoListaId)
+            ? {
+                ...prev,
+                [grupoListaId]: atualizarAtivoNaLista(prev[grupoListaId], complementoId, novoAtivo),
+              }
+            : prev
+        )
+
+        showToast.success(novoAtivo ? 'Complemento ativado.' : 'Complemento desativado.')
+      } catch (err) {
+        console.error(err)
+        showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar complemento.')
+      } finally {
+        setTogglingComplementoId(null)
+      }
+    },
+    [auth]
   )
 
   const handleClose = () => {
     onClose()
-  }
-  const handleRemoveGroup = async (grupo: GrupoComplemento) => {
-    if (isUpdating) return
-
-    const token = auth?.getAccessToken()
-    if (!token) {
-      showToast.error('Token não encontrado. Faça login novamente.')
-      return
-    }
-
-    if (!produtoId) {
-      showToast.error('Produto não encontrado.')
-      return
-    }
-
-    const requestUrl = `/api/produtos/${encodeURIComponent(
-      produtoId
-    )}/grupos-complementos/${encodeURIComponent(grupo.id)}`
-    console.log('[ComplementosMultiSelectDialog] Removendo grupo', {
-      produtoId,
-      grupoId: grupo.id,
-      requestUrl,
-    })
-
-    setIsUpdating(true)
-    try {
-      const response = await fetch(requestUrl, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      console.log('[ComplementosMultiSelectDialog] Resposta remoção', {
-        status: response.status,
-        ok: response.ok,
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error(
-          '[ComplementosMultiSelectDialog] Erro ao remover grupo',
-          response.status,
-          errorData
-        )
-        throw new Error(errorData.message || 'Erro ao remover grupo do produto')
-      }
-
-      setGroups((prev) => prev.filter((g) => g.id !== grupo.id))
-      showToast.success(`Grupo "${grupo.nome}" removido com sucesso.`)
-    } catch (error) {
-      console.error(error)
-      showToast.error(
-        error instanceof Error
-          ? error.message
-          : 'Não foi possível remover o grupo. Tente novamente.'
-      )
-    } finally {
-      setIsUpdating(false)
-    }
-  }
-
-
-  const toggleGroupVisibility = (grupoId: string) => {
-    setExpandedGroups((prev) => ({
-      ...prev,
-      [grupoId]: !prev[grupoId],
-    }))
-  }
-
-  const handleOpenSelectDialog = () => {
-    setSelectSearch('')
-    setTempSelection(groups.map((grupo) => grupo.id))
-    setIsSelectDialogOpen(true)
-    loadSelectableGroups()
-  }
-
-  const handleCloseSelectDialog = () => {
-    setSelectSearch('')
-    setTempSelection(groups.map((grupo) => grupo.id))
-    setIsSelectDialogOpen(false)
-  }
-
-  const handleToggleSelection = (grupoId: string) => {
-    setTempSelection((prev) =>
-      prev.includes(grupoId) ? prev.filter((id) => id !== grupoId) : [...prev, grupoId]
-    )
-  }
-
-  const handleApplySelection = async () => {
-    if (isSavingSelection || isUpdating) return
-    setIsSavingSelection(true)
-    const success = await persistGruposSelection(tempSelection)
-    setIsSavingSelection(false)
-    if (success) {
-      setIsSelectDialogOpen(false)
-    }
   }
 
   const handleOpenNovoGrupoModal = useCallback(() => {
@@ -374,366 +665,254 @@ export function ComplementosMultiSelectDialog({
     })
   }, [])
 
-  const handleEditGrupo = useCallback((grupo: GrupoComplemento) => {
-    // Converter o grupo simples para uma instância de GrupoComplemento
-    try {
-      const grupoEntity = GrupoComplementoEntity.create(
-        grupo.id,
-        grupo.nome,
-        grupo.qtdMinima,
-        grupo.qtdMaxima,
-        true, // Assumindo que está ativo se está vinculado ao produto
-        undefined, // ordem
-        grupo.complementos.map((c) => c.getId()), // complementosIds
-        grupo.complementos // complementos
-      )
-
-      setGruposTabsModalState({
-        open: true,
-        tab: 'grupo',
-        mode: 'edit',
-        grupo: grupoEntity,
-      })
-    } catch (error) {
-      console.error('Erro ao criar instância de GrupoComplemento:', error)
-      showToast.error('Erro ao abrir edição do grupo')
-    }
-  }, [])
-
   const handleCloseGruposTabsModal = useCallback(() => {
-    setGruposTabsModalState((prev) => ({
+    setGruposTabsModalState(prev => ({
       ...prev,
       open: false,
     }))
   }, [])
 
   const handleGruposTabsTabChange = useCallback((tab: 'grupo' | 'complementos') => {
-    setGruposTabsModalState((prev) => ({
+    setGruposTabsModalState(prev => ({
       ...prev,
       tab,
     }))
   }, [])
 
   const handleGruposTabsReload = useCallback(async () => {
-    await loadGroups()
-    await loadSelectableGroups()
+    await Promise.all([loadGroups({ silent: true }), loadSelectableGroups()])
   }, [loadGroups, loadSelectableGroups])
 
   const handleGruposTabsClose = useCallback(() => {
-    setGruposTabsModalState((prev) => ({
+    setGruposTabsModalState(prev => ({
       ...prev,
       open: false,
     }))
-    // Recarregar grupos após fechar o modal de edição
-    loadGroups()
+    // Recarrega vínculos sem cobrir a lista com o spinner completo
+    void loadGroups({ silent: true })
   }, [loadGroups])
 
-  const renderContent = () => {
-    if (isLoading) {
-      return (
-        <div className="flex flex-col items-center justify-center py-12 gap-2">
-          <img
-            src="/images/jiffy-loading.gif"
-            alt="Carregando"
-            className="w-16 h-16 object-contain"
-          />
-          <p className="text-secondary-text text-sm text-center">Carregando complementos...</p>
+  const renderCatalogoGruposCard = () => (
+    <div className="mb-4 flex min-h-0 flex-col rounded-lg border border-[#E6E9F4] bg-white p-2 shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center gap-2 py-12">
+          <JiffyLoading />
         </div>
-      )
-    }
-
-    if (error) {
-      return (
-        <div className="flex flex-col items-center justify-center py-12 text-center space-y-3">
-          <p className="text-secondary-text text-sm">{error}</p>
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center space-y-3 py-12 text-center">
+          <p className="text-sm text-secondary-text">{error}</p>
           <button
             type="button"
-            onClick={loadGroups}
-            className="text-primary text-sm font-semibold hover:underline"
+            onClick={() => void loadGroups()}
+            className="text-sm font-semibold text-primary hover:underline"
           >
             Tentar novamente
           </button>
         </div>
-      )
-    }
+      ) : (
+        <>
+          <div className="relative mb-2 shrink-0">
+            <MdSearch
+              className="pointer-events-none absolute left-2.5 top-1/2 z-[1] -translate-y-1/2 text-secondary-text"
+              size={16}
+            />
+            <input
+              type="text"
+              value={catalogSearch}
+              onChange={e => setCatalogSearch(e.target.value)}
+              placeholder="Buscar grupo..."
+              className="font-nunito h-9 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-xs text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+            />
+          </div>
+          <div className="scrollbar-hide max-h-[280px] min-h-0 overflow-y-auto rounded-lg border border-gray-100 bg-gray-50/50 md:max-h-[360px]">
+            {isLoadingSelectableGroups ? (
+              <p className="font-nunito py-8 text-center text-xs text-secondary-text">
+                Carregando grupos...
+              </p>
+            ) : gruposCatalogoParaLista.length ? (
+              <ul className="divide-y divide-gray-100">
+                {gruposCatalogoParaLista.map(grupo => {
+                  const vinculado = gruposVinculadosIds.includes(grupo.id)
+                  const expandido = expandedGrupoIds.has(grupo.id)
+                  const grupoVinculado = groups.find(g => g.id === grupo.id)
+                  const complementosLista =
+                    grupoVinculado?.complementos ?? detalhesComplementosCache[grupo.id] ?? []
+                  const complementosOrdenados = ordenarComplementosParaExibicao(complementosLista)
+                  const mostrarLoadingDetalhe =
+                    expandido &&
+                    !grupoVinculado &&
+                    loadingDetalheGrupoId === grupo.id &&
+                    !(grupo.id in detalhesComplementosCache)
 
-    if (!filteredGroups.length) {
-      return (
-        <div className="flex items-center justify-center py-12">
-          <p className="text-secondary-text text-sm">
-            Nenhum complemento encontrado para &quot;{searchQuery}&quot;.
-          </p>
-        </div>
-      )
-    }
-
-    return (
-      <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
-        {filteredGroups.map((grupo, groupIndex) => {
-          const maxLabel = grupo.qtdMaxima ? `máx ${grupo.qtdMaxima}` : 'sem limite'
-          const minLabel = grupo.qtdMinima ? `mín ${grupo.qtdMinima}` : 'mín 0'
-          const isExpanded = expandedGroups[grupo.id] !== false
-
-          return (
-            <div
-              key={grupo.id}
-              className={`rounded-lg ${groupIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}
-            >
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => toggleGroupVisibility(grupo.id)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault()
-                    toggleGroupVisibility(grupo.id)
-                  }
-                }}
-                className="w-full flex items-center justify-between md:px-4 px-1.5 py-3 text-left cursor-pointer"
-              >
-                <div className="flex items-center gap-3 flex-1">
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      handleRemoveGroup(grupo)
-                    }}
-                    className="text-error hover:text-error/80 transition-colors"
-                    aria-label={`Remover grupo ${grupo.nome}`}
-                  >
-                    <MdDelete size={18} />
-                  </button>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-primary-text">{grupo.nome}</p>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          handleEditGrupo(grupo)
-                        }}
-                        className="text-primary hover:text-primary/80 transition-colors"
-                        aria-label={`Editar grupo ${grupo.nome}`}
-                        title="Editar grupo"
-                      >
-                        <MdEdit size={16} />
-                      </button>
-                    </div>
-                    <p className="text-xs text-secondary-text">
-                      {minLabel} • {maxLabel}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  {grupo.obrigatorio && (
-                    <span className="text-[10px] uppercase tracking-wide text-primary font-semibold bg-primary/10 px-2 py-1 rounded-full">
-                      Obrigatório
-                    </span>
-                  )}
-                  <MdKeyboardArrowDown
-                    className={`text-lg text-secondary-text transition-transform ${
-                      isExpanded ? 'rotate-0' : '-rotate-90'
-                    }`}
-                  />
-                </div>
-              </div>
-              {isExpanded && (
-                <div className="px-4 pb-4 space-y-2">
-                  {grupo.complementos.map((complemento, index) => {
-                    return (
-                      <div
-                        key={complemento.getId()}
-                        className={`w-full flex items-center gap-3 rounded-lg px-4 py-3 text-left ${
-                          index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
-                        }`}
-                      >
-                        <MdCheck size={20} className="text-primary" />
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-primary-text">
-                            {complemento.getNome()}
-                          </p>
-                          {complemento.getDescricao() && (
-                            <p className="text-xs text-secondary-text">
-                              {complemento.getDescricao()}
+                  return (
+                    <li key={grupo.id}>
+                      <div className="flex items-center justify-between gap-1 px-2 py-1.5 hover:bg-white/80">
+                        <button
+                          type="button"
+                          onClick={() => toggleGrupoExpanded(grupo.id)}
+                          className="flex min-w-0 flex-1 items-start gap-1 rounded-md py-2 text-left outline-none ring-primary focus-visible:ring-2"
+                          aria-expanded={expandido}
+                          aria-controls={`grupo-comp-list-${grupo.id}`}
+                          id={`grupo-comp-trigger-${grupo.id}`}
+                        >
+                          <MdKeyboardArrowDown
+                            className={cn(
+                              'mt-0.5 shrink-0 text-secondary-text transition-transform duration-200',
+                              expandido ? 'rotate-0' : '-rotate-90'
+                            )}
+                            size={20}
+                            aria-hidden
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="font-nunito truncate text-xs font-medium text-primary-text">
+                              {grupo.nome || 'Grupo'}
                             </p>
-                          )}
-                        </div>
-                        <div className="text-sm font-semibold text-primary-text">
-                          {transformarParaReal(complemento.getValor())}
+                            {grupo.obrigatorio ? (
+                              <span className="mt-0.5 inline-flex rounded-full bg-primary/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-primary">
+                                Obrigatório
+                              </span>
+                            ) : null}
+                          </div>
+                        </button>
+                        <div
+                          className="shrink-0 self-center"
+                          onClick={e => e.stopPropagation()}
+                          onMouseDown={e => e.stopPropagation()}
+                        >
+                          <JiffyIconSwitch
+                            checked={vinculado}
+                            onChange={e => {
+                              e.stopPropagation()
+                              void handleToggleCatalogGrupo(grupo.id)
+                            }}
+                            labelPosition="start"
+                            bordered={false}
+                            size="xs"
+                            className="shrink-0"
+                            disabled={salvandoGrupoId === grupo.id}
+                            inputProps={{
+                              'aria-label': vinculado
+                                ? `Desvincular grupo ${grupo.nome ?? ''}`
+                                : `Vincular grupo ${grupo.nome ?? ''}`,
+                              onClick: e => e.stopPropagation(),
+                            }}
+                          />
                         </div>
                       </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-    )
-  }
-
-  const renderDialogBody = () => (
-    <>
-      <div className="flex flex-col gap-1 mb-2 max-w-[400px]">
-        <span className="text-xs font-semibold text-secondary-text">Buscar complementos vinculados</span>
-        <div className="relative flex-1">
-          <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={20} />
-          <input
-            type="text"
-            placeholder="Digite para filtrar..."
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            className="w-full h-8 pl-10 pr-4 rounded-lg border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
-          />
-        </div>
-      </div>
-      {renderContent()}
-    </>
+                      {expandido ? (
+                        <div
+                          id={`grupo-comp-list-${grupo.id}`}
+                          role="region"
+                          aria-labelledby={`grupo-comp-trigger-${grupo.id}`}
+                          className="border-t border-gray-200 bg-info py-2 pl-8 pr-2 md:py-3 md:pl-10 md:pr-3"
+                        >
+                          {mostrarLoadingDetalhe ? (
+                            <div className="flex justify-center py-10">
+                              <JiffyLoading />
+                            </div>
+                          ) : complementosOrdenados.length === 0 ? (
+                            <p className="text-center text-sm text-secondary-text">
+                              Nenhum complemento neste grupo.
+                            </p>
+                          ) : (
+                            <>
+                              {complementosOrdenados.map(comp => (
+                                <div
+                                  key={comp.getId()}
+                                  className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 border-b border-gray-200 p-2 transition-colors hover:bg-primary-bg/60"
+                                >
+                                  <p
+                                    className={cn(
+                                      'min-w-0 truncate text-sm font-normal text-primary-text',
+                                      !comp.isAtivo() && 'text-secondary-text line-through'
+                                    )}
+                                  >
+                                    {comp.getNome()}
+                                  </p>
+                                  <div className="min-w-[100px] rounded border border-gray-200 bg-white px-2 py-1 text-right text-xs font-normal tabular-nums text-primary-text">
+                                    {formatarValorComplemento(comp.getValor())}
+                                  </div>
+                                  <div
+                                    className="flex justify-end self-center"
+                                    onClick={e => e.stopPropagation()}
+                                    onMouseDown={e => e.stopPropagation()}
+                                  >
+                                    <JiffyIconSwitch
+                                      size="xs"
+                                      checked={comp.isAtivo()}
+                                      onChange={e => {
+                                        e.stopPropagation()
+                                        void handleToggleComplementoAtivo(
+                                          grupo.id,
+                                          comp,
+                                          e.target.checked
+                                        )
+                                      }}
+                                      disabled={togglingComplementoId === comp.getId()}
+                                      bordered={false}
+                                      className="shrink-0"
+                                      inputProps={{
+                                        'aria-label': comp.isAtivo()
+                                          ? 'Desativar complemento'
+                                          : 'Ativar complemento',
+                                        onClick: ev => ev.stopPropagation(),
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </>
+                          )}
+                        </div>
+                      ) : null}
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : (
+              <p className="font-nunito py-8 text-center text-xs text-secondary-text">
+                {allSelectableGroups.length === 0
+                  ? 'Nenhum grupo de complementos cadastrado.'
+                  : 'Nenhum grupo encontrado para a busca.'}
+              </p>
+            )}
+          </div>
+        </>
+      )}
+    </div>
   )
 
-  const selectionDialog = (
-    <Dialog
-      open={isSelectDialogOpen}
-      onOpenChange={(openState) => {
-        if (!openState) {
-          handleCloseSelectDialog()
-        }
-      }}
-      fullWidth
-      maxWidth="xs"
-    >
-        <div className="flex flex-col md:flex-row md:h-16 py-4 px-2 md:px-4 items-top justify-between border-b-2 border-primary/70">
-        <span className="text-sm font-semibold text-primary-text">Selecionar grupos de complementos</span>
-        <button
-          type="button"
-          onClick={handleOpenNovoGrupoModal}
-          className="md:h-8 md:px-4 px-2 py-1 mt-2 md:mt-0 rounded-lg bg-primary text-info md:text-sm text-xs font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
-          aria-label="Criar novo grupo"
-        >
-          Criar novo grupo
-        </button>
-        </div>
-      <DialogContent sx={{ padding: '4px 4px' }}>
-        <div className="relative mb-4">
-          <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text" size={18} />
-          <input
-            type="text"
-            value={selectSearch}
-            onChange={(event) => setSelectSearch(event.target.value)}
-            placeholder="Buscar grupo..."
-            className="w-full h-8 pl-10 pr-4 rounded-lg border border-gray-200 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
-          />
-        </div>
-        <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
-          {isLoadingSelectableGroups ? (
-            <div className="flex flex-col items-center justify-center py-6 gap-2">
-              <img
-                src="/images/jiffy-loading.gif"
-                alt="Carregando"
-                className="w-16 h-16 object-contain"
-              />
-              <p className="text-secondary-text text-sm text-center">Carregando grupos...</p>
-            </div>
-          ) : filteredSelectableGroups.length ? (
-            filteredSelectableGroups.map((grupo, index) => {
-              const isSelected = tempSelection.includes(grupo.id)
-              return (
-                <label
-                  key={grupo.id}
-                  className={`flex items-center md:gap-3 gap-1 rounded-lg md:px-4 px-1.5 py-3 cursor-pointer transition-colors ${
-                    isSelected
-                      ? 'border-primary bg-primary/5'
-                      : `border-gray-200 ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => handleToggleSelection(grupo.id)}
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                  />
-                  <div className="flex-1">
-                    <p className="md:text-sm text-xs font-semibold text-primary-text break-words whitespace-normal">
-                      {grupo.nome}
-                    </p>
-                  </div>
-                  {isSelected && <span className="md:text-xs text-[10px] font-semibold text-primary">Selecionado</span>}
-                </label>
-              )
-            })
-          ) : (
-            <p className="text-center text-secondary-text text-sm py-6">Nenhum grupo encontrado.</p>
-          )}
-        </div>
-      </DialogContent>
-      <div className="flex items-center justify-between md:px-4 px-1.5 py-3">
-        <button
-          type="button"
-          onClick={handleCloseSelectDialog}
-          className="h-8 px-5 rounded-lg border border-gray-300 text-sm font-semibold text-primary-text hover:bg-gray-50 transition-colors"
-        >
-          Cancelar
-        </button>
-        <button
-          type="button"
-          onClick={handleApplySelection}
-          disabled={isSavingSelection || isUpdating}
-          className="h-8 px-6 rounded-lg bg-primary text-info md:text-sm text-xs font-semibold transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {isSavingSelection ? 'Aplicando...' : 'Aplicar seleção'}
-        </button>
-      </div>
-    </Dialog>
-  )
-
-  const selectionDialogNode =
-    isEmbedded && typeof document !== 'undefined'
-      ? createPortal(selectionDialog, document.getElementById('modal-root') ?? document.body)
-      : selectionDialog
+  const renderDialogBody = () => renderCatalogoGruposCard()
 
   if (isEmbedded) {
     return (
       <>
-        <div className="h-full flex flex-col overflow-hidden">
-          <div className="px-6 py-4 border-b-2 border-primary/70 flex items-center justify-between">
-            <div>
-              <h3 className="md:text-lg text-sm font-semibold text-primary-text">
-                {produtoNome ? `Complementos de ${produtoNome}` : 'Complementos'}
-              </h3>
-              <p className="text-xs text-secondary-text">
-                {groups.length} grupo{groups.length === 1 ? '' : 's'} vinculados
-              </p>
-            </div>
-            <div className="flex flex-col items-end gap-1">
+        <div className="flex h-full flex-col overflow-hidden">
+          <div className="px-6 py-3">
+            {/* Mesmo padrão de NovoComplemento (&quot;Dados do Complemento&quot;): título + linha + ação na mesma linha */}
+            <div className="flex min-w-0 flex-wrap items-center gap-3 md:gap-5">
+              <h2 className="min-w-0 break-words font-exo text-lg font-semibold text-primary md:text-xl">
+                Complementos Vinculados
+              </h2>
+              <div className="h-px min-w-8 flex-1 bg-primary/70" />
               <button
                 type="button"
-                onClick={handleOpenSelectDialog}
-                disabled={isUpdating || !abreComplementos}
-                className="md:h-8 px-4 py-1 rounded-lg border border-primary bg-primary text-white font-semibold md:text-sm text-xs flex items-center md:gap-2 hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                onClick={handleOpenNovoGrupoModal}
+                disabled={salvandoGrupoId !== null}
+                className="flex shrink-0 items-center rounded-lg border border-primary bg-primary px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 md:h-8 md:gap-2 md:px-4 md:text-sm"
               >
                 <MdAdd size={18} />
-                Vincular grupo
+                Criar novo grupo
               </button>
-              {!abreComplementos && (
-                <span className="text-[10px] text-secondary-text text-right max-w-[200px]">
-                  Ative &quot;Abre Complementos&quot; nas configurações do produto
-                </span>
-              )}
             </div>
+            <p className="font-nunito text-sm text-secondary-text">
+              {groups.length} grupo{groups.length === 1 ? '' : 's'} vinculados
+            </p>
           </div>
-          <div className="flex-1 overflow-y-auto md:px-6 px-2 py-4">{renderDialogBody()}</div>
-          <div className="px-6 py-12 border-t border-gray-100 flex justify-end">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="h-8 px-6 rounded-lg border border-primary text-sm font-semibold text-primary hover:bg-primary/20 transition-colors"
-            >
-              Fechar
-            </button>
+          <div className="scrollbar-hide flex-1 overflow-y-auto px-2 py-4 md:px-6">
+            {renderDialogBody()}
           </div>
         </div>
-        {selectionDialogNode}
         <GruposComplementosTabsModal
           state={gruposTabsModalState}
           onClose={handleGruposTabsClose}
@@ -748,7 +927,7 @@ export function ComplementosMultiSelectDialog({
     <>
       <Dialog
         open={open}
-        onOpenChange={(openState) => !openState && handleClose()}
+        onOpenChange={openState => !openState && handleClose()}
         fullWidth
         maxWidth="md"
         sx={{
@@ -773,24 +952,33 @@ export function ComplementosMultiSelectDialog({
           <button
             type="button"
             onClick={handleClose}
-            className="absolute top-2 left-2 text-secondary-text hover:text-primary transition-colors"
+            className="absolute left-2 top-2 text-secondary-text transition-colors hover:text-primary"
             aria-label="Fechar"
           >
             <MdClose size={22} />
           </button>
           <div className="pr-8">
-            <DialogTitle>
-              {produtoNome ? `Complementos de ${produtoNome}` : 'Selecionar complementos'}
-            </DialogTitle>
-            <p className="text-xs text-secondary-text mt-1">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <DialogTitle className="flex-1 !pb-0 !pt-0">
+                {produtoNome ? `Complementos de ${produtoNome}` : 'Selecionar complementos'}
+              </DialogTitle>
+              <button
+                type="button"
+                onClick={handleOpenNovoGrupoModal}
+                disabled={salvandoGrupoId !== null}
+                className="flex shrink-0 items-center rounded-lg border border-primary bg-primary px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 md:h-8 md:gap-2 md:px-4 md:text-sm"
+              >
+                <MdAdd size={18} />
+                Criar novo grupo
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-secondary-text">
               {groups.length} grupo{groups.length === 1 ? '' : 's'} vinculados
             </p>
           </div>
         </DialogHeader>
 
-        <DialogContent sx={{ padding: '16px 24px 0 24px' }}>
-          {renderDialogBody()}
-        </DialogContent>
+        <DialogContent sx={{ padding: '16px 24px 0 24px' }}>{renderDialogBody()}</DialogContent>
 
         <DialogFooter
           className="flex items-center justify-start border-t border-gray-100"
@@ -799,14 +987,13 @@ export function ComplementosMultiSelectDialog({
           <button
             type="button"
             onClick={handleClose}
-            className="h-10 px-6 rounded-[24px] border border-gray-300 text-sm font-semibold text-primary-text hover:bg-gray-50 transition-colors"
+            className="h-10 rounded-[24px] border border-gray-300 px-6 text-sm font-semibold text-primary-text transition-colors hover:bg-gray-50"
           >
             Fechar
           </button>
         </DialogFooter>
       </Dialog>
 
-      {selectionDialogNode}
       <GruposComplementosTabsModal
         state={gruposTabsModalState}
         onClose={handleCloseGruposTabsModal}
@@ -816,4 +1003,3 @@ export function ComplementosMultiSelectDialog({
     </>
   )
 }
-

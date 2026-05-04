@@ -4,37 +4,105 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
+import { Input } from '@/src/presentation/components/ui/input'
+import { MenuItem } from '@mui/material'
+
+/** Labels outlined — alinhado a NovoMeioPagamento / EditarTerminais */
+const sxOutlinedLabelTextoEscuro = {
+  '& .MuiInputLabel-root': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiInputLabel-root.Mui-focused': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiInputLabel-root.MuiInputLabel-shrink': {
+    color: 'var(--color-primary-text)',
+  },
+} as const
+
+const entradaCompactaInput = {
+  padding: '12px 10px',
+  fontSize: '0.875rem',
+} as const
+
+const entradaCompactaSelect = {
+  padding: '12px 10px',
+  fontSize: '0.875rem',
+  minHeight: '1.5em',
+  lineHeight: 1.4,
+  display: 'flex',
+  alignItems: 'center',
+} as const
+
+const sxEntradaEmpresa = {
+  ...sxOutlinedLabelTextoEscuro,
+  '& .MuiOutlinedInput-root': {
+    backgroundColor: 'transparent',
+    borderRadius: '8px',
+  },
+  '& .MuiOutlinedInput-notchedOutline': {
+    borderColor: 'rgba(0, 0, 0, 0.23)',
+  },
+  '& .MuiOutlinedInput-input': entradaCompactaInput,
+  '& .MuiOutlinedInput-input.Mui-disabled': {
+    WebkitTextFillColor: 'var(--color-primary-text)',
+    opacity: 0.85,
+  },
+  '& .MuiSelect-select': entradaCompactaSelect,
+} as const
+
+/** Digitação em maiúsculas (e-mail e selects com valor técnico ficam de fora). */
+const maiusculasPt = (valor: string) => valor.toLocaleUpperCase('pt-BR')
 
 // Siglas dos estados brasileiros em ordem alfabética
 const ESTADOS_BRASILEIROS = [
-  { sigla: 'AC', nome: 'Acre' },
-  { sigla: 'AL', nome: 'Alagoas' },
-  { sigla: 'AP', nome: 'Amapá' },
-  { sigla: 'AM', nome: 'Amazonas' },
-  { sigla: 'BA', nome: 'Bahia' },
-  { sigla: 'CE', nome: 'Ceará' },
-  { sigla: 'DF', nome: 'Distrito Federal' },
-  { sigla: 'ES', nome: 'Espírito Santo' },
-  { sigla: 'GO', nome: 'Goiás' },
-  { sigla: 'MA', nome: 'Maranhão' },
-  { sigla: 'MT', nome: 'Mato Grosso' },
-  { sigla: 'MS', nome: 'Mato Grosso do Sul' },
-  { sigla: 'MG', nome: 'Minas Gerais' },
-  { sigla: 'PA', nome: 'Pará' },
-  { sigla: 'PB', nome: 'Paraíba' },
-  { sigla: 'PR', nome: 'Paraná' },
-  { sigla: 'PE', nome: 'Pernambuco' },
-  { sigla: 'PI', nome: 'Piauí' },
-  { sigla: 'RJ', nome: 'Rio de Janeiro' },
-  { sigla: 'RN', nome: 'Rio Grande do Norte' },
-  { sigla: 'RS', nome: 'Rio Grande do Sul' },
-  { sigla: 'RO', nome: 'Rondônia' },
-  { sigla: 'RR', nome: 'Roraima' },
-  { sigla: 'SC', nome: 'Santa Catarina' },
-  { sigla: 'SP', nome: 'São Paulo' },
-  { sigla: 'SE', nome: 'Sergipe' },
-  { sigla: 'TO', nome: 'Tocantins' },
+  { sigla: 'AC', nome: 'ACRE' },
+  { sigla: 'AL', nome: 'ALAGOAS' },
+  { sigla: 'AP', nome: 'AMAPÁ' },
+  { sigla: 'AM', nome: 'AMAZONAS' },
+  { sigla: 'BA', nome: 'BAHIA' },
+  { sigla: 'CE', nome: 'CEARÁ' },
+  { sigla: 'DF', nome: 'DISTRITO FEDERAL' },
+  { sigla: 'ES', nome: 'ESPÍRITO SANTO' },
+  { sigla: 'GO', nome: 'GOIÁS' },
+  { sigla: 'MA', nome: 'MARANHÃO' },
+  { sigla: 'MT', nome: 'MATO GROSSO' },
+  { sigla: 'MS', nome: 'MATO GROSSO DO SUL' },
+  { sigla: 'MG', nome: 'MINAS GERAIS' },
+  { sigla: 'PA', nome: 'PARÁ' },
+  { sigla: 'PB', nome: 'PARAÍBA' },
+  { sigla: 'PR', nome: 'PARANÁ' },
+  { sigla: 'PE', nome: 'PERNAMBUCO' },
+  { sigla: 'PI', nome: 'PIAUÍ' },
+  { sigla: 'RJ', nome: 'RIO DE JANEIRO' },
+  { sigla: 'RN', nome: 'RIO GRANDE DO NORTE' },
+  { sigla: 'RS', nome: 'RIO GRANDE DO SUL' },
+  { sigla: 'RO', nome: 'RONDÔNIA' },
+  { sigla: 'RR', nome: 'RORAIMA' },
+  { sigla: 'SC', nome: 'SANTA CATARINA' },
+  { sigla: 'SP', nome: 'SÃO PAULO' },
+  { sigla: 'SE', nome: 'SERGIPE' },
+  { sigla: 'TO', nome: 'TOCANTINS' },
+]
+
+/** Fusos IANA usados no Brasil (campo `parametroEmpresa.timezone` na API). */
+const FUSOS_IANA_BRASIL = [
+  { id: 'America/Noronha', label: 'America/Noronha (Fernando de Noronha)' },
+  { id: 'America/Sao_Paulo', label: 'America/Sao_Paulo — Brasília (maior parte do país)' },
+  { id: 'America/Araguaina', label: 'America/Araguaina' },
+  { id: 'America/Fortaleza', label: 'America/Fortaleza' },
+  { id: 'America/Recife', label: 'America/Recife' },
+  { id: 'America/Maceio', label: 'America/Maceió' },
+  { id: 'America/Bahia', label: 'America/Bahia' },
+  { id: 'America/Belem', label: 'America/Belém' },
+  { id: 'America/Cuiaba', label: 'America/Cuiabá (MT)' },
+  { id: 'America/Campo_Grande', label: 'America/Campo Grande (MS)' },
+  { id: 'America/Manaus', label: 'America/Manaus (AM)' },
+  { id: 'America/Porto_Velho', label: 'America/Porto Velho (RO)' },
+  { id: 'America/Boa_Vista', label: 'America/Boa Vista (RR)' },
+  { id: 'America/Rio_Branco', label: 'America/Rio Branco (AC)' },
 ]
 
 /**
@@ -61,7 +129,11 @@ export function EmpresaTab() {
   const [estado, setEstado] = useState('')
   const [cidadeValida, setCidadeValida] = useState<boolean | null>(null)
   const [codigoCidadeIbge, setCodigoCidadeIbge] = useState<string | null>(null)
-  
+  /** Valor exibido no select (IANA); vem de `parametroEmpresa.timezone` no GET /empresas/me. */
+  const [timezone, setTimezone] = useState('')
+  /** Snapshot de `parametroEmpresa` para PATCH preservar tipos impressão/cobrança etc. */
+  const [parametroEmpresaDraft, setParametroEmpresaDraft] = useState<Record<string, unknown>>({})
+
   // Ref para rastrear o último valor de cidade usado para buscar código IBGE
   const ultimaCidadeBuscada = useRef<string>('')
 
@@ -84,33 +156,48 @@ export function EmpresaTab() {
 
       if (response.ok) {
         const data = await response.json()
-        
+
         // Debug: log da resposta da API
         if (process.env.NODE_ENV === 'development') {
           console.log('Resposta da API de empresa:', data)
         }
-        
+
+        const raw = data as Record<string, unknown>
+        const rawPe = raw.parametroEmpresa
+        if (rawPe && typeof rawPe === 'object' && !Array.isArray(rawPe)) {
+          setParametroEmpresaDraft({ ...(rawPe as Record<string, unknown>) })
+          const pe = rawPe as Record<string, unknown>
+          const tz =
+            (typeof pe.timezone === 'string' && pe.timezone) ||
+            (typeof pe.timeZone === 'string' && pe.timeZone) ||
+            ''
+          setTimezone(String(tz).trim())
+        } else {
+          setParametroEmpresaDraft({})
+          setTimezone('')
+        }
+
         try {
           const empresaData = Cliente.fromJSON(data)
           setEmpresa(empresaData)
 
           // Preencher campos
-          setCnpj(empresaData.getCnpj() || '')
-          setRazaoSocial(empresaData.getRazaoSocial() || '')
-          setNomeFantasia(empresaData.getNomeFantasia() || '')
+          setCnpj(maiusculasPt(empresaData.getCnpj() || ''))
+          setRazaoSocial(maiusculasPt(empresaData.getRazaoSocial() || ''))
+          setNomeFantasia(maiusculasPt(empresaData.getNomeFantasia() || ''))
           setEmail(empresaData.getEmail() || '')
-          setTelefone(empresaData.getTelefone() || '')
-          
+          setTelefone(maiusculasPt(empresaData.getTelefone() || ''))
+
           const endereco = empresaData.getEndereco()
           if (endereco) {
-            setCep(endereco.cep || '')
-            setRua(endereco.rua || '')
-            setNumero(endereco.numero || '')
-            setComplemento(endereco.complemento || '')
-            setBairro(endereco.bairro || '')
-            setCidade(endereco.cidade || '')
+            setCep(maiusculasPt(endereco.cep || ''))
+            setRua(maiusculasPt(endereco.rua || ''))
+            setNumero(maiusculasPt(endereco.numero || ''))
+            setComplemento(maiusculasPt(endereco.complemento || ''))
+            setBairro(maiusculasPt(endereco.bairro || ''))
+            setCidade(maiusculasPt(endereco.cidade || ''))
             setEstado(endereco.estado || '')
-            
+
             // Carregar código IBGE se cidade e estado estiverem preenchidos
             if (endereco.cidade && endereco.estado) {
               const cidade = endereco.cidade
@@ -137,7 +224,11 @@ export function EmpresaTab() {
           setEmpresa(empresaData)
         }
       } else {
-        console.error('Erro na resposta da API:', response.status, await response.text().catch(() => ''))
+        console.error(
+          'Erro na resposta da API:',
+          response.status,
+          await response.text().catch(() => '')
+        )
       }
     } catch (error) {
       console.error('Erro ao carregar empresa:', error)
@@ -169,18 +260,21 @@ export function EmpresaTab() {
       if (response.ok) {
         const data = await response.json()
         const municipios = data.municipios || []
-        
+
         // Normalizar nome da cidade para comparação (remover acentos, converter para minúsculas)
-        const normalizar = (str: string) => 
-          str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-        
+        const normalizar = (str: string) =>
+          str
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+
         const cidadeNormalizada = normalizar(nomeCidade.trim())
-        
+
         // Buscar município correspondente
-        const municipio = municipios.find((m: any) => 
-          normalizar(m.nomeCidade) === cidadeNormalizada
+        const municipio = municipios.find(
+          (m: any) => normalizar(m.nomeCidade) === cidadeNormalizada
         )
-        
+
         if (municipio && municipio.codigoCidadeIbge) {
           setCodigoCidadeIbge(municipio.codigoCidadeIbge)
           return true
@@ -237,7 +331,7 @@ export function EmpresaTab() {
         // Se não tem código IBGE, validar via API
         // Usar o nome da cidade do formulário, mas se tivermos ultimaCidadeBuscada, usar ela
         const nomeCidadeParaValidar = ultimaCidadeBuscada.current || cidade.trim()
-        
+
         try {
           const response = await fetch(
             `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(nomeCidadeParaValidar)}&uf=${estado}`
@@ -245,7 +339,9 @@ export function EmpresaTab() {
           if (response.ok) {
             const data = await response.json()
             if (!data.valido) {
-              showToast.error(`Cidade "${nomeCidadeParaValidar}" não encontrada no estado ${estado}. Por favor, selecione uma cidade válida.`)
+              showToast.error(
+                `Cidade "${nomeCidadeParaValidar}" não encontrada no estado ${estado}. Por favor, selecione uma cidade válida.`
+              )
               return
             }
             // Buscar código IBGE se não estiver definido
@@ -271,7 +367,7 @@ export function EmpresaTab() {
     try {
       // Monta o body apenas com campos que têm valor
       const body: Record<string, any> = {}
-      
+
       if (cnpj) body.cnpj = cnpj
       if (razaoSocial) body.razaoSocial = razaoSocial
       if (nomeFantasia) body.nomeFantasia = nomeFantasia
@@ -296,6 +392,17 @@ export function EmpresaTab() {
         body.endereco = endereco
       }
 
+      /* PATCH: `parametroEmpresa.timezone` — preserva outros campos já retornados pela API. */
+      const parametroEmpresa: Record<string, unknown> = { ...parametroEmpresaDraft }
+      if (timezone.trim()) {
+        parametroEmpresa.timezone = timezone.trim()
+      } else {
+        delete parametroEmpresa.timezone
+      }
+      if (Object.keys(parametroEmpresa).length > 0) {
+        body.parametroEmpresa = parametroEmpresa
+      }
+
       console.log('Enviando dados:', body)
 
       const response = await fetch(`/api/empresas/${empresa.getId()}`, {
@@ -308,7 +415,7 @@ export function EmpresaTab() {
       })
 
       const responseData = await response.json().catch(() => ({}))
-      
+
       if (response.ok) {
         setIsEditing(false)
         await loadEmpresa()
@@ -327,287 +434,255 @@ export function EmpresaTab() {
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <img
-          src="/images/jiffy-loading.gif"
-          alt="Carregando"
-          className="w-20 object-contain"
-        />
-        <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
+        <JiffyLoading />
       </div>
     )
   }
 
   return (
-    <div className="h-full overflow-y-auto md:px-6 px-1 py-2 scrollbar-hide">
+    <div className="scrollbar-hide h-full overflow-y-auto px-1 py-1 md:px-6">
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-primary text-lg md:text-xl font-semibold font-exo mb-1">
-            Dados da Empresa
-          </h3>
-          <p className="text-secondary-text text-xs md:text-sm font-nunito">
-            Gerencie as informações da sua empresa
-          </p>
-        </div>
-        {!isEditing && (
-          <button
-            onClick={() => setIsEditing(true)}
-            className="h-8 px-6 bg-primary text-white rounded-lg text-sm font-medium font-exo hover:bg-primary/90 transition-colors"
-          >
-            Editar
-          </button>
-        )}
-        {isEditing && (
-          <div className="flex flex-col md:flex-row gap-2">
-            <button
-              onClick={handleSave}
-              disabled={cidadeValida === false && cidade.length > 0}
-              className="h-8 px-6 bg-primary text-white rounded-lg text-sm font-medium font-exo hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span>✓</span> Salvar
-            </button>
-            <button
-              onClick={() => {
-                setIsEditing(false)
-                loadEmpresa()
-              }}
-              className="h-8 px-6 bg-primary/10 text-primary border border-primary rounded-lg text-sm font-medium font-exo hover:bg-primary/15 transition-colors"
-            >
-              Cancelar
-            </button>
+        <div className="flex items-center justify-between border-b-2 border-primary/70 pb-2">
+          <div>
+            <h3 className="text-lg font-semibold text-primary md:text-xl">Dados da Empresa</h3>
+            <p className="text-xs text-secondary-text md:text-sm">
+              Gerencie as informações da sua empresa
+            </p>
           </div>
-        )}
-      </div>
+          {!isEditing && (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="h-8 rounded-lg bg-primary px-6 font-exo text-sm font-medium text-white transition-colors hover:bg-primary/90"
+            >
+              Editar
+            </button>
+          )}
+          {isEditing && (
+            <div className="flex flex-col gap-2 md:flex-row">
+              <button
+                onClick={handleSave}
+                disabled={cidadeValida === false && cidade.length > 0}
+                className="flex h-8 items-center gap-2 rounded-lg bg-primary px-6 font-exo text-sm font-medium text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span>✓</span> Salvar
+              </button>
+              <button
+                onClick={() => {
+                  setIsEditing(false)
+                  loadEmpresa()
+                }}
+                className="h-8 rounded-lg border border-primary bg-primary/10 px-6 font-exo text-sm font-medium text-primary transition-colors hover:bg-primary/15"
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
+        </div>
 
-      <div className="bg-info md:px-[18px] px-1 space-y-4">
-        {/* Dados Básicos */}
-        <div>
-          <h4 className="text-primary text-lg font-bold font-nunito mb-2">
-            Dados Básicos
-          </h4>
-          <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-primary-text">
-                CNPJ
-              </label>
-              <input
-                type="text"
+        <div className="space-y-4 bg-info px-1 md:px-[18px]">
+          {/* Dados Básicos */}
+          <div>
+            <h4 className="font-nunito mb-2 text-lg font-semibold text-primary">Dados Básicos</h4>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Input
+                label="CNPJ"
                 value={cnpj}
-                onChange={(e) => setCnpj(e.target.value)}
+                onChange={e => setCnpj(maiusculasPt(e.target.value))}
                 disabled={!isEditing}
-                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                size="small"
+                sx={sxEntradaEmpresa}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-primary-text">
-                Razão Social
-              </label>
-              <input
-                type="text"
+              <Input
+                label="Razão Social"
                 value={razaoSocial}
-                onChange={(e) => setRazaoSocial(e.target.value)}
+                onChange={e => setRazaoSocial(maiusculasPt(e.target.value))}
                 disabled={!isEditing}
-                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                size="small"
+                sx={sxEntradaEmpresa}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-primary-text">
-                Nome Fantasia
-              </label>
-              <input
-                type="text"
+              <Input
+                label="Nome Fantasia"
                 value={nomeFantasia}
-                onChange={(e) => setNomeFantasia(e.target.value)}
+                onChange={e => setNomeFantasia(maiusculasPt(e.target.value))}
                 disabled={!isEditing}
-                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                size="small"
+                sx={sxEntradaEmpresa}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-primary-text">
-                Email
-              </label>
-              <input
+              <Input
                 type="email"
+                label="Email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={e => setEmail(e.target.value)}
                 disabled={!isEditing}
-                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                size="small"
+                sx={sxEntradaEmpresa}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-primary-text">
-                Telefone
-              </label>
-              <input
-                type="text"
+              <Input
+                label="Telefone"
                 value={telefone}
-                onChange={(e) => setTelefone(e.target.value)}
+                onChange={e => setTelefone(maiusculasPt(e.target.value))}
                 disabled={!isEditing}
-                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
+                size="small"
+                sx={sxEntradaEmpresa}
               />
             </div>
           </div>
-        </div>
 
-        {/* Endereço */}
-        <div>
-          <h4 className="text-primary text-lg font-bold font-nunito mb-2">
-            Endereço
-          </h4>
-          <div className="grid md:grid-cols-3 grid-cols-1 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-primary-text">
-                CEP
-              </label>
-              <input
-                type="text"
-                value={cep}
-                onChange={(e) => setCep(e.target.value)}
-                disabled={!isEditing}
-                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
-              />
-            </div>
-            <div className="md:col-span-2 col-span-1">
-              <label className="block text-sm font-medium text-primary-text">
-                Rua
-              </label>
-              <input
-                type="text"
-                value={rua}
-                onChange={(e) => setRua(e.target.value)}
-                disabled={!isEditing}
-                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-primary-text">
-                Número
-              </label>
-              <input
-                type="text"
-                value={numero}
-                onChange={(e) => setNumero(e.target.value)}
-                disabled={!isEditing}
-                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
-              />
-            </div>
-            <div className="md:col-span-2 col-span-1">
-              <label className="block text-sm font-medium text-primary-text">
-                Complemento
-              </label>
-              <input
-                type="text"
-                value={complemento}
-                onChange={(e) => setComplemento(e.target.value)}
-                disabled={!isEditing}
-                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-primary-text">
-                Bairro
-              </label>
-              <input
-                type="text"
-                value={bairro}
-                onChange={(e) => setBairro(e.target.value)}
-                disabled={!isEditing}
-                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
-              />
-            </div>
-            <div>
-              <CidadeAutocomplete
-                value={cidade}
-                onChange={(novaCidade) => {
-                  // Atualizar estado quando cidade é alterada (digitada ou selecionada)
-                  setCidade(novaCidade)
-                  // Se a cidade foi apenas digitada (não selecionada da lista),
-                  // limpar código IBGE para forçar busca quando for validada/selecionada
-                  if (!novaCidade) {
+          {/* Endereço */}
+          <div>
+            <h4 className="font-nunito mb-2 text-lg font-semibold text-primary">Endereço</h4>
+            <div className="space-y-4">
+              {/* Linha 1: CEP + Rua */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <Input
+                  label="CEP"
+                  value={cep}
+                  onChange={e => setCep(maiusculasPt(e.target.value))}
+                  disabled={!isEditing}
+                  size="small"
+                  sx={sxEntradaEmpresa}
+                />
+                <div className="md:col-span-2">
+                  <Input
+                    label="Rua"
+                    value={rua}
+                    onChange={e => setRua(maiusculasPt(e.target.value))}
+                    disabled={!isEditing}
+                    size="small"
+                    sx={sxEntradaEmpresa}
+                  />
+                </div>
+              </div>
+
+              {/* Linha 2: Número, Complemento e Bairro */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <Input
+                  label="Número"
+                  value={numero}
+                  onChange={e => setNumero(maiusculasPt(e.target.value))}
+                  disabled={!isEditing}
+                  size="small"
+                  sx={sxEntradaEmpresa}
+                />
+                <Input
+                  label="Complemento"
+                  value={complemento}
+                  onChange={e => setComplemento(maiusculasPt(e.target.value))}
+                  disabled={!isEditing}
+                  size="small"
+                  sx={sxEntradaEmpresa}
+                />
+                <Input
+                  label="Bairro"
+                  value={bairro}
+                  onChange={e => setBairro(maiusculasPt(e.target.value))}
+                  disabled={!isEditing}
+                  size="small"
+                  sx={sxEntradaEmpresa}
+                />
+              </div>
+
+              {/* Linha 3: Estado + Cidade + Fuso horário (IANA) */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <Input
+                  select
+                  label="Estado"
+                  value={estado}
+                  onChange={async e => {
+                    const novoEstado = e.target.value
+                    const cidadeAnterior = cidade
+
                     setCodigoCidadeIbge(null)
                     ultimaCidadeBuscada.current = ''
-                  }
-                }}
-                estado={estado}
-                label="Cidade"
-                placeholder="Digite o nome da cidade"
-                required={false}
-                disabled={!isEditing || !estado}
-                useNativeInput={true}
-                inputClassName="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
-                onCidadeSelecionada={(nomeCidade, codigoIbge) => {
-                  // Quando uma cidade é selecionada da lista, armazenar código IBGE imediatamente
-                  // e garantir que o estado do formulário seja atualizado com o nome oficial
-                  setCodigoCidadeIbge(codigoIbge)
-                  ultimaCidadeBuscada.current = nomeCidade
-                  setCidadeValida(true)
-                  // Atualizar o estado do formulário com o nome oficial da cidade selecionada
-                  // Isso garante que a variável cidade tenha o valor correto
-                  setCidade(nomeCidade)
-                }}
-                onValidationChange={async (isValid) => {
-                  setCidadeValida(isValid)
-                  // Se validou como true e não tem código IBGE ainda, buscar
-                  // Isso cobre o caso de validação via API (quando usuário digita e perde foco)
-                  if (isValid && cidade && estado && !codigoCidadeIbge) {
-                    await buscarCodigoIbge(cidade.trim(), estado)
-                  }
-                }}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-primary-text">
-                Estado
-              </label>
-              <select
-                value={estado}
-                onChange={async (e) => {
-                  const novoEstado = e.target.value
-                  const cidadeAnterior = cidade
-                  
-                  // Limpa código IBGE ao trocar o estado
-                  setCodigoCidadeIbge(null)
-                  ultimaCidadeBuscada.current = ''
-                  setCidadeValida(null)
-                  
-                  // Se havia uma cidade preenchida antes, tentar buscar código IBGE para o novo estado
-                  // Se encontrar, manter a cidade; se não encontrar, limpar
-                  if (cidadeAnterior && cidadeAnterior.trim() && novoEstado) {
-                    // Aguardar um pouco para garantir que o estado foi atualizado
-                    await new Promise(resolve => setTimeout(resolve, 100))
-                    // Tentar buscar código IBGE da cidade no novo estado
-                    const encontrou = await buscarCodigoIbge(cidadeAnterior.trim(), novoEstado)
-                    if (encontrou) {
-                      // Cidade existe no novo estado, manter ela
-                      setEstado(novoEstado)
-                      setCidadeValida(true)
+                    setCidadeValida(null)
+
+                    if (cidadeAnterior && cidadeAnterior.trim() && novoEstado) {
+                      await new Promise(resolve => setTimeout(resolve, 100))
+                      const encontrou = await buscarCodigoIbge(cidadeAnterior.trim(), novoEstado)
+                      if (encontrou) {
+                        setEstado(novoEstado)
+                        setCidadeValida(true)
+                      } else {
+                        setEstado(novoEstado)
+                        setCidade('')
+                      }
                     } else {
-                      // Cidade não existe no novo estado, limpar
                       setEstado(novoEstado)
                       setCidade('')
                     }
-                  } else {
-                    // Não havia cidade, apenas atualizar estado
-                    setEstado(novoEstado)
-                    setCidade('')
-                  }
-                }}
-                disabled={!isEditing}
-                className="w-full h-8 px-4 rounded-lg border border-primary bg-primary-bg text-primary-text focus:outline-none focus:border-primary disabled:opacity-50"
-              >
-                <option value="">Selecione o estado</option>
-                {ESTADOS_BRASILEIROS.map((estadoOption) => (
-                  <option key={estadoOption.sigla} value={estadoOption.sigla}>
-                    {estadoOption.sigla} - {estadoOption.nome}
-                  </option>
-                ))}
-              </select>
+                  }}
+                  disabled={!isEditing}
+                  size="small"
+                  sx={sxEntradaEmpresa}
+                  InputLabelProps={{ shrink: true }}
+                  SelectProps={{ displayEmpty: true }}
+                >
+                  <MenuItem value="">
+                    <em>Selecione o estado</em>
+                  </MenuItem>
+                  {ESTADOS_BRASILEIROS.map(estadoOption => (
+                    <MenuItem key={estadoOption.sigla} value={estadoOption.sigla}>
+                      {estadoOption.sigla} - {estadoOption.nome}
+                    </MenuItem>
+                  ))}
+                </Input>
+                <CidadeAutocomplete
+                  value={cidade}
+                  onChange={novaCidade => {
+                    setCidade(maiusculasPt(novaCidade))
+                    if (!novaCidade) {
+                      setCodigoCidadeIbge(null)
+                      ultimaCidadeBuscada.current = ''
+                    }
+                  }}
+                  estado={estado}
+                  label="Cidade"
+                  placeholder="Digite o nome da cidade"
+                  required={false}
+                  disabled={!isEditing || !estado}
+                  useNativeInput={false}
+                  sx={sxEntradaEmpresa}
+                  onCidadeSelecionada={(nomeCidade, codigoIbge) => {
+                    setCodigoCidadeIbge(codigoIbge)
+                    ultimaCidadeBuscada.current = nomeCidade
+                    setCidadeValida(true)
+                    setCidade(maiusculasPt(nomeCidade))
+                  }}
+                  onValidationChange={async isValid => {
+                    setCidadeValida(isValid)
+                    if (isValid && cidade && estado && !codigoCidadeIbge) {
+                      await buscarCodigoIbge(cidade.trim(), estado)
+                    }
+                  }}
+                />
+                <Input
+                  select
+                  label="Fuso horário (IANA)"
+                  value={timezone}
+                  onChange={e => setTimezone(e.target.value)}
+                  disabled={!isEditing}
+                  size="small"
+                  sx={sxEntradaEmpresa}
+                  InputLabelProps={{ shrink: true }}
+                  SelectProps={{ displayEmpty: true }}
+                >
+                  <MenuItem value="">
+                    <em>Selecione o fuso</em>
+                  </MenuItem>
+                  {timezone && !FUSOS_IANA_BRASIL.some(f => f.id === timezone) && (
+                    <MenuItem value={timezone}>{timezone} (registrado na API)</MenuItem>
+                  )}
+                  {FUSOS_IANA_BRASIL.map(f => (
+                    <MenuItem key={f.id} value={f.id}>
+                      {f.label}
+                    </MenuItem>
+                  ))}
+                </Input>
+              </div>
             </div>
           </div>
         </div>
-      </div>
       </div>
     </div>
   )
 }
-

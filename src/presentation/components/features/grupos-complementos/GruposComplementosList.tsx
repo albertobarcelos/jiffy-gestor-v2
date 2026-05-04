@@ -1,11 +1,11 @@
 'use client'
 
-'use client'
-
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { useGruposComplementosInfinite } from '@/src/presentation/hooks/useGruposComplementos'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import {
   MdSearch,
   MdExtension,
@@ -81,15 +81,15 @@ const GrupoItem = memo(function GrupoItem({
           rowIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'
         }`}
       >
-        <div className="w-16 flex-col items-start text-xs text-secondary-text hidden md:flex">
+        <div className="items-start text-xs text-secondary-text md:flex-1">
           
           <span className="text-sm text-left font-semibold text-primary-text/70">
             {ordemPosicional}
           </span>
         </div>
-        <div className="md:flex-[3] flex-[2] min-w-0 flex items-start gap-3 pl-1 md:pl-3">
+        <div className="md:flex-[3] flex-[2] min-w-0 flex items-start">
           <div className="flex flex-col md:flex-row gap-1">
-            <span className="flex items-center gap-2 truncate font-nunito font-semibold md:text-sm text-xs text-primary-text">
+            <span className="flex items-center gap-2 truncate font-normal md:text-sm text-xs text-primary-text">
               {grupo.getNome()}
             </span>
               <button
@@ -100,7 +100,7 @@ const GrupoItem = memo(function GrupoItem({
                   e.stopPropagation()
                   onOpenComplementosModal?.(grupo)
                 }}
-                className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors ${
+                className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
                   hasComplementos
                     ? 'bg-primary text-white border border-primary hover:bg-primary/90'
                     : 'bg-info text-primary border border-primary/30 hover:bg-gray-300'
@@ -131,8 +131,8 @@ const GrupoItem = memo(function GrupoItem({
                 className={`flex items-center gap-2 ${item.invertButtons ? 'flex-row-reverse justify-end' : ''}`}
               >
                 <div className="flex flex-col items-center text-center text-xs text-secondary-text min-w-[70px]">
-                  <span className="uppercase tracking-wide">{item.label}</span>
-                  <span className="text-sm font-semibold text-primary-text">{item.valor}</span>
+                  <span className="tracking-wide">{item.label}</span>
+                  <span className="text-sm font-normal text-primary-text">{item.valor}</span>
                 </div>
                 <div className="flex flex-col gap-1">
                   <button
@@ -161,10 +161,10 @@ const GrupoItem = memo(function GrupoItem({
         
         <div className="flex-[2] flex items-center justify-start" onClick={(e) => e.stopPropagation()}>
           {complementos.length === 0 ? (
-            <span className="text-sm font-nunito text-secondary-text">Nenhum complemento</span>
+            <span className="text-sm font-normal text-secondary-text">Nenhum complemento</span>
           ) : (
             <select
-              className="w-full md:px-3 py-1.5 rounded-xl border border-gray-300 bg-white md:text-sm text-xs font-semibold text-primary-text focus:outline-none focus:border-primary"
+              className="w-full md:px-3 py-1.5 rounded-xl border border-gray-300 bg-white md:text-sm text-xs font-normal text-primary-text focus:outline-none focus:border-primary"
               defaultValue=""
               onChange={(event) => {
                 event.target.value = ''
@@ -182,25 +182,25 @@ const GrupoItem = memo(function GrupoItem({
             </select>
           )}
         </div>
-        <div className="md:flex-[2] flex items-center md:justify-center justify-end" onClick={(e) => e.stopPropagation()}>
-          <label 
-            className="relative inline-flex items-center h-4 w-8 md:h-5 md:w-12 cursor-pointer"
-            onMouseDown={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-          >
-            <input
-              type="checkbox"
-              className="sr-only peer"
-              checked={isAtivo}
-              onChange={(event) => {
-                event.stopPropagation()
-                onToggleStatus?.(grupo.getId(), event.target.checked)
-              }}
-              onClick={(e) => e.stopPropagation()}
-            />
-            <div className="w-full h-full rounded-full bg-gray-300 peer-checked:bg-primary transition-colors" />
-            <span className="absolute left-[2px] top-1/2 block h-[12px] w-[12px] md:h-3 md:w-3 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[14px] md:peer-checked:translate-x-6" />
-          </label>
+        <div
+          className="md:flex-[1.5] flex items-center md:justify-end justify-end"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+        >
+          <JiffyIconSwitch
+            checked={isAtivo}
+            onChange={(e) => {
+              e.stopPropagation()
+              onToggleStatus?.(grupo.getId(), e.target.checked)
+            }}
+            bordered={false}
+            size="sm"
+            className="shrink-0"
+            inputProps={{
+              'aria-label': isAtivo ? 'Desativar grupo de complementos' : 'Ativar grupo de complementos',
+            }}
+          />
         </div>
       </div>
 
@@ -211,7 +211,7 @@ const GrupoItem = memo(function GrupoItem({
 export function GruposComplementosList({ onReload }: GruposComplementosListProps) {
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
+  const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Inativo'>('Todos')
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -236,7 +236,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
 
   // Determina o filtro ativo (memoizado)
   const ativoFilter = useMemo<boolean | null>(() => {
-    return filterStatus === 'Ativo' ? true : filterStatus === 'Desativado' ? false : null
+    return filterStatus === 'Ativo' ? true : filterStatus === 'Inativo' ? false : null
   }, [filterStatus])
 
   // Hook otimizado com React Query
@@ -518,10 +518,10 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
       <div className="md:px-[30px] px-2 py-[4px] flex-shrink-0">
         <div className="flex flex-row items-center justify-between">
           <div className="flex flex-col md:pl-5">
-            <p className="text-primary text-sm font-semibold font-nunito">
+            <p className="text-primary text-lg font-semibold">
               Grupos de Complementos Cadastrados
             </p>
-            <p className="text-tertiary md:text-[22px] text-sm font-medium font-nunito">
+            <p className="text-tertiary md:text-[22px] text-sm font-normal">
               Total {grupos.length} de {filteredTotal}
             </p>
           </div>
@@ -541,14 +541,8 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
         </div>
       </div>
       <div className="h-[2px] border-t-2 border-primary/70 flex-shrink-0"></div>
-      <div className="flex gap-3 md:px-[20px] px-2 py-2 flex-shrink-0">
+      <div className="flex gap-3 px-2 py-1 flex-shrink-0">
       <div className="flex-1 min-w-[180px] max-w-[360px]">
-            <label
-              htmlFor="grupos-complementos-search"
-              className="text-xs font-semibold text-secondary-text mb-1 block"
-            >
-              Buscar grupo...
-            </label>
             <div className="relative h-8">
               <input
                 id="grupos-complementos-search"
@@ -556,7 +550,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
                 placeholder="Pesquisar grupo..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full px-5 pl-12 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+                className="w-full h-full px-5 pl-12 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm"
               />
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
                 <MdSearch size={18} />
@@ -564,40 +558,40 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
             </div>
           </div>
 
-          <div className="w-full sm:w-[160px]">
+          <div className="w-full flex gap-1 items-center sm:w-[160px]">
             <label className="text-xs font-semibold text-secondary-text mb-1 block">
               Status
             </label>
             <select
               value={filterStatus}
               onChange={(e) =>
-                setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
+                setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Inativo')
               }
-              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm"
             >
               <option value="Todos">Todos</option>
               <option value="Ativo">Ativo</option>
-              <option value="Desativado">Desativado</option>
+              <option value="Inativo">Inativo</option>
             </select>
           </div>
           </div>
 
       {/* Cabeçalho da tabela */}
-      <div className="md:px-[30px] px-1 flex-shrink-0">
-        <div className="h-10 bg-custom-2 rounded-lg md:px-4 px-1 flex items-center gap-[10px]">
-          <div className="w-16 font-nunito font-semibold text-sm text-primary-text justify-start hidden md:flex">
+      <div className="flex-shrink-0">
+        <div className="h-10 bg-custom-2 rounded-lg px-2 flex items-center gap-[10px]">
+          <div className="font-semibold text-sm text-primary-text md:flex-1">
             Ordem
           </div>
-          <div className="md:flex-[3] flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="md:flex-[3] flex-[2] font-semibold md:text-sm text-xs text-primary-text">
             Nome
           </div>
-          <div className="flex-[3] font-nunito font-semibold text-sm text-primary-text justify-center hidden md:flex">
+          <div className="flex-[3] font-semibold text-sm text-primary-text justify-center hidden md:flex">
             Qtd de Complementos
           </div>
-          <div className="flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="flex-[2] font-semibold md:text-sm text-xs text-primary-text">
             Complementos
           </div>
-          <div className="md:flex-[2] md:text-center text-right font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="md:flex-[1.5] text-end font-semibold md:text-sm text-xs text-primary-text">
             Status
           </div>
         </div>
@@ -606,18 +600,13 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
       {/* Lista de grupos com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto md:px-[30px] px-2 mt-2 scrollbar-hide"
-        style={{ maxHeight: 'calc(100vh - 300px)' }}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-1 pb-2 pt-2 scrollbar-hide"
+        style={{ maxHeight: 'calc(100vh - 250px)' }}
       >
         {/* Skeleton loaders para carregamento inicial - sempre mostra durante loading */}
         {(isLoading || (grupos.length === 0 && isFetching)) && (
           <div className="flex flex-col items-center justify-center py-8 gap-2">
-            <img
-              src="/images/jiffy-loading.gif"
-              alt="Carregando"
-              className="w-16 h-16 object-contain"
-            />
-            <p className="text-sm text-secondary-text text-center">Carregando grupos...</p>
+            <JiffyLoading />
           </div>
         )}
 

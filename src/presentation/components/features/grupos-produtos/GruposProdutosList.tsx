@@ -23,6 +23,7 @@ import { useGruposProdutosInfinite } from '@/src/presentation/hooks/useGruposPro
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useQueryClient } from '@tanstack/react-query'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdSearch } from 'react-icons/md'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
@@ -43,7 +44,7 @@ interface GruposProdutosListProps {
 export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
+  const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Inativo'>('Ativo')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const loadMoreRef = useRef<HTMLDivElement>(null)
@@ -107,7 +108,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
 
   // Determina o filtro ativo (memoizado)
   const ativoFilter = useMemo<boolean | null>(() => {
-    return filterStatus === 'Ativo' ? true : filterStatus === 'Desativado' ? false : null
+    return filterStatus === 'Ativo' ? true : filterStatus === 'Inativo' ? false : null
   }, [filterStatus])
 
   // Hook otimizado com React Query
@@ -430,14 +431,14 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     <>
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
-      <div className="md:px-[30px] px-1 pt-1 pb-[6px]">
+      <div className="md:px-[30px] px-1 py-[4px]">
         <div className="flex flex-col gap-2">
-          <div className="flex items-start justify-between flex-wrap gap-4">
+          <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="md:pl-5">
-              <p className="text-primary text-sm md:text-lg font-semibold font-nunito mb-1">
+              <p className="text-primary text-sm font-semibold">
                 Grupos Cadastrados
               </p>
-              <p className="text-tertiary md:text-[22px] text-sm font-medium font-nunito">
+              <p className="text-tertiary md:text-[22px] text-sm font-normal">
                 Total {localGrupos.length} de {totalGrupos}
               </p>
             </div>
@@ -462,14 +463,8 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       </div>
       <div className="h-[2px] border-t-2 border-primary/70"></div>
 
-      <div className="flex gap-3 md:px-[20px] px-1 py-2">
+      <div className="flex gap-3 px-1 py-2">
         <div className="flex-1 min-w-[180px] max-w-[360px]">
-            <label
-              htmlFor="grupos-complementos-search"
-              className="text-xs font-semibold text-secondary-text mb-1 block"
-            >
-              Buscar grupo...
-            </label>
             <div className="relative h-8">
               <input
                 id="grupos-complementos-search"
@@ -485,26 +480,26 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
             </div>
           </div>
 
-          <div className="w-full sm:w-[160px]">
+          <div className="w-full flex gap-1 items-center sm:w-[160px]">
             <label className="text-xs font-semibold text-secondary-text mb-1 block">
               Status
             </label>
             <select
               value={filterStatus}
               onChange={(e) =>
-                setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
+                setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Inativo')
               }
               className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
             >
               <option value="Todos">Todos</option>
               <option value="Ativo">Ativo</option>
-              <option value="Desativado">Desativado</option>
+              <option value="Inativo">Inativo</option>
             </select>
           </div>
       </div>
 
       {/* Cabeçalho da tabela */}
-      <div className="md:px-[30px] px-1 mt-1">
+      <div className="px-1">
         <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px]">
           <div className="flex-[1] font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
             Ordem
@@ -515,7 +510,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
           <div className="flex-[4] font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
             Nome
           </div>
-          <div className="flex-[2] md:text-center text-right font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
+          <div className="flex-[2] md:text-end text-right font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
             Status
           </div>
         </div>
@@ -524,19 +519,14 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       {/* Lista de grupos com scroll e drag and drop */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto md:px-[30px] px-1 mt-2 scrollbar-hide"
-        style={{ maxHeight: 'calc(100vh - 300px)' }}
+        className="flex-1 overflow-y-auto px-1 mt-1 scrollbar-hide"
+        style={{ maxHeight: 'calc(100vh - 250px)' }}
       >
         {/* Skeleton loaders para carregamento inicial - sempre mostra durante loading */}
         {showInitialLoading && (
           <div className="flex items-center justify-center py-8">
             <div className="flex flex-col items-center gap-2">
-              <img
-                src="/images/jiffy-loading.gif"
-                alt="Carregando"
-                className="w-20 h-20 object-contain"
-              />
-              <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
+              <JiffyLoading />
             </div>
           </div>
         )}

@@ -59,8 +59,8 @@ export async function GET(
           if (errorText) {
             try {
               const errorData = JSON.parse(errorText)
-              if (errorData.message) {
-                errorMessage = errorData.message
+              if (errorData.message || errorData.error) {
+                errorMessage = errorData.message || errorData.error
               }
             } catch {
               // Se não for JSON, usar o texto direto se contiver informação útil
@@ -73,10 +73,18 @@ export async function GET(
           // Ignorar erro ao ler resposta
         }
         
+        const normalized = errorMessage.toUpperCase()
+        const nonRetryable =
+          normalized.includes('CANCELADA') ||
+          normalized.includes('CANCELADO') ||
+          normalized.includes('NÃO PODE SER GERADO') ||
+          normalized.includes('NAO PODE SER GERADO')
+
         return NextResponse.json(
-          { 
+          {
             error: errorMessage,
-            retryAfter: 5, // Sugerir retry após 5 segundos
+            retryAfter: nonRetryable ? undefined : 5, // Só sugerir retry para cenários transitórios
+            nonRetryable, // Sinaliza ao frontend que retry/regeneração não devem ser sugeridos
           },
           { status: 404 }
         )

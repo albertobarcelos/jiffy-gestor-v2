@@ -1,70 +1,106 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+} from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/src/presentation/components/ui/select'
 import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
 import { showToast } from '@/src/shared/utils/toast'
-import { MdSearch, MdClear, MdPerson, MdLocationOn } from 'react-icons/md'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { MdSearch, MdClear, MdPerson, MdLocationOn, MdReceiptLong } from 'react-icons/md'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
+import { MenuItem } from '@mui/material'
 
 interface NovoClienteProps {
   clienteId?: string
   isEmbedded?: boolean
+  hideEmbeddedHeader?: boolean
+  embeddedFormId?: string
+  hideEmbeddedFormActions?: boolean
+  onEmbedFormStateChange?: (s: { isSubmitting: boolean; canSubmit: boolean }) => void
   onClose?: () => void
   onSaved?: () => void
+  /** Embutido: fechar o painel após "Salvar e fechar" com sucesso (ex.: `onClose` direto do modal). */
+  onCloseAfterSave?: () => void
+}
+
+/** API imperativa — confirmação ao fechar o painel (`PADRAO_MODAL_SAIR_SEM_SALVAR`). */
+export interface NovoClienteHandle {
+  isDirty: () => boolean
+  /** Salva o cliente sem fechar o painel (modo embedded). */
+  saveCliente: () => void
+  saveClienteAndClose: () => void
 }
 
 // Siglas dos estados brasileiros em ordem alfabética
 const ESTADOS_BRASILEIROS = [
-  { sigla: 'AC', nome: 'Acre' },
-  { sigla: 'AL', nome: 'Alagoas' },
-  { sigla: 'AP', nome: 'Amapá' },
-  { sigla: 'AM', nome: 'Amazonas' },
-  { sigla: 'BA', nome: 'Bahia' },
-  { sigla: 'CE', nome: 'Ceará' },
-  { sigla: 'DF', nome: 'Distrito Federal' },
-  { sigla: 'ES', nome: 'Espírito Santo' },
-  { sigla: 'GO', nome: 'Goiás' },
-  { sigla: 'MA', nome: 'Maranhão' },
-  { sigla: 'MT', nome: 'Mato Grosso' },
-  { sigla: 'MS', nome: 'Mato Grosso do Sul' },
-  { sigla: 'MG', nome: 'Minas Gerais' },
-  { sigla: 'PA', nome: 'Pará' },
-  { sigla: 'PB', nome: 'Paraíba' },
-  { sigla: 'PR', nome: 'Paraná' },
-  { sigla: 'PE', nome: 'Pernambuco' },
-  { sigla: 'PI', nome: 'Piauí' },
-  { sigla: 'RJ', nome: 'Rio de Janeiro' },
-  { sigla: 'RN', nome: 'Rio Grande do Norte' },
-  { sigla: 'RS', nome: 'Rio Grande do Sul' },
-  { sigla: 'RO', nome: 'Rondônia' },
-  { sigla: 'RR', nome: 'Roraima' },
-  { sigla: 'SC', nome: 'Santa Catarina' },
-  { sigla: 'SP', nome: 'São Paulo' },
-  { sigla: 'SE', nome: 'Sergipe' },
-  { sigla: 'TO', nome: 'Tocantins' },
+  { sigla: 'AC', nome: 'ACRE' },
+  { sigla: 'AL', nome: 'ALAGOAS' },
+  { sigla: 'AP', nome: 'AMAPÁ' },
+  { sigla: 'AM', nome: 'AMAZONAS' },
+  { sigla: 'BA', nome: 'BAHIA' },
+  { sigla: 'CE', nome: 'CEARÁ' },
+  { sigla: 'DF', nome: 'DISTRITO FEDERAL' },
+  { sigla: 'ES', nome: 'ESPÍRITO SANTO' },
+  { sigla: 'GO', nome: 'GOIÁS' },
+  { sigla: 'MA', nome: 'MARANHÃO' },
+  { sigla: 'MT', nome: 'MATO GROSSO' },
+  { sigla: 'MS', nome: 'MATO GROSSO DO SUL' },
+  { sigla: 'MG', nome: 'MINAS GERAIS' },
+  { sigla: 'PA', nome: 'PARÁ' },
+  { sigla: 'PB', nome: 'PARAÍBA' },
+  { sigla: 'PR', nome: 'PARANÁ' },
+  { sigla: 'PE', nome: 'PERNAMBUCO' },
+  { sigla: 'PI', nome: 'PIAUÍ' },
+  { sigla: 'RJ', nome: 'RIO DE JANEIRO' },
+  { sigla: 'RN', nome: 'RIO GRANDE DO NORTE' },
+  { sigla: 'RS', nome: 'RIO GRANDE DO SUL' },
+  { sigla: 'RO', nome: 'RONDÔNIA' },
+  { sigla: 'RR', nome: 'RORAIMA' },
+  { sigla: 'SC', nome: 'SANTA CATARINA' },
+  { sigla: 'SP', nome: 'SÃO PAULO' },
+  { sigla: 'SE', nome: 'SERGIPE' },
+  { sigla: 'TO', nome: 'TOCANTINS' },
 ]
+
+/** Indicador da inscrição estadual (padrão SPED / documentação fiscal) */
+const INDICADOR_IE_OPCOES = [
+  { value: '1', label: 'CONTRIBUINTE ICMS' },
+  { value: '2', label: 'CONTRIBUINTE ISENTO DE IE' },
+  { value: '9', label: 'NÃO CONTRIBUINTE' },
+] as const
+
+/** Somente contribuinte ICMS (1) permite editar IE; nos demais o campo fica fixo em ISENTO. */
+function indicadorPermiteEditarIe(ind: string): boolean {
+  return String(ind).trim() === '1'
+}
 
 /**
  * Componente para criar/editar cliente
  * Replica o design e funcionalidades do Flutter
  */
-export function NovoCliente({
-  clienteId,
-  isEmbedded = false,
-  onClose,
-  onSaved,
-}: NovoClienteProps) {
+export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(function NovoCliente(
+  {
+    clienteId,
+    isEmbedded = false,
+    hideEmbeddedHeader = false,
+    embeddedFormId,
+    onEmbedFormStateChange,
+    onClose,
+    onSaved,
+    onCloseAfterSave,
+  },
+  ref
+) {
   const router = useRouter()
   const { auth } = useAuthStore()
   const isEditing = !!clienteId
@@ -77,6 +113,8 @@ export function NovoCliente({
   const [telefone, setTelefone] = useState('')
   const [email, setEmail] = useState('')
   const [nomeFantasia, setNomeFantasia] = useState('')
+  const [indicadorInscricaoEstadual, setIndicadorInscricaoEstadual] = useState('9')
+  const [inscricaoEstadual, setInscricaoEstadual] = useState(() => (isEditing ? '' : 'ISENTO'))
   const [ativo, setAtivo] = useState(true)
   const [incluirEndereco, setIncluirEndereco] = useState(false)
 
@@ -98,6 +136,98 @@ export function NovoCliente({
   const [isLoadingCNPJ, setIsLoadingCNPJ] = useState(false)
   const [isLoadingCEP, setIsLoadingCEP] = useState(false)
   const hasLoadedClienteRef = useRef(false)
+  const canSubmit = Boolean(nome && nome.trim())
+
+  const INPUT_LABEL_PROPS = { shrink: true } as const
+  const formId = embeddedFormId ?? 'novo-cliente-form'
+  const inputSx = {
+    '& .MuiOutlinedInput-root': {
+      height: '38px',
+      backgroundColor: 'var(--color-primary-bg)',
+      borderRadius: '8px',
+    },
+    '& .MuiInputBase-input': {
+      padding: '8px 14px',
+      fontSize: '14px',
+    },
+  } as const
+  /**
+   * Força apenas o texto digitado em caixa alta via `onChange` nos campos relevantes.
+   * Não aplicamos `textTransform` aqui porque isso também altera a exibição do placeholder.
+   */
+  const UPPERCASE_INPUT_PROPS = {} as const
+
+  const getFormSnapshot = useCallback(() => {
+    return JSON.stringify({
+      nome: (nome || '').trim(),
+      razaoSocial: (razaoSocial || '').trim(),
+      cpf: cpf.replace(/\D/g, ''),
+      cnpj: cnpj.replace(/\D/g, ''),
+      telefone: telefone.replace(/\D/g, ''),
+      email: (email || '').trim(),
+      nomeFantasia: (nomeFantasia || '').trim(),
+      indicadorInscricaoEstadual: (indicadorInscricaoEstadual || '').trim(),
+      inscricaoEstadual: (inscricaoEstadual || '').trim(),
+      ativo,
+      incluirEndereco,
+      rua: (rua || '').trim(),
+      numero: (numero || '').trim(),
+      bairro: (bairro || '').trim(),
+      cidade: (cidade || '').trim(),
+      estado: (estado || '').trim(),
+      cep: cep.replace(/\D/g, ''),
+      complemento: (complemento || '').trim(),
+      codigoCidadeIbge: codigoCidadeIbge || '',
+      codigoEstadoIbge: codigoEstadoIbge || '',
+      cidadeValida,
+    })
+  }, [
+    nome,
+    razaoSocial,
+    cpf,
+    cnpj,
+    telefone,
+    email,
+    nomeFantasia,
+    indicadorInscricaoEstadual,
+    inscricaoEstadual,
+    ativo,
+    incluirEndereco,
+    rua,
+    numero,
+    bairro,
+    cidade,
+    estado,
+    cep,
+    complemento,
+    codigoCidadeIbge,
+    codigoEstadoIbge,
+    cidadeValida,
+  ])
+
+  const baselineSerializedRef = useRef('')
+  const embeddedCloseAfterSaveRef = useRef(false)
+
+  const commitBaseline = useCallback(() => {
+    baselineSerializedRef.current = getFormSnapshot()
+  }, [getFormSnapshot])
+
+  const commitBaselineLatestRef = useRef(commitBaseline)
+  commitBaselineLatestRef.current = commitBaseline
+
+  useEffect(() => {
+    onEmbedFormStateChange?.({ isSubmitting: isLoading, canSubmit })
+  }, [onEmbedFormStateChange, isLoading, canSubmit])
+
+  // Baseline inicial em modo criação (embed)
+  useEffect(() => {
+    if (isLoadingCliente) return
+    if (isEditing) return
+    const t = window.setTimeout(() => {
+      commitBaselineLatestRef.current()
+    }, 100)
+    return () => window.clearTimeout(t)
+  }, [isLoadingCliente, isEditing, clienteId])
 
   // Carregar dados do cliente se estiver editando
   useEffect(() => {
@@ -159,6 +289,12 @@ export function NovoCliente({
           
           setEmail(cliente.getEmail() || '')
           setNomeFantasia(cliente.getNomeFantasia() || '')
+          const indIe = cliente.getIndicadorInscricaoEstadual()
+          const indStr =
+            indIe != null && String(indIe).trim() !== '' ? String(indIe) : '9'
+          setIndicadorInscricaoEstadual(indStr)
+          const ieApi = cliente.getInscricaoEstadual() ?? ''
+          setInscricaoEstadual(indicadorPermiteEditarIe(indStr) ? ieApi : 'ISENTO')
           setAtivo(cliente.isAtivo())
           
           // Formata CEP e endereço ao carregar
@@ -208,6 +344,9 @@ export function NovoCliente({
         console.error('Erro ao carregar cliente:', error)
       } finally {
         setIsLoadingCliente(false)
+        window.setTimeout(() => {
+          commitBaselineLatestRef.current()
+        }, 150)
       }
     }
 
@@ -372,6 +511,7 @@ export function NovoCliente({
     setEstado('')
     setCodigoCidadeIbge('')
     setCodigoEstadoIbge('')
+    setCidadeValida(null)
 
     try {
       // API ViaCEP - gratuita e pública
@@ -401,16 +541,16 @@ export function NovoCliente({
 
       // Preenche os campos de endereço automaticamente
       if (data.logradouro) {
-        setRua(data.logradouro)
+        setRua(String(data.logradouro).toLocaleUpperCase('pt-BR'))
       }
       if (data.bairro) {
-        setBairro(data.bairro)
+        setBairro(String(data.bairro).toLocaleUpperCase('pt-BR'))
       }
       if (data.complemento) {
-        setComplemento(data.complemento)
+        setComplemento(String(data.complemento).toLocaleUpperCase('pt-BR'))
       }
       if (data.localidade) {
-        setCidade(data.localidade)
+        setCidade(String(data.localidade).toLocaleUpperCase('pt-BR'))
       }
       if (data.uf) {
         const ufUpper = data.uf.toUpperCase()
@@ -469,9 +609,24 @@ export function NovoCliente({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const shouldClosePanel = embeddedCloseAfterSaveRef.current
+    embeddedCloseAfterSaveRef.current = false
+
     const token = auth?.getAccessToken()
     if (!token) {
-      alert('Token não encontrado')
+      showToast.error('Token não encontrado')
+      return
+    }
+
+    const cpfLimpo = cpf.replace(/\D/g, '')
+    const cnpjLimpo = cnpj.replace(/\D/g, '')
+
+    const telefoneLimpo = telefone.replace(/\D/g, '')
+    // API externa exige DDD + número completo (10 fixo ou 11 celular no Brasil)
+    if (telefoneLimpo.length > 0 && telefoneLimpo.length !== 10 && telefoneLimpo.length !== 11) {
+      showToast.error(
+        'Telefone com DDD deve ter 10 dígitos (fixo) ou 11 (celular). Verifique o número digitado.'
+      )
       return
     }
 
@@ -507,34 +662,37 @@ export function NovoCliente({
     }
 
     setIsLoading(true)
+    onEmbedFormStateChange?.({ isSubmitting: true, canSubmit })
 
     try {
-      // Remove formatação dos campos antes de enviar
-      const cpfLimpo = cpf.replace(/\D/g, '')
-      const cnpjLimpo = cnpj.replace(/\D/g, '')
-      const telefoneLimpo = telefone.replace(/\D/g, '')
       const cepLimpo = cep.replace(/\D/g, '')
+      const toNullableString = (value: string): string | null => {
+        const trimmed = value.trim()
+        return trimmed ? trimmed : null
+      }
 
       const body: any = {
         nome,
-        razaoSocial: razaoSocial || undefined,
-        email: email || undefined,
-        nomeFantasia: nomeFantasia || undefined,
+        razaoSocial: isEditing ? toNullableString(razaoSocial) : razaoSocial || undefined,
+        email: isEditing ? toNullableString(email) : email || undefined,
+        nomeFantasia: isEditing ? toNullableString(nomeFantasia) : nomeFantasia || undefined,
         ativo,
       }
 
-      // CPF e CNPJ: lógica diferente para criação e edição
+      // Fiscal (raiz do payload — alinhado a POST/PATCH /pessoas/clientes)
+      if (indicadorInscricaoEstadual.trim()) {
+        body.indicadorInscricaoEstadual = indicadorInscricaoEstadual.trim()
+      }
+      body.inscricaoEstadual = isEditing ? toNullableString(inscricaoEstadual) : inscricaoEstadual.trim()
+
+      // CPF e CNPJ: na edição envia o que estiver no formulário (ambos se preenchidos); string vazia limpa no backend
       if (isEditing) {
-        // Em edição, sempre envia CPF e CNPJ (mesmo vazios) para garantir atualização
-        // String vazia será convertida para null no repositório para limpar o valor na API externa
         body.cpf = cpfLimpo || ''
         body.cnpj = cnpjLimpo || ''
-        
-        // Telefone: se estiver editando e quiser remover, envia null
-        // Se tiver valor, envia a string limpa
+
+        // Telefone: null limpa na API externa (string vazia aciona validação de 11 dígitos)
         body.telefone = telefoneLimpo ? telefoneLimpo : null
       } else {
-        // Em criação, envia apenas se tiver valor
         if (cpfLimpo) body.cpf = cpfLimpo
         if (cnpjLimpo) body.cnpj = cnpjLimpo
         if (telefoneLimpo) body.telefone = telefoneLimpo
@@ -544,13 +702,13 @@ export function NovoCliente({
       if (incluirEndereco) {
         // Se o switch estiver ativado, envia os dados do endereço
         body.endereco = {
-          rua: rua || undefined,
-          numero: numero || undefined,
-          bairro: bairro || undefined,
-          cidade: cidade || undefined,
+          rua: isEditing ? toNullableString(rua) : rua || undefined,
+          numero: isEditing ? toNullableString(numero) : numero || undefined,
+          bairro: isEditing ? toNullableString(bairro) : bairro || undefined,
+          cidade: isEditing ? toNullableString(cidade) : cidade || undefined,
           estado: estado || undefined,
-          cep: cepLimpo || undefined,
-          complemento: complemento || undefined,
+          cep: isEditing ? (cepLimpo ? cepLimpo : null) : cepLimpo || undefined,
+          complemento: isEditing ? toNullableString(complemento) : complemento || undefined,
           codigoCidadeIbge: codigoCidadeIbge || undefined,
           codigoEstadoIbge: codigoEstadoIbge || undefined,
         }
@@ -588,25 +746,92 @@ export function NovoCliente({
         body: JSON.stringify(body),
       })
 
+      const result: { error?: string; message?: string } = await response
+        .json()
+        .catch(() => ({}))
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Erro ao salvar cliente')
+        const msgErro =
+          (typeof result.error === 'string' && result.error.trim()) ||
+          (typeof result.message === 'string' && result.message.trim()) ||
+          'Erro ao salvar cliente'
+        throw new Error(msgErro)
       }
 
       showToast.success(isEditing ? 'Cliente atualizado com sucesso!' : 'Cliente criado com sucesso!')
-      
-      if (onSaved) {
+
+      // API pode retornar aviso informativo no corpo (ex.: prioridade CPF ao enviar CPF + CNPJ)
+      const mensagemApi =
+        typeof result.message === 'string' ? result.message.trim() : ''
+
+      // Debug: conferir se `message` veio na resposta (toasts podem sobrepor no tempo)
+      console.debug('[NovoCliente] salvar cliente — campo message da API', {
+        'result.message': result.message,
+        mensagemApiAposTrim: mensagemApi || '(vazia — sem toast info)',
+        chavesNoBody: Object.keys(result),
+      })
+
+      if (mensagemApi) {
+        showToast.info(mensagemApi)
+      }
+
+      window.setTimeout(() => {
+        commitBaselineLatestRef.current()
+      }, 0)
+
+      if (isEmbedded) {
+        onSaved?.()
+        if (shouldClosePanel) {
+          onCloseAfterSave?.()
+        }
+      } else if (onSaved) {
         onSaved()
       } else {
         router.push('/cadastros/clientes')
       }
     } catch (error) {
       console.error('Erro ao salvar cliente:', error)
-      alert(error instanceof Error ? error.message : 'Erro ao salvar cliente')
+      const mensagem =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'string'
+            ? error
+            : 'Erro ao salvar cliente'
+      // Remove prefixo do repositório para o toast mostrar só o texto da API quando existir
+      const textoToast = mensagem
+        .replace(/^Erro ao (atualizar|criar) cliente:\s*/i, '')
+        .trim()
+      showToast.error(textoToast || mensagem)
     } finally {
       setIsLoading(false)
+      onEmbedFormStateChange?.({ isSubmitting: false, canSubmit })
     }
   }
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      isDirty: () => {
+        if (isLoadingCliente) return false
+        return getFormSnapshot() !== baselineSerializedRef.current
+      },
+      saveCliente: () => {
+        embeddedCloseAfterSaveRef.current = false
+        const el = document.getElementById(formId)
+        if (el instanceof HTMLFormElement) {
+          el.requestSubmit()
+        }
+      },
+      saveClienteAndClose: () => {
+        embeddedCloseAfterSaveRef.current = true
+        const el = document.getElementById(formId)
+        if (el instanceof HTMLFormElement) {
+          el.requestSubmit()
+        }
+      },
+    }),
+    [formId, getFormSnapshot, isLoadingCliente]
+  )
 
   const handleCancel = () => {
     if (isEmbedded) {
@@ -621,91 +846,101 @@ export function NovoCliente({
   if (isLoadingCliente) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-2">
-        <img
-          src="/images/jiffy-loading.gif"
-          alt="Carregando..."
-          className="w-20 h-20"
-        />
-        <span className="text-sm font-medium text-primary-text font-nunito">Carregando...</span>
+        <JiffyLoading />
       </div>
     )
   }
 
+  // Aviso de UX: CPF e CNPJ não devem ser preenchidos juntos (validação definitiva no backend)
+  const cpfSoDigitos = cpf.replace(/\D/g, '')
+  const cnpjSoDigitos = cnpj.replace(/\D/g, '')
+  const exibeAvisoCpfECnpjPreenchidos =
+    cpfSoDigitos.length > 0 && cnpjSoDigitos.length > 0
+
   return (
     <div className="flex flex-col h-full">
       {/* Header fixo */}
-      <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[30px] shadow-md md:px-[30px] px-1 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div
-              className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                nome
-                  ? 'bg-primary/25 text-primary'
-                  : 'bg-secondary-text/10 text-secondary-text'
-              }`}
-            >
-              <span className="text-2xl"><MdPerson/></span>
+      {!isEmbedded || !hideEmbeddedHeader ? (
+        <div className="sticky top-0 z-10 bg-primary-bg px-1 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div
+                className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                  nome ? 'bg-primary/25 text-primary' : 'bg-secondary-text/10 text-secondary-text'
+                }`}
+              >
+                <span className="text-2xl">
+                  <MdPerson />
+                </span>
+              </div>
+              <h1 className="text-primary text-lg font-semibold font-exo">
+                {isEditing ? 'Editar Cliente' : 'Novo Cliente'}
+              </h1>
             </div>
-            <h1 className="text-primary text-lg font-semibold font-exo">
-              {isEditing ? 'Editar Cliente' : 'Novo Cliente'}
-            </h1>
+            <Button
+              onClick={handleCancel}
+              variant="outlined"
+              className="px-6 h-8 rounded-lg border-primary hover:bg-primary/10"
+              sx={{
+                color: 'var(--color-primary)',
+                borderColor: 'var(--color-primary)',
+                '&:hover': {
+                  backgroundColor: 'primary.100',
+                },
+              }}
+            >
+              Cancelar
+            </Button>
           </div>
-          <Button
-            onClick={handleCancel}
-            variant="outlined"
-            className="px-6 h-8 rounded-lg border-primary hover:bg-primary/10"
-            sx={{
-              color: 'var(--color-primary)',
-              borderColor: 'var(--color-primary)',
-              
-              '&:hover': {
-                backgroundColor: 'primary.100',
-                
-              },
-            }}          >
-            Cancelar
-          </Button>
         </div>
-      </div>
+      ) : null}
 
       {/* Formulário com scroll */}
-      <div className="flex-1 overflow-y-auto md:px-[30px] px-1">
-        <form onSubmit={handleSubmit} className="">
+      <div className="flex-1 overflow-y-auto px-1">
+        <form id={formId} onSubmit={handleSubmit} className="">
           {/* Toggle Pessoa Física/Jurídica */}
-          <div className="flex items-center border-b border-primary/70 justify-between md:px-5 px-1 py-3 bg-info">
-            <div className="flex flex-col items-start">
-                <p className="text-lg font-medium text-primary-text">
-                  {nome || 'Nome do Cliente'}
-                </p>
-                <p className="text-sm text-secondary-text">
-                  {razaoSocial || 'Razão Social'}
-                </p>
+          <div className="md:px-5 px-1 py-3 bg-info">
+            <div className="flex items-center gap-3">
+              <h2 className="text-primary text-xl font-semibold">
+                Dados do Cliente
+              </h2>
+              <div className="flex-1 border-t border-primary/40" aria-hidden />
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={ativo}
-                onChange={(e) => setAtivo(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[28px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-            </label>
           </div>
 
           {/* Dados Pessoais */}
           <div className="bg-info rounded-lg md:px-5 py-2 space-y-4">
-            <h2 className="text-primary text-base font-semibold font-nunito mb-2">
-              Dados Pessoais
-            </h2>
+            <div className="flex items-center gap-1">
+              <MdPerson className="text-primary text-2xl" />
+              <h2 className="text-primary text-base font-semibold font-nunito">
+                Dados Pessoais
+              </h2>
+              <div className="flex-1" aria-hidden />
+              <div className="shrink-0">
+                <JiffyIconSwitch
+                  checked={ativo}
+                  onChange={e => setAtivo(e.target.checked)}
+                  disabled={isLoading}
+                  label="Ativo"
+                  labelPosition="start"
+                  bordered={false}
+                  size="sm"
+                  className="shrink-0"
+                  inputProps={{ 'aria-label': ativo ? 'Desativar cliente' : 'Ativar cliente' }}
+                />
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 md:gap-2 gap-1">
               <Input
                 label="Nome"
                 value={nome}
-                onChange={(e) => setNome(e.target.value)}
+                onChange={(e) => setNome(e.target.value.toLocaleUpperCase('pt-BR'))}
                 required
-                placeholder="Nome completo"
+                placeholder="Nome Completo"
                 size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
+                inputProps={UPPERCASE_INPUT_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -721,9 +956,11 @@ export function NovoCliente({
               <Input
                 label="Razão Social"
                 value={razaoSocial}
-                onChange={(e) => setRazaoSocial(e.target.value)}
-                placeholder="Razão social"
+                onChange={(e) => setRazaoSocial(e.target.value.toLocaleUpperCase('pt-BR'))}
+                placeholder="Razão Social"
                 size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
+                inputProps={UPPERCASE_INPUT_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -746,6 +983,7 @@ export function NovoCliente({
                 placeholder="000.000.000-00"
                 inputProps={{ maxLength: 14 }}
                 size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -766,6 +1004,7 @@ export function NovoCliente({
                   placeholder="00.000.000/0000-00"
                   inputProps={{ maxLength: 18 }}
                   size="small"
+                  InputLabelProps={INPUT_LABEL_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -810,6 +1049,16 @@ export function NovoCliente({
               </div>
             </div>
 
+            {exibeAvisoCpfECnpjPreenchidos && (
+              <p
+                role="alert"
+                className="text-sm font-nunito rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-950"
+              >
+                Informe apenas CPF ou CNPJ — não é possível preencher os dois ao mesmo tempo.
+                Remova um dos campos.
+              </p>
+            )}
+
             <div className="grid md:grid-cols-2 grid-cols-1 gap-3">
               <Input
                 label="Telefone"
@@ -818,6 +1067,7 @@ export function NovoCliente({
                 placeholder="(00) 00000-0000"
                 inputProps={{ maxLength: 15 }}
                 size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -837,6 +1087,7 @@ export function NovoCliente({
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="email@exemplo.com"
                 size="small"
+                InputLabelProps={INPUT_LABEL_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -854,9 +1105,11 @@ export function NovoCliente({
             <Input
               label="Nome Fantasia"
               value={nomeFantasia}
-              onChange={(e) => setNomeFantasia(e.target.value)}
-              placeholder="Nome fantasia"
+              onChange={(e) => setNomeFantasia(e.target.value.toLocaleUpperCase('pt-BR'))}
+              placeholder="Nome Fantasia"
               size="small"
+              InputLabelProps={INPUT_LABEL_PROPS}
+              inputProps={UPPERCASE_INPUT_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -871,31 +1124,97 @@ export function NovoCliente({
             />
           </div>
 
-          {/* Toggle Endereço */}
-          <div className="flex items-center justify-between px-5 bg-info">
+          {/* Fiscal (antes do endereço — mesmo nível do payload da API) */}
+          <div className="mt-2 rounded-lg bg-info md:px-5 px-1 py-2 space-y-4">
             <div className="flex items-center gap-3">
-              <span className="text-2xl text-primary"><MdLocationOn/></span>
-              <span className="text-primary-text font-medium">
-                Incluir Endereço
-              </span>
+              <h2 className="text-primary text-base font-semibold font-nunito flex items-center gap-2">
+                <span className="text-xl text-primary">
+                  <MdReceiptLong />
+                </span>
+                Fiscal
+              </h2>
+              <div className="flex-1 border-t border-primary/40" aria-hidden />
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={incluirEndereco}
-                onChange={(e) => handleToggleEndereco(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[28px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-            </label>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:items-start">
+              <div className="flex min-h-0 flex-col">
+                <Input
+                  select
+                  id="cliente-indicador-ie"
+                  label="Indicador da inscrição estadual"
+                  value={indicadorInscricaoEstadual}
+                  onChange={(e) => {
+                    const newValue = e.target.value
+                    setIndicadorInscricaoEstadual(newValue)
+
+                    // Se o usuário escolher "Contribuinte ICMS", não faz sentido manter "ISENTO" no campo IE
+                    if (newValue === '1' && inscricaoEstadual.trim().toUpperCase() === 'ISENTO') {
+                      setInscricaoEstadual('')
+                    }
+
+                    // Se o usuário escolher "Contribuinte isento" ou "Não contribuinte", preenche como ISENTO
+                    if (newValue === '2' || newValue === '9') {
+                      setInscricaoEstadual('ISENTO')
+                    }
+                  }}
+                  size="small"
+                  InputLabelProps={INPUT_LABEL_PROPS}
+                  sx={inputSx}
+                >
+                  {INDICADOR_IE_OPCOES.map((opt) => (
+                    <MenuItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </MenuItem>
+                  ))}
+                </Input>
+              </div>
+              <div className="flex min-h-0 flex-col">
+                <Input
+                  id="cliente-inscricao-estadual"
+                  label="Inscrição estadual"
+                  value={inscricaoEstadual}
+                  onChange={(e) => setInscricaoEstadual(e.target.value)}
+                  placeholder="Número Da IE Ou Isento"
+                  size="small"
+                  disabled={!indicadorPermiteEditarIe(indicadorInscricaoEstadual)}
+                  InputLabelProps={INPUT_LABEL_PROPS}
+                  sx={{
+                    ...inputSx,
+                    '& .MuiInputBase-root': {
+                      marginTop: 0,
+                    },
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Toggle Endereço */}
+          <div className="flex items-center justify-end gap-2 px-5 pt-4 bg-info">
+            <JiffyIconSwitch
+              checked={incluirEndereco}
+              onChange={e => handleToggleEndereco(e.target.checked)}
+              disabled={isLoading}
+              label="Incluir Endereço"
+              labelPosition="start"
+              bordered={false}
+              size="sm"
+              className="shrink-0"
+              inputProps={{
+                'aria-label': incluirEndereco ? 'Remover endereço do cliente' : 'Incluir endereço no cliente',
+              }}
+            />
           </div>
 
           {/* Endereço */}
           {incluirEndereco && (
             <div className="bg-info md:px-5 py-1 space-y-4">
-              <h2 className="text-primary text-base font-semibold font-nunito mb-4">
-                Endereço
-              </h2>
+              <div className="flex items-center gap-1">
+              <MdLocationOn className="text-primary text-2xl" />
+                <h2 className="text-primary text-base font-semibold font-nunito">
+                  Endereço
+                </h2>
+                <div className="flex-1 border-t border-primary/40" aria-hidden />
+              </div>
 
               <div className="grid md:grid-cols-2 grid-cols-1 gap-3">
                 <div className="relative">
@@ -906,6 +1225,7 @@ export function NovoCliente({
                     placeholder="00000-000"
                     inputProps={{ maxLength: 9 }}
                     size="small"
+                    InputLabelProps={INPUT_LABEL_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -951,9 +1271,11 @@ export function NovoCliente({
                 <Input
                   label="Rua"
                   value={rua}
-                  onChange={(e) => setRua(e.target.value)}
-                  placeholder="Nome da rua"
+                  onChange={(e) => setRua(e.target.value.toLocaleUpperCase('pt-BR'))}
+                  placeholder="Nome Da Rua"
                   size="small"
+                  InputLabelProps={INPUT_LABEL_PROPS}
+                  inputProps={UPPERCASE_INPUT_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -975,6 +1297,7 @@ export function NovoCliente({
                   onChange={(e) => setNumero(e.target.value)}
                   placeholder="Número"
                   size="small"
+                  InputLabelProps={INPUT_LABEL_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -990,10 +1313,12 @@ export function NovoCliente({
                 <Input
                   label="Bairro"
                   value={bairro}
-                  onChange={(e) => setBairro(e.target.value)}
+                  onChange={(e) => setBairro(e.target.value.toLocaleUpperCase('pt-BR'))}
                   placeholder="Bairro"
                   size="small"
                   className="col-span-2"
+                  InputLabelProps={INPUT_LABEL_PROPS}
+                  inputProps={UPPERCASE_INPUT_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -1009,9 +1334,11 @@ export function NovoCliente({
                 <Input
                   label="Complemento"
                   value={complemento}
-                  onChange={(e) => setComplemento(e.target.value)}
+                  onChange={(e) => setComplemento(e.target.value.toLocaleUpperCase('pt-BR'))}
                   placeholder="Complemento"
                   size="small"
+                  InputLabelProps={INPUT_LABEL_PROPS}
+                  inputProps={UPPERCASE_INPUT_PROPS}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: '38px',
@@ -1028,24 +1355,23 @@ export function NovoCliente({
 
               <div className="grid md:grid-cols-2 grid-cols-1 gap-3">
                 <div className="flex flex-col">
-                  <label className="text-sm font-medium text-primary-text mb-2">
-                    Estado
-                  </label>
-                  <Select
+                  <Input
+                    select
+                    label="Estado"
                     value={estado}
-                    onValueChange={handleEstadoChange}
+                    onChange={(e) => handleEstadoChange(e.target.value)}
+                    size="small"
+                    InputLabelProps={INPUT_LABEL_PROPS}
+                    inputProps={UPPERCASE_INPUT_PROPS}
+                    sx={inputSx}
                   >
-                    <SelectTrigger className="h-[38px] bg-primary-bg">
-                      <SelectValue placeholder="Selecione o estado" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ESTADOS_BRASILEIROS.map((estadoOption) => (
-                        <SelectItem key={estadoOption.sigla} value={estadoOption.sigla}>
-                          {estadoOption.sigla} - {estadoOption.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <MenuItem value="">Selecione o estado</MenuItem>
+                    {ESTADOS_BRASILEIROS.map((estadoOption) => (
+                      <MenuItem key={estadoOption.sigla} value={estadoOption.sigla}>
+                        {estadoOption.sigla} - {estadoOption.nome}
+                      </MenuItem>
+                    ))}
+                  </Input>
                 </div>
                 <div className="flex flex-col">
                   <CidadeAutocomplete
@@ -1053,11 +1379,11 @@ export function NovoCliente({
                     onChange={setCidade}
                     estado={estado}
                     label="Cidade"
-                    placeholder="Digite o nome da cidade"
+                    placeholder="Digite O Nome Da Cidade"
                     required={false}
                     disabled={!estado}
                     onValidationChange={setCidadeValida}
-                    onCidadeSelecionada={setCodigoCidadeIbge}
+                    onCidadeSelecionada={(_, codigoIbge) => setCodigoCidadeIbge(codigoIbge)}
                     className="w-full"
                     size="small"
                     sx={{
@@ -1078,37 +1404,42 @@ export function NovoCliente({
           )}
 
           {/* Botões de ação */}
-          <div className="flex justify-end gap-4 py-4">
-            <Button
-              type="button"
-              onClick={handleCancel}
-              variant="outlined"
-              className="px-6 h-8 rounded-lg border-primary hover:bg-primary/10"
-              sx={{
-                color: 'var(--color-primary)',
-                borderColor: 'var(--color-primary)',
-                
-                '&:hover': {
-                  backgroundColor: 'primary.100',
-                  
-                },
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isLoading || !nome}
-             className="px-6 h-8 rounded-lg border-primary hover:bg-primary/90"
-             sx={{
-               color: 'var(--color-info)',
-               borderColor: 'var(--color-primary)',
-               backgroundColor: 'var(--color-primary)',
-             }}>
-              {isLoading ? 'Salvando...' : isEditing ? 'Atualizar' : 'Salvar'}
-            </Button>
-          </div>
+          {!isEmbedded ? (
+            <div className="flex justify-end gap-4 py-4">
+              <Button
+                type="button"
+                onClick={handleCancel}
+                variant="outlined"
+                className="px-6 h-8 rounded-lg border-primary hover:bg-primary/10"
+                sx={{
+                  color: 'var(--color-primary)',
+                  borderColor: 'var(--color-primary)',
+                  '&:hover': {
+                    backgroundColor: 'primary.100',
+                  },
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={isLoading || !nome}
+                className="px-6 h-8 rounded-lg border-primary hover:bg-primary/90"
+                sx={{
+                  color: 'var(--color-info)',
+                  borderColor: 'var(--color-primary)',
+                  backgroundColor: 'var(--color-primary)',
+                }}
+              >
+                {isLoading ? 'Salvando...' : isEditing ? 'Atualizar' : 'Salvar'}
+              </Button>
+            </div>
+          ) : null}
         </form>
       </div>
     </div>
   )
-}
+})
+
+NovoCliente.displayName = 'NovoCliente'
 

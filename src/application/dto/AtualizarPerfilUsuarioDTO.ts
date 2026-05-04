@@ -13,6 +13,21 @@ export const AtualizarPerfilUsuarioSchema = z.object({
   aplicarDescontoVenda: z.boolean().optional(),
   aplicarAcrescimoProduto: z.boolean().optional(),
   aplicarAcrescimoVenda: z.boolean().optional(),
+  removerProdutoLancado: z.boolean().optional(),
+  removerPagamento: z.boolean().optional(),
+  reimprimir: z.boolean().optional(),
+  acessoVisaoGeral: z.boolean().optional(),
+  acessoHistorico: z.boolean().optional(),
+  acessoMesa: z.boolean().optional(),
+  acessoBalcao: z.boolean().optional(),
+  acessoConfiguracoes: z.boolean().optional(),
+  crudCardapio: z.boolean().optional(),
+  crudUsuario: z.boolean().optional(),
+  crudCliente: z.boolean().optional(),
+  encerrarCaixa: z.boolean().optional(),
+  lancarTaxa: z.boolean().optional(),
+  removerTaxa: z.boolean().optional(),
+  removerLicenca: z.boolean().optional(),
 })
 
 export type AtualizarPerfilUsuarioDTO = z.infer<typeof AtualizarPerfilUsuarioSchema>

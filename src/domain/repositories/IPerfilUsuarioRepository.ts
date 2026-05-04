@@ -16,6 +16,21 @@ export interface CriarPerfilUsuarioDTO {
   aplicarDescontoVenda?: boolean
   aplicarAcrescimoProduto?: boolean
   aplicarAcrescimoVenda?: boolean
+  removerProdutoLancado?: boolean
+  removerPagamento?: boolean
+  reimprimir?: boolean
+  acessoVisaoGeral?: boolean
+  acessoHistorico?: boolean
+  acessoMesa?: boolean
+  acessoBalcao?: boolean
+  acessoConfiguracoes?: boolean
+  crudCardapio?: boolean
+  crudUsuario?: boolean
+  crudCliente?: boolean
+  encerrarCaixa?: boolean
+  lancarTaxa?: boolean
+  removerTaxa?: boolean
+  removerLicenca?: boolean
 }
 
 export interface AtualizarPerfilUsuarioDTO {
@@ -27,6 +42,21 @@ export interface AtualizarPerfilUsuarioDTO {
   aplicarDescontoVenda?: boolean
   aplicarAcrescimoProduto?: boolean
   aplicarAcrescimoVenda?: boolean
+  removerProdutoLancado?: boolean
+  removerPagamento?: boolean
+  reimprimir?: boolean
+  acessoVisaoGeral?: boolean
+  acessoHistorico?: boolean
+  acessoMesa?: boolean
+  acessoBalcao?: boolean
+  acessoConfiguracoes?: boolean
+  crudCardapio?: boolean
+  crudUsuario?: boolean
+  crudCliente?: boolean
+  encerrarCaixa?: boolean
+  lancarTaxa?: boolean
+  removerTaxa?: boolean
+  removerLicenca?: boolean
 }
 
 /**

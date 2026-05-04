@@ -46,7 +46,7 @@ export function HubView() {
           </div>
 
           {/* Título */}
-          <h1 className="text-[22px] font-bold text-[#101213] mb-1 animate-fade-in-up animation-delay-100">
+          <h1 className="text-[22px] font-semibold text-[#101213] mb-1 animate-fade-in-up animation-delay-100">
             Sign In
           </h1>
 

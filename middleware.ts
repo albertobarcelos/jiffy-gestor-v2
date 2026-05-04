@@ -8,20 +8,26 @@ import type { NextRequest } from 'next/server'
  */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
-  
+
   // Rotas públicas - bypass rápido
   if (
-    pathname === '/login' || 
+    pathname === '/login' ||
     pathname.startsWith('/api/auth/login') ||
     pathname.startsWith('/api/consulta-cnpj') ||
     pathname.startsWith('/api/consulta-cep') ||
-    pathname.startsWith('/cardapio') // Rotas do cardápio são públicas
+    pathname.startsWith('/notas-fiscais') ||
+    pathname.startsWith('/api/public/notas-fiscais-consumidor')
   ) {
     return NextResponse.next()
   }
 
-  // Se está na raiz, redireciona para dashboard
+  // Raiz → dashboard (rota canônica)
   if (pathname === '/') {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+
+  // Antiga URL /dashboard/v2 → /dashboard
+  if (pathname === '/dashboard/v2' || pathname === '/dashboard/v2/') {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 

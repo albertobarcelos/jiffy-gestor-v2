@@ -22,9 +22,13 @@ export async function GET(
       return NextResponse.json({ error: 'ID da venda é obrigatório' }, { status: 400 })
     }
 
+    const { searchParams } = new URL(request.url)
+    const query = searchParams.toString()
+    const path = `/api/v1/gestor/vendas/${id}${query ? `?${query}` : ''}`
+
     const apiClient = new ApiClient()
     const response = await apiClient.request<any>(
-      `/api/v1/gestor/vendas/${id}`,
+      path,
       {
         method: 'GET',
         headers: {

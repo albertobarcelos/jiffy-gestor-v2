@@ -9,7 +9,7 @@ import { useCallback, useRef } from 'react'
  */
 function extrairMotivoRejeicao(xmlRetorno: string): string | null {
   if (!xmlRetorno) return null
-  
+
   try {
     // Tentar extrair xMotivo usando regex (mais simples que parser XML completo)
     // Formato: <xMotivo>mensagem</xMotivo> ou <xMotivo>mensagem</xMotivo>
@@ -24,9 +24,11 @@ function extrairMotivoRejeicao(xmlRetorno: string): string | null {
         .replace(/&apos;/g, "'")
         .trim()
     }
-    
+
     // Tentar formato alternativo: <erro><xMotivo>mensagem</xMotivo></erro>
-    const matchErro = xmlRetorno.match(/<erro>[\s\S]*?<xMotivo[^>]*>(.*?)<\/xMotivo>[\s\S]*?<\/erro>/i)
+    const matchErro = xmlRetorno.match(
+      /<erro>[\s\S]*?<xMotivo[^>]*>(.*?)<\/xMotivo>[\s\S]*?<\/erro>/i
+    )
     if (matchErro && matchErro[1]) {
       return matchErro[1]
         .replace(/&lt;/g, '<')
@@ -39,7 +41,7 @@ function extrairMotivoRejeicao(xmlRetorno: string): string | null {
   } catch (error) {
     console.error('Erro ao extrair motivo de rejeição do XML:', error)
   }
-  
+
   return null
 }
 
@@ -58,12 +60,17 @@ type CancelamentoErrorPayload = {
 
 function resolveDomainErrorMessage(payload: CancelamentoErrorPayload, fallback: string): string {
   const baseMessage = payload.error || payload.message || fallback
-  const domainCode = payload.codigo || payload.codigoErro || payload.codigoRejeicao || payload.categoria
+  const domainCode =
+    payload.codigo || payload.codigoErro || payload.codigoRejeicao || payload.categoria
   return domainCode ? `[${domainCode}] ${baseMessage}` : baseMessage
 }
 
-function resolveMensagemErroCancelamento(payload: CancelamentoErrorPayload, statusCode: number): string {
-  const baseMessage = payload.error || payload.message || `Erro ${statusCode}: não foi possível cancelar a venda`
+function resolveMensagemErroCancelamento(
+  payload: CancelamentoErrorPayload,
+  statusCode: number
+): string {
+  const baseMessage =
+    payload.error || payload.message || `Erro ${statusCode}: não foi possível cancelar a venda`
   const motivo = payload.motivo?.trim()
   const cStat = payload.cStat?.trim()
   const categoria = payload.categoria?.trim()
@@ -82,8 +89,9 @@ function resolveMensagemErroCancelamento(payload: CancelamentoErrorPayload, stat
       : 'Cancelamento fora do prazo permitido pela SEFAZ.'
   }
 
-  const indisponivelTemporario =
-    baseMessage.toLowerCase().includes('temporariamente indisponível para cancelamento')
+  const indisponivelTemporario = baseMessage
+    .toLowerCase()
+    .includes('temporariamente indisponível para cancelamento')
 
   if (indisponivelTemporario && motivo && !motivo.toLowerCase().includes('circuit breaker')) {
     return cStat ? `[${cStat}] ${motivo}` : motivo
@@ -104,7 +112,10 @@ interface FiscalEmissionResolvedConfig {
 }
 
 const FISCAL_CONFIG_TTL_MS = 30_000
-const fiscalConfigCache = new Map<string, { expiresAt: number; value: FiscalEmissionResolvedConfig }>()
+const fiscalConfigCache = new Map<
+  string,
+  { expiresAt: number; value: FiscalEmissionResolvedConfig }
+>()
 const fiscalConfigInflight = new Map<string, Promise<FiscalEmissionResolvedConfig>>()
 
 function buildFiscalConfigCacheKey(token: string, modelo: 55 | 65): string {
@@ -127,133 +138,130 @@ async function resolveFiscalEmissionConfig(
   }
 
   const loadPromise = (async (): Promise<FiscalEmissionResolvedConfig> => {
-  const tipoDocumento: 'NFE' | 'NFCE' = modelo === 55 ? 'NFE' : 'NFCE'
-  const authHeaders = {
-    Authorization: `Bearer ${token}`,
-    'Content-Type': 'application/json',
-  }
+    const tipoDocumento: 'NFE' | 'NFCE' = modelo === 55 ? 'NFE' : 'NFCE'
+    const authHeaders = {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    }
 
-  const numeracaoResponse = await fetch(`/api/v1/fiscal/configuracoes/emissao?modelo=${modelo}`, {
-    headers: authHeaders,
-  })
+    const numeracaoResponse = await fetch(`/api/v1/fiscal/configuracoes/emissao?modelo=${modelo}`, {
+      headers: authHeaders,
+    })
 
-  if (!numeracaoResponse.ok) {
-    const errorData = await numeracaoResponse.json().catch(() => ({}))
-    throw new Error(
-      errorData.error ||
-        errorData.message ||
-        `Erro ao buscar numeração fiscal para modelo ${modelo}`
-    )
-  }
+    if (!numeracaoResponse.ok) {
+      const errorData = await numeracaoResponse.json().catch(() => ({}))
+      throw new Error(
+        errorData.error ||
+          errorData.message ||
+          `Erro ao buscar numeração fiscal para modelo ${modelo}`
+      )
+    }
 
-  const numeracoesPayload = await numeracaoResponse.json()
-  const numeracoesBase = (Array.isArray(numeracoesPayload)
-    ? numeracoesPayload
-    : numeracoesPayload
-      ? [numeracoesPayload]
-      : []) as Array<{
-    serie?: number
-    ativo?: boolean
-    terminalId?: string | null
-    ambiente?: 'HOMOLOGACAO' | 'PRODUCAO' | string
-    modelo?: number
-  }>
-
-  let numeracoes = numeracoesBase
-    .filter((n) => Number(n?.modelo ?? modelo) === modelo)
-
-  // Alguns backends retornam lista vazia no endpoint agregado mesmo com configuração existente.
-  // Nesse caso, consulta diretamente por ambiente no endpoint específico do modelo.
-  if (numeracoes.length === 0) {
-    const ambientes: Array<'PRODUCAO' | 'HOMOLOGACAO'> = ['PRODUCAO', 'HOMOLOGACAO']
-    const fallbackNumeracoes: Array<{
+    const numeracoesPayload = await numeracaoResponse.json()
+    const numeracoesBase = (
+      Array.isArray(numeracoesPayload)
+        ? numeracoesPayload
+        : numeracoesPayload
+          ? [numeracoesPayload]
+          : []
+    ) as Array<{
       serie?: number
       ativo?: boolean
       terminalId?: string | null
       ambiente?: 'HOMOLOGACAO' | 'PRODUCAO' | string
       modelo?: number
-    }> = []
+    }>
 
-    for (const ambiente of ambientes) {
-      const response = await fetch(
-        `/api/v1/fiscal/configuracoes/emissao/${modelo}?ambiente=${ambiente}`,
-        { headers: authHeaders }
-      )
+    let numeracoes = numeracoesBase.filter(n => Number(n?.modelo ?? modelo) === modelo)
 
-      if (response.ok) {
-        const data = await response.json()
-        fallbackNumeracoes.push(data)
-        continue
+    // Alguns backends retornam lista vazia no endpoint agregado mesmo com configuração existente.
+    // Nesse caso, consulta diretamente por ambiente no endpoint específico do modelo.
+    if (numeracoes.length === 0) {
+      const ambientes: Array<'PRODUCAO' | 'HOMOLOGACAO'> = ['PRODUCAO', 'HOMOLOGACAO']
+      const fallbackNumeracoes: Array<{
+        serie?: number
+        ativo?: boolean
+        terminalId?: string | null
+        ambiente?: 'HOMOLOGACAO' | 'PRODUCAO' | string
+        modelo?: number
+      }> = []
+
+      for (const ambiente of ambientes) {
+        const response = await fetch(
+          `/api/v1/fiscal/configuracoes/emissao/${modelo}?ambiente=${ambiente}`,
+          { headers: authHeaders }
+        )
+
+        if (response.ok) {
+          const data = await response.json()
+          fallbackNumeracoes.push(data)
+          continue
+        }
+
+        if (response.status === 400 || response.status === 404) {
+          continue
+        }
+
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(
+          errorData.error ||
+            errorData.message ||
+            `Erro ao buscar configuração fiscal de ${tipoDocumento} no ambiente ${ambiente}`
+        )
       }
 
-      if (response.status === 400 || response.status === 404) {
-        continue
-      }
+      numeracoes = fallbackNumeracoes
+    }
 
-      const errorData = await response.json().catch(() => ({}))
+    const numeracaoSelecionada =
+      numeracoes.find(n => n.ativo !== false && n.terminalId == null) ||
+      numeracoes.find(n => n.terminalId == null) ||
+      numeracoes.find(n => n.ativo !== false) ||
+      numeracoes[0]
+
+    const serie = Number(numeracaoSelecionada?.serie)
+    if (!Number.isFinite(serie) || serie <= 0) {
       throw new Error(
-        errorData.error ||
-          errorData.message ||
-          `Erro ao buscar configuração fiscal de ${tipoDocumento} no ambiente ${ambiente}`
+        `Numeração fiscal não configurada para ${tipoDocumento}. Configure a série no Painel do Contador.`
+      )
+    }
+    const ambienteConfigurado = numeracaoSelecionada?.ambiente
+    if (ambienteConfigurado !== 'HOMOLOGACAO' && ambienteConfigurado !== 'PRODUCAO') {
+      throw new Error(
+        `Ambiente fiscal não configurado em ${tipoDocumento}. Defina HOMOLOGACAO ou PRODUCAO na configuração de emissão.`
+      )
+    }
+    const ambiente: FiscalEmissionResolvedConfig['ambiente'] = ambienteConfigurado
+
+    const empresaFiscalResponse = await fetch('/api/v1/fiscal/empresas-fiscais/me', {
+      headers: authHeaders,
+    })
+
+    if (!empresaFiscalResponse.ok) {
+      const errorData = await empresaFiscalResponse.json().catch(() => ({}))
+      throw new Error(
+        errorData.error || errorData.message || 'Configuração fiscal da empresa não encontrada.'
       )
     }
 
-    numeracoes = fallbackNumeracoes
-  }
+    const empresaFiscalData = await empresaFiscalResponse.json()
+    const crt = Number(empresaFiscalData?.codigoRegimeTributario) as 1 | 2 | 3
 
-  const numeracaoSelecionada =
-    numeracoes.find((n) => n.ativo !== false && (n.terminalId == null)) ||
-    numeracoes.find((n) => n.terminalId == null) ||
-    numeracoes.find((n) => n.ativo !== false) ||
-    numeracoes[0]
+    if (![1, 2, 3].includes(crt)) {
+      throw new Error('CRT (Regime Tributário) inválido na configuração fiscal da empresa.')
+    }
 
-  const serie = Number(numeracaoSelecionada?.serie)
-  if (!Number.isFinite(serie) || serie <= 0) {
-    throw new Error(
-      `Numeração fiscal não configurada para ${tipoDocumento}. Configure a série no Painel do Contador.`
-    )
-  }
-  const ambienteConfigurado = numeracaoSelecionada?.ambiente
-  if (ambienteConfigurado !== 'HOMOLOGACAO' && ambienteConfigurado !== 'PRODUCAO') {
-    throw new Error(
-      `Ambiente fiscal não configurado em ${tipoDocumento}. Defina HOMOLOGACAO ou PRODUCAO na configuração de emissão.`
-    )
-  }
-  const ambiente: FiscalEmissionResolvedConfig['ambiente'] = ambienteConfigurado
-
-  const empresaFiscalResponse = await fetch('/api/v1/fiscal/empresas-fiscais/me', {
-    headers: authHeaders,
-  })
-
-  if (!empresaFiscalResponse.ok) {
-    const errorData = await empresaFiscalResponse.json().catch(() => ({}))
-    throw new Error(
-      errorData.error ||
-        errorData.message ||
-        'Configuração fiscal da empresa não encontrada.'
-    )
-  }
-
-  const empresaFiscalData = await empresaFiscalResponse.json()
-  const crt = Number(empresaFiscalData?.codigoRegimeTributario) as 1 | 2 | 3
-
-  if (![1, 2, 3].includes(crt)) {
-    throw new Error(
-      'CRT (Regime Tributário) inválido na configuração fiscal da empresa.'
-    )
-  }
-
-  const config = {
-    tipoDocumento,
-    serie,
-    ambiente,
-    crt,
-  }
-  fiscalConfigCache.set(cacheKey, {
-    value: config,
-    expiresAt: Date.now() + FISCAL_CONFIG_TTL_MS,
-  })
-  return config
+    const config = {
+      tipoDocumento,
+      serie,
+      ambiente,
+      crt,
+    }
+    fiscalConfigCache.set(cacheKey, {
+      value: config,
+      expiresAt: Date.now() + FISCAL_CONFIG_TTL_MS,
+    })
+    return config
   })()
 
   fiscalConfigInflight.set(cacheKey, loadPromise)
@@ -273,8 +281,8 @@ interface VendasQueryParams {
   valorFinalMaximo?: number
   meioPagamentoId?: string
   terminalId?: string
-  periodoInicial?: string
-  periodoFinal?: string
+  dataFinalizacaoInicial?: string
+  dataFinalizacaoFinal?: string
   status?: string[]
   solicitarEmissaoFiscal?: boolean
   statusFiscal?: string
@@ -291,7 +299,7 @@ interface VendasResponse {
 
 /**
  * Hook para buscar vendas com React Query
- * 
+ *
  * Benefícios:
  * - Cache automático
  * - Deduplicação de requisições
@@ -316,14 +324,18 @@ export function useVendas(params: VendasQueryParams = {}) {
       if (params.tipoVenda) searchParams.append('tipoVenda', params.tipoVenda)
       if (params.abertoPorId) searchParams.append('abertoPorId', params.abertoPorId)
       if (params.canceladoPorId) searchParams.append('canceladoPorId', params.canceladoPorId)
-      if (params.valorFinalMinimo) searchParams.append('valorFinalMinimo', params.valorFinalMinimo.toString())
-      if (params.valorFinalMaximo) searchParams.append('valorFinalMaximo', params.valorFinalMaximo.toString())
+      if (params.valorFinalMinimo)
+        searchParams.append('valorFinalMinimo', params.valorFinalMinimo.toString())
+      if (params.valorFinalMaximo)
+        searchParams.append('valorFinalMaximo', params.valorFinalMaximo.toString())
       if (params.meioPagamentoId) searchParams.append('meioPagamentoId', params.meioPagamentoId)
       if (params.terminalId) searchParams.append('terminalId', params.terminalId)
-      if (params.periodoInicial) searchParams.append('periodoInicial', params.periodoInicial)
-      if (params.periodoFinal) searchParams.append('periodoFinal', params.periodoFinal)
+      if (params.dataFinalizacaoInicial)
+        searchParams.append('dataFinalizacaoInicial', params.dataFinalizacaoInicial)
+      if (params.dataFinalizacaoFinal)
+        searchParams.append('dataFinalizacaoFinal', params.dataFinalizacaoFinal)
       if (params.status) {
-        params.status.forEach((status) => searchParams.append('status', status))
+        params.status.forEach(status => searchParams.append('status', status))
       }
       if (params.solicitarEmissaoFiscal !== undefined) {
         searchParams.append('solicitarEmissaoFiscal', params.solicitarEmissaoFiscal.toString())
@@ -433,7 +445,11 @@ export function useCreateVenda() {
           statusText: response.statusText,
           errorData: JSON.stringify(errorData, null, 2),
         })
-        const errorMessage = errorData.error || errorData.message || errorData.details || `Erro ${response.status}: ${response.statusText}`
+        const errorMessage =
+          errorData.error ||
+          errorData.message ||
+          errorData.details ||
+          `Erro ${response.status}: ${response.statusText}`
         const error = new Error(errorMessage)
         ;(error as any).response = { data: errorData, status: response.status }
         throw error
@@ -476,7 +492,11 @@ export function useCreateVendaGestor() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        const errorMessage = errorData.error || errorData.message || errorData.details || `Erro ${response.status}: ${response.statusText}`
+        const errorMessage =
+          errorData.error ||
+          errorData.message ||
+          errorData.details ||
+          `Erro ${response.status}: ${response.statusText}`
         const error = new Error(errorMessage)
         ;(error as any).response = { data: errorData, status: response.status }
         throw error
@@ -600,7 +620,12 @@ export function useMarcarEmissaoFiscal() {
   const token = auth?.getAccessToken()
 
   return useMutation({
-    mutationFn: async (params: { id: string; tabelaOrigem?: 'venda' | 'venda_gestor' }) => {
+    mutationFn: async (params: {
+      id: string
+      tabelaOrigem?: 'venda' | 'venda_gestor'
+      /** Não exibir toast de sucesso (ex.: correção automática no Kanban) */
+      silent?: boolean
+    }) => {
       if (!token) {
         throw new Error('Token não encontrado')
       }
@@ -634,7 +659,9 @@ export function useMarcarEmissaoFiscal() {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
       queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
       queryClient.invalidateQueries({ queryKey: ['venda', params.id] })
-      showToast.success('Venda marcada para emissão fiscal!')
+      if (!params.silent) {
+        showToast.success('Venda marcada para emissão fiscal!')
+      }
     },
     onError: (error: Error) => {
       showToast.error(error.message || 'Erro ao marcar emissão fiscal')
@@ -697,6 +724,73 @@ export function useDesmarcarEmissaoFiscal() {
 }
 
 /**
+ * Vincula um cliente à venda (PATCH com clienteId).
+ * - Gestor: PATCH /api/vendas/gestor/:id
+ * - PDV: PATCH /api/vendas/:id
+ * Por padrão envia apenas `clienteId`. Inclui `solicitarEmissaoFiscal` somente quando o chamador
+ * passar explicitamente (ex.: preservar o valor atual da venda, sem forçar `true`).
+ */
+export function useVincularClienteNaVenda() {
+  const { auth } = useAuthStore()
+  const queryClient = useQueryClient()
+  const token = auth?.getAccessToken()
+
+  return useMutation({
+    mutationFn: async (params: {
+      vendaId: string
+      clienteId: string
+      tabelaOrigem?: 'venda' | 'venda_gestor'
+      /** Se informado, envia o valor atual da venda (não há padrão `true`). */
+      solicitarEmissaoFiscal?: boolean
+    }) => {
+      if (!token) {
+        throw new Error('Token não encontrado')
+      }
+
+      const origem = params.tabelaOrigem ?? 'venda_gestor'
+      const url =
+        origem === 'venda_gestor'
+          ? `/api/vendas/gestor/${params.vendaId}`
+          : `/api/vendas/${params.vendaId}`
+
+      const body: Record<string, unknown> = { clienteId: params.clienteId }
+      if (params.solicitarEmissaoFiscal !== undefined) {
+        body.solicitarEmissaoFiscal = params.solicitarEmissaoFiscal
+      }
+
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = resolveDomainErrorMessage(
+          errorData,
+          `Erro ${response.status}: ${response.statusText}`
+        )
+        throw new Error(errorMessage)
+      }
+
+      return await response.json()
+    },
+    onSuccess: (_, params) => {
+      queryClient.invalidateQueries({ queryKey: ['vendas'] })
+      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      queryClient.invalidateQueries({ queryKey: ['venda', params.vendaId] })
+      showToast.success('Cliente vinculado à venda.')
+    },
+    onError: (error: Error) => {
+      showToast.error(error.message || 'Erro ao vincular cliente à venda')
+    },
+  })
+}
+
+/**
  * Hook para emitir NFe (NFC-e ou NF-e) para uma venda PDV.
  * Fluxo assíncrono real: retorna após enfileirar/processar no backend.
  * A atualização final de status vem por webhook + refetch.
@@ -707,13 +801,7 @@ export function useEmitirNfe() {
   const token = auth?.getAccessToken()
 
   return useMutation({
-    mutationFn: async ({
-      id,
-      modelo,
-    }: {
-      id: string
-      modelo: 55 | 65
-    }) => {
+    mutationFn: async ({ id, modelo }: { id: string; modelo: 55 | 65 }) => {
       if (!token) {
         throw new Error('Token não encontrado')
       }
@@ -737,7 +825,8 @@ export function useEmitirNfe() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        let errorMessage = errorData.error || errorData.message || `Erro ${response.status}: ${response.statusText}`
+        let errorMessage =
+          errorData.error || errorData.message || `Erro ${response.status}: ${response.statusText}`
         if (errorData.xmlRetorno) {
           const xMotivo = extrairMotivoRejeicao(errorData.xmlRetorno)
           if (xMotivo) {
@@ -784,7 +873,8 @@ export function useEmitirNfe() {
       }
 
       if (data?.status === 'REJEITADA') {
-        const motivo = data?.mensagemAmigavel || data?.codigoRejeicao || 'Nota fiscal rejeitada pela SEFAZ'
+        const motivo =
+          data?.mensagemAmigavel || data?.codigoRejeicao || 'Nota fiscal rejeitada pela SEFAZ'
         showToast.error(motivo)
         return
       }
@@ -808,13 +898,7 @@ export function useEmitirNfeGestor() {
   const token = auth?.getAccessToken()
 
   return useMutation({
-    mutationFn: async ({
-      id,
-      modelo,
-    }: {
-      id: string
-      modelo: 55 | 65
-    }) => {
+    mutationFn: async ({ id, modelo }: { id: string; modelo: 55 | 65 }) => {
       if (!token) {
         throw new Error('Token não encontrado')
       }
@@ -838,7 +922,8 @@ export function useEmitirNfeGestor() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        let errorMessage = errorData.error || errorData.message || `Erro ${response.status}: ${response.statusText}`
+        let errorMessage =
+          errorData.error || errorData.message || `Erro ${response.status}: ${response.statusText}`
         if (errorData.xmlRetorno) {
           const xMotivo = extrairMotivoRejeicao(errorData.xmlRetorno)
           if (xMotivo) {
@@ -883,6 +968,27 @@ export function useEmitirNfeGestor() {
   })
 }
 
+/** Body alinhado ao contrato de reemitir-nota: `documentId` obrigatório; `numero` opcional. */
+export type ReemitirNfeVariables = {
+  /** ID da venda na URL do proxy */
+  id: string
+  /** ID do documento fiscal (rejeitado) — mesmo valor do GET vendas unificado `documentoFiscalId` */
+  documentId: string
+  /** Número da nota rejeitada, se existir na listagem */
+  numero?: number
+}
+
+export function montarBodyReemitirNota(params: {
+  documentId: string
+  numero?: number
+}): Record<string, string | number> {
+  const body: Record<string, string | number> = { documentId: params.documentId.trim() }
+  if (params.numero != null && Number.isFinite(Number(params.numero))) {
+    body.numero = Number(params.numero)
+  }
+  return body
+}
+
 /**
  * Hook para reemitir NFe (NFC-e ou NF-e) de uma venda PDV rejeitada.
  */
@@ -892,24 +998,14 @@ export function useReemitirNfe() {
   const token = auth?.getAccessToken()
 
   return useMutation({
-    mutationFn: async ({
-      id,
-      modelo,
-      tipoDocumento,
-      serie,
-    }: {
-      id: string
-      modelo: 55 | 65
-      tipoDocumento: 'NFE' | 'NFCE'
-      serie: number
-    }) => {
+    mutationFn: async (variables: ReemitirNfeVariables) => {
       if (!token) {
         throw new Error('Token não encontrado')
       }
 
-      const fiscalConfig = await resolveFiscalEmissionConfig(token, modelo)
-      if (!Number.isFinite(serie) || serie <= 0) {
-        throw new Error('Série fiscal da rejeição não encontrada para reemissão.')
+      const { id, documentId, numero } = variables
+      if (!documentId?.trim()) {
+        throw new Error('documentId é obrigatório para reemissão.')
       }
 
       const response = await fetch(`/api/vendas/${id}/reemitir`, {
@@ -918,13 +1014,7 @@ export function useReemitirNfe() {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          tipoDocumento,
-          modelo,
-          serie,
-          ambiente: fiscalConfig.ambiente,
-          crt: fiscalConfig.crt,
-        }),
+        body: JSON.stringify(montarBodyReemitirNota({ documentId, numero })),
       })
 
       if (!response.ok) {
@@ -946,7 +1036,8 @@ export function useReemitirNfe() {
       await queryClient.refetchQueries({ queryKey: ['vendas-unificadas'] })
 
       if (data?.status === 'REJEITADA') {
-        const motivo = data?.mensagemAmigavel || data?.codigoRejeicao || 'Reemissão rejeitada pela SEFAZ'
+        const motivo =
+          data?.mensagemAmigavel || data?.codigoRejeicao || 'Reemissão rejeitada pela SEFAZ'
         showToast.error(motivo)
         return
       }
@@ -973,24 +1064,14 @@ export function useReemitirNfeGestor() {
   const token = auth?.getAccessToken()
 
   return useMutation({
-    mutationFn: async ({
-      id,
-      modelo,
-      tipoDocumento,
-      serie,
-    }: {
-      id: string
-      modelo: 55 | 65
-      tipoDocumento: 'NFE' | 'NFCE'
-      serie: number
-    }) => {
+    mutationFn: async (variables: ReemitirNfeVariables) => {
       if (!token) {
         throw new Error('Token não encontrado')
       }
 
-      const fiscalConfig = await resolveFiscalEmissionConfig(token, modelo)
-      if (!Number.isFinite(serie) || serie <= 0) {
-        throw new Error('Série fiscal da rejeição não encontrada para reemissão.')
+      const { id, documentId, numero } = variables
+      if (!documentId?.trim()) {
+        throw new Error('documentId é obrigatório para reemissão.')
       }
 
       const response = await fetch(`/api/vendas/gestor/${id}/reemitir`, {
@@ -999,13 +1080,7 @@ export function useReemitirNfeGestor() {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          tipoDocumento,
-          modelo,
-          serie,
-          ambiente: fiscalConfig.ambiente,
-          crt: fiscalConfig.crt,
-        }),
+        body: JSON.stringify(montarBodyReemitirNota({ documentId, numero })),
       })
 
       if (!response.ok) {
@@ -1027,7 +1102,8 @@ export function useReemitirNfeGestor() {
       await queryClient.refetchQueries({ queryKey: ['vendas-unificadas'] })
 
       if (data?.status === 'REJEITADA') {
-        const motivo = data?.mensagemAmigavel || data?.codigoRejeicao || 'Reemissão rejeitada pela SEFAZ'
+        const motivo =
+          data?.mensagemAmigavel || data?.codigoRejeicao || 'Reemissão rejeitada pela SEFAZ'
         showToast.error(motivo)
         return
       }
@@ -1054,13 +1130,7 @@ export function useCancelarVendaGestor() {
   const token = auth?.getAccessToken()
 
   return useMutation({
-    mutationFn: async ({ 
-      id, 
-      motivo 
-    }: { 
-      id: string
-      motivo: string
-    }) => {
+    mutationFn: async ({ id, motivo }: { id: string; motivo: string }) => {
       if (!token) {
         throw new Error('Token não encontrado')
       }
@@ -1097,6 +1167,106 @@ export function useCancelarVendaGestor() {
     },
     onError: (error: Error) => {
       showToast.error(error.message || 'Erro ao cancelar venda')
+    },
+  })
+}
+
+/**
+ * Hook para cancelar nota fiscal de uma venda PDV
+ */
+export function useCancelarNotaFiscalVendaPdv() {
+  const { auth } = useAuthStore()
+  const queryClient = useQueryClient()
+  const token = auth?.getAccessToken()
+
+  return useMutation({
+    mutationFn: async ({ id, justificativa }: { id: string; justificativa: string }) => {
+      if (!token) {
+        throw new Error('Token não encontrado')
+      }
+
+      if (justificativa.trim().length < 15) {
+        throw new Error('Justificativa deve ter no mínimo 15 caracteres')
+      }
+
+      const response = await fetch(`/api/vendas/${id}/cancelar-nota`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ justificativa: justificativa.trim() }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = resolveDomainErrorMessage(
+          errorData,
+          `Erro ${response.status}: ${response.statusText}`
+        )
+        throw new Error(errorMessage)
+      }
+
+      return await response.json()
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['vendas'] })
+      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      queryClient.invalidateQueries({ queryKey: ['venda', variables.id] })
+      showToast.success('Nota fiscal cancelada com sucesso!')
+    },
+    onError: (error: Error) => {
+      showToast.error(error.message || 'Erro ao cancelar nota fiscal')
+    },
+  })
+}
+
+/**
+ * Hook para cancelar nota fiscal de uma venda do Gestor
+ */
+export function useCancelarNotaFiscalVendaGestor() {
+  const { auth } = useAuthStore()
+  const queryClient = useQueryClient()
+  const token = auth?.getAccessToken()
+
+  return useMutation({
+    mutationFn: async ({ id, justificativa }: { id: string; justificativa: string }) => {
+      if (!token) {
+        throw new Error('Token não encontrado')
+      }
+
+      if (justificativa.trim().length < 15) {
+        throw new Error('Justificativa deve ter no mínimo 15 caracteres')
+      }
+
+      const response = await fetch(`/api/vendas/gestor/${id}/cancelar-nota`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ justificativa: justificativa.trim() }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = resolveDomainErrorMessage(
+          errorData,
+          `Erro ${response.status}: ${response.statusText}`
+        )
+        throw new Error(errorMessage)
+      }
+
+      return await response.json()
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['vendas'] })
+      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id] })
+      showToast.success('Nota fiscal cancelada com sucesso!')
+    },
+    onError: (error: Error) => {
+      showToast.error(error.message || 'Erro ao cancelar nota fiscal')
     },
   })
 }

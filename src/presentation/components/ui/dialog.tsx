@@ -10,20 +10,26 @@ import {
   Typography,
   Box,
 } from '@mui/material'
+import type { SxProps, Theme } from '@mui/material/styles'
 
-export interface DialogProps extends Omit<MuiDialogProps, 'open'> {
+export interface DialogProps extends Omit<MuiDialogProps, 'open' | 'onClose'> {
   open: boolean
-  onOpenChange?: (open: boolean) => void
+  onOpenChange?: (open: boolean, reason?: 'backdropClick' | 'escapeKeyDown') => void
+  /** Repasse opcional do onClose nativo do MUI (chamado junto com onOpenChange) */
+  onClose?: MuiDialogProps['onClose']
 }
 
 export const Dialog = React.forwardRef<HTMLDivElement, DialogProps>(
-  ({ open, onOpenChange, children, ...props }, ref) => {
+  ({ open, onOpenChange, onClose: userOnClose, children, ...rest }, ref) => {
     return (
       <MuiDialog
         ref={ref}
         open={open}
-        onClose={() => onOpenChange?.(false)}
-        {...props}
+        onClose={(event, reason) => {
+          userOnClose?.(event, reason)
+          onOpenChange?.(false, reason)
+        }}
+        {...rest}
       >
         {children}
       </MuiDialog>
@@ -69,22 +75,26 @@ export const DialogTitle = React.forwardRef<HTMLHeadingElement, DialogTitleProps
 
 DialogTitle.displayName = 'DialogTitle'
 
-export const DialogDescription = React.forwardRef<
-  HTMLParagraphElement,
-  React.HTMLAttributes<HTMLParagraphElement>
->(({ className, children, ...props }, ref) => {
-  return (
-    <Typography
-      ref={ref}
-      variant="body2"
-      color="text.secondary"
-      sx={{ mt: 1, fontFamily: 'Nunito, sans-serif' }}
-      {...props}
-    >
-      {children}
-    </Typography>
-  )
-})
+export interface DialogDescriptionProps extends React.HTMLAttributes<HTMLParagraphElement> {
+  sx?: SxProps<Theme>
+}
+
+export const DialogDescription = React.forwardRef<HTMLParagraphElement, DialogDescriptionProps>(
+  ({ className, children, sx, ...props }, ref) => {
+    return (
+      <Typography
+        ref={ref}
+        variant="body2"
+        color="text.secondary"
+        className={className}
+        sx={{ mt: 1, fontFamily: 'Nunito, sans-serif', ...sx }}
+        {...props}
+      >
+        {children}
+      </Typography>
+    )
+  }
+)
 
 DialogDescription.displayName = 'DialogDescription'
 

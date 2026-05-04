@@ -77,10 +77,11 @@ export function useComplementosInfinite(params: Omit<ComplementosQueryParams, 'o
 export function useComplementos(params: { ativo?: boolean; limit?: number } = {}) {
   const { auth, isAuthenticated } = useAuthStore()
   const token = auth?.getAccessToken()
-  const normalizedLimit = Math.min(params.limit ?? 100, 100)
+  // Limite alto para telas que listam o catálogo inteiro (ex.: vínculo grupo ↔ complementos)
+  const normalizedLimit = Math.min(params.limit ?? 100, 2000)
 
   return useQuery<Complemento[], Error>({
-    queryKey: ['complementos', 'simple', params.ativo],
+    queryKey: ['complementos', 'simple', params.ativo, normalizedLimit],
     queryFn: async () => {
       if (!isAuthenticated || !token) {
         throw new Error('Usuário não autenticado ou token ausente.')

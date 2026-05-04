@@ -11,11 +11,13 @@ export default function GruposComplementosLayout({
   const pathname = usePathname()
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <TopNav />
-      <main className='md:px-6'>
-        {children}
-      </main>
-    </div>
+     <div className="fixed inset-0 z-[40] flex flex-col overflow-hidden overscroll-none bg-gray-50">
+     <div className="shrink-0">
+       <TopNav />
+     </div>
+     <main className="flex min-h-0 flex-1 flex-col overflow-hidden md:px-6 px-1">
+       {children}
+     </main>
+   </div>
   )
 }

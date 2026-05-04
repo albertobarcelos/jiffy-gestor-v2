@@ -1,5 +1,4 @@
 import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto'
-import { useAuthStore } from '@/src/presentation/stores/authStore' // Para obter o token de autenticação
 
 interface TopProdutoApiItem {
   produto: string
@@ -18,27 +17,18 @@ export class BuscarTopProdutosDetalhadoUseCase {
     periodoInicialCustom?: Date | null,
     periodoFinalCustom?: Date | null
   ): Promise<DashboardTopProduto[]> {
-    const { auth } = useAuthStore.getState()
-    const token = auth?.getAccessToken()
-
-    if (!token) {
-      throw new Error('Token de autenticação não disponível.')
-    }
-
     const params = new URLSearchParams()
     params.append('periodo', periodo)
     params.append('limit', limit.toString())
 
     // Se datas personalizadas foram fornecidas, passa elas para a API
     if (periodoInicialCustom && periodoFinalCustom) {
-      params.append('periodoInicial', periodoInicialCustom.toISOString())
-      params.append('periodoFinal', periodoFinalCustom.toISOString())
+      params.append('dataFinalizacaoInicial', periodoInicialCustom.toISOString())
+      params.append('dataFinalizacaoFinal', periodoFinalCustom.toISOString())
     }
 
     const response = await fetch(`/api/dashboard/top-produtos?${params.toString()}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      credentials: 'include',
     })
 
     if (!response.ok) {
@@ -59,4 +49,3 @@ export class BuscarTopProdutosDetalhadoUseCase {
     )
   }
 }
-

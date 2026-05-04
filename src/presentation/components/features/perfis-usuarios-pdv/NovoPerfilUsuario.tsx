@@ -1,6 +1,14 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+} from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { PerfilUsuario } from '@/src/domain/entities/PerfilUsuario'
@@ -8,8 +16,10 @@ import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import toast from 'react-hot-toast'
-import { MdPerson, MdClose, MdSearch } from 'react-icons/md'
+import { MdPerson, MdSearch } from 'react-icons/md'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import {
   MeiosPagamentosTabsModal,
   MeiosPagamentosTabsModalState,
@@ -18,8 +28,27 @@ import {
 interface NovoPerfilUsuarioProps {
   perfilId?: string
   isEmbedded?: boolean
-  onSaved?: () => void
+  hideEmbeddedHeader?: boolean
+  embeddedFormId?: string
+  hideEmbeddedFormActions?: boolean
+  onEmbedFormStateChange?: (s: { isSubmitting: boolean; canSubmit: boolean }) => void
+  /** Embutido: notifica se há alterações não refletidas no baseline (ex.: bloquear aba Usuário no modal). */
+  onEmbedDirtyChange?: (dirty: boolean) => void
+  /** Embutido: após POST com sucesso envia `perfilIdCriado` para o pai manter o modal aberto */
+  onSaved?: (payload?: { perfilIdCriado?: string }) => void
+  /**
+   * Embutido: fechar o painel após "Salvar e fechar" com sucesso.
+   * Deve chamar `onClose` do modal direto — não usar `onCancel` (evita `handleRequestClose` / confirmação com `dirty` ainda não propagado).
+   */
+  onClosePanelAfterSave?: () => void
   onCancel?: () => void
+}
+
+/** API imperativa — confirmação ao fechar o painel (`PADRAO_MODAL_SAIR_SEM_SALVAR`). */
+export interface NovoPerfilUsuarioHandle {
+  isDirty: () => boolean
+  /** Submete o form do perfil e, em embed, força fechamento após sucesso (inclui criação com `perfilIdCriado`). */
+  savePerfilAndClose: () => void
 }
 
 interface MeioPagamento {
@@ -27,16 +56,50 @@ interface MeioPagamento {
   nome: string
 }
 
+/** Campos de permissão persistidos via PATCH (espelha `AtualizarPerfilUsuarioDTO`) */
+type PermissaoCampo =
+  | 'cancelarVenda'
+  | 'cancelarProduto'
+  | 'aplicarDescontoProduto'
+  | 'aplicarDescontoVenda'
+  | 'aplicarAcrescimoProduto'
+  | 'aplicarAcrescimoVenda'
+  | 'removerProdutoLancado'
+  | 'removerPagamento'
+  | 'reimprimir'
+  | 'acessoVisaoGeral'
+  | 'acessoHistorico'
+  | 'acessoMesa'
+  | 'acessoBalcao'
+  | 'acessoConfiguracoes'
+  | 'crudCardapio'
+  | 'crudUsuario'
+  | 'crudCliente'
+  | 'encerrarCaixa'
+  | 'lancarTaxa'
+  | 'removerTaxa'
+  | 'removerLicenca'
+
 /**
  * Componente para criar/editar perfil de usuário
  * Replica o design e funcionalidades do Flutter
  */
-export function NovoPerfilUsuario({
-  perfilId,
-  isEmbedded = false,
-  onSaved,
-  onCancel,
-}: NovoPerfilUsuarioProps) {
+export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilUsuarioProps>(
+  function NovoPerfilUsuario(
+    {
+      perfilId,
+      isEmbedded = false,
+      hideEmbeddedHeader = false,
+      embeddedFormId,
+      hideEmbeddedFormActions = false,
+      onEmbedFormStateChange,
+      onEmbedDirtyChange,
+      onSaved,
+      onClosePanelAfterSave,
+      onCancel,
+    },
+    ref
+  ) {
   const router = useRouter()
   const { auth } = useAuthStore()
   const isEditing = !!perfilId
@@ -50,11 +113,31 @@ export function NovoPerfilUsuario({
   const [aplicarDescontoVenda, setAplicarDescontoVenda] = useState(false)
   const [aplicarAcrescimoProduto, setAplicarAcrescimoProduto] = useState(false)
   const [aplicarAcrescimoVenda, setAplicarAcrescimoVenda] = useState(false)
+  const [removerProdutoLancado, setRemoverProdutoLancado] = useState(false)
+  const [removerPagamento, setRemoverPagamento] = useState(false)
+  const [reimprimir, setReimprimir] = useState(false)
+  const [acessoVisaoGeral, setAcessoVisaoGeral] = useState(false)
+  const [acessoHistorico, setAcessoHistorico] = useState(false)
+  const [acessoMesa, setAcessoMesa] = useState(false)
+  const [acessoBalcao, setAcessoBalcao] = useState(false)
+  const [acessoConfiguracoes, setAcessoConfiguracoes] = useState(false)
+  const [crudCardapio, setCrudCardapio] = useState(false)
+  const [crudUsuario, setCrudUsuario] = useState(false)
+  const [crudCliente, setCrudCliente] = useState(false)
+  const [encerrarCaixa, setEncerrarCaixa] = useState(false)
+  const [lancarTaxa, setLancarTaxa] = useState(false)
+  const [removerTaxa, setRemoverTaxa] = useState(false)
+  const [removerLicenca, setRemoverLicenca] = useState(false)
 
   // Estados de loading e dados
   const [isLoading, setIsLoading] = useState(false)
+  /** PATCH só dos meios ao alternar switch — não bloqueia o submit do formulário inteiro */
+  const [isSavingMeiosPagamento, setIsSavingMeiosPagamento] = useState(false)
+  /** PATCH das permissões ao alternar switch */
+  const [savingPermissoes, setSavingPermissoes] = useState<Set<PermissaoCampo>>(
+    () => new Set()
+  )
   const [isLoadingPerfil, setIsLoadingPerfil] = useState(false)
-  const [showMeiosPagamentoModal, setShowMeiosPagamentoModal] = useState(false)
   const [searchMeioPagamento, setSearchMeioPagamento] = useState('')
   const [meiosPagamentosTabsModalState, setMeiosPagamentosTabsModalState] =
     useState<MeiosPagamentosTabsModalState>({
@@ -67,28 +150,452 @@ export function NovoPerfilUsuario({
   const lastMeioPagamentoErrorToastRef = useRef<string | null>(null)
   const perfilMeiosPagamentoNomesRef = useRef<string[]>([])
   const [perfilLoaded, setPerfilLoaded] = useState(false)
+  const canSubmit = Boolean(role && role.trim() && selectedMeiosPagamento.length > 0)
+  const formId = embeddedFormId ?? 'novo-perfil-usuario-form'
+
+  /** Snapshot só de dados persistidos (PADRAO_MODAL_SAIR_SEM_SALVAR). */
+  const getFormSnapshot = useCallback(() => {
+    const meiosIds = [...selectedMeiosPagamento]
+      .map((m) => m.id)
+      .sort()
+      .join(',')
+    return JSON.stringify({
+      role: (role || '').trim(),
+      meiosIds,
+      cancelarVenda,
+      cancelarProduto,
+      aplicarDescontoProduto,
+      aplicarDescontoVenda,
+      aplicarAcrescimoProduto,
+      aplicarAcrescimoVenda,
+      removerProdutoLancado,
+      removerPagamento,
+      reimprimir,
+      acessoVisaoGeral,
+      acessoHistorico,
+      acessoMesa,
+      acessoBalcao,
+      acessoConfiguracoes,
+      crudCardapio,
+      crudUsuario,
+      crudCliente,
+      encerrarCaixa,
+      lancarTaxa,
+      removerTaxa,
+      removerLicenca,
+    })
+  }, [
+    role,
+    selectedMeiosPagamento,
+    cancelarVenda,
+    cancelarProduto,
+    aplicarDescontoProduto,
+    aplicarDescontoVenda,
+    aplicarAcrescimoProduto,
+    aplicarAcrescimoVenda,
+    removerProdutoLancado,
+    removerPagamento,
+    reimprimir,
+    acessoVisaoGeral,
+    acessoHistorico,
+    acessoMesa,
+    acessoBalcao,
+    acessoConfiguracoes,
+    crudCardapio,
+    crudUsuario,
+    crudCliente,
+    encerrarCaixa,
+    lancarTaxa,
+    removerTaxa,
+    removerLicenca,
+  ])
+
+  const baselineSerializedRef = useRef('')
+  /** Incrementado a cada `commitBaseline` para o pai recalcular `dirty` (baseline está em ref). */
+  const [baselineTick, setBaselineTick] = useState(0)
+  /** Após "Salvar e fechar" no diálogo de confirmação — força `onCancel` no embed mesmo com `perfilIdCriado`. */
+  const closeAfterEmbeddedSaveRef = useRef(false)
+
+  const commitBaseline = useCallback(() => {
+    baselineSerializedRef.current = getFormSnapshot()
+    setBaselineTick(t => t + 1)
+  }, [getFormSnapshot])
+
+  const embedDirtyComputed = useMemo(() => {
+    if (isLoadingPerfil) return false
+    return getFormSnapshot() !== baselineSerializedRef.current
+  }, [getFormSnapshot, isLoadingPerfil, baselineTick])
+
+  useEffect(() => {
+    if (!isEmbedded || !onEmbedDirtyChange) return
+    onEmbedDirtyChange(embedDirtyComputed)
+  }, [isEmbedded, onEmbedDirtyChange, embedDirtyComputed])
+
+  useEffect(() => {
+    return () => {
+      if (isEmbedded) {
+        onEmbedDirtyChange?.(false)
+      }
+    }
+  }, [isEmbedded, onEmbedDirtyChange])
+
+  const commitBaselineLatestRef = useRef(commitBaseline)
+  commitBaselineLatestRef.current = commitBaseline
+
+  const selectedMeiosPagamentoRef = useRef(selectedMeiosPagamento)
+  selectedMeiosPagamentoRef.current = selectedMeiosPagamento
+
+  /** Evita reverter estado se outro PATCH de meios foi disparado depois */
+  const meiosPersistSeqRef = useRef(0)
+  const meiosPatchInFlightRef = useRef(0)
+
+  const persistAcessoMeiosPagamento = useCallback(
+    async (next: MeioPagamento[], previous: MeioPagamento[]) => {
+      if (!perfilId) return
+      const seqAtStart = ++meiosPersistSeqRef.current
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        if (seqAtStart === meiosPersistSeqRef.current) {
+          selectedMeiosPagamentoRef.current = previous
+          setSelectedMeiosPagamento(previous)
+        }
+        return
+      }
+
+      meiosPatchInFlightRef.current += 1
+      setIsSavingMeiosPagamento(true)
+      try {
+        const response = await fetch(`/api/perfis-usuarios-pdv/${perfilId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            acessoMeiosPagamento: next.map((mp) => mp.nome),
+          }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(
+            typeof errorData.error === 'string'
+              ? errorData.error
+              : `Erro ao atualizar meios (${response.status})`
+          )
+        }
+
+        if (seqAtStart !== meiosPersistSeqRef.current) return
+
+        perfilMeiosPagamentoNomesRef.current = next.map((m) => m.nome)
+        window.setTimeout(() => {
+          commitBaselineLatestRef.current()
+        }, 0)
+      } catch (err) {
+        console.error('Erro ao persistir meios de pagamento do perfil:', err)
+        showToast.error(
+          err instanceof Error ? err.message : 'Erro ao atualizar meios de pagamento'
+        )
+        if (seqAtStart === meiosPersistSeqRef.current) {
+          selectedMeiosPagamentoRef.current = previous
+          setSelectedMeiosPagamento(previous)
+        }
+      } finally {
+        meiosPatchInFlightRef.current -= 1
+        if (meiosPatchInFlightRef.current <= 0) {
+          meiosPatchInFlightRef.current = 0
+          setIsSavingMeiosPagamento(false)
+        }
+      }
+    },
+    [perfilId, auth]
+  )
+
+  // Baseline inicial em modo criação
+  useEffect(() => {
+    if (isLoadingPerfil) return
+    if (isEditing) return
+    const t = window.setTimeout(() => {
+      commitBaselineLatestRef.current()
+    }, 100)
+    return () => window.clearTimeout(t)
+  }, [isLoadingPerfil, isEditing, perfilId])
+
+  const permissoesPersistSeqRef = useRef(0)
+  const permissoesPatchInFlightRef = useRef(0)
+
+  const permissoesRef = useRef({
+    cancelarVenda: false,
+    cancelarProduto: false,
+    aplicarDescontoProduto: false,
+    aplicarDescontoVenda: false,
+    aplicarAcrescimoProduto: false,
+    aplicarAcrescimoVenda: false,
+    removerProdutoLancado: false,
+    removerPagamento: false,
+    reimprimir: false,
+    acessoVisaoGeral: false,
+    acessoHistorico: false,
+    acessoMesa: false,
+    acessoBalcao: false,
+    acessoConfiguracoes: false,
+    crudCardapio: false,
+    crudUsuario: false,
+    crudCliente: false,
+    encerrarCaixa: false,
+    lancarTaxa: false,
+    removerTaxa: false,
+    removerLicenca: false,
+  })
+
+  useEffect(() => {
+    permissoesRef.current = {
+      cancelarVenda,
+      cancelarProduto,
+      aplicarDescontoProduto,
+      aplicarDescontoVenda,
+      aplicarAcrescimoProduto,
+      aplicarAcrescimoVenda,
+      removerProdutoLancado,
+      removerPagamento,
+      reimprimir,
+      acessoVisaoGeral,
+      acessoHistorico,
+      acessoMesa,
+      acessoBalcao,
+      acessoConfiguracoes,
+      crudCardapio,
+      crudUsuario,
+      crudCliente,
+      encerrarCaixa,
+      lancarTaxa,
+      removerTaxa,
+      removerLicenca,
+    }
+  }, [
+    cancelarVenda,
+    cancelarProduto,
+    aplicarDescontoProduto,
+    aplicarDescontoVenda,
+    aplicarAcrescimoProduto,
+    aplicarAcrescimoVenda,
+    removerProdutoLancado,
+    removerPagamento,
+    reimprimir,
+    acessoVisaoGeral,
+    acessoHistorico,
+    acessoMesa,
+    acessoBalcao,
+    acessoConfiguracoes,
+    crudCardapio,
+    crudUsuario,
+    crudCliente,
+    encerrarCaixa,
+    lancarTaxa,
+    removerTaxa,
+    removerLicenca,
+  ])
+
+  const aplicarValorPermissao = useCallback((campo: PermissaoCampo, value: boolean) => {
+    switch (campo) {
+      case 'cancelarVenda':
+        setCancelarVenda(value)
+        break
+      case 'cancelarProduto':
+        setCancelarProduto(value)
+        break
+      case 'aplicarDescontoProduto':
+        setAplicarDescontoProduto(value)
+        break
+      case 'aplicarDescontoVenda':
+        setAplicarDescontoVenda(value)
+        break
+      case 'aplicarAcrescimoProduto':
+        setAplicarAcrescimoProduto(value)
+        break
+      case 'aplicarAcrescimoVenda':
+        setAplicarAcrescimoVenda(value)
+        break
+      case 'removerProdutoLancado':
+        setRemoverProdutoLancado(value)
+        break
+      case 'removerPagamento':
+        setRemoverPagamento(value)
+        break
+      case 'reimprimir':
+        setReimprimir(value)
+        break
+      case 'acessoVisaoGeral':
+        setAcessoVisaoGeral(value)
+        break
+      case 'acessoHistorico':
+        setAcessoHistorico(value)
+        break
+      case 'acessoMesa':
+        setAcessoMesa(value)
+        break
+      case 'acessoBalcao':
+        setAcessoBalcao(value)
+        break
+      case 'acessoConfiguracoes':
+        setAcessoConfiguracoes(value)
+        break
+      case 'crudCardapio':
+        setCrudCardapio(value)
+        break
+      case 'crudUsuario':
+        setCrudUsuario(value)
+        break
+      case 'crudCliente':
+        setCrudCliente(value)
+        break
+      case 'encerrarCaixa':
+        setEncerrarCaixa(value)
+        break
+      case 'lancarTaxa':
+        setLancarTaxa(value)
+        break
+      case 'removerTaxa':
+        setRemoverTaxa(value)
+        break
+      case 'removerLicenca':
+        setRemoverLicenca(value)
+        break
+    }
+  }, [])
+
+  const persistPermissaoCampo = useCallback(
+    async (campo: PermissaoCampo, next: boolean, previous: boolean) => {
+      if (!perfilId) return
+      const seqAtStart = ++permissoesPersistSeqRef.current
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        if (seqAtStart === permissoesPersistSeqRef.current) {
+          permissoesRef.current = { ...permissoesRef.current, [campo]: previous }
+          aplicarValorPermissao(campo, previous)
+        }
+        return
+      }
+
+      permissoesPatchInFlightRef.current += 1
+      setSavingPermissoes(prev => {
+        const nextSet = new Set(prev)
+        nextSet.add(campo)
+        return nextSet
+      })
+      try {
+        const response = await fetch(`/api/perfis-usuarios-pdv/${perfilId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ [campo]: next }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(
+            typeof errorData.error === 'string'
+              ? errorData.error
+              : `Erro ao atualizar permissões (${response.status})`
+          )
+        }
+
+        if (seqAtStart !== permissoesPersistSeqRef.current) return
+        window.setTimeout(() => {
+          commitBaselineLatestRef.current()
+        }, 0)
+      } catch (err) {
+        console.error('Erro ao persistir permissão do perfil:', err)
+        showToast.error(
+          err instanceof Error ? err.message : 'Erro ao atualizar permissão'
+        )
+        if (seqAtStart === permissoesPersistSeqRef.current) {
+          permissoesRef.current = { ...permissoesRef.current, [campo]: previous }
+          aplicarValorPermissao(campo, previous)
+        }
+      } finally {
+        permissoesPatchInFlightRef.current -= 1
+        if (permissoesPatchInFlightRef.current <= 0) {
+          permissoesPatchInFlightRef.current = 0
+        }
+        setSavingPermissoes(prev => {
+          const nextSet = new Set(prev)
+          nextSet.delete(campo)
+          return nextSet
+        })
+      }
+    },
+    [perfilId, auth, aplicarValorPermissao]
+  )
+
+  /** Atualiza UI e, se já existir perfil, persiste o campo via PATCH */
+  const handlePermissaoChange = useCallback(
+    (campo: PermissaoCampo, next: boolean) => {
+      const previous = permissoesRef.current[campo]
+      permissoesRef.current = { ...permissoesRef.current, [campo]: next }
+      aplicarValorPermissao(campo, next)
+      if (perfilId) {
+        void persistPermissaoCampo(campo, next, previous)
+      }
+    },
+    [perfilId, aplicarValorPermissao, persistPermissaoCampo]
+  )
 
   // Carregar lista de meios de pagamento usando React Query (com cache)
   const {
     data,
     isLoading: isLoadingMeiosPagamento,
     refetch: refetchMeiosPagamento,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
   } = useMeiosPagamentoInfinite({
     limit: 100,
   })
 
-  // Achatando todas as páginas em uma única lista
-  const meiosPagamento: MeioPagamento[] = data?.pages.flatMap((page) =>
-    page.meiosPagamento.map((meio) => ({
-      id: meio.getId(),
-      nome: meio.getNome(),
-    }))
-  ) || []
+  // Carrega todas as páginas para exibir a lista completa no formulário
+  useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      void fetchNextPage()
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  // Lista achatada das páginas — memoizada por `data` para não criar novo array a cada render.
+  // Sem isso, qualquer setState (ex.: toggle de permissão) recria `meiosPagamento`, invalida os
+  // useMemos abaixo e roda sort/filtro de novo desnecessariamente (reflow junto ao scroll do modal).
+  const meiosPagamento = useMemo<MeioPagamento[]>(() => {
+    if (!data?.pages?.length) return []
+    return data.pages.flatMap((page) =>
+      page.meiosPagamento.map((meio) => ({
+        id: meio.getId(),
+        nome: meio.getNome(),
+      }))
+    )
+  }, [data])
 
   // Cria uma string serializada dos IDs dos meios de pagamento para usar como dependência estável
   const meiosPagamentoIds = useMemo(() => {
     return meiosPagamento.map((mp) => mp.id).sort().join(',')
   }, [meiosPagamento])
+
+  const meiosPagamentoFiltrados = useMemo(() => {
+    const q = searchMeioPagamento.trim().toLowerCase()
+    const lista =
+      !q ? [...meiosPagamento] : meiosPagamento.filter((m) => m.nome.toLowerCase().includes(q))
+    // Vinculados ao perfil primeiro; desempate alfabético estável
+    const vinculadosIds = new Set(selectedMeiosPagamento.map((m) => m.id))
+    lista.sort((a, b) => {
+      const av = vinculadosIds.has(a.id) ? 1 : 0
+      const bv = vinculadosIds.has(b.id) ? 1 : 0
+      if (bv !== av) return bv - av
+      return a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })
+    })
+    return lista
+  }, [meiosPagamento, searchMeioPagamento, selectedMeiosPagamento])
 
   // Carregar dados do perfil se estiver editando
   useEffect(() => {
@@ -113,13 +620,28 @@ export function NovoPerfilUsuario({
           const data = await response.json()
           const perfil = PerfilUsuario.fromJSON(data)
 
-          setRole(perfil.getRole())
+          setRole((perfil.getRole() || '').toUpperCase())
           setCancelarVenda(perfil.canCancelarVenda())
           setCancelarProduto(perfil.canCancelarProduto())
           setAplicarDescontoProduto(perfil.canAplicarDescontoProduto())
           setAplicarDescontoVenda(perfil.canAplicarDescontoVenda())
           setAplicarAcrescimoProduto(perfil.canAplicarAcrescimoProduto())
           setAplicarAcrescimoVenda(perfil.canAplicarAcrescimoVenda())
+          setRemoverProdutoLancado(perfil.canRemoverProdutoLancado())
+          setRemoverPagamento(perfil.canRemoverPagamento())
+          setReimprimir(perfil.canReimprimir())
+          setAcessoVisaoGeral(perfil.canAcessoVisaoGeral())
+          setAcessoHistorico(perfil.canAcessoHistorico())
+          setAcessoMesa(perfil.canAcessoMesa())
+          setAcessoBalcao(perfil.canAcessoBalcao())
+          setAcessoConfiguracoes(perfil.canAcessoConfiguracoes())
+          setCrudCardapio(perfil.canCrudCardapio())
+          setCrudUsuario(perfil.canCrudUsuario())
+          setCrudCliente(perfil.canCrudCliente())
+          setEncerrarCaixa(perfil.canEncerrarCaixa())
+          setLancarTaxa(perfil.canLancarTaxa())
+          setRemoverTaxa(perfil.canRemoverTaxa())
+          setRemoverLicenca(perfil.canRemoverLicenca())
 
           // Guarda os nomes dos meios de pagamento do perfil para usar depois
           const nomesMeios = perfil.getAcessoMeiosPagamento()
@@ -143,6 +665,9 @@ export function NovoPerfilUsuario({
         console.error('Erro ao carregar perfil:', error)
       } finally {
         setIsLoadingPerfil(false)
+        window.setTimeout(() => {
+          commitBaselineLatestRef.current()
+        }, 250)
       }
     }
 
@@ -176,6 +701,11 @@ export function NovoPerfilUsuario({
       }
       return prev
     })
+    if (isEditing && perfilLoaded) {
+      window.setTimeout(() => {
+        commitBaselineLatestRef.current()
+      }, 200)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing, perfilLoaded, meiosPagamentoIds, meiosPagamento.length])
 
@@ -191,8 +721,15 @@ export function NovoPerfilUsuario({
     }
   }, [])
 
+  useEffect(() => {
+    onEmbedFormStateChange?.({ isSubmitting: isLoading, canSubmit })
+  }, [onEmbedFormStateChange, isLoading, canSubmit])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const forceClosePanel = closeAfterEmbeddedSaveRef.current
+    closeAfterEmbeddedSaveRef.current = false
+
     const token = auth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado. Faça login novamente.')
@@ -211,6 +748,7 @@ export function NovoPerfilUsuario({
     }
 
     setIsLoading(true)
+    onEmbedFormStateChange?.({ isSubmitting: true, canSubmit })
 
     try {
       // Garante que sempre enviamos um array, mesmo que vazio
@@ -225,6 +763,21 @@ export function NovoPerfilUsuario({
         aplicarDescontoVenda,
         aplicarAcrescimoProduto,
         aplicarAcrescimoVenda,
+        removerProdutoLancado,
+        removerPagamento,
+        reimprimir,
+        acessoVisaoGeral,
+        acessoHistorico,
+        acessoMesa,
+        acessoBalcao,
+        acessoConfiguracoes,
+        crudCardapio,
+        crudUsuario,
+        crudCliente,
+        encerrarCaixa,
+        lancarTaxa,
+        removerTaxa,
+        removerLicenca,
       }
 
       // Debug: log do body antes de enviar
@@ -304,7 +857,34 @@ export function NovoPerfilUsuario({
       }
 
       if (isEmbedded) {
-        onSaved?.()
+        // Criação embutida: devolve o id para o modal trocar para modo edição sem fechar
+        if (!isEditing) {
+          const criado = PerfilUsuario.fromJSON(responseData)
+          const novoId = criado.getId()
+          if (!novoId) {
+            showToast.error('Perfil salvo, mas não foi possível obter o ID. Recarregue a página.')
+            return
+          }
+          // Sincroniza ref dos nomes para o efeito de meios não limpar a seleção ao virar edição
+          perfilMeiosPagamentoNomesRef.current = selectedMeiosPagamento.map(
+            (mp) => mp.nome
+          )
+          // Evita GET redundante quando o pai passar `perfilId` e virar edição
+          hasLoadedPerfilRef.current = true
+          setPerfilLoaded(true)
+          onSaved?.({ perfilIdCriado: novoId })
+          commitBaselineLatestRef.current()
+          if (forceClosePanel) {
+            onClosePanelAfterSave?.()
+          }
+        } else {
+          showToast.success('Perfil atualizado com sucesso!')
+          onSaved?.()
+          commitBaselineLatestRef.current()
+          if (forceClosePanel) {
+            onClosePanelAfterSave?.()
+          }
+        }
       } else {
         showToast.success(isEditing ? 'Perfil atualizado com sucesso!' : 'Perfil criado com sucesso!')
         router.push('/cadastros/perfis-usuarios-pdv')
@@ -314,6 +894,7 @@ export function NovoPerfilUsuario({
       showToast.error(error instanceof Error ? error.message : 'Erro ao salvar perfil')
     } finally {
       setIsLoading(false)
+      onEmbedFormStateChange?.({ isSubmitting: false, canSubmit })
     }
   }
 
@@ -333,38 +914,40 @@ export function NovoPerfilUsuario({
     }
   }
 
-  const toggleMeioPagamento = (meio: MeioPagamento) => {
-    setSelectedMeiosPagamento((prev) => {
+  const toggleMeioPagamento = useCallback(
+    (meio: MeioPagamento) => {
+      const prev = selectedMeiosPagamentoRef.current
       const exists = prev.find((mp) => mp.id === meio.id)
       if (exists) {
-        // Validação: não permite remover se for o último meio de pagamento
         if (prev.length === 1) {
-          // Sempre exibe o toast quando tenta remover o último item
-          // O ID garante que substitui o toast anterior se ainda estiver visível
           const toastId = 'meio-pagamento-error'
           toast.error('É necessário manter pelo menos um meio de pagamento selecionado', {
             id: toastId,
             duration: 5000,
           })
           lastMeioPagamentoErrorToastRef.current = toastId
-          return prev
+          return
         }
-        // Limpa o toast de erro se a remoção for bem-sucedida
         if (lastMeioPagamentoErrorToastRef.current) {
           toast.dismiss(lastMeioPagamentoErrorToastRef.current)
           lastMeioPagamentoErrorToastRef.current = null
         }
-        return prev.filter((mp) => mp.id !== meio.id)
-      } else {
-        // Limpa o toast de erro se adicionar um meio de pagamento
-        if (lastMeioPagamentoErrorToastRef.current) {
-          toast.dismiss(lastMeioPagamentoErrorToastRef.current)
-          lastMeioPagamentoErrorToastRef.current = null
-        }
-        return [...prev, meio]
+      } else if (lastMeioPagamentoErrorToastRef.current) {
+        toast.dismiss(lastMeioPagamentoErrorToastRef.current)
+        lastMeioPagamentoErrorToastRef.current = null
       }
-    })
-  }
+
+      const next = exists ? prev.filter((mp) => mp.id !== meio.id) : [...prev, meio]
+      selectedMeiosPagamentoRef.current = next
+      setSelectedMeiosPagamento(next)
+
+      // Perfil ainda não persistido: só estado local até o primeiro Salvar do formulário
+      if (perfilId) {
+        void persistAcessoMeiosPagamento(next, prev)
+      }
+    },
+    [perfilId, persistAcessoMeiosPagamento]
+  )
 
   const openMeiosPagamentosTabsModal = () => {
     setMeiosPagamentosTabsModalState({
@@ -392,15 +975,28 @@ export function NovoPerfilUsuario({
     await refetchMeiosPagamento()
   }
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      isDirty: () => {
+        if (isLoadingPerfil) return false
+        return getFormSnapshot() !== baselineSerializedRef.current
+      },
+      savePerfilAndClose: () => {
+        closeAfterEmbeddedSaveRef.current = true
+        const el = document.getElementById(formId)
+        if (el instanceof HTMLFormElement) {
+          el.requestSubmit()
+        }
+      },
+    }),
+    [formId, getFormSnapshot, isLoadingPerfil]
+  )
+
   if (isLoadingPerfil) {
     return (
       <div className="flex flex-col items-center justify-center h-full">
-        <img
-          src="/images/jiffy-loading.gif"
-          alt="Carregando"
-          className="w-20 h-20 object-contain"
-        />
-        <span className="text-sm font-medium text-primary-text font-nunito mt-2">Carregando...</span>
+        <JiffyLoading />
       </div>
     )
   }
@@ -408,218 +1004,473 @@ export function NovoPerfilUsuario({
   return (
     <div className="flex flex-col h-full">
       {/* Header fixo */}
-      <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[30px] shadow-md md:px-[30px] px-2 py-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="md:w-12 w-10 md:h-12 h-10 rounded-full bg-primary/25 text-primary flex items-center justify-center">
-              <span className="md:text-2xl text-xl"><MdPerson /></span>
+      {!isEmbedded || !hideEmbeddedHeader ? (
+        <div className="sticky top-0 z-10 bg-white shadow-sm md:px-[30px] px-2 py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="md:w-12 w-10 md:h-12 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                <span className="md:text-2xl text-xl">
+                  <MdPerson />
+                </span>
+              </div>
+              <h1 className="text-primary md:text-lg text-sm font-semibold font-exo">
+                {isEditing ? 'Editar Perfil de Usuário' : 'Novo Perfil de Usuário'}
+              </h1>
             </div>
-            <h1 className="text-primary md:text-lg text-sm font-semibold font-exo">
-              {isEditing ? 'Editar Perfil de Usuário' : 'Novo Perfil de Usuário'}
-            </h1>
+            <Button
+              onClick={handleCancel}
+              variant="outlined"
+              className="h-8 px-8 rounded-lg hover:bg-primary/15 transition-colors"
+              sx={{
+                backgroundColor: 'var(--color-info)',
+                color: 'var(--color-primary)',
+                borderColor: 'var(--color-primary)',
+              }}
+            >
+              Cancelar
+            </Button>
           </div>
-          <Button
-            onClick={handleCancel}
-            variant="outlined"
-            className="h-8 px-8 rounded-lg hover:bg-primary/15 transition-colors"
-            sx={{
-              backgroundColor: 'var(--color-info)',
-              color: 'var(--color-primary)',
-              borderColor: 'var(--color-primary)',
-            }}
-          >
-            Cancelar
-          </Button>
         </div>
-      </div>
+      ) : null}
 
       {/* Formulário com scroll */}
-      <div className="flex-1 overflow-y-auto md:px-[30px] px-1 py-2">
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="flex-1 overflow-y-auto px-5 py-4 scrollbar-hide">
+        <form id={formId} onSubmit={handleSubmit} className="space-y-4">
           {/* Dados */}
-          <div className="bg-info">
-            <h2 className="text-primary md:text-xl text-sm font-semibold font-exo mb-1">
-              Dados do Perfil
-            </h2>
-            <div className="h-[2px] bg-primary/70 mb-4"></div>
+          <div className="bg-white">
+          <div className="mb-4 flex items-center gap-5">
+                <h2 className="shrink-0 text-primary md:text-xl text-sm font-semibold">
+                  Dados do Perfil
+                </h2>
+                <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
+              </div>
 
             <div className="space-y-2">
               <Input
                 label="Nome do Perfil"
                 value={role}
-                onChange={(e) => setRole(e.target.value)}
+                onChange={(e) => setRole(e.target.value.toUpperCase())}
                 required
                 placeholder="Digite o nome do perfil"
                 className="bg-info"
+                size="small"
+                sx={{
+                  '& .MuiOutlinedInput-input': {
+                    padding: '6px 10px',
+                  },
+                }}
               />
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Meios de Pagamento *
-                </label>
-                <div className="flex md:flex-row flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowMeiosPagamentoModal(true)}
-                    className="flex-1 md:px-4 px-2 md:py-3 py-2 rounded-lg border border-gray-400 bg-info text-left text-gray-900 focus:outline-none focus:border-2 focus:border-primary"
-                  >
-                    {isLoadingMeiosPagamento ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                        <span>Carregando...</span>
-                      </div>
-                    ) : selectedMeiosPagamento.length === 0 ? (
-                      'Clique para Selecionar Meios de Pagamento'
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {selectedMeiosPagamento.map((mp) => (
-                          <span
-                            key={mp.id}
-                            className="md:px-3 px-2 py-1 bg-primary-bg rounded-full md:text-sm text-xs border border-primary flex items-center gap-2"
-                          >
-                            {mp.nome}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setSelectedMeiosPagamento((prev) => {
-                                  // Validação: não permite remover se for o último meio de pagamento
-                                  if (prev.length === 1) {
-                                    // Sempre exibe o toast quando tenta remover o último item
-                                    // O ID garante que substitui o toast anterior se ainda estiver visível
-                                    const toastId = 'meio-pagamento-error'
-                                    toast.error('É necessário manter pelo menos um meio de pagamento selecionado', {
-                                      id: toastId,
-                                      duration: 5000,
-                                    })
-                                    lastMeioPagamentoErrorToastRef.current = toastId
-                                    return prev
-                                  }
-                                  // Limpa o toast de erro se a remoção for bem-sucedida
-                                  if (lastMeioPagamentoErrorToastRef.current) {
-                                    toast.dismiss(lastMeioPagamentoErrorToastRef.current)
-                                    lastMeioPagamentoErrorToastRef.current = null
-                                  }
-                                  return prev.filter((p) => p.id !== mp.id)
-                                })
-                              }}
-                              className="text-secondary-text hover:text-primary md:text-sm text-xs"
-                            >
-                              <MdClose />
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowMeiosPagamentoModal(true)}
-                    className="h-8 px-4 rounded-lg bg-primary text-info font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
-                  >
-                    Vincular Pagamentos
-                  </button>
-                </div>
-              </div>
             </div>
+
+              <div className="mt-4 space-y-2">
+                <div className="mb-2 flex items-center gap-5">
+                  <h2 className="shrink-0 text-primary md:text-base text-sm font-semibold font-exo">
+                    Meios de Pagamento *
+                  </h2>
+                  <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
+                </div>
+
+                <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div className="relative min-w-0 flex-1">
+                    <MdSearch
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text"
+                      size={18}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Buscar meio de pagamento..."
+                      value={searchMeioPagamento}
+                      onChange={(e) => setSearchMeioPagamento(e.target.value)}
+                      className="font-nunito h-8 w-full rounded-lg border border-gray-300 bg-info pl-10 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={openMeiosPagamentosTabsModal}
+                    className="h-8 w-full shrink-0 rounded-lg bg-primary px-4 text-info hover:bg-primary/90 sm:w-auto"
+                    sx={{
+                      backgroundColor: 'var(--color-primary)',
+                      color: 'var(--color-info)',
+                      borderColor: 'var(--color-primary)',
+                    }}
+                  >
+                    Adicionar Meios de Pagamento
+                  </Button>
+                </div>
+
+                {isLoadingMeiosPagamento && meiosPagamento.length === 0 ? (
+                  <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-info px-4 py-6 text-primary-text">
+                    <div className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    <span>Carregando meios de pagamento...</span>
+                  </div>
+                ) : meiosPagamento.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-gray-300 bg-info px-4 py-6 text-center text-sm text-secondary-text">
+                    Nenhum meio de pagamento cadastrado. Use o botão acima para cadastrar.
+                  </div>
+                ) : meiosPagamentoFiltrados.length === 0 ? (
+                  <div className="rounded-lg border border-gray-200 bg-info px-4 py-4 text-center text-sm text-secondary-text">
+                    Nenhum resultado para a busca.
+                  </div>
+                ) : (
+                  <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-info scrollbar-hide">
+                    {meiosPagamentoFiltrados.map((meio) => {
+                      const isVinculado = selectedMeiosPagamento.some((mp) => mp.id === meio.id)
+                      return (
+                        <div
+                          key={meio.id}
+                          className="flex items-center justify-between gap-3 border-b border-gray-200 px-3 py-1.5 last:border-b-0"
+                        >
+                          <span className="min-w-0 flex-1 text-xs font-medium text-primary-text">
+                            {meio.nome}
+                          </span>
+                          <JiffyIconSwitch
+                            checked={isVinculado}
+                            onChange={() => toggleMeioPagamento(meio)}
+                            disabled={
+                              isLoading ||
+                              isLoadingMeiosPagamento ||
+                              isSavingMeiosPagamento
+                            }
+                            bordered={false}
+                            size="sm"
+                            className="shrink-0 justify-center gap-0 px-0 py-0"
+                            inputProps={{
+                              'aria-label': `Vincular ${meio.nome} ao perfil`,
+                            }}
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                {isFetchingNextPage ? (
+                  <p className="mt-1 text-xs text-secondary-text">Carregando mais meios de pagamento...</p>
+                ) : null}
+              </div>
           </div>
 
           {/* Permissões */}
-          <div className="bg-info">
-            <h2 className="text-primary md:text-xl text-sm font-semibold font-exo mb-1">
-              Permissões
-            </h2>
-            <div className="h-[2px] bg-primary/70 mb-2"></div>
-
-            <div className="space-y-2">
+          <div className="bg-white">
+              <div className="mb-2 flex items-center gap-5">
+                <h2 className="shrink-0 text-primary md:text-base text-sm font-semibold">
+                  Permissões
+                </h2>
+                <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
+              </div>
+            <div className="">
               {/* Toggle Cancelar Venda */}
-              <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
-                <span className="text-primary-text font-medium text-sm md:text-base">Pode Cancelar Venda?</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Cancelar Venda?</span>
+                <JiffyIconSwitch
                     checked={cancelarVenda}
-                    onChange={(e) => setCancelarVenda(e.target.checked)}
-                    className="sr-only peer"
+                    onChange={e => handlePermissaoChange('cancelarVenda', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('cancelarVenda')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir cancelar venda' }}
                   />
-                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-                </label>
+
               </div>
 
               {/* Toggle Cancelar Produto */}
-              <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
-                <span className="text-primary-text font-medium text-sm md:text-base">Pode Cancelar Produto?</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Cancelar Produto?</span>
+                <JiffyIconSwitch
                     checked={cancelarProduto}
-                    onChange={(e) => setCancelarProduto(e.target.checked)}
-                    className="sr-only peer"
+                    onChange={e => handlePermissaoChange('cancelarProduto', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('cancelarProduto')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir cancelar produto' }}
                   />
-                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-                </label>
+
               </div>
 
               {/* Toggle Aplicar Desconto Produto */}
-              <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
-                <span className="text-primary-text font-medium text-sm md:text-base">Pode Aplicar Desconto no Produto?</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Aplicar Desconto no Produto?</span>
+                <JiffyIconSwitch
                     checked={aplicarDescontoProduto}
-                    onChange={(e) => setAplicarDescontoProduto(e.target.checked)}
-                    className="sr-only peer"
+                    onChange={e => handlePermissaoChange('aplicarDescontoProduto', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('aplicarDescontoProduto')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir aplicar desconto no produto' }}
                   />
-                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-                </label>
+
               </div>
 
               {/* Toggle Aplicar Desconto Venda */}
-              <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
-                <span className="text-primary-text font-medium text-sm md:text-base">Pode Aplicar Desconto na Venda?</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Aplicar Desconto na Venda?</span>
+                <JiffyIconSwitch
                     checked={aplicarDescontoVenda}
-                    onChange={(e) => setAplicarDescontoVenda(e.target.checked)}
-                    className="sr-only peer"
+                    onChange={e => handlePermissaoChange('aplicarDescontoVenda', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('aplicarDescontoVenda')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir aplicar desconto na venda' }}
                   />
-                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-                </label>
+
               </div>
 
               {/* Toggle Aplicar Acréscimo Produto */}
-              <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
-                <span className="text-primary-text font-medium text-sm md:text-base">Pode Aplicar Acréscimo no Produto?</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Aplicar Acréscimo no Produto?</span>
+                <JiffyIconSwitch
                     checked={aplicarAcrescimoProduto}
-                    onChange={(e) => setAplicarAcrescimoProduto(e.target.checked)}
-                    className="sr-only peer"
+                    onChange={e => handlePermissaoChange('aplicarAcrescimoProduto', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('aplicarAcrescimoProduto')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir aplicar acréscimo no produto' }}
                   />
-                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-                </label>
+
               </div>
 
               {/* Toggle Aplicar Acréscimo Venda */}
-              <div className="flex items-center justify-between p-2 bg-primary-bg rounded-lg">
-                <span className="text-primary-text font-medium text-sm md:text-base">Pode Aplicar Acréscimo na Venda?</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Aplicar Acréscimo na Venda?</span>
+                <JiffyIconSwitch
                     checked={aplicarAcrescimoVenda}
-                    onChange={(e) => setAplicarAcrescimoVenda(e.target.checked)}
-                    className="sr-only peer"
+                    onChange={e => handlePermissaoChange('aplicarAcrescimoVenda', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('aplicarAcrescimoVenda')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir aplicar acréscimo na venda' }}
                   />
-                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-                </label>
+
+              </div>
+
+              <div className="my-2 h-px w-full bg-gray-200" aria-hidden />
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Remover Produto Lançado?</span>
+                <JiffyIconSwitch
+                    checked={removerProdutoLancado}
+                    onChange={e => handlePermissaoChange('removerProdutoLancado', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('removerProdutoLancado')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir remover produto lançado' }}
+                  />
+
+              </div>
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Remover Pagamento?</span>
+                <JiffyIconSwitch
+                    checked={removerPagamento}
+                    onChange={e => handlePermissaoChange('removerPagamento', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('removerPagamento')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir remover pagamento' }}
+                  />
+
+              </div>
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Reimprimir?</span>
+                <JiffyIconSwitch
+                    checked={reimprimir}
+                    onChange={e => handlePermissaoChange('reimprimir', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('reimprimir')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir reimprimir' }}
+                  />
+
+              </div>
+
+              <div className="my-2 h-px w-full bg-gray-200" aria-hidden />
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Acesso à Visão Geral?</span>
+                <JiffyIconSwitch
+                    checked={acessoVisaoGeral}
+                    onChange={e => handlePermissaoChange('acessoVisaoGeral', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('acessoVisaoGeral')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir acesso visão geral' }}
+                  />
+
+              </div>
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Acesso ao Histórico?</span>
+                <JiffyIconSwitch
+                    checked={acessoHistorico}
+                    onChange={e => handlePermissaoChange('acessoHistorico', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('acessoHistorico')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir acesso histórico' }}
+                  />
+
+              </div>
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Acesso a Mesas?</span>
+                <JiffyIconSwitch
+                    checked={acessoMesa}
+                    onChange={e => handlePermissaoChange('acessoMesa', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('acessoMesa')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir acesso mesas' }}
+                  />
+
+              </div>
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Acesso ao Balcão?</span>
+                <JiffyIconSwitch
+                    checked={acessoBalcao}
+                    onChange={e => handlePermissaoChange('acessoBalcao', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('acessoBalcao')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir acesso balcão' }}
+                  />
+
+              </div>
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Acesso a Configurações?</span>
+                <JiffyIconSwitch
+                    checked={acessoConfiguracoes}
+                    onChange={e => handlePermissaoChange('acessoConfiguracoes', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('acessoConfiguracoes')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir acesso configurações' }}
+                  />
+
+              </div>
+
+              <div className="my-2 h-px w-full bg-gray-200" aria-hidden />
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">CRUD Cardápio?</span>
+                <JiffyIconSwitch
+                    checked={crudCardapio}
+                    onChange={e => handlePermissaoChange('crudCardapio', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('crudCardapio')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir CRUD cardápio' }}
+                  />
+
+              </div>
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">CRUD Usuário?</span>
+                <JiffyIconSwitch
+                    checked={crudUsuario}
+                    onChange={e => handlePermissaoChange('crudUsuario', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('crudUsuario')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir CRUD usuário' }}
+                  />
+
+              </div>
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">CRUD Cliente?</span>
+                <JiffyIconSwitch
+                    checked={crudCliente}
+                    onChange={e => handlePermissaoChange('crudCliente', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('crudCliente')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir CRUD cliente' }}
+                  />
+
+              </div>
+
+              <div className="my-2 h-px w-full bg-gray-200" aria-hidden />
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Encerrar Caixa?</span>
+                <JiffyIconSwitch
+                    checked={encerrarCaixa}
+                    onChange={e => handlePermissaoChange('encerrarCaixa', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('encerrarCaixa')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir encerrar caixa' }}
+                  />
+
+              </div>
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Lançar Taxa?</span>
+                <JiffyIconSwitch
+                    checked={lancarTaxa}
+                    onChange={e => handlePermissaoChange('lancarTaxa', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('lancarTaxa')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir lançar taxa' }}
+                  />
+
+              </div>
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Remover Taxa?</span>
+                <JiffyIconSwitch
+                    checked={removerTaxa}
+                    onChange={e => handlePermissaoChange('removerTaxa', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('removerTaxa')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir remover taxa' }}
+                  />
+
+              </div>
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Pode Remover Licença?</span>
+                <JiffyIconSwitch
+                    checked={removerLicenca}
+                    onChange={e => handlePermissaoChange('removerLicenca', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('removerLicenca')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Permitir remover licença' }}
+                  />
+
               </div>
             </div>
           </div>
 
           {/* Botões de ação */}
-          <div className="flex justify-end gap-4 pt-2">
+          {!isEmbedded || !hideEmbeddedFormActions ? (
+            <div className="flex justify-end gap-4 pt-2">
             <Button
               type="button"
               onClick={handleCancel}
@@ -644,88 +1495,9 @@ export function NovoPerfilUsuario({
               {isLoading ? 'Salvando...' : isEditing ? 'Atualizar' : 'Salvar'}
             </Button>
           </div>
+          ) : null}
         </form>
       </div>
-
-      {/* Modal de seleção de meios de pagamento */}
-      {showMeiosPagamentoModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-info rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold text-primary">Vincular Meios de Pagamento</h3>
-              <button
-                type="button"
-                onClick={() => setShowMeiosPagamentoModal(false)}
-                className="text-secondary-text hover:text-primary-text"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="mb-4 flex gap-2 items-center">
-              <div className="flex-1 relative">
-                <MdSearch
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text"
-                  size={18}
-                />
-                <input
-                  type="text"
-                  placeholder="Buscar meio de pagamento..."
-                  value={searchMeioPagamento}
-                  onChange={(e) => setSearchMeioPagamento(e.target.value)}
-                  className="w-full h-8 pl-10 pr-4 rounded-lg border border-gray-300 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={openMeiosPagamentosTabsModal}
-                className="h-8 px-4 rounded-lg bg-primary text-info font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
-              >
-                Adicionar Meios de Pagamento
-              </button>
-            </div>
-            <div className="space-y-2">
-              {meiosPagamento
-                .filter((meio) =>
-                  meio.nome.toLowerCase().includes(searchMeioPagamento.toLowerCase())
-                )
-                .map((meio) => {
-                const isSelected = selectedMeiosPagamento.some((mp) => mp.id === meio.id)
-                return (
-                  <button
-                    key={meio.id}
-                    type="button"
-                    onClick={() => toggleMeioPagamento(meio)}
-                    className={`w-full py-2 px-4 rounded-lg border-2 text-left transition-colors ${
-                      isSelected
-                        ? 'border-primary bg-primary/10'
-                        : 'border-gray-300 bg-info hover:bg-primary-bg'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-primary-text">{meio.nome}</span>
-                      {isSelected && <span className="text-primary">✓</span>}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-            <div className="mt-4 flex justify-end">
-              <Button
-                type="button"
-                onClick={() => setShowMeiosPagamentoModal(false)}
-                className="h-8 px-4 rounded-lg bg-primary text-info font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
-                sx={{
-                  backgroundColor: 'var(--color-primary)',
-                  color: 'var(--color-info)',
-                  borderColor: 'var(--color-primary)',
-                }}
-              >
-                Confirmar
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <MeiosPagamentosTabsModal
         state={meiosPagamentosTabsModalState}
@@ -735,5 +1507,6 @@ export function NovoPerfilUsuario({
       />
     </div>
   )
-}
+})
 
+NovoPerfilUsuario.displayName = 'NovoPerfilUsuario'

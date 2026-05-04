@@ -11,6 +11,9 @@ export const CriarClienteSchema = z.object({
   telefone: z.string().optional(),
   email: z.string().email('Email inválido').optional().or(z.literal('')),
   nomeFantasia: z.string().optional(),
+  /** Indicador da IE (ex.: SPED — string "1", "2", "9") */
+  indicadorInscricaoEstadual: z.string().optional(),
+  inscricaoEstadual: z.string().optional(),
   ativo: z.boolean().optional().default(true),
   endereco: z
     .object({

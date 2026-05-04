@@ -223,7 +223,7 @@ export default function EscolherCores({ isOpen, onClose }: EscolherCoresProps) {
       <div className="relative bg-white rounded-2xl w-[600px] h-[600px] p-6 shadow-xl">
         {/* Header */}
         <div className="mb-5">
-          <h2 className="text-lg font-bold text-gray-800">
+          <h2 className="text-lg font-semibold text-gray-800">
             Escolha uma cor
           </h2>
         </div>
@@ -448,7 +448,7 @@ export default function EscolherCores({ isOpen, onClose }: EscolherCoresProps) {
               leaveTo="opacity-0 scale-95"
             >
               <Dialog.Panel className="w-[600px] h-[600px] bg-white rounded-2xl shadow-xl p-6 flex flex-col">
-                <Dialog.Title className="text-lg font-bold text-gray-800 mb-5">
+                <Dialog.Title className="text-lg font-semibold text-gray-800 mb-5">
                   Escolha uma cor
                 </Dialog.Title>
 
@@ -739,7 +739,7 @@ export default function EscolherCores({ isOpen, onClose }: EscolherCoresProps) {
       <div className="fixed inset-0 bg-black/50" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <Dialog.Panel className="bg-white rounded-2xl w-[600px] h-[600px] p-6">
-          <Dialog.Title className="text-lg font-bold mb-5">
+          <Dialog.Title className="text-lg font-semibold mb-5">
             Escolha uma cor
           </Dialog.Title>
           <div className="flex flex-wrap gap-[5px] overflow-y-auto h-[calc(100%-60px)]">

@@ -1,15 +1,21 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Terminal } from '@/src/domain/entities/Terminal'
-import { MdPhone, MdPowerSettingsNew, MdSearch } from 'react-icons/md'
+import { MdDelete, MdPhone, MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { TerminaisTabsModal, TerminaisTabsModalState } from './TerminaisTabsModal'
+
+/** Tamanho de página alinhado ao backend (Swagger): menos round-trips na listagem */
+const PAGE_SIZE_TERMINAIS = 100
+const PAGE_SIZE_PREFS = 100
 
 /**
  * Tab de Terminais - Lista de terminais carregando todos os itens de uma vez
- * Faz requisições sequenciais de 10 em 10 até carregar tudo
+ * Pagina terminais e preferências de 100 em 100; preferências em lista quando disponível
  */
 interface TerminalData {
   terminal: Terminal
@@ -20,6 +26,48 @@ interface TerminalPreferenceData {
   compartilharMesas: boolean
   impressoraFinalizacaoNome: string
   impressoraFinalizacaoId?: string
+  fiscalAtivo: boolean
+  leitorHabilitado: boolean
+}
+
+/** Normaliza resposta de GET único ou item da lista de preferências */
+function rawToPreferenceData(data: any): TerminalPreferenceData {
+  const impressoraId =
+    data.impressoraFinalizacaoId ||
+    data.impressoraFinalizacao?.id ||
+    data.impressoraFinalizacao?.impressoraId ||
+    data.impressoraFinalizacao?.impressora?.id
+  const impressoraNome =
+    data.impressoraFinalizacao?.name ||
+    data.impressoraFinalizacao?.nome ||
+    data.impressoraFinalizacaoNome ||
+    data.impressoraFinalizacao?.impressora?.nome ||
+    data.impressoraFinalizacao?.impressora?.name ||
+    'Nenhuma'
+  return {
+    compartilharMesas: !!data.compartilharMesas,
+    impressoraFinalizacaoNome: impressoraNome,
+    impressoraFinalizacaoId: impressoraId,
+    fiscalAtivo: !!data.fiscalAtivo,
+    leitorHabilitado: !!data.leitorHabilitado,
+  }
+}
+
+/** Preferências padrão quando o backend ainda não tem registro para o terminal */
+const DEFAULT_TERMINAL_PREFERENCES: TerminalPreferenceData = {
+  compartilharMesas: false,
+  impressoraFinalizacaoNome: 'Nenhuma',
+  impressoraFinalizacaoId: undefined,
+  fiscalAtivo: false,
+  leitorHabilitado: false,
+}
+
+/** Após carregar preferências, terminais sem registro usam o padrão (evita “Carregando...” infinito) */
+function resolvePreferencesForTerminal(
+  terminalId: string,
+  map: Record<string, TerminalPreferenceData>
+): TerminalPreferenceData {
+  return map[terminalId] ?? DEFAULT_TERMINAL_PREFERENCES
 }
 
 export function TerminaisTab() {
@@ -30,7 +78,11 @@ export function TerminaisTab() {
   const [totalItems, setTotalItems] = useState(0)
   const [togglingStatus, setTogglingStatus] = useState<Record<string, boolean>>({})
   const [preferencesMap, setPreferencesMap] = useState<Record<string, TerminalPreferenceData>>({})
+  /** true somente após tentativa de carregar preferências (lista ou fallback por terminal) */
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false)
   const [updatingShare, setUpdatingShare] = useState<Record<string, boolean>>({})
+  const [updatingFiscal, setUpdatingFiscal] = useState<Record<string, boolean>>({})
+  const [updatingLeitor, setUpdatingLeitor] = useState<Record<string, boolean>>({})
   const [updatingPrinter, setUpdatingPrinter] = useState<Record<string, boolean>>({})
   const [impressoras, setImpressoras] = useState<Array<{ id: string; nome: string }>>([])
   const [loadingImpressoras, setLoadingImpressoras] = useState(false)
@@ -40,7 +92,6 @@ export function TerminaisTab() {
     mode: 'edit',
     terminalId: undefined,
   })
-
   const searchQueryRef = useRef('')
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
 
@@ -50,17 +101,19 @@ export function TerminaisTab() {
 
   /**
    * Carrega todos os terminais fazendo requisições sequenciais
-   * Continua carregando páginas de 10 em 10 até não haver mais itens
+   * Continua carregando páginas até não haver mais itens (PAGE_SIZE_TERMINAIS por página)
    */
   const loadAllTerminais = useCallback(
     async () => {
       const token = auth?.getAccessToken()
       if (!token) {
         setIsLoading(false)
+        setPreferencesLoaded(true)
         return
       }
 
       setIsLoading(true)
+      setPreferencesLoaded(false)
 
       try {
         const allTerminais: TerminalData[] = []
@@ -72,7 +125,7 @@ export function TerminaisTab() {
         // Loop para carregar todas as páginas
         while (hasMore) {
           const params = new URLSearchParams({
-            limit: '10',
+            limit: String(PAGE_SIZE_TERMINAIS),
             offset: currentOffset.toString(),
           })
 
@@ -124,9 +177,8 @@ export function TerminaisTab() {
 
           allTerminais.push(...newTerminais)
 
-          // Verifica se há mais páginas
-          // Se retornou menos de 10 itens, não há mais páginas
-          hasMore = newTerminais.length === 10
+          // Verifica se há mais páginas (página cheia = pode existir próxima)
+          hasMore = newTerminais.length === PAGE_SIZE_TERMINAIS
           currentOffset += newTerminais.length
 
           // Proteção contra loop infinito: se não retornou nenhum item e já fez pelo menos uma requisição, para
@@ -138,64 +190,86 @@ export function TerminaisTab() {
         setTerminais(allTerminais)
         setTotalItems(totalCount)
 
-        // Buscar preferências (compartilhar mesas e impressora) para cada terminal
+        // Preferências: lista paginada (1+ requisições) em vez de N GETs por terminal
         try {
-          const prefsEntries = await Promise.all(
-            allTerminais.map(async (item) => {
-              try {
-                const resp = await fetch(`/api/preferencias-terminal/${item.terminal.getId()}`, {
-                  headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                  },
-                })
+          const q = searchQueryRef.current
+          let prefsMap: Record<string, TerminalPreferenceData> = {}
 
-                if (!resp.ok) {
+          let prefsOffset = 0
+          let prefsHasMore = true
+          let listOk = false
+
+          while (prefsHasMore) {
+            const pParams = new URLSearchParams({
+              limit: String(PAGE_SIZE_PREFS),
+              offset: String(prefsOffset),
+            })
+            if (q) {
+              pParams.append('q', q)
+            }
+
+            const listResp = await fetch(`/api/preferencias-terminal?${pParams.toString()}`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            })
+
+            if (!listResp.ok) {
+              break
+            }
+
+            listOk = true
+            const listData = await listResp.json()
+            const items: any[] = listData.items || []
+
+            for (const row of items) {
+              const tid = row.terminalId ?? row.terminal?.id
+              if (!tid) {
+                continue
+              }
+              prefsMap[tid] = rawToPreferenceData(row)
+            }
+
+            prefsHasMore = items.length === PAGE_SIZE_PREFS
+            prefsOffset += items.length
+          }
+
+          if (!listOk) {
+            // Fallback: backend sem GET em lista — mantém comportamento anterior
+            const prefsEntries = await Promise.all(
+              allTerminais.map(async (item) => {
+                try {
+                  const resp = await fetch(`/api/preferencias-terminal/${item.terminal.getId()}`, {
+                    headers: {
+                      Authorization: `Bearer ${token}`,
+                      'Content-Type': 'application/json',
+                    },
+                  })
+                  if (!resp.ok) {
+                    return null
+                  }
+                  const data = await resp.json()
+                  return {
+                    terminalId: item.terminal.getId(),
+                    ...rawToPreferenceData(data),
+                  }
+                } catch {
                   return null
                 }
-
-                const data = await resp.json()
-                const impressoraId =
-                  data.impressoraFinalizacaoId ||
-                  data.impressoraFinalizacao?.id ||
-                  data.impressoraFinalizacao?.impressoraId ||
-                  data.impressoraFinalizacao?.impressora?.id
-                const impressoraNome =
-                  data.impressoraFinalizacao?.name ||
-                  data.impressoraFinalizacao?.nome ||
-                  data.impressoraFinalizacaoNome ||
-                  data.impressoraFinalizacao?.impressora?.nome ||
-                  data.impressoraFinalizacao?.impressora?.name ||
-                  'Nenhuma'
-                return {
-                  terminalId: item.terminal.getId(),
-                  compartilharMesas: !!data.compartilharMesas,
-                  impressoraFinalizacaoNome: impressoraNome,
-                  impressoraFinalizacaoId: impressoraId,
-                }
-              } catch {
-                return null
-              }
-            })
-          )
-
-          const prefsMap = prefsEntries
-            .filter(
-              (p): p is {
-                terminalId: string
-                compartilharMesas: boolean
-                impressoraFinalizacaoNome: string
-                impressoraFinalizacaoId: string | undefined
-              } => !!p
+              })
             )
-            .reduce<Record<string, TerminalPreferenceData>>((acc, curr) => {
-              acc[curr.terminalId] = {
-                compartilharMesas: curr.compartilharMesas,
-                impressoraFinalizacaoNome: curr.impressoraFinalizacaoNome,
-                impressoraFinalizacaoId: curr.impressoraFinalizacaoId,
-              }
-              return acc
-            }, {})
+
+            prefsMap = prefsEntries
+              .filter(
+                (p): p is { terminalId: string } & TerminalPreferenceData => !!p
+              )
+              .reduce<Record<string, TerminalPreferenceData>>((acc, curr) => {
+                const { terminalId, ...rest } = curr
+                acc[terminalId] = rest
+                return acc
+              }, {})
+          }
 
           setPreferencesMap(prefsMap)
         } catch (error) {
@@ -205,6 +279,7 @@ export function TerminaisTab() {
         console.error('Erro ao carregar terminais:', error)
       } finally {
         setIsLoading(false)
+        setPreferencesLoaded(true)
       }
     },
     [auth]
@@ -364,6 +439,8 @@ export function TerminaisTab() {
           compartilharMesas: novoValor,
           impressoraFinalizacaoNome: prev[terminalId]?.impressoraFinalizacaoNome || 'Nenhuma',
           impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId, // Preserva o ID da impressora
+          fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
+          leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
         },
       }))
 
@@ -398,27 +475,10 @@ export function TerminaisTab() {
 
           if (prefsResponse.ok) {
             const prefsData = await prefsResponse.json()
-            const impressoraId =
-              prefsData.impressoraFinalizacaoId ||
-              prefsData.impressoraFinalizacao?.id ||
-              prefsData.impressoraFinalizacao?.impressoraId ||
-              prefsData.impressoraFinalizacao?.impressora?.id
-            const impressoraNome =
-              prefsData.impressoraFinalizacao?.name ||
-              prefsData.impressoraFinalizacao?.nome ||
-              prefsData.impressoraFinalizacaoNome ||
-              prefsData.impressoraFinalizacao?.impressora?.nome ||
-              prefsData.impressoraFinalizacao?.impressora?.name ||
-              'Nenhuma'
-
             // Atualiza o estado com os dados confirmados do backend
             setPreferencesMap((prev) => ({
               ...prev,
-              [terminalId]: {
-                compartilharMesas: !!prefsData.compartilharMesas,
-                impressoraFinalizacaoNome: impressoraNome,
-                impressoraFinalizacaoId: impressoraId,
-              },
+              [terminalId]: rawToPreferenceData(prefsData),
             }))
           }
         } catch (prefsError) {
@@ -436,10 +496,178 @@ export function TerminaisTab() {
             compartilharMesas: !novoValor,
             impressoraFinalizacaoNome: prev[terminalId]?.impressoraFinalizacaoNome || 'Nenhuma',
             impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId, // Preserva o ID da impressora
+            fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
+            leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
           },
         }))
       } finally {
         setUpdatingShare((prev) => {
+          const { [terminalId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [auth]
+  )
+
+  const handleToggleFiscalAtivo = useCallback(
+    async (terminalId: string, novoValor: boolean) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      setUpdatingFiscal((prev) => ({ ...prev, [terminalId]: true }))
+      setPreferencesMap((prev) => ({
+        ...prev,
+        [terminalId]: {
+          compartilharMesas: prev[terminalId]?.compartilharMesas ?? false,
+          impressoraFinalizacaoNome: prev[terminalId]?.impressoraFinalizacaoNome || 'Nenhuma',
+          impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId,
+          fiscalAtivo: novoValor,
+          leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
+        },
+      }))
+
+      try {
+        const response = await fetch(`/api/preferencias-terminal`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            terminaisId: terminalId,
+            fields: {
+              fiscalAtivo: novoValor,
+            },
+          }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Erro ao atualizar preferências')
+        }
+
+        try {
+          const prefsResponse = await fetch(`/api/preferencias-terminal/${terminalId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          })
+
+          if (prefsResponse.ok) {
+            const prefsData = await prefsResponse.json()
+            setPreferencesMap((prev) => ({
+              ...prev,
+              [terminalId]: rawToPreferenceData(prefsData),
+            }))
+          }
+        } catch (prefsError) {
+          console.warn('Erro ao buscar preferências atualizadas:', prefsError)
+        }
+
+        showToast.success('Preferência fiscal atualizada!')
+      } catch (error: any) {
+        console.error('Erro ao atualizar fiscal ativo:', error)
+        showToast.error(error.message || 'Erro ao atualizar fiscal ativo')
+        setPreferencesMap((prev) => ({
+          ...prev,
+          [terminalId]: {
+            compartilharMesas: prev[terminalId]?.compartilharMesas ?? false,
+            impressoraFinalizacaoNome: prev[terminalId]?.impressoraFinalizacaoNome || 'Nenhuma',
+            impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId,
+            fiscalAtivo: !novoValor,
+            leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
+          },
+        }))
+      } finally {
+        setUpdatingFiscal((prev) => {
+          const { [terminalId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [auth]
+  )
+
+  const handleToggleLeitorCodigoBarras = useCallback(
+    async (terminalId: string, novoValor: boolean) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      setUpdatingLeitor((prev) => ({ ...prev, [terminalId]: true }))
+      setPreferencesMap((prev) => ({
+        ...prev,
+        [terminalId]: {
+          compartilharMesas: prev[terminalId]?.compartilharMesas ?? false,
+          impressoraFinalizacaoNome: prev[terminalId]?.impressoraFinalizacaoNome || 'Nenhuma',
+          impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId,
+          fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
+          leitorHabilitado: novoValor,
+        },
+      }))
+
+      try {
+        const response = await fetch(`/api/preferencias-terminal`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            terminaisId: terminalId,
+            fields: {
+              leitorHabilitado: novoValor,
+            },
+          }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Erro ao atualizar preferências')
+        }
+
+        try {
+          const prefsResponse = await fetch(`/api/preferencias-terminal/${terminalId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          })
+
+          if (prefsResponse.ok) {
+            const prefsData = await prefsResponse.json()
+            setPreferencesMap((prev) => ({
+              ...prev,
+              [terminalId]: rawToPreferenceData(prefsData),
+            }))
+          }
+        } catch (prefsError) {
+          console.warn('Erro ao buscar preferências atualizadas:', prefsError)
+        }
+
+        showToast.success('Preferência do leitor atualizada!')
+      } catch (error: any) {
+        console.error('Erro ao atualizar leitor habilitado:', error)
+        showToast.error(error.message || 'Erro ao atualizar leitor habilitado')
+        setPreferencesMap((prev) => ({
+          ...prev,
+          [terminalId]: {
+            compartilharMesas: prev[terminalId]?.compartilharMesas ?? false,
+            impressoraFinalizacaoNome: prev[terminalId]?.impressoraFinalizacaoNome || 'Nenhuma',
+            impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId,
+            fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
+            leitorHabilitado: !novoValor,
+          },
+        }))
+      } finally {
+        setUpdatingLeitor((prev) => {
           const { [terminalId]: _, ...rest } = prev
           return rest
         })
@@ -467,6 +695,8 @@ export function TerminaisTab() {
           compartilharMesas: prev[terminalId]?.compartilharMesas ?? false,
           impressoraFinalizacaoNome: impressoraNome,
           impressoraFinalizacaoId: impressoraId || undefined,
+          fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
+          leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
         },
       }))
 
@@ -504,6 +734,8 @@ export function TerminaisTab() {
               impressoras.find((i) => i.id === prev[terminalId]?.impressoraFinalizacaoId)?.nome ||
               'Nenhuma',
             impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId,
+            fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
+            leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
           },
         }))
       } finally {
@@ -523,17 +755,26 @@ export function TerminaisTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  /** Lista só terminais não bloqueados (ativos); API não filtra por status. */
+  const terminaisFiltrados = useMemo(() => {
+    return terminais.filter(({ terminal, rawData }) => {
+      const bloqueado = rawData?.bloqueado ?? terminal.getBloqueado()
+      return !bloqueado
+    })
+  }, [terminais])
+
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden py-1">
       {/* Header fixo */}
-      <div className="md:px-4 px-1 flex-shrink-0">
+      <div className="md:px-6 px-1 flex-shrink-0">
         <div className="flex items-center justify-between border-b-2 border-primary/70 pb-2">
           <div className="flex flex-col">
             <span className="text-primary text-lg md:text-xl font-semibold font-exo">
               Terminais Cadastrados
             </span>
             <span className="text-tertiary text-sm md:text-[20px] font-medium font-nunito">
-              Total {terminais.length} de {totalItems}
+              Total {terminaisFiltrados.length}
+              {totalItems > 0 ? ` de ${terminaisFiltrados.length}` : ''}
             </span>
           </div>
           
@@ -543,12 +784,6 @@ export function TerminaisTab() {
       {/* Busca fixa */}
       <div className="flex gap-3 md:px-[20px] px-1 pb-2 flex-shrink-0">
         <div className="flex-1 min-w-[180px] max-w-[360px]">
-          <label
-            htmlFor="terminais-search"
-            className="text-xs font-semibold text-secondary-text mb-1 block"
-          >
-            Buscar Terminal...
-          </label>
           <div className="relative h-8">
             <MdSearch
               className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
@@ -569,7 +804,7 @@ export function TerminaisTab() {
       {/* Lista de terminais com scroll */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden md:px-[20px] px-1 scrollbar-hide">
         {/* Barra de títulos das colunas - sticky dentro do scroll */}
-        {terminais.length > 0 && (
+        {terminaisFiltrados.length > 0 && (
           <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px] sticky top-0 z-10 mb-2">
             <div className="flex-[2] font-nunito font-semibold text-xs text-primary-text uppercase hidden md:block">
               Código do Terminal
@@ -589,8 +824,14 @@ export function TerminaisTab() {
             <div className="flex-[1.5] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Comp. Mesas
             </div>
+            <div className="flex-[1.5] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
+              Fiscal ativo
+            </div>
+            <div className="flex-[1.5] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
+              Leitor C. Barras
+            </div>
             <div className="md:flex-[1.5] flex-[1] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
-              Status
+              Remover
             </div>
           </div>
         )}
@@ -607,18 +848,29 @@ export function TerminaisTab() {
           </div>
         )}
 
-        {terminais.map(({ terminal, rawData }) => {
+        {terminais.length > 0 && terminaisFiltrados.length === 0 && !isLoading && (
+          <div className="flex flex-col items-center justify-center py-12">
+            <MdPhone className="text-secondary-text mb-4" size={48} />
+            <p className="text-primary-text font-semibold text-lg mb-2">
+              Nenhum terminal ativo
+            </p>
+            <p className="text-secondary-text text-sm text-center max-w-md">
+              Esta lista mostra apenas terminais ativos. Os desativados permanecem no cadastro, mas
+              não aparecem aqui.
+            </p>
+          </div>
+        )}
+
+        {terminaisFiltrados.map(({ terminal, rawData }, index) => {
           // Extrai campos dos dados brutos conforme documentação da API
           const codigo = rawData?.codigoInterno || rawData?.codigo || rawData?.code || terminal.getName() || 'N/A'
           const nome = rawData?.nome || terminal.getName() || codigo
           const modelo = rawData?.modeloDispositivo || rawData?.modelo || rawData?.deviceModel || 'Unknown'
           const versao = rawData?.versaoApk || rawData?.versao || rawData?.apkVersion || rawData?.version || '1.0.0'
-          // Status: bloqueado = false significa ATIVO, bloqueado = true significa BLOQUEADO/INATIVO
-          const bloqueado = rawData?.bloqueado ?? terminal.getBloqueado()
-          const ativo = !bloqueado
-          const prefs = preferencesMap[terminal.getId()]
-          const compartilhamentoAtivo = prefs?.compartilharMesas ?? false
-          const impressoraFinalizacaoNome = prefs?.impressoraFinalizacaoNome ?? '—'
+          const prefs = resolvePreferencesForTerminal(terminal.getId(), preferencesMap)
+          const compartilhamentoAtivo = prefs.compartilharMesas
+          const fiscalAtivo = prefs.fiscalAtivo
+          const leitorHabilitado = prefs.leitorHabilitado
 
           return (
               <div
@@ -631,11 +883,13 @@ export function TerminaisTab() {
                   terminalId: terminal.getId(),
                 })
               }
-              className=" px-4 py-2 flex items-center gap-[10px] bg-info rounded-lg my-2 shadow-sm shadow-primary-text/50 hover:bg-primary/10 transition-colors cursor-pointer"
+              className={`px-4 py-2 flex items-center gap-[10px] rounded-lg hover:bg-primary/10 transition-colors cursor-pointer ${
+                index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+              }`}
             >
               <div className="flex-[2] hidden md:flex items-center gap-3">
                 
-                <span className="text-sm font-medium text-primary-text font-nunito">
+                <span className="text-sm font-normal text-primary-text">
                  # {codigo}
                 </span>
               </div>
@@ -649,9 +903,9 @@ export function TerminaisTab() {
                 {versao}
               </div>
               <div className="flex-[2] md:text-sm text-[10px] text-secondary-text font-nunito hidden md:flex">
-                {preferencesMap[terminal.getId()] ? (
+                {preferencesLoaded ? (
                   <select
-                    value={preferencesMap[terminal.getId()]?.impressoraFinalizacaoId ?? ''}
+                    value={prefs.impressoraFinalizacaoId ?? ''}
                     onChange={(event) => {
                       event.stopPropagation()
                       handleChangeImpressora(terminal.getId(), event.target.value)
@@ -671,53 +925,86 @@ export function TerminaisTab() {
                   <div className="md:text-xs text-[10px] text-secondary-text">Carregando...</div>
                 )}
               </div>
-              <div className="flex-[1.5] flex justify-center" onClick={(e) => e.stopPropagation()}>
-                <label
-                  className={`relative inline-flex h-4 w-10 md:h-5 md:w-12 items-center ${
-                    updatingShare[terminal.getId()] ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
-                  }`}
-                  title={compartilhamentoAtivo ? 'Compartilhamento habilitado' : 'Compartilhamento desabilitado'}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={compartilhamentoAtivo}
-                    onChange={(event) => {
-                      event.stopPropagation();
-                      handleToggleCompartilhar(terminal.getId(), event.target.checked)
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    disabled={!!updatingShare[terminal.getId()]}
-                  />
-                  <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                  <span className="absolute left-[2px] top-1/2 block h-[14px] w-[14px] md:h-4 md:w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[18px] md:peer-checked:translate-x-[28px]" />
-                </label>
+              <div
+                className="flex-[1.5] flex justify-center"
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <JiffyIconSwitch
+                  checked={compartilhamentoAtivo}
+                  onChange={(e) => {
+                    e.stopPropagation()
+                    handleToggleCompartilhar(terminal.getId(), e.target.checked)
+                  }}
+                  disabled={!!updatingShare[terminal.getId()]}
+                  size="sm"
+                  className="justify-center gap-0 px-0 py-0"
+                  inputProps={{
+                    'aria-label': `Compartilhar mesas — ${nome}`,
+                    title: compartilhamentoAtivo
+                      ? 'Compartilhamento habilitado'
+                      : 'Compartilhamento desabilitado',
+                  }}
+                />
               </div>
-              <div className="md:flex-[1.5] flex-[1] flex justify-center" onClick={(e) => e.stopPropagation()}>
-                <label
-                  className={`relative inline-flex h-4 w-10 md:h-5 md:w-12 items-center ${
-                    togglingStatus[terminal.getId()]
-                      ? 'cursor-not-allowed opacity-60'
-                      : 'cursor-pointer'
-                  }`}
-                  title={ativo ? 'Terminal Ativo' : 'Terminal Bloqueado'}
-                  onClick={(e) => e.stopPropagation()}
+              <div
+                className="flex-[1.5] flex justify-center"
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <JiffyIconSwitch
+                  checked={fiscalAtivo}
+                  onChange={(e) => {
+                    e.stopPropagation()
+                    handleToggleFiscalAtivo(terminal.getId(), e.target.checked)
+                  }}
+                  disabled={!!updatingFiscal[terminal.getId()]}
+                  size="sm"
+                  className="justify-center gap-0 px-0 py-0"
+                  inputProps={{
+                    'aria-label': `Fiscal ativo — ${nome}`,
+                    title: fiscalAtivo ? 'Fiscal ativo' : 'Fiscal inativo',
+                  }}
+                />
+              </div>
+              <div
+                className="flex-[1.5] flex justify-center"
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <JiffyIconSwitch
+                  checked={leitorHabilitado}
+                  onChange={(e) => {
+                    e.stopPropagation()
+                    handleToggleLeitorCodigoBarras(terminal.getId(), e.target.checked)
+                  }}
+                  disabled={!!updatingLeitor[terminal.getId()]}
+                  size="sm"
+                  className="justify-center gap-0 px-0 py-0"
+                  inputProps={{
+                    'aria-label': `Leitor código de barras — ${nome}`,
+                    title: leitorHabilitado ? 'Leitor habilitado' : 'Leitor desabilitado',
+                  }}
+                />
+              </div>
+              <div
+                className="md:flex-[1.5] flex-[1] flex justify-center"
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void handleToggleTerminalStatus(terminal.getId(), true)
+                  }}
+                  disabled={!!togglingStatus[terminal.getId()]}
+                  className="rounded-lg p-1.5 text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Desativar terminal"
+                  aria-label={`Desativar terminal — ${nome}`}
                 >
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={ativo}
-                    onChange={(event) => {
-                      event.stopPropagation();
-                      handleToggleTerminalStatus(terminal.getId(), !event.target.checked)
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    disabled={!!togglingStatus[terminal.getId()]}
-                  />
-                  <div className="h-full w-full rounded-full bg-gray-300 transition-colors peer-checked:bg-primary" />
-                  <span className="absolute left-[2px] top-1/2 block h-[14px] w-[14px] md:h-4 md:w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-[18px] md:peer-checked:translate-x-[28px]" />
-                </label>
+                  <MdDelete className="h-6 w-6" />
+                </button>
               </div>
             </div>
           )
@@ -725,12 +1012,7 @@ export function TerminaisTab() {
 
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-8">
-            <img
-              src="/images/jiffy-loading.gif"
-              alt="Carregando"
-              className="w-20 object-contain"
-            />
-            <span className="text-sm font-medium font-nunito text-primary-text">Carregando...</span>
+            <JiffyLoading />
           </div>
         )}
       </div>

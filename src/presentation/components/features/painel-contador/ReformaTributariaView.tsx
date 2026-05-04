@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { ConfigurarReformaTributariaModal } from './ConfigurarReformaTributariaModal'
 
 interface ConfiguracaoReformaTributaria {
@@ -79,7 +80,7 @@ export function ReformaTributariaView() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-secondary-text">Carregando configurações...</div>
+        <JiffyLoading />
       </div>
     )
   }
@@ -95,7 +96,7 @@ export function ReformaTributariaView() {
 
       <div className="flex flex-col h-full w-full p-6 bg-info">
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-secondary-text mb-2">
+          <h2 className="text-2xl font-semibold text-secondary-text mb-2">
             Reforma Tributária - Configurações por NCM
           </h2>
           <p className="text-sm text-secondary-text/70">

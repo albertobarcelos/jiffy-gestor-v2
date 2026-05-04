@@ -1,4 +1,42 @@
 /**
+ * Converte um input mascarado (ex.: "R$ 1.234,56") ou número para centavos → float.
+ * Retorna `null` se o valor não for parseável.
+ */
+export function parseBRLToNumber(value: number | string): number | null {
+  if (typeof value === 'number') {
+    return Number.isNaN(value) ? null : value
+  }
+  const trimmed = value.replace(/\s/g, '').replace(/[^\d.,-]/g, '')
+  if (!trimmed) return null
+  const hasComma = trimmed.includes(',')
+  const normalized = hasComma
+    ? trimmed.replace(/\./g, '').replace(',', '.')
+    : trimmed
+  const parsed = Number(normalized)
+  return Number.isNaN(parsed) ? null : parsed
+}
+
+/**
+ * Formata um valor bruto de input (dígitos digitados) como moeda BRL mascarada.
+ * Trata o valor como centavos inteiros (ex.: "1234" → "R$ 12,34").
+ */
+export function formatBRLFromMaskedInput(value: number | string): string {
+  const raw = typeof value === 'number'
+    ? value
+    : Number(String(value).replace(/\D/g, '')) / 100
+
+  const numberValue = typeof value === 'number'
+    ? value
+    : raw
+
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+  }).format(Number.isNaN(numberValue) ? 0 : numberValue)
+}
+
+/**
  * Formata valor para Real (R$)
  * Replica exatamente a função transformarParaReal do Flutter
  */

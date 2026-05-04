@@ -7,20 +7,19 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useQueryClient } from '@tanstack/react-query'
-import { MdDashboard, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose, MdAirplaneTicket } from 'react-icons/md'
+import { MdDashboard, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose } from 'react-icons/md'
 import { 
   MdInventory2, 
   MdShoppingBag, 
   MdPeople, 
   MdPerson, 
   MdGroup, 
-  MdPrint, 
-  MdPayment,
   MdCategory,
   MdAddCircle,
   MdReceipt,
   MdAccountBalance,
-  MdHistory
+  MdHistory,
+  MdPercent,
 } from 'react-icons/md'
 import type { IconType } from 'react-icons'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
@@ -54,6 +53,7 @@ export function TopNav() {
     const routesToPrefetch = [
       '/cadastros/grupos-complementos',
       '/cadastros/complementos',
+      '/cadastros/taxas',
       '/produtos',
       '/cadastros/grupos-produtos',
       '/estoque',
@@ -148,8 +148,6 @@ export function TopNav() {
         { name: 'Produtos', path: '/produtos', icon: MdShoppingBag },
         { name: 'Grupo de Complementos', path: '/cadastros/grupos-complementos', icon: MdCategory },
         { name: 'Complementos', path: '/cadastros/complementos', icon: MdAddCircle },
-        { name: 'Cadastro por Planilhas', path: '/cadastro-por-planilha', icon: MdAirplaneTicket },
-        { name: 'Impressoras', path: '/cadastros/impressoras', icon: MdPrint },
       ],
     },
     {
@@ -169,6 +167,7 @@ export function TopNav() {
       path: '#',
       icon: MdPointOfSale,
       children: [
+        { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: MdReceipt },
         {
           name: 'Mesas Abertas',
           path: '/vendas/abertas',
@@ -186,10 +185,10 @@ export function TopNav() {
             />
           ),
         },
+        { name: 'Relatórios Vendas', path: '/relatorios-vendas', icon: MdAssessment },
         { name: 'Hist. Fechamentos', path: '/historico-fechamento', icon: MdHistory },
-        { name: 'Relatórios', path: '/relatorios', icon: MdAssessment },
-        { name: 'Meios de Pagamentos', path: '/cadastros/meios-pagamentos', icon: MdPayment },
-        { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: MdReceipt },
+        { name: 'Comissões', path: '/vendas/comissoes', icon: MdPercent },
+
       ],
     },
     { name: 'Painel do Contador', path: '/painel-contador', icon: MdAccountBalance },
@@ -234,6 +233,17 @@ export function TopNav() {
     },
     [handleMobileNavigate]
   )
+
+  const handleLogout = useCallback(async () => {
+    try {
+      queryClient.clear()
+      await logout()
+      window.location.href = '/login'
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error)
+      window.location.href = '/login'
+    }
+  }, [queryClient, logout])
 
   useEffect(() => {
     if (isMobileMenuOpen) {
@@ -364,7 +374,7 @@ export function TopNav() {
                 'U'
               : 'U'}
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-gray-900">
               {isHydrated ? user?.getName() || user?.getEmail() || 'Usuário' : 'Usuário'}
             </p>
@@ -372,13 +382,22 @@ export function TopNav() {
               {isHydrated && user?.getEmail() ? user.getEmail() : 'Admin'}
             </p>
           </div>
+          {/* Logout no mobile: ações do usuário ficam em `hidden sm:flex` na barra superior */}
+          <button
+            type="button"
+            onClick={() => void handleLogout()}
+            className="shrink-0 p-2.5 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+            aria-label="Sair da conta"
+          >
+            <MdLogout className="w-6 h-6" />
+          </button>
         </div>
       </div>
     </div>
   )
 
   return (
-    <nav className="h-16 bg-white border-b border-gray-200 shadow-sm relative">
+    <nav className="relative z-40 h-16 shrink-0 bg-white border-b border-gray-200 shadow-sm">
       <div className="h-full flex items-center justify-between xl:px-4">
         {/* Logo */}
         <div className="flex items-center">
@@ -539,24 +558,11 @@ export function TopNav() {
 
           {/* Logout */}
           <button
-            onClick={async () => {
-              try {
-                // Limpar cache do React Query
-                queryClient.clear()
-                
-                // Fazer logout (limpa store, localStorage e chama API para remover cookie)
-                await logout()
-                
-                // Forçar redirecionamento com reload completo para garantir limpeza
-                window.location.href = '/login'
-              } catch (error) {
-                console.error('Erro ao fazer logout:', error)
-                // Mesmo com erro, força redirecionamento
-                window.location.href = '/login'
-              }
-            }}
+            type="button"
+            onClick={() => void handleLogout()}
             className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             title="Logout"
+            aria-label="Sair da conta"
           >
             <MdLogout className="w-5 h-5" />
           </button>

@@ -1,6 +1,15 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+  type FormEvent,
+  type ReactNode,
+} from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
@@ -9,20 +18,111 @@ import { IconPickerModal } from './IconPickerModal'
 import { ColorPickerModal } from './ColorPickerModal'
 import { ProdutosPorGrupoList } from './ProdutosPorGrupoList'
 import { useQueryClient } from '@tanstack/react-query'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
+import { Input } from '@/src/presentation/components/ui/input'
+import { cn } from '@/src/shared/utils/cn'
+import { showToast } from '@/src/shared/utils/toast'
+
+/** Labels outlined em preto — igual NovoGrupoComplemento */
+const sxOutlinedLabelTextoEscuro = {
+  '& .MuiInputLabel-root': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiInputLabel-root.Mui-focused': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiInputLabel-root.MuiInputLabel-shrink': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiFormLabel-asterisk': {
+    color: 'var(--color-error)',
+  },
+} as const
+
+const entradaCompactaInput = {
+  padding: '10px',
+  fontSize: '0.875rem',
+} as const
+
+const sxEntradaNomeGrupoProduto = {
+  ...sxOutlinedLabelTextoEscuro,
+  '& .MuiOutlinedInput-input': entradaCompactaInput,
+} as const
 
 interface NovoGrupoProps {
   grupoId?: string
   isEmbedded?: boolean
+  /** `id` do `<form>` para o rodapé do `JiffySidePanelModal` usar `form="..."` no Salvar */
+  embeddedFormId?: string
+  /** Omite o cabeçalho Cancelar/Salvar (ações no rodapé do painel) */
+  hideEmbeddedFormActions?: boolean
+  /** Permite o modal compor o título com o nome atual do grupo */
+  onGrupoNomeChange?: (nome: string) => void
+  /** Sincroniza estado com o rodapé do modal (loading / pode submeter) */
+  onEmbedFormStateChange?: (state: {
+    isSubmitting: boolean
+    canSubmit: boolean
+  }) => void
+  /** Aba interna 0 = Detalhes, 1 = Produtos — para o rodapé (Salvar vs Fechar) */
+  onEmbeddedTabChange?: (tabIndex: number) => void
   onClose?: () => void
   onSaved?: () => void
+  /** Após salvar mantendo o painel aberto (ex.: aba Produtos vinculados) — invalida listas sem fechar. */
+  onReload?: () => void
   initialTab?: number // 0 = Detalhes do Grupo, 1 = Produtos Vinculados
+}
+
+/** API imperativa para confirmação ao fechar o painel (`PADRAO_MODAL_SAIR_SEM_SALVAR`). */
+export interface NovoGrupoHandle {
+  /** Há alterações em relação ao último baseline (carregamento ou salvamento). */
+  isDirty: () => boolean
+  /** Persiste o grupo sem depender do `<form>` (rodapé na aba Produtos vinculados). */
+  saveGrupo: () => Promise<void>
+  /** Salva e fecha o painel (mesmo fluxo do submit do formulário em modo embed). */
+  saveGrupoAndClose: () => Promise<void>
+}
+
+/** Envolve o card de detalhes em `<form>` apenas quando há `embeddedFormId` (submit pelo rodapé do painel) */
+function GrupoDetalhesFormShell({
+  formId,
+  onSubmit,
+  children,
+}: {
+  formId?: string
+  onSubmit: (e: FormEvent<HTMLFormElement>) => void
+  children: ReactNode
+}) {
+  if (formId) {
+    return (
+      <form id={formId} onSubmit={onSubmit}>
+        {children}
+      </form>
+    )
+  }
+  return <>{children}</>
 }
 
 /**
  * Componente para criar/editar grupo de produtos
  * Replica o design e lógica do Flutter NovoGrupoTabbedWidget
  */
-export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initialTab = 0 }: NovoGrupoProps) {
+export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function NovoGrupo(
+  {
+    grupoId,
+    isEmbedded = false,
+    embeddedFormId,
+    hideEmbeddedFormActions,
+    onGrupoNomeChange,
+    onEmbedFormStateChange,
+    onEmbeddedTabChange,
+    onClose,
+    onSaved,
+    onReload,
+    initialTab = 0,
+  },
+  ref
+) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { auth } = useAuthStore()
@@ -43,9 +143,31 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
   const hasLoadedGrupoRef = useRef(false)
   const loadedGrupoIdRef = useRef<string | null>(null)
 
+  useEffect(() => {
+    onGrupoNomeChange?.(nome)
+  }, [nome, onGrupoNomeChange])
+
   // Determina se está editando ou criando
   const effectiveGrupoId = grupoId || searchParams.get('id') || null
   const isEditMode = !!effectiveGrupoId
+
+  /** Cabeçalho próprio só fora do painel padronizado (ou embed sem delegar ao modal) */
+  const showPageHeader = !(isEmbedded && hideEmbeddedFormActions)
+
+  const emitEmbedFormState = useCallback(() => {
+    onEmbedFormStateChange?.({
+      isSubmitting: isLoading,
+      canSubmit: nome.trim().length > 0,
+    })
+  }, [isLoading, nome, onEmbedFormStateChange])
+
+  useEffect(() => {
+    emitEmbedFormState()
+  }, [emitEmbedFormState])
+
+  useEffect(() => {
+    onEmbeddedTabChange?.(activeTab)
+  }, [activeTab, onEmbeddedTabChange])
 
   const normalizeColor = useCallback((value: string) => {
     if (!value) return '#CCCCCC'
@@ -76,10 +198,41 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
     [normalizeColor]
   )
 
+  /** Snapshot só dos campos persistidos — aba interna não entra (PADRAO_MODAL_SAIR_SEM_SALVAR). */
+  const getFormSnapshot = useCallback(() => {
+    return JSON.stringify({
+      nome,
+      ativo,
+      corHex: normalizeColor(corHex),
+      iconName,
+      ativoDelivery,
+      ativoLocal,
+    })
+  }, [nome, ativo, corHex, iconName, ativoDelivery, ativoLocal, normalizeColor])
+
+  const baselineSerializedRef = useRef<string>('')
+
+  const commitBaseline = useCallback(() => {
+    baselineSerializedRef.current = getFormSnapshot()
+  }, [getFormSnapshot])
+
+  const commitBaselineLatestRef = useRef(commitBaseline)
+  commitBaselineLatestRef.current = commitBaseline
+
   // Atualiza a aba ativa quando initialTab mudar
   useEffect(() => {
     setActiveTab(initialTab)
   }, [initialTab])
+
+  // Baseline inicial em modo criação (estado padrão aplicado)
+  useEffect(() => {
+    if (isLoadingData) return
+    if (isEditMode) return
+    const t = window.setTimeout(() => {
+      commitBaselineLatestRef.current()
+    }, 100)
+    return () => window.clearTimeout(t)
+  }, [isLoadingData, isEditMode, effectiveGrupoId])
 
   // Carrega dados do grupo para edição
   useEffect(() => {
@@ -122,6 +275,10 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
 
         hasLoadedGrupoRef.current = true
         loadedGrupoIdRef.current = effectiveGrupoId
+
+        window.setTimeout(() => {
+          commitBaselineLatestRef.current()
+        }, 100)
       } catch (error) {
         console.error('Erro ao carregar grupo:', error)
         alert('Erro ao carregar dados do grupo')
@@ -131,77 +288,121 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
     }
 
     loadGrupo()
-  }, [isEditMode, effectiveGrupoId, auth])
+  }, [isEditMode, effectiveGrupoId, auth, normalizeColor])
 
-  const handleSave = async () => {
-    if (!nome.trim()) {
-      alert('Nome do grupo é obrigatório')
-      return
-    }
-
-    const token = auth?.getAccessToken()
-    if (!token) {
-      alert('Token não encontrado')
-      return
-    }
-
-    setIsLoading(true)
-
-    try {
-      const url = isEditMode
-        ? `/api/grupos-produtos/${effectiveGrupoId}`
-        : '/api/grupos-produtos'
-      const method = isEditMode ? 'PATCH' : 'POST'
-
-      const body = isEditMode
-        ? {
-            nome,
-            ativo,
-            corHex,
-            iconName,
-            ativoDelivery,
-            ativoLocal,
-          }
-        : {
-            nome,
-            ativo,
-            corHex,
-            iconName,
-            ativoDelivery,
-            ativoLocal,
-          }
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Erro ao salvar grupo')
+  const handleSave = useCallback(
+    async (opts?: { keepModalOpen?: boolean }) => {
+      if (!nome.trim()) {
+        alert('Nome do grupo é obrigatório')
+        return
       }
 
-      // Sucesso - redireciona para a lista
-      if (isEmbedded) {
-        onSaved?.()
-        onClose?.()
-      } else {
-        router.push('/cadastros/grupos-produtos')
-        router.refresh() // Força a revalidação dos dados da rota para recarregar a lista
-        queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false }) // Invalida todas as queries de grupos de produtos
-        queryClient.invalidateQueries({ queryKey: ['produtos', 'infinite'] }) // Invalida o cache do React Query para produtos
+      const token = auth?.getAccessToken()
+      if (!token) {
+        alert('Token não encontrado')
+        return
       }
-    } catch (error: any) {
-      console.error('Erro ao salvar grupo:', error)
-      alert(error.message || 'Erro ao salvar grupo')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+
+      setIsLoading(true)
+
+      try {
+        const url = isEditMode
+          ? `/api/grupos-produtos/${effectiveGrupoId}`
+          : '/api/grupos-produtos'
+        const method = isEditMode ? 'PATCH' : 'POST'
+
+        const body = isEditMode
+          ? {
+              nome,
+              ativo,
+              corHex,
+              iconName,
+              ativoDelivery,
+              ativoLocal,
+            }
+          : {
+              nome,
+              ativo,
+              corHex,
+              iconName,
+              ativoDelivery,
+              ativoLocal,
+            }
+
+        const response = await fetch(url, {
+          method,
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(body),
+        })
+
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.message || 'Erro ao salvar grupo')
+        }
+
+        // Sucesso — mesmo cache que na página avulsa (lista de produtos depende dos dois)
+        if (isEmbedded) {
+          void queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false })
+          void queryClient.invalidateQueries({
+            queryKey: ['produtos', 'infinite'],
+            exact: false,
+            refetchType: 'active',
+          })
+          commitBaselineLatestRef.current()
+          if (opts?.keepModalOpen) {
+            onReload?.()
+            showToast.success('Grupo salvo com sucesso.')
+            return
+          }
+          onSaved?.()
+          onClose?.()
+        } else {
+          router.push('/cadastros/grupos-produtos')
+          router.refresh() // Força a revalidação dos dados da rota para recarregar a lista
+          queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false }) // Invalida todas as queries de grupos de produtos
+          queryClient.invalidateQueries({ queryKey: ['produtos', 'infinite'] }) // Invalida o cache do React Query para produtos
+        }
+      } catch (error: any) {
+        console.error('Erro ao salvar grupo:', error)
+        alert(error.message || 'Erro ao salvar grupo')
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [
+      nome,
+      isEditMode,
+      effectiveGrupoId,
+      ativo,
+      corHex,
+      iconName,
+      ativoDelivery,
+      ativoLocal,
+      auth,
+      isEmbedded,
+      queryClient,
+      router,
+      onReload,
+      onSaved,
+      onClose,
+    ]
+  )
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      isDirty: () => {
+        if (isLoadingData) return false
+        return getFormSnapshot() !== baselineSerializedRef.current
+      },
+      saveGrupo: () => handleSave({ keepModalOpen: true }),
+      saveGrupoAndClose: () => handleSave(),
+    }),
+    [getFormSnapshot, isLoadingData, handleSave]
+  )
 
   const handleCancel = () => {
     if (isEmbedded) {
@@ -211,67 +412,65 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
     }
   }
 
+  const handleFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    await handleSave()
+  }
+
   if (isLoadingData) {
     return (
-      <div className="flex items-center justify-center h-screen bg-info">
+      <div
+        className={cn(
+          'flex items-center justify-center bg-info',
+          isEmbedded ? 'h-full min-h-[200px]' : 'h-screen'
+        )}
+      >
         <div className="text-center flex flex-col items-center gap-2">
-          <img
-            src="/images/jiffy-loading.gif"
-            alt="Carregando"
-            className="w-20 object-contain"
-          />
-          <p className="text-primary-text font-nunito">Carregando dados do grupo...</p>
+          <JiffyLoading />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-screen bg-info">
-      {/* Header */}
-      <div className="h-20 bg-info md:px-[35px] px-2 flex items-center justify-between">
-        <h1 className="text-primary md:text-xl text-sm font-exo font-semibold">
-          {isEditMode ? 'Editar Grupo de Produtos' : 'Novo Grupo de Produtos'}
-        </h1>
-        <div className="flex px-1 items-center gap-2">
-          <button
-            onClick={handleCancel}
-            className="px-6 h-8 bg-primary-bg text-primary-text rounded-lg font-nunito md:text-sm text-xs hover:bg-primary-bg/80 transition-colors"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={isLoading}
-            className="px-6 h-8 bg-primary text-info rounded-lg font-nunito md:text-sm text-xs font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isLoading ? 'Salvando...' : 'Salvar'}
-          </button>
-        </div>
-      </div>
+    <div
+      className={cn(
+        'flex flex-col bg-info',
+        isEmbedded ? 'h-full min-h-0 flex-1' : 'h-screen'
+      )}
+    >
 
       {/* Conteúdo principal */}
-      <div className="flex-1 bg-primary-bg rounded-tl-lg overflow-y-auto">
-        {/* Tabs */}
-        <div className="border-b border-primary/20">
-          <div className="flex md:px-8 px-2">
+      <div
+        className={cn(
+          'flex flex-col bg-info rounded-tl-lg overflow-hidden',
+          isEmbedded && 'min-h-0'
+        )}
+      >
+        {/* Abas — mesmo modelo do `GruposComplementosTabsModal` (faixa cinza + pílulas) */}
+        <div className="shrink-0 w-full border-b border-gray-200 bg-info px-6">
+          <div className="flex flex-wrap gap-1">
             <button
+              type="button"
               onClick={() => setActiveTab(0)}
-              className={`md:px-6 py-2 font-nunito md:text-sm text-xs transition-colors ${
+              className={cn(
+                'rounded-t-lg px-4 py-2 font-nunito text-xs font-semibold transition-colors md:text-sm',
                 activeTab === 0
-                  ? 'text-primary border-b-2 border-primary font-semibold'
-                  : 'text-secondary-text'
-              }`}
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
+              )}
             >
               Detalhes do Grupo
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab(1)}
-              className={`px-6 py-2 font-nunito md:text-sm text-xs transition-colors ${
+              className={cn(
+                'rounded-t-lg px-4 py-2 font-nunito text-xs font-semibold transition-colors md:text-sm',
                 activeTab === 1
-                  ? 'text-primary border-b-2 border-primary font-semibold'
-                  : 'text-secondary-text'
-              }`}
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
+              )}
             >
               Produtos Vinculados
             </button>
@@ -279,13 +478,24 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
         </div>
 
         {/* Conteúdo das tabs */}
-        <div className="p-1">
+        <div className="flex min-h-0 flex-1 flex-col px-6 overflow-hidden">
           {activeTab === 0 && (
-            <div className="max-w-4xl">
-              {/* Card de informações */}
-              <div className="bg-info rounded-t-lg rounded-b-lg mt-2 md:mx-2 mx-1">
+            <div className="min-h-0 flex-1 overflow-y-auto max-w-4xl mx-5 py-6">
+              <GrupoDetalhesFormShell
+                formId={embeddedFormId}
+                onSubmit={handleFormSubmit}
+              >
+                <div className="mb-2 flex items-center gap-5">
+                <h2 className="shrink-0 text-primary md:text-xl text-sm font-semibold">
+                  Dados do Grupo de Produtos
+                </h2>
+                <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
+              </div>
+
+                {/* Card de informações */}
+                <div className="bg-info rounded-t-lg rounded-b-lg mt-2">
                 {/* Header do card */}
-                <div className="md:px-5 px-2 py-4 border-b border-primary/10">
+                <div className="py-4 border-b border-primary/10">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div
@@ -308,39 +518,33 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-2">
-                      <p className="text-primary-text md:text-sm text-xs font-nunito">
-                        {ativo ? 'Grupo ativo' : 'Grupo inativo'}
-                      </p>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={ativo}
-                          onChange={(e) => setAtivo(e.target.checked)}
-                          className="sr-only peer"
-                        />
-                        <div className="w-12 h-5 bg-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[16px] after:bg-info after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
-                      </label>
+                      <JiffyIconSwitch
+                        checked={ativo}
+                        onChange={e => setAtivo(e.target.checked)}
+                        label={ativo ? 'Grupo ativo' : 'Grupo inativo'}
+                        labelPosition="end"
+                        bordered={false}
+                        size="sm"
+                        className="justify-end"
+                      />
                     </div>
                   </div>
                 </div>
 
                 {/* Formulário */}
-                <div className="md:p-5 p-2">
+                <div className="md:py-5 py-2">
                   <div className="md:space-y-6 space-y-4">
-                    {/* Nome */}
-                    <div>
-                      <label className="block text-primary-text text-sm font-nunito font-semibold mb-2">
-                        Nome do Grupo *
-                      </label>
-                      <input
-                        type="text"
-                        value={nome}
-                        onChange={(e) => setNome(e.target.value)}
-                        placeholder="Digite o nome do grupo"
-                        className="w-full px-4 py-3 bg-primary-bg border border-primary/20 rounded-lg text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary font-nunito"
-                        required
-                      />
-                    </div>
+                    {/* Nome — label na borda superior (outlined), igual cadastro de grupo de complementos */}
+                    <Input
+                      label="Nome do Grupo"
+                      value={nome}
+                      onChange={e => setNome(e.target.value.toLocaleUpperCase('pt-BR'))}
+                      required
+                      size="small"
+                      placeholder="Digite o nome do grupo"
+                      className="bg-info"
+                      sx={sxEntradaNomeGrupoProduto}
+                    />
 
                     {/* Cor e Ícone */}
                     <div className="grid grid-cols-2 gap-2">
@@ -481,12 +685,13 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
                     </div>
                   </div>
                 </div>
-              </div>
+                </div>
+              </GrupoDetalhesFormShell>
             </div>
           )}
 
           {activeTab === 1 && (
-            <div className="py-6">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden py-6">
               {isEditMode && effectiveGrupoId ? (
                 <ProdutosPorGrupoList grupoProdutoId={effectiveGrupoId} />
               ) : (
@@ -518,5 +723,6 @@ export function NovoGrupo({ grupoId, isEmbedded = false, onClose, onSaved, initi
       />
     </div>
   )
-}
+})
 
+NovoGrupo.displayName = 'NovoGrupo'

@@ -138,7 +138,7 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
     <Dialog open={open} onClose={handleClose}>
       <div className="max-w-md px-4">
         <div>
-          <p className="text-2xl text-center font-bold text-primary pt-4">
+          <p className="text-2xl text-center font-semibold text-primary pt-4">
             Cadastrar Certificado Digital
           </p>
           <p className="text-secondary-text">

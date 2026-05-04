@@ -69,16 +69,16 @@ export class GrupoComplemento {
       qtdMinima,
       qtdMaxima,
       data.ativo === true || data.ativo === 'true',
-      data.complementosIds
-        ? (Array.isArray(data.complementosIds)
-            ? data.complementosIds.map((id: any) => id.toString())
-            : [])
-        : undefined,
       typeof data.ordem === 'number'
         ? data.ordem
         : typeof data.ordem === 'string'
           ? Number(data.ordem)
           : undefined,
+      data.complementosIds
+        ? (Array.isArray(data.complementosIds)
+            ? data.complementosIds.map((id: any) => id.toString())
+            : [])
+        : undefined,
       data.complementos
     )
   }

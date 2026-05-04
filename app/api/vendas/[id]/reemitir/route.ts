@@ -11,9 +11,23 @@ type ApiErrorData = {
   categoria?: string
 }
 
+/** Evita 500 genérico se o body não for JSON válido ou vier vazio. */
+async function lerCorpoJsonSeguro(request: NextRequest): Promise<unknown> {
+  try {
+    const text = await request.text()
+    if (!text?.trim()) return {}
+    return JSON.parse(text) as unknown
+  } catch {
+    return {}
+  }
+}
+
 /**
  * POST /api/vendas/[id]/reemitir
- * Reemite nota fiscal para uma venda PDV rejeitada
+ *
+ * Rota **local** do Next (nome curto). O destino na API externa é sempre `.../reemitir-nota` (Swagger).
+ * Um `POST .../reemitir 500` no log do Next indica que o **backend externo** devolveu HTTP 500; o corpo JSON
+ * (mensagem SEFAZ etc.) ainda é repassado ao browser — não é falha de URL no proxy.
  */
 export async function POST(
   request: NextRequest,
@@ -31,11 +45,11 @@ export async function POST(
       return NextResponse.json({ error: 'ID da venda é obrigatório' }, { status: 400 })
     }
 
-    const body = await request.json()
+    const body = await lerCorpoJsonSeguro(request)
     const apiClient = new ApiClient()
 
     const response = await apiClient.request<any>(
-      `/api/v1/operacao-pdv/vendas/${id}/reemitir`,
+      `/api/v1/operacao-pdv/vendas/${id}/reemitir-nota`,
       {
         method: 'POST',
         headers: {
@@ -50,19 +64,36 @@ export async function POST(
   } catch (error) {
     if (error instanceof ApiError) {
       const errorData =
-        error.data && typeof error.data === 'object'
-          ? (error.data as ApiErrorData)
+        error.data && typeof error.data === 'object' && !Array.isArray(error.data)
+          ? (error.data as ApiErrorData & Record<string, unknown>)
           : {}
+
+      if (process.env.NODE_ENV === 'development') {
+        console.error(
+          '[proxy PDV reemitir-nota] status upstream:',
+          error.status,
+          'mensagem:',
+          error.message
+        )
+      }
 
       return NextResponse.json(
         {
-          error: error.message || errorData.message || errorData.error || 'Erro ao reemitir nota fiscal',
+          ...errorData,
+          error:
+            error.message ||
+            errorData.message ||
+            errorData.error ||
+            'Erro ao reemitir nota fiscal',
           codigo: errorData.codigo ?? errorData.codigoErro ?? null,
           codigoRejeicao: errorData.codigoRejeicao ?? null,
           categoria: errorData.categoria ?? null,
         },
         { status: error.status }
       )
+    }
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[proxy PDV reemitir-nota] erro não-ApiError:', error)
     }
     return NextResponse.json(
       { error: 'Erro interno do servidor' },

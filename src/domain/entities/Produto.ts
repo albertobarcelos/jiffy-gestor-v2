@@ -34,6 +34,9 @@ export class Produto {
     private readonly abreComplementos?: boolean,
     private readonly permiteAcrescimo?: boolean,
     private readonly permiteDesconto?: boolean,
+    private readonly permiteAlterarPreco?: boolean,
+    private readonly incideTaxa?: boolean,
+    private readonly ordem?: number,
     private readonly gruposComplementos?: ProdutoGrupoComplementoResumo[],
     private readonly impressoras?: ProdutoImpressoraResumo[],
     private readonly descricao?: string
@@ -52,6 +55,9 @@ export class Produto {
     abreComplementos?: boolean,
     permiteAcrescimo?: boolean,
     permiteDesconto?: boolean,
+    permiteAlterarPreco?: boolean,
+    incideTaxa?: boolean,
+    ordem?: number,
     gruposComplementos?: ProdutoGrupoComplementoResumo[],
     impressoras?: ProdutoImpressoraResumo[],
     descricao?: string
@@ -73,6 +79,9 @@ export class Produto {
       abreComplementos,
       permiteAcrescimo,
       permiteDesconto,
+      permiteAlterarPreco,
+      incideTaxa,
+      ordem,
       gruposComplementos,
       impressoras,
       descricao
@@ -103,6 +112,16 @@ export class Produto {
       data.abreComplementos === true || data.abreComplementos === 'true',
       data.permiteAcrescimo === true || data.permiteAcrescimo === 'true',
       data.permiteDesconto === true || data.permiteDesconto === 'true',
+      data.permiteAlterarPreco === true || data.permiteAlterarPreco === 'true',
+      data.incideTaxa === true || data.incideTaxa === 'true',
+      (() => {
+        if (typeof data.ordem === 'number' && Number.isFinite(data.ordem)) return data.ordem
+        if (typeof data.ordem === 'string' && data.ordem.trim() !== '') {
+          const n = parseInt(data.ordem, 10)
+          return Number.isFinite(n) ? n : undefined
+        }
+        return undefined
+      })(),
       Array.isArray(data.gruposComplementos)
         ? data.gruposComplementos.map((grupo: any) => ({
             id: grupo.id?.toString() || '',
@@ -117,14 +136,7 @@ export class Produto {
               : [],
           }))
         : [],
-      Array.isArray(data.impressoras)
-        ? data.impressoras.map((imp: any) => ({
-            id: imp.id?.toString() || '',
-            nome: imp.nome?.toString() || 'Impressora',
-            ativo: imp.ativo === true || imp.ativo === 'true',
-          }))
-        : [],
-      data.descricao?.toString()
+      impressorasMapeadas
     )
   }
 
@@ -176,6 +188,18 @@ export class Produto {
     return this.permiteDesconto === true
   }
 
+  permiteAlterarPrecoAtivo(): boolean {
+    return this.permiteAlterarPreco === true
+  }
+
+  incideTaxaAtivo(): boolean {
+    return this.incideTaxa === true
+  }
+
+  getOrdem(): number | undefined {
+    return this.ordem
+  }
+
   getGruposComplementos(): ProdutoGrupoComplementoResumo[] {
     return this.gruposComplementos || []
   }
@@ -202,6 +226,9 @@ export class Produto {
       abreComplementos: this.abreComplementos,
       permiteAcrescimo: this.permiteAcrescimo,
       permiteDesconto: this.permiteDesconto,
+      permiteAlterarPreco: this.permiteAlterarPreco,
+      incideTaxa: this.incideTaxa,
+      ordem: this.ordem,
       gruposComplementos: this.gruposComplementos,
       impressoras: this.impressoras,
       descricao: this.descricao,

@@ -1,10 +1,18 @@
 'use client'
 
-import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
-import { NovoCliente } from './NovoCliente'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import {
+  JiffySidePanelModal,
+  type JiffySidePanelFooterActions,
+} from '@/src/presentation/components/ui/jiffy-side-panel-modal'
+import { NovoCliente, type NovoClienteHandle } from './NovoCliente'
 import { VisualizarCliente } from './VisualizarCliente'
+import { showToast } from '@/src/shared/utils/toast'
 
 type TabKey = 'cliente' | 'visualizar'
+
+const CLIENTE_TABS_FORM_ID = 'cliente-tabs-modal-form'
 
 export interface ClientesTabsModalState {
   open: boolean
@@ -27,112 +35,239 @@ export function ClientesTabsModal({
   onTabChange,
 }: ClientesTabsModalProps) {
   const clienteId = state.clienteId
+  const clienteRef = useRef<NovoClienteHandle>(null)
 
-  const handleEdit = () => {
+  const handleEdit = useCallback(() => {
     onTabChange('cliente')
-  }
+  }, [onTabChange])
+
+  const title = useMemo(() => {
+    if (state.tab === 'visualizar') return 'Visualizar Cliente'
+    if (state.mode === 'create') return 'Novo Cliente'
+    return 'Editar Cliente'
+  }, [state.tab, state.mode])
+
+  const [embedFormState, setEmbedFormState] = useState({
+    isSubmitting: false,
+    canSubmit: false,
+  })
+
+  /** Confirmação ao fechar com alterações não salvas (`PADRAO_MODAL_SAIR_SEM_SALVAR`). */
+  const [confirmExitOpen, setConfirmExitOpen] = useState(false)
+
+  const [formSession, setFormSession] = useState(0)
+  const prevPainelAbertoRef = useRef(false)
+
+  useEffect(() => {
+    if (state.open && !prevPainelAbertoRef.current) {
+      setFormSession(s => s + 1)
+    }
+    prevPainelAbertoRef.current = state.open
+  }, [state.open])
+
+  useEffect(() => {
+    if (!state.open) {
+      setConfirmExitOpen(false)
+    }
+  }, [state.open])
+
+  const isActiveFormDirty = useCallback(() => {
+    if (state.tab !== 'cliente') return false
+    return Boolean(clienteRef.current?.isDirty?.())
+  }, [state.tab])
+
+  const handleRequestClose = useCallback(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (isActiveFormDirty()) {
+          setConfirmExitOpen(true)
+          return
+        }
+        onClose()
+      })
+    })
+  }, [onClose, isActiveFormDirty])
+
+  const handleConfirmDiscardExit = useCallback(() => {
+    setConfirmExitOpen(false)
+    onClose()
+  }, [onClose])
+
+  const handleCancelDiscardExit = useCallback(() => {
+    setConfirmExitOpen(false)
+  }, [])
+
+  const handleSaveAndCloseFromConfirm = useCallback(() => {
+    setConfirmExitOpen(false)
+    void clienteRef.current?.saveClienteAndClose?.()
+  }, [])
+
+  const handleTabClick = useCallback(
+    (key: TabKey) => {
+      if (key === 'visualizar' && state.tab === 'cliente') {
+        if (Boolean(clienteRef.current?.isDirty?.())) {
+          showToast.warning(
+            'Salve ou descarte as alterações na aba Cliente antes de abrir Visualizar.'
+          )
+          return
+        }
+      }
+      onTabChange(key)
+    },
+    [onTabChange, state.tab]
+  )
+
+  const footerActions = useMemo((): JiffySidePanelFooterActions => {
+    if (state.tab === 'visualizar') {
+      return {
+        barActionOrder: ['cancel', 'save'],
+        showCancel: true,
+        cancelVariant: 'primaryTint10',
+        cancelLabel: 'Fechar',
+        onCancel: handleRequestClose,
+        showSave: true,
+        saveLabel: 'Editar',
+        onSave: handleEdit,
+      }
+    }
+
+    const saving = embedFormState.isSubmitting
+    const disabled = !embedFormState.canSubmit || embedFormState.isSubmitting
+    return {
+      barActionOrder: ['cancel', 'save'],
+      showCancel: true,
+      cancelLabel: 'Fechar',
+      cancelVariant: 'primaryTint10',
+      onCancel: handleRequestClose,
+      showSave: true,
+      saveLabel: 'Salvar',
+      onSave: () => {
+        void clienteRef.current?.saveCliente?.()
+      },
+      saveLoading: saving,
+      saveDisabled: disabled,
+    }
+  }, [state.tab, embedFormState, handleRequestClose, handleEdit])
 
   return (
-    <Dialog
-      open={state.open}
-      onOpenChange={(open) => {
-        if (!open) {
-          onClose()
-        }
-      }}
-      fullWidth
-      maxWidth="xl"
-      sx={{
-        '& .MuiDialog-container': {
-          zIndex: 1500,
-          justifyContent: {
-            xs: 'center', // Centraliza em mobile
-            md: 'flex-end', // Alinha à direita em desktop
-          },
-          alignItems: 'stretch',
-          margin: 0,
-        },
-        '& .MuiBackdrop-root': { zIndex: 1500 },
-        '& .MuiDialog-paper': { zIndex: 1500 },
-      }}
-      PaperProps={{
-        sx: {
-          height: '100vh',
-          maxHeight: '100vh',
-          width: {
-            xs: '95vw', // Em telas muito pequenas (mobile), ocupa 95% da largura
-            sm: '90vw', // Em telas pequenas, ocupa 90% da largura
-            md: 'min(900px, 60vw)', // Em telas médias e maiores, mantém o comportamento original
-          },
-          margin: {
-            xs: 'auto', // Centraliza em mobile (com width 95vw, deixa 2.5% de cada lado)
-            md: 0, // Sem margin em desktop
-          },
-          borderRadius: 0,
-          display: 'flex',
-          flexDirection: 'column',
-        },
-      }}
-    >
-      <DialogContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <div className="px-6 pt-4 flex gap-1 border-b border-gray-200">
-          {(
-            [
+    <>
+      <JiffySidePanelModal
+        open={state.open}
+        onClose={handleRequestClose}
+        title={title}
+        scrollableBody={false}
+        footerVariant="bar"
+        panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]"
+        footerActions={footerActions}
+        tabsSlot={
+          <div className="flex flex-wrap gap-1 px-2 pb-0">
+            {[
               { key: 'cliente' as TabKey, label: 'Cliente', disabled: false },
               {
                 key: 'visualizar' as TabKey,
                 label: 'Visualizar',
                 disabled: state.mode === 'create' || !clienteId,
               },
-            ] as Array<{
-              key: TabKey
-              label: string
-              disabled: boolean
-            }>
-          ).map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              disabled={tab.disabled}
-              onClick={() => !tab.disabled && onTabChange(tab.key)}
-              className={`px-4 py-2 rounded-t-lg text-sm font-semibold transition-colors ${
-                state.tab === tab.key
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
-              } ${tab.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {tab.label}
-            </button>
-          ))}
+            ].map(tab => (
+              <button
+                key={tab.key}
+                type="button"
+                disabled={tab.disabled}
+                onClick={() => !tab.disabled && handleTabClick(tab.key)}
+                className={`rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                  state.tab === tab.key
+                    ? 'bg-primary text-white'
+                    : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
+                } ${tab.disabled ? 'cursor-not-allowed opacity-50' : ''}`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        }
+      >
+        <div className="flex min-h-0 flex-1 flex-col">
+          {state.tab === 'cliente' ? (
+            <NovoCliente
+              ref={clienteRef}
+              key={`cliente-${clienteId ?? 'new'}-${state.mode}-sess-${formSession}`}
+              clienteId={state.mode === 'create' ? undefined : clienteId}
+              isEmbedded
+              hideEmbeddedHeader
+              embeddedFormId={CLIENTE_TABS_FORM_ID}
+              hideEmbeddedFormActions
+              onEmbedFormStateChange={setEmbedFormState}
+              onClose={handleRequestClose}
+              onSaved={() => {
+                onReload?.()
+              }}
+              onCloseAfterSave={() => {
+                onClose()
+              }}
+            />
+          ) : null}
+          {state.tab === 'visualizar' && clienteId ? (
+            <VisualizarCliente
+              clienteId={clienteId}
+              isEmbedded
+              hideEmbeddedHeader
+              onClose={handleRequestClose}
+              onEdit={handleEdit}
+            />
+          ) : null}
         </div>
+      </JiffySidePanelModal>
 
-        <div className="flex-1 overflow-hidden">
-          {state.tab === 'cliente' && (
-            <div className="h-full overflow-y-auto">
-              <NovoCliente
-                clienteId={state.mode === 'create' ? undefined : clienteId}
-                isEmbedded
-                onClose={onClose}
-                onSaved={() => {
-                  onReload?.()
-                  onClose()
-                }}
-              />
-            </div>
-          )}
-          {state.tab === 'visualizar' && clienteId && (
-            <div className="h-full overflow-y-auto">
-              <VisualizarCliente
-                clienteId={clienteId}
-                isEmbedded
-                onClose={onClose}
-                onEdit={handleEdit}
-              />
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+      {confirmExitOpen && typeof document !== 'undefined'
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/50 md:p-4"
+              role="presentation"
+            >
+              <div
+                className="w-[85vw] max-w-[85vw] rounded-lg bg-white p-6 shadow-lg md:w-auto md:max-w-md"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="clientes-tabs-modal-exit-title"
+              >
+                <h3
+                  id="clientes-tabs-modal-exit-title"
+                  className="mb-4 text-lg font-semibold text-primary-text"
+                >
+                  Alterações não salvas
+                </h3>
+                <p className="mb-6 text-sm text-secondary-text">
+                  Você pode salvar antes de sair ou descartar as alterações.
+                </p>
+                <div className="mb-2 flex flex-col justify-between sm:flex-row sm:flex-wrap sm:justify-between">
+                  <button
+                    type="button"
+                    onClick={handleCancelDiscardExit}
+                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-primary-text transition-colors hover:bg-gray-50"
+                  >
+                    Continuar editando
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleConfirmDiscardExit}
+                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-secondary-text transition-colors hover:bg-gray-50"
+                  >
+                    Sair sem salvar
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSaveAndCloseFromConfirm}
+                  className="w-full rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
+                >
+                  Salvar e fechar
+                </button>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
+    </>
   )
 }
-

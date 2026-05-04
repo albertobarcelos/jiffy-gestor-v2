@@ -18,7 +18,13 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    return NextResponse.json(response.data)
+    const payload = response.data
+    if (process.env.NODE_ENV === 'development' && payload && typeof payload === 'object') {
+      const p = payload as Record<string, unknown>
+      console.log('[api/empresas/me] parametroEmpresa (timezone API):', p.parametroEmpresa)
+    }
+
+    return NextResponse.json(payload)
   } catch (error) {
     console.error('Erro ao buscar empresa:', error)
     if (error instanceof ApiError) {
@@ -27,9 +33,6 @@ export async function GET(request: NextRequest) {
         { status: error.status }
       )
     }
-    return NextResponse.json(
-      { error: 'Erro interno do servidor' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
   }
 }

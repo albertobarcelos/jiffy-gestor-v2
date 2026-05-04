@@ -24,27 +24,13 @@ export class DashboardVendas {
   }
 
   static fromJSON(data: any): DashboardVendas {
-    console.log('🔍 DashboardVendas.fromJSON - Dados recebidos:', {
-      temMetricas: !!data?.metricas,
-      metricas: data?.metricas,
-      itemsCount: data?.items?.length || 0,
-      hasNext: data?.hasNext,
-      dataCompleta: data,
-    })
     const metrics = data?.metricas || {}; // Correção aqui: usar 'metricas'
-    const result = DashboardVendas.create({
+    return DashboardVendas.create({
       totalFaturado: metrics.totalFaturado,
       countVendasEfetivadas: metrics.countVendasEfetivadas,
       countVendasCanceladas: metrics.countVendasCanceladas,
       countProdutosVendidos: metrics.countProdutosVendidos,
     })
-    console.log('🔍 DashboardVendas.fromJSON - DashboardVendas criado:', {
-      totalFaturado: result.getTotalFaturado(),
-      countVendasEfetivadas: result.getCountVendasEfetivadas(),
-      countVendasCanceladas: result.getCountVendasCanceladas(),
-      countProdutosVendidos: result.getCountProdutosVendidos(),
-    })
-    return result
   }
 
   getTotalFaturado(): number {

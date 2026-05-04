@@ -1,33 +1,113 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+} from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Complemento } from '@/src/domain/entities/Complemento'
+import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
-import { MdOutlineOfflinePin } from 'react-icons/md'
+
+/** Labels outlined em preto (MUI usa cinza por padrão) */
+const sxOutlinedLabelTextoEscuro = {
+  '& .MuiInputLabel-root': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiInputLabel-root.Mui-focused': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiInputLabel-root.MuiInputLabel-shrink': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiFormLabel-asterisk': {
+    color: 'var(--color-error)',
+  },
+} as const
+
+/** Padding interno reduzido — base para TextField / Select deste formulário */
+const entradaCompactaInput = {
+  padding: '10px',
+  fontSize: '0.875rem',
+} as const
+
+const entradaCompactaSelect = {
+  padding: '10px',
+  fontSize: '0.875rem',
+  minHeight: '1.5em',
+  lineHeight: 1.4,
+  display: 'flex',
+  alignItems: 'center',
+} as const
+
+const sxEntradaCompactaComplemento = {
+  ...sxOutlinedLabelTextoEscuro,
+  '& .MuiOutlinedInput-input': entradaCompactaInput,
+  '& .MuiSelect-select': entradaCompactaSelect,
+} as const
+
+/** Nome e descrição: estado normalizado no onChange (placeholder não deve ficar em caixa alta). */
+const sxCampoTextoMaiusculo = {
+  ...sxEntradaCompactaComplemento,
+  '& .MuiOutlinedInput-input': {
+    ...entradaCompactaInput,
+  },
+} as const
 
 interface NovoComplementoProps {
   complementoId?: string
   isEmbedded?: boolean
+  /** Quando true com isEmbedded, omite o cabeçalho interno (título + Cancelar) — o shell do modal já fornece */
+  hideEmbeddedHeader?: boolean
+  /** `id` do `<form>` para o rodapé externo usar `form="..."` no botão Salvar */
+  embeddedFormId?: string
+  /** Omite a linha de Salvar dentro do formulário (ações ficam no rodapé do painel) */
+  hideEmbeddedFormActions?: boolean
+  /** Sincroniza estado com o rodapé do modal (loading / pode submeter) */
+  onEmbedFormStateChange?: (state: {
+    isSubmitting: boolean
+    canSubmit: boolean
+  }) => void
   onSaved?: () => void
   onCancel?: () => void
+}
+
+/** API imperativa para confirmação ao fechar o painel (`PADRAO_MODAL_SAIR_SEM_SALVAR`). */
+export interface NovoComplementoHandle {
+  isDirty: () => boolean
+  saveComplementoAndClose: () => Promise<void>
 }
 
 /**
  * Componente para criar/editar complemento
  * Replica o design e funcionalidades do Flutter
  */
-export function NovoComplemento({
-  complementoId,
-  isEmbedded,
-  onSaved,
-  onCancel,
-}: NovoComplementoProps) {
+export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplementoProps>(
+  function NovoComplemento(
+    {
+      complementoId,
+      isEmbedded,
+      hideEmbeddedHeader,
+      embeddedFormId,
+      hideEmbeddedFormActions,
+      onEmbedFormStateChange,
+      onSaved,
+      onCancel,
+    },
+    ref
+  ) {
   const router = useRouter()
   const { auth } = useAuthStore()
+  const accessToken = auth?.getAccessToken()
   const isEditing = !!complementoId
 
   // Estados do formulário
@@ -40,50 +120,18 @@ export function NovoComplemento({
   // Estados de loading
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingComplemento, setIsLoadingComplemento] = useState(false)
-  const hasLoadedComplementoRef = useRef(false)
+  const baselineSerializedRef = useRef<string>('')
 
-  // Carregar dados do complemento se estiver editando
+  const emitEmbedFormState = useCallback(() => {
+    onEmbedFormStateChange?.({
+      isSubmitting: isLoading,
+      canSubmit: nome.trim().length > 0,
+    })
+  }, [isLoading, nome, onEmbedFormStateChange])
+
   useEffect(() => {
-    if (!isEditing || hasLoadedComplementoRef.current) return
-
-    const loadComplemento = async () => {
-      const token = auth?.getAccessToken()
-      if (!token) return
-
-      setIsLoadingComplemento(true)
-      hasLoadedComplementoRef.current = true
-
-      try {
-        const response = await fetch(`/api/complementos/${complementoId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          const complemento = Complemento.fromJSON(data)
-
-          setNome(complemento.getNome())
-          setDescricao(complemento.getDescricao() || '')
-          setValor(formatValorFromNumber(complemento.getValor()))
-          const tipoBanco = (complemento.getTipoImpactoPreco() || 'nenhum').toLowerCase()
-          const tipoNormalizado =
-            tipoBanco === 'aumenta' || tipoBanco === 'diminui' ? tipoBanco : 'nenhum'
-          setTipoImpactoPreco(tipoNormalizado)
-          setAtivo(complemento.isAtivo())
-        }
-      } catch (error) {
-        console.error('Erro ao carregar complemento:', error)
-      } finally {
-        setIsLoadingComplemento(false)
-      }
-    }
-
-    loadComplemento()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditing, complementoId])
+    emitEmbedFormState()
+  }, [emitEmbedFormState])
 
   // Formatação de valor monetário
   const formatValorInput = (value: string) => {
@@ -112,8 +160,95 @@ export function NovoComplemento({
     return Number.isNaN(parsed) ? 0 : parsed
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  /** Snapshot alinhado ao body enviado no PATCH/POST. */
+  const getFormSnapshot = useCallback(() => {
+    return JSON.stringify({
+      nome: nome.trim().toUpperCase(),
+      descricao: descricao.trim().toUpperCase(),
+      valor: parseValorToNumber(valor),
+      ativo,
+      tipoImpactoPreco,
+    })
+  }, [nome, descricao, valor, ativo, tipoImpactoPreco])
+
+  const commitBaseline = useCallback(() => {
+    baselineSerializedRef.current = getFormSnapshot()
+  }, [getFormSnapshot])
+
+  const commitBaselineLatestRef = useRef(commitBaseline)
+  commitBaselineLatestRef.current = commitBaseline
+
+  // Baseline em modo criação
+  useEffect(() => {
+    if (isLoadingComplemento) return
+    if (isEditing) return
+    const t = window.setTimeout(() => {
+      commitBaselineLatestRef.current()
+    }, 100)
+    return () => window.clearTimeout(t)
+  }, [isLoadingComplemento, isEditing, complementoId])
+
+  // Carregar dados do complemento em modo edição (cancela se id mudar ou desmontar)
+  useEffect(() => {
+    if (!isEditing || !complementoId) {
+      setIsLoadingComplemento(false)
+      return
+    }
+
+    let cancelled = false
+    if (!accessToken) {
+      return
+    }
+
+    setIsLoadingComplemento(true)
+
+    const loadComplemento = async () => {
+      try {
+        const response = await fetch(`/api/complementos/${complementoId}`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (cancelled) return
+
+        if (response.ok) {
+          const data = await response.json()
+          const complemento = Complemento.fromJSON(data)
+
+          setNome(complemento.getNome().toUpperCase())
+          setDescricao((complemento.getDescricao() || '').toUpperCase())
+          setValor(formatValorFromNumber(complemento.getValor()))
+          const tipoBanco = (complemento.getTipoImpactoPreco() || 'nenhum').toLowerCase()
+          const tipoNormalizado =
+            tipoBanco === 'aumenta' || tipoBanco === 'diminui' ? tipoBanco : 'nenhum'
+          setTipoImpactoPreco(tipoNormalizado)
+          setAtivo(complemento.isAtivo())
+
+          window.setTimeout(() => {
+            commitBaselineLatestRef.current()
+          }, 100)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Erro ao carregar complemento:', error)
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingComplemento(false)
+        }
+      }
+    }
+
+    void loadComplemento()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isEditing, complementoId, accessToken])
+
+  const persistComplemento = useCallback(async () => {
     const token = auth?.getAccessToken()
     if (!token) {
       alert('Token não encontrado')
@@ -125,9 +260,12 @@ export function NovoComplemento({
     try {
       const valorNumero = parseValorToNumber(valor)
 
+      const nomeUpper = nome.trim().toUpperCase()
+      const descUpper = descricao.trim().toUpperCase()
+
       const body: any = {
-        nome,
-        descricao: descricao || undefined,
+        nome: nomeUpper,
+        descricao: descUpper || undefined,
         valor: valorNumero,
         ativo,
         tipoImpactoPreco,
@@ -153,6 +291,7 @@ export function NovoComplemento({
       }
 
       showToast.success(isEditing ? 'Complemento atualizado com sucesso!' : 'Complemento criado com sucesso!')
+      commitBaselineLatestRef.current()
       if (isEmbedded) {
         onSaved?.()
       } else {
@@ -164,6 +303,35 @@ export function NovoComplemento({
     } finally {
       setIsLoading(false)
     }
+  }, [
+    auth,
+    isEditing,
+    complementoId,
+    nome,
+    descricao,
+    valor,
+    ativo,
+    tipoImpactoPreco,
+    isEmbedded,
+    onSaved,
+    router,
+  ])
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      isDirty: () => {
+        if (isLoadingComplemento) return false
+        return getFormSnapshot() !== baselineSerializedRef.current
+      },
+      saveComplementoAndClose: () => persistComplemento(),
+    }),
+    [getFormSnapshot, isLoadingComplemento, persistComplemento]
+  )
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await persistComplemento()
   }
 
   const handleCancel = () => {
@@ -176,38 +344,55 @@ export function NovoComplemento({
 
   if (isLoadingComplemento) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div
+        className={
+          isEmbedded
+            ? 'flex min-h-0 flex-1 flex-col items-center justify-center'
+            : 'flex min-h-[40vh] flex-col items-center justify-center'
+        }
+      >
+        <JiffyLoading />
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header fixo */}
-      <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[20px] shadow-md md:px-[30px] px-2 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            
-            <h1 className="text-primary md:text-lg text-sm font-semibold font-exo">
-              {isEditing
-                ? `Editar Complemento: ${nome || ''}`
-                : `Novo Complemento: ${nome || ''}`}
-            </h1>
+    <div
+      className={
+        isEmbedded && hideEmbeddedHeader
+          ? 'flex min-h-0 flex-1 flex-col'
+          : 'flex h-full flex-col'
+      }
+    >
+      {/* Header fixo — omitido quando o modal shell já exibe título e fechar */}
+      {!(isEmbedded && hideEmbeddedHeader) ? (
+        <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[20px] shadow-md md:px-[30px] px-2 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h1 className="text-primary md:text-lg text-sm font-semibold font-exo">
+                {isEditing
+                  ? `Editar Complemento: ${nome || ''}`
+                  : `Novo Complemento: ${nome || ''}`}
+              </h1>
+            </div>
+            <Button
+              onClick={handleCancel}
+              variant="outlined"
+              className="h-8 px-[26px] rounded-lg border-primary/15 text-primary bg-primary/10 hover:bg-primary/20"
+            >
+              Cancelar
+            </Button>
           </div>
-          <Button
-            onClick={handleCancel}
-            variant="outlined"
-            className="h-8 px-[26px] rounded-lg border-primary/15 text-primary bg-primary/10 hover:bg-primary/20"
-          >
-            Cancelar
-          </Button>
         </div>
-      </div>
+      ) : null}
 
       {/* Formulário com scroll */}
       <div className="flex-1 overflow-y-auto md:px-[30px] px-1 py-[30px]">
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form
+          id={embeddedFormId}
+          onSubmit={handleSubmit}
+          className="space-y-6"
+        >
           {/* Dados */}
           <div className="bg-info rounded-[10px] p-2">
             <div className="flex items-center gap-5 mb-2">
@@ -217,96 +402,121 @@ export function NovoComplemento({
               <div className="flex-1 h-px bg-primary/70"></div>
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-end gap-3 rounded-lg px-4 py-1">
-                <span className="text-primary-text font-medium">Ativo</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={ativo}
-                    onChange={(e) => setAtivo(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-12 h-5 bg-secondary-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[9px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-                </label>
-              </div>
+            <div className="space-y-6">
+              <JiffyIconSwitch
+                checked={ativo}
+                onChange={e => setAtivo(e.target.checked)}
+                label={ativo ? 'Ativo' : 'Inativo'}
+                bordered={false}
+                size="sm"
+                className="justify-end"
+              />
 
               <Input
                 label="Nome do Complemento"
                 value={nome}
-                onChange={(e) => setNome(e.target.value)}
+                onChange={e => setNome(e.target.value.toUpperCase())}
                 required
-                placeholder="Nome do complemento"
-                className="bg-primary-bg"
-                InputLabelProps={{
-                  required: true,
-                  sx: {
-                    '& .MuiFormLabel-asterisk': {
-                      color: 'var(--color-error)',
-                    },
-                  },
-                }}
+                size="small"
+                placeholder="Nome do Complemento"
+                className="bg-white"
+                sx={sxCampoTextoMaiusculo}
+                InputLabelProps={{ required: true }}
               />
 
               <Input
                 label="Descrição"
                 value={descricao}
-                onChange={(e) => setDescricao(e.target.value)}
-                placeholder="Descrição do complemento"
-                className="bg-primary-bg"
+                onChange={e => setDescricao(e.target.value.toUpperCase())}
+                size="small"
+                placeholder="Descrição do Complemento"
+                className="bg-white"
+                sx={sxCampoTextoMaiusculo}
               />
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Valor (R$)
-                  </label>
-                  <input
-                    type="text"
+                  <Input
+                    label="Valor (R$)"
                     value={valor}
                     onChange={(e) => setValor(formatValorInput(e.target.value))}
+                    size="small"
                     placeholder="R$ 0,00"
-                    className="w-full px-4 py-3 rounded-xl border-[1.5px] border-gray-400 bg-primary-bg text-gray-900 placeholder:text-gray-500 focus:outline-none focus:border-2 focus:border-primary-text"
+                    className="bg-white"
+                    sx={sxEntradaCompactaComplemento}
+                    inputProps={{
+                      inputMode: 'decimal',
+                      autoComplete: 'off',
+                    }}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tipo Impacto
-                  </label>
-                  <select
-                    value={tipoImpactoPreco}
-                    onChange={(e) => {
-                      const value = e.target.value.toLowerCase()
-                      setTipoImpactoPreco(
-                        value === 'aumenta' || value === 'diminui' ? value : 'nenhum'
-                      )
+                  <FormControl
+                    fullWidth
+                    size="small"
+                    variant="outlined"
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        backgroundColor: '#fff',
+                      },
+                      ...sxEntradaCompactaComplemento,
+                      '& .MuiSelect-select': {
+                        ...entradaCompactaSelect,
+                        textTransform: 'uppercase',
+                      },
                     }}
-                    className="w-full px-4 py-3 rounded-xl border-[1.5px] border-gray-400 bg-primary-bg text-gray-900 focus:outline-none focus:border-2 focus:border-primary-text"
                   >
-                    <option value="nenhum">Nenhum</option>
-                    <option value="aumenta">Aumenta</option>
-                    <option value="diminui">Diminui</option>
-                  </select>
+                    <InputLabel id="novo-complemento-tipo-impacto-label">
+                      Tipo Impacto
+                    </InputLabel>
+                    <Select
+                      labelId="novo-complemento-tipo-impacto-label"
+                      id="novo-complemento-tipo-impacto"
+                      label="Tipo Impacto"
+                      size="small"
+                      value={tipoImpactoPreco}
+                      onChange={e => {
+                        const value = String(e.target.value).toLowerCase()
+                        setTipoImpactoPreco(
+                          value === 'aumenta' || value === 'diminui' ? value : 'nenhum'
+                        )
+                      }}
+                    >
+                      <MenuItem value="nenhum" sx={{ textTransform: 'uppercase' }}>
+                        Nenhum
+                      </MenuItem>
+                      <MenuItem value="aumenta" sx={{ textTransform: 'uppercase' }}>
+                        Aumenta
+                      </MenuItem>
+                      <MenuItem value="diminui" sx={{ textTransform: 'uppercase' }}>
+                        Diminui
+                      </MenuItem>
+                    </Select>
+                  </FormControl>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Botões de ação */}
-          <div className="flex justify-end pt-4">
-            
-            <Button type="submit" disabled={isLoading || !nome} 
-            sx={{
-              backgroundColor: 'var(--color-primary)',
-            }}
-            className="text-white hover:bg-primary/80 w-32 h-8">
-              {isLoading ? 'Salvando...' : isEditing ? 'Atualizar' : 'Salvar'}
-            </Button>
-          </div>
+          {hideEmbeddedFormActions ? null : (
+            <div className="flex justify-end pt-4">
+              <Button
+                type="submit"
+                disabled={isLoading || !nome.trim()}
+                sx={{
+                  backgroundColor: 'var(--color-primary)',
+                }}
+                className="h-8 w-32 text-white hover:bg-primary/80"
+              >
+                {isLoading ? 'Salvando...' : isEditing ? 'Atualizar' : 'Salvar'}
+              </Button>
+            </div>
+          )}
         </form>
       </div>
     </div>
   )
-}
+})
 
+NovoComplemento.displayName = 'NovoComplemento'

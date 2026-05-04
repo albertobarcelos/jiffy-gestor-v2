@@ -825,7 +825,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
                 )}
                 <div className="flex justify-between border-t pt-2 mt-2">
                   <span className="text-lg font-semibold">Valor Final:</span>
-                  <span className="text-lg font-bold text-primary">
+                  <span className="text-lg font-semibold text-primary">
                     {transformarParaReal(valorFinalNum)}
                   </span>
                 </div>

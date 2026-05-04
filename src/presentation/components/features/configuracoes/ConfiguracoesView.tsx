@@ -1,67 +1,126 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useMemo } from 'react'
+import dynamic from 'next/dynamic'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { EmpresaTab } from './tabs/EmpresaTab'
 import { TerminaisTab } from './tabs/TerminaisTab'
-import { OutrasConfiguracoesTab } from './tabs/OutrasConfiguracoesTab'
+import { ImpressorasList } from '@/src/presentation/components/features/impressoras/ImpressorasList'
+import { MeiosPagamentosList } from '@/src/presentation/components/features/meios-pagamentos/MeiosPagamentosList'
+import { TaxasList } from '@/src/presentation/components/features/taxas/TaxasList'
+import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
+import { cn } from '@/src/shared/utils/cn'
+
+const CadastroPorPlanilha = dynamic(
+  () =>
+    import(
+      '@/src/presentation/components/features/cadastro-por-planilha/cadastro-por-planilha'
+    ).then(m => ({ default: m.CadastroPorPlanilha })),
+  { ssr: false, loading: () => <PageLoading /> }
+)
+
+type ConfigTab =
+  | 'empresa'
+  | 'terminais'
+  | 'impressoras'
+  | 'planilha'
+  | 'meios-pagamentos'
+  | 'taxas'
+
+const TAB_QUERY_VALUES: readonly ConfigTab[] = [
+  'empresa',
+  'terminais',
+  'impressoras',
+  'planilha',
+  'meios-pagamentos',
+  'taxas',
+]
+
+function parseTabParam(value: string | null): ConfigTab {
+  if (value && TAB_QUERY_VALUES.includes(value as ConfigTab)) {
+    return value as ConfigTab
+  }
+  return 'empresa'
+}
 
 /**
  * Componente principal de Configurações
  * Replica o design e funcionalidades do Flutter
  */
 export function ConfiguracoesView() {
-  const [activeTab, setActiveTab] = useState<'empresa' | 'terminais' | 'outras'>('empresa')
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Fonte única: ?tab= na URL (ex.: /configuracoes?tab=planilha)
+  const activeTab = useMemo(() => parseTabParam(searchParams.get('tab')), [searchParams])
+
+  const goToTab = useCallback(
+    (tab: ConfigTab) => {
+      const q = new URLSearchParams(searchParams.toString())
+      if (tab === 'empresa') {
+        q.delete('tab')
+      } else {
+        q.set('tab', tab)
+      }
+      const qs = q.toString()
+      router.replace(qs ? `/configuracoes?${qs}` : '/configuracoes', { scroll: false })
+    },
+    [router, searchParams]
+  )
+
+  const tabBtn = (tab: ConfigTab, label: string) => (
+    <button
+      key={tab}
+      type="button"
+      onClick={() => goToTab(tab)}
+      className={cn(
+        'rounded-t-lg px-4 py-2 text-xs font-semibold transition-colors md:text-sm',
+        activeTab === tab
+          ? 'bg-primary text-white'
+          : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
+      )}
+    >
+      {label}
+    </button>
+  )
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="py-2 flex-shrink-0">
-        {/* Container principal com tabs */}
-        <div className="bg-custom-2 rounded-lg">
-          {/* Tabs */}
-          <div className="flex">
-            <button
-              onClick={() => setActiveTab('empresa')}
-              className={`px-5 py-2 text-sm font-semibold font-exo transition-colors ${
-                activeTab === 'empresa'
-                  ? 'text-primary border-b-2 border-tertiary'
-                  : 'text-secondary-text hover:text-primary'
-              }`}
-            >
-              Empresa
-            </button>
-            <button
-              onClick={() => setActiveTab('terminais')}
-              className={`px-5 py-2 text-sm font-semibold font-exo transition-colors ${
-                activeTab === 'terminais'
-                  ? 'text-primary border-b-2 border-tertiary'
-                  : 'text-secondary-text hover:text-primary'
-              }`}
-            >
-              Terminais
-            </button>
-            {/*<button
-              onClick={() => setActiveTab('outras')}
-              className={`px-5 py-2 text-sm font-semibold font-exo transition-colors ${
-                activeTab === 'outras'
-                  ? 'text-primary border-b-2 border-tertiary'
-                  : 'text-secondary-text hover:text-primary'
-              }`}
-            >
-              Outras Configurações
-            </button>*/}
-          </div>
+    <div className="flex h-full flex-col pt-2">
+      {/* Mesmo padrão visual das abas em modais (ex.: NovoGrupo, Grupo de Complementos) */}
+      <div className="w-full shrink-0 border-b border-gray-200 bg-gray-50 px-4 md:px-4">
+        <div className="flex flex-wrap gap-1 pt-2">
+          {tabBtn('empresa', 'Empresa')}
+          {tabBtn('terminais', 'Terminais')}
+          {tabBtn('impressoras', 'Impressoras')}
+          {tabBtn('meios-pagamentos', 'Meios de pagamento')}
+          {tabBtn('taxas', 'Taxas')}
+          {tabBtn('planilha', 'Importar Dados')}
         </div>
       </div>
 
       {/* Conteúdo das tabs - ocupa todo o espaço restante */}
-      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-        <div className="bg-info rounded-b-[10px] flex-1 flex flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden rounded-b-[10px] bg-info">
           {activeTab === 'empresa' && <EmpresaTab />}
           {activeTab === 'terminais' && <TerminaisTab />}
-          {activeTab === 'outras' && <OutrasConfiguracoesTab />}
+          {activeTab === 'impressoras' && <ImpressorasList />}
+          {activeTab === 'meios-pagamentos' && (
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <MeiosPagamentosList />
+            </div>
+          )}
+          {activeTab === 'taxas' && (
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <TaxasList />
+            </div>
+          )}
+          {activeTab === 'planilha' && (
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <CadastroPorPlanilha />
+            </div>
+          )}
         </div>
       </div>
     </div>
   )
 }
-

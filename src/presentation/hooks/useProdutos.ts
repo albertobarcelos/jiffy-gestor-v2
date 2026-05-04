@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Produto } from '@/src/domain/entities/Produto'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
@@ -94,11 +94,12 @@ export function useProdutos(params: ProdutosQueryParams = {}) {
       }
     },
     enabled: !!token, // Só executa se tiver token
-    staleTime: 0,
-    gcTime: 1000 * 60 * 1,
+    // Alinhado ao QueryProvider: evita refetch ao voltar à aba/tela enquanto os dados forem recentes
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 30,
     refetchOnReconnect: true,
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: true,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -171,13 +172,15 @@ export function useProdutosInfinite(params: Omit<ProdutosQueryParams, 'offset'> 
     enabled: !!token,
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextOffset,
-    staleTime: 0, // sempre considerado “stale” para refetch imediato
-    gcTime: 1000 * 60 * 1, // descarta cache rápido (1 min)
-    refetchOnWindowFocus: true,
+    // Dados frescos por 5 min: não refaz todas as páginas ao remontar a lista ou focar a janela
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 30,
+    refetchOnWindowFocus: false,
     refetchOnReconnect: true,
-    refetchOnMount: 'always',
-    // Não reutiliza dados anteriores para evitar exibir valores antigos
-    placeholderData: undefined,
+    refetchOnMount: false,
+    // Mantém os dados anteriores visíveis enquanto a query com novos filtros carrega.
+    // Evita o "piscar" da lista (produtos somem e voltam) ao trocar filtro/busca.
+    placeholderData: keepPreviousData,
   })
 }
 

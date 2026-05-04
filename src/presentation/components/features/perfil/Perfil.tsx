@@ -4,6 +4,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { MdPerson, MdLock, MdEdit, MdSave, MdClose, MdBusiness } from 'react-icons/md'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 
 interface UserMeData {
   sub?: string
@@ -202,12 +203,7 @@ export function Perfil() {
     return (
       <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
         <div className="text-center">
-          <img 
-            src="/images/jiffy-loading.gif" 
-            alt="Carregando..." 
-            className="w-20 h-20 mx-auto mb-4" 
-          />
-          <p className="text-gray-600">Carregando perfil...</p>
+          <JiffyLoading />
         </div>
       </div>
     )
@@ -403,7 +399,7 @@ export function Perfil() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-2">
-          <h1 className="text-3xl font-bold text-gray-900">Meu Perfil</h1>
+          <h1 className="text-3xl font-semibold text-gray-900">Meu Perfil</h1>
           <p className="text-gray-600 mt-1">Gerencie suas informações pessoais</p>
         </div>
 
@@ -419,13 +415,13 @@ export function Perfil() {
             <div className="flex items-center gap-2">
               {/* Avatar */}
               <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center border-4 border-white/30">
-                <span className="text-2xl font-bold text-white">
+                <span className="text-2xl font-semibold text-white">
                   {userInitial}
                 </span>
               </div>
               {/* Informações do usuário */}
               <div>
-                <h2 className="text-xl font-bold text-white">
+                <h2 className="text-xl font-semibold text-white">
                   {userName}
                 </h2>
                 <p className="text-sm text-white/90 mt-1">
@@ -713,11 +709,7 @@ export function Perfil() {
                         >
                           {isSaving ? (
                             <>
-                              <img 
-                                src="/images/jiffy-loading.gif" 
-                                alt="Salvando..." 
-                                className="w-4 h-4" 
-                              />
+                              <JiffyLoading className="!gap-0 !py-0" size={20} />
                               Salvando...
                             </>
                           ) : (

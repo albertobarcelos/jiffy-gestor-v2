@@ -55,7 +55,7 @@ export function OutrasConfiguracoesTab() {
         </div>
 
         <div className="border-t border-[#B9CCD8] pt-6 space-y-4">
-          <h4 className="text-secondary text-sm font-bold font-nunito">
+          <h4 className="text-secondary text-sm font-semibold font-nunito">
             Identificação
           </h4>
 
