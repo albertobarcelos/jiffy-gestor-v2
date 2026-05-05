@@ -121,7 +121,8 @@ function formatEnderecoPrincipal(ent: VendaGestorTicketsResponse['enderecoEntreg
   if (ent == null) return ''
   if (typeof ent === 'string') return ent.trim()
   const o = ent as Record<string, unknown>
-  return [o.logradouro, o.rua, o.numero, o.complemento, o.cep]
+  const logradouroOuRua = o.rua || o.logradouro
+  return [logradouroOuRua, o.numero, o.cep]
     .filter(x => x != null && String(x).trim() !== '')
     .map(x => String(x).trim())
     .join(', ')
@@ -161,13 +162,13 @@ function larguraPx(mm: number): number {
 }
 
 function paddingPorDensidade(densidade: DeliveryCupomTemplateConfig['densidade']): number {
-  if (densidade === 'compacto') return 5
+  if (densidade === 'compacto') return 2
   if (densidade === 'espacoso') return 12
   return 8
 }
 
 function lineHeightPorDensidade(densidade: DeliveryCupomTemplateConfig['densidade']): number {
-  if (densidade === 'compacto') return 1.22
+  if (densidade === 'compacto') return 1.1
   if (densidade === 'espacoso') return 1.5
   return 1.35
 }
@@ -310,7 +311,7 @@ function renderProducao(
   return `${renderCabecalho(root, template, empresa, cabecalhoExtra)}
   ${renderMetaPedido(root, true)}
   <div class="separator"></div>
-  <div class="section customer-section"><strong>Cliente:</strong> ${escapeHtml(cliente)}</div>
+  <div class="section customer-section" style="white-space: normal; word-wrap: break-word; overflow-wrap: break-word; word-break: normal;"><strong>Cliente:</strong> ${escapeHtml(cliente)}</div>
   <div class="separator"></div>
   <div class="items-title">ITENS DO PEDIDO (${totalItensPedido(ticket)})</div>
   ${renderItens(ticket, template, { mostrarValores: false })}
@@ -323,17 +324,19 @@ function renderEnderecoExpedicao(root: VendaGestorTicketsResponse, template: Del
   if (!template.mostrarEnderecoEntrega) return ''
   const ent = enderecoObj(root.enderecoEntrega)
   const enderecoCompleto = formatEnderecoPrincipal(root.enderecoEntrega)
+  const complemento = ent.complemento ? String(ent.complemento).trim() : ''
   const bairro = ent.bairro ? String(ent.bairro).trim() : ''
   const cidade = ent.cidade || ent.municipio ? String(ent.cidade ?? ent.municipio).trim() : ''
   const referencia = ent.referencia || ent.pontoReferencia ? String(ent.referencia ?? ent.pontoReferencia).trim() : ''
 
-  if (!enderecoCompleto && !bairro && !cidade && !referencia) return ''
+  if (!enderecoCompleto && !complemento && !bairro && !cidade && !referencia) return ''
 
-  return `<div class="section address-section">
-    ${enderecoCompleto ? `<div><strong>ENDEREÇO:</strong> ${escapeHtml(enderecoCompleto)}</div>` : ''}
-    ${bairro ? `<div><strong>BAIRRO:</strong> ${escapeHtml(bairro)}</div>` : ''}
-    ${cidade ? `<div><strong>CIDADE:</strong> ${escapeHtml(cidade)}</div>` : ''}
-    ${referencia ? `<div><strong>REFERENCIA:</strong> ${escapeHtml(referencia)}</div>` : ''}
+  return `<div class="section address-section" style="white-space: normal; word-wrap: break-word; overflow-wrap: break-word; word-break: normal;">
+    ${enderecoCompleto ? `<div style="margin-bottom: 1px;"><strong>ENDEREÇO:</strong> ${escapeHtml(enderecoCompleto)}</div>` : ''}
+    ${complemento ? `<div style="margin-bottom: 1px;"><strong>COMPLEMENTO:</strong> ${escapeHtml(complemento)}</div>` : ''}
+    ${bairro ? `<div style="margin-bottom: 1px;"><strong>BAIRRO:</strong> ${escapeHtml(bairro)}</div>` : ''}
+    ${cidade ? `<div style="margin-bottom: 1px;"><strong>CIDADE:</strong> ${escapeHtml(cidade)}</div>` : ''}
+    ${referencia ? `<div style="margin-bottom: 1px;"><strong>REFERENCIA:</strong> ${escapeHtml(referencia)}</div>` : ''}
   </div>`
 }
 
@@ -460,9 +463,9 @@ function renderExpedicao(
   return `${renderCabecalho(root, template, empresa, cabecalhoExtra)}
   ${renderMetaPedido(root, false)}
   <div class="separator"></div>
-  <div class="section customer-section">
-    <strong>CLIENTE:</strong> ${escapeHtml(cliente)}
-    ${template.mostrarTelefoneCliente && telefoneFormatado ? ` <strong>TELEFONE: ${escapeHtml(telefoneFormatado)}</strong>` : ''}
+  <div class="section customer-section" style="white-space: normal; word-wrap: break-word; overflow-wrap: break-word; word-break: normal;">
+    <div style="margin-bottom: 1px;"><strong>CLIENTE:</strong> ${escapeHtml(cliente)}</div>
+    ${template.mostrarTelefoneCliente && telefoneFormatado ? `<div style="margin-bottom: 1px;"><strong>TELEFONE:</strong> ${escapeHtml(telefoneFormatado)}</div>` : ''}
   </div>
   ${renderEnderecoExpedicao(root, template)}
   ${renderWhatsappQr(tel)}
@@ -530,7 +533,7 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
   .section { margin:${padding}px 0; }
   .meta-section { font-size:${fontePedido}px; }
   .customer-section, .address-section { font-size:${fonteClienteEndereco}px; }
-  .whatsapp-qr { margin:${Math.max(3, Math.floor(padding / 2))}px 0; display:flex; align-items:center; justify-content:center; gap:6px; font-size:10px; font-weight:700; line-height:1.15; }
+  .whatsapp-qr { margin:${Math.max(3, Math.floor(padding / 2))}px 0; display:flex; align-items:center; justify-content:flex-start; gap:6px; font-size:10px; font-weight:700; line-height:1.15; }
   .whatsapp-qr img { display:block; width:74px; height:74px; flex:0 0 auto; image-rendering:pixelated; }
   .whatsapp-qr div { max-width:130px; text-align:left; }
   .separator { margin:${padding}px 0; overflow:hidden; white-space:nowrap; font-weight:900; line-height:1; letter-spacing:0; }

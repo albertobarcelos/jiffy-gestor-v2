@@ -414,7 +414,7 @@ export function EntregaClienteSelector({
 
     const dto = {
       telefone: digitos,
-      tipoEtiqueta: formNova.tipoEtiqueta,
+      tipoEtiqueta: formNova.tipoEtiqueta.toLowerCase(),
       nomeMorada: nomeMoradaTrim,
       endereco,
     }
