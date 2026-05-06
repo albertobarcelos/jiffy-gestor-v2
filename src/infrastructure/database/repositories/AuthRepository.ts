@@ -1,4 +1,5 @@
-import { IAuthRepository } from '@/src/domain/repositories/IAuthRepository'
+import { IAuthRepository, type LoginResult } from '@/src/domain/repositories/IAuthRepository'
+import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
 import { Auth } from '@/src/domain/entities/Auth'
 import { User } from '@/src/domain/entities/User'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
@@ -49,11 +50,11 @@ export class AuthRepository implements IAuthRepository {
     this.apiClient = apiClient || new ApiClient()
   }
 
-  async login(username: string, password: string): Promise<Auth> {
+  async login(username: string, password: string): Promise<LoginResult> {
     try {
       return this.getAuthFlow() === 'multi_empresa'
         ? await this.loginMultiEmpresa(username, password)
-        : await this.loginLegacy(username, password)
+        : await this.loginLegacyResult(username, password)
     } catch (error) {
       if (error instanceof ApiError) {
         throw new Error(error.message || 'Erro ao realizar login')
@@ -72,6 +73,11 @@ export class AuthRepository implements IAuthRepository {
       : 'legacy'
   }
 
+  private async loginLegacyResult(username: string, password: string): Promise<LoginResult> {
+    const auth = await this.loginLegacy(username, password)
+    return { auth }
+  }
+
   private async loginLegacy(username: string, password: string): Promise<Auth> {
     const response = await this.apiClient.post<ApiRecord>(LEGACY_LOGIN_ENDPOINT, {
       username,
@@ -81,7 +87,28 @@ export class AuthRepository implements IAuthRepository {
     return this.createAuthFromResponse(response.data, username)
   }
 
-  private async loginMultiEmpresa(username: string, password: string): Promise<Auth> {
+  /**
+   * Converte registro de empresa da API para snapshot usado no hub.
+   */
+  private mapEmpresaGestorItem(company: ApiRecord): LoginEmpresaSnapshot | null {
+    const id = this.getCompanyId(company)
+    const nomeFantasia = getFirstString(company, [
+      ['nomeFantasia'],
+      ['nome'],
+      ['razaoSocial'],
+      ['nomeFantasiaEmpresa'],
+    ])
+    const cnpj = getFirstString(company, [['cnpj'], ['documento'], ['cnpjCpf']])
+    const bloqueado = typeof company.bloqueado === 'boolean' ? company.bloqueado : false
+
+    if (!id || !nomeFantasia || !cnpj) {
+      return null
+    }
+
+    return { id, nomeFantasia, cnpj, bloqueado }
+  }
+
+  private async loginMultiEmpresa(username: string, password: string): Promise<LoginResult> {
     const loginResponse = await this.apiClient.post<ApiRecord>(MULTI_EMPRESA_LOGIN_ENDPOINT, {
       username,
       password,
@@ -89,11 +116,27 @@ export class AuthRepository implements IAuthRepository {
 
     const loginData = loginResponse.data
     const identityToken = this.extractAccessToken(loginData)
+    const companies = this.extractCompanies(loginData)
+
+    // Hub gestor: lista de empresas no login → só identityToken; escolha em POST /auth/escolher-empresa depois
+    if (companies.length > 0 && identityToken) {
+      const empresas = companies
+        .map(c => this.mapEmpresaGestorItem(c))
+        .filter((e): e is LoginEmpresaSnapshot => e !== null)
+
+      if (empresas.length > 0) {
+        return {
+          auth: this.createAuthFromResponse(loginData, username, identityToken),
+          empresas,
+        }
+      }
+    }
+
     const empresaId = this.resolveEmpresaId(loginData)
 
     if (!empresaId) {
       if (identityToken) {
-        return this.createAuthFromResponse(loginData, username, identityToken)
+        return { auth: this.createAuthFromResponse(loginData, username, identityToken) }
       }
 
       throw new Error('Empresa não encontrada na resposta de login')
@@ -119,11 +162,13 @@ export class AuthRepository implements IAuthRepository {
       throw new Error('Token de acesso não recebido ao escolher empresa')
     }
 
-    return this.createAuthFromResponse(
-      this.mergeAuthResponses(loginData, escolherEmpresaData),
-      username,
-      accessToken
-    )
+    return {
+      auth: this.createAuthFromResponse(
+        this.mergeAuthResponses(loginData, escolherEmpresaData),
+        username,
+        accessToken
+      ),
+    }
   }
 
   private createAuthFromResponse(data: unknown, username: string, tokenOverride?: string): Auth {

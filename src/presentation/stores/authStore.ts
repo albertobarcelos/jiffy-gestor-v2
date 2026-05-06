@@ -4,14 +4,18 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { Auth } from '@/src/domain/entities/Auth'
 import { User } from '@/src/domain/entities/User'
+import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
 
 interface AuthState {
   auth: Auth | null
+  /** Empresas retornadas no último login multi-empresa (hub Meus aplicativos). */
+  hubEmpresas: LoginEmpresaSnapshot[] | null
   isAuthenticated: boolean
   isLoading: boolean
   isRehydrated: boolean
   error: string | null
   login: (auth: Auth) => void
+  setHubEmpresas: (empresas: LoginEmpresaSnapshot[] | null) => void
   logout: () => Promise<void>
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
@@ -28,6 +32,7 @@ interface AuthStorage {
     }
     expiresAt: string
   } | null
+  hubEmpresas: LoginEmpresaSnapshot[] | null
   isAuthenticated: boolean
 }
 
@@ -39,6 +44,7 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       auth: null,
+      hubEmpresas: null,
       isAuthenticated: false,
       isLoading: false,
       isRehydrated: false,
@@ -58,6 +64,10 @@ export const useAuthStore = create<AuthState>()(
         })
       },
 
+      setHubEmpresas: (empresas: LoginEmpresaSnapshot[] | null) => {
+        set({ hubEmpresas: empresas })
+      },
+
       logout: async () => {
         try {
           // Chamar API de logout para remover cookie httpOnly
@@ -72,6 +82,7 @@ export const useAuthStore = create<AuthState>()(
         // Limpar estado do store
         set({
           auth: null,
+          hubEmpresas: null,
           isAuthenticated: false,
           error: null,
         })
@@ -104,6 +115,7 @@ export const useAuthStore = create<AuthState>()(
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         auth: state.auth ? (state.auth.toJSON() as unknown as AuthStorage['auth']) : null,
+        hubEmpresas: state.hubEmpresas,
         isAuthenticated: state.isAuthenticated,
       }),
       onRehydrateStorage: () => (state) => {

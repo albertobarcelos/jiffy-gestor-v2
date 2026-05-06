@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, FormEvent } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Auth } from '@/src/domain/entities/Auth'
 import { User } from '@/src/domain/entities/User'
+import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
 import {
   Dialog,
   DialogContent,
@@ -13,17 +15,46 @@ import {
   DialogTitle,
 } from '@/src/presentation/components/ui/dialog'
 
+/** Extrai lista de empresas da resposta do login (contrato hub gestor). */
+function parseEmpresasLogin(raw: unknown): LoginEmpresaSnapshot[] | null {
+  if (!Array.isArray(raw)) {
+    return null
+  }
+
+  const out: LoginEmpresaSnapshot[] = []
+
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') {
+      continue
+    }
+    const o = item as Record<string, unknown>
+    const id = typeof o.id === 'string' ? o.id.trim() : ''
+    const nomeFantasia = typeof o.nomeFantasia === 'string' ? o.nomeFantasia.trim() : ''
+    const cnpj = typeof o.cnpj === 'string' ? o.cnpj.trim() : ''
+    const bloqueado = o.bloqueado === true
+
+    if (!id || !nomeFantasia || !cnpj) {
+      continue
+    }
+
+    out.push({ id, nomeFantasia, cnpj, bloqueado })
+  }
+
+  return out
+}
+
 /**
  * Componente de formulário de login
  */
 export function LoginForm() {
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({})
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false)
 
-  const { login, setLoading, setError, isLoading } = useAuthStore()
+  const { login, setHubEmpresas, setLoading, setError, isLoading } = useAuthStore()
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -80,8 +111,16 @@ export function LoginForm() {
       // Atualiza o store
       login(auth)
 
-      // Redireciona para dashboard v2
-      window.location.href = '/dashboard'
+      // Lista de empresas do login multi-empresa (hub Meus aplicativos)
+      const empresasRaw = data.data?.empresas as unknown
+      if (empresasRaw === undefined) {
+        setHubEmpresas(null)
+      } else {
+        const lista = parseEmpresasLogin(empresasRaw)
+        setHubEmpresas(lista ?? null)
+      }
+
+      router.replace('/meus-apps')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao fazer login'
       setError(message)

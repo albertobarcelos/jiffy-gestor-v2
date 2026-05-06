@@ -19,13 +19,16 @@ export async function POST(request: NextRequest) {
     const loginUseCase = new LoginUseCase(authRepository)
 
     // Executa o caso de uso
-    const auth = await loginUseCase.execute(validatedData)
+    const { auth, empresas } = await loginUseCase.execute(validatedData)
 
-    // Retorna resposta com token
+    // Retorna resposta com token e, quando existir, empresas do login multi-empresa
     const response = NextResponse.json(
       {
         success: true,
-        data: auth.toJSON(),
+        data: {
+          ...auth.toJSON(),
+          ...(empresas && empresas.length > 0 ? { empresas } : {}),
+        },
       },
       { status: 200 }
     )

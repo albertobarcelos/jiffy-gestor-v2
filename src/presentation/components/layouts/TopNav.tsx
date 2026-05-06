@@ -20,6 +20,7 @@ import {
   MdAccountBalance,
   MdHistory,
   MdPercent,
+  MdMail,
 } from 'react-icons/md'
 import type { IconType } from 'react-icons'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
@@ -158,6 +159,7 @@ export function TopNav() {
         { name: 'Perfis PDV', path: '/cadastros/perfis-usuarios-pdv', icon: MdGroup },
         { name: 'Usuários PDV', path: '/cadastros/usuarios', icon: MdPerson },
         { name: 'Perfis Gestor', path: '/cadastros/perfis-gestor', icon: MdAccountBalance },
+        { name: 'Convites gestor', path: '/cadastros/convites-gestor', icon: MdMail },
         { name: 'Usuários Gestor', path: '/cadastros/usuarios-gestor', icon: MdPerson },
         { name: 'Clientes', path: '/cadastros/clientes', icon: MdPeople },
       ],
