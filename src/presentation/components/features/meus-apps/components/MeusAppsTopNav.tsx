@@ -3,6 +3,9 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useMemo } from 'react'
+import AppsIcon from '@mui/icons-material/Apps'
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
+import SchoolIcon from '@mui/icons-material/School'
 import { LogOut } from 'lucide-react'
 import Image from 'next/image'
 import { cn } from '@/src/shared/utils/cn'
@@ -11,12 +14,14 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 type MenuItem = {
   label: string
   href: string
+  /** Ícones Material (`@mui/icons-material`), mesma família que `AppsIcon`. */
+  Icon: typeof AppsIcon
 }
 
 const MENU_ITEMS: MenuItem[] = [
-  { label: 'Meus Aplicativos', href: '/meus-apps' },
-  { label: 'Extrato Financeiro', href: '/meus-apps/extrato-financeiro' },
-  { label: 'Treinamentos', href: '/meus-apps/treinamentos' },
+  { label: 'Meus Aplicativos', href: '/meus-apps', Icon: AppsIcon },
+  { label: 'Extrato Financeiro', href: '/meus-apps/extrato-financeiro', Icon: ReceiptLongIcon },
+  { label: 'Treinamentos', href: '/meus-apps/treinamentos', Icon: SchoolIcon },
 ]
 
 function isActivePath(pathname: string | null, href: string): boolean {
@@ -51,26 +56,29 @@ export function MeusAppsTopNav() {
                 src="/images/jiffy-100x100.gif"
                 alt="Jiffy"
                 fill
-                sizes="50px"
+                sizes="56px"
                 className="object-contain"
               />
-            </div>          
+            </div>
             <span className="text-lg font-bold tracking-wide text-info">Jiffy</span>
             </Link>
-
-          <nav className="hidden min-w-0 items-center gap-1 md:flex" aria-label="Navegação do hub">
+            </div>
+            <div className="flex items-center gap-2">
+          <nav className="hidden min-w-0 items-center gap-6 md:flex" aria-label="Navegação do hub">
             {MENU_ITEMS.map(item => {
               const active = isActivePath(pathname, item.href)
+              const Icon = item.Icon
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'rounded-full px-3 py-2 text-sm font-semibold transition',
+                    'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition',
                     active ? 'bg-white/10 text-white' : 'text-white/80 hover:bg-white/10 hover:text-white'
                   )}
                 >
-                  {item.label}
+                  <Icon className="shrink-0" sx={{ fontSize: 20, color: 'inherit' }} aria-hidden />
+                  <span>{item.label}</span>
                 </Link>
               )
             })}
@@ -78,7 +86,7 @@ export function MeusAppsTopNav() {
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="hidden items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-white/90 md:flex">
+          <div className="hidden items-center gap-2 border-l border-white/90 px-3 py-1.5 text-white/90 md:flex">
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-sky-500 text-xs font-bold text-white">
               {userInitial}
             </span>
@@ -125,4 +133,3 @@ export function MeusAppsTopNav() {
     </header>
   )
 }
-
