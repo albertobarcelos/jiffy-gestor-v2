@@ -4,6 +4,9 @@ import { FormEvent, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { senhaGestorEhValida, SENHA_GESTOR_MENSAGEM_ERRO } from '@/src/shared/utils/senhaGestorRules'
+import { showToast } from '@/src/shared/utils/toast'
+import { GestorPasswordField } from '@/src/presentation/components/features/auth/components/GestorPasswordField'
+import { PasswordFieldPressReveal } from '@/src/presentation/components/features/auth/components/PasswordFieldPressReveal'
 
 export function RedefinirSenhaForm() {
   const router = useRouter()
@@ -24,11 +27,11 @@ export function RedefinirSenhaForm() {
       return
     }
     if (!senhaGestorEhValida(password)) {
-      setError(SENHA_GESTOR_MENSAGEM_ERRO)
+      showToast.warning(SENHA_GESTOR_MENSAGEM_ERRO)
       return
     }
     if (password !== confirm) {
-      setError('As senhas não conferem.')
+      showToast.error('As senhas não conferem.')
       return
     }
 
@@ -67,29 +70,23 @@ export function RedefinirSenhaForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Nova senha</label>
-        <input
-          type="password"
-          required
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          autoComplete="new-password"
-          className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-alternate"
-        />
-        <p className="mt-1 text-xs text-gray-600">{SENHA_GESTOR_MENSAGEM_ERRO}</p>
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Confirmar nova senha</label>
-        <input
-          type="password"
-          required
-          value={confirm}
-          onChange={e => setConfirm(e.target.value)}
-          autoComplete="new-password"
-          className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-alternate"
-        />
-      </div>
+      <GestorPasswordField
+        label="Nova senha"
+        forcaBarIdPrefix="redefinir-senha"
+        required
+        value={password}
+        onChange={e => setPassword(e.target.value)}
+        autoComplete="new-password"
+        disabled={loading}
+      />
+      <PasswordFieldPressReveal
+        label="Confirmar nova senha"
+        required
+        value={confirm}
+        onChange={e => setConfirm(e.target.value)}
+        autoComplete="new-password"
+        disabled={loading}
+      />
       {error ? <p className="text-sm text-error">{error}</p> : null}
       <button
         type="submit"

@@ -131,7 +131,7 @@ export function queryRegistroConviteNovoUsuarioFromLoginSearch(
   if (cid?.trim()) {
     q.set('conviteId', cid.trim())
   }
-  q.set('fluxo', 'convite')
+  q.set('novousuario', 'true')
   return q
 }
 
