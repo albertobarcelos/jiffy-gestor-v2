@@ -19,6 +19,7 @@ export type GestorPasswordFieldProps = Omit<InputHTMLAttributes<HTMLInputElement
 
 /**
  * Campo de senha com revelar ao pressionar + barra de força do gestor + tooltip opcional com as regras.
+ * A barra de força só aparece depois que o usuário começa a digitar (campo não vazio).
  */
 export function GestorPasswordField({
   label,
@@ -30,17 +31,22 @@ export function GestorPasswordField({
   ...rest
 }: GestorPasswordFieldProps) {
   const password = typeof value === 'string' ? value : ''
+  const mostrarForca = password.length > 0
+
   return (
     <PasswordFieldPressReveal
       label={label}
       labelHint={mostrarHintNoLabel ? labelHint : undefined}
+      leadingLockIcon
       value={value}
       footer={
-        <SenhaGestorForcaBar
-          password={password}
-          idPrefix={forcaBarIdPrefix}
-          className={forcaBarClassName}
-        />
+        mostrarForca ?
+          <SenhaGestorForcaBar
+            password={password}
+            idPrefix={forcaBarIdPrefix}
+            className={forcaBarClassName}
+          />
+        : undefined
       }
       {...rest}
     />

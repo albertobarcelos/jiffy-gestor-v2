@@ -7,6 +7,8 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { senhaGestorEhValida, SENHA_GESTOR_MENSAGEM_ERRO } from '@/src/shared/utils/senhaGestorRules'
 import { showToast } from '@/src/shared/utils/toast'
 import { executarPosRegistroConvite } from '@/src/presentation/components/features/auth/utils/executarPosRegistroConvite'
+import { AuthEmailField } from '@/src/presentation/components/features/auth/components/AuthEmailField'
+import { AuthNameField } from '@/src/presentation/components/features/auth/components/AuthNameField'
 import { GestorPasswordField } from '@/src/presentation/components/features/auth/components/GestorPasswordField'
 import { PasswordFieldPressReveal } from '@/src/presentation/components/features/auth/components/PasswordFieldPressReveal'
 
@@ -97,7 +99,10 @@ export function RegistroForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-2 [@media(max-height:720px)]:space-y-2 [@media(max-height:640px)]:space-y-1.5"
+    >
       {fluxoConvite ? (
         <p className="text-sm text-gray-800 rounded-lg bg-white/50 border border-white/60 p-3">
           Você foi convidado para uma empresa na Jiffy. Complete o cadastro; em seguida entraremos e aceitaremos o
@@ -105,31 +110,25 @@ export function RegistroForm() {
         </p>
       ) : null}
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Nome completo</label>
-        <input
-          type="text"
-          required
-          value={nome}
-          onChange={e => setNome(e.target.value)}
-          autoComplete="name"
-          className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-alternate"
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
-        <input
-          type="email"
-          required
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          autoComplete="email"
-          readOnly={fluxoConvite && Boolean(emailConvite.trim())}
-          className={`w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-alternate ${
-            fluxoConvite && emailConvite.trim() ? 'opacity-90 cursor-not-allowed' : ''
-          }`}
-        />
-      </div>
+      <AuthNameField
+        label="Nome completo"
+        required
+        value={nome}
+        onChange={e => setNome(e.target.value)}
+        disabled={loading}
+      />
+      <AuthEmailField
+        label="E-mail"
+        required
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+        autoComplete="email"
+        readOnly={fluxoConvite && Boolean(emailConvite.trim())}
+        disabled={loading}
+        className={
+          fluxoConvite && emailConvite.trim() ? 'cursor-not-allowed opacity-90' : undefined
+        }
+      />
       <GestorPasswordField
         label="Senha"
         forcaBarIdPrefix="registro-senha"
@@ -141,6 +140,7 @@ export function RegistroForm() {
       />
       <PasswordFieldPressReveal
         label="Confirmar senha"
+        leadingLockIcon
         required
         value={confirm}
         onChange={e => setConfirm(e.target.value)}
@@ -153,14 +153,14 @@ export function RegistroForm() {
       <button
         type="submit"
         disabled={loading}
-        className="w-full py-3 px-4 rounded-lg font-semibold text-white bg-[var(--color-alternate)] disabled:opacity-50"
+        className="w-full py-3 px-4 rounded-lg font-semibold text-white bg-[var(--color-secondary)] disabled:opacity-50"
       >
         {loading ? (fluxoConvite ? 'Entrando…' : 'Cadastrando…') : fluxoConvite ? 'Cadastrar e continuar' : 'Criar conta'}
       </button>
 
       <p className="text-center text-sm text-gray-700">
         Já tem conta?{' '}
-        <Link href="/login" className="font-semibold text-[var(--color-alternate)] underline">
+        <Link href="/login" className="font-semibold text-[var(--color-secondary)] underline">
           Entrar
         </Link>
       </p>

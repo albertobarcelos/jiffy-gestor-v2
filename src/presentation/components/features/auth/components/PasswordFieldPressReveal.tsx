@@ -2,6 +2,8 @@
 
 import { Eye, Info } from 'lucide-react'
 import { useId, useState, type InputHTMLAttributes, type ReactNode } from 'react'
+import { AuthLockIcon } from '@/src/presentation/components/features/auth/components/auth-input-icons'
+import { authFluid } from '@/src/presentation/components/features/auth/components/auth-input-fluid'
 import { cn } from '@/src/shared/utils/cn'
 
 type Props = {
@@ -10,6 +12,8 @@ type Props = {
   labelHint?: string
   footer?: ReactNode
   inputClassName?: string
+  /** Ícone de cadeado à esquerda (mesmo padrão do login). */
+  leadingLockIcon?: boolean
 } & Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>
 
 /**
@@ -22,6 +26,7 @@ export function PasswordFieldPressReveal({
   disabled,
   className,
   inputClassName,
+  leadingLockIcon = false,
   id: idProp,
   ...rest
 }: Props) {
@@ -36,8 +41,11 @@ export function PasswordFieldPressReveal({
 
   return (
     <div className={cn(className)}>
-      <div className="mb-1 flex items-center gap-1.5">
-        <label htmlFor={fieldId} className="text-sm font-medium text-gray-700">
+      <div className="mb-[clamp(0.25rem,0.85vmin,0.5rem)] flex items-center gap-1.5">
+        <label
+          htmlFor={fieldId}
+          className="font-medium text-gray-700 text-[clamp(0.6875rem,2.1vmin,0.875rem)]"
+        >
           {label}
         </label>
         {labelHint ? (
@@ -49,7 +57,7 @@ export function PasswordFieldPressReveal({
               aria-label={labelHint}
               aria-describedby={hintTooltipId}
             >
-              <Info className="h-4 w-4" aria-hidden strokeWidth={2} />
+              <Info className="h-[clamp(0.75rem,2.6vmin,1rem)] w-[clamp(0.75rem,2.6vmin,1rem)]" aria-hidden strokeWidth={2} />
             </button>
             <span
               id={hintTooltipId}
@@ -62,13 +70,20 @@ export function PasswordFieldPressReveal({
         ) : null}
       </div>
       <div className="relative">
+        {leadingLockIcon ? (
+          <div className={authFluid.iconLeft}>
+            <AuthLockIcon className={authFluid.iconSvg} />
+          </div>
+        ) : null}
         <input
           {...rest}
           id={fieldId}
           type={reveal ? 'text' : 'password'}
           disabled={busy}
           className={cn(
-            'w-full rounded-lg border border-gray-300 bg-gray-100 px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-alternate',
+            authFluid.shell,
+            authFluid.textAndPy,
+            leadingLockIcon ? authFluid.padPwdField : authFluid.padPwdNoLock,
             inputClassName
           )}
         />
@@ -78,10 +93,7 @@ export function PasswordFieldPressReveal({
           disabled={busy}
           aria-label="Segure para exibir a senha"
           aria-pressed={reveal}
-          className={cn(
-            'absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-gray-500 transition-colors hover:text-gray-800',
-            busy && 'cursor-not-allowed opacity-50'
-          )}
+          className={cn(authFluid.eyeBtn, busy && 'cursor-not-allowed opacity-50')}
           onMouseDown={e => {
             if (busy) return
             e.preventDefault()
@@ -97,7 +109,7 @@ export function PasswordFieldPressReveal({
           onTouchEnd={ocultar}
           onTouchCancel={ocultar}
         >
-          <Eye className="h-5 w-5" aria-hidden strokeWidth={2} />
+          <Eye className={authFluid.eyeIcon} aria-hidden strokeWidth={2} />
         </button>
       </div>
       {footer ? <div className="mt-1">{footer}</div> : null}

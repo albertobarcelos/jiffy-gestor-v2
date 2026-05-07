@@ -1,12 +1,13 @@
 import Link from 'next/link'
 import { AuthPublicShell } from '@/src/presentation/components/features/auth/components/AuthPublicShell'
 
-export default function RegistroSucessoPage({
+export default async function RegistroSucessoPage({
   searchParams,
 }: {
-  searchParams: { ativo?: string }
+  searchParams: Promise<{ ativo?: string }>
 }) {
-  const isAtivo = searchParams.ativo === 'true'
+  const { ativo } = await searchParams
+  const isAtivo = ativo === 'true'
 
   return (
     <AuthPublicShell

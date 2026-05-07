@@ -141,7 +141,7 @@ export function AppCard({
               'inline-flex h-10 w-full items-center justify-center rounded-lg px-4 text-sm font-semibold text-white transition',
               navDisabled
                 ? 'cursor-not-allowed bg-gray-400'
-                : 'bg-secondary hover:bg-alternate'
+                : 'bg-alternate hover:bg-alternate/80'
             )}
           >
             {bloqueado ? 'Bloqueado' : isSelecting ? 'Abrindo…' : 'Acessar'}

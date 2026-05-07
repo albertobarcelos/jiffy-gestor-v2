@@ -7,6 +7,9 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { loginViaApiRoute } from '@/src/presentation/components/features/auth/utils/loginViaApiRoute'
 import { extrairEmailLoginQuery } from '@/src/presentation/components/features/auth/utils/emailFromLoginQuery'
 import { decodeInvitePayloadFromLoginSearch } from '@/src/presentation/components/features/auth/utils/inviteLoginPayload'
+import { AuthEnvelopeIcon, AuthLockIcon } from '@/src/presentation/components/features/auth/components/auth-input-icons'
+import { authFluid } from '@/src/presentation/components/features/auth/components/auth-input-fluid'
+import { cn } from '@/src/shared/utils/cn'
 
 /**
  * Componente de formulário de login
@@ -118,27 +121,16 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-5 [@media(max-height:720px)]:space-y-2 [@media(max-height:640px)]:space-y-1.5"
+    >
       {/* Campo E-mail com ícone de envelope */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          E-mail
-        </label>
+        <label className={authFluid.label}>E-mail</label>
         <div className="relative">
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-              />
-            </svg>
+          <div className={authFluid.iconLeft}>
+            <AuthEnvelopeIcon className={authFluid.iconSvg} />
           </div>
           <input
             type="email"
@@ -147,9 +139,13 @@ export function LoginForm() {
             placeholder="seu@email.com"
             disabled={isLoading}
             autoComplete="email"
-            className={`w-full pl-10 pr-4 py-3 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-alternate focus:border-transparent transition-all ${
-              errors.email ? 'border-error' : ''
-            } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={cn(
+              authFluid.shell,
+              authFluid.textAndPy,
+              authFluid.padIconField,
+              errors.email ? 'border-error' : '',
+              isLoading ? 'cursor-not-allowed opacity-50' : ''
+            )}
           />
         </div>
         {errors.email && (
@@ -173,24 +169,10 @@ export function LoginForm() {
 
       {/* Campo Senha com ícone de cadeado e toggle de visibilidade */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Senha
-        </label>
+        <label className={authFluid.label}>Senha</label>
         <div className="relative">
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-              />
-            </svg>
+          <div className={authFluid.iconLeft}>
+            <AuthLockIcon className={authFluid.iconSvg} />
           </div>
           <input
             type={showPassword ? 'text' : 'password'}
@@ -199,19 +181,27 @@ export function LoginForm() {
             placeholder="••••••••"
             disabled={isLoading}
             autoComplete="current-password"
-            className={`w-full pl-10 pr-12 py-3 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-alternate focus:border-transparent transition-all ${
-              errors.password ? 'border-error' : ''
-            } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={cn(
+              authFluid.shell,
+              authFluid.textAndPy,
+              authFluid.padPwdField,
+              errors.password ? 'border-error' : '',
+              isLoading ? 'cursor-not-allowed opacity-50' : ''
+            )}
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
+            className={cn(
+              authFluid.eyeBtn,
+              'hover:text-gray-700',
+              isLoading && 'cursor-not-allowed opacity-50'
+            )}
             disabled={isLoading}
           >
             {showPassword ? (
               <svg
-                className="w-5 h-5"
+                className={authFluid.eyeIcon}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -225,7 +215,7 @@ export function LoginForm() {
               </svg>
             ) : (
               <svg
-                className="w-5 h-5"
+                className={authFluid.eyeIcon}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -255,9 +245,9 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={isLoading}
-        className="w-full py-3 px-4 bg-[var(--color-alternate)] hover:bg-[var(--color-secondary)] text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        className="w-full py-2 px-4 bg-[var(--color-secondary)] hover:bg-[var(--color-alternate)] text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         style={{
-          backgroundColor: 'var(--color-alternate)',
+          backgroundColor: 'var(--color-secondary)',
         }}
       >
         {isLoading ? (
@@ -289,17 +279,17 @@ export function LoginForm() {
         )}
       </button>
 
-      <div className="space-y-2 text-center">
+      <div className="space-y-1 text-center">
         <Link
           href="/esqueci-senha"
-          className="block w-full text-sm text-[var(--color-alternate)] hover:text-[var(--color-secondary)] transition-colors disabled:opacity-50"
+          className="block w-full text-sm text-[var(--color-secondary)] hover:text-[var(--color-alternate)] transition-colors disabled:opacity-50"
           style={{ color: 'var(--color-secondary)' }}
         >
           Esqueceu sua senha?
         </Link>
         <p className="text-sm text-gray-700">
           Não tem conta?{' '}
-          <Link href="/registro" className="font-semibold text-[var(--color-alternate)] underline">
+          <Link href="/registro" className="font-semibold text-[var(--color-secondary)] underline">
             Criar conta
           </Link>
         </p>

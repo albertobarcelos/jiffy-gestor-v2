@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from 'react'
 import Link from 'next/link'
+import { AuthEmailField } from '@/src/presentation/components/features/auth/components/AuthEmailField'
 
 export function EsqueciSenhaForm() {
   const [email, setEmail] = useState('')
@@ -45,31 +46,31 @@ export function EsqueciSenhaForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-4 [@media(max-height:720px)]:space-y-3 [@media(max-height:640px)]:space-y-2.5"
+    >
       <p className="text-sm text-gray-700">
         Informe o e-mail da sua conta. Enviaremos um link para definir uma nova senha.
       </p>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
-        <input
-          type="email"
-          required
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          autoComplete="email"
-          className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-alternate"
-        />
-      </div>
+      <AuthEmailField
+        label="E-mail"
+        required
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+        autoComplete="email"
+        disabled={loading}
+      />
       {error ? <p className="text-sm text-error">{error}</p> : null}
       <button
         type="submit"
         disabled={loading}
-        className="w-full py-3 px-4 rounded-lg font-semibold text-white bg-[var(--color-alternate)] disabled:opacity-50"
+        className="w-full py-3 px-4 rounded-lg font-semibold text-white bg-[var(--color-secondary)] disabled:opacity-50"
       >
         {loading ? 'Enviando…' : 'Enviar instruções'}
       </button>
       <p className="text-center text-sm">
-        <Link href="/login" className="text-[var(--color-alternate)] underline">
+        <Link href="/login" className="text-[var(--color-secondary)] underline">
           Voltar ao login
         </Link>
       </p>

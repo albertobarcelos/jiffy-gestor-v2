@@ -47,7 +47,7 @@ export function MeusAppsTopNav() {
   }, [userLabel])
 
   return (
-    <header className="sticky top-0 z-40 border-b border-gray-200 bg-secondary">
+    <header className="sticky top-0 z-40 border-b border-gray-200 bg-primary">
       <div className="mx-auto flex h-14 w-full max-w-[1400px] items-center justify-between gap-3 px-2 md:px-4">
         <div className="flex min-w-0 items-center gap-3">
           <Link href="/meus-apps" className="flex items-center gap-2">
@@ -60,7 +60,7 @@ export function MeusAppsTopNav() {
                 className="object-contain"
               />
             </div>
-            <span className="text-lg font-bold tracking-wide text-info">Jiffy</span>
+            <span className="text-2xl font-semibold tracking-wide text-info">Jiffy</span>
             </Link>
             </div>
             <div className="flex items-center gap-2">
@@ -73,7 +73,7 @@ export function MeusAppsTopNav() {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition',
+                    'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-regular transition',
                     active ? 'bg-white/10 text-white' : 'text-white/80 hover:bg-white/10 hover:text-white'
                   )}
                 >
@@ -87,10 +87,8 @@ export function MeusAppsTopNav() {
 
         <div className="flex items-center gap-2">
           <div className="hidden items-center gap-2 border-l border-white/90 px-3 py-1.5 text-white/90 md:flex">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-sky-500 text-xs font-bold text-white">
-              {userInitial}
-            </span>
-            <span className="max-w-[220px] truncate text-sm font-semibold">{userLabel}</span>
+            
+            <span className="max-w-[220px] truncate text-sm font-normal">{userLabel}</span>
             <button
               type="button"
               onClick={() => {

@@ -80,7 +80,7 @@ export function ConfirmarEmailClient() {
     return (
       <div className="space-y-4 text-center">
         <p className="text-error text-sm">Link inválido: falta o token de confirmação.</p>
-        <Link href="/login" className="text-[var(--color-alternate)] font-semibold text-sm underline">
+        <Link href="/login" className="text-[var(--color-secondary)] font-semibold text-sm underline">
           Voltar ao login
         </Link>
       </div>
@@ -93,7 +93,7 @@ export function ConfirmarEmailClient() {
         <p className="text-primary-text font-medium">E-mail confirmado com sucesso!</p>
         <Link
           href="/login"
-          className="inline-flex w-full justify-center py-3 px-4 rounded-lg font-semibold text-white bg-[var(--color-alternate)] hover:opacity-95"
+          className="inline-flex w-full justify-center py-3 px-4 rounded-lg font-semibold text-white bg-[var(--color-secondary)] hover:opacity-95"
         >
           Ir para o login
         </Link>
@@ -120,7 +120,7 @@ export function ConfirmarEmailClient() {
         <button
           type="submit"
           disabled={reenviando}
-          className="w-full py-3 px-4 rounded-lg font-semibold text-white bg-[var(--color-alternate)] disabled:opacity-50"
+          className="w-full py-3 px-4 rounded-lg font-semibold text-white bg-[var(--color-secondary)] disabled:opacity-50"
         >
           {reenviando ? 'Enviando…' : 'Reenviar e-mail de confirmação'}
         </button>
@@ -133,7 +133,7 @@ export function ConfirmarEmailClient() {
       ) : null}
 
       <div className="text-center">
-        <Link href="/login" className="text-sm text-[var(--color-alternate)] underline">
+        <Link href="/login" className="text-sm text-[var(--color-secondary)] underline">
           Voltar ao login
         </Link>
       </div>

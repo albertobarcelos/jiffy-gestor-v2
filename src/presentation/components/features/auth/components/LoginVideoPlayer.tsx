@@ -3,25 +3,22 @@
 import { useEffect, useRef, useState } from 'react'
 
 /**
- * Componente de player de vídeo para a página de login
- * Replica o comportamento do Flutter
- * Otimizado com lazy loading e Intersection Observer
+ * Player de vídeo da área pública de autenticação (login e fluxos relacionados).
  */
-export function VideoPlayer() {
+export function LoginVideoPlayer() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
   const [shouldLoad, setShouldLoad] = useState(false)
 
-  // Intersection Observer para carregar vídeo apenas quando visível
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
 
     const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
+      entries => {
+        entries.forEach(entry => {
           if (entry.isIntersecting) {
             setShouldLoad(true)
             observer.disconnect()
@@ -29,7 +26,7 @@ export function VideoPlayer() {
         })
       },
       {
-        rootMargin: '50px', // Carrega 50px antes de ficar visível
+        rootMargin: '50px',
         threshold: 0.1,
       }
     )
@@ -41,7 +38,6 @@ export function VideoPlayer() {
     }
   }, [])
 
-  // Configuração do vídeo quando deve carregar
   useEffect(() => {
     if (!shouldLoad) return
 
@@ -50,15 +46,10 @@ export function VideoPlayer() {
 
     const handleLoadedData = () => {
       setIsLoading(false)
-      // Configurações do Flutter:
-      // - Looping: true
-      // - Velocidade: 0.5x
-      // - Volume: 0 (mudo)
       video.loop = true
       video.playbackRate = 0.5
       video.volume = 0
-      video.play().catch((error) => {
-        console.error('Erro ao reproduzir vídeo:', error)
+      video.play().catch(() => {
         setHasError(true)
         setIsLoading(false)
       })
@@ -71,7 +62,6 @@ export function VideoPlayer() {
     }
 
     const handleCanPlay = () => {
-      // Garante que o vídeo está pronto para reproduzir
       if (video.readyState >= 3) {
         setIsLoading(false)
       }
@@ -81,7 +71,6 @@ export function VideoPlayer() {
     video.addEventListener('canplay', handleCanPlay)
     video.addEventListener('error', handleError)
 
-    // Força o carregamento do vídeo
     video.load()
 
     return () => {
@@ -93,19 +82,17 @@ export function VideoPlayer() {
 
   return (
     <div ref={containerRef} className="relative w-full h-full">
-      {isLoading && !hasError && (
+      {isLoading && !hasError ? (
         <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
           <div className="w-8 h-8 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin" />
         </div>
-      )}
-      {hasError && (
+      ) : null}
+      {hasError ? (
         <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
-          <p className="text-white text-center text-sm px-4">
-            Erro ao carregar o vídeo.
-          </p>
+          <p className="text-white text-center text-sm px-4">Erro ao carregar o vídeo.</p>
         </div>
-      )}
-      {shouldLoad && (
+      ) : null}
+      {shouldLoad ? (
         <video
           ref={videoRef}
           className="w-full h-full object-cover rounded-xl"
@@ -117,14 +104,12 @@ export function VideoPlayer() {
           <source src="/videos/video_de_fundo5.mp4" type="video/mp4" />
           Seu navegador não suporta vídeos.
         </video>
-      )}
-      {!shouldLoad && (
+      ) : null}
+      {!shouldLoad ? (
         <div className="w-full h-full bg-black/50 rounded-xl flex items-center justify-center">
           <div className="w-8 h-8 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin" />
         </div>
-      )}
+      ) : null}
     </div>
   )
 }
-
-

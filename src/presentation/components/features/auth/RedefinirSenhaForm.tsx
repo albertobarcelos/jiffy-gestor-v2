@@ -69,7 +69,10 @@ export function RedefinirSenhaForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-4 [@media(max-height:720px)]:space-y-3 [@media(max-height:640px)]:space-y-2.5"
+    >
       <GestorPasswordField
         label="Nova senha"
         forcaBarIdPrefix="redefinir-senha"
@@ -81,6 +84,7 @@ export function RedefinirSenhaForm() {
       />
       <PasswordFieldPressReveal
         label="Confirmar nova senha"
+        leadingLockIcon
         required
         value={confirm}
         onChange={e => setConfirm(e.target.value)}
@@ -91,12 +95,12 @@ export function RedefinirSenhaForm() {
       <button
         type="submit"
         disabled={loading}
-        className="w-full py-3 px-4 rounded-lg font-semibold text-white bg-[var(--color-alternate)] disabled:opacity-50"
+        className="w-full py-3 px-4 rounded-lg font-semibold text-white bg-[var(--color-secondary)] disabled:opacity-50"
       >
         {loading ? 'Salvando…' : 'Salvar nova senha'}
       </button>
       <p className="text-center text-sm">
-        <Link href="/login" className="text-[var(--color-alternate)] underline">
+        <Link href="/login" className="text-[var(--color-secondary)] underline">
           Voltar ao login
         </Link>
       </p>
