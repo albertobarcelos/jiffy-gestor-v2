@@ -1,65 +1,59 @@
 'use client'
 
-import { useState, FormEvent } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, FormEvent, useEffect } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { Auth } from '@/src/domain/entities/Auth'
-import { User } from '@/src/domain/entities/User'
-import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/src/presentation/components/ui/dialog'
-
-/** Extrai lista de empresas da resposta do login (contrato hub gestor). */
-function parseEmpresasLogin(raw: unknown): LoginEmpresaSnapshot[] | null {
-  if (!Array.isArray(raw)) {
-    return null
-  }
-
-  const out: LoginEmpresaSnapshot[] = []
-
-  for (const item of raw) {
-    if (!item || typeof item !== 'object') {
-      continue
-    }
-    const o = item as Record<string, unknown>
-    const id = typeof o.id === 'string' ? o.id.trim() : ''
-    const nomeFantasia = typeof o.nomeFantasia === 'string' ? o.nomeFantasia.trim() : ''
-    const cnpj = typeof o.cnpj === 'string' ? o.cnpj.trim() : ''
-    const bloqueado = o.bloqueado === true
-
-    if (!id || !nomeFantasia || !cnpj) {
-      continue
-    }
-
-    out.push({ id, nomeFantasia, cnpj, bloqueado })
-  }
-
-  return out
-}
+import { loginViaApiRoute } from '@/src/presentation/components/features/auth/utils/loginViaApiRoute'
+import { extrairEmailLoginQuery } from '@/src/presentation/components/features/auth/utils/emailFromLoginQuery'
+import { decodeInvitePayloadFromLoginSearch } from '@/src/presentation/components/features/auth/utils/inviteLoginPayload'
 
 /**
  * Componente de formulário de login
  */
 export function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({})
-  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false)
+  const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false)
+  const [resendLoading, setResendLoading] = useState(false)
+  const [resendMessage, setResendMessage] = useState<string | null>(null)
 
   const { login, setHubEmpresas, setLoading, setError, isLoading } = useAuthStore()
+
+  /** Convite por e-mail: `p` (base64url), ou legado `email` / `conviteId`. */
+  useEffect(() => {
+    const doPayload = decodeInvitePayloadFromLoginSearch(searchParams)
+    if (doPayload?.email?.trim()) {
+      setEmail(doPayload.email.trim())
+      return
+    }
+    const daBusca = searchParams.get('email')
+    if (daBusca?.trim()) {
+      try {
+        setEmail(decodeURIComponent(daBusca.trim()))
+      } catch {
+        setEmail(daBusca.trim())
+      }
+      return
+    }
+    if (typeof window !== 'undefined') {
+      const recuperado = extrairEmailLoginQuery(window.location.search)
+      if (recuperado) {
+        setEmail(recuperado)
+      }
+    }
+  }, [searchParams])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setErrors({})
     setError(null)
+    setNeedsEmailConfirmation(false)
+    setResendMessage(null)
 
     // Validação básica
     const newErrors: { email?: string; password?: string } = {}
@@ -78,47 +72,17 @@ export function LoginForm() {
     try {
       setLoading(true)
 
-      // Chama a API route
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: email.trim(),
-          password,
-        }),
-      })
+      const resultado = await loginViaApiRoute(email.trim(), password)
 
-      const data = await response.json()
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Erro ao fazer login')
+      if (!resultado.ok) {
+        if (resultado.needsEmailConfirmation) {
+          setNeedsEmailConfirmation(true)
+        }
+        throw new Error(resultado.error)
       }
 
-      // Reconstrói Auth a partir da resposta
-      const authData = data.data
-      
-      const user = User.create(
-        authData.user.id,
-        authData.user.email,
-        authData.user.name
-      )
-
-      const expiresAt = new Date(authData.expiresAt)
-      const auth = Auth.createWithExpiration(authData.accessToken, user, expiresAt)
-
-      // Atualiza o store
-      login(auth)
-
-      // Lista de empresas do login multi-empresa (hub Meus aplicativos)
-      const empresasRaw = data.data?.empresas as unknown
-      if (empresasRaw === undefined) {
-        setHubEmpresas(null)
-      } else {
-        const lista = parseEmpresasLogin(empresasRaw)
-        setHubEmpresas(lista ?? null)
-      }
+      login(resultado.auth)
+      setHubEmpresas(resultado.empresas)
 
       router.replace('/meus-apps')
     } catch (error) {
@@ -127,6 +91,29 @@ export function LoginForm() {
       setErrors({ email: message })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleResendConfirmation = async () => {
+    if (!email.trim()) return
+    setResendLoading(true)
+    setResendMessage(null)
+    try {
+      const res = await fetch('/api/auth/usuario/reenviar-confirmacao', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: email.trim() }),
+      })
+      if (res.status === 204) {
+        setResendMessage(
+          'Se o e-mail estiver cadastrado e pendente de confirmação, um novo link foi enviado.'
+        )
+      } else {
+        const data = (await res.json().catch(() => ({}))) as { error?: string }
+        setResendMessage(data.error || 'Não foi possível reenviar o e-mail.')
+      }
+    } finally {
+      setResendLoading(false)
     }
   }
 
@@ -167,6 +154,20 @@ export function LoginForm() {
         </div>
         {errors.email && (
           <p className="mt-1 text-sm text-error">{errors.email}</p>
+        )}
+        {needsEmailConfirmation && (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+            <p className="mb-2">Confirme seu e-mail para continuar.</p>
+            <button
+              type="button"
+              onClick={() => void handleResendConfirmation()}
+              disabled={resendLoading || !email.trim()}
+              className="w-full py-2 rounded-lg font-semibold text-white bg-amber-700 hover:bg-amber-800 disabled:opacity-50 text-xs sm:text-sm"
+            >
+              {resendLoading ? 'Enviando…' : 'Reenviar e-mail de confirmação'}
+            </button>
+            {resendMessage ? <p className="mt-2 text-xs text-amber-900">{resendMessage}</p> : null}
+          </div>
         )}
       </div>
 
@@ -288,63 +289,21 @@ export function LoginForm() {
         )}
       </button>
 
-      {/* Link Esqueceu senha - roxo/rosa claro */}
-      <button
-        type="button"
-        onClick={() => {
-          setForgotPasswordOpen(true)
-        }}
-        className="w-full text-center text-sm text-[var(--color-alternate)] hover:text-[var(--color-secondary)] transition-colors disabled:opacity-50"
-        style={{
-          color: 'var(--color-secondary)',
-        }}
-        disabled={isLoading}
-      >
-        Esqueceu sua senha?
-      </button>
-
-      <Dialog
-        open={forgotPasswordOpen}
-        onOpenChange={(openState) => setForgotPasswordOpen(openState)}
-        maxWidth="xs"
-        fullWidth
-        sx={{
-          '& .MuiDialog-paper': {
-            borderRadius: 3,
-            p: 0,
-          },
-        }}
-      >
-        <DialogContent sx={{ p: 2.5 }}>
-          <DialogHeader sx={{ p: 0, pb: 1.5 }}>
-            <DialogTitle sx={{ fontSize: '1.05rem', color: 'var(--color-alternate)' }}>
-              Recuperação de senha
-            </DialogTitle>
-            <DialogDescription sx={{ mt: 1 }}>
-              Para recuperar seu acesso, fale com o suporte técnico. Se possível, informe seu e-mail e o CNPJ da
-              empresa para agilizar o atendimento.
-            </DialogDescription>
-          </DialogHeader>
-
-          <DialogFooter sx={{ p: 0, pt: 2, gap: 1, justifyContent: 'flex-end' }}>
-            <button
-              type="button"
-              onClick={() => setForgotPasswordOpen(false)}
-              className="h-10 rounded-lg border border-gray-300 px-4 text-sm font-semibold text-primary-text transition-colors hover:bg-gray-50"
-            >
-              Entendi
-            </button>
-            <a
-              href="https://wa.me/556592298724?text=Ol%C3%A1!%20Preciso%20de%20ajuda%20para%20recuperar%20minhas%20credenciais%20de%20login."
-              target="_blank"
-              rel="noreferrer"
-              className="h-10 rounded-lg bg-[var(--color-alternate)] px-4 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-secondary)] inline-flex items-center"
-            >
-              Falar com suporte
-            </a>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <div className="space-y-2 text-center">
+        <Link
+          href="/esqueci-senha"
+          className="block w-full text-sm text-[var(--color-alternate)] hover:text-[var(--color-secondary)] transition-colors disabled:opacity-50"
+          style={{ color: 'var(--color-secondary)' }}
+        >
+          Esqueceu sua senha?
+        </Link>
+        <p className="text-sm text-gray-700">
+          Não tem conta?{' '}
+          <Link href="/registro" className="font-semibold text-[var(--color-alternate)] underline">
+            Criar conta
+          </Link>
+        </p>
+      </div>
     </form>
   )
 }

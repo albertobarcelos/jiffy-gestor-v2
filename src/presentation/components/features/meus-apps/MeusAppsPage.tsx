@@ -14,16 +14,7 @@ import { ViewControls, type MeusAppsViewMode } from './components/ViewControls'
 import { MeusAppsTopNav } from './components/MeusAppsTopNav'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { empresaParaMeusApp } from './utils/empresaParaMeusApp'
-
-/** Monta snapshot de empresa após aceitar convite (CNPJ pode vir em novo login). */
-function conviteAceitoParaEmpresa(convite: ConvitePendente): LoginEmpresaSnapshot {
-  return {
-    id: convite.empresaId,
-    nomeFantasia: convite.nomeEmpresa,
-    cnpj: '—',
-    bloqueado: false,
-  }
-}
+import { conviteParaEmpresaSnapshot } from '@/src/presentation/components/features/convites/utils/conviteParaEmpresaSnapshot'
 
 export default function MeusAppsPage() {
   const hubEmpresas = useAuthStore(s => s.hubEmpresas)
@@ -94,7 +85,7 @@ export default function MeusAppsPage() {
 
   const mergeEmpresaAceita = useCallback(
     (convite: ConvitePendente) => {
-      const novo = conviteAceitoParaEmpresa(convite)
+      const novo = conviteParaEmpresaSnapshot(convite)
       const atual = hubEmpresas ?? []
       if (atual.some(e => e.id === novo.id)) {
         return

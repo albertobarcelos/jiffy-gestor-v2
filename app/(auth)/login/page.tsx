@@ -1,4 +1,6 @@
+import { Suspense } from 'react'
 import { LoginForm } from '@/src/presentation/components/features/auth/LoginForm'
+import { LoginInviteRedirect } from '@/src/presentation/components/features/auth/LoginInviteRedirect'
 import { VideoPlayer } from './VideoPlayer'
 import Image from 'next/image'
 
@@ -44,6 +46,9 @@ export default function LoginPage() {
         {/* Formulário de login (direita) */}
         <div className="w-full md:w-1/2 flex items-center justify-center p-6 md:p-12 relative z-10">
           <div className="w-full max-w-[450px]">
+            <Suspense fallback={null}>
+              <LoginInviteRedirect />
+            </Suspense>
             <div className="backdrop-blur-md bg-white/30 border-white border-2 rounded-[20px] p-4 shadow-[0_10px_30px_rgba(0,0,0,0.15)]">
               {/* Logo */}
               <div className="flex justify-center mb-6">
@@ -68,8 +73,16 @@ export default function LoginPage() {
               Faça login para acessar o sistema
               </p>
 
-              {/* Formulário */}
-              <LoginForm />
+              {/* Formulário — Suspense por uso de useSearchParams no LoginForm */}
+              <Suspense
+                fallback={
+                  <p className="text-center text-sm text-primary-text" role="status">
+                    Carregando…
+                  </p>
+                }
+              >
+                <LoginForm />
+              </Suspense>
             </div>
           </div>
         </div>

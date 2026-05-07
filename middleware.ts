@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { queryRegistroConviteNovoUsuarioFromLoginSearch } from '@/src/presentation/components/features/auth/utils/inviteLoginPayload'
 
 /**
  * Middleware para proteção de rotas - OTIMIZADO
@@ -9,10 +10,27 @@ import type { NextRequest } from 'next/server'
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  /** Convite novo usuário: não renderiza /login — vai direto para /registro (evita “flash” do login). */
+  if (pathname === '/login') {
+    const q = queryRegistroConviteNovoUsuarioFromLoginSearch(request.nextUrl.search)
+    if (q) {
+      const dest = new URL('/registro', request.url)
+      dest.search = q.toString()
+      return NextResponse.redirect(dest)
+    }
+  }
+
   // Rotas públicas - bypass rápido
   if (
     pathname === '/login' ||
+    pathname === '/registro' ||
+    pathname.startsWith('/registro/') ||
+    pathname === '/confirmar-email' ||
+    pathname === '/esqueci-senha' ||
+    pathname === '/redefinir-senha' ||
+    pathname.startsWith('/redefinir-senha/') ||
     pathname.startsWith('/api/auth/login') ||
+    pathname.startsWith('/api/auth/usuario/') ||
     pathname.startsWith('/api/consulta-cnpj') ||
     pathname.startsWith('/api/consulta-cep') ||
     pathname.startsWith('/notas-fiscais') ||
@@ -23,7 +41,7 @@ export function middleware(request: NextRequest) {
 
   // Raiz → dashboard (rota canônica)
   if (pathname === '/') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    return NextResponse.redirect(new URL('/meus-apps', request.url))
   }
 
   // Antiga URL /dashboard/v2 → /dashboard

@@ -155,7 +155,7 @@ Arquivo: `middleware.ts`
   - `/api/consulta-cep*`
   - `/notas-fiscais*`
   - `/api/public/notas-fiscais-consumidor*`
-- `/` redireciona para `/dashboard`
+- `/` redireciona para `/meus-apps`
 - validação mínima:
   - se **não** houver token em cookie `auth-token` **ou** header `Authorization: Bearer ...`
     - páginas: redirect `/login`
@@ -176,7 +176,7 @@ Arquivo: `src/presentation/components/auth/AuthGuard.tsx`
 
 Hoje, após login, a UI sempre manda para:
 
-- **`/dashboard`**
+- **`/meus-apps`**
 
 E essa rota está protegida por `app/dashboard/layout.tsx`:
 
@@ -189,7 +189,7 @@ E essa rota está protegida por `app/dashboard/layout.tsx`:
 - **API interna chama API externa**: login `legacy` ou `multi_empresa`
 - **API interna seta cookie httpOnly**: `auth-token`
 - **UI salva sessão no Zustand (localStorage)**: `auth-storage`
-- **UI navega para**: `/dashboard`
+- **UI navega para**: `/meus-apps`
 - **Proteções**:
   - middleware exige token presente
   - `AuthGuard` exige store reidratado + `auth` válido e não expirado

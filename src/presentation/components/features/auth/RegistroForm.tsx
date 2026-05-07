@@ -1,0 +1,172 @@
+'use client'
+
+import { FormEvent, useEffect, useState } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { senhaGestorEhValida, SENHA_GESTOR_MENSAGEM_ERRO } from '@/src/shared/utils/senhaGestorRules'
+import { executarPosRegistroConvite } from '@/src/presentation/components/features/auth/utils/executarPosRegistroConvite'
+
+export function RegistroForm() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const fluxoConvite = searchParams.get('fluxo') === 'convite'
+  const emailConvite = searchParams.get('email') ?? ''
+  const conviteId = searchParams.get('conviteId') ?? ''
+
+  const login = useAuthStore(s => s.login)
+  const setHubEmpresas = useAuthStore(s => s.setHubEmpresas)
+
+  const [nome, setNome] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (emailConvite.trim()) {
+      setEmail(emailConvite.trim())
+    }
+  }, [emailConvite])
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    setError(null)
+
+    if (!senhaGestorEhValida(password)) {
+      setError(SENHA_GESTOR_MENSAGEM_ERRO)
+      return
+    }
+    if (password !== confirm) {
+      setError('As senhas não conferem.')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const body: {
+        nome: string
+        username: string
+        password: string
+        conviteId?: string
+      } = {
+        nome: nome.trim(),
+        username: email.trim(),
+        password,
+      }
+      if (fluxoConvite && conviteId.trim()) {
+        body.conviteId = conviteId.trim()
+      }
+
+      const res = await fetch('/api/auth/usuario/registro', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = (await res.json().catch(() => ({}))) as { error?: string; ativo?: boolean }
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Não foi possível concluir o cadastro.')
+      }
+
+      if (fluxoConvite) {
+        await executarPosRegistroConvite(email.trim(), password, {
+          login,
+          setHubEmpresas,
+          getHubEmpresas: () => useAuthStore.getState().hubEmpresas,
+          onPrecisaConfirmarEmail: () => router.push('/registro/sucesso'),
+          onConcluido: () => router.replace('/meus-apps'),
+        })
+        return
+      }
+
+      if (data.ativo) {
+        router.push('/registro/sucesso?ativo=true')
+      } else {
+        router.push('/registro/sucesso')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao cadastrar.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {fluxoConvite ? (
+        <p className="text-sm text-gray-800 rounded-lg bg-white/50 border border-white/60 p-3">
+          Você foi convidado para uma empresa na Jiffy. Complete o cadastro; em seguida entraremos e aceitaremos o
+          convite automaticamente quando possível.
+        </p>
+      ) : null}
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Nome completo</label>
+        <input
+          type="text"
+          required
+          value={nome}
+          onChange={e => setNome(e.target.value)}
+          autoComplete="name"
+          className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-alternate"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
+        <input
+          type="email"
+          required
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          autoComplete="email"
+          readOnly={fluxoConvite && Boolean(emailConvite.trim())}
+          className={`w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-alternate ${
+            fluxoConvite && emailConvite.trim() ? 'opacity-90 cursor-not-allowed' : ''
+          }`}
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+        <input
+          type="password"
+          required
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          autoComplete="new-password"
+          className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-alternate"
+        />
+        <p className="mt-1 text-xs text-gray-600">{SENHA_GESTOR_MENSAGEM_ERRO}</p>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Confirmar senha</label>
+        <input
+          type="password"
+          required
+          value={confirm}
+          onChange={e => setConfirm(e.target.value)}
+          autoComplete="new-password"
+          className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-alternate"
+        />
+      </div>
+
+      {error ? <p className="text-sm text-error">{error}</p> : null}
+
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full py-3 px-4 rounded-lg font-semibold text-white bg-[var(--color-alternate)] disabled:opacity-50"
+      >
+        {loading ? (fluxoConvite ? 'Entrando…' : 'Cadastrando…') : fluxoConvite ? 'Cadastrar e continuar' : 'Criar conta'}
+      </button>
+
+      <p className="text-center text-sm text-gray-700">
+        Já tem conta?{' '}
+        <Link href="/login" className="font-semibold text-[var(--color-alternate)] underline">
+          Entrar
+        </Link>
+      </p>
+    </form>
+  )
+}
