@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Produto } from '@/src/domain/entities/Produto'
 import { Impressora } from '@/src/domain/entities/Impressora'
 import { transformarParaReal, brToEUA } from '@/src/shared/utils/formatters'
@@ -43,6 +43,123 @@ type PermissaoCampoChave =
   | 'permiteAlterarPreco'
   | 'incideTaxa'
   | 'abreComplementos'
+
+const PRODUTOS_LOTE_PAGE_SIZE = 50
+
+const FILTRO_COLUNA_TODOS = 'todos'
+
+/** Filtro apenas no front: mostrar só produtos sem dado na coluna escolhida. */
+type FiltroColunaVazia =
+  | typeof FILTRO_COLUNA_TODOS
+  | 'sem_impressoras'
+  | 'sem_ncm'
+  | 'sem_grupos_complementos'
+  /* Colunas CEST / origem / tipo / indicador: backend ainda não devolve na listagem — descomente quando o GET /api/produtos incluir:
+  | 'sem_cest'
+  | 'sem_origem'
+  | 'sem_tipo'
+  | 'sem_indicador'
+  */
+
+const LABEL_FILTRO_COLUNA: Record<FiltroColunaVazia, string> = {
+  [FILTRO_COLUNA_TODOS]: 'Todos',
+  sem_impressoras: 'Sem impressoras',
+  sem_ncm: 'Sem NCM',
+  sem_grupos_complementos: 'Sem grupos de complementos',
+  /* sem_cest: 'Sem CEST',
+  sem_origem: 'Sem origem da mercadoria',
+  sem_tipo: 'Sem tipo de produto',
+  sem_indicador: 'Sem indicador de produção', */
+}
+
+function produtoSemDadoNaColuna(p: Produto, filtro: FiltroColunaVazia): boolean {
+  if (filtro === FILTRO_COLUNA_TODOS) return true
+  switch (filtro) {
+    case 'sem_impressoras':
+      return p.getImpressoras().length === 0
+    case 'sem_ncm':
+      return !p.getNcm().trim()
+    case 'sem_grupos_complementos':
+      return p.getGruposComplementos().length === 0
+    /* case 'sem_cest':
+      return !p.getCest().trim()
+    case 'sem_origem':
+      return !p.getOrigemMercadoria().trim()
+    case 'sem_tipo':
+      return !p.getTipoProduto().trim()
+    case 'sem_indicador': {
+      const v = p.getIndicadorProducaoEscala()
+      return v === null || String(v).trim() === ''
+    } */
+    default:
+      return true
+  }
+}
+
+function parseProdutosLoteApiResponse(data: unknown): { list: Produto[]; count: number | null } {
+  const d = data as Record<string, unknown>
+  const produtosList = Array.isArray(d.items)
+    ? d.items
+    : Array.isArray(d.produtos)
+      ? d.produtos
+      : Array.isArray(data)
+        ? (data as unknown[])
+        : []
+
+  const list = produtosList
+    .map((p: unknown) => {
+      try {
+        return Produto.fromJSON(p as Record<string, unknown>)
+      } catch (error) {
+        console.error('Erro ao parsear produto:', error, p)
+        return null
+      }
+    })
+    .filter((p: Produto | null): p is Produto => p !== null)
+
+  const count = typeof d.count === 'number' ? d.count : null
+  return { list, count }
+}
+
+/** Ancestor com overflow de rolagem (ex.: `main` do layout de produtos). */
+function findScrollableAncestor(start: HTMLElement | null): HTMLElement | null {
+  let el: HTMLElement | null = start
+  while (el) {
+    const { overflowY } = window.getComputedStyle(el)
+    if (/(auto|scroll|overlay)/.test(overflowY) && el.scrollHeight > el.clientHeight + 1) {
+      return el
+    }
+    el = el.parentElement
+  }
+  return null
+}
+
+/** Texto único para célula sem dado (alinha com o filtro “sem …”). */
+function textoOuNenhum(v: string | null | undefined): string {
+  const t = v === null || v === undefined ? '' : String(v).trim()
+  return t === '' ? 'Nenhum' : t
+}
+
+/* Usados nas colunas da grade quando CEST/origem/tipo/indicador vierem do backend na listagem:
+function labelListaFiscal(
+  value: string | null | undefined,
+  options: { value: string; label: string }[],
+): { curto: string; title: string } {
+  const v = value === null || value === undefined ? '' : String(value).trim()
+  if (v === '') return { curto: 'Nenhum', title: '' }
+  const opt = options.find((o) => o.value === v)
+  if (opt) return { curto: opt.value, title: opt.label }
+  return { curto: v, title: v }
+}
+
+function celulaFiscalIndicador(v: string | null | undefined): { curto: string; title: string } {
+  const s = v === null || v === undefined ? '' : String(v).trim()
+  if (s === '') return { curto: 'Nenhum', title: '' }
+  const opt = indicadoresProducao.find((o) => o.value === s)
+  if (opt) return { curto: s, title: opt.label }
+  return { curto: s, title: s }
+}
+*/
 
 const CAMPOS_PERMISSAO_PDV: { chave: PermissaoCampoChave; label: string }[] = [
   { chave: 'favorito', label: 'Favorito' },
@@ -158,10 +275,14 @@ export function AtualizarPrecoLote() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [searchText, setSearchText] = useState('')
   const [total, setTotal] = useState(0)
+  const [hasMoreProdutos, setHasMoreProdutos] = useState(false)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
   const [ativoLocalFilter, setAtivoLocalFilter] = useState<'Todos' | 'Sim' | 'Não'>('Todos')
   const [ativoDeliveryFilter, setAtivoDeliveryFilter] = useState<'Todos' | 'Sim' | 'Não'>('Todos')
   const [grupoProdutoFilter, setGrupoProdutoFilter] = useState('')
+  /** Mostrar apenas produtos sem dado na coluna escolhida (filtro só no front). */
+  const [filtroColunaVazia, setFiltroColunaVazia] = useState<FiltroColunaVazia>(FILTRO_COLUNA_TODOS)
   const [adjustMode, setAdjustMode] = useState<'valor' | 'percentual'>('valor')
   const [adjustAmount, setAdjustAmount] = useState('')
   const [adjustDirection, setAdjustDirection] = useState<'increase' | 'decrease'>('increase')
@@ -208,7 +329,31 @@ export function AtualizarPrecoLote() {
     fiscal: new Set(),
   }))
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
+  const produtosRef = useRef<Produto[]>([])
+  const listaAreaRef = useRef<HTMLDivElement>(null)
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null)
+  const hasMoreProdutosRef = useRef(false)
+  const isLoadingRef = useRef(false)
+  const isLoadingMoreRef = useRef(false)
+  const loadMoreLockRef = useRef(false)
+  const carregarMaisProdutosRef = useRef<() => Promise<void>>(async () => {})
   const { auth } = useAuthStore()
+
+  useEffect(() => {
+    produtosRef.current = produtos
+  }, [produtos])
+
+  useEffect(() => {
+    hasMoreProdutosRef.current = hasMoreProdutos
+  }, [hasMoreProdutos])
+
+  useEffect(() => {
+    isLoadingRef.current = isLoading
+  }, [isLoading])
+
+  useEffect(() => {
+    isLoadingMoreRef.current = isLoadingMore
+  }, [isLoadingMore])
 
   const marcarProdutosAlteradosNaSessao = useCallback((ids: string[], aba: TabPainelLote) => {
     if (ids.length === 0) return
@@ -227,22 +372,8 @@ export function AtualizarPrecoLote() {
     isLoading: isLoadingGruposComplementos,
   } = useGruposComplementos({ limit: 100, ativo: null })
 
-  // Buscar produtos
-  const buscarProdutos = useCallback(async () => {
-    const token = auth?.getAccessToken()
-    if (!token) return
-
-    const limit = 50
-    setIsLoading(true)
-    setProdutos([])
-    // Mantém produtosSelecionados: a seleção persiste entre buscas até ação manual ou após salvar em lote
-
-    try {
-      let hasMorePages = true
-      let currentOffset = 0
-      const acumulado: Produto[] = []
-      let totalFromApi: number | null = null
-
+  const buildProdutosLoteParams = useCallback(
+    (offset: number) => {
       const ativoFilter =
         filterStatus === 'Ativo' ? true : filterStatus === 'Desativado' ? false : null
       const ativoLocalBoolean =
@@ -250,84 +381,172 @@ export function AtualizarPrecoLote() {
       const ativoDeliveryBoolean =
         ativoDeliveryFilter === 'Sim' ? true : ativoDeliveryFilter === 'Não' ? false : null
 
-      while (hasMorePages) {
-        const params = new URLSearchParams({
-          name: searchText,
-          limit: limit.toString(),
-          offset: currentOffset.toString(),
-        })
-        if (ativoFilter !== null) {
-          params.append('ativo', ativoFilter.toString())
-        }
-        if (ativoLocalBoolean !== null) {
-          params.append('ativoLocal', ativoLocalBoolean.toString())
-        }
-        if (ativoDeliveryBoolean !== null) {
-          params.append('ativoDelivery', ativoDeliveryBoolean.toString())
-        }
-        if (grupoProdutoFilter) {
-          params.append('grupoProdutoId', grupoProdutoFilter)
-        }
+      const params = new URLSearchParams({
+        name: searchText,
+        limit: PRODUTOS_LOTE_PAGE_SIZE.toString(),
+        offset: offset.toString(),
+      })
+      if (ativoFilter !== null) {
+        params.append('ativo', ativoFilter.toString())
+      }
+      if (ativoLocalBoolean !== null) {
+        params.append('ativoLocal', ativoLocalBoolean.toString())
+      }
+      if (ativoDeliveryBoolean !== null) {
+        params.append('ativoDelivery', ativoDeliveryBoolean.toString())
+      }
+      if (grupoProdutoFilter) {
+        params.append('grupoProdutoId', grupoProdutoFilter)
+      }
+      return params
+    },
+    [searchText, filterStatus, ativoLocalFilter, ativoDeliveryFilter, grupoProdutoFilter],
+  )
 
-        const response = await fetch(`/api/produtos?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
+  const buscarProdutos = useCallback(async () => {
+    const token = auth?.getAccessToken()
+    if (!token) return
 
-        if (!response.ok) {
-          throw new Error(`Erro ${response.status}: ${response.statusText}`)
-        }
+    loadMoreLockRef.current = false
+    setIsLoading(true)
+    setProdutos([])
+    setHasMoreProdutos(false)
+    setIsLoadingMore(false)
+    // Mantém produtosSelecionados: a seleção persiste entre buscas até ação manual ou após salvar em lote
 
-        const data = await response.json()
-        // A API retorna { success: true, items: [...], count: number }
-        const produtosList = Array.isArray(data.items)
-          ? data.items
-          : Array.isArray(data.produtos)
-            ? data.produtos
-            : Array.isArray(data)
-              ? data
-              : []
+    try {
+      const params = buildProdutosLoteParams(0)
+      const response = await fetch(`/api/produtos?${params.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
 
-        const produtosParsed = produtosList
-          .map((p: any) => {
-            try {
-              return Produto.fromJSON(p)
-            } catch (error) {
-              console.error('Erro ao parsear produto:', error, p)
-              return null
-            }
-          })
-          .filter((p: Produto | null): p is Produto => p !== null)
-
-        acumulado.push(...produtosParsed)
-        if (typeof data.count === 'number') {
-          totalFromApi = data.count
-        }
-
-        currentOffset += produtosParsed.length
-        hasMorePages = produtosParsed.length === limit && (totalFromApi ? currentOffset < totalFromApi : true)
-
-        if (produtosParsed.length === 0) {
-          hasMorePages = false
-        }
+      if (!response.ok) {
+        throw new Error(`Erro ${response.status}: ${response.statusText}`)
       }
 
-      setProdutos(acumulado)
-      setTotal(totalFromApi ?? acumulado.length)
-    } catch (error: any) {
+      const data = await response.json()
+      const { list: produtosParsed, count } = parseProdutosLoteApiResponse(data)
+
+      setProdutos(produtosParsed)
+      setTotal(count ?? produtosParsed.length)
+
+      const hasMore =
+        produtosParsed.length === PRODUTOS_LOTE_PAGE_SIZE &&
+        (count !== null ? produtosParsed.length < count : true)
+      setHasMoreProdutos(produtosParsed.length > 0 && hasMore)
+    } catch (error: unknown) {
       console.error('Erro ao buscar produtos', error)
     } finally {
       setIsLoading(false)
     }
-  }, [
-    auth,
-    searchText,
-    filterStatus,
-    ativoLocalFilter,
-    ativoDeliveryFilter,
-    grupoProdutoFilter,
-  ])
+  }, [auth, buildProdutosLoteParams])
+
+  const carregarMaisProdutos = useCallback(async () => {
+    const token = auth?.getAccessToken()
+    if (!token) return
+    if (
+      loadMoreLockRef.current ||
+      isLoadingRef.current ||
+      isLoadingMoreRef.current ||
+      !hasMoreProdutosRef.current
+    ) {
+      return
+    }
+
+    const offset = produtosRef.current.length
+    loadMoreLockRef.current = true
+    setIsLoadingMore(true)
+
+    try {
+      const params = buildProdutosLoteParams(offset)
+      const response = await fetch(`/api/produtos?${params.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`Erro ${response.status}: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      const { list: newItems, count } = parseProdutosLoteApiResponse(data)
+
+      const existingIds = new Set(produtosRef.current.map((p) => p.getId()))
+      const deduped = newItems.filter((p) => !existingIds.has(p.getId()))
+      const newLen = offset + deduped.length
+
+      setProdutos((prev) => {
+        const ids = new Set(prev.map((p) => p.getId()))
+        const merged = [...prev]
+        for (const p of deduped) {
+          if (!ids.has(p.getId())) merged.push(p)
+        }
+        return merged
+      })
+
+      if (typeof count === 'number') {
+        setTotal(count)
+      }
+
+      if (newItems.length === 0) {
+        setHasMoreProdutos(false)
+      } else {
+        const hasMore =
+          newItems.length === PRODUTOS_LOTE_PAGE_SIZE &&
+          (count !== null ? newLen < count : true)
+        setHasMoreProdutos(hasMore)
+      }
+    } catch (error: unknown) {
+      console.error('Erro ao carregar mais produtos', error)
+    } finally {
+      loadMoreLockRef.current = false
+      setIsLoadingMore(false)
+    }
+  }, [auth, buildProdutosLoteParams])
+
+  useEffect(() => {
+    carregarMaisProdutosRef.current = carregarMaisProdutos
+  }, [carregarMaisProdutos])
+
+  /** Rolagem no `main` (layout produtos): dispara “carregar mais” perto do fim. */
+  useEffect(() => {
+    const scrollEl = findScrollableAncestor(listaAreaRef.current)
+    if (!scrollEl) return
+
+    const onScroll = () => {
+      const { scrollTop, clientHeight, scrollHeight } = scrollEl
+      if (scrollHeight - scrollTop - clientHeight < 280) {
+        void carregarMaisProdutosRef.current()
+      }
+    }
+
+    scrollEl.addEventListener('scroll', onScroll, { passive: true })
+    return () => scrollEl.removeEventListener('scroll', onScroll)
+  }, [hasMoreProdutos, isLoading, produtos.length])
+
+  useEffect(() => {
+    const sentinel = loadMoreSentinelRef.current
+    if (!sentinel || !hasMoreProdutos || isLoading) {
+      return
+    }
+
+    const root = findScrollableAncestor(sentinel)
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries
+        if (entry?.isIntersecting) {
+          void carregarMaisProdutosRef.current()
+        }
+      },
+      { root: root ?? null, rootMargin: '200px', threshold: 0 },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMoreProdutos, isLoading, produtos.length])
 
   // Debounce na busca e filtros
   useEffect(() => {
@@ -1292,8 +1511,16 @@ export function AtualizarPrecoLote() {
   const isNcmValidFiscal = ncmValidation != null && ncmValidation.valido
   const hasCestsDisponiveisFiscal = cestsDisponiveis.length > 0
 
-  const todosSelecionados = produtos.length > 0 && produtosSelecionados.size === produtos.length
-  const algunsSelecionados = produtosSelecionados.size > 0 && produtosSelecionados.size < produtos.length
+  const produtosExibicao = useMemo(() => {
+    if (filtroColunaVazia === FILTRO_COLUNA_TODOS) return produtos
+    return produtos.filter((p) => produtoSemDadoNaColuna(p, filtroColunaVazia))
+  }, [produtos, filtroColunaVazia])
+
+  const todosSelecionados =
+    produtosExibicao.length > 0 &&
+    produtosExibicao.every((p) => produtosSelecionados.has(p.getId()))
+  const algunsSelecionadosLista =
+    produtosExibicao.some((p) => produtosSelecionados.has(p.getId())) && !todosSelecionados
   const todasImpressorasSelecionadas = impressorasDisponiveis.length > 0 && impressorasSelecionadas.size === impressorasDisponiveis.length
   const algumasImpressorasSelecionadas = impressorasSelecionadas.size > 0 && impressorasSelecionadas.size < impressorasDisponiveis.length
   const todosGruposComplementosSelecionados = gruposComplementos.length > 0 && gruposComplementosSelecionados.size === gruposComplementos.length
@@ -1308,10 +1535,11 @@ export function AtualizarPrecoLote() {
     setAtivoLocalFilter('Todos')
     setAtivoDeliveryFilter('Todos')
     setGrupoProdutoFilter('')
+    setFiltroColunaVazia(FILTRO_COLUNA_TODOS)
   }, [])
 
   return (
-    <div className="flex flex-col h-full bg-info">
+    <div className="flex flex-col bg-info">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between bg-primary-bg border-b border-primary/70 md:px-6 px-1 py-1 md:gap-4 gap-2">
         <div className="flex items-center justify-between">
@@ -1329,6 +1557,13 @@ export function AtualizarPrecoLote() {
             </h1>
             <p className="md:text-sm text-xs text-secondary-text">
               Total de itens: {total} | Selecionados: {produtosSelecionados.size}
+              {filtroColunaVazia !== FILTRO_COLUNA_TODOS ? (
+                <>
+                  {' '}
+                  | {LABEL_FILTRO_COLUNA[filtroColunaVazia]}: exibindo {produtosExibicao.length} de{' '}
+                  {produtos.length} carregados nesta busca (filtro só na tela)
+                </>
+              ) : null}
             </p>
           </div>
         </div>
@@ -2306,6 +2541,37 @@ export function AtualizarPrecoLote() {
               </FormControl>
             </div>
 
+            <div className="w-[min(280px,88vw)] min-w-[200px] shrink-0">
+              <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
+                <InputLabel id="lote-filter-coluna-vazia-label">Listar sem dado em</InputLabel>
+                <Select
+                  labelId="lote-filter-coluna-vazia-label"
+                  label="Listar sem dado em"
+                  value={filtroColunaVazia}
+                  onChange={(e: SelectChangeEvent<string>) =>
+                    setFiltroColunaVazia(e.target.value as FiltroColunaVazia)
+                  }
+                  MenuProps={{
+                    PaperProps: {
+                      sx: { maxHeight: 320 },
+                    },
+                  }}
+                  renderValue={(selected) =>
+                    LABEL_FILTRO_COLUNA[selected as FiltroColunaVazia] ?? String(selected)
+                  }
+                >
+                  <MenuItem value={FILTRO_COLUNA_TODOS}>{LABEL_FILTRO_COLUNA[FILTRO_COLUNA_TODOS]}</MenuItem>
+                  {(Object.entries(LABEL_FILTRO_COLUNA) as [FiltroColunaVazia, string][])
+                    .filter(([key]) => key !== FILTRO_COLUNA_TODOS)
+                    .map(([value, label]) => (
+                      <MenuItem key={value} value={value}>
+                        {label}
+                      </MenuItem>
+                    ))}
+                </Select>
+              </FormControl>
+            </div>
+
             <div className="shrink-0">
               <button
                 type="button"
@@ -2320,7 +2586,7 @@ export function AtualizarPrecoLote() {
       </div>
 
       {/* Conteúdo */}
-      <div className="flex-1 overflow-auto py-2">
+      <div ref={listaAreaRef} className="py-2">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-12 gap-2">
             <JiffyLoading />
@@ -2329,15 +2595,24 @@ export function AtualizarPrecoLote() {
           <div className="text-center py-12">
             <p className="text-secondary-text">Nenhum produto encontrado</p>
           </div>
+        ) : produtosExibicao.length === 0 ? (
+          <div className="text-center py-12 px-4">
+            <p className="text-secondary-text">
+              {filtroColunaVazia !== FILTRO_COLUNA_TODOS
+                ? `Nenhum produto entre os já carregados atende a “${LABEL_FILTRO_COLUNA[filtroColunaVazia]}”. Continue rolando para carregar mais itens ou altere os filtros da busca (filtro só na tela).`
+                : 'Nenhum produto para exibir com o filtro atual.'}
+            </p>
+          </div>
         ) : (
           <div className="bg-info rounded-lg overflow-hidden">
             <div className="flex items-center h-11 gap-2 md:px-4 px-2 text-xs font-semibold text-primary-text uppercase tracking-wide bg-custom-2">
               <div className="flex-none md:w-10 w-6 flex justify-center">
                 <Checkbox
                   checked={todosSelecionados}
+                  indeterminate={algunsSelecionadosLista}
                   onChange={(e) => {
                     if (e.target.checked) {
-                      setProdutosSelecionados(new Set(produtos.map((p) => p.getId())))
+                      setProdutosSelecionados(new Set(produtosExibicao.map((p) => p.getId())))
                     } else {
                       setProdutosSelecionados(new Set())
                     }
@@ -2349,11 +2624,20 @@ export function AtualizarPrecoLote() {
               <div className="flex-[1.5] text-xs">Nome</div>
               <div className="flex-[1.2] text-center hidden md:flex">Impressoras</div>
               <div className="flex-[1.2] text-center hidden md:flex">Grupos Complementos</div>
+              <div className="hidden lg:flex w-[80px] shrink-0 text-center text-xs leading-tight">NCM</div>
+              {/* Colunas CEST / Origem / Tipo / Indic. produção — ocultas até o backend retornar esses campos na listagem (descomente junto com filtros e células abaixo).
+              <div className="hidden lg:flex w-[64px] shrink-0 text-center text-xs leading-tight">CEST</div>
+              <div className="hidden lg:flex w-[52px] shrink-0 text-center text-xs leading-tight">Origem</div>
+              <div className="hidden lg:flex w-[40px] shrink-0 text-center text-xs leading-tight">Tipo</div>
+              <div className="hidden lg:flex min-w-0 w-[120px] shrink-0 text-center text-[10px] leading-tight px-0.5">
+                Indic. produção
+              </div>
+              */}
               <div className="md:flex-1 text-right text-xs">Valor atual</div>
             </div>
 
             <div className="flex flex-col gap-2 mt-2">
-              {produtos
+              {produtosExibicao
                 .slice()
                 .sort((a, b) => a.getNome().localeCompare(b.getNome(), 'pt-BR'))
                 .map((produto, index) => {
@@ -2363,6 +2647,9 @@ export function AtualizarPrecoLote() {
                 const impressorasDoProduto = produto.getImpressoras()
                 // Usar diretamente os grupos de complementos que vêm do produto
                 const gruposComplementosDoProduto = produto.getGruposComplementos()
+                /* const fiscalOrigem = labelListaFiscal(produto.getOrigemMercadoria(), origensMercadoria)
+                const fiscalTipo = labelListaFiscal(produto.getTipoProduto(), tiposProduto)
+                const fiscalInd = celulaFiscalIndicador(produto.getIndicadorProducaoEscala()) */
                 // Cor: selecionado > alterado nesta aba (mesmo tom do hover da lista) > zebra
                 const bgColor = isSelected
                   ? foiAlteradoNaSessao
@@ -2394,10 +2681,10 @@ export function AtualizarPrecoLote() {
                         />
                       </div>
                       <div className="flex-1 md:w-24 font-mono text-xs text-secondary-text">
-                        {produto.getCodigoProduto() || '-'}
+                        {textoOuNenhum(String(produto.getCodigoProduto() ?? ''))}
                       </div>
                       <div className="md:flex-[1.5] flex-[2] min-w-0 md:pr-4">
-                        <p className="break-words text-xs font-semibold text-primary-text md:text-sm">
+                        <p className="break-words text-xs font-normal text-primary-text md:text-sm">
                           {produto.getNome()}
                         </p>
                         <ProdutoActionIconsDisplay produto={produto} />
@@ -2405,7 +2692,7 @@ export function AtualizarPrecoLote() {
                       {/* Colunas de impressoras e grupos (apenas desktop) */}
                       <div className="flex-[1.2] justify-center hidden md:flex">
                         {impressorasDoProduto.length === 0 ? (
-                          <span className="text-xs text-secondary-text">Nenhuma</span>
+                          <span className="text-xs text-secondary-text">Nenhum</span>
                         ) : (
                           <select
                             className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
@@ -2449,7 +2736,43 @@ export function AtualizarPrecoLote() {
                           </select>
                         )}
                       </div>
-                      <div className="flex-1 text-right font-semibold md:text-sm text-xs text-primary-text">
+                      <div className="hidden lg:flex w-[80px] shrink-0 justify-center font-mono text-[11px] text-primary-text px-0.5">
+                        <span className="truncate" title={produto.getNcm() || undefined}>
+                          {textoOuNenhum(produto.getNcm())}
+                        </span>
+                      </div>
+                      {/* CEST / Origem / Tipo / Indic. — ver cabeçalho da grade
+                      <div className="hidden lg:flex w-[64px] shrink-0 justify-center font-mono text-[11px] text-primary-text px-0.5">
+                        <span className="truncate" title={produto.getCest() || undefined}>
+                          {textoOuNenhum(produto.getCest())}
+                        </span>
+                      </div>
+                      <div className="hidden lg:flex w-[52px] shrink-0 justify-center px-0.5">
+                        <span
+                          className="truncate text-center text-[11px] text-primary-text"
+                          title={fiscalOrigem.title || undefined}
+                        >
+                          {fiscalOrigem.curto}
+                        </span>
+                      </div>
+                      <div className="hidden lg:flex w-[40px] shrink-0 justify-center px-0.5">
+                        <span
+                          className="truncate text-center text-[11px] text-primary-text"
+                          title={fiscalTipo.title || undefined}
+                        >
+                          {fiscalTipo.curto}
+                        </span>
+                      </div>
+                      <div className="hidden lg:flex min-w-0 w-[120px] shrink-0 justify-center px-0.5">
+                        <span
+                          className="truncate text-center text-[11px] text-primary-text"
+                          title={fiscalInd.title || undefined}
+                        >
+                          {fiscalInd.curto}
+                        </span>
+                      </div>
+                      */}
+                      <div className="flex-1 text-right font-normal md:text-sm text-xs text-primary-text">
                         {transformarParaReal(produto.getValor())}
                       </div>
                       {/* Botão para expandir/ocultar (apenas mobile) */}
@@ -2480,7 +2803,7 @@ export function AtualizarPrecoLote() {
                           <div className="flex flex-col gap-1">
                             <label className="text-xs font-semibold text-secondary-text">Impressoras</label>
                             {impressorasDoProduto.length === 0 ? (
-                              <span className="text-xs text-secondary-text">Nenhuma</span>
+                              <span className="text-xs text-secondary-text">Nenhum</span>
                             ) : (
                               <select
                                 className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
@@ -2525,12 +2848,57 @@ export function AtualizarPrecoLote() {
                               </select>
                             )}
                           </div>
+                          <div className="flex flex-col gap-1 border-t border-gray-200 pt-2">
+                            <label className="text-xs font-semibold text-secondary-text">Dados fiscais</label>
+                            <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-xs text-primary-text">
+                              <div>
+                                <span className="text-secondary-text">NCM: </span>
+                                <span className="font-mono">{textoOuNenhum(produto.getNcm())}</span>
+                              </div>
+                              {/* CEST / Origem / Tipo / Indic. — mesmo motivo da grade (backend listagem)
+                              <div>
+                                <span className="text-secondary-text">CEST: </span>
+                                <span className="font-mono">{textoOuNenhum(produto.getCest())}</span>
+                              </div>
+                              <div className="col-span-2 break-words">
+                                <span className="text-secondary-text">Origem: </span>
+                                <span>
+                                  {fiscalOrigem.curto === 'Nenhum'
+                                    ? 'Nenhum'
+                                    : `${fiscalOrigem.curto} — ${fiscalOrigem.title}`}
+                                </span>
+                              </div>
+                              <div className="col-span-2 break-words">
+                                <span className="text-secondary-text">Tipo: </span>
+                                <span>
+                                  {fiscalTipo.curto === 'Nenhum'
+                                    ? 'Nenhum'
+                                    : `${fiscalTipo.curto} — ${fiscalTipo.title}`}
+                                </span>
+                              </div>
+                              <div className="col-span-2 break-words">
+                                <span className="text-secondary-text">Indic. produção: </span>
+                                <span>
+                                  {fiscalInd.curto === 'Nenhum' ? 'Nenhum' : fiscalInd.title}
+                                </span>
+                              </div>
+                              */}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )}
                   </div>
                 )
               })}
+              {hasMoreProdutos ? (
+                <div ref={loadMoreSentinelRef} className="h-2 w-full shrink-0" aria-hidden />
+              ) : null}
+              {isLoadingMore ? (
+                <div className="flex justify-center py-3">
+                  <JiffyLoading />
+                </div>
+              ) : null}
             </div>
           </div>
         )}
