@@ -158,7 +158,7 @@ export function ConviteCard({
                 ? 'cursor-not-allowed bg-gray-400'
                 : loadingAction === 'aceitar'
                   ? 'cursor-wait bg-gray-400'
-                  : 'bg-alternate hover:bg-alternate/80'
+                  : 'bg-secondary hover:bg-alternate'
             )}
           >
             {loadingAction === 'aceitar' ? 'Aceitando…' : 'Aceitar'}
