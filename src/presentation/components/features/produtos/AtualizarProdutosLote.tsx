@@ -243,6 +243,15 @@ interface CestPorNcmItem {
 /** Abas do painel de lote — usado para guardar destaque de linhas alteradas por aba. */
 type TabPainelLote = 'precos' | 'impressoras' | 'gruposComplementos' | 'permissoes' | 'fiscal'
 
+/** Filtro “sem dado em…” só faz sentido para colunas visíveis na aba atual. */
+function filtrosDisponiveisPorAba(tab: TabPainelLote): FiltroColunaVazia[] {
+  const r: FiltroColunaVazia[] = [FILTRO_COLUNA_TODOS]
+  if (tab === 'impressoras') r.push('sem_impressoras')
+  if (tab === 'gruposComplementos') r.push('sem_grupos_complementos')
+  if (tab === 'fiscal') r.push('sem_ncm')
+  return r
+}
+
 function montarBodyFiscalLote(d: FiscalLoteDraft): Record<string, unknown> | null {
   const fiscal: Record<string, unknown> = {}
   const ncmT = d.ncm.replace(/\D/g, '').slice(0, 8)
@@ -354,6 +363,16 @@ export function AtualizarPrecoLote() {
   useEffect(() => {
     isLoadingMoreRef.current = isLoadingMore
   }, [isLoadingMore])
+
+  useEffect(() => {
+    setFiltroColunaVazia((prev) =>
+      filtrosDisponiveisPorAba(activeTab).includes(prev) ? prev : FILTRO_COLUNA_TODOS,
+    )
+  }, [activeTab])
+
+  useEffect(() => {
+    setProdutosExpandidos(new Set())
+  }, [activeTab])
 
   const marcarProdutosAlteradosNaSessao = useCallback((ids: string[], aba: TabPainelLote) => {
     if (ids.length === 0) return
@@ -2541,36 +2560,37 @@ export function AtualizarPrecoLote() {
               </FormControl>
             </div>
 
-            <div className="w-[min(280px,88vw)] min-w-[200px] shrink-0">
-              <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
-                <InputLabel id="lote-filter-coluna-vazia-label">Listar sem dado em</InputLabel>
-                <Select
-                  labelId="lote-filter-coluna-vazia-label"
-                  label="Listar sem dado em"
-                  value={filtroColunaVazia}
-                  onChange={(e: SelectChangeEvent<string>) =>
-                    setFiltroColunaVazia(e.target.value as FiltroColunaVazia)
-                  }
-                  MenuProps={{
-                    PaperProps: {
-                      sx: { maxHeight: 320 },
-                    },
-                  }}
-                  renderValue={(selected) =>
-                    LABEL_FILTRO_COLUNA[selected as FiltroColunaVazia] ?? String(selected)
-                  }
-                >
-                  <MenuItem value={FILTRO_COLUNA_TODOS}>{LABEL_FILTRO_COLUNA[FILTRO_COLUNA_TODOS]}</MenuItem>
-                  {(Object.entries(LABEL_FILTRO_COLUNA) as [FiltroColunaVazia, string][])
-                    .filter(([key]) => key !== FILTRO_COLUNA_TODOS)
-                    .map(([value, label]) => (
-                      <MenuItem key={value} value={value}>
-                        {label}
-                      </MenuItem>
-                    ))}
-                </Select>
-              </FormControl>
-            </div>
+            {filtrosDisponiveisPorAba(activeTab).length > 1 ? (
+              <div className="w-[min(280px,88vw)] min-w-[200px] shrink-0">
+                <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
+                  <InputLabel id="lote-filter-coluna-vazia-label">Listar sem dado em</InputLabel>
+                  <Select
+                    labelId="lote-filter-coluna-vazia-label"
+                    label="Listar sem dado em"
+                    value={filtroColunaVazia}
+                    onChange={(e: SelectChangeEvent<string>) =>
+                      setFiltroColunaVazia(e.target.value as FiltroColunaVazia)
+                    }
+                    MenuProps={{
+                      PaperProps: {
+                        sx: { maxHeight: 320 },
+                      },
+                    }}
+                    renderValue={(selected) =>
+                      LABEL_FILTRO_COLUNA[selected as FiltroColunaVazia] ?? String(selected)
+                    }
+                  >
+                    {(Object.entries(LABEL_FILTRO_COLUNA) as [FiltroColunaVazia, string][])
+                      .filter(([key]) => filtrosDisponiveisPorAba(activeTab).includes(key))
+                      .map(([value, label]) => (
+                        <MenuItem key={value} value={value}>
+                          {label}
+                        </MenuItem>
+                      ))}
+                  </Select>
+                </FormControl>
+              </div>
+            ) : null}
 
             <div className="shrink-0">
               <button
@@ -2622,9 +2642,15 @@ export function AtualizarPrecoLote() {
               </div>
               <div className="flex-1 md:w-14 text-xs">Código</div>
               <div className="flex-[1.5] text-xs">Nome</div>
-              <div className="flex-[1.2] text-center hidden md:flex">Impressoras</div>
-              <div className="flex-[1.2] text-center hidden md:flex">Grupos Complementos</div>
-              <div className="hidden lg:flex w-[80px] shrink-0 text-center text-xs leading-tight">NCM</div>
+              {activeTab === 'impressoras' ? (
+                <div className="flex-[1.2] text-center hidden md:flex">Impressoras</div>
+              ) : null}
+              {activeTab === 'gruposComplementos' ? (
+                <div className="flex-[1.2] text-center hidden md:flex">Grupos Complementos</div>
+              ) : null}
+              {activeTab === 'fiscal' ? (
+                <div className="hidden md:flex w-[80px] shrink-0 text-center text-xs leading-tight">NCM</div>
+              ) : null}
               {/* Colunas CEST / Origem / Tipo / Indic. produção — ocultas até o backend retornar esses campos na listagem (descomente junto com filtros e células abaixo).
               <div className="hidden lg:flex w-[64px] shrink-0 text-center text-xs leading-tight">CEST</div>
               <div className="hidden lg:flex w-[52px] shrink-0 text-center text-xs leading-tight">Origem</div>
@@ -2687,60 +2713,67 @@ export function AtualizarPrecoLote() {
                         <p className="break-words text-xs font-normal text-primary-text md:text-sm">
                           {produto.getNome()}
                         </p>
-                        <ProdutoActionIconsDisplay produto={produto} />
+                        {activeTab === 'permissoes' ? (
+                          <ProdutoActionIconsDisplay produto={produto} />
+                        ) : null}
                       </div>
-                      {/* Colunas de impressoras e grupos (apenas desktop) */}
-                      <div className="flex-[1.2] justify-center hidden md:flex">
-                        {impressorasDoProduto.length === 0 ? (
-                          <span className="text-xs text-secondary-text">Nenhum</span>
-                        ) : (
-                          <select
-                            className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
-                            defaultValue=""
-                            onChange={(event) => {
-                              event.currentTarget.value = ''
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <option value="" disabled>
-                              {impressorasDoProduto.length} impressora{impressorasDoProduto.length !== 1 ? 's' : ''}
-                            </option>
-                            {impressorasDoProduto.map((impressora) => (
-                              <option key={impressora.id} value={impressora.id}>
-                                {impressora.nome}
+                      {activeTab === 'impressoras' ? (
+                        <div className="flex-[1.2] justify-center hidden md:flex">
+                          {impressorasDoProduto.length === 0 ? (
+                            <span className="text-xs text-secondary-text">Nenhum</span>
+                          ) : (
+                            <select
+                              className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
+                              defaultValue=""
+                              onChange={(event) => {
+                                event.currentTarget.value = ''
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <option value="" disabled>
+                                {impressorasDoProduto.length} impressora{impressorasDoProduto.length !== 1 ? 's' : ''}
                               </option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
-                      <div className="flex-[1.2] justify-center hidden md:flex">
-                        {gruposComplementosDoProduto.length === 0 ? (
-                          <span className="text-xs text-secondary-text">Nenhum</span>
-                        ) : (
-                          <select
-                            className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
-                            defaultValue=""
-                            onChange={(event) => {
-                              event.currentTarget.value = ''
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <option value="" disabled>
-                              {gruposComplementosDoProduto.length} grupo{gruposComplementosDoProduto.length !== 1 ? 's' : ''}
-                            </option>
-                            {gruposComplementosDoProduto.map((grupo) => (
-                              <option key={grupo.id} value={grupo.id}>
-                                {grupo.nome}
+                              {impressorasDoProduto.map((impressora) => (
+                                <option key={impressora.id} value={impressora.id}>
+                                  {impressora.nome}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                      ) : null}
+                      {activeTab === 'gruposComplementos' ? (
+                        <div className="flex-[1.2] justify-center hidden md:flex">
+                          {gruposComplementosDoProduto.length === 0 ? (
+                            <span className="text-xs text-secondary-text">Nenhum</span>
+                          ) : (
+                            <select
+                              className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
+                              defaultValue=""
+                              onChange={(event) => {
+                                event.currentTarget.value = ''
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <option value="" disabled>
+                                {gruposComplementosDoProduto.length} grupo{gruposComplementosDoProduto.length !== 1 ? 's' : ''}
                               </option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
-                      <div className="hidden lg:flex w-[80px] shrink-0 justify-center font-mono text-[11px] text-primary-text px-0.5">
-                        <span className="truncate" title={produto.getNcm() || undefined}>
-                          {textoOuNenhum(produto.getNcm())}
-                        </span>
-                      </div>
+                              {gruposComplementosDoProduto.map((grupo) => (
+                                <option key={grupo.id} value={grupo.id}>
+                                  {grupo.nome}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                      ) : null}
+                      {activeTab === 'fiscal' ? (
+                        <div className="hidden md:flex w-[80px] shrink-0 justify-center font-mono text-[11px] text-primary-text px-0.5">
+                          <span className="truncate" title={produto.getNcm() || undefined}>
+                            {textoOuNenhum(produto.getNcm())}
+                          </span>
+                        </div>
+                      ) : null}
                       {/* CEST / Origem / Tipo / Indic. — ver cabeçalho da grade
                       <div className="hidden lg:flex w-[64px] shrink-0 justify-center font-mono text-[11px] text-primary-text px-0.5">
                         <span className="truncate" title={produto.getCest() || undefined}>
@@ -2775,31 +2808,33 @@ export function AtualizarPrecoLote() {
                       <div className="flex-1 text-right font-normal md:text-sm text-xs text-primary-text">
                         {transformarParaReal(produto.getValor())}
                       </div>
-                      {/* Botão para expandir/ocultar (apenas mobile) */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          toggleExpansao(produto.getId())
-                        }}
-                        className="md:hidden flex items-center justify-center w-8 h-8 rounded-lg hover:bg-primary/10 transition-colors"
-                        aria-label={isExpanded ? 'Ocultar detalhes' : 'Expandir detalhes'}
-                      >
-                        {isExpanded ? (
-                          <MdExpandLess size={20} className="text-primary-text" />
-                        ) : (
-                          <MdExpandMore size={20} className="text-primary-text" />
-                        )}
-                      </button>
+                      {(activeTab === 'impressoras' ||
+                        activeTab === 'gruposComplementos' ||
+                        activeTab === 'fiscal') && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleExpansao(produto.getId())
+                          }}
+                          className="md:hidden flex items-center justify-center w-8 h-8 rounded-lg hover:bg-primary/10 transition-colors"
+                          aria-label={isExpanded ? 'Ocultar detalhes' : 'Expandir detalhes'}
+                        >
+                          {isExpanded ? (
+                            <MdExpandLess size={20} className="text-primary-text" />
+                          ) : (
+                            <MdExpandMore size={20} className="text-primary-text" />
+                          )}
+                        </button>
+                      )}
                     </div>
-                    {/* Área expansível com impressoras e grupos (apenas mobile) */}
-                    {isExpanded && (
-                      <div
-                        className={`md:hidden px-2 pb-2 pt-1 border-b border-gray-200 ${
-                          foiAlteradoNaSessao ? 'bg-primary-bg' : 'bg-gray-50'
-                        }`}
-                      >
-                        <div className="flex flex-col gap-3">
+                    {isExpanded &&
+                      activeTab === 'impressoras' && (
+                        <div
+                          className={`md:hidden px-2 pb-2 pt-1 border-b border-gray-200 ${
+                            foiAlteradoNaSessao ? 'bg-primary-bg' : 'bg-gray-50'
+                          }`}
+                        >
                           <div className="flex flex-col gap-1">
                             <label className="text-xs font-semibold text-secondary-text">Impressoras</label>
                             {impressorasDoProduto.length === 0 ? (
@@ -2824,6 +2859,15 @@ export function AtualizarPrecoLote() {
                               </select>
                             )}
                           </div>
+                        </div>
+                      )}
+                    {isExpanded &&
+                      activeTab === 'gruposComplementos' && (
+                        <div
+                          className={`md:hidden px-2 pb-2 pt-1 border-b border-gray-200 ${
+                            foiAlteradoNaSessao ? 'bg-primary-bg' : 'bg-gray-50'
+                          }`}
+                        >
                           <div className="flex flex-col gap-1">
                             <label className="text-xs font-semibold text-secondary-text">Grupos de Complementos</label>
                             {gruposComplementosDoProduto.length === 0 ? (
@@ -2848,46 +2892,23 @@ export function AtualizarPrecoLote() {
                               </select>
                             )}
                           </div>
-                          <div className="flex flex-col gap-1 border-t border-gray-200 pt-2">
-                            <label className="text-xs font-semibold text-secondary-text">Dados fiscais</label>
-                            <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-xs text-primary-text">
-                              <div>
-                                <span className="text-secondary-text">NCM: </span>
-                                <span className="font-mono">{textoOuNenhum(produto.getNcm())}</span>
-                              </div>
-                              {/* CEST / Origem / Tipo / Indic. — mesmo motivo da grade (backend listagem)
-                              <div>
-                                <span className="text-secondary-text">CEST: </span>
-                                <span className="font-mono">{textoOuNenhum(produto.getCest())}</span>
-                              </div>
-                              <div className="col-span-2 break-words">
-                                <span className="text-secondary-text">Origem: </span>
-                                <span>
-                                  {fiscalOrigem.curto === 'Nenhum'
-                                    ? 'Nenhum'
-                                    : `${fiscalOrigem.curto} — ${fiscalOrigem.title}`}
-                                </span>
-                              </div>
-                              <div className="col-span-2 break-words">
-                                <span className="text-secondary-text">Tipo: </span>
-                                <span>
-                                  {fiscalTipo.curto === 'Nenhum'
-                                    ? 'Nenhum'
-                                    : `${fiscalTipo.curto} — ${fiscalTipo.title}`}
-                                </span>
-                              </div>
-                              <div className="col-span-2 break-words">
-                                <span className="text-secondary-text">Indic. produção: </span>
-                                <span>
-                                  {fiscalInd.curto === 'Nenhum' ? 'Nenhum' : fiscalInd.title}
-                                </span>
-                              </div>
-                              */}
-                            </div>
+                        </div>
+                      )}
+                    {isExpanded &&
+                      activeTab === 'fiscal' && (
+                        <div
+                          className={`md:hidden px-2 pb-2 pt-1 border-b border-gray-200 ${
+                            foiAlteradoNaSessao ? 'bg-primary-bg' : 'bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex flex-col gap-1">
+                            <label className="text-xs font-semibold text-secondary-text">NCM</label>
+                            <span className="font-mono text-xs text-primary-text">
+                              {textoOuNenhum(produto.getNcm())}
+                            </span>
                           </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                   </div>
                 )
               })}
