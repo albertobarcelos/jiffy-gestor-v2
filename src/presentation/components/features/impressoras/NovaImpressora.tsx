@@ -29,6 +29,8 @@ interface TerminalConfig {
   modoFicha: boolean
   ativo: boolean
   isHovering: boolean
+  /** Só preenchido ao editar/copiar: espelha `terminal.bloqueado` da API. Usado só para ocultar na UI; o estado completo segue em `terminaisConfig` para o PATCH. */
+  bloqueado?: boolean
 }
 
 export interface NovaImpressoraHandle {
@@ -70,6 +72,15 @@ const MODELO_REVERSE_MAP: Record<string, string> = {
 }
 
 const MODELOS_OPTIONS = ['Genérico', 'Sunmi Integrada', 'Stone Integrada', 'Pagbank Integrada']
+
+/**
+ * Mesmo critério que `TerminaisTab` (`terminaisFiltrados`): só terminais não bloqueados.
+ */
+function terminaisAtivosParaNovaImpressora<T extends { bloqueado?: boolean | string }>(
+  items: T[]
+): T[] {
+  return items.filter(t => !(t.bloqueado === true || t.bloqueado === 'true'))
+}
 
 /** Grid desktop (cabeçalho + linhas): mesma largura de colunas e padding para alinhar títulos aos controles */
 const DESKTOP_TERMINAL_ROW_GRID =
@@ -367,7 +378,9 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
           }
 
           const data = await response.json()
-          const terminais = data.items || []
+          const rawItems = data.items || []
+          const terminais =
+            !impressoraId ? terminaisAtivosParaNovaImpressora(rawItems) : rawItems
 
           // Cria configurações padrão para cada terminal
           const newConfigs: TerminalConfig[] = terminais.map((terminal: any) => ({
@@ -405,7 +418,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
           // Não define isLoadingTerminais aqui, pois é gerenciado por loadAllTerminais
         }
       },
-      [auth]
+      [auth, impressoraId]
     )
 
     /**
@@ -461,7 +474,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
           }
 
           const data = await response.json()
-          const terminais = data.items || []
+          const terminais = terminaisAtivosParaNovaImpressora(data.items || [])
 
           // Se não retornou nenhum terminal e já fez pelo menos uma requisição, para
           if (terminais.length === 0) {
@@ -636,6 +649,11 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
 
           // Monta a configuração do terminal (seguindo o padrão do Flutter)
           const modeloDB = config.modelo || 'generico'
+          const bloqueado =
+            terminal?.bloqueado === true ||
+            terminal?.bloqueado === 'true' ||
+            false
+
           configs.push({
             terminalId: terminalId,
             nome: terminalName,
@@ -649,6 +667,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
               config.modoFicha === undefined,
             ativo: config.ativo === true || config.ativo === 'true' || config.ativo === undefined,
             isHovering: false,
+            bloqueado,
           })
         }
 
@@ -707,12 +726,24 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
       return () => container.removeEventListener('scroll', handleScroll)
     }, [currentPage, hasMoreTerminals, isLoadingMore, isEditing, loadTerminais])
 
-    /** Edição/cópia: filtro local por nome. Nova impressora: lista já vem filtrada da API (`q`). */
+    /**
+     * Lista para renderização. Em edição/cópia: oculta terminais bloqueados (como a lista geral),
+     * sem remover do estado — o salvamento continua a enviar todos os vínculos ao backend.
+     */
     const terminaisVisiveis = useMemo(() => {
-      if (!isEditing && !isCopyMode) return terminaisConfig
+      let base = terminaisConfig
+
+      if (isEditing || isCopyMode) {
+        base = base.filter(t => !t.bloqueado)
+      }
+
+      if (!isEditing && !isCopyMode) {
+        return base
+      }
+
       const q = buscaTerminalDraft.trim().toLowerCase()
-      if (!q) return terminaisConfig
-      return terminaisConfig.filter(t => t.nome.toLowerCase().includes(q))
+      if (!q) return base
+      return base.filter(t => t.nome.toLowerCase().includes(q))
     }, [terminaisConfig, buscaTerminalDraft, isEditing, isCopyMode])
 
     /** Nova impressora (sem impressoraId): recarrega lista com `q` após debounce. */
@@ -1607,6 +1638,21 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                         </p>
                         <p className="max-w-xs text-center text-sm text-secondary-text">
                           Ajuste o termo ou limpe o campo de busca.
+                        </p>
+                      </div>
+                    )}
+
+                  {terminaisConfig.length > 0 &&
+                    terminaisVisiveis.length === 0 &&
+                    (isEditing || isCopyMode) &&
+                    buscaTerminalDraft.trim() === '' && (
+                      <div className="flex flex-col items-center justify-center gap-3 px-4 py-12">
+                        <p className="text-lg font-semibold text-primary-text">
+                          Nenhum terminal ativo para exibir
+                        </p>
+                        <p className="max-w-md text-center text-sm text-secondary-text">
+                          Terminais bloqueados não aparecem aqui (mesma regra da lista geral). Desbloqueie
+                          o terminal em Configurações para voltar a vê-lo nesta impressora.
                         </p>
                       </div>
                     )}
