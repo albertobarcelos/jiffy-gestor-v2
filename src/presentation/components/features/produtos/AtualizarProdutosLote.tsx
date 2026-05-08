@@ -1580,7 +1580,7 @@ export function AtualizarPrecoLote() {
                 <>
                   {' '}
                   | {LABEL_FILTRO_COLUNA[filtroColunaVazia]}: exibindo {produtosExibicao.length} de{' '}
-                  {produtos.length} carregados nesta busca (filtro só na tela)
+                  {produtos.length} 
                 </>
               ) : null}
             </p>
