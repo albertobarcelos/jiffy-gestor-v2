@@ -68,7 +68,12 @@ export function produtoFromApiPreservandoOrdem(anterior: Produto, raw: unknown):
     parsed.incideTaxaAtivo(),
     ordemAnt,
     parsed.getGruposComplementos(),
-    parsed.getImpressoras()
+    parsed.getImpressoras(),
+    parsed.getNcm(),
+    parsed.getCest(),
+    parsed.getOrigemMercadoria(),
+    parsed.getTipoProduto(),
+    parsed.getIndicadorProducaoEscala()
   )
 }
 
@@ -90,7 +95,12 @@ export const cloneProdutoWithPatch = (produto: Produto, patch: ProdutoPatch): Pr
     patch.incideTaxa ?? produto.incideTaxaAtivo(),
     produto.getOrdem(),
     produto.getGruposComplementos(),
-    produto.getImpressoras()
+    produto.getImpressoras(),
+    produto.getNcm(),
+    produto.getCest(),
+    produto.getOrigemMercadoria(),
+    produto.getTipoProduto(),
+    produto.getIndicadorProducaoEscala()
   )
 
 /**
