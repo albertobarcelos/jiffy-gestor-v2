@@ -9,6 +9,7 @@ export function MeusAppsFeedGrid({
   cells,
   onAcessar,
   onGerenciarConvites,
+  onGerenciarUsuariosGestor,
   busyAppId,
   onAceitarConvite,
   onRecusarConvite,
@@ -17,6 +18,7 @@ export function MeusAppsFeedGrid({
   cells: MeusAppsGridCell[]
   onAcessar: (appId: string) => void
   onGerenciarConvites?: (appId: string) => void
+  onGerenciarUsuariosGestor?: (appId: string) => void
   busyAppId?: string | null
   onAceitarConvite: (id: string) => void
   onRecusarConvite: (id: string) => void
@@ -43,6 +45,7 @@ export function MeusAppsFeedGrid({
             app={cell.app}
             onAcessar={onAcessar}
             onGerenciarConvites={onGerenciarConvites}
+            onGerenciarUsuariosGestor={onGerenciarUsuariosGestor}
             isSelecting={busyAppId === cell.app.id}
             actionsLocked={locked && busyAppId !== cell.app.id}
           />

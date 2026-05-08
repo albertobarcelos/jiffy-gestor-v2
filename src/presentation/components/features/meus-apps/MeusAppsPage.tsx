@@ -390,6 +390,23 @@ export default function MeusAppsPage() {
     }
   }
 
+  const handleGerenciarUsuariosGestor = async (appId: string) => {
+    const app = appsBase.find(a => a.id === appId)
+    if (!app || app.status === 'inativo') {
+      return
+    }
+
+    setAcessoErro(null)
+
+    try {
+      await aplicarContextoEmpresa(appId)
+      const slug = empresaNomeParaSlugUrl(app.nome)
+      window.open(`/meus-apps/usuarios-gestor/${slug}`, '_blank')
+    } catch (e) {
+      reportErroAcessoEmpresa(e)
+    }
+  }
+
   const convitesCarregados = convitesCarregadosFlag
   const temEmpresas = appsBase.length > 0
   const temConvitesLista = (convites?.length ?? 0) > 0
@@ -521,6 +538,7 @@ export default function MeusAppsPage() {
                 cells={gridCells}
                 onAcessar={handleAcessar}
                 onGerenciarConvites={handleGerenciarConvites}
+                onGerenciarUsuariosGestor={handleGerenciarUsuariosGestor}
                 busyAppId={busyAppId}
                 onAceitarConvite={handleAceitarConvite}
                 onRecusarConvite={handleRecusarConvite}
@@ -531,6 +549,7 @@ export default function MeusAppsPage() {
                 items={feedItems}
                 onAcessar={handleAcessar}
                 onGerenciarConvites={handleGerenciarConvites}
+                onGerenciarUsuariosGestor={handleGerenciarUsuariosGestor}
                 busyAppId={busyAppId}
                 onAceitarConvite={handleAceitarConvite}
                 onRecusarConvite={handleRecusarConvite}

@@ -36,6 +36,7 @@ export function AppCard({
   app,
   onAcessar,
   onGerenciarConvites,
+  onGerenciarUsuariosGestor,
   isSelecting = false,
   actionsLocked = false,
 }: {
@@ -43,6 +44,8 @@ export function AppCard({
   onAcessar: (appId: string) => void
   /** Convites gestor (sessão empresa): mesma base que Acessar, abre rota de convites em nova aba */
   onGerenciarConvites?: (appId: string) => void
+  /** Lista de usuários gestor no hub */
+  onGerenciarUsuariosGestor?: (appId: string) => void
   /** Esta empresa está em POST escolher-empresa */
   isSelecting?: boolean
   /** Outra empresa está abrindo; bloqueia interação neste card */
@@ -54,6 +57,7 @@ export function AppCard({
   const gearItems = buildEmpresaCardGearItems(app.id, {
     navDisabled,
     onGerenciarConvites,
+    onGerenciarUsuariosGestor,
   })
 
   /** Evita que o clique no item do menu (portal) dispare o `onClick` do card e abra o dashboard junto. */
