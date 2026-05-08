@@ -12,6 +12,39 @@ async function parseError(res: Response): Promise<string> {
   return `Erro ${res.status}`
 }
 
+/** Resolve `role` de cada perfil gestor via GET /api/pessoas/perfis-gestor/[id]. */
+async function buscarNomesPerfilGestor(
+  token: string,
+  perfilGestorIds: string[]
+): Promise<Record<string, string>> {
+  const unique = [
+    ...new Set(perfilGestorIds.map(id => String(id).trim()).filter(Boolean)),
+  ]
+  const out: Record<string, string> = {}
+  await Promise.all(
+    unique.map(async id => {
+      try {
+        const res = await fetch(`/api/pessoas/perfis-gestor/${encodeURIComponent(id)}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+        if (!res.ok) {
+          out[id] = '—'
+          return
+        }
+        const data = (await res.json()) as { role?: unknown }
+        const role = typeof data.role === 'string' ? data.role.trim() : ''
+        out[id] = role.length > 0 ? role : '—'
+      } catch {
+        out[id] = '—'
+      }
+    })
+  )
+  return out
+}
+
 /**
  * Chamadas ao BFF de gestão de convites da empresa (token com contexto de empresa).
  */
@@ -19,6 +52,7 @@ export function useConvitesGestao() {
   const auth = useAuthStore(s => s.auth)
 
   const [convites, setConvites] = useState<ConviteGestaoDTO[]>([])
+  const [perfilGestorNomePorId, setPerfilGestorNomePorId] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -44,9 +78,13 @@ export function useConvitesGestao() {
         throw new Error(await parseError(res))
       }
       const data = (await res.json()) as ConviteGestaoDTO[]
-      setConvites(Array.isArray(data) ? data : [])
+      const arr = Array.isArray(data) ? data : []
+      setConvites(arr)
+      const ids = arr.map(c => c.perfilGestorId)
+      setPerfilGestorNomePorId(await buscarNomesPerfilGestor(token, ids))
     } catch (e) {
       setConvites([])
+      setPerfilGestorNomePorId({})
       setError(e instanceof Error ? e.message : 'Erro ao carregar convites')
     } finally {
       setLoading(false)
@@ -73,6 +111,8 @@ export function useConvitesGestao() {
       }
       const criado = (await res.json()) as ConviteGestaoDTO
       setConvites(prev => [criado, ...prev])
+      const extras = await buscarNomesPerfilGestor(token, [criado.perfilGestorId])
+      setPerfilGestorNomePorId(prev => ({ ...prev, ...extras }))
       return criado
     },
     [getToken]
@@ -125,6 +165,7 @@ export function useConvitesGestao() {
   return {
     convites,
     setConvites,
+    perfilGestorNomePorId,
     loading,
     error,
     setError,

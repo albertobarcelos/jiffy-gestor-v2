@@ -8,6 +8,7 @@ import { ConviteGestaoRow } from './components/ConviteGestaoRow'
 
 export function ConvitesGestaoList({
   convites,
+  perfilGestorNomePorId,
   loading,
   error,
   busyById,
@@ -15,6 +16,7 @@ export function ConvitesGestaoList({
   onReenviar,
 }: {
   convites: ConviteGestaoDTO[]
+  perfilGestorNomePorId: Record<string, string>
   loading: boolean
   error: string | null
   busyById: Record<string, 'cancelar' | 'reenviar' | null>
@@ -53,8 +55,8 @@ export function ConvitesGestaoList({
   }
 
   return (
-    <div className="flex w-full min-w-0 max-w-full flex-col gap-3">
-      <div className="flex flex-shrink-0 flex-col gap-2 px-1 md:flex-row md:items-center md:justify-between">
+    <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-4">
+      <div className="flex flex-shrink-0 flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="relative h-8 min-w-[180px] max-w-[360px] flex-1">
           <MdSearch className="absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-secondary-text" />
           <input
@@ -85,44 +87,44 @@ export function ConvitesGestaoList({
           </p>
         </div>
       ) : (
-        <>
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
           {/* Grade com minmax(0,…) para colunas encolherem dentro da largura útil */}
-          <div className="hidden min-w-0 flex-shrink-0 px-1 md:block">
-            <div className="grid h-10 w-full min-w-0 grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,0.85fr)_minmax(0,1.35fr)_minmax(0,1.35fr)_5rem] items-center gap-[10px] rounded-lg bg-custom-2 px-2 pr-1 md:px-4">
-              <div className="min-w-0 truncate text-left font-nunito text-sm font-semibold text-primary-text">
+          <div className="hidden min-w-0 flex-shrink-0 md:block">
+            <div className="grid h-11 w-full min-w-0 grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1.25fr)_minmax(0,1.25fr)_5rem] items-center gap-[10px] border-b border-gray-200 bg-gray-50 px-3 pr-2 md:px-4">
+              <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary-text md:text-sm">
                 E-mail
               </div>
-              <div className="min-w-0 truncate text-center font-nunito text-sm font-semibold text-primary-text">
+              <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary-text md:text-sm">
                 Status
               </div>
-              <div className="min-w-0 truncate text-center font-nunito text-sm font-semibold text-primary-text">
-                Enviado
+              <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary-text md:text-sm">
+                Perfil
               </div>
-              <div className="min-w-0 truncate text-center font-nunito text-sm font-semibold text-primary-text">
+              <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary-text md:text-sm">
                 Expira em
               </div>
-              <div className="min-w-0 truncate text-center font-nunito text-sm font-semibold text-primary-text">
+              <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary-text md:text-sm">
                 Criado em
               </div>
-              <div className="min-w-0 shrink-0 text-center font-nunito text-sm font-semibold text-primary-text">
+              <div className="min-w-0 shrink-0 text-center font-nunito text-xs font-semibold text-secondary-text md:text-sm">
                 Ações
               </div>
             </div>
           </div>
 
-          <div className="min-w-0 max-w-full px-1 scrollbar-hide">
-            {visiveis.map((c, index) => (
+          <div className="min-w-0 max-w-full divide-y divide-gray-100 scrollbar-hide">
+            {visiveis.map(c => (
               <ConviteGestaoRow
                 key={c.id}
                 convite={c}
-                index={index}
+                perfilNome={perfilGestorNomePorId[c.perfilGestorId] ?? '—'}
                 busyAction={busyById[c.id] ?? null}
                 onCancelar={onCancelar}
                 onReenviar={onReenviar}
               />
             ))}
           </div>
-        </>
+        </div>
       )}
     </div>
   )

@@ -18,15 +18,46 @@ function formatarDataHora(iso: string): string {
   })
 }
 
+function StatusBadge({ status }: { status: string }) {
+  const raw = status.trim()
+  const u = raw.toUpperCase()
+  let label = raw
+  if (u === 'PENDENTE') label = 'Pendente'
+  else if (u === 'ACEITO' || u === 'ACCEPTED') label = 'Aceito'
+  else if (u === 'CANCELADO') label = 'Cancelado'
+  else if (u === 'EXPIRADO') label = 'Expirado'
+
+  const tone =
+    u === 'PENDENTE'
+      ? 'bg-amber-100 text-amber-900 ring-1 ring-amber-200/80'
+      : u === 'ACEITO' || u === 'ACCEPTED'
+        ? 'bg-emerald-100 text-emerald-900 ring-1 ring-emerald-200/80'
+        : u === 'CANCELADO' || u === 'EXPIRADO'
+          ? 'bg-gray-100 text-gray-700 ring-1 ring-gray-200'
+          : 'bg-slate-100 text-slate-800 ring-1 ring-slate-200'
+
+  return (
+    <span
+      className={cn(
+        'inline-flex max-w-full items-center justify-center rounded-full px-2.5 py-0.5 font-nunito text-xs font-semibold tabular-nums',
+        tone
+      )}
+      title={status}
+    >
+      <span className="truncate">{label}</span>
+    </span>
+  )
+}
+
 export function ConviteGestaoRow({
   convite,
-  index,
+  perfilNome,
   busyAction,
   onCancelar,
   onReenviar,
 }: {
   convite: ConviteGestaoDTO
-  index: number
+  perfilNome: string
   busyAction: 'cancelar' | 'reenviar' | null
   onCancelar: (id: string) => void
   onReenviar: (id: string) => void
@@ -39,30 +70,22 @@ export function ConviteGestaoRow({
   const iconBtn =
     'tooltip-hover-below tooltip-hover-below-icon flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40'
 
-  const isZebraEven = index % 2 === 0
-  const bgClass = isZebraEven ? 'bg-gray-50' : 'bg-white'
-
   return (
-    <div
-      className={cn(
-        bgClass,
-        'rounded-lg my-2 overflow-visible transition-colors hover:bg-primary/10'
-      )}
-    >
+    <div className="overflow-visible transition-colors hover:bg-gray-50/80">
       {/* Desktop — mesma grade CSS do cabeçalho (minmax 0 evita overflow horizontal) */}
-      <div className="relative hidden min-h-[50px] w-full min-w-0 grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,0.85fr)_minmax(0,1.35fr)_minmax(0,1.35fr)_5rem] items-center gap-[10px] px-2 py-1 md:grid md:px-4">
+      <div className="relative hidden min-h-[52px] w-full min-w-0 grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1.25fr)_minmax(0,1.25fr)_5rem] items-center gap-[10px] px-3 py-2 md:grid md:px-4">
         <div className="min-w-0 font-nunito text-left text-sm text-primary-text">
-          <span className="block truncate" title={convite.email}>
+          <span className="block truncate font-semibold" title={convite.email}>
             {convite.email}
           </span>
         </div>
-        <div className="min-w-0 text-center font-nunito text-xs text-primary-text md:text-sm">
-          <span className="block truncate font-semibold" title={convite.status}>
-            {convite.status}
-          </span>
+        <div className="flex min-w-0 justify-center">
+          <StatusBadge status={convite.status} />
         </div>
-        <div className="min-w-0 text-center font-nunito text-xs text-secondary-text md:text-sm">
-          <span className="block truncate">{convite.emailEnviado ? 'Sim' : 'Não'}</span>
+        <div className="min-w-0 text-center font-nunito text-sm text-primary-text">
+          <span className="block truncate font-medium" title={perfilNome}>
+            {perfilNome}
+          </span>
         </div>
         <div className="min-w-0 text-center font-nunito text-xs text-secondary-text tabular-nums md:text-sm">
           <span className="block truncate" title={formatarDataHora(convite.expiraEm)}>
@@ -121,18 +144,18 @@ export function ConviteGestaoRow({
       </div>
 
       {/* Mobile */}
-      <div className="md:hidden p-3">
+      <div className="md:hidden p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <p className="font-nunito text-sm font-semibold text-primary-text break-all">
               {convite.email}
             </p>
-            <p className="mt-1 font-nunito text-xs text-secondary-text">
-              Status:{' '}
-              <span className="font-semibold text-primary-text">{convite.status}</span>
-              {' · '}
-              E-mail enviado: {convite.emailEnviado ? 'Sim' : 'Não'}
-            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <StatusBadge status={convite.status} />
+              <span className="font-nunito text-xs text-secondary-text">
+                Perfil: <span className="font-semibold text-primary-text">{perfilNome}</span>
+              </span>
+            </div>
             <p className="mt-1 font-nunito text-xs text-secondary-text">
               Expira: {formatarDataHora(convite.expiraEm)}
             </p>

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
-import { getAuthToken } from '@/src/shared/utils/getAuthToken'
+import {
+  AUTH_COOKIE_IDENTITY,
+  AUTH_COOKIE_LEGACY,
+  AUTH_COOKIE_TENANT,
+  cookieOptsMaxAge,
+} from '@/src/shared/utils/authCookies'
 import {
   EscolherEmpresaRequestSchema,
   EscolherEmpresaResponseSchema,
@@ -10,9 +15,24 @@ import {
  * BFF: Abre sessão na empresa selecionada (multi-empresa)
  * POST /api/auth/escolher-empresa
  */
+function getIdentityTokenParaEscolherEmpresa(request: NextRequest): string | null {
+  const authHeader = request.headers.get('authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    const t = authHeader.substring(7).trim()
+    if (t.length > 0) {
+      return t
+    }
+  }
+  return (
+    request.cookies.get(AUTH_COOKIE_IDENTITY)?.value ??
+    request.cookies.get(AUTH_COOKIE_LEGACY)?.value ??
+    null
+  )
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const token = getAuthToken(request)
+    const token = getIdentityTokenParaEscolherEmpresa(request)
     if (!token) {
       return NextResponse.json({ error: 'Token não encontrado' }, { status: 401 })
     }
@@ -29,15 +49,8 @@ export async function POST(request: NextRequest) {
 
     const parsed = EscolherEmpresaResponseSchema.parse(response.data)
 
-    // Cookie httpOnly = token da empresa (tenant); priorizado em getAuthToken sobre o header.
     const res = NextResponse.json(parsed, { status: 200 })
-    res.cookies.set('auth-token', parsed.accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-      maxAge: 60 * 60 * 24,
-    })
+    res.cookies.set(AUTH_COOKIE_TENANT, parsed.accessToken, cookieOptsMaxAge(60 * 60 * 24))
     return res
   } catch (error) {
     if (error instanceof ApiError) {

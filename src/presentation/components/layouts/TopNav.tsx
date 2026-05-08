@@ -6,6 +6,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { disconnectEmpresaTab } from '@/src/presentation/utils/disconnectEmpresaTab'
 import { useQueryClient } from '@tanstack/react-query'
 import { MdDashboard, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose } from 'react-icons/md'
 import { 
@@ -20,7 +21,6 @@ import {
   MdAccountBalance,
   MdHistory,
   MdPercent,
-  MdMail,
 } from 'react-icons/md'
 import type { IconType } from 'react-icons'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
@@ -34,7 +34,7 @@ export function TopNav() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
-  const { logout, getUser } = useAuthStore()
+  const { logoutTenant, getUser } = useAuthStore()
   const queryClient = useQueryClient()
   const menuRef = useRef<HTMLDivElement>(null)
   
@@ -159,7 +159,6 @@ export function TopNav() {
         { name: 'Perfis PDV', path: '/cadastros/perfis-usuarios-pdv', icon: MdGroup },
         { name: 'Usuários PDV', path: '/cadastros/usuarios', icon: MdPerson },
         { name: 'Perfis Gestor', path: '/cadastros/perfis-gestor', icon: MdAccountBalance },
-        { name: 'Convites gestor', path: '/cadastros/convites-gestor', icon: MdMail },
         { name: 'Usuários Gestor', path: '/cadastros/usuarios-gestor', icon: MdPerson },
         { name: 'Clientes', path: '/cadastros/clientes', icon: MdPeople },
       ],
@@ -237,15 +236,8 @@ export function TopNav() {
   )
 
   const handleLogout = useCallback(async () => {
-    try {
-      queryClient.clear()
-      await logout()
-      window.location.href = '/login'
-    } catch (error) {
-      console.error('Erro ao fazer logout:', error)
-      window.location.href = '/login'
-    }
-  }, [queryClient, logout])
+    await disconnectEmpresaTab({ queryClient, logoutTenant })
+  }, [queryClient, logoutTenant])
 
   useEffect(() => {
     if (isMobileMenuOpen) {

@@ -1,24 +1,34 @@
 import { NextRequest } from 'next/server'
+import {
+  AUTH_COOKIE_IDENTITY,
+  AUTH_COOKIE_LEGACY,
+  AUTH_COOKIE_TENANT,
+} from '@/src/shared/utils/authCookies'
 
 /**
- * Obtém o token de autenticação da requisição.
- * Ordem: cookie `auth-token` (httpOnly, atualizado no login / escolher-empresa),
- * depois header `Authorization: Bearer`.
- * No cliente, `auth-storage` (Zustand) espelha o token para fetch com Bearer; no servidor o cookie costuma ser a fonte vigente.
+ * Obtém o token JWT da requisição.
+ * Ordem: header `Authorization` (cliente envia o bearer desejado),
+ * depois `tenant-token`, `identity-token`, cookie legado `auth-token`.
  */
 export function getAuthToken(request: NextRequest): string | null {
-  // Prioriza cookie httpOnly para evitar uso de token stale do client store
-  const token = request.cookies.get('auth-token')?.value
-  if (token) {
-    return token
-  }
-
-  // Fallback para header Authorization
   const authHeader = request.headers.get('authorization')
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    return authHeader.substring(7)
+  if (authHeader?.startsWith('Bearer ')) {
+    const bearer = authHeader.substring(7).trim()
+    if (bearer.length > 0) {
+      return bearer
+    }
   }
 
-  return null
+  const tenant = request.cookies.get(AUTH_COOKIE_TENANT)?.value
+  if (tenant) {
+    return tenant
+  }
+
+  const identity = request.cookies.get(AUTH_COOKIE_IDENTITY)?.value
+  if (identity) {
+    return identity
+  }
+
+  return request.cookies.get(AUTH_COOKIE_LEGACY)?.value ?? null
 }
 

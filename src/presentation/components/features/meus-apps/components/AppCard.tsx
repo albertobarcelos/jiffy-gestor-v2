@@ -1,8 +1,11 @@
 'use client'
 
-import { Heart, Settings } from 'lucide-react'
+import { useRef } from 'react'
+import { Heart } from 'lucide-react'
+import { CardGearMenu } from '@/src/presentation/components/ui/CardGearMenu'
 import { cn } from '@/src/shared/utils/cn'
 import type { MeusApp } from '../types'
+import { buildEmpresaCardGearItems } from '../utils/buildEmpresaCardGearItems'
 
 function StatusBadge({ status }: { status: MeusApp['status'] }) {
   const label = status === 'ativo' ? 'Ativo' : 'Inativo'
@@ -32,11 +35,14 @@ function AppAvatar({ nome, sigla }: { nome: string; sigla?: string }) {
 export function AppCard({
   app,
   onAcessar,
+  onGerenciarConvites,
   isSelecting = false,
   actionsLocked = false,
 }: {
   app: MeusApp
   onAcessar: (appId: string) => void
+  /** Convites gestor (sessão empresa): mesma base que Acessar, abre rota de convites em nova aba */
+  onGerenciarConvites?: (appId: string) => void
   /** Esta empresa está em POST escolher-empresa */
   isSelecting?: boolean
   /** Outra empresa está abrindo; bloqueia interação neste card */
@@ -45,20 +51,37 @@ export function AppCard({
   const bloqueado = app.status === 'inativo'
   const navDisabled = bloqueado || actionsLocked || isSelecting
 
+  const gearItems = buildEmpresaCardGearItems(app.id, {
+    navDisabled,
+    onGerenciarConvites,
+  })
+
+  /** Evita que o clique no item do menu (portal) dispare o `onClick` do card e abra o dashboard junto. */
+  const ignorarAcessarAteRef = useRef(0)
+
+  const handleAntesMenuGear = () => {
+    ignorarAcessarAteRef.current = Date.now() + 600
+  }
+
+  const tentarAcessarPeloCard = () => {
+    if (navDisabled) return
+    if (Date.now() < ignorarAcessarAteRef.current) return
+    onAcessar(app.id)
+  }
+
   return (
     <div
       role="button"
       tabIndex={navDisabled ? -1 : 0}
       onClick={() => {
-        if (!navDisabled) {
-          onAcessar(app.id)
-        }
+        tentarAcessarPeloCard()
       }}
       onKeyDown={e => {
         if (navDisabled) {
           return
         }
         if (e.key === 'Enter' || e.key === ' ') {
+          if (Date.now() < ignorarAcessarAteRef.current) return
           onAcessar(app.id)
         }
       }}
@@ -103,15 +126,13 @@ export function AppCard({
                 >
                   <Heart className="h-4 w-4" aria-hidden />
                 </button>
-                <button
-                  type="button"
-                  onClick={e => e.stopPropagation()}
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-800"
-                  aria-label="Configurações"
-                  title="Configurações"
-                >
-                  <Settings className="h-4 w-4" aria-hidden />
-                </button>
+                <CardGearMenu
+                  disabled={navDisabled}
+                  triggerAriaLabel="Opções do aplicativo"
+                  triggerTitle="Opções do aplicativo"
+                  items={gearItems}
+                  onBeforeMenuItemAction={handleAntesMenuGear}
+                />
               </div>
             </div>
 

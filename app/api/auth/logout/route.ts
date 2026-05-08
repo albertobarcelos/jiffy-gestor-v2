@@ -1,13 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import {
+  clearAuthCookie,
+  AUTH_COOKIE_IDENTITY,
+  AUTH_COOKIE_TENANT,
+  AUTH_COOKIE_LEGACY,
+} from '@/src/shared/utils/authCookies'
 
 /**
- * API Route para logout
+ * API Route para logout completo (identidade + tenant + legado).
  * POST /api/auth/logout
- * Remove o cookie de autenticação do servidor
  */
 export async function POST() {
   try {
-    // Cria resposta de sucesso
     const response = NextResponse.json(
       {
         success: true,
@@ -16,17 +20,9 @@ export async function POST() {
       { status: 200 }
     )
 
-    // Remove o cookie de autenticação
-    response.cookies.delete('auth-token')
-    
-    // Garante que o cookie seja removido com todas as configurações
-    response.cookies.set('auth-token', '', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-      maxAge: 0, // Expira imediatamente
-    })
+    clearAuthCookie(response, AUTH_COOKIE_IDENTITY)
+    clearAuthCookie(response, AUTH_COOKIE_TENANT)
+    clearAuthCookie(response, AUTH_COOKIE_LEGACY)
 
     return response
   } catch (error) {

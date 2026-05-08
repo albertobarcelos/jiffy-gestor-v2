@@ -3,6 +3,8 @@ import localFont from 'next/font/local'
 import { Toaster } from 'react-hot-toast'
 import { ThemeProvider } from '@/src/presentation/providers/ThemeProvider'
 import { QueryProvider } from '@/src/presentation/providers/QueryProvider'
+import { AuthStorageCrossTabSync } from '@/src/presentation/components/auth/AuthStorageCrossTabSync'
+import { EmpresaSessionLostGate } from '@/src/presentation/components/auth/EmpresaSessionLostGate'
 import { DocumentoFiscalPdfRetryModal } from '@/src/presentation/components/features/nfe/DocumentoFiscalPdfRetryModal'
 import './globals.css'
 
@@ -31,6 +33,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${generalSans.className} antialiased`} suppressHydrationWarning>
         <QueryProvider>
           <ThemeProvider>
+            <AuthStorageCrossTabSync />
+            <EmpresaSessionLostGate />
             {children}
             <DocumentoFiscalPdfRetryModal />
             <Toaster

@@ -3,7 +3,9 @@
 import { ConviteListRow } from '@/src/presentation/components/features/convites/components/ConviteListRow'
 import type { MeusAppsFeedItem } from '../types'
 import type { MeusApp } from '../types'
+import { CardGearMenu } from '@/src/presentation/components/ui/CardGearMenu'
 import { cn } from '@/src/shared/utils/cn'
+import { buildEmpresaCardGearItems } from '../utils/buildEmpresaCardGearItems'
 
 function StatusPill({ status }: { status: MeusApp['status'] }) {
   return (
@@ -23,6 +25,7 @@ function StatusPill({ status }: { status: MeusApp['status'] }) {
 export function MeusAppsFeedList({
   items,
   onAcessar,
+  onGerenciarConvites,
   busyAppId,
   onAceitarConvite,
   onRecusarConvite,
@@ -30,6 +33,7 @@ export function MeusAppsFeedList({
 }: {
   items: MeusAppsFeedItem[]
   onAcessar: (appId: string) => void
+  onGerenciarConvites?: (appId: string) => void
   busyAppId?: string | null
   onAceitarConvite: (id: string) => void
   onRecusarConvite: (id: string) => void
@@ -53,6 +57,7 @@ export function MeusAppsFeedList({
             key={`app-${item.app.id}`}
             app={item.app}
             onAcessar={onAcessar}
+            onGerenciarConvites={onGerenciarConvites}
             busyAppId={busyAppId}
             locked={locked}
           />
@@ -65,11 +70,13 @@ export function MeusAppsFeedList({
 function EmpresaListRow({
   app,
   onAcessar,
+  onGerenciarConvites,
   busyAppId,
   locked,
 }: {
   app: MeusApp
   onAcessar: (appId: string) => void
+  onGerenciarConvites?: (appId: string) => void
   busyAppId?: string | null
   locked: boolean
 }) {
@@ -77,6 +84,11 @@ function EmpresaListRow({
   const isSelecting = busyAppId === app.id
   const actionsLocked = locked && busyAppId !== app.id
   const navDisabled = bloqueado || actionsLocked || isSelecting
+
+  const gearItems = buildEmpresaCardGearItems(app.id, {
+    navDisabled,
+    onGerenciarConvites,
+  })
 
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
@@ -90,7 +102,14 @@ function EmpresaListRow({
         <div className="sm:flex sm:justify-center">
           <StatusPill status={app.status} />
         </div>
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <CardGearMenu
+            disabled={navDisabled}
+            triggerAriaLabel="Opções do aplicativo"
+            triggerTitle="Opções do aplicativo"
+            items={gearItems}
+            triggerClassName="h-10 w-10 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+          />
           <button
             type="button"
             disabled={navDisabled}

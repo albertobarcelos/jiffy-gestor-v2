@@ -1,10 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import Menu from '@mui/material/Menu'
-import MenuItem from '@mui/material/MenuItem'
-import { Settings } from 'lucide-react'
 import { JiffyConfirmDialog } from '@/src/presentation/components/ui/jiffy-confirm-dialog'
+import { CardGearMenu } from '@/src/presentation/components/ui/CardGearMenu'
 import { cn } from '@/src/shared/utils/cn'
 import type { ConvitePendente } from '../types'
 
@@ -56,15 +54,10 @@ export function ConviteCard({
   loadingAction?: 'aceitar' | 'recusar' | null
 }) {
   const isLoading = loadingAction != null
-  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null)
-  const menuAberto = Boolean(menuAnchor)
   const [confirmRecusarAberto, setConfirmRecusarAberto] = useState(false)
-
-  const fecharMenu = () => setMenuAnchor(null)
 
   /** Abre o modal de confirmação (recusar só após “Continuar”). */
   const handleAbrirConfirmacaoRecusar = () => {
-    fecharMenu()
     setConfirmRecusarAberto(true)
   }
 
@@ -85,52 +78,20 @@ export function ConviteCard({
                 <ConvitePendenteBadge />
               </div>
               <div className="flex shrink-0 items-center gap-1">
-                <button
-                  type="button"
+                <CardGearMenu
                   disabled={isLoading}
-                  onClick={e => {
-                    e.stopPropagation()
-                    setMenuAnchor(e.currentTarget)
-                  }}
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
-                  aria-label="Opções do convite"
-                  title="Opções do convite"
-                  aria-haspopup="menu"
-                  aria-expanded={menuAberto}
-                >
-                  <Settings className="h-4 w-4" aria-hidden />
-                </button>
-                <Menu
-                  anchorEl={menuAnchor}
-                  open={menuAberto}
-                  onClose={fecharMenu}
-                  anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                  transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                  slotProps={{
-                    paper: {
-                      className: 'min-w-0 py-0.5',
-                      elevation: 2,
-                      sx: { '& .MuiList-root': { py: 0 } },
+                  triggerAriaLabel="Opções do convite"
+                  triggerTitle="Opções do convite"
+                  items={[
+                    {
+                      id: 'recusar',
+                      label: loadingAction === 'recusar' ? 'Recusando…' : 'Recusar',
+                      onClick: handleAbrirConfirmacaoRecusar,
+                      disabled: isLoading,
+                      tone: 'danger',
                     },
-                  }}
-                >
-                  <MenuItem
-                    dense
-                    disabled={isLoading}
-                    onClick={handleAbrirConfirmacaoRecusar}
-                    className=""
-                    sx={{
-                      minHeight: 28,
-                      py: 0.375,
-                      px: 1.25,
-                      fontSize: '0.65rem',
-                      fontWeight: 600,
-                      color: 'error.main',
-                    }}
-                  >
-                    {loadingAction === 'recusar' ? 'Recusando…' : 'Recusar'}
-                  </MenuItem>
-                </Menu>
+                  ]}
+                />
               </div>
             </div>
 

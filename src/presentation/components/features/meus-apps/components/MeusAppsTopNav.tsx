@@ -10,6 +10,7 @@ import { LogOut } from 'lucide-react'
 import Image from 'next/image'
 import { cn } from '@/src/shared/utils/cn'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { disconnectHubTab } from '@/src/presentation/utils/disconnectHubTab'
 
 type MenuItem = {
   label: string
@@ -26,13 +27,19 @@ const MENU_ITEMS: MenuItem[] = [
 
 function isActivePath(pathname: string | null, href: string): boolean {
   if (!pathname) return false
-  if (href === '/meus-apps') return pathname === '/meus-apps'
+  if (href === '/meus-apps') {
+    if (pathname === '/meus-apps') return true
+    if (!pathname.startsWith('/meus-apps/')) return false
+    if (pathname.startsWith('/meus-apps/extrato-financeiro')) return false
+    if (pathname.startsWith('/meus-apps/treinamentos')) return false
+    return true
+  }
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
 export function MeusAppsTopNav() {
   const pathname = usePathname()
-  const { getUser, logout } = useAuthStore()
+  const { getUser, logoutHub } = useAuthStore()
   const user = getUser()
 
   const userLabel = useMemo(() => {
@@ -92,13 +99,7 @@ export function MeusAppsTopNav() {
             <button
               type="button"
               onClick={() => {
-                void (async () => {
-                  try {
-                    await logout()
-                  } finally {
-                    window.location.href = '/login'
-                  }
-                })()
+                void disconnectHubTab({ logoutHub })
               }}
               className="ml-1 inline-flex h-8 w-8 items-center justify-center rounded-full text-white/90 transition hover:bg-white/10"
               aria-label="Sair"
@@ -111,13 +112,7 @@ export function MeusAppsTopNav() {
             <button
               type="button"
               onClick={() => {
-                void (async () => {
-                  try {
-                    await logout()
-                  } finally {
-                    window.location.href = '/login'
-                  }
-                })()
+                void disconnectHubTab({ logoutHub })
               }}
               className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-sm font-bold text-white transition hover:bg-white/15"
               aria-label="Sair"

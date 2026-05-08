@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import {
+  AUTH_COOKIE_IDENTITY,
+  AUTH_COOKIE_LEGACY,
+  AUTH_COOKIE_TENANT,
+} from '@/src/shared/utils/authCookies'
 import { queryRegistroConviteNovoUsuarioFromLoginSearch } from '@/src/presentation/components/features/auth/utils/inviteLoginPayload'
 
 /**
@@ -49,12 +54,17 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  // Verificar token no cookie OU no header Authorization
-  const cookieToken = request.cookies.get('auth-token')?.value
+  const tenantTok = request.cookies.get(AUTH_COOKIE_TENANT)?.value
+  const identityTok = request.cookies.get(AUTH_COOKIE_IDENTITY)?.value
+  const legacyTok = request.cookies.get(AUTH_COOKIE_LEGACY)?.value
   const authHeader = request.headers.get('authorization')
-  const headerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null
-  
-  const token = cookieToken || headerToken
+  const headerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7).trim() : null
+
+  const token =
+    (headerToken && headerToken.length > 0 ? headerToken : null) ||
+    tenantTok ||
+    identityTok ||
+    legacyTok
   const isApiRoute = pathname.startsWith('/api/')
   
   // Rotas protegidas - verificação mínima

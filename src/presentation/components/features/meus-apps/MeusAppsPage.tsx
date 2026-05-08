@@ -25,14 +25,16 @@ import {
   isLikelyHubSessionTokenError,
 } from './utils/hubSessionTokenFeedback'
 import { appEmpresaCorrespondeBusca, conviteCorrespondeBusca } from './utils/meusAppsBusca'
+import { empresaNomeParaSlugUrl } from '@/src/shared/utils/empresaNomeParaSlugUrl'
 
 const HUB_SESSAO_TOAST_ID = 'meus-apps-sessao-token'
 
 export default function MeusAppsPage() {
   const hubEmpresas = useAuthStore(s => s.hubEmpresas)
   const setHubEmpresas = useAuthStore(s => s.setHubEmpresas)
-  const auth = useAuthStore(s => s.auth)
-  const login = useAuthStore(s => s.login)
+  /** Sessão do hub (identidade); não usar `auth` aqui — pode ser só tenant se outra aba abriu empresa. */
+  const identityAuth = useAuthStore(s => s.identityAuth)
+  const setTenantAuth = useAuthStore(s => s.setTenantAuth)
   const isRehydrated = useAuthStore(s => s.isRehydrated)
 
   const [busca, setBusca] = useState('')
@@ -60,12 +62,12 @@ export default function MeusAppsPage() {
   /** Assim que o JWT expira (ou pouco depois): toast + banner, sem esperar nova requisição. */
   const hubSessaoProativaDisparadaRef = useRef(false)
   useEffect(() => {
-    if (!isRehydrated || !auth) {
+    if (!isRehydrated || !identityAuth) {
       return
     }
 
     const dispararSeExpirado = () => {
-      if (!auth.isExpired()) {
+      if (!identityAuth.isExpired()) {
         return
       }
       if (hubSessaoProativaDisparadaRef.current) {
@@ -78,7 +80,7 @@ export default function MeusAppsPage() {
     dispararSeExpirado()
     const intervalo = window.setInterval(dispararSeExpirado, 15_000)
 
-    const msAteExp = auth.getExpiresAt().getTime() - Date.now()
+    const msAteExp = identityAuth.getExpiresAt().getTime() - Date.now()
     let timeoutId: number | undefined
     if (msAteExp > 0 && msAteExp < 1000 * 60 * 60 * 72) {
       timeoutId = window.setTimeout(dispararSeExpirado, msAteExp + 750)
@@ -90,17 +92,17 @@ export default function MeusAppsPage() {
         window.clearTimeout(timeoutId)
       }
     }
-  }, [auth, isRehydrated, reportHubSessionIssue])
+  }, [identityAuth, isRehydrated, reportHubSessionIssue])
 
   useEffect(() => {
-    if (auth && !auth.isExpired()) {
+    if (identityAuth && !identityAuth.isExpired()) {
       hubSessaoProativaDisparadaRef.current = false
       setHubTokenBanner(null)
     }
-  }, [auth])
+  }, [identityAuth])
 
   useEffect(() => {
-    if (!isRehydrated || !auth) {
+    if (!isRehydrated || !identityAuth) {
       return
     }
 
@@ -109,7 +111,7 @@ export default function MeusAppsPage() {
     void (async () => {
       try {
         setConvitesErro(null)
-        const token = auth.getAccessToken()
+        const token = identityAuth.getAccessToken()
         const res = await fetch('/api/convites/me', {
           method: 'GET',
           credentials: 'include',
@@ -147,7 +149,7 @@ export default function MeusAppsPage() {
     return () => {
       cancelado = true
     }
-  }, [auth, isRehydrated, reportHubSessionIssue])
+  }, [identityAuth, isRehydrated, reportHubSessionIssue])
 
   const setConviteLoading = useCallback((id: string, action: 'aceitar' | 'recusar' | null) => {
     setLoadingConviteById(prev => ({ ...prev, [id]: action }))
@@ -167,7 +169,7 @@ export default function MeusAppsPage() {
 
   const handleAceitarConvite = useCallback(
     async (id: string) => {
-      const token = auth?.getAccessToken()
+      const token = identityAuth?.getAccessToken()
       const conviteSnapshot = convites?.find(c => c.id === id)
       setConviteLoading(id, 'aceitar')
       try {
@@ -202,12 +204,12 @@ export default function MeusAppsPage() {
         setConviteLoading(id, null)
       }
     },
-    [auth, convites, mergeEmpresaAceita, reportHubSessionIssue, setConviteLoading]
+    [identityAuth, convites, mergeEmpresaAceita, reportHubSessionIssue, setConviteLoading]
   )
 
   const handleRecusarConvite = useCallback(
     async (id: string) => {
-      const token = auth?.getAccessToken()
+      const token = identityAuth?.getAccessToken()
       setConviteLoading(id, 'recusar')
       try {
         const res = await fetch(`/api/convites/me/${encodeURIComponent(id)}/recusar`, {
@@ -238,7 +240,7 @@ export default function MeusAppsPage() {
         setConviteLoading(id, null)
       }
     },
-    [auth, reportHubSessionIssue, setConviteLoading]
+    [identityAuth, reportHubSessionIssue, setConviteLoading]
   )
 
   const appsBase = useMemo(
@@ -299,20 +301,17 @@ export default function MeusAppsPage() {
     setFeedGridExpandido(false)
   }, [busca, feedFiltro])
 
-  const handleAcessar = async (appId: string) => {
-    const app = appsBase.find(a => a.id === appId)
-    if (app?.status === 'inativo') {
-      return
-    }
-
-    setAcessoErro(null)
-    setBusyAppId(appId)
-
-    try {
+  /** Mesmo fluxo que “Acessar”: POST escolher-empresa + token da empresa no store (aba atual). */
+  const aplicarContextoEmpresa = useCallback(
+    async (appId: string): Promise<void> => {
+      const idTok = identityAuth?.getAccessToken()
       const res = await fetch('/api/auth/escolher-empresa', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(idTok ? { Authorization: `Bearer ${idTok}` } : {}),
+        },
         body: JSON.stringify({ empresaId: appId }),
       })
 
@@ -327,7 +326,7 @@ export default function MeusAppsPage() {
         throw new Error('Resposta sem accessToken')
       }
 
-      const prev = auth?.getUser()
+      const prev = identityAuth?.getUser()
       const novoAuth = buildAuthFromAccessToken(
         accessToken,
         prev
@@ -335,10 +334,13 @@ export default function MeusAppsPage() {
           : undefined
       )
 
-      login(novoAuth)
+      setTenantAuth(novoAuth)
+    },
+    [identityAuth, setTenantAuth]
+  )
 
-      window.open('/dashboard', '_blank', 'noopener,noreferrer')
-    } catch (e) {
+  const reportErroAcessoEmpresa = useCallback(
+    (e: unknown) => {
       const msg =
         e instanceof Error ? e.message : 'Não foi possível abrir o aplicativo'
       if (isLikelyHubSessionTokenError(msg)) {
@@ -347,8 +349,44 @@ export default function MeusAppsPage() {
       } else {
         setAcessoErro(msg)
       }
+    },
+    [reportHubSessionIssue]
+  )
+
+  const handleAcessar = async (appId: string) => {
+    const app = appsBase.find(a => a.id === appId)
+    if (app?.status === 'inativo') {
+      return
+    }
+
+    setAcessoErro(null)
+    setBusyAppId(appId)
+
+    try {
+      await aplicarContextoEmpresa(appId)
+      window.open('/dashboard', '_blank', 'noopener,noreferrer')
+    } catch (e) {
+      reportErroAcessoEmpresa(e)
     } finally {
       setBusyAppId(null)
+    }
+  }
+
+  const handleGerenciarConvites = async (appId: string) => {
+    const app = appsBase.find(a => a.id === appId)
+    if (!app || app.status === 'inativo') {
+      return
+    }
+
+    setAcessoErro(null)
+
+    try {
+      await aplicarContextoEmpresa(appId)
+      const slug = empresaNomeParaSlugUrl(app.nome)
+      // Sem noopener: a aba de convites usa `window.opener` no Voltar para focar o hub e fechar só esta guia.
+      window.open(`/meus-apps/convidar-usuarios/${slug}`, '_blank')
+    } catch (e) {
+      reportErroAcessoEmpresa(e)
     }
   }
 
@@ -482,6 +520,7 @@ export default function MeusAppsPage() {
               <MeusAppsFeedGrid
                 cells={gridCells}
                 onAcessar={handleAcessar}
+                onGerenciarConvites={handleGerenciarConvites}
                 busyAppId={busyAppId}
                 onAceitarConvite={handleAceitarConvite}
                 onRecusarConvite={handleRecusarConvite}
@@ -491,6 +530,7 @@ export default function MeusAppsPage() {
               <MeusAppsFeedList
                 items={feedItems}
                 onAcessar={handleAcessar}
+                onGerenciarConvites={handleGerenciarConvites}
                 busyAppId={busyAppId}
                 onAceitarConvite={handleAceitarConvite}
                 onRecusarConvite={handleRecusarConvite}

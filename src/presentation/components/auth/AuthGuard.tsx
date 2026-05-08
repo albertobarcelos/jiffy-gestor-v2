@@ -4,6 +4,18 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { SESSION_STORAGE_HUB_LOGOUT_SELF } from '@/src/shared/constants/sessionCoordinator'
+
+function isHubLogoutInitiatorTab(): boolean {
+  if (typeof window === 'undefined') {
+    return false
+  }
+  try {
+    return sessionStorage.getItem(SESSION_STORAGE_HUB_LOGOUT_SELF) === '1'
+  } catch {
+    return false
+  }
+}
 
 interface AuthGuardProps {
   children: React.ReactNode
@@ -25,7 +37,11 @@ const SESSAO_TIMEOUT_MAX_MS = 1000 * 60 * 60 * 24 * 14
  */
 export function AuthGuard({ children }: AuthGuardProps) {
   const pathname = usePathname()
-  const { isAuthenticated, auth, isRehydrated, logout } = useAuthStore()
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated)
+  const auth = useAuthStore(s => s.auth)
+  const identityAuth = useAuthStore(s => s.identityAuth)
+  const isRehydrated = useAuthStore(s => s.isRehydrated)
+  const logout = useAuthStore(s => s.logout)
   const [allowed, setAllowed] = useState(false)
   const redirectingRef = useRef(false)
 
@@ -42,6 +58,14 @@ export function AuthGuard({ children }: AuthGuardProps) {
     window.location.href = '/login'
   }, [logout])
 
+  const redirectHubSemIdentidade = useCallback(() => {
+    if (redirectingRef.current) {
+      return
+    }
+    redirectingRef.current = true
+    window.location.href = '/login'
+  }, [])
+
   useEffect(() => {
     if (!isRehydrated) {
       return
@@ -57,16 +81,36 @@ export function AuthGuard({ children }: AuthGuardProps) {
       return
     }
 
-    const isValid = isAuthenticated && auth !== null && !auth.isExpired()
+    const isHubArea = pathname?.startsWith('/meus-apps') ?? false
+
+    const isValid = isHubArea
+      ? identityAuth !== null && !identityAuth.isExpired()
+      : isAuthenticated && auth !== null && !auth.isExpired()
 
     if (!isValid) {
-      void invalidateSessionToLogin()
+      if (isHubArea) {
+        if (isHubLogoutInitiatorTab()) {
+          setAllowed(true)
+          return
+        }
+        redirectHubSemIdentidade()
+      } else {
+        void invalidateSessionToLogin()
+      }
       return
     }
 
     redirectingRef.current = false
     setAllowed(true)
-  }, [isAuthenticated, auth, pathname, isRehydrated, invalidateSessionToLogin])
+  }, [
+    isAuthenticated,
+    auth,
+    identityAuth,
+    pathname,
+    isRehydrated,
+    invalidateSessionToLogin,
+    redirectHubSemIdentidade,
+  ])
 
   useEffect(() => {
     if (!isRehydrated || !allowed) {
@@ -81,8 +125,21 @@ export function AuthGuard({ children }: AuthGuardProps) {
       return
     }
 
+    const isHubArea = pathname?.startsWith('/meus-apps') ?? false
+
     const checkExpired = () => {
-      const { isAuthenticated: ok, auth: current } = useAuthStore.getState()
+      const st = useAuthStore.getState()
+      if (isHubArea) {
+        if (isHubLogoutInitiatorTab()) {
+          return
+        }
+        const id = st.identityAuth
+        if (id === null || id.isExpired()) {
+          redirectHubSemIdentidade()
+        }
+        return
+      }
+      const { isAuthenticated: ok, auth: current } = st
       if (!ok || current === null || current.isExpired()) {
         void invalidateSessionToLogin()
       }
@@ -90,10 +147,11 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
     const intervalId = window.setInterval(checkExpired, SESSAO_POLL_MS)
 
-    const { auth: a } = useAuthStore.getState()
+    const st = useAuthStore.getState()
+    const watchAuth = isHubArea ? st.identityAuth : st.auth
     let timeoutId: number | undefined
-    if (a) {
-      const msAteExp = a.getExpiresAt().getTime() - Date.now()
+    if (watchAuth) {
+      const msAteExp = watchAuth.getExpiresAt().getTime() - Date.now()
       if (msAteExp > 0 && msAteExp < SESSAO_TIMEOUT_MAX_MS) {
         timeoutId = window.setTimeout(checkExpired, msAteExp + 750)
       }
@@ -105,7 +163,15 @@ export function AuthGuard({ children }: AuthGuardProps) {
         window.clearTimeout(timeoutId)
       }
     }
-  }, [isRehydrated, allowed, auth, pathname, invalidateSessionToLogin])
+  }, [
+    isRehydrated,
+    allowed,
+    auth,
+    identityAuth,
+    pathname,
+    invalidateSessionToLogin,
+    redirectHubSemIdentidade,
+  ])
 
   if (!isRehydrated || !allowed) {
     return (
