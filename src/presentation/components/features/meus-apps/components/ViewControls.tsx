@@ -24,8 +24,10 @@ function IconButton({
       type="button"
       onClick={onClick}
       className={cn(
-        'inline-flex h-9 w-9 items-center justify-center rounded-full border text-gray-700 shadow-sm transition',
-        active ? 'border-gray-300 bg-white' : 'border-transparent bg-transparent hover:bg-gray-100'
+        'inline-flex h-9 w-9 items-center justify-center rounded-full border text-secondary shadow-sm transition-colors',
+        active
+          ? 'border-secondary/35 bg-secondary/10'
+          : 'border-transparent bg-transparent hover:bg-gray-100 hover:text-alternate'
       )}
       aria-pressed={active ? 'true' : 'false'}
       aria-label={label}

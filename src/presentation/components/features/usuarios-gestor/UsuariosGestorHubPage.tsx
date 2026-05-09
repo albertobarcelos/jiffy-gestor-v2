@@ -50,11 +50,11 @@ export default function UsuariosGestorHubPage() {
       <MeusAppsTopNav />
 
       <div className="mx-auto w-full max-w-6xl flex-shrink-0 px-3 pt-4 md:px-8">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={handleVoltar}
-            className="flex h-8 shrink-0 items-center gap-2 rounded-lg bg-primary px-5 font-exo text-sm font-semibold text-info transition-colors hover:bg-primary/90"
+            className="flex h-8 shrink-0 items-center gap-2 rounded-lg bg-secondary px-5 font-exo text-sm font-semibold text-info transition-colors hover:bg-alternate"
           >
             <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
             Voltar

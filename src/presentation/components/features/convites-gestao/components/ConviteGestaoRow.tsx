@@ -29,17 +29,17 @@ function StatusBadge({ status }: { status: string }) {
 
   const tone =
     u === 'PENDENTE'
-      ? 'bg-amber-100 text-amber-900 ring-1 ring-amber-200/80'
+      ? 'text-amber-700'
       : u === 'ACEITO' || u === 'ACCEPTED'
-        ? 'bg-emerald-100 text-emerald-900 ring-1 ring-emerald-200/80'
+        ? 'text-emerald-700'
         : u === 'CANCELADO' || u === 'EXPIRADO'
-          ? 'bg-gray-100 text-gray-700 ring-1 ring-gray-200'
-          : 'bg-slate-100 text-slate-800 ring-1 ring-slate-200'
+          ? 'text-gray-600'
+          : 'text-slate-700'
 
   return (
     <span
       className={cn(
-        'inline-flex max-w-full items-center justify-center rounded-full px-2.5 py-0.5 font-nunito text-xs font-semibold tabular-nums',
+        'inline-flex max-w-full items-center justify-center font-nunito text-xs font-semibold tabular-nums',
         tone
       )}
       title={status}
@@ -75,7 +75,7 @@ export function ConviteGestaoRow({
       {/* Desktop — mesma grade CSS do cabeçalho (minmax 0 evita overflow horizontal) */}
       <div className="relative hidden min-h-[52px] w-full min-w-0 grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1.25fr)_minmax(0,1.25fr)_5rem] items-center gap-[10px] px-3 py-2 md:grid md:px-4">
         <div className="min-w-0 font-nunito text-left text-sm text-primary-text">
-          <span className="block truncate font-semibold" title={convite.email}>
+          <span className="block truncate font-normal" title={convite.email}>
             {convite.email}
           </span>
         </div>
@@ -147,7 +147,7 @@ export function ConviteGestaoRow({
       <div className="md:hidden p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <p className="font-nunito text-sm font-semibold text-primary-text break-all">
+            <p className="font-nunito text-sm font-normal text-primary-text break-all">
               {convite.email}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">

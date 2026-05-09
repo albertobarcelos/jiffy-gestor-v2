@@ -2,12 +2,11 @@
 
 import { FormControl, MenuItem, Select } from '@mui/material'
 import { UsuarioGestor } from '@/src/domain/entities/UsuarioGestor'
-import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { cn } from '@/src/shared/utils/cn'
 
 /** Mesma família de colunas que `ConviteGestaoRow` / `ConvitesGestaoList` (minmax evita overflow). */
 export const USUARIO_GESTAO_GRID_DESKTOP =
-  'grid w-full min-w-0 grid-cols-[minmax(0,2.25fr)_minmax(0,2.25fr)_minmax(0,1.85fr)_minmax(0,6.5rem)] items-center gap-[10px]'
+  'grid w-full min-w-0 grid-cols-[minmax(0,2.25fr)_minmax(0,2.25fr)_minmax(0,1.85fr)] items-center gap-[10px]'
 
 type PerfilOption = { id: string; role: string }
 
@@ -16,19 +15,13 @@ export function UsuarioGestaoRow({
   perfilNome,
   allPerfis,
   updatingPerfil,
-  togglingStatus,
-  onRowClick,
   onPerfilChange,
-  onToggleStatus,
 }: {
   usuario: UsuarioGestor
   perfilNome: string
   allPerfis: PerfilOption[]
   updatingPerfil: boolean
-  togglingStatus: boolean
-  onRowClick: () => void
   onPerfilChange: (usuarioId: string, perfilId: string) => void
-  onToggleStatus: (usuarioId: string, ativo: boolean) => void
 }) {
   const selectSx = {
     fontSize: '14px',
@@ -49,29 +42,20 @@ export function UsuarioGestaoRow({
 
   return (
     <div className="overflow-visible transition-colors hover:bg-gray-50/80">
-      {/* Desktop — mesma grade do cabeçalho */}
+      {/* Desktop — mesma grade do cabeçalho (sem cursor de link: edição por linha desativada temporariamente) */}
       <div
-        role="button"
-        tabIndex={0}
-        onClick={onRowClick}
-        onKeyDown={e => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            onRowClick()
-          }
-        }}
         className={cn(
           USUARIO_GESTAO_GRID_DESKTOP,
-          'relative hidden min-h-[52px] cursor-pointer px-3 py-2 md:grid md:px-4'
+          'relative hidden min-h-[52px] cursor-default px-3 py-2 md:grid md:px-4'
         )}
       >
         <div className="min-w-0 text-left font-nunito text-sm text-primary-text">
-          <span className="block truncate font-semibold" title={usuario.getNome()}>
+          <span className="block truncate font-normal">
             {usuario.getNome()}
           </span>
         </div>
         <div className="min-w-0 font-nunito text-sm text-secondary-text">
-          <span className="block truncate" title={usuario.getUsername()}>
+          <span className="block truncate">
             {usuario.getUsername()}
           </span>
         </div>
@@ -118,49 +102,14 @@ export function UsuarioGestaoRow({
             </Select>
           </FormControl>
         </div>
-        <div
-          className="flex shrink-0 items-center justify-center"
-          onClick={e => e.stopPropagation()}
-          onMouseDown={e => e.stopPropagation()}
-          onTouchStart={e => e.stopPropagation()}
-        >
-          <div
-            className="tooltip-hover-below flex items-center justify-center"
-            data-tooltip={
-              usuario.isAtivo() ? 'Usuário gestor ativo' : 'Usuário gestor desativado'
-            }
-          >
-            <JiffyIconSwitch
-              checked={usuario.isAtivo()}
-              onChange={e => {
-                e.stopPropagation()
-                onToggleStatus(usuario.getId(), e.target.checked)
-              }}
-              disabled={togglingStatus}
-              bordered={false}
-              size="sm"
-              className="shrink-0 px-0 py-0"
-              inputProps={{
-                'aria-label': usuario.isAtivo()
-                  ? 'Desativar usuário gestor'
-                  : 'Ativar usuário gestor',
-                onClick: e => e.stopPropagation(),
-              }}
-            />
-          </div>
-        </div>
       </div>
 
       {/* Mobile — alinhado ao padrão da lista de convites */}
       <div className="md:hidden p-4">
-        <button
-          type="button"
-          className="w-full text-left"
-          onClick={onRowClick}
-        >
+        <div className="w-full cursor-default text-left">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
-              <p className="break-words font-nunito text-sm font-semibold text-primary-text">
+              <p className="break-words font-nunito text-sm font-normal text-primary-text">
                 {usuario.getNome()}
               </p>
               <p className="mt-1 font-nunito text-xs text-secondary-text break-all">
@@ -173,34 +122,8 @@ export function UsuarioGestaoRow({
                 </span>
               </div>
             </div>
-            <div
-              className="tooltip-hover-below flex shrink-0"
-              onClick={e => e.stopPropagation()}
-              onMouseDown={e => e.stopPropagation()}
-              data-tooltip={
-                usuario.isAtivo() ? 'Usuário gestor ativo' : 'Usuário gestor desativado'
-              }
-            >
-              <JiffyIconSwitch
-                checked={usuario.isAtivo()}
-                onChange={e => {
-                  e.stopPropagation()
-                  onToggleStatus(usuario.getId(), e.target.checked)
-                }}
-                disabled={togglingStatus}
-                bordered={false}
-                size="sm"
-                className="shrink-0 px-0 py-0"
-                inputProps={{
-                  'aria-label': usuario.isAtivo()
-                    ? 'Desativar usuário gestor'
-                    : 'Ativar usuário gestor',
-                  onClick: e => e.stopPropagation(),
-                }}
-              />
-            </div>
           </div>
-        </button>
+        </div>
         <div
           className="mt-3 max-w-full"
           onClick={e => e.stopPropagation()}

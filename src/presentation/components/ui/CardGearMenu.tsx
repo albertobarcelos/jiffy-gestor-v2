@@ -28,6 +28,11 @@ type CardGearMenuProps = {
    * Útil no card com `onClick` no container (evita “clique fantasma” abrindo o app).
    */
   onBeforeMenuItemAction?: () => void
+  /**
+   * Chamado sempre que o menu fecha (item, backdrop, Escape).
+   * Use no mesmo cenário do card clicável: o clique no backdrop pode repetir no card por baixo.
+   */
+  onMenuClose?: () => void
 }
 
 const menuItemSxBase = {
@@ -49,11 +54,17 @@ export function CardGearMenu({
   items,
   triggerClassName,
   onBeforeMenuItemAction,
+  onMenuClose,
 }: CardGearMenuProps) {
   const [anchor, setAnchor] = useState<null | HTMLElement>(null)
   const aberto = Boolean(anchor)
 
   const fechar = () => setAnchor(null)
+
+  const handleMenuClose = () => {
+    setAnchor(null)
+    onMenuClose?.()
+  }
 
   return (
     <>
@@ -80,7 +91,7 @@ export function CardGearMenu({
       <Menu
         anchorEl={anchor}
         open={aberto}
-        onClose={fechar}
+        onClose={handleMenuClose}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
         slotProps={{

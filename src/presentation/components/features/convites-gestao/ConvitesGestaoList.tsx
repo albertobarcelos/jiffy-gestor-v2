@@ -91,22 +91,22 @@ export function ConvitesGestaoList({
           {/* Grade com minmax(0,…) para colunas encolherem dentro da largura útil */}
           <div className="hidden min-w-0 flex-shrink-0 md:block">
             <div className="grid h-11 w-full min-w-0 grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1.25fr)_minmax(0,1.25fr)_5rem] items-center gap-[10px] border-b border-gray-200 bg-gray-50 px-3 pr-2 md:px-4">
-              <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary-text md:text-sm">
+              <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary md:text-sm">
                 E-mail
               </div>
-              <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary-text md:text-sm">
+              <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:text-sm">
                 Status
               </div>
-              <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary-text md:text-sm">
+              <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:text-sm">
                 Perfil
               </div>
-              <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary-text md:text-sm">
+              <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:text-sm">
                 Expira em
               </div>
-              <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary-text md:text-sm">
+              <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:text-sm">
                 Criado em
               </div>
-              <div className="min-w-0 shrink-0 text-center font-nunito text-xs font-semibold text-secondary-text md:text-sm">
+              <div className="min-w-0 shrink-0 text-center font-nunito text-xs font-semibold text-secondary md:text-sm">
                 Ações
               </div>
             </div>

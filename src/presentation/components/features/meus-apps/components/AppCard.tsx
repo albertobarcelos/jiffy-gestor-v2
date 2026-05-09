@@ -60,10 +60,10 @@ export function AppCard({
     onGerenciarUsuariosGestor,
   })
 
-  /** Evita que o clique no item do menu (portal) dispare o `onClick` do card e abra o dashboard junto. */
+  /** Evita clique fantasma no card após usar o menu (item, backdrop ou Escape — menu em portal). */
   const ignorarAcessarAteRef = useRef(0)
 
-  const handleAntesMenuGear = () => {
+  const evitarAcessoCardPorInteracaoMenu = () => {
     ignorarAcessarAteRef.current = Date.now() + 600
   }
 
@@ -135,7 +135,8 @@ export function AppCard({
                   triggerAriaLabel="Opções do aplicativo"
                   triggerTitle="Opções do aplicativo"
                   items={gearItems}
-                  onBeforeMenuItemAction={handleAntesMenuGear}
+                  onBeforeMenuItemAction={evitarAcessoCardPorInteracaoMenu}
+                  onMenuClose={evitarAcessoCardPorInteracaoMenu}
                 />
               </div>
             </div>

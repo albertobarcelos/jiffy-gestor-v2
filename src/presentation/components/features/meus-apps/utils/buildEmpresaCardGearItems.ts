@@ -2,7 +2,6 @@ import type { CardGearMenuItemConfig } from '@/src/presentation/components/ui/Ca
 
 /**
  * Itens do menu da engrenagem no card de empresa vinculada (Meus Apps).
- * Convites e usuários gestor abrem fluxos no hub; demais entradas são placeholders.
  */
 export function buildEmpresaCardGearItems(
   appId: string,
@@ -27,18 +26,6 @@ export function buildEmpresaCardGearItems(
       label: 'Usuários gestor',
       onClick: () => opts.onGerenciarUsuariosGestor?.(appId),
       disabled: !podeUsuariosGestor,
-    },
-    {
-      id: 'placeholder-relatorios',
-      label: 'Relatórios (em breve)',
-      onClick: () => {},
-      disabled: true,
-    },
-    {
-      id: 'placeholder-integracoes',
-      label: 'Integrações (em breve)',
-      onClick: () => {},
-      disabled: true,
     },
   ]
 }

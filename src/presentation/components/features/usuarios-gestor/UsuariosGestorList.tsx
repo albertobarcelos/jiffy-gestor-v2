@@ -30,15 +30,13 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [totalUsuarios, setTotalUsuarios] = useState(0)
   const [perfisMap, setPerfisMap] = useState<Record<string, string>>({}) // Mapa de perfilGestorId -> role
   const [allPerfis, setAllPerfis] = useState<Array<{ id: string; role: string }>>([]) // Lista de todos os perfis disponíveis
-  const [togglingStatus, setTogglingStatus] = useState<Record<string, boolean>>({})
   const [updatingPerfil, setUpdatingPerfil] = useState<Record<string, boolean>>({})
   const [tabsModalState, setTabsModalState] = useState<UsuariosGestorTabsModalState>({
     open: false,
     tab: 'usuario',
-    mode: 'create',
+    mode: 'edit',
     usuarioId: undefined,
   })
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
@@ -140,7 +138,6 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
         const allUsuarios: UsuarioGestor[] = []
         let currentOffset = 0
         let hasMore = true
-        let totalCount = 0
 
         // Loop para carregar todas as páginas
         while (hasMore) {
@@ -181,11 +178,6 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
             })
             .filter((usuario: UsuarioGestor | null): usuario is UsuarioGestor => usuario !== null)
           allUsuarios.push(...newUsuarios)
-
-          // Atualiza o total apenas na primeira requisição
-          if (currentOffset === 0) {
-            totalCount = data.count || 0
-          }
 
           // Verifica se há mais páginas
           // Usa hasNext da API se disponível, senão verifica se retornou 10 itens
@@ -230,13 +222,11 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
 
         // Atualiza o estado com todos os itens carregados e o mapa de perfis
         setUsuarios(allUsuarios)
-        setTotalUsuarios(totalCount)
         setPerfisMap(perfisMapTemp)
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido ao carregar usuários gestor'
         showToast.error(errorMessage)
         setUsuarios([])
-        setTotalUsuarios(0)
         setPerfisMap({})
       } finally {
         setIsLoading(false)
@@ -293,7 +283,7 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
     setTabsModalState(() => ({
       open: true,
       tab: config.tab ?? 'usuario',
-      mode: config.mode ?? 'create',
+      mode: config.mode ?? 'edit',
       usuarioId: config.usuarioId,
     }))
 
@@ -358,13 +348,10 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
       )
 
       try {
-        const bodyData: any = {
+        // Contrato PATCH gestor (OpenAPI): apenas `perfilGestorId` e/ou `modulosAcesso`.
+        // O validador do backend é `.strict()` — campos extra (ex.: `ativo`) fazem o PATCH falhar.
+        const bodyData: { perfilGestorId: string } = {
           perfilGestorId: novoPerfilId,
-        }
-
-        // Mantém o status atual
-        if (usuario.isAtivo() !== undefined) {
-          bodyData.ativo = usuario.isAtivo()
         }
 
         const response = await fetch(`/api/pessoas/usuarios-gestor/${usuarioId}`, {
@@ -383,18 +370,31 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
 
         const updatedData = await response.json()
 
-        // Atualiza com os dados do servidor
+        // Resposta é `UsuarioGestorDTO`: perfil vem em `perfilGestor`.
+        // Mescla com o estado local para não zerar campos não retornados (ex.: módulos no cliente).
+        const perfilIdResolved =
+          updatedData.perfilGestor?.id?.toString?.() ?? novoPerfilId
+        const merged = {
+          ...usuario.toJSON(),
+          id: updatedData.id ?? usuario.getId(),
+          nome: updatedData.nome ?? usuario.getNome(),
+          username: updatedData.username ?? usuario.getUsername(),
+          empresaId: updatedData.empresaId ?? usuario.getEmpresaId(),
+          perfilGestor: updatedData.perfilGestor,
+          perfilGestorId: perfilIdResolved,
+        }
+
         setUsuarios((prev) =>
           prev.map((u) =>
-            u.getId() === usuarioId ? UsuarioGestor.fromJSON(updatedData) : u
+            u.getId() === usuarioId ? UsuarioGestor.fromJSON(merged) : u
           )
         )
 
-        // Atualiza o mapa de perfis
-        if (updatedData.perfilGestorId) {
-          const updatedPerfilNome = allPerfis.find((p) => p.id === updatedData.perfilGestorId)?.role || '-'
-          setPerfisMap((prev) => ({ ...prev, [updatedData.perfilGestorId]: updatedPerfilNome }))
-        }
+        const updatedPerfilNome =
+          allPerfis.find((p) => p.id === perfilIdResolved)?.role ||
+          updatedData.perfilGestor?.role ||
+          '-'
+        setPerfisMap((prev) => ({ ...prev, [perfilIdResolved]: updatedPerfilNome }))
 
         showToast.success('Perfil atualizado com sucesso!')
       } catch (error: any) {
@@ -412,87 +412,6 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
     [auth, usuarios, allPerfis, loadAllUsuarios]
   )
 
-  /**
-   * Atualiza o status do usuário diretamente na lista
-   */
-  const handleToggleUsuarioStatus = useCallback(
-    async (usuarioId: string, novoStatus: boolean) => {
-      const token = auth?.getAccessToken()
-      if (!token) {
-        showToast.error('Token não encontrado. Faça login novamente.')
-        return
-      }
-
-      setTogglingStatus((prev) => ({ ...prev, [usuarioId]: true }))
-
-      // Atualização otimista
-      setUsuarios((prev) =>
-        prev.map((u) =>
-          u.getId() === usuarioId
-            ? UsuarioGestor.fromJSON({ ...u.toJSON(), ativo: novoStatus })
-            : u
-        )
-      )
-
-      try {
-        const usuario = usuarios.find((u) => u.getId() === usuarioId)
-        if (!usuario) {
-          throw new Error('Usuário não encontrado')
-        }
-
-        // Envia apenas os campos necessários para atualizar o status
-        // Remove campos que não devem ser enviados ou que a API não espera
-        const bodyData: any = {
-          ativo: novoStatus,
-        }
-
-        // Adiciona apenas campos essenciais se necessário
-        const perfilGestorId = usuario.getPerfilGestorId()
-        if (perfilGestorId) {
-          bodyData.perfilGestorId = perfilGestorId
-        }
-
-        const response = await fetch(`/api/pessoas/usuarios-gestor/${usuarioId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(bodyData),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.error || 'Erro ao atualizar usuário')
-        }
-
-        const updatedData = await response.json()
-
-        // Atualiza com os dados do servidor
-        setUsuarios((prev) =>
-          prev.map((u) =>
-            u.getId() === usuarioId ? UsuarioGestor.fromJSON(updatedData) : u
-          )
-        )
-
-        showToast.success(
-          novoStatus ? 'Usuário ativado com sucesso!' : 'Usuário desativado com sucesso!'
-        )
-      } catch (error: any) {
-        showToast.error(error.message || 'Erro ao atualizar status do usuário')
-
-        // Reverte a atualização otimista em caso de erro
-        loadAllUsuarios()
-      } finally {
-        setTogglingStatus((prev) => {
-          const { [usuarioId]: _, ...rest } = prev
-          return rest
-        })
-      }
-    },
-    [auth, usuarios, loadAllUsuarios]
-  )
-
   if ((isLoading || !hasLoadedInitialRef.current) && usuarios.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-2 py-12">
@@ -504,21 +423,6 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-4">
       <div className="flex flex-shrink-0 flex-col gap-3">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="font-nunito text-sm text-secondary-text">
-            <span className="font-semibold text-primary-text">{usuarios.length}</span> de{' '}
-            {totalUsuarios} usuários
-          </p>
-          <button
-            type="button"
-            onClick={() => openTabsModal({ mode: 'create' })}
-            className="flex h-8 flex-shrink-0 items-center gap-2 rounded-lg bg-primary px-[30px] font-exo text-sm font-semibold text-info transition-colors hover:bg-primary/90"
-          >
-            Novo
-            <span className="text-lg leading-none">+</span>
-          </button>
-        </div>
-
         <div className="relative h-8 min-w-[180px] max-w-[360px] flex-1">
           <MdSearch className="absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-secondary-text" />
           <input
@@ -527,7 +431,7 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
             placeholder="Buscar por nome ou e-mail…"
             value={searchText}
             onChange={e => setSearchText(e.target.value)}
-            className="h-full w-full rounded-lg border border-gray-200 bg-info pl-11 pr-4 font-nunito text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+            className="h-8 w-full rounded-lg border border-gray-200 bg-info pl-11 pr-4 font-nunito text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
           />
         </div>
       </div>
@@ -544,17 +448,14 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
             <div
               className={`${USUARIO_GESTAO_GRID_DESKTOP} h-11 w-full flex-shrink-0 border-b border-gray-200 bg-gray-50 px-3 pr-2 md:px-4`}
             >
-              <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary-text md:text-sm">
+              <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary md:text-sm">
                 Nome
               </div>
-              <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary-text md:text-sm">
+              <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary md:text-sm">
                 E-mail
               </div>
-              <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary-text md:text-sm">
+              <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:text-sm">
                 Perfil
-              </div>
-              <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary-text md:text-sm">
-                Status
               </div>
             </div>
           </div>
@@ -574,10 +475,7 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
                   perfilNome={perfilNome}
                   allPerfis={allPerfis}
                   updatingPerfil={!!updatingPerfil[usuario.getId()]}
-                  togglingStatus={!!togglingStatus[usuario.getId()]}
-                  onRowClick={() => openTabsModal({ mode: 'edit', usuarioId: usuario.getId() })}
                   onPerfilChange={handlePerfilChange}
-                  onToggleStatus={handleToggleUsuarioStatus}
                 />
               )
             })}
