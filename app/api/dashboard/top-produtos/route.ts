@@ -99,7 +99,6 @@ export async function GET(request: NextRequest) {
   }
 
   params.append('status', 'FINALIZADA')
-  params.append('limit', '100')
 
   try {
     const apiClient = new ApiClient()
@@ -119,14 +118,55 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ items: cached.items })
     }
 
-    const vendasResponse = await apiClient.request<{ items?: Array<{ id: string }> }>(
-      `/api/v1/operacao-pdv/vendas?${params.toString()}`,
-      { method: 'GET', headers }
-    )
+    // Buscar todas as vendas finalizadas com paginação
+    const limitPerPage = 100
+    const vendaIds = new Set<string>()
+    let page = 0
+    let totalPages = 1
 
-    const vendaIds: string[] = (vendasResponse.data?.items || []).map((venda) => venda.id)
+    while (page < totalPages) {
+      const pageParams = new URLSearchParams(params.toString())
+      pageParams.append('limit', limitPerPage.toString())
+      pageParams.append('offset', (page * limitPerPage).toString())
 
-    if (vendaIds.length === 0) {
+      const vendasResponse = await apiClient.request<{
+        items?: Array<{ id: string }>
+        count?: number
+        total?: number
+        totalCount?: number
+      }>(`/api/v1/operacao-pdv/vendas?${pageParams.toString()}`, { method: 'GET', headers })
+
+      const items = vendasResponse.data?.items || []
+      items.forEach((v) => {
+        if (v.id) vendaIds.add(v.id)
+      })
+
+      if (page === 0) {
+        const data = vendasResponse.data || {}
+        const totalCount =
+          (typeof data.count === 'number' && Number.isFinite(data.count) ? data.count : null) ??
+          (typeof data.total === 'number' && Number.isFinite(data.total) ? data.total : null) ??
+          (typeof data.totalCount === 'number' && Number.isFinite(data.totalCount) ? data.totalCount : null)
+
+        if (typeof totalCount === 'number' && totalCount > 0) {
+          totalPages = Math.ceil(totalCount / limitPerPage)
+        } else if (items.length < limitPerPage) {
+          totalPages = 1
+        } else {
+          totalPages = 200 // Fallback seguro
+        }
+      }
+
+      if (items.length < limitPerPage) {
+        break
+      }
+
+      page++
+    }
+
+    const vendaIdsArray = Array.from(vendaIds)
+
+    if (vendaIdsArray.length === 0) {
       return NextResponse.json({ items: [] })
     }
 
@@ -150,7 +190,7 @@ export async function GET(request: NextRequest) {
     }
 
     const detalhes = await fetchWithConcurrency(
-      vendaIds,
+      vendaIdsArray,
       10,
       async (vendaId) => {
         try {
@@ -170,6 +210,7 @@ export async function GET(request: NextRequest) {
     )
 
     const aggregationByProdutoId = new Map<string, { quantidade: number; valorTotal: number }>()
+
     for (const venda of detalhes) {
       if (!venda?.produtosLancados) continue
       for (const p of venda.produtosLancados) {
