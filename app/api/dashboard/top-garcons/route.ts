@@ -122,9 +122,9 @@ async function fetchTodosIdsVendasFinalizadas(args: {
 }): Promise<string[]> {
   const PAGE = 100
   /** Evita loop enorme se a API ignorar offset ou responder sempre página cheia. */
-  const MAX_PAGES_LISTA = 80
+  const MAX_PAGES_LISTA = 200
   /** Cada ID vira um GET `/vendas/:id` — limite defensivo para o BFF não dar 504 / abort. */
-  const MAX_IDS_PARA_DETALHAR = 400
+  const MAX_IDS_PARA_DETALHAR = 10000
   const ids: string[] = []
 
   paginas: for (let pageIndex = 0; pageIndex < MAX_PAGES_LISTA; pageIndex++) {
