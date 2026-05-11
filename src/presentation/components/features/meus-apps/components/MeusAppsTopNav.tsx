@@ -42,16 +42,16 @@ export function MeusAppsTopNav() {
   const { getUser, logoutHub } = useAuthStore()
   const user = getUser()
 
-  const userLabel = useMemo(() => {
-    const nome = user?.getName()?.trim()
-    const email = user?.getEmail()?.trim()
-    return nome || email || 'Usuário'
-  }, [user])
+  /** Nome vem da sessão de login (`POST /auth/login` → campo `usuario.nome` no backend multi-empresa). */
+  const nomeUsuario = user?.getName()?.trim() ?? ''
+  const emailUsuario = user?.getEmail()?.trim() ?? ''
+  const nomeExibicao = nomeUsuario
 
+  /** Prioriza letra do nome; senão do e-mail (mesmo critério visual do header). */
   const userInitial = useMemo(() => {
-    const t = userLabel.trim()
+    const t = (nomeExibicao || emailUsuario || 'Usuário').trim()
     return t ? t.charAt(0).toUpperCase() : 'U'
-  }, [userLabel])
+  }, [nomeExibicao, emailUsuario])
 
   return (
     <header className="sticky top-0 z-40 border-b border-gray-200 bg-primary">
@@ -94,8 +94,21 @@ export function MeusAppsTopNav() {
 
         <div className="flex items-center gap-2">
           <div className="hidden items-center gap-2 border-l border-white/90 px-3 py-1.5 text-white/90 md:flex">
-            
-            <span className="max-w-[220px] truncate text-sm font-normal">{userLabel}</span>
+            <div className="flex min-w-0 flex-col items-end text-right leading-tight">
+              {nomeExibicao ? (
+                <span className="max-w-[220px] truncate text-sm font-medium text-white">
+                  {nomeExibicao}
+                </span>
+              ) : null}
+              <span
+                className={cn(
+                  'max-w-[220px] truncate text-sm',
+                  nomeExibicao ? 'text-white/80' : 'font-normal text-white/90'
+                )}
+              >
+                {emailUsuario || 'Usuário'}
+              </span>
+            </div>
             <button
               type="button"
               onClick={() => {
