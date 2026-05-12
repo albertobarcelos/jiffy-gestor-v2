@@ -5,13 +5,10 @@ import { User } from '@/src/domain/entities/User'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 import { decodeToken } from '@/src/shared/utils/validateToken'
 
-type AuthFlow = 'legacy' | 'multi_empresa'
-
 type ApiRecord = Record<string, unknown>
 
-const LEGACY_LOGIN_ENDPOINT = '/api/v1/auth/login/usuario-gestor'
-const MULTI_EMPRESA_LOGIN_ENDPOINT = '/api/v1/auth/login'
-const MULTI_EMPRESA_ESCOLHER_EMPRESA_ENDPOINT = '/api/v1/auth/escolher-empresa'
+const LOGIN_ENDPOINT = '/api/v1/auth/login'
+const ESCOLHER_EMPRESA_ENDPOINT = '/api/v1/auth/escolher-empresa'
 
 function isRecord(value: unknown): value is ApiRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -40,8 +37,8 @@ function getFirstString(source: unknown, paths: string[][]): string | undefined 
 }
 
 /**
- * Implementação do repositório de autenticação
- * Comunica com a API externa
+ * Implementação do repositório de autenticação.
+ * Sempre utiliza o fluxo multi-empresa (identity token + escolher-empresa).
  */
 export class AuthRepository implements IAuthRepository {
   private apiClient: ApiClient
@@ -52,39 +49,13 @@ export class AuthRepository implements IAuthRepository {
 
   async login(username: string, password: string): Promise<LoginResult> {
     try {
-      return this.getAuthFlow() === 'multi_empresa'
-        ? await this.loginMultiEmpresa(username, password)
-        : await this.loginLegacyResult(username, password)
+      return await this.loginMultiEmpresa(username, password)
     } catch (error) {
       if (error instanceof ApiError) {
         throw new Error(error.message || 'Erro ao realizar login')
       }
       throw error
     }
-  }
-
-  private getAuthFlow(): AuthFlow {
-    const rawFlow = (process.env.AUTH_FLOW || process.env.NEXT_PUBLIC_AUTH_FLOW || 'legacy')
-      .trim()
-      .toLowerCase()
-
-    return ['multi_empresa', 'multi-empresa', 'multiempresa', 'multi_company', 'new'].includes(rawFlow)
-      ? 'multi_empresa'
-      : 'legacy'
-  }
-
-  private async loginLegacyResult(username: string, password: string): Promise<LoginResult> {
-    const auth = await this.loginLegacy(username, password)
-    return { auth }
-  }
-
-  private async loginLegacy(username: string, password: string): Promise<Auth> {
-    const response = await this.apiClient.post<ApiRecord>(LEGACY_LOGIN_ENDPOINT, {
-      username,
-      password,
-    })
-
-    return this.createAuthFromResponse(response.data, username)
   }
 
   /**
@@ -109,7 +80,7 @@ export class AuthRepository implements IAuthRepository {
   }
 
   private async loginMultiEmpresa(username: string, password: string): Promise<LoginResult> {
-    const loginResponse = await this.apiClient.post<ApiRecord>(MULTI_EMPRESA_LOGIN_ENDPOINT, {
+    const loginResponse = await this.apiClient.post<ApiRecord>(LOGIN_ENDPOINT, {
       username,
       password,
     })
@@ -118,7 +89,6 @@ export class AuthRepository implements IAuthRepository {
     const identityToken = this.extractAccessToken(loginData)
     const companies = this.extractCompanies(loginData)
 
-    // Hub gestor: lista de empresas no login → só identityToken; escolha em POST /auth/escolher-empresa depois
     if (companies.length > 0 && identityToken) {
       const empresas = companies
         .map(c => this.mapEmpresaGestorItem(c))
@@ -143,7 +113,7 @@ export class AuthRepository implements IAuthRepository {
     }
 
     const escolherEmpresaResponse = await this.apiClient.request<ApiRecord>(
-      MULTI_EMPRESA_ESCOLHER_EMPRESA_ENDPOINT,
+      ESCOLHER_EMPRESA_ENDPOINT,
       {
         method: 'POST',
         headers: identityToken
@@ -396,4 +366,3 @@ export class AuthRepository implements IAuthRepository {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
   }
 }
-
