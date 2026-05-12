@@ -2,26 +2,37 @@
 
 import { useMemo, useState } from 'react'
 import type { ConviteGestaoDTO } from '@/src/application/dto/convites/ConvitesGestaoDTO'
+import type { PerfilGestorOption, UsuarioAceitoInfo } from './hooks/useConvitesGestao'
 import { MdSearch } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { ConviteGestaoRow } from './components/ConviteGestaoRow'
 
 export function ConvitesGestaoList({
   convites,
+  perfisList,
   perfilGestorNomePorId,
+  nomePorEmail,
+  usuariosPorEmail,
   loading,
   error,
   busyById,
   onCancelar,
   onReenviar,
+  onPerfilChange,
+  onRemoverVinculo,
 }: {
   convites: ConviteGestaoDTO[]
+  perfisList: PerfilGestorOption[]
   perfilGestorNomePorId: Record<string, string>
+  nomePorEmail: Record<string, string>
+  usuariosPorEmail: Record<string, UsuarioAceitoInfo>
   loading: boolean
   error: string | null
   busyById: Record<string, 'cancelar' | 'reenviar' | null>
   onCancelar: (id: string) => void
   onReenviar: (id: string) => void
+  onPerfilChange: (email: string, novoPerfilGestorId: string) => void
+  onRemoverVinculo: (email: string) => void
 }) {
   const [busca, setBusca] = useState('')
 
@@ -76,21 +87,15 @@ export function ConvitesGestaoList({
       ) : (
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
           <div className="hidden min-w-0 flex-shrink-0 md:block">
-            <div className="grid h-11 w-full min-w-0 grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1.25fr)_minmax(0,1.25fr)_5rem] items-center gap-[10px] border-b border-gray-200 bg-gray-50 px-3 pr-2 md:px-4">
+            <div className="grid h-11 w-full min-w-0 grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1.5fr)_5rem] items-center gap-[10px] border-b border-gray-200 bg-gray-50 px-3 pr-2 md:px-4">
               <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary md:text-sm">
-                E-mail
+                Usuários
               </div>
               <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:text-sm">
                 Status
               </div>
               <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:text-sm">
                 Perfil
-              </div>
-              <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:text-sm">
-                Expira em
-              </div>
-              <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:text-sm">
-                Criado em
               </div>
               <div className="min-w-0 shrink-0 text-center font-nunito text-xs font-semibold text-secondary md:text-sm">
                 Ações
@@ -99,16 +104,26 @@ export function ConvitesGestaoList({
           </div>
 
           <div className="min-w-0 max-w-full divide-y divide-gray-100 scrollbar-hide">
-            {visiveis.map(c => (
-              <ConviteGestaoRow
-                key={c.id}
-                convite={c}
-                perfilNome={perfilGestorNomePorId[c.perfilGestorId] ?? '\u2014'}
-                busyAction={busyById[c.id] ?? null}
-                onCancelar={onCancelar}
-                onReenviar={onReenviar}
-              />
-            ))}
+            {visiveis.map(c => {
+              const emailKey = c.email.toLowerCase().trim()
+              const isAceito = c.status.toUpperCase() === 'ACEITO'
+              const temUsuario = isAceito && !!usuariosPorEmail[emailKey]
+
+              return (
+                <ConviteGestaoRow
+                  key={c.id}
+                  convite={c}
+                  nomeUsuario={nomePorEmail[emailKey] ?? null}
+                  perfilNome={perfilGestorNomePorId[c.perfilGestorId] ?? '\u2014'}
+                  perfisList={temUsuario ? perfisList : null}
+                  busyAction={busyById[c.id] ?? null}
+                  onCancelar={onCancelar}
+                  onReenviar={onReenviar}
+                  onPerfilChange={temUsuario ? onPerfilChange : undefined}
+                  onRemoverVinculo={temUsuario ? onRemoverVinculo : undefined}
+                />
+              )
+            })}
           </div>
         </div>
       )}

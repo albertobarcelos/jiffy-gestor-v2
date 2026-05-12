@@ -23,6 +23,7 @@ import { conviteParaEmpresaSnapshot } from '@/src/presentation/components/featur
 import {
   HUB_SESSAO_TOKEN_MENSAGEM,
   isLikelyHubSessionTokenError,
+  isLikelyVinculoRemovidoError,
 } from './utils/hubSessionTokenFeedback'
 import { appEmpresaCorrespondeBusca, conviteCorrespondeBusca } from './utils/meusAppsBusca'
 import { empresaNomeParaSlugUrl } from '@/src/shared/utils/empresaNomeParaSlugUrl'
@@ -329,10 +330,26 @@ export default function MeusAppsPage() {
     [identityAuth]
   )
 
+  const removerEmpresaDesvinculada = useCallback(
+    (appId: string) => {
+      const atual = hubEmpresas ?? []
+      const atualizado = atual.filter(e => e.id !== appId)
+      setHubEmpresas(atualizado)
+      toast.error('Seu vínculo com esta empresa foi removido.', { duration: 5000 })
+    },
+    [hubEmpresas, setHubEmpresas]
+  )
+
   const reportErroAcessoEmpresa = useCallback(
-    (e: unknown) => {
+    (e: unknown, appId?: string) => {
       const msg =
         e instanceof Error ? e.message : 'Não foi possível abrir o aplicativo'
+
+      if (appId && isLikelyVinculoRemovidoError(msg)) {
+        removerEmpresaDesvinculada(appId)
+        return
+      }
+
       if (isLikelyHubSessionTokenError(msg)) {
         reportHubSessionIssue(msg)
         setAcessoErro(null)
@@ -340,7 +357,7 @@ export default function MeusAppsPage() {
         setAcessoErro(msg)
       }
     },
-    [reportHubSessionIssue]
+    [reportHubSessionIssue, removerEmpresaDesvinculada]
   )
 
   const handleAcessar = async (appId: string) => {
@@ -357,7 +374,7 @@ export default function MeusAppsPage() {
       const { empParam } = prepareTabSession(token, app?.nome ?? '', appId)
       window.open(`/dashboard?${empParam}`, '_blank')
     } catch (e) {
-      reportErroAcessoEmpresa(e)
+      reportErroAcessoEmpresa(e, appId)
     } finally {
       setBusyAppId(null)
     }
@@ -377,7 +394,7 @@ export default function MeusAppsPage() {
       const slug = empresaNomeParaSlugUrl(app.nome)
       window.open(`/meus-apps/convidar-usuarios/${slug}?${empParam}`, '_blank')
     } catch (e) {
-      reportErroAcessoEmpresa(e)
+      reportErroAcessoEmpresa(e, appId)
     }
   }
 
@@ -395,7 +412,7 @@ export default function MeusAppsPage() {
       const slug = empresaNomeParaSlugUrl(app.nome)
       window.open(`/meus-apps/usuarios-gestor/${slug}?${empParam}`, '_blank')
     } catch (e) {
-      reportErroAcessoEmpresa(e)
+      reportErroAcessoEmpresa(e, appId)
     }
   }
 

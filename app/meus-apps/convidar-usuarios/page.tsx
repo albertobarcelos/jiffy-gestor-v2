@@ -1,14 +1,13 @@
-import { Suspense } from 'react'
-import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
-import { ConvidarUsuariosRedirect } from '@/src/presentation/components/features/convites-gestao/components/ConvidarUsuariosRedirect'
+import ConvitesGestaoPage from '@/src/presentation/components/features/convites-gestao/ConvitesGestaoPage'
+import { ConvidarUsuariosSlugSync } from '@/src/presentation/components/features/convites-gestao/components/ConvidarUsuariosSlugSync'
 
-/** Sem slug: redireciona para `/meus-apps/convidar-usuarios/<slug>` derivado do nome da empresa. */
+/**
+ * Rota sem slug: renderiza a página normalmente e redireciona silenciosamente para a URL com slug.
+ */
 export default function ConvidarUsuariosIndexPage() {
   return (
-    <div className="h-full">
-      <Suspense fallback={<PageLoading />}>
-        <ConvidarUsuariosRedirect />
-      </Suspense>
-    </div>
+    <ConvidarUsuariosSlugSync routeSlug="">
+      <ConvitesGestaoPage />
+    </ConvidarUsuariosSlugSync>
   )
 }

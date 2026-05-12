@@ -221,6 +221,9 @@ export function AuthGuard({ children }: AuthGuardProps) {
   ])
 
   if (!isRehydrated || !allowed) {
+    if (isHubPath(pathname)) {
+      return <div className="min-h-screen bg-[#fafafa]" />
+    }
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <JiffyLoading />
