@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import {
-  JIFFY_SESSION_BROADCAST_CHANNEL,
   SESSION_STORAGE_HUB_LOGOUT_SELF,
   SESSION_STORAGE_TENANT_LOGOUT_SELF,
 } from '@/src/shared/constants/sessionCoordinator'
@@ -138,8 +137,9 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
     if (!tenantAuth && !hasSessionNonce()) {
       if (isTenantLogoutInProgress()) {
-        setAllowed(false)
-        return
+        try {
+          sessionStorage.removeItem(SESSION_STORAGE_TENANT_LOGOUT_SELF)
+        } catch { /* noop */ }
       }
       if (identityAuth) {
         redirectToMeusApps()
@@ -221,10 +221,6 @@ export function AuthGuard({ children }: AuthGuardProps) {
   ])
 
   if (!isRehydrated || !allowed) {
-    if (isRehydrated && isTenantLogoutInProgress()) {
-      return <TenantSessionEndedScreen />
-    }
-
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <JiffyLoading />
@@ -235,90 +231,3 @@ export function AuthGuard({ children }: AuthGuardProps) {
   return <>{children}</>
 }
 
-function TenantSessionEndedScreen() {
-  const [hubAlive, setHubAlive] = useState<boolean | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    async function check() {
-      let alive = false
-      try {
-        const bc = new BroadcastChannel(JIFFY_SESSION_BROADCAST_CHANNEL)
-        alive = await new Promise<boolean>(resolve => {
-          const timer = window.setTimeout(() => resolve(false), 400)
-          bc.onmessage = (ev: MessageEvent<{ type?: string }>) => {
-            if (ev.data?.type === 'hub-pong') {
-              window.clearTimeout(timer)
-              resolve(true)
-            }
-          }
-          bc.postMessage({ type: 'hub-ping', ts: Date.now() })
-        })
-        bc.close()
-      } catch { /* noop */ }
-      if (!cancelled) setHubAlive(alive)
-    }
-    void check()
-    return () => { cancelled = true }
-  }, [])
-
-  const handleNavigateToHub = () => {
-    try {
-      sessionStorage.removeItem(SESSION_STORAGE_TENANT_LOGOUT_SELF)
-    } catch { /* noop */ }
-    window.location.assign('/meus-apps')
-  }
-
-  if (hubAlive === null) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <JiffyLoading />
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
-      <div className="mx-4 flex max-w-sm flex-col items-center gap-5 rounded-xl bg-white p-8 shadow-lg">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
-          <svg
-            className="h-7 w-7 text-green-600"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M5 13l4 4L19 7"
-            />
-          </svg>
-        </div>
-
-        <div className="text-center">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Sessão encerrada
-          </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            {hubAlive
-              ? 'O acesso a esta empresa foi encerrado. Você já possui a aba Meus Apps aberta — pode fechar esta aba.'
-              : 'O acesso a esta empresa foi encerrado com sucesso.'}
-          </p>
-        </div>
-
-        {!hubAlive && (
-          <div className="flex w-full flex-col gap-2">
-            <button
-              type="button"
-              onClick={handleNavigateToHub}
-              className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary/90"
-            >
-              Ir para Meus Apps
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}

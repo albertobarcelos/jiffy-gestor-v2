@@ -18,7 +18,9 @@ type FallbackPending = { empresaId: string; empParam: string; tempNonce: string 
 
 function getEmpParam(): string | null {
   try {
-    return new URLSearchParams(window.location.search).get('emp')
+    const raw = window.location.search.slice(1).split('&')[0]
+    if (!raw || raw.includes('=')) return null
+    return raw
   } catch {
     return null
   }

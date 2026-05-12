@@ -24,16 +24,12 @@ export function ConvitesGestaoList({
   onReenviar: (id: string) => void
 }) {
   const [busca, setBusca] = useState('')
-  const [mostrarTodos, setMostrarTodos] = useState(false)
 
   const visiveis = useMemo(() => {
     const q = busca.trim().toLowerCase()
-    let base = mostrarTodos ? convites : convites.filter(c => c.status === 'PENDENTE')
-    if (q) {
-      base = base.filter(c => c.email.toLowerCase().includes(q))
-    }
-    return base
-  }, [convites, busca, mostrarTodos])
+    if (!q) return convites
+    return convites.filter(c => c.email.toLowerCase().includes(q))
+  }, [convites, busca])
 
   if (loading && convites.length === 0) {
     return (
@@ -61,21 +57,12 @@ export function ConvitesGestaoList({
           <MdSearch className="absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-secondary-text" />
           <input
             type="search"
-            placeholder="Buscar por e-mail…"
+            placeholder="Buscar por e-mail..."
             value={busca}
             onChange={e => setBusca(e.target.value)}
             className="h-full w-full rounded-lg border border-gray-200 bg-info pl-11 pr-4 font-nunito text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
           />
         </div>
-        <label className="flex cursor-pointer items-center gap-2 font-nunito text-sm text-primary-text">
-          <input
-            type="checkbox"
-            checked={mostrarTodos}
-            onChange={e => setMostrarTodos(e.target.checked)}
-            className="rounded border-gray-300"
-          />
-          Mostrar todos os status
-        </label>
       </div>
 
       {visiveis.length === 0 ? (
@@ -83,12 +70,11 @@ export function ConvitesGestaoList({
           <p className="font-nunito text-sm text-secondary-text">
             {convites.length === 0
               ? 'Nenhum convite encontrado.'
-              : 'Nenhum convite neste filtro. Marque “Mostrar todos os status” ou limpe a busca.'}
+              : 'Nenhum convite encontrado para esta busca.'}
           </p>
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-          {/* Grade com minmax(0,…) para colunas encolherem dentro da largura útil */}
           <div className="hidden min-w-0 flex-shrink-0 md:block">
             <div className="grid h-11 w-full min-w-0 grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1.25fr)_minmax(0,1.25fr)_5rem] items-center gap-[10px] border-b border-gray-200 bg-gray-50 px-3 pr-2 md:px-4">
               <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary md:text-sm">
@@ -117,7 +103,7 @@ export function ConvitesGestaoList({
               <ConviteGestaoRow
                 key={c.id}
                 convite={c}
-                perfilNome={perfilGestorNomePorId[c.perfilGestorId] ?? '—'}
+                perfilNome={perfilGestorNomePorId[c.perfilGestorId] ?? '\u2014'}
                 busyAction={busyById[c.id] ?? null}
                 onCancelar={onCancelar}
                 onReenviar={onReenviar}

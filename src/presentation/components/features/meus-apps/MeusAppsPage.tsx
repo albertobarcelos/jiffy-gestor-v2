@@ -355,7 +355,7 @@ export default function MeusAppsPage() {
     try {
       const token = await obterTokenEmpresa(appId)
       const { empParam } = prepareTabSession(token, app?.nome ?? '', appId)
-      window.open(`/dashboard?emp=${empParam}`, '_blank')
+      window.open(`/dashboard?${empParam}`, '_blank')
     } catch (e) {
       reportErroAcessoEmpresa(e)
     } finally {
@@ -375,7 +375,7 @@ export default function MeusAppsPage() {
       const token = await obterTokenEmpresa(appId)
       const { empParam } = prepareTabSession(token, app.nome, appId)
       const slug = empresaNomeParaSlugUrl(app.nome)
-      window.open(`/meus-apps/convidar-usuarios/${slug}?emp=${empParam}`, '_blank')
+      window.open(`/meus-apps/convidar-usuarios/${slug}?${empParam}`, '_blank')
     } catch (e) {
       reportErroAcessoEmpresa(e)
     }
@@ -393,7 +393,7 @@ export default function MeusAppsPage() {
       const token = await obterTokenEmpresa(appId)
       const { empParam } = prepareTabSession(token, app.nome, appId)
       const slug = empresaNomeParaSlugUrl(app.nome)
-      window.open(`/meus-apps/usuarios-gestor/${slug}?emp=${empParam}`, '_blank')
+      window.open(`/meus-apps/usuarios-gestor/${slug}?${empParam}`, '_blank')
     } catch (e) {
       reportErroAcessoEmpresa(e)
     }

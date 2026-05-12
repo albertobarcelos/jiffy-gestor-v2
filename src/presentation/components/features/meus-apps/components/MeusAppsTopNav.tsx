@@ -58,16 +58,15 @@ export function MeusAppsTopNav() {
       <div className="mx-auto flex h-14 w-full max-w-[1400px] items-center justify-between gap-3 px-2 md:px-4">
         <div className="flex min-w-0 items-center gap-3">
           <Link href="/meus-apps" className="flex items-center gap-2">
-          <div className="relative w-14 h-14">
+          <div className="relative w-20 h-20">
               <Image
-                src="/images/jiffy-100x100.gif"
+                src="/images/jiffy-head.png"
                 alt="Jiffy"
                 fill
-                sizes="56px"
+                sizes="24px"
                 className="object-contain"
               />
             </div>
-            <span className="text-2xl font-semibold tracking-wide text-info">Jiffy</span>
             </Link>
             </div>
             <div className="flex items-center gap-2">

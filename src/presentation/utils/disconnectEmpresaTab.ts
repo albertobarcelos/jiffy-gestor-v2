@@ -72,9 +72,8 @@ export async function disconnectEmpresaTab({ queryClient, logoutTenant }: Discon
     return
   }
 
-  // window.close() falhou (aba aberta manualmente, não por window.open).
-  // Manter flag ativo → AuthGuard exibe tela de "sessão encerrada"
-  // em vez de redirecionar para /meus-apps (evita duplicar guia do hub).
+  cleanupFlag()
+  window.location.assign('/meus-apps')
 }
 
 function cleanupFlag(): void {
