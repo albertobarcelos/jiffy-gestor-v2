@@ -5,6 +5,7 @@ import { AuthRepository } from '@/src/infrastructure/database/repositories/AuthR
 import {
   AUTH_COOKIE_IDENTITY,
   AUTH_COOKIE_TENANT,
+  AUTH_COOKIE_REFRESH,
   AUTH_COOKIE_LEGACY,
   clearAuthCookie,
   cookieOptsMaxAge,
@@ -40,9 +41,14 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     )
 
-    const maxAge = 60 * 60 * 24
+    const expiresAt = auth.getExpiresAt()
+    const maxAge = expiresAt
+      ? Math.max(Math.floor((expiresAt.getTime() - Date.now()) / 1000), 60)
+      : 60 * 60 * 24
+
     response.cookies.set(AUTH_COOKIE_IDENTITY, auth.getAccessToken(), cookieOptsMaxAge(maxAge))
     clearAuthCookie(response, AUTH_COOKIE_TENANT)
+    clearAuthCookie(response, AUTH_COOKIE_REFRESH)
     clearAuthCookie(response, AUTH_COOKIE_LEGACY)
 
     return response

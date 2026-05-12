@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
-import { getAuthToken } from '@/src/shared/utils/getAuthToken'
+import { getTokenInfo } from '@/src/shared/utils/getTokenInfo'
 
 /**
  * BFF: Recusa convite pendente
@@ -8,10 +8,11 @@ import { getAuthToken } from '@/src/shared/utils/getAuthToken'
  */
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
-    const token = getAuthToken(request)
-    if (!token) {
+    const tokenInfo = getTokenInfo(request)
+    if (!tokenInfo) {
       return NextResponse.json({ error: 'Token não encontrado' }, { status: 401 })
     }
+    const token = tokenInfo.token
 
     const { id } = await ctx.params
     if (!id) {

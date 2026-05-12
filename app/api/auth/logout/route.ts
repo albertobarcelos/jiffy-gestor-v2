@@ -3,6 +3,7 @@ import {
   clearAuthCookie,
   AUTH_COOKIE_IDENTITY,
   AUTH_COOKIE_TENANT,
+  AUTH_COOKIE_REFRESH,
   AUTH_COOKIE_LEGACY,
 } from '@/src/shared/utils/authCookies'
 
@@ -22,6 +23,7 @@ export async function POST() {
 
     clearAuthCookie(response, AUTH_COOKIE_IDENTITY)
     clearAuthCookie(response, AUTH_COOKIE_TENANT)
+    clearAuthCookie(response, AUTH_COOKIE_REFRESH)
     clearAuthCookie(response, AUTH_COOKIE_LEGACY)
 
     return response

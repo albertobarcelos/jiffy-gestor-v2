@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import type {
   ComissaoPdvItemDTO,
   ComissoesPdvListagemResponseDTO,
@@ -65,10 +66,11 @@ function mapResponse(data: Record<string, unknown>): ComissoesPdvListagemRespons
 export function useComissoesPdv(params: ComissoesPdvFetchParams | null) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
   const enabled = Boolean(token && params?.taxaId?.trim())
 
   return useQuery({
-    queryKey: ['comissoes-pdv', params],
+    queryKey: ['comissoes-pdv', params, empresaId],
     queryFn: async (): Promise<ComissoesPdvListagemResponseDTO> => {
       if (!token || !params?.taxaId?.trim()) {
         throw new Error('Sessão ou taxa inválida.')

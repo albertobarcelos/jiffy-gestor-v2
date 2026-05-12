@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { clearAuthCookie, AUTH_COOKIE_TENANT } from '@/src/shared/utils/authCookies'
+import { clearAuthCookie, AUTH_COOKIE_TENANT, AUTH_COOKIE_REFRESH } from '@/src/shared/utils/authCookies'
 
 /**
  * Encerra só a sessão na empresa (token após escolher-empresa).
@@ -11,5 +11,6 @@ export async function POST() {
     { status: 200 }
   )
   clearAuthCookie(response, AUTH_COOKIE_TENANT)
+  clearAuthCookie(response, AUTH_COOKIE_REFRESH)
   return response
 }

@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { BuscarMetodosPagamentoDetalhadoUseCase } from '@/src/application/use-cases/dashboard/BuscarMetodosPagamentoDetalhadoUseCase'
 
 function mapPeriodoToUseCaseFormat(frontendPeriodo: string): string {
@@ -41,6 +42,7 @@ export function useDashboardMetodosPagamentoDetalhadoQuery({
 }: Params) {
   const mappedPeriodo = useMemo(() => mapPeriodoToUseCaseFormat(periodo), [periodo])
   const useCustomDates = !!(periodoInicial && periodoFinal)
+  const empresaId = useTenantEmpresaId()
 
   return useQuery({
     queryKey: [
@@ -49,6 +51,7 @@ export function useDashboardMetodosPagamentoDetalhadoQuery({
       mappedPeriodo,
       useCustomDates ? periodoInicial!.toISOString() : null,
       useCustomDates ? periodoFinal!.toISOString() : null,
+      empresaId,
     ],
     queryFn: async () => {
       const useCase = new BuscarMetodosPagamentoDetalhadoUseCase()

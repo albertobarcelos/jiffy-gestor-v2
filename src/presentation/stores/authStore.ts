@@ -5,6 +5,9 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { Auth } from '@/src/domain/entities/Auth'
 import { User } from '@/src/domain/entities/User'
 import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
+import { buildAuthFromAccessToken } from '@/src/shared/utils/buildAuthFromAccessToken'
+import { SESSION_STORAGE_TENANT_TOKEN } from '@/src/shared/constants/sessionCoordinator'
+import { clearTabSession } from '@/src/shared/utils/tabSession'
 
 type PersistedAuthJSON = {
   accessToken: string
@@ -81,6 +84,26 @@ function asPersistedAuthJson(raw: unknown): PersistedAuthJSON | null {
   }
 }
 
+/**
+ * Lê o tenant token per-tab do sessionStorage (SSR-safe).
+ * Chamado sincronamente durante `onRehydrateStorage` para que o tenantAuth
+ * esteja disponível ANTES de qualquer componente ver `isRehydrated = true`.
+ */
+function restoreTenantFromSessionStorage(identityAuth: Auth | null): Auth | null {
+  if (typeof sessionStorage === 'undefined') return null
+  try {
+    const token = sessionStorage.getItem(SESSION_STORAGE_TENANT_TOKEN)
+    if (!token) return null
+    const prev = identityAuth?.getUser()
+    return buildAuthFromAccessToken(
+      token,
+      prev ? { id: prev.getId(), email: prev.getEmail(), name: prev.getName() } : undefined
+    )
+  } catch {
+    return null
+  }
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -140,14 +163,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logoutTenant: async () => {
-        try {
-          await fetch('/api/auth/logout-tenant', {
-            method: 'POST',
-            credentials: 'include',
-          })
-        } catch (error) {
-          console.error('Erro ao chamar API logout-tenant:', error)
-        }
+        clearTabSession()
 
         set(state => ({
           tenantAuth: null,
@@ -202,7 +218,6 @@ export const useAuthStore = create<AuthState>()(
       storage: createJSONStorage(() => localStorage),
       partialize: state => ({
         identityAuth: state.identityAuth ? (state.identityAuth.toJSON() as PersistedAuthJSON) : null,
-        tenantAuth: state.tenantAuth ? (state.tenantAuth.toJSON() as PersistedAuthJSON) : null,
         hubEmpresas: state.hubEmpresas,
         isAuthenticated: state.isAuthenticated,
       }),
@@ -213,11 +228,12 @@ export const useAuthStore = create<AuthState>()(
         const s = state as AuthState & { auth?: unknown }
 
         let identityAuth = authFromJson(asPersistedAuthJson(s.identityAuth))
-        let tenantAuth = authFromJson(asPersistedAuthJson(s.tenantAuth))
 
-        if (!identityAuth && !tenantAuth && s.auth !== undefined) {
+        if (!identityAuth && s.auth !== undefined) {
           identityAuth = authFromJson(asPersistedAuthJson(s.auth))
         }
+
+        const tenantAuth = restoreTenantFromSessionStorage(identityAuth)
 
         s.identityAuth = identityAuth
         s.tenantAuth = tenantAuth

@@ -6,8 +6,11 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 const AUTH_STORAGE_KEY = 'auth-storage'
 
 /**
- * Quando outra aba altera o `localStorage` do Zustand persist (ex.: logout do hub em convites),
- * reidrata o store aqui para que identidade/tenant fiquem alinhados em todas as guias.
+ * Quando outra aba altera o `localStorage` do Zustand persist (ex.: logout do hub),
+ * reidrata **identityAuth** aqui.
+ *
+ * `tenantAuth` NÃO é persistido no localStorage (isolamento per-tab), então a
+ * reidratação nunca sobrescreve o tenant da aba corrente.
  */
 export function AuthStorageCrossTabSync() {
   useEffect(() => {
@@ -16,21 +19,31 @@ export function AuthStorageCrossTabSync() {
         return
       }
 
+      const currentTenant = useAuthStore.getState().tenantAuth
+
       if (e.newValue === null) {
         useAuthStore.setState({
           identityAuth: null,
-          tenantAuth: null,
-          auth: null,
+          tenantAuth: currentTenant,
+          auth: currentTenant ?? null,
           hubEmpresas: null,
-          isAuthenticated: false,
+          isAuthenticated: !!currentTenant,
           error: null,
         })
         return
       }
 
-      void Promise.resolve(useAuthStore.persist.rehydrate()).catch(() => {
-        /* noop — estado já pode estar consistente */
-      })
+      void Promise.resolve(useAuthStore.persist.rehydrate())
+        .then(() => {
+          useAuthStore.setState(s => ({
+            tenantAuth: currentTenant,
+            auth: currentTenant ?? s.identityAuth ?? null,
+            isAuthenticated: !!(currentTenant || s.identityAuth),
+          }))
+        })
+        .catch(() => {
+          /* noop */
+        })
     }
 
     window.addEventListener('storage', onStorage)

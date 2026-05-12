@@ -4,6 +4,8 @@ import type { NextResponse } from 'next/server'
 export const AUTH_COOKIE_IDENTITY = 'identity-token'
 /** Cookie httpOnly: JWT após POST escolher-empresa (tenant). */
 export const AUTH_COOKIE_TENANT = 'tenant-token'
+/** Cookie httpOnly: refresh token da última empresa aberta (longa duração). */
+export const AUTH_COOKIE_REFRESH = 'refresh-token'
 /** Legado (login antigo); ainda lido em getAuthToken até migração completa. */
 export const AUTH_COOKIE_LEGACY = 'auth-token'
 

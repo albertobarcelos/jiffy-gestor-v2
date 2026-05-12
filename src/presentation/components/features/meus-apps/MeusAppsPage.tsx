@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { buildAuthFromAccessToken } from '@/src/shared/utils/buildAuthFromAccessToken'
+import { prepareTabSession } from '@/src/shared/utils/tabSession'
 import type { ConvitePendente } from '@/src/presentation/components/features/convites/types'
 import { SearchBar } from './components/SearchBar'
 import { MeusAppsFeedGrid } from './components/MeusAppsFeedGrid'
@@ -34,7 +34,6 @@ export default function MeusAppsPage() {
   const setHubEmpresas = useAuthStore(s => s.setHubEmpresas)
   /** Sessão do hub (identidade); não usar `auth` aqui — pode ser só tenant se outra aba abriu empresa. */
   const identityAuth = useAuthStore(s => s.identityAuth)
-  const setTenantAuth = useAuthStore(s => s.setTenantAuth)
   const isRehydrated = useAuthStore(s => s.isRehydrated)
 
   const [busca, setBusca] = useState('')
@@ -302,8 +301,8 @@ export default function MeusAppsPage() {
   }, [busca, feedFiltro])
 
   /** Mesmo fluxo que “Acessar”: POST escolher-empresa + token da empresa no store (aba atual). */
-  const aplicarContextoEmpresa = useCallback(
-    async (appId: string): Promise<void> => {
+  const obterTokenEmpresa = useCallback(
+    async (appId: string): Promise<string> => {
       const idTok = identityAuth?.getAccessToken()
       const res = await fetch('/api/auth/escolher-empresa', {
         method: 'POST',
@@ -321,22 +320,13 @@ export default function MeusAppsPage() {
         throw new Error(typeof body.error === 'string' ? body.error : `Erro ${res.status}`)
       }
 
-      const accessToken = body.accessToken
-      if (!accessToken) {
+      if (!body.accessToken) {
         throw new Error('Resposta sem accessToken')
       }
 
-      const prev = identityAuth?.getUser()
-      const novoAuth = buildAuthFromAccessToken(
-        accessToken,
-        prev
-          ? { id: prev.getId(), email: prev.getEmail(), name: prev.getName() }
-          : undefined
-      )
-
-      setTenantAuth(novoAuth)
+      return body.accessToken
     },
-    [identityAuth, setTenantAuth]
+    [identityAuth]
   )
 
   const reportErroAcessoEmpresa = useCallback(
@@ -363,8 +353,9 @@ export default function MeusAppsPage() {
     setBusyAppId(appId)
 
     try {
-      await aplicarContextoEmpresa(appId)
-      window.open('/dashboard', '_blank', 'noopener,noreferrer')
+      const token = await obterTokenEmpresa(appId)
+      const { empParam } = prepareTabSession(token, app?.nome ?? '', appId)
+      window.open(`/dashboard?emp=${empParam}`, '_blank')
     } catch (e) {
       reportErroAcessoEmpresa(e)
     } finally {
@@ -381,10 +372,10 @@ export default function MeusAppsPage() {
     setAcessoErro(null)
 
     try {
-      await aplicarContextoEmpresa(appId)
+      const token = await obterTokenEmpresa(appId)
+      const { empParam } = prepareTabSession(token, app.nome, appId)
       const slug = empresaNomeParaSlugUrl(app.nome)
-      // Sem noopener: a aba de convites usa `window.opener` no Voltar para focar o hub e fechar só esta guia.
-      window.open(`/meus-apps/convidar-usuarios/${slug}`, '_blank')
+      window.open(`/meus-apps/convidar-usuarios/${slug}?emp=${empParam}`, '_blank')
     } catch (e) {
       reportErroAcessoEmpresa(e)
     }
@@ -399,9 +390,10 @@ export default function MeusAppsPage() {
     setAcessoErro(null)
 
     try {
-      await aplicarContextoEmpresa(appId)
+      const token = await obterTokenEmpresa(appId)
+      const { empParam } = prepareTabSession(token, app.nome, appId)
       const slug = empresaNomeParaSlugUrl(app.nome)
-      window.open(`/meus-apps/usuarios-gestor/${slug}`, '_blank')
+      window.open(`/meus-apps/usuarios-gestor/${slug}?emp=${empParam}`, '_blank')
     } catch (e) {
       reportErroAcessoEmpresa(e)
     }

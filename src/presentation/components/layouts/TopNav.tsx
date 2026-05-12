@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { disconnectEmpresaTab } from '@/src/presentation/utils/disconnectEmpresaTab'
+import { useEmpresaUrlSync } from '@/src/presentation/hooks/useEmpresaUrlSync'
 import { useQueryClient } from '@tanstack/react-query'
 import { MdDashboard, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose } from 'react-icons/md'
 import { 
@@ -37,6 +38,8 @@ export function TopNav() {
   const { logoutTenant, getUser } = useAuthStore()
   const queryClient = useQueryClient()
   const menuRef = useRef<HTMLDivElement>(null)
+
+  useEmpresaUrlSync()
   
   // Estado para controlar hidratação (evita hydration mismatch)
   const [isHydrated, setIsHydrated] = useState(false)

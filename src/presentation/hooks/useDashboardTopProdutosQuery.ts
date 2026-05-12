@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto'
 
 type ApiItem = {
@@ -19,7 +21,7 @@ type Params = {
   enabled?: boolean
 }
 
-async function fetchTopProdutos(params: Params): Promise<DashboardTopProduto[]> {
+async function fetchTopProdutos(params: Params & { token: string }): Promise<DashboardTopProduto[]> {
   const search = new URLSearchParams()
   search.append('periodo', params.periodo)
   search.append('limit', String(params.limit ?? 10))
@@ -28,7 +30,9 @@ async function fetchTopProdutos(params: Params): Promise<DashboardTopProduto[]> 
     search.append('dataFinalizacaoFinal', params.periodoFinal.toISOString())
   }
 
-  const response = await fetch(`/api/dashboard/top-produtos?${search.toString()}`)
+  const response = await fetch(`/api/dashboard/top-produtos?${search.toString()}`, {
+    headers: { Authorization: `Bearer ${params.token}` },
+  })
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
   if (!response.ok) {
     const msg = typeof data.error === 'string' ? data.error : 'Erro ao buscar top produtos.'
@@ -54,6 +58,10 @@ export function useDashboardTopProdutosQuery({
   periodoFinal,
   enabled = true,
 }: Params) {
+  const { auth } = useAuthStore()
+  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
+
   return useQuery({
     queryKey: [
       'dashboard',
@@ -62,9 +70,10 @@ export function useDashboardTopProdutosQuery({
       limit,
       periodoInicial ? periodoInicial.toISOString() : null,
       periodoFinal ? periodoFinal.toISOString() : null,
+      empresaId,
     ],
-    queryFn: () => fetchTopProdutos({ periodo, limit, periodoInicial, periodoFinal, enabled }),
-    enabled,
+    queryFn: () => fetchTopProdutos({ periodo, limit, periodoInicial, periodoFinal, enabled, token: token! }),
+    enabled: enabled && !!token,
     staleTime: 30_000,
   })
 }

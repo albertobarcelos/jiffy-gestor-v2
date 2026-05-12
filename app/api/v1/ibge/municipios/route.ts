@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
+import { getTokenInfo } from '@/src/shared/utils/getTokenInfo'
 
 /**
  * GET /api/v1/ibge/municipios?uf=SP
@@ -7,6 +8,11 @@ import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
  */
 export async function GET(request: NextRequest) {
   try {
+    const tokenInfo = getTokenInfo(request)
+    if (!tokenInfo) {
+      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const uf = searchParams.get('uf')
 

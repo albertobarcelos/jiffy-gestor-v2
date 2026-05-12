@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 
 type DashboardResumoMetricas = {
   total: {
@@ -33,12 +35,14 @@ type DashboardResumoParams = {
   enabled?: boolean
 }
 
-async function fetchDashboardResumo(params: DashboardResumoParams): Promise<DashboardResumoResponse> {
+async function fetchDashboardResumo(params: DashboardResumoParams & { token: string }): Promise<DashboardResumoResponse> {
   const search = new URLSearchParams()
   if (params.periodoInicial) search.append('dataFinalizacaoInicial', params.periodoInicial.toISOString())
   if (params.periodoFinal) search.append('dataFinalizacaoFinal', params.periodoFinal.toISOString())
 
-  const response = await fetch(`/api/dashboard/resumo?${search.toString()}`)
+  const response = await fetch(`/api/dashboard/resumo?${search.toString()}`, {
+    headers: { Authorization: `Bearer ${params.token}` },
+  })
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
   if (!response.ok) {
     const msg = typeof data.error === 'string' ? data.error : 'Erro ao carregar resumo do dashboard'
@@ -49,15 +53,20 @@ async function fetchDashboardResumo(params: DashboardResumoParams): Promise<Dash
 }
 
 export function useDashboardResumoQuery({ periodoInicial, periodoFinal, enabled = true }: DashboardResumoParams) {
+  const { auth } = useAuthStore()
+  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
+
   return useQuery({
     queryKey: [
       'dashboard',
       'resumo',
       periodoInicial ? periodoInicial.toISOString() : null,
       periodoFinal ? periodoFinal.toISOString() : null,
+      empresaId,
     ],
-    queryFn: () => fetchDashboardResumo({ periodoInicial, periodoFinal }),
-    enabled,
+    queryFn: () => fetchDashboardResumo({ periodoInicial, periodoFinal, token: token! }),
+    enabled: enabled && !!token,
     staleTime: 30_000,
   })
 }

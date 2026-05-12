@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
-import { getAuthToken } from '@/src/shared/utils/getAuthToken'
+import { getTokenInfo } from '@/src/shared/utils/getTokenInfo'
 import { ListarConvitesPendentesResponseSchema } from '@/src/application/dto/convites/ConvitesDTO'
 
 /**
@@ -9,10 +9,11 @@ import { ListarConvitesPendentesResponseSchema } from '@/src/application/dto/con
  */
 export async function GET(request: NextRequest) {
   try {
-    const token = getAuthToken(request)
-    if (!token) {
+    const tokenInfo = getTokenInfo(request)
+    if (!tokenInfo) {
       return NextResponse.json({ error: 'Token não encontrado' }, { status: 401 })
     }
+    const token = tokenInfo.token
 
     const apiClient = new ApiClient()
     const response = await apiClient.request<unknown>('/api/v1/convites/me', {

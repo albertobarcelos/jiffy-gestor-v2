@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { Produto } from '@/src/domain/entities/Produto'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
@@ -35,8 +36,9 @@ interface ProdutosResponse {
 export function useProdutos(params: ProdutosQueryParams = {}) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  const queryKey = ['produtos', params]
+  const queryKey = ['produtos', params, empresaId]
 
   return useQuery({
     queryKey,
@@ -109,9 +111,10 @@ export function useProdutos(params: ProdutosQueryParams = {}) {
 export function useProdutosInfinite(params: Omit<ProdutosQueryParams, 'offset'> = {}) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useInfiniteQuery({
-    queryKey: ['produtos', 'infinite', params],
+    queryKey: ['produtos', 'infinite', params, empresaId],
     queryFn: async ({ pageParam = 0 }): Promise<{ produtos: Produto[]; count: number; nextOffset: number | null }> => {
       if (!token) {
         throw new Error('Token não encontrado')
@@ -191,9 +194,10 @@ export function useProdutosInfinite(params: Omit<ProdutosQueryParams, 'offset'> 
 export function useProduto(id: string) {
   const { auth, isAuthenticated } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useQuery<Produto, ApiError>({
-    queryKey: ['produto', id],
+    queryKey: ['produto', id, empresaId],
     queryFn: async () => {
       if (!isAuthenticated || !token) {
         throw new Error('Usuário não autenticado ou token ausente.')
@@ -230,6 +234,7 @@ export function useProdutoMutation() {
   const { auth } = useAuthStore()
   const queryClient = useQueryClient()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useMutation({
     mutationFn: async ({ produtoId, data, isUpdate }: { produtoId?: string; data: any; isUpdate: boolean }) => {
@@ -267,7 +272,7 @@ export function useProdutoMutation() {
 
       // Se for atualização, atualizar otimisticamente
       if (isUpdate && produtoId) {
-        queryClient.setQueryData(['produto', produtoId], (old: any) => {
+        queryClient.setQueriesData({ queryKey: ['produto', produtoId] }, (old: any) => {
           if (!old) return old
           return { ...old, ...data }
         })

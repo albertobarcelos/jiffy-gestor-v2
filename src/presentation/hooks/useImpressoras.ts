@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { Impressora } from '@/src/domain/entities/Impressora'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
@@ -22,9 +23,10 @@ interface ImpressorasResponse {
 export function useImpressorasInfinite(params: Omit<ImpressorasQueryParams, 'offset'> = {}) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useInfiniteQuery({
-    queryKey: ['impressoras', 'infinite', params],
+    queryKey: ['impressoras', 'infinite', params, empresaId],
     queryFn: async ({ pageParam = 0 }): Promise<{ impressoras: Impressora[]; count: number; nextOffset: number | null }> => {
       if (!token) {
         throw new Error('Token não encontrado')
@@ -78,9 +80,10 @@ export function useImpressorasInfinite(params: Omit<ImpressorasQueryParams, 'off
 export function useImpressora(id: string) {
   const { auth, isAuthenticated } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useQuery<Impressora, ApiError>({
-    queryKey: ['impressora', id],
+    queryKey: ['impressora', id, empresaId],
     queryFn: async () => {
       if (!isAuthenticated || !token) {
         throw new Error('Usuário não autenticado ou token ausente.')
@@ -117,6 +120,7 @@ export function useImpressoraMutation() {
   const { auth } = useAuthStore()
   const queryClient = useQueryClient()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useMutation({
     mutationFn: async ({ impressoraId, data, isUpdate }: { impressoraId?: string; data: any; isUpdate: boolean }) => {

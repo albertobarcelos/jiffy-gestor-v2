@@ -1,10 +1,14 @@
 import type { Metadata } from 'next'
 import localFont from 'next/font/local'
 import { Toaster } from 'react-hot-toast'
+import { AppRouterCacheProvider } from '@mui/material-nextjs/v15-appRouter'
 import { ThemeProvider } from '@/src/presentation/providers/ThemeProvider'
 import { QueryProvider } from '@/src/presentation/providers/QueryProvider'
 import { AuthStorageCrossTabSync } from '@/src/presentation/components/auth/AuthStorageCrossTabSync'
 import { EmpresaSessionLostGate } from '@/src/presentation/components/auth/EmpresaSessionLostGate'
+import { AuthGuard } from '@/src/presentation/components/auth/AuthGuard'
+import { TabSessionBootstrap } from '@/src/presentation/components/auth/TabSessionBootstrap'
+import { TenantCacheIsolation } from '@/src/presentation/components/auth/TenantCacheIsolation'
 import { DocumentoFiscalPdfRetryModal } from '@/src/presentation/components/features/nfe/DocumentoFiscalPdfRetryModal'
 import './globals.css'
 
@@ -31,38 +35,44 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="pt-BR" className={generalSans.variable}>
       {/* suppressHydrationWarning: extensões (ex. ColorZilla) injetam atributos no body e disparam falso positivo de hidratação */}
       <body className={`${generalSans.className} antialiased`} suppressHydrationWarning>
-        <QueryProvider>
-          <ThemeProvider>
-            <AuthStorageCrossTabSync />
-            <EmpresaSessionLostGate />
-            {children}
-            <DocumentoFiscalPdfRetryModal />
-            <Toaster
-              position="top-right"
-              toastOptions={{
-                duration: 4000,
-                style: {
-                  background: '#fff',
-                  color: '#333',
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                },
-                success: {
-                  iconTheme: {
-                    primary: '#10b981',
-                    secondary: '#fff',
+        <AppRouterCacheProvider>
+          <QueryProvider>
+            <ThemeProvider>
+              <AuthStorageCrossTabSync />
+              <EmpresaSessionLostGate />
+              <TenantCacheIsolation />
+              <TabSessionBootstrap />
+              <AuthGuard>
+                {children}
+              </AuthGuard>
+              <DocumentoFiscalPdfRetryModal />
+              <Toaster
+                position="top-right"
+                toastOptions={{
+                  duration: 4000,
+                  style: {
+                    background: '#fff',
+                    color: '#333',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                   },
-                },
-                error: {
-                  iconTheme: {
-                    primary: '#ef4444',
-                    secondary: '#fff',
+                  success: {
+                    iconTheme: {
+                      primary: '#10b981',
+                      secondary: '#fff',
+                    },
                   },
-                },
-              }}
-            />
-          </ThemeProvider>
-        </QueryProvider>
+                  error: {
+                    iconTheme: {
+                      primary: '#ef4444',
+                      secondary: '#fff',
+                    },
+                  },
+                }}
+              />
+            </ThemeProvider>
+          </QueryProvider>
+        </AppRouterCacheProvider>
       </body>
     </html>
   )

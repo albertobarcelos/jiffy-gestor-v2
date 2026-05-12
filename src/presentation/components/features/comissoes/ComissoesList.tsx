@@ -12,6 +12,7 @@ import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useComissoesPdv } from '@/src/presentation/hooks/useComissoesPdv'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import type { ComissoesPdvFetchParams } from '@/src/presentation/hooks/useComissoesPdv'
 import type {
   OrderByFieldComissoes,
@@ -116,6 +117,7 @@ export function ComissoesList() {
   const { auth } = useAuthStore()
   const { timezoneAgregacao } = useEmpresaMe()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   const [taxaId, setTaxaId] = useState('')
   const [draft, setDraft] = useState<FiltrosUI>(FILTROS_INICIAIS)
@@ -159,7 +161,7 @@ export function ComissoesList() {
   const { data, isLoading, isFetching, error } = useComissoesPdv(fetchParams)
 
   const taxasPercentualQuery = useQuery({
-    queryKey: ['taxas', 'dropdown-comissoes'],
+    queryKey: ['taxas', 'dropdown-comissoes', empresaId],
     queryFn: async (): Promise<Taxa[]> => {
       if (!token) return []
       const todas: Taxa[] = []

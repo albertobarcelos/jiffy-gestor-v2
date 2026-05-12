@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 
 import type { DashboardEvolucaoPoint } from '@/src/presentation/hooks/useDashboardEvolucaoQuery'
 
@@ -113,7 +115,7 @@ function rangeDiaNoFusoEmpresaParaUtc(args: {
   return { inicioUtc, fimUtc }
 }
 
-async function fetchFaturamentoPorDia(params: Params): Promise<Record<string, number>> {
+async function fetchFaturamentoPorDia(params: Params & { token: string }): Promise<Record<string, number>> {
   const tz = (params.timeZoneEmpresa ?? '').trim()
 
   /**
@@ -153,7 +155,9 @@ async function fetchFaturamentoPorDia(params: Params): Promise<Record<string, nu
   search.append('dataFinalizacaoFinal', fim.toISOString())
   search.append('status', 'FINALIZADA')
 
-  const response = await fetch(`/api/dashboard/evolucao?${search.toString()}`)
+  const response = await fetch(`/api/dashboard/evolucao?${search.toString()}`, {
+    headers: { Authorization: `Bearer ${params.token}` },
+  })
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
   if (!response.ok) {
     const msg = typeof data.error === 'string' ? data.error : 'Erro ao carregar faturamento por dia'
@@ -177,6 +181,10 @@ export function useDashboardFaturamentoPorDiaQuery({
   enabled = true,
   timeZoneEmpresa,
 }: Params) {
+  const { auth } = useAuthStore()
+  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
+
   return useQuery({
     queryKey: [
       'dashboard',
@@ -184,9 +192,10 @@ export function useDashboardFaturamentoPorDiaQuery({
       periodoInicial.toISOString(),
       periodoFinal.toISOString(),
       timeZoneEmpresa ?? '',
+      empresaId,
     ],
-    queryFn: () => fetchFaturamentoPorDia({ periodoInicial, periodoFinal, timeZoneEmpresa }),
-    enabled,
+    queryFn: () => fetchFaturamentoPorDia({ periodoInicial, periodoFinal, timeZoneEmpresa, token: token! }),
+    enabled: enabled && !!token,
     staleTime: 30_000,
   })
 }

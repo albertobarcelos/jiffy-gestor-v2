@@ -10,9 +10,17 @@ type DisconnectOpts = {
 }
 
 /**
- * Logout só da empresa: limpa cache, remove tenant; pergunta ao hub (BroadcastChannel) se existe.
- * Sem hub → navegações diretas para `/login` (evita `close()` antes e perder o fallback).
- * Com hub → tenta fechar a guia; se ainda estiver visível, fallback `/meus-apps`.
+ * Logout só da empresa: limpa cache + tenant state, depois fecha a aba.
+ *
+ * Fluxo:
+ *  1. Marca `TENANT_LOGOUT_SELF` → AuthGuard não redireciona enquanto o flag existir.
+ *  2. Limpa React Query e chama logoutTenant (sessionStorage + Zustand).
+ *  3. Pergunta ao hub (BroadcastChannel) se existe.
+ *  4. Hub vivo → tenta `window.close()`.
+ *     - Se fechar → fim.
+ *     - Se não fechar (aba aberta manualmente) → mantém flag, AuthGuard exibe tela
+ *       de "sessão encerrada" (evita duplicar guia Meus Apps).
+ *  5. Sem hub → navega `/login`.
  */
 export async function disconnectEmpresaTab({ queryClient, logoutTenant }: DisconnectOpts): Promise<void> {
   try {
@@ -31,24 +39,23 @@ export async function disconnectEmpresaTab({ queryClient, logoutTenant }: Discon
   let hubAlive = false
   try {
     const bc = new BroadcastChannel(JIFFY_SESSION_BROADCAST_CHANNEL)
-    const onPong = (ev: MessageEvent<{ type?: string }>) => {
-      if (ev.data?.type === 'hub-pong') {
-        hubAlive = true
+    hubAlive = await new Promise<boolean>(resolve => {
+      const timer = window.setTimeout(() => resolve(false), 400)
+      bc.onmessage = (ev: MessageEvent<{ type?: string }>) => {
+        if (ev.data?.type === 'hub-pong') {
+          window.clearTimeout(timer)
+          resolve(true)
+        }
       }
-    }
-    bc.addEventListener('message', onPong)
-    bc.postMessage({ type: 'hub-ping', ts: Date.now() })
-    await new Promise<void>(resolve => {
-      window.setTimeout(resolve, 400)
+      bc.postMessage({ type: 'hub-ping', ts: Date.now() })
     })
-    bc.removeEventListener('message', onPong)
     bc.close()
   } catch {
     /* BroadcastChannel indisponível */
   }
 
-  // Sem guia Meus Apps: não tentar fechar antes — se close() funcionar, o fallback nunca roda e o utilizador fica sem login.
   if (!hubAlive) {
+    cleanupFlag()
     window.location.assign('/login')
     return
   }
@@ -59,15 +66,21 @@ export async function disconnectEmpresaTab({ queryClient, logoutTenant }: Discon
     /* noop */
   }
 
-  window.setTimeout(() => {
-    try {
-      sessionStorage.removeItem(SESSION_STORAGE_TENANT_LOGOUT_SELF)
-    } catch {
-      /* noop */
-    }
-    if (typeof document === 'undefined' || document.visibilityState !== 'visible') {
-      return
-    }
-    window.location.assign('/meus-apps')
-  }, 250)
+  await new Promise<void>(r => window.setTimeout(r, 300))
+
+  if (typeof document === 'undefined' || document.visibilityState !== 'visible') {
+    return
+  }
+
+  // window.close() falhou (aba aberta manualmente, não por window.open).
+  // Manter flag ativo → AuthGuard exibe tela de "sessão encerrada"
+  // em vez de redirecionar para /meus-apps (evita duplicar guia do hub).
+}
+
+function cleanupFlag(): void {
+  try {
+    sessionStorage.removeItem(SESSION_STORAGE_TENANT_LOGOUT_SELF)
+  } catch {
+    /* noop */
+  }
 }

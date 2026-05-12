@@ -3,9 +3,11 @@ import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 import {
   AUTH_COOKIE_IDENTITY,
   AUTH_COOKIE_LEGACY,
+  AUTH_COOKIE_REFRESH,
   AUTH_COOKIE_TENANT,
   cookieOptsMaxAge,
 } from '@/src/shared/utils/authCookies'
+import { decodeToken } from '@/src/shared/utils/validateToken'
 import {
   EscolherEmpresaRequestSchema,
   EscolherEmpresaResponseSchema,
@@ -49,8 +51,19 @@ export async function POST(request: NextRequest) {
 
     const parsed = EscolherEmpresaResponseSchema.parse(response.data)
 
+    const decoded = decodeToken(parsed.accessToken)
+    const accessMaxAge = decoded?.exp
+      ? Math.max(decoded.exp - Math.floor(Date.now() / 1000), 60)
+      : 60 * 60 * 24
+
+    const refreshDecoded = decodeToken(parsed.refreshToken)
+    const refreshMaxAge = refreshDecoded?.exp
+      ? Math.max(refreshDecoded.exp - Math.floor(Date.now() / 1000), 60)
+      : 60 * 60 * 24 * 7
+
     const res = NextResponse.json(parsed, { status: 200 })
-    res.cookies.set(AUTH_COOKIE_TENANT, parsed.accessToken, cookieOptsMaxAge(60 * 60 * 24))
+    res.cookies.set(AUTH_COOKIE_TENANT, parsed.accessToken, cookieOptsMaxAge(accessMaxAge))
+    res.cookies.set(AUTH_COOKIE_REFRESH, parsed.refreshToken, cookieOptsMaxAge(refreshMaxAge))
     return res
   } catch (error) {
     if (error instanceof ApiError) {
