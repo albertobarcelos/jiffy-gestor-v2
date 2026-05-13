@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 import {
-  appendIntervaloFinalizacaoVendasPdv,
-  lerIntervaloFinalizacaoVendasPdv,
-} from '@/src/shared/utils/parametrosDataFinalizacaoVendasPdv'
+  calcularPeriodoNoFusoEmpresa,
+  calcularPeriodoAnteriorParaComparacaoNoFusoEmpresa,
+} from '@/src/shared/utils/periodoNoFusoEmpresa'
 
 type VendasMetricas = {
   totalFaturado?: number
@@ -122,10 +122,44 @@ export async function GET(request: NextRequest) {
     const { tokenInfo } = validation
 
     const { searchParams } = new URL(request.url)
-    const paramsBase = new URLSearchParams()
-    const intervalo = lerIntervaloFinalizacaoVendasPdv(searchParams)
-    if (intervalo) {
-      appendIntervaloFinalizacaoVendasPdv(paramsBase, intervalo)
+    const periodo = searchParams.get('periodo') || 'hoje'
+    const timezone = searchParams.get('timezone') || 'America/Sao_Paulo'
+    
+    let inicioAtual: Date | null = null
+    let fimAtual: Date | null = null
+    let inicioAnterior: Date | null = null
+    let fimAnterior: Date | null = null
+
+    if (periodo === 'personalizado') {
+      const iniStr = searchParams.get('dataFinalizacaoInicial')
+      const fimStr = searchParams.get('dataFinalizacaoFinal')
+      if (iniStr && fimStr) {
+        inicioAtual = new Date(iniStr)
+        fimAtual = new Date(fimStr)
+        // Desloca 30 dias para trás para o período personalizado
+        const deltaMs = 30 * 86_400_000
+        inicioAnterior = new Date(inicioAtual.getTime() - deltaMs)
+        fimAnterior = new Date(fimAtual.getTime() - deltaMs)
+      }
+    } else {
+      // Mapeia o periodo do frontend para a opção do utilitário
+      const mapOpcao: Record<string, string> = {
+        hoje: 'Hoje',
+        ontem: 'Ontem',
+        semana: 'Últimos 7 Dias',
+        '30dias': 'Últimos 30 Dias',
+      }
+      const opcao = mapOpcao[periodo] || 'Hoje'
+      
+      const atual = calcularPeriodoNoFusoEmpresa(opcao, timezone)
+      inicioAtual = atual.inicio
+      fimAtual = atual.fim
+      
+      const anterior = calcularPeriodoAnteriorParaComparacaoNoFusoEmpresa(opcao, timezone)
+      if (anterior) {
+        inicioAnterior = anterior.inicio
+        fimAnterior = anterior.fim
+      }
     }
 
     const apiClient = new ApiClient()
@@ -134,74 +168,86 @@ export async function GET(request: NextRequest) {
       'Content-Type': 'application/json',
     }
 
-    const paramsTotal = new URLSearchParams(paramsBase.toString())
-    paramsTotal.append('status', 'FINALIZADA')
-    paramsTotal.append('status', 'CANCELADA')
+    async function fetchMetricas(inicio: Date | null, fim: Date | null, isAtual: boolean) {
+      if (!inicio || !fim) return null
 
-    const paramsFinalizadas = new URLSearchParams(paramsBase.toString())
-    paramsFinalizadas.append('status', 'FINALIZADA')
+      const paramsBase = new URLSearchParams()
+      paramsBase.append('dataFinalizacaoInicial', inicio.toISOString())
+      paramsBase.append('dataFinalizacaoFinal', fim.toISOString())
 
-    const paramsCanceladas = new URLSearchParams(paramsBase.toString())
-    paramsCanceladas.append('status', 'CANCELADA')
+      const paramsTotal = new URLSearchParams(paramsBase.toString())
+      paramsTotal.append('status', 'FINALIZADA')
+      paramsTotal.append('status', 'CANCELADA')
 
-    const [totalResp, finalizadasResp, canceladasResp, mesasAbertasCount] = await Promise.all([
-      apiClient.request<VendasResponse>(`/api/v1/operacao-pdv/vendas?${paramsTotal.toString()}`, {
-        method: 'GET',
-        headers,
-      }),
-      apiClient.request<VendasResponse>(`/api/v1/operacao-pdv/vendas?${paramsFinalizadas.toString()}`, {
-        method: 'GET',
-        headers,
-      }),
-      apiClient.request<VendasResponse>(`/api/v1/operacao-pdv/vendas?${paramsCanceladas.toString()}`, {
-        method: 'GET',
-        headers,
-      }),
-      countMesasAbertas({ apiClient, headers }),
-    ])
+      const paramsFinalizadas = new URLSearchParams(paramsBase.toString())
+      paramsFinalizadas.append('status', 'FINALIZADA')
 
-    const totalMetricas = totalResp.data?.metricas ?? {}
-    const finalizadasMetricas = finalizadasResp.data?.metricas ?? {}
-    const canceladasMetricas = canceladasResp.data?.metricas ?? {}
+      const paramsCanceladas = new URLSearchParams(paramsBase.toString())
+      paramsCanceladas.append('status', 'CANCELADA')
 
-    // Total cancelado não vem pronto em `metricas`, então calculamos somando os itens CANCELADA.
-    // Faz paginação no BFF para evitar custo no cliente.
-    let totalCancelado = 0
-    try {
-      const countCanceladas = resolveCountFromResponse(canceladasResp.data ?? {})
-      const limit = 100
-      const totalPages =
-        typeof countCanceladas === 'number' && countCanceladas >= 0
-          ? Math.ceil(countCanceladas / limit)
-          : 1
-      const safeTotalPages = Math.max(1, Math.min(totalPages, 200))
-
-      for (let page = 0; page < safeTotalPages; page++) {
-        const paramsPage = new URLSearchParams(paramsBase.toString())
-        paramsPage.append('status', 'CANCELADA')
-        paramsPage.append('limit', limit.toString())
-        paramsPage.append('offset', String(page * limit))
-
-        const resp = await apiClient.request<VendasResponse>(`/api/v1/operacao-pdv/vendas?${paramsPage.toString()}`, {
+      const promises: Promise<any>[] = [
+        apiClient.request<VendasResponse>(`/api/v1/operacao-pdv/vendas?${paramsTotal.toString()}`, {
           method: 'GET',
           headers,
-        })
+        }),
+        apiClient.request<VendasResponse>(`/api/v1/operacao-pdv/vendas?${paramsFinalizadas.toString()}`, {
+          method: 'GET',
+          headers,
+        }),
+        apiClient.request<VendasResponse>(`/api/v1/operacao-pdv/vendas?${paramsCanceladas.toString()}`, {
+          method: 'GET',
+          headers,
+        }),
+      ]
 
-        const items = Array.isArray(resp.data?.items) ? resp.data.items : []
-        totalCancelado += sumCanceladas(items)
-
-        // Se não temos contagem confiável, paramos quando vier menos que o limit.
-        if (typeof countCanceladas !== 'number' && items.length < limit) {
-          break
-        }
+      if (isAtual) {
+        promises.push(countMesasAbertas({ apiClient, headers }))
       }
-    } catch (err) {
-      console.warn('Não foi possível calcular totalCancelado:', err)
-      totalCancelado = 0
-    }
 
-    return NextResponse.json({
-      metricas: {
+      const results = await Promise.all(promises)
+      const totalResp = results[0]
+      const finalizadasResp = results[1]
+      const canceladasResp = results[2]
+      const mesasAbertasCount = isAtual ? results[3] : 0
+
+      const totalMetricas = totalResp.data?.metricas ?? {}
+      const finalizadasMetricas = finalizadasResp.data?.metricas ?? {}
+      const canceladasMetricas = canceladasResp.data?.metricas ?? {}
+
+      let totalCancelado = 0
+      try {
+        const countCanceladas = resolveCountFromResponse(canceladasResp.data ?? {})
+        const limit = 100
+        const totalPages =
+          typeof countCanceladas === 'number' && countCanceladas >= 0
+            ? Math.ceil(countCanceladas / limit)
+            : 1
+        const safeTotalPages = Math.max(1, Math.min(totalPages, 200))
+
+        for (let page = 0; page < safeTotalPages; page++) {
+          const paramsPage = new URLSearchParams(paramsBase.toString())
+          paramsPage.append('status', 'CANCELADA')
+          paramsPage.append('limit', limit.toString())
+          paramsPage.append('offset', String(page * limit))
+
+          const resp = await apiClient.request<VendasResponse>(`/api/v1/operacao-pdv/vendas?${paramsPage.toString()}`, {
+            method: 'GET',
+            headers,
+          })
+
+          const items = Array.isArray(resp.data?.items) ? resp.data.items : []
+          totalCancelado += sumCanceladas(items)
+
+          if (typeof countCanceladas !== 'number' && items.length < limit) {
+            break
+          }
+        }
+      } catch (err) {
+        console.warn('Não foi possível calcular totalCancelado:', err)
+        totalCancelado = 0
+      }
+
+      return {
         total: {
           totalFaturado: totalMetricas.totalFaturado ?? 0,
           countVendasEfetivadas: totalMetricas.countVendasEfetivadas ?? 0,
@@ -220,9 +266,76 @@ export async function GET(request: NextRequest) {
           countVendasCanceladas: canceladasMetricas.countVendasCanceladas ?? 0,
           countProdutosVendidos: canceladasMetricas.countProdutosVendidos ?? 0,
         },
+        mesasAbertas: mesasAbertasCount ?? 0,
+        totalCancelado,
+      }
+    }
+
+    const [dadosAtual, dadosAnterior] = await Promise.all([
+      fetchMetricas(inicioAtual, fimAtual, true),
+      fetchMetricas(inicioAnterior, fimAnterior, false)
+    ])
+
+    const atual = dadosAtual || {
+      total: { totalFaturado: 0, countVendasEfetivadas: 0, countVendasCanceladas: 0, countProdutosVendidos: 0 },
+      finalizadas: { totalFaturado: 0, countVendasEfetivadas: 0, countVendasCanceladas: 0, countProdutosVendidos: 0 },
+      canceladas: { totalFaturado: 0, countVendasEfetivadas: 0, countVendasCanceladas: 0, countProdutosVendidos: 0 },
+      mesasAbertas: 0,
+      totalCancelado: 0
+    }
+
+    const anterior = dadosAnterior || {
+      total: { totalFaturado: 0, countVendasEfetivadas: 0, countVendasCanceladas: 0, countProdutosVendidos: 0 },
+      finalizadas: { totalFaturado: 0, countVendasEfetivadas: 0, countVendasCanceladas: 0, countProdutosVendidos: 0 },
+      canceladas: { totalFaturado: 0, countVendasEfetivadas: 0, countVendasCanceladas: 0, countProdutosVendidos: 0 },
+      mesasAbertas: 0,
+      totalCancelado: 0
+    }
+
+    function calcComparacao(valAtual: number, valAnterior: number, menorMelhor = false) {
+      if (valAnterior <= 0 && valAtual <= 0) return { percentual: 0, status: 'neutro' }
+      if (valAnterior <= 0 && valAtual > 0) return { percentual: 0, status: 'sem_base' }
+      
+      const pct = Math.round(((valAtual - valAnterior) / valAnterior) * 100)
+      let status = 'neutro'
+      if (pct > 0) status = menorMelhor ? 'negativo' : 'positivo'
+      else if (pct < 0) status = menorMelhor ? 'positivo' : 'negativo'
+      
+      return { percentual: pct, status }
+    }
+
+    function calcTicketMedio(totalFaturado: number, countVendas: number) {
+      return countVendas > 0 ? totalFaturado / countVendas : 0
+    }
+
+    function calcItensPorPedido(countProdutos: number, countVendas: number) {
+      return countVendas > 0 ? countProdutos / countVendas : 0
+    }
+
+    const ticketAtual = calcTicketMedio(atual.total.totalFaturado, atual.total.countVendasEfetivadas)
+    const ticketAnterior = calcTicketMedio(anterior.total.totalFaturado, anterior.total.countVendasEfetivadas)
+
+    const itensAtual = calcItensPorPedido(atual.total.countProdutosVendidos, atual.total.countVendasEfetivadas)
+    const itensAnterior = calcItensPorPedido(anterior.total.countProdutosVendidos, anterior.total.countVendasEfetivadas)
+
+    return NextResponse.json({
+      atual: {
+        ...atual,
+        ticketMedio: ticketAtual,
+        itensPorPedido: itensAtual,
       },
-      mesasAbertas: mesasAbertasCount ?? 0,
-      totalCancelado,
+      anterior: {
+        ...anterior,
+        ticketMedio: ticketAnterior,
+        itensPorPedido: itensAnterior,
+      },
+      comparacao: {
+        totalFaturado: calcComparacao(atual.total.totalFaturado, anterior.total.totalFaturado),
+        countVendasEfetivadas: calcComparacao(atual.total.countVendasEfetivadas, anterior.total.countVendasEfetivadas),
+        countVendasCanceladas: calcComparacao(atual.canceladas.countVendasCanceladas, anterior.canceladas.countVendasCanceladas, true),
+        ticketMedio: calcComparacao(ticketAtual, ticketAnterior),
+        itensPorPedido: calcComparacao(itensAtual, itensAnterior)
+      }
     })
   } catch (error) {
     console.error('Erro ao buscar resumo do dashboard:', error)

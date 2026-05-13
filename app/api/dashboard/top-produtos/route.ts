@@ -5,80 +5,12 @@ import {
   appendIntervaloFinalizacaoVendasPdv,
   lerIntervaloFinalizacaoVendasPdv,
 } from '@/src/shared/utils/parametrosDataFinalizacaoVendasPdv'
-
-interface PeriodoDates {
-  periodoInicial: string
-  periodoFinal: string
-}
-
-function getPeriodoDates(periodo: string): PeriodoDates {
-  const now = new Date()
-
-  let inicio: Date | null = null
-  let fim: Date | null = null
-
-  switch (periodo) {
-    case 'hoje':
-      inicio = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-      inicio.setHours(0, 0, 0, 0)
-      fim = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-      fim.setHours(23, 59, 59, 999)
-      break
-    case 'ontem': {
-      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
-      inicio = new Date(d)
-      inicio.setHours(0, 0, 0, 0)
-      fim = new Date(d)
-      fim.setHours(23, 59, 59, 999)
-      break
-    }
-    case 'semana':
-      inicio = new Date(now)
-      inicio.setDate(now.getDate() - 6)
-      inicio.setHours(0, 0, 0, 0)
-      fim = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-      fim.setHours(23, 59, 59, 999)
-      break
-    case '30dias':
-      inicio = new Date(now)
-      inicio.setDate(now.getDate() - 29)
-      inicio.setHours(0, 0, 0, 0)
-      fim = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-      fim.setHours(23, 59, 59, 999)
-      break
-    case 'mes':
-      inicio = new Date(now.getFullYear(), now.getMonth(), 1)
-      inicio.setHours(0, 0, 0, 0)
-      fim = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-      fim.setHours(23, 59, 59, 999)
-      break
-    case '60dias':
-      inicio = new Date(now)
-      inicio.setDate(now.getDate() - 59)
-      inicio.setHours(0, 0, 0, 0)
-      fim = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-      fim.setHours(23, 59, 59, 999)
-      break
-    case '90dias':
-      inicio = new Date(now)
-      inicio.setDate(now.getDate() - 89)
-      inicio.setHours(0, 0, 0, 0)
-      fim = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-      fim.setHours(23, 59, 59, 999)
-      break
-    default:
-      return { periodoInicial: '', periodoFinal: '' }
-  }
-
-  return {
-    periodoInicial: inicio ? inicio.toISOString() : '',
-    periodoFinal: fim ? fim.toISOString() : '',
-  }
-}
+import { calcularPeriodoNoFusoEmpresa } from '@/src/shared/utils/periodoNoFusoEmpresa'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const periodo = searchParams.get('periodo') || 'hoje'
+  const timezone = searchParams.get('timezone') || 'America/Sao_Paulo'
   const limit = Number(searchParams.get('limit') || '10')
   const validation = validateRequest(request)
   if (!validation.valid || !validation.tokenInfo) {
@@ -92,9 +24,21 @@ export async function GET(request: NextRequest) {
   if (intervaloCustom) {
     appendIntervaloFinalizacaoVendasPdv(params, intervaloCustom)
   } else {
-    const { periodoInicial, periodoFinal } = getPeriodoDates(periodo)
-    if (periodoInicial && periodoFinal) {
-      appendIntervaloFinalizacaoVendasPdv(params, { inicial: periodoInicial, final: periodoFinal })
+    // Mapeia o periodo do frontend para a opção do utilitário
+    const mapOpcao: Record<string, string> = {
+      hoje: 'Hoje',
+      ontem: 'Ontem',
+      semana: 'Últimos 7 Dias',
+      '30dias': 'Últimos 30 Dias',
+      mes: 'Mês Atual',
+      '60dias': 'Últimos 60 Dias',
+      '90dias': 'Últimos 90 Dias',
+    }
+    const opcao = mapOpcao[periodo] || 'Hoje'
+    const { inicio, fim } = calcularPeriodoNoFusoEmpresa(opcao, timezone)
+    
+    if (inicio && fim) {
+      appendIntervaloFinalizacaoVendasPdv(params, { inicial: inicio.toISOString(), final: fim.toISOString() })
     }
   }
 

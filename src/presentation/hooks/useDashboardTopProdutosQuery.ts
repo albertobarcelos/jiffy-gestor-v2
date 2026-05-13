@@ -18,12 +18,14 @@ type Params = {
   limit?: number
   periodoInicial?: Date | null
   periodoFinal?: Date | null
+  timezone?: string
   enabled?: boolean
 }
 
-async function fetchTopProdutos(params: Params & { token: string }): Promise<DashboardTopProduto[]> {
+async function fetchTopProdutos(params: Params & { token: string; timezone: string }): Promise<DashboardTopProduto[]> {
   const search = new URLSearchParams()
   search.append('periodo', params.periodo)
+  search.append('timezone', params.timezone)
   search.append('limit', String(params.limit ?? 10))
   if (params.periodoInicial && params.periodoFinal) {
     search.append('dataFinalizacaoInicial', params.periodoInicial.toISOString())
@@ -56,11 +58,13 @@ export function useDashboardTopProdutosQuery({
   limit = 10,
   periodoInicial,
   periodoFinal,
+  timezone,
   enabled = true,
 }: Params) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
+  const resolvedTimezone = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
 
   return useQuery({
     queryKey: [
@@ -71,8 +75,9 @@ export function useDashboardTopProdutosQuery({
       periodoInicial ? periodoInicial.toISOString() : null,
       periodoFinal ? periodoFinal.toISOString() : null,
       empresaId,
+      resolvedTimezone,
     ],
-    queryFn: () => fetchTopProdutos({ periodo, limit, periodoInicial, periodoFinal, enabled, token: token! }),
+    queryFn: () => fetchTopProdutos({ periodo, limit, periodoInicial, periodoFinal, enabled, token: token!, timezone: resolvedTimezone }),
     enabled: enabled && !!token,
     staleTime: 30_000,
   })

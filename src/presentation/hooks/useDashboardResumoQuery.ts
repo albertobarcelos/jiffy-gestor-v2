@@ -21,15 +21,27 @@ type DashboardResumoMetricas = {
     countVendasCanceladas: number
     countProdutosVendidos: number
   }
+  mesasAbertas: number
+  totalCancelado: number
+  ticketMedio: number
+  itensPorPedido: number
 }
 
 export type DashboardResumoResponse = {
-  metricas: DashboardResumoMetricas
-  mesasAbertas: number
-  totalCancelado: number
+  atual: DashboardResumoMetricas
+  anterior: DashboardResumoMetricas
+  comparacao: {
+    totalFaturado: { percentual: number; status: 'neutro' | 'sem_base' | 'positivo' | 'negativo' }
+    countVendasEfetivadas: { percentual: number; status: 'neutro' | 'sem_base' | 'positivo' | 'negativo' }
+    countVendasCanceladas: { percentual: number; status: 'neutro' | 'sem_base' | 'positivo' | 'negativo' }
+    ticketMedio: { percentual: number; status: 'neutro' | 'sem_base' | 'positivo' | 'negativo' }
+    itensPorPedido: { percentual: number; status: 'neutro' | 'sem_base' | 'positivo' | 'negativo' }
+  }
 }
 
 type DashboardResumoParams = {
+  periodo?: string
+  timezone?: string
   periodoInicial?: Date | null
   periodoFinal?: Date | null
   enabled?: boolean
@@ -37,8 +49,12 @@ type DashboardResumoParams = {
 
 async function fetchDashboardResumo(params: DashboardResumoParams & { token: string }): Promise<DashboardResumoResponse> {
   const search = new URLSearchParams()
-  if (params.periodoInicial) search.append('dataFinalizacaoInicial', params.periodoInicial.toISOString())
-  if (params.periodoFinal) search.append('dataFinalizacaoFinal', params.periodoFinal.toISOString())
+  if (params.periodo) search.append('periodo', params.periodo)
+  if (params.timezone) search.append('timezone', params.timezone)
+  if (params.periodo === 'personalizado' && params.periodoInicial && params.periodoFinal) {
+    search.append('dataFinalizacaoInicial', params.periodoInicial.toISOString())
+    search.append('dataFinalizacaoFinal', params.periodoFinal.toISOString())
+  }
 
   const response = await fetch(`/api/dashboard/resumo?${search.toString()}`, {
     headers: { Authorization: `Bearer ${params.token}` },
@@ -52,7 +68,7 @@ async function fetchDashboardResumo(params: DashboardResumoParams & { token: str
   return data as unknown as DashboardResumoResponse
 }
 
-export function useDashboardResumoQuery({ periodoInicial, periodoFinal, enabled = true }: DashboardResumoParams) {
+export function useDashboardResumoQuery({ periodo, timezone, periodoInicial, periodoFinal, enabled = true }: DashboardResumoParams) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
@@ -61,11 +77,13 @@ export function useDashboardResumoQuery({ periodoInicial, periodoFinal, enabled 
     queryKey: [
       'dashboard',
       'resumo',
-      periodoInicial ? periodoInicial.toISOString() : null,
-      periodoFinal ? periodoFinal.toISOString() : null,
+      periodo,
+      timezone,
+      periodo === 'personalizado' && periodoInicial ? periodoInicial.toISOString() : null,
+      periodo === 'personalizado' && periodoFinal ? periodoFinal.toISOString() : null,
       empresaId,
     ],
-    queryFn: () => fetchDashboardResumo({ periodoInicial, periodoFinal, token: token! }),
+    queryFn: () => fetchDashboardResumo({ periodo, timezone, periodoInicial, periodoFinal, token: token! }),
     enabled: enabled && !!token,
     staleTime: 30_000,
   })
