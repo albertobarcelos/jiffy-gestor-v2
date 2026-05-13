@@ -7,9 +7,9 @@ import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { empresaNomeParaSlugUrl } from '@/src/shared/utils/empresaNomeParaSlugUrl'
 
 /**
- * Mantém a URL canônica `/meus-apps/convidar-usuarios/<slug>` alinhada ao nome da empresa da sessão.
+ * Mantém a URL canônica `/meus-apps/perfis-gestor/<slug>` alinhada ao nome da empresa da sessão.
  */
-export function ConvidarUsuariosSlugSync({
+export function PerfisGestorSlugSync({
   routeSlug,
   children,
 }: {
@@ -25,7 +25,7 @@ export function ConvidarUsuariosSlugSync({
     }
     const esperado = empresaNomeParaSlugUrl(empresa.nomeExibicao)
     if (esperado !== routeSlug) {
-      router.replace(`/meus-apps/convidar-usuarios/${esperado}`)
+      router.replace(`/meus-apps/perfis-gestor/${esperado}`)
     }
   }, [empresa, isLoading, routeSlug, router])
 

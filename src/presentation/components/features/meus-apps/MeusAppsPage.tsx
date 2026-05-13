@@ -392,13 +392,13 @@ export default function MeusAppsPage() {
       const token = await obterTokenEmpresa(appId)
       const { empParam } = prepareTabSession(token, app.nome, appId)
       const slug = empresaNomeParaSlugUrl(app.nome)
-      window.open(`/meus-apps/convidar-usuarios/${slug}?${empParam}`, '_blank')
+      window.open(`/meus-apps/gerenciar-usuarios/${slug}?${empParam}`, '_blank')
     } catch (e) {
       reportErroAcessoEmpresa(e, appId)
     }
   }
 
-  const handleGerenciarUsuariosGestor = async (appId: string) => {
+  const handleGerenciarPerfisGestor = async (appId: string) => {
     const app = appsBase.find(a => a.id === appId)
     if (!app || app.status === 'inativo') {
       return
@@ -410,7 +410,7 @@ export default function MeusAppsPage() {
       const token = await obterTokenEmpresa(appId)
       const { empParam } = prepareTabSession(token, app.nome, appId)
       const slug = empresaNomeParaSlugUrl(app.nome)
-      window.open(`/meus-apps/usuarios-gestor/${slug}?${empParam}`, '_blank')
+      window.open(`/meus-apps/perfis-gestor/${slug}?${empParam}`, '_blank')
     } catch (e) {
       reportErroAcessoEmpresa(e, appId)
     }
@@ -547,7 +547,7 @@ export default function MeusAppsPage() {
                 cells={gridCells}
                 onAcessar={handleAcessar}
                 onGerenciarConvites={handleGerenciarConvites}
-                onGerenciarUsuariosGestor={handleGerenciarUsuariosGestor}
+                onGerenciarPerfisGestor={handleGerenciarPerfisGestor}
                 busyAppId={busyAppId}
                 onAceitarConvite={handleAceitarConvite}
                 onRecusarConvite={handleRecusarConvite}
@@ -558,7 +558,7 @@ export default function MeusAppsPage() {
                 items={feedItems}
                 onAcessar={handleAcessar}
                 onGerenciarConvites={handleGerenciarConvites}
-                onGerenciarUsuariosGestor={handleGerenciarUsuariosGestor}
+                onGerenciarPerfisGestor={handleGerenciarPerfisGestor}
                 busyAppId={busyAppId}
                 onAceitarConvite={handleAceitarConvite}
                 onRecusarConvite={handleRecusarConvite}

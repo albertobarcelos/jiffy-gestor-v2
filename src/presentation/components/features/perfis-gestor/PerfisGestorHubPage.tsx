@@ -4,21 +4,15 @@ import { useCallback } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { MeusAppsTopNav } from '@/src/presentation/components/features/meus-apps/components/MeusAppsTopNav'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
-import { UsuariosGestorList } from './UsuariosGestorList'
+import { PerfisGestorList } from './PerfisGestorList'
 
-/**
- * Lista de usuários gestor no hub (sessão tenant), com navegação Omie-like e Voltar para Meus Apps.
- */
-export default function UsuariosGestorHubPage() {
-  const { empresa, isLoading: empresaLoading } = useEmpresaMe()
+export function PerfisGestorHubPage() {
+  const { empresa } = useEmpresaMe()
 
-  const nomeEmpresa =
-    empresa?.nomeExibicao ?? (empresaLoading ? 'Carregando…' : 'Empresa')
+  const nomeEmpresa = empresa?.nomeExibicao ?? ''
 
   const handleVoltar = useCallback(() => {
-    if (typeof window === 'undefined') {
-      return
-    }
+    if (typeof window === 'undefined') return
 
     try {
       const { opener } = window
@@ -28,7 +22,7 @@ export default function UsuariosGestorHubPage() {
         return
       }
     } catch {
-      /* opener indisponível em alguns cenários */
+      /* opener indisponível */
     }
 
     window.open('/meus-apps', '_blank', 'noopener,noreferrer')
@@ -50,7 +44,7 @@ export default function UsuariosGestorHubPage() {
       <MeusAppsTopNav />
 
       <div className="mx-auto w-full max-w-6xl flex-shrink-0 px-3 pt-4 md:px-8">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={handleVoltar}
@@ -61,26 +55,26 @@ export default function UsuariosGestorHubPage() {
           </button>
         </div>
 
-        <div className="mt-6 flex flex-col gap-4 border-b border-gray-200 pb-6 md:mt-8 md:flex-row md:items-center md:justify-between md:gap-8">
-          <div className="min-w-0">
-            <h1 className="font-nunito text-xl font-bold tracking-tight text-primary-text md:text-2xl">
-              {nomeEmpresa}
-            </h1>
-            <p className="mt-1 font-nunito text-sm text-secondary-text">
-              {empresa ? 'Usuários gestor' : empresaLoading ? '…' : '—'}
-            </p>
+        {nomeEmpresa && (
+          <div className="mt-6 flex flex-col gap-4 border-b border-gray-200 pb-6 md:mt-8 md:flex-row md:items-center md:justify-between md:gap-8">
+            <div className="min-w-0">
+              <h1 className="text-lg font-normal uppercase tracking-tight text-primary-text md:text-xl">
+                {nomeEmpresa}
+              </h1>
+              <p className="mt-1 text-sm text-secondary-text">Ativo</p>
+            </div>
+            <div
+              className="flex h-28 w-full max-w-[220px] shrink-0 items-center justify-center self-start rounded-lg border border-dashed border-gray-300 bg-white font-nunito text-xs text-secondary-text md:self-center"
+              aria-hidden
+            >
+              Imagem da empresa
+            </div>
           </div>
-          <div
-            className="flex h-28 w-full max-w-[220px] shrink-0 items-center justify-center self-start rounded-lg border border-dashed border-gray-300 bg-white font-nunito text-xs text-secondary-text md:self-center"
-            aria-hidden
-          >
-            Imagem da empresa
-          </div>
-        </div>
+        )}
       </div>
 
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 md:px-8 md:pb-8">
-        <UsuariosGestorList />
+        <PerfisGestorList />
       </div>
     </div>
   )

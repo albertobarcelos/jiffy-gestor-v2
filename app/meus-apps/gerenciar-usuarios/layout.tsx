@@ -1,7 +1,7 @@
 /**
- * Sub-rota do hub: usuários gestor sem TopNav do ERP (sessão já na empresa).
+ * Sub-rota do hub: gestão de convites sem TopNav do ERP (sessão já na empresa).
  */
-export default function UsuariosGestorHubLayout({
+export default function GerenciarUsuariosLayout({
   children,
 }: {
   children: React.ReactNode

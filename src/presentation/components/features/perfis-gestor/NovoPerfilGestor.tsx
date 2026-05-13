@@ -268,7 +268,7 @@ export const NovoPerfilGestor = forwardRef<NovoPerfilGestorHandle, NovoPerfilGes
             ? 'Perfil gestor atualizado com sucesso!'
             : 'Perfil gestor criado com sucesso!'
         )
-        router.push('/cadastros/perfis-gestor')
+        router.push('/meus-apps/perfis-gestor')
       }
     } catch (error) {
       showToast.error(
@@ -284,7 +284,7 @@ export const NovoPerfilGestor = forwardRef<NovoPerfilGestorHandle, NovoPerfilGes
     if (isEmbedded) {
       onCancel?.()
     } else {
-      router.push('/cadastros/perfis-gestor')
+      router.push('/meus-apps/perfis-gestor')
     }
   }
 

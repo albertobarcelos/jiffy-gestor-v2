@@ -20,6 +20,7 @@ export function ConvitesGestaoList({
   onReenviar,
   onPerfilChange,
   onRemoverVinculo,
+  onEditarGrupos,
 }: {
   convites: ConviteGestaoDTO[]
   perfisList: PerfilGestorOption[]
@@ -33,6 +34,7 @@ export function ConvitesGestaoList({
   onReenviar: (id: string) => void
   onPerfilChange: (email: string, novoPerfilGestorId: string) => void
   onRemoverVinculo: (email: string) => void
+  onEditarGrupos?: () => void
 }) {
   const [busca, setBusca] = useState('')
 
@@ -85,20 +87,17 @@ export function ConvitesGestaoList({
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="overflow-visible rounded-lg border border-gray-200 bg-white shadow-sm">
           <div className="hidden min-w-0 flex-shrink-0 md:block">
-            <div className="grid h-11 w-full min-w-0 grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1.5fr)_5rem] items-center gap-[10px] border-b border-gray-200 bg-gray-50 px-3 pr-2 md:px-4">
+            <div className="grid h-11 w-full min-w-0 grid-cols-[minmax(180px,280px)_80px_160px] items-center gap-[10px] border-b border-gray-200 bg-gray-50 px-3 pr-2 md:px-4">
               <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary md:text-sm">
-                Usuários
+                Usuários convidados
               </div>
-              <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:text-sm">
-                Status
+              <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary md:text-sm">
+                Situação
               </div>
-              <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:text-sm">
+              <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary md:text-sm">
                 Perfil
-              </div>
-              <div className="min-w-0 shrink-0 text-center font-nunito text-xs font-semibold text-secondary md:text-sm">
-                Ações
               </div>
             </div>
           </div>
@@ -121,6 +120,7 @@ export function ConvitesGestaoList({
                   onReenviar={onReenviar}
                   onPerfilChange={temUsuario ? onPerfilChange : undefined}
                   onRemoverVinculo={temUsuario ? onRemoverVinculo : undefined}
+                  onEditarGrupos={onEditarGrupos}
                 />
               )
             })}

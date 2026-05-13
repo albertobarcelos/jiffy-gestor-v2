@@ -1,7 +1,7 @@
 /**
- * Sub-rota do hub: gestão de convites sem TopNav do ERP (sessão já na empresa).
+ * Sub-rota do hub: gestão de perfis gestor sem TopNav do ERP (sessão já na empresa).
  */
-export default function ConvidarUsuariosLayout({
+export default function PerfisGestorHubLayout({
   children,
 }: {
   children: React.ReactNode

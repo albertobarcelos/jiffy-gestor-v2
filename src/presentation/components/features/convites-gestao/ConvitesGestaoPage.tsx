@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react'
 import { ArrowLeft, Plus } from 'lucide-react'
 import { MeusAppsTopNav } from '@/src/presentation/components/features/meus-apps/components/MeusAppsTopNav'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import { empresaNomeParaSlugUrl } from '@/src/shared/utils/empresaNomeParaSlugUrl'
 import { useConvitesGestao } from './hooks/useConvitesGestao'
 import { ConvitesGestaoList } from './ConvitesGestaoList'
 import { NovoConviteModal } from './components/NovoConviteModal'
@@ -29,6 +30,12 @@ export default function ConvitesGestaoPage() {
   const [modalOpen, setModalOpen] = useState(false)
 
   const nomeEmpresa = empresa?.nomeExibicao ?? ''
+
+  const handleEditarGrupos = useCallback(() => {
+    if (!nomeEmpresa) return
+    const slug = empresaNomeParaSlugUrl(nomeEmpresa)
+    window.open(`/meus-apps/perfis-gestor/${slug}`, '_blank')
+  }, [nomeEmpresa])
 
   const handleVoltar = useCallback(() => {
     if (typeof window === 'undefined') return
@@ -83,7 +90,7 @@ export default function ConvitesGestaoPage() {
         </div>
 
         {nomeEmpresa && (
-          <div className="mt-6 flex flex-col gap-4 border-b border-gray-200 pb-6 md:mt-8 md:flex-row md:items-center md:justify-between md:gap-8">
+          <div className="mt-2 flex flex-col gap-4 border-b border-gray-200 pb-2 md:flex-row md:items-center md:justify-between md:gap-8">
             <div className="min-w-0">
               <h1 className="text-lg font-normal uppercase tracking-tight text-primary-text md:text-xl">
                 {nomeEmpresa}
@@ -114,6 +121,7 @@ export default function ConvitesGestaoPage() {
           onReenviar={handleReenviar}
           onPerfilChange={handlePerfilChange}
           onRemoverVinculo={handleRemoverVinculo}
+          onEditarGrupos={handleEditarGrupos}
         />
       </div>
 
