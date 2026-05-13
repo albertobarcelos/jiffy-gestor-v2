@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
+import type { Auth } from '@/src/domain/entities/Auth'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { buildAuthFromAccessToken } from '@/src/shared/utils/buildAuthFromAccessToken'
+import { getTabTenantToken } from '@/src/shared/utils/tabSession'
 import {
   SESSION_STORAGE_HUB_LOGOUT_SELF,
   SESSION_STORAGE_TENANT_LOGOUT_SELF,
@@ -64,6 +67,34 @@ function isHubPath(p: string | null): boolean {
   return p?.startsWith('/meus-apps') ?? false
 }
 
+/**
+ * JWT da empresa (tenant) ainda válido nesta aba — Zustand e/ou `sessionStorage` (prepareTabSession).
+ * Independente do JWT de identidade (hub).
+ */
+function getActiveTenantAuthOrNull(): Auth | null {
+  const st = useAuthStore.getState()
+  const t = st.tenantAuth
+  if (t !== null && !t.isExpired()) {
+    return t
+  }
+  const raw = getTabTenantToken()
+  if (!raw) return null
+  try {
+    const u = st.identityAuth?.getUser()
+    const built = buildAuthFromAccessToken(
+      raw,
+      u ? { id: u.getId(), email: u.getEmail(), name: u.getName() } : undefined
+    )
+    return built.isExpired() ? null : built
+  } catch {
+    return null
+  }
+}
+
+function isTenantSessionAlive(): boolean {
+  return getActiveTenantAuthOrNull() !== null
+}
+
 export function AuthGuard({ children }: AuthGuardProps) {
   const pathname = usePathname()
   const isAuthenticated = useAuthStore(s => s.isAuthenticated)
@@ -117,7 +148,8 @@ export function AuthGuard({ children }: AuthGuardProps) {
     const isHub = isHubPath(pathname)
 
     if (isHub) {
-      if (identityAuth !== null && !identityAuth.isExpired()) {
+      const tenantAlive = isTenantSessionAlive()
+      if ((identityAuth !== null && !identityAuth.isExpired()) || tenantAlive) {
         redirectingRef.current = false
         setAllowed(true)
         return
@@ -180,6 +212,9 @@ export function AuthGuard({ children }: AuthGuardProps) {
         if (isHubLogoutInitiatorTab()) {
           return
         }
+        if (isTenantSessionAlive()) {
+          return
+        }
         const id = st.identityAuth
         if (id === null || id.isExpired()) {
           redirectHubSemIdentidade()
@@ -195,7 +230,8 @@ export function AuthGuard({ children }: AuthGuardProps) {
     const intervalId = window.setInterval(checkExpired, SESSAO_POLL_MS)
 
     const st = useAuthStore.getState()
-    const watchAuth = isHub ? st.identityAuth : st.auth
+    const tenantA = getActiveTenantAuthOrNull()
+    const watchAuth = isHub ? (tenantA ?? st.identityAuth) : st.auth
     let timeoutId: number | undefined
     if (watchAuth) {
       const msAteExp = watchAuth.getExpiresAt().getTime() - Date.now()
@@ -215,6 +251,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     allowed,
     auth,
     identityAuth,
+    tenantAuth,
     pathname,
     invalidateSessionToLogin,
     redirectHubSemIdentidade,
