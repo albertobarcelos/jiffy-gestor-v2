@@ -5,7 +5,6 @@ export type Status = 'FINALIZADA' | 'CANCELADA'
 
 export type VendaLike = {
   dataFinalizacao?: string
-  dataCriacao?: string
   valorFinal?: number
   dataCancelamento?: string | null
 }
@@ -40,8 +39,9 @@ export function parseDateSafe(value: unknown): Date | null {
   return Number.isNaN(d.getTime()) ? null : d
 }
 
+/** Data para bucket do gráfico: finalização; canceladas sem finalização usam cancelamento (nunca data de criação). */
 export function resolveVendaDate(v: VendaLike): Date | null {
-  return parseDateSafe(v.dataFinalizacao) ?? parseDateSafe(v.dataCriacao)
+  return parseDateSafe(v.dataFinalizacao) ?? parseDateSafe(v.dataCancelamento)
 }
 
 export function resolveVendaValor(v: VendaLike): number {

@@ -219,8 +219,10 @@ export default function DashboardV2() {
   } = useDashboardResumoQuery({
     periodo: periodoData,
     timezone: timezoneAgregacao,
-    periodoInicial: periodoPersonalizadoInicio,
-    periodoFinal: periodoPersonalizadoFim,
+    intervaloAtualInicio: inicioResumo,
+    intervaloAtualFim: fimResumo,
+    intervaloComparacaoInicio: inicioAnterior,
+    intervaloComparacaoFim: fimAnterior,
   })
   const totalFaturadoPeriodo = dadosResumo?.atual?.total?.totalFaturado ?? 0
 
