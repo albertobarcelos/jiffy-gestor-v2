@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
@@ -22,9 +23,10 @@ interface GruposComplementosResponse {
 export function useGruposComplementos(params: GruposComplementosQueryParams = {}) {
   const { auth, isAuthenticated } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useQuery<GrupoComplemento[], ApiError>({
-    queryKey: ['grupos-complementos', params.q, params.ativo],
+    queryKey: ['grupos-complementos', params.q, params.ativo, empresaId],
     queryFn: async () => {
       if (!isAuthenticated || !token) {
         throw new Error('Usuário não autenticado ou token ausente.')
@@ -71,9 +73,10 @@ export function useGruposComplementos(params: GruposComplementosQueryParams = {}
 export function useGruposComplementosInfinite(params: Omit<GruposComplementosQueryParams, 'offset'> = {}) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useInfiniteQuery({
-    queryKey: ['grupos-complementos', 'infinite', params],
+    queryKey: ['grupos-complementos', 'infinite', params, empresaId],
     queryFn: async ({ pageParam = 0 }): Promise<{ grupos: GrupoComplemento[]; count: number; nextOffset: number | null }> => {
       if (!token) {
         throw new Error('Token não encontrado')
@@ -145,9 +148,10 @@ export function useGruposComplementosInfinite(params: Omit<GruposComplementosQue
 export function useGrupoComplemento(id: string) {
   const { auth, isAuthenticated } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useQuery<GrupoComplemento, ApiError>({
-    queryKey: ['grupo-complemento', id],
+    queryKey: ['grupo-complemento', id, empresaId],
     queryFn: async () => {
       if (!isAuthenticated || !token) {
         throw new Error('Usuário não autenticado ou token ausente.')
@@ -184,6 +188,7 @@ export function useGrupoComplementoMutation() {
   const { auth } = useAuthStore()
   const queryClient = useQueryClient()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useMutation({
     mutationFn: async ({ grupoId, data, isUpdate }: { grupoId?: string; data: any; isUpdate: boolean }) => {

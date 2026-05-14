@@ -1,13 +1,6 @@
-import { Suspense } from 'react'
-import { UsuariosGestorList } from '@/src/presentation/components/features/usuarios-gestor/UsuariosGestorList'
-import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
+import { redirect } from 'next/navigation'
 
-export default function UsuariosGestorPage() {
-  return (
-    <div className="h-full">
-      <Suspense fallback={<PageLoading />}>
-        <UsuariosGestorList />
-      </Suspense>
-    </div>
-  )
+/** URL antiga do menu; entrada oficial pelo Hub: `/meus-apps/usuarios-gestor`. */
+export default function LegacyUsuariosGestorRedirect() {
+  redirect('/meus-apps/usuarios-gestor')
 }

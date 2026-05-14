@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getTokenInfo } from '@/src/shared/utils/getTokenInfo'
 
 /**
  * API Route para consultar CNPJ na API CNPJA (mesma usada no Flutter)
  * Faz a requisição pelo servidor para evitar problemas de CORS
  * GET /api/consulta-cnpj?cnpj=12345678000190
- * 
+ *
  * URL da API: https://open.cnpja.com/office/{cnpj}
  */
 export async function GET(request: NextRequest) {
   try {
+    const tokenInfo = getTokenInfo(request)
+    if (!tokenInfo) {
+      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const cnpj = searchParams.get('cnpj')
 

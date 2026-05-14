@@ -4,6 +4,11 @@ import { AppRouterCacheProvider } from '@mui/material-nextjs/v15-appRouter'
 import { Toaster } from 'react-hot-toast'
 import { ThemeProvider } from '@/src/presentation/providers/ThemeProvider'
 import { QueryProvider } from '@/src/presentation/providers/QueryProvider'
+import { AuthStorageCrossTabSync } from '@/src/presentation/components/auth/AuthStorageCrossTabSync'
+import { EmpresaSessionLostGate } from '@/src/presentation/components/auth/EmpresaSessionLostGate'
+import { AuthGuard } from '@/src/presentation/components/auth/AuthGuard'
+import { TabSessionBootstrap } from '@/src/presentation/components/auth/TabSessionBootstrap'
+import { TenantCacheIsolation } from '@/src/presentation/components/auth/TenantCacheIsolation'
 import { DocumentoFiscalPdfRetryModal } from '@/src/presentation/components/features/nfe/DocumentoFiscalPdfRetryModal'
 import './globals.css'
 
@@ -30,10 +35,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="pt-BR" className={generalSans.variable}>
       {/* suppressHydrationWarning: extensões (ex. ColorZilla) injetam atributos no body e disparam falso positivo de hidratação */}
       <body className={`${generalSans.className} antialiased`} suppressHydrationWarning>
-        <QueryProvider>
-          <AppRouterCacheProvider options={{ enableCssLayer: true }}>
+        <AppRouterCacheProvider options={{ enableCssLayer: true }}>
+          <QueryProvider>
             <ThemeProvider>
-              {children}
+              <AuthStorageCrossTabSync />
+              <EmpresaSessionLostGate />
+              <TenantCacheIsolation />
+              <TabSessionBootstrap />
+              <AuthGuard>
+                {children}
+              </AuthGuard>
               <DocumentoFiscalPdfRetryModal />
               <Toaster
                 position="top-right"
@@ -60,8 +71,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 }}
               />
             </ThemeProvider>
-          </AppRouterCacheProvider>
-        </QueryProvider>
+          </QueryProvider>
+        </AppRouterCacheProvider>
       </body>
     </html>
   )

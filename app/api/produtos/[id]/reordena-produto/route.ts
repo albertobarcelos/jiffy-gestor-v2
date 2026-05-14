@@ -25,7 +25,8 @@ export async function PATCH(
     )
   }
 
-  if (!novaPosicao || novaPosicao < 1) {
+  // Cardápio aceita posição 0 (índice); não usar !novaPosicao — isso rejeitava o zero incorretamente
+  if (!Number.isFinite(novaPosicao) || novaPosicao < 0) {
     return NextResponse.json(
       { message: 'Nova posição inválida' },
       { status: 400 }

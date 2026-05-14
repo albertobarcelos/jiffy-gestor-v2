@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 import { useCallback, useRef } from 'react'
@@ -309,8 +310,9 @@ interface VendasResponse {
 export function useVendas(params: VendasQueryParams = {}) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  const queryKey = ['vendas', params]
+  const queryKey = ['vendas', params, empresaId]
 
   return useQuery({
     queryKey,
@@ -383,9 +385,10 @@ export function useVendas(params: VendasQueryParams = {}) {
 export function useVenda(id: string) {
   const { auth, isAuthenticated } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useQuery<any, ApiError>({
-    queryKey: ['venda', id],
+    queryKey: ['venda', id, empresaId],
     queryFn: async () => {
       if (!isAuthenticated || !token) {
         throw new Error('Usuário não autenticado ou token ausente.')

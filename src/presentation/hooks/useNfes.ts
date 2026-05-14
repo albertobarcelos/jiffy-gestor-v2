@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { NFe, NFeStatus } from '@/src/domain/entities/NFe'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 
 interface NfesGroupedByStatus {
   PENDENTE: NFe[]
@@ -17,9 +18,10 @@ interface NfesGroupedByStatus {
 export function useNfes() {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useQuery<NfesGroupedByStatus>({
-    queryKey: ['nfes'],
+    queryKey: ['nfes', empresaId],
     queryFn: async (): Promise<NfesGroupedByStatus> => {
       if (!token) {
         throw new Error('Token não encontrado')

@@ -1,34 +1,62 @@
 'use client'
 
-import { useState, FormEvent } from 'react'
+import { useState, FormEvent, useEffect } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { Auth } from '@/src/domain/entities/Auth'
-import { User } from '@/src/domain/entities/User'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/src/presentation/components/ui/dialog'
+import { loginViaApiRoute } from '@/src/presentation/components/features/auth/utils/loginViaApiRoute'
+import { extrairEmailLoginQuery } from '@/src/presentation/components/features/auth/utils/emailFromLoginQuery'
+import { decodeInvitePayloadFromLoginSearch } from '@/src/presentation/components/features/auth/utils/inviteLoginPayload'
+import { AuthEnvelopeIcon, AuthLockIcon } from '@/src/presentation/components/features/auth/components/auth-input-icons'
+import { authFluid } from '@/src/presentation/components/features/auth/components/auth-input-fluid'
+import { cn } from '@/src/shared/utils/cn'
 
 /**
  * Componente de formulário de login
  */
 export function LoginForm() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({})
-  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false)
+  const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false)
+  const [resendLoading, setResendLoading] = useState(false)
+  const [resendMessage, setResendMessage] = useState<string | null>(null)
 
-  const { login, setLoading, setError, isLoading } = useAuthStore()
+  const { login, setHubEmpresas, setLoading, setError, isLoading } = useAuthStore()
+
+  /** Convite por e-mail: `p` (base64url), ou legado `email` / `conviteId`. */
+  useEffect(() => {
+    const doPayload = decodeInvitePayloadFromLoginSearch(searchParams)
+    if (doPayload?.email?.trim()) {
+      setEmail(doPayload.email.trim())
+      return
+    }
+    const daBusca = searchParams.get('email')
+    if (daBusca?.trim()) {
+      try {
+        setEmail(decodeURIComponent(daBusca.trim()))
+      } catch {
+        setEmail(daBusca.trim())
+      }
+      return
+    }
+    if (typeof window !== 'undefined') {
+      const recuperado = extrairEmailLoginQuery(window.location.search)
+      if (recuperado) {
+        setEmail(recuperado)
+      }
+    }
+  }, [searchParams])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setErrors({})
     setError(null)
+    setNeedsEmailConfirmation(false)
+    setResendMessage(null)
 
     // Validação básica
     const newErrors: { email?: string; password?: string } = {}
@@ -47,41 +75,19 @@ export function LoginForm() {
     try {
       setLoading(true)
 
-      // Chama a API route
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: email.trim(),
-          password,
-        }),
-      })
+      const resultado = await loginViaApiRoute(email.trim(), password)
 
-      const data = await response.json()
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Erro ao fazer login')
+      if (!resultado.ok) {
+        if (resultado.needsEmailConfirmation) {
+          setNeedsEmailConfirmation(true)
+        }
+        throw new Error(resultado.error)
       }
 
-      // Reconstrói Auth a partir da resposta
-      const authData = data.data
-      
-      const user = User.create(
-        authData.user.id,
-        authData.user.email,
-        authData.user.name
-      )
+      login(resultado.auth)
+      setHubEmpresas(resultado.empresas)
 
-      const expiresAt = new Date(authData.expiresAt)
-      const auth = Auth.createWithExpiration(authData.accessToken, user, expiresAt)
-
-      // Atualiza o store
-      login(auth)
-
-      // Redireciona para dashboard v2
-      window.location.href = '/dashboard'
+      router.replace('/meus-apps')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao fazer login'
       setError(message)
@@ -91,28 +97,40 @@ export function LoginForm() {
     }
   }
 
+  const handleResendConfirmation = async () => {
+    if (!email.trim()) return
+    setResendLoading(true)
+    setResendMessage(null)
+    try {
+      const res = await fetch('/api/auth/usuario/reenviar-confirmacao', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: email.trim() }),
+      })
+      if (res.status === 204) {
+        setResendMessage(
+          'Se o e-mail estiver cadastrado e pendente de confirmação, um novo link foi enviado.'
+        )
+      } else {
+        const data = (await res.json().catch(() => ({}))) as { error?: string }
+        setResendMessage(data.error || 'Não foi possível reenviar o e-mail.')
+      }
+    } finally {
+      setResendLoading(false)
+    }
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-5 [@media(max-height:720px)]:space-y-2 [@media(max-height:640px)]:space-y-1.5"
+    >
       {/* Campo E-mail com ícone de envelope */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          E-mail
-        </label>
+        <label className={authFluid.label}>E-mail</label>
         <div className="relative">
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-              />
-            </svg>
+          <div className={authFluid.iconLeft}>
+            <AuthEnvelopeIcon className={authFluid.iconSvg} />
           </div>
           <input
             type="email"
@@ -121,36 +139,40 @@ export function LoginForm() {
             placeholder="seu@email.com"
             disabled={isLoading}
             autoComplete="email"
-            className={`w-full pl-10 pr-4 py-3 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-alternate focus:border-transparent transition-all ${
-              errors.email ? 'border-error' : ''
-            } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={cn(
+              authFluid.shell,
+              authFluid.textAndPy,
+              authFluid.padIconField,
+              errors.email ? 'border-error' : '',
+              isLoading ? 'cursor-not-allowed opacity-50' : ''
+            )}
           />
         </div>
         {errors.email && (
           <p className="mt-1 text-sm text-error">{errors.email}</p>
         )}
+        {needsEmailConfirmation && (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+            <p className="mb-2">Confirme seu e-mail para continuar.</p>
+            <button
+              type="button"
+              onClick={() => void handleResendConfirmation()}
+              disabled={resendLoading || !email.trim()}
+              className="w-full py-2 rounded-lg font-semibold text-white bg-amber-700 hover:bg-amber-800 disabled:opacity-50 text-xs sm:text-sm"
+            >
+              {resendLoading ? 'Enviando…' : 'Reenviar e-mail de confirmação'}
+            </button>
+            {resendMessage ? <p className="mt-2 text-xs text-amber-900">{resendMessage}</p> : null}
+          </div>
+        )}
       </div>
 
       {/* Campo Senha com ícone de cadeado e toggle de visibilidade */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Senha
-        </label>
+        <label className={authFluid.label}>Senha</label>
         <div className="relative">
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-              />
-            </svg>
+          <div className={authFluid.iconLeft}>
+            <AuthLockIcon className={authFluid.iconSvg} />
           </div>
           <input
             type={showPassword ? 'text' : 'password'}
@@ -159,19 +181,27 @@ export function LoginForm() {
             placeholder="••••••••"
             disabled={isLoading}
             autoComplete="current-password"
-            className={`w-full pl-10 pr-12 py-3 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-alternate focus:border-transparent transition-all ${
-              errors.password ? 'border-error' : ''
-            } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={cn(
+              authFluid.shell,
+              authFluid.textAndPy,
+              authFluid.padPwdField,
+              errors.password ? 'border-error' : '',
+              isLoading ? 'cursor-not-allowed opacity-50' : ''
+            )}
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
+            className={cn(
+              authFluid.eyeBtn,
+              'hover:text-gray-700',
+              isLoading && 'cursor-not-allowed opacity-50'
+            )}
             disabled={isLoading}
           >
             {showPassword ? (
               <svg
-                className="w-5 h-5"
+                className={authFluid.eyeIcon}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -185,7 +215,7 @@ export function LoginForm() {
               </svg>
             ) : (
               <svg
-                className="w-5 h-5"
+                className={authFluid.eyeIcon}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -215,9 +245,9 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={isLoading}
-        className="w-full py-3 px-4 bg-[var(--color-alternate)] hover:bg-[var(--color-secondary)] text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        className="w-full py-2 px-4 bg-[var(--color-secondary)] hover:bg-[var(--color-alternate)] text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         style={{
-          backgroundColor: 'var(--color-alternate)',
+          backgroundColor: 'var(--color-secondary)',
         }}
       >
         {isLoading ? (
@@ -249,63 +279,21 @@ export function LoginForm() {
         )}
       </button>
 
-      {/* Link Esqueceu senha - roxo/rosa claro */}
-      <button
-        type="button"
-        onClick={() => {
-          setForgotPasswordOpen(true)
-        }}
-        className="w-full text-center text-sm text-[var(--color-alternate)] hover:text-[var(--color-secondary)] transition-colors disabled:opacity-50"
-        style={{
-          color: 'var(--color-secondary)',
-        }}
-        disabled={isLoading}
-      >
-        Esqueceu sua senha?
-      </button>
-
-      <Dialog
-        open={forgotPasswordOpen}
-        onOpenChange={(openState) => setForgotPasswordOpen(openState)}
-        maxWidth="xs"
-        fullWidth
-        sx={{
-          '& .MuiDialog-paper': {
-            borderRadius: 3,
-            p: 0,
-          },
-        }}
-      >
-        <DialogContent sx={{ p: 2.5 }}>
-          <DialogHeader sx={{ p: 0, pb: 1.5 }}>
-            <DialogTitle sx={{ fontSize: '1.05rem', color: 'var(--color-alternate)' }}>
-              Recuperação de senha
-            </DialogTitle>
-            <DialogDescription sx={{ mt: 1 }}>
-              Para recuperar seu acesso, fale com o suporte técnico. Se possível, informe seu e-mail e o CNPJ da
-              empresa para agilizar o atendimento.
-            </DialogDescription>
-          </DialogHeader>
-
-          <DialogFooter sx={{ p: 0, pt: 2, gap: 1, justifyContent: 'flex-end' }}>
-            <button
-              type="button"
-              onClick={() => setForgotPasswordOpen(false)}
-              className="h-10 rounded-lg border border-gray-300 px-4 text-sm font-semibold text-primary-text transition-colors hover:bg-gray-50"
-            >
-              Entendi
-            </button>
-            <a
-              href="https://wa.me/556592298724?text=Ol%C3%A1!%20Preciso%20de%20ajuda%20para%20recuperar%20minhas%20credenciais%20de%20login."
-              target="_blank"
-              rel="noreferrer"
-              className="h-10 rounded-lg bg-[var(--color-alternate)] px-4 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-secondary)] inline-flex items-center"
-            >
-              Falar com suporte
-            </a>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <div className="space-y-1 text-center">
+        <Link
+          href="/esqueci-senha"
+          className="block w-full text-sm text-[var(--color-secondary)] hover:text-[var(--color-alternate)] transition-colors disabled:opacity-50"
+          style={{ color: 'var(--color-secondary)' }}
+        >
+          Esqueceu sua senha?
+        </Link>
+        <p className="text-sm text-gray-700">
+          Não tem conta?{' '}
+          <Link href="/registro" className="font-semibold text-[var(--color-secondary)] underline">
+            Criar conta
+          </Link>
+        </p>
+      </div>
     </form>
   )
 }

@@ -43,6 +43,7 @@ import {
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useImpressaoDelivery } from '@/src/presentation/hooks/useImpressaoDelivery'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { extractTokenInfo } from '@/src/shared/utils/validateToken'
 import {
@@ -423,6 +424,7 @@ export function NovoPedidoModal({
   const { auth } = useAuthStore()
   const { empresa, preferenciasImpressaoDelivery } = useEmpresaMe()
   const { processarAposTransicaoVendaGestorId } = useImpressaoDelivery()
+  const empresaId = useTenantEmpresaId()
   const createVendaGestor = useCreateVendaGestor()
   const cancelarVendaGestor = useCancelarVendaGestor()
   const cancelarNotaFiscalVendaPdv = useCancelarNotaFiscalVendaPdv()
@@ -657,7 +659,7 @@ export function NovoPedidoModal({
     isLoading: isLoadingProdutos,
     error: produtosError,
   } = useQuery({
-    queryKey: ['produtos-por-grupo', grupoSelecionadoId],
+    queryKey: ['produtos-por-grupo', grupoSelecionadoId, empresaId],
     queryFn: async () => {
       if (!grupoSelecionadoId || !auth?.getAccessToken()) {
         return { produtos: [], count: 0 }

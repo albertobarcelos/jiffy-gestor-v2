@@ -4,93 +4,177 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { Auth } from '@/src/domain/entities/Auth'
 import { User } from '@/src/domain/entities/User'
+import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
+import { buildAuthFromAccessToken } from '@/src/shared/utils/buildAuthFromAccessToken'
+import { SESSION_STORAGE_TENANT_TOKEN } from '@/src/shared/constants/sessionCoordinator'
+import { clearTabSession } from '@/src/shared/utils/tabSession'
+
+type PersistedAuthJSON = {
+  accessToken: string
+  user: {
+    id: string
+    email: string
+    name?: string
+  }
+  expiresAt: string
+}
 
 interface AuthState {
+  /** JWT do login (hub / identidade). Não é substituído ao escolher empresa. */
+  identityAuth: Auth | null
+  /** JWT após POST escolher-empresa (tenant). */
+  tenantAuth: Auth | null
+  /**
+   * Compat: sessão “ativa” para o ERP = tenant se existir, senão identidade.
+   * Hub (Meus Apps) deve usar sempre `identityAuth` nos fetches.
+   */
   auth: Auth | null
+  hubEmpresas: LoginEmpresaSnapshot[] | null
   isAuthenticated: boolean
   isLoading: boolean
   isRehydrated: boolean
   error: string | null
   login: (auth: Auth) => void
+  setTenantAuth: (tenant: Auth | null) => void
+  setHubEmpresas: (empresas: LoginEmpresaSnapshot[] | null) => void
+  /** Logout só do hub (Meus Apps); mantém sessão da empresa. */
+  logoutHub: () => Promise<void>
+  /** Logout só da empresa; mantém identidade no hub. */
+  logoutTenant: () => Promise<void>
+  /** Logout completo (identidade + tenant). */
   logout: () => Promise<void>
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
   getUser: () => User | null
 }
 
-interface AuthStorage {
-  auth: {
-    accessToken: string
-    user: {
-      id: string
-      email: string
-      name?: string
-    }
-    expiresAt: string
-  } | null
-  isAuthenticated: boolean
+function authFromJson(data: PersistedAuthJSON | null | undefined): Auth | null {
+  if (!data?.accessToken) {
+    return null
+  }
+  const user = User.create(data.user.id, data.user.email, data.user.name)
+  const expiresAt = new Date(data.expiresAt)
+  return Auth.createWithExpiration(data.accessToken, user, expiresAt)
 }
 
-function authToStorageShape(auth: Auth | AuthStorage['auth'] | null): AuthStorage['auth'] | null {
-  if (auth == null) return null
-  if (typeof (auth as Auth).toJSON === 'function') {
-    return (auth as Auth).toJSON() as AuthStorage['auth']
+function asPersistedAuthJson(raw: unknown): PersistedAuthJSON | null {
+  if (raw === null || raw === undefined || typeof raw !== 'object') {
+    return null
   }
-  const plain = auth as AuthStorage['auth']
-  if (
-    plain &&
-    typeof plain.accessToken === 'string' &&
-    plain.user &&
-    typeof plain.user.id === 'string' &&
-    typeof plain.user.email === 'string'
-  ) {
-    const expiresAt =
-      typeof plain.expiresAt === 'string'
-        ? plain.expiresAt
-        : new Date(plain.expiresAt as unknown as string).toISOString()
-    return {
-      accessToken: plain.accessToken,
-      user: {
-        id: plain.user.id,
-        email: plain.user.email,
-        name: plain.user.name,
-      },
-      expiresAt,
-    }
+  const o = raw as Record<string, unknown>
+  if (typeof o.accessToken !== 'string' || typeof o.expiresAt !== 'string') {
+    return null
   }
-  return null
+  const u = o.user
+  if (!u || typeof u !== 'object') {
+    return null
+  }
+  const user = u as Record<string, unknown>
+  if (typeof user.id !== 'string' || typeof user.email !== 'string') {
+    return null
+  }
+  return {
+    accessToken: o.accessToken,
+    expiresAt: o.expiresAt,
+    user: {
+      id: user.id,
+      email: user.email,
+      name: typeof user.name === 'string' ? user.name : undefined,
+    },
+  }
 }
 
 /**
- * Store de autenticação usando Zustand
- * Gerencia o estado de autenticação do usuário
+ * Lê o tenant token per-tab do sessionStorage (SSR-safe).
+ * Chamado sincronamente durante `onRehydrateStorage` para que o tenantAuth
+ * esteja disponível ANTES de qualquer componente ver `isRehydrated = true`.
  */
+function restoreTenantFromSessionStorage(identityAuth: Auth | null): Auth | null {
+  if (typeof sessionStorage === 'undefined') return null
+  try {
+    const token = sessionStorage.getItem(SESSION_STORAGE_TENANT_TOKEN)
+    if (!token) return null
+    const prev = identityAuth?.getUser()
+    return buildAuthFromAccessToken(
+      token,
+      prev ? { id: prev.getId(), email: prev.getEmail(), name: prev.getName() } : undefined
+    )
+  } catch {
+    return null
+  }
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
+      identityAuth: null,
+      tenantAuth: null,
       auth: null,
+      hubEmpresas: null,
       isAuthenticated: false,
       isLoading: false,
       isRehydrated: false,
       error: null,
 
-      login: (auth: Auth) => {
-        // Verifica se o token não expirou
-        if (auth.isExpired()) {
+      login: (authSession: Auth) => {
+        if (authSession.isExpired()) {
           set({ error: 'Sessão expirada. Faça login novamente.' })
           return
         }
 
         set({
-          auth,
+          identityAuth: authSession,
+          tenantAuth: null,
+          auth: authSession,
           isAuthenticated: true,
           error: null,
         })
       },
 
+      setTenantAuth: (tenant: Auth | null) => {
+        set(state => ({
+          tenantAuth: tenant,
+          auth: tenant ?? state.identityAuth,
+          isAuthenticated: !!(tenant ?? state.identityAuth),
+        }))
+      },
+
+      setHubEmpresas: (empresas: LoginEmpresaSnapshot[] | null) => {
+        set({ hubEmpresas: empresas })
+      },
+
+      logoutHub: async () => {
+        try {
+          await fetch('/api/auth/logout-hub', {
+            method: 'POST',
+            credentials: 'include',
+          })
+        } catch (error) {
+          console.error('Erro ao chamar API logout-hub:', error)
+        }
+
+        set(state => ({
+          identityAuth: null,
+          hubEmpresas: null,
+          auth: state.tenantAuth ?? null,
+          isAuthenticated: !!state.tenantAuth,
+          error: null,
+        }))
+      },
+
+      logoutTenant: async () => {
+        clearTabSession()
+
+        set(state => ({
+          tenantAuth: null,
+          auth: state.identityAuth ?? null,
+          isAuthenticated: !!state.identityAuth,
+          error: null,
+        }))
+      },
+
       logout: async () => {
         try {
-          // Chamar API de logout para remover cookie httpOnly
           await fetch('/api/auth/logout', {
             method: 'POST',
             credentials: 'include',
@@ -99,17 +183,17 @@ export const useAuthStore = create<AuthState>()(
           console.error('Erro ao chamar API de logout:', error)
         }
 
-        // Limpar estado do store
         set({
+          identityAuth: null,
+          tenantAuth: null,
           auth: null,
+          hubEmpresas: null,
           isAuthenticated: false,
           error: null,
         })
 
-        // Limpar localStorage (Zustand persist faz isso automaticamente, mas garantimos)
         try {
           localStorage.removeItem('auth-storage')
-          // Limpar também as abas ao fazer logout
           localStorage.removeItem('tabs-storage')
         } catch (error) {
           console.error('Erro ao limpar localStorage:', error)
@@ -125,42 +209,38 @@ export const useAuthStore = create<AuthState>()(
       },
 
       getUser: () => {
-        const { auth } = get()
-        return auth?.getUser() || null
+        const { identityAuth, tenantAuth } = get()
+        return identityAuth?.getUser() ?? tenantAuth?.getUser() ?? null
       },
     }),
     {
       name: 'auth-storage',
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({
-        auth: authToStorageShape(state.auth),
+      partialize: state => ({
+        identityAuth: state.identityAuth ? (state.identityAuth.toJSON() as PersistedAuthJSON) : null,
+        hubEmpresas: state.hubEmpresas,
         isAuthenticated: state.isAuthenticated,
       }),
-      onRehydrateStorage: () => (state) => {
-        // Reconstrói Auth a partir do JSON salvo
-        if (state?.auth && typeof state.auth === 'object' && 'accessToken' in state.auth) {
-          const authData = state.auth as unknown as AuthStorage['auth']
-          if (authData) {
-            const user = User.create(
-              authData.user.id,
-              authData.user.email,
-              authData.user.name
-            )
-            const expiresAt = new Date(authData.expiresAt)
-            const auth = Auth.create(
-              authData.accessToken,
-              user,
-              Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60))
-            )
-            state.auth = auth
-          }
+      onRehydrateStorage: () => state => {
+        if (!state) {
+          return
         }
-        // Marca como reidratado após processar o estado (sempre, mesmo se não houver dados)
-        if (state) {
-          state.isRehydrated = true
+        const s = state as AuthState & { auth?: unknown }
+
+        let identityAuth = authFromJson(asPersistedAuthJson(s.identityAuth))
+
+        if (!identityAuth && s.auth !== undefined) {
+          identityAuth = authFromJson(asPersistedAuthJson(s.auth))
         }
+
+        const tenantAuth = restoreTenantFromSessionStorage(identityAuth)
+
+        s.identityAuth = identityAuth
+        s.tenantAuth = tenantAuth
+        s.auth = tenantAuth ?? identityAuth ?? null
+        s.isAuthenticated = !!(identityAuth || tenantAuth)
+        s.isRehydrated = true
       },
     }
   )
 )
-

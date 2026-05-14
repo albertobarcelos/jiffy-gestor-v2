@@ -9,7 +9,7 @@ import {
   forwardRef,
   useImperativeHandle,
 } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { UsuarioGestor } from '@/src/domain/entities/UsuarioGestor'
 import { PerfilGestor as PerfilGestorEntity } from '@/src/domain/entities/PerfilGestor'
@@ -73,7 +73,12 @@ export const NovoUsuarioGestor = forwardRef<NovoUsuarioGestorHandle, NovoUsuario
     ref
   ) {
   const router = useRouter()
+  const pathname = usePathname()
   const { auth } = useAuthStore()
+  const hubUsuariosGestorPath =
+    pathname != null && pathname.startsWith('/meus-apps/usuarios-gestor')
+      ? pathname.split('?')[0]
+      : null
   const isEditing = !!usuarioId
   const formId = embeddedFormId ?? 'novo-usuario-gestor-form'
   const INPUT_LABEL_PROPS = { shrink: true } as const
@@ -416,6 +421,8 @@ export const NovoUsuarioGestor = forwardRef<NovoUsuarioGestorHandle, NovoUsuario
         if (shouldClosePanel) {
           onCloseAfterSave?.()
         }
+      } else if (hubUsuariosGestorPath) {
+        router.push(hubUsuariosGestorPath)
       } else {
         router.push('/cadastros/usuarios-gestor')
       }
@@ -430,6 +437,8 @@ export const NovoUsuarioGestor = forwardRef<NovoUsuarioGestorHandle, NovoUsuario
   const handleCancel = () => {
     if (isEmbedded) {
       onCancel?.()
+    } else if (hubUsuariosGestorPath) {
+      router.push(hubUsuariosGestorPath)
     } else {
       router.push('/cadastros/usuarios-gestor')
     }

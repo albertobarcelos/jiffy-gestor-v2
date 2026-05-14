@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { showToast } from '@/src/shared/utils/toast'
 
 /**
@@ -348,8 +349,9 @@ function montarSearchParamsVendasUnificadas(
 export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  const queryKey = ['vendas-unificadas', params]
+  const queryKey = ['vendas-unificadas', params, empresaId]
 
   return useQuery({
     queryKey,

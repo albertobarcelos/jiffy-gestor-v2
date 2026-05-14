@@ -5,7 +5,6 @@ import { UsuarioGestor } from '@/src/domain/entities/UsuarioGestor'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
-import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { MdSearch } from 'react-icons/md'
 import { Select, MenuItem, FormControl } from '@mui/material'
@@ -13,6 +12,10 @@ import {
   UsuariosGestorTabsModal,
   UsuariosGestorTabsModalState,
 } from './UsuariosGestorTabsModal'
+import {
+  UsuarioGestaoRow,
+  USUARIO_GESTAO_GRID_DESKTOP,
+} from './components/UsuarioGestaoRow'
 
 interface UsuariosGestorListProps {
   onReload?: () => void
@@ -27,18 +30,15 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [totalUsuarios, setTotalUsuarios] = useState(0)
   const [perfisMap, setPerfisMap] = useState<Record<string, string>>({}) // Mapa de perfilGestorId -> role
   const [allPerfis, setAllPerfis] = useState<Array<{ id: string; role: string }>>([]) // Lista de todos os perfis disponíveis
-  const [togglingStatus, setTogglingStatus] = useState<Record<string, boolean>>({})
   const [updatingPerfil, setUpdatingPerfil] = useState<Record<string, boolean>>({})
   const [tabsModalState, setTabsModalState] = useState<UsuariosGestorTabsModalState>({
     open: false,
     tab: 'usuario',
-    mode: 'create',
+    mode: 'edit',
     usuarioId: undefined,
   })
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
   const { auth, isAuthenticated } = useAuthStore()
@@ -138,7 +138,6 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
         const allUsuarios: UsuarioGestor[] = []
         let currentOffset = 0
         let hasMore = true
-        let totalCount = 0
 
         // Loop para carregar todas as páginas
         while (hasMore) {
@@ -179,11 +178,6 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
             })
             .filter((usuario: UsuarioGestor | null): usuario is UsuarioGestor => usuario !== null)
           allUsuarios.push(...newUsuarios)
-
-          // Atualiza o total apenas na primeira requisição
-          if (currentOffset === 0) {
-            totalCount = data.count || 0
-          }
 
           // Verifica se há mais páginas
           // Usa hasNext da API se disponível, senão verifica se retornou 10 itens
@@ -228,13 +222,11 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
 
         // Atualiza o estado com todos os itens carregados e o mapa de perfis
         setUsuarios(allUsuarios)
-        setTotalUsuarios(totalCount)
         setPerfisMap(perfisMapTemp)
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido ao carregar usuários gestor'
         showToast.error(errorMessage)
         setUsuarios([])
-        setTotalUsuarios(0)
         setPerfisMap({})
       } finally {
         setIsLoading(false)
@@ -291,7 +283,7 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
     setTabsModalState(() => ({
       open: true,
       tab: config.tab ?? 'usuario',
-      mode: config.mode ?? 'create',
+      mode: config.mode ?? 'edit',
       usuarioId: config.usuarioId,
     }))
 
@@ -356,13 +348,10 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
       )
 
       try {
-        const bodyData: any = {
+        // Contrato PATCH gestor (OpenAPI): apenas `perfilGestorId` e/ou `modulosAcesso`.
+        // O validador do backend é `.strict()` — campos extra (ex.: `ativo`) fazem o PATCH falhar.
+        const bodyData: { perfilGestorId: string } = {
           perfilGestorId: novoPerfilId,
-        }
-
-        // Mantém o status atual
-        if (usuario.isAtivo() !== undefined) {
-          bodyData.ativo = usuario.isAtivo()
         }
 
         const response = await fetch(`/api/pessoas/usuarios-gestor/${usuarioId}`, {
@@ -381,18 +370,31 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
 
         const updatedData = await response.json()
 
-        // Atualiza com os dados do servidor
+        // Resposta é `UsuarioGestorDTO`: perfil vem em `perfilGestor`.
+        // Mescla com o estado local para não zerar campos não retornados (ex.: módulos no cliente).
+        const perfilIdResolved =
+          updatedData.perfilGestor?.id?.toString?.() ?? novoPerfilId
+        const merged = {
+          ...usuario.toJSON(),
+          id: updatedData.id ?? usuario.getId(),
+          nome: updatedData.nome ?? usuario.getNome(),
+          username: updatedData.username ?? usuario.getUsername(),
+          empresaId: updatedData.empresaId ?? usuario.getEmpresaId(),
+          perfilGestor: updatedData.perfilGestor,
+          perfilGestorId: perfilIdResolved,
+        }
+
         setUsuarios((prev) =>
           prev.map((u) =>
-            u.getId() === usuarioId ? UsuarioGestor.fromJSON(updatedData) : u
+            u.getId() === usuarioId ? UsuarioGestor.fromJSON(merged) : u
           )
         )
 
-        // Atualiza o mapa de perfis
-        if (updatedData.perfilGestorId) {
-          const updatedPerfilNome = allPerfis.find((p) => p.id === updatedData.perfilGestorId)?.role || '-'
-          setPerfisMap((prev) => ({ ...prev, [updatedData.perfilGestorId]: updatedPerfilNome }))
-        }
+        const updatedPerfilNome =
+          allPerfis.find((p) => p.id === perfilIdResolved)?.role ||
+          updatedData.perfilGestor?.role ||
+          '-'
+        setPerfisMap((prev) => ({ ...prev, [perfilIdResolved]: updatedPerfilNome }))
 
         showToast.success('Perfil atualizado com sucesso!')
       } catch (error: any) {
@@ -410,416 +412,76 @@ export function UsuariosGestorList({ onReload }: UsuariosGestorListProps) {
     [auth, usuarios, allPerfis, loadAllUsuarios]
   )
 
-  /**
-   * Atualiza o status do usuário diretamente na lista
-   */
-  const handleToggleUsuarioStatus = useCallback(
-    async (usuarioId: string, novoStatus: boolean) => {
-      const token = auth?.getAccessToken()
-      if (!token) {
-        showToast.error('Token não encontrado. Faça login novamente.')
-        return
-      }
-
-      setTogglingStatus((prev) => ({ ...prev, [usuarioId]: true }))
-
-      // Atualização otimista
-      setUsuarios((prev) =>
-        prev.map((u) =>
-          u.getId() === usuarioId
-            ? UsuarioGestor.fromJSON({ ...u.toJSON(), ativo: novoStatus })
-            : u
-        )
-      )
-
-      try {
-        const usuario = usuarios.find((u) => u.getId() === usuarioId)
-        if (!usuario) {
-          throw new Error('Usuário não encontrado')
-        }
-
-        // Envia apenas os campos necessários para atualizar o status
-        // Remove campos que não devem ser enviados ou que a API não espera
-        const bodyData: any = {
-          ativo: novoStatus,
-        }
-
-        // Adiciona apenas campos essenciais se necessário
-        const perfilGestorId = usuario.getPerfilGestorId()
-        if (perfilGestorId) {
-          bodyData.perfilGestorId = perfilGestorId
-        }
-
-        const response = await fetch(`/api/pessoas/usuarios-gestor/${usuarioId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(bodyData),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.error || 'Erro ao atualizar usuário')
-        }
-
-        const updatedData = await response.json()
-
-        // Atualiza com os dados do servidor
-        setUsuarios((prev) =>
-          prev.map((u) =>
-            u.getId() === usuarioId ? UsuarioGestor.fromJSON(updatedData) : u
-          )
-        )
-
-        showToast.success(
-          novoStatus ? 'Usuário ativado com sucesso!' : 'Usuário desativado com sucesso!'
-        )
-      } catch (error: any) {
-        showToast.error(error.message || 'Erro ao atualizar status do usuário')
-
-        // Reverte a atualização otimista em caso de erro
-        loadAllUsuarios()
-      } finally {
-        setTogglingStatus((prev) => {
-          const { [usuarioId]: _, ...rest } = prev
-          return rest
-        })
-      }
-    },
-    [auth, usuarios, loadAllUsuarios]
-  )
+  if ((isLoading || !hasLoadedInitialRef.current) && usuarios.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 py-12">
+        <JiffyLoading />
+      </div>
+    )
+  }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header com título e botão */}
-      <div className="md:px-[30px] px-1 pt-1 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex flex-col w-1/2 md:pl-5">
-            <span className="text-primary md:text-lg text-sm font-semibold font-nunito">
-              Usuários Gestor Cadastrados
-            </span>
-            <span className="text-tertiary md:text-[22px] text-sm font-medium font-nunito">
-              Total {usuarios.length} de {totalUsuarios}
-            </span>
-          </div>
-          <button
-            onClick={() => openTabsModal({ mode: 'create' })}
-            className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
-          >
-            Novo
-            <span className="text-lg">+</span>
-          </button>
+    <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-4">
+      <div className="flex flex-shrink-0 flex-col gap-3">
+        <div className="relative h-8 min-w-[180px] max-w-[360px] flex-1">
+          <MdSearch className="absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-secondary-text" />
+          <input
+            id="usuarios-gestor-search"
+            type="search"
+            placeholder="Buscar por nome ou e-mail…"
+            value={searchText}
+            onChange={e => setSearchText(e.target.value)}
+            className="h-8 w-full rounded-lg border border-gray-200 bg-info pl-11 pr-4 font-nunito text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+          />
         </div>
       </div>
 
-      <div className="h-[4px] border-t-2 border-primary/70 flex-shrink-0"></div>
-      <div className="flex gap-3 px-1 pb-2 flex-shrink-0">
-        <div className="flex-1 min-w-[180px] max-w-[360px]">
-          <div className="relative h-8">
-            <MdSearch
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
-              size={18}
-            />
-            <input
-              id="usuarios-gestor-search"
-              type="text"
-              placeholder="Pesquisar usuário gestor..."
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
-            />
-          </div>
+      {usuarios.length === 0 && !isLoading && hasLoadedInitialRef.current ? (
+        <div className="rounded-lg border border-dashed border-gray-300 bg-white px-6 py-12 text-center">
+          <p className="font-nunito text-sm text-secondary-text">
+            Nenhum usuário gestor encontrado.
+          </p>
         </div>
-      </div>
-
-      {/* Cabeçalho da tabela - Apenas Desktop */}
-      {usuarios.length > 0 && (
-        <div className="hidden md:block px-1 flex-shrink-0">
-          <div className="h-10 bg-custom-2 rounded-lg md:px-4 pr-1 flex items-center gap-2">
-            <div className="md:flex-[2] font-nunito font-semibold text-left md:text-sm text-primary-text ">
-              Nome
-            </div>
-            <div className="md:flex-[1.5] font-nunito font-semibold text-left md:text-sm text-primary-text ">
-              E-mail
-            </div>
-            <div className="md:flex-[1.5] font-nunito font-semibold text-left md:text-sm text-primary-text ">
-              Perfil
-            </div>
-            <div className="md:flex-[1] font-nunito font-semibold text-right md:text-sm text-primary-text ">
-              Status
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Lista de usuários com scroll */}
-      <div
-        ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-1 scrollbar-hide"
-        style={{ maxHeight: 'calc(100vh - 250px)' }}
-      >
-        {/* Mostrar loading quando está carregando ou ainda não houve tentativa de carregamento */}
-        {(isLoading || !hasLoadedInitialRef.current) && usuarios.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 gap-2">
-            <JiffyLoading />
-          </div>
-        )}
-
-        {/* Só exibir mensagem de "nenhum usuário" quando realmente não há usuários e já houve tentativa de carregamento */}
-        {usuarios.length === 0 && !isLoading && hasLoadedInitialRef.current && (
-          <div className="flex items-center justify-center py-12">
-            <p className="text-secondary-text">Nenhum usuário gestor encontrado.</p>
-          </div>
-        )}
-
-        {usuarios.map((usuario, index) => {
-            // Handler para abrir edição ao clicar na linha do usuário
-            const handleUsuarioRowClick = () => {
-              openTabsModal({ mode: 'edit', usuarioId: usuario.getId() })
-            }
-
-            // Intercala cores de fundo: cinza-50 para pares, branco para ímpares
-            const isZebraEven = index % 2 === 0
-            const bgClass = isZebraEven ? 'bg-gray-50' : 'bg-white'
-            const perfilNome = usuario.getPerfilGestorId()
-              ? perfisMap[usuario.getPerfilGestorId()!] || usuario.getPerfilGestor()?.role || '-'
-              : '-'
-
-          return (
+      ) : usuarios.length > 0 ? (
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+          <div className="hidden min-w-0 flex-shrink-0 md:block">
             <div
-              key={usuario.getId()}
-              className={`${bgClass} rounded-lg my-2 overflow-visible hover:bg-primary/10 transition-colors`}
+              className={`${USUARIO_GESTAO_GRID_DESKTOP} h-11 w-full flex-shrink-0 border-b border-gray-200 bg-gray-50 px-3 pr-2 md:px-4`}
             >
-              {/* Layout Desktop - Tabela horizontal */}
-              <div 
-                onClick={handleUsuarioRowClick}
-                className="hidden md:flex h-[50px] md:px-4 items-center md:gap-[10px] relative overflow-visible cursor-pointer"
-              >
-                <div className="md:flex-[2] font-normal text-left md:text-sm text-primary-text">
-                  {usuario.getNome()}
-                </div>
-                <div className="md:flex-[1.5] font-nunito md:text-sm text-secondary-text">
-                  {usuario.getUsername()}
-                </div>
-                <div 
-                  className="md:flex-[1.5] font-nunito md:text-sm text-secondary-text"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <FormControl size="small" sx={{ minWidth: 120, width: '100%' }}>
-                    <Select
-                      value={usuario.getPerfilGestorId() || ''}
-                      onChange={(e) => {
-                        e.stopPropagation()
-                        handlePerfilChange(usuario.getId(), e.target.value)
-                      }}
-                      disabled={!!updatingPerfil[usuario.getId()] || allPerfis.length === 0}
-                      displayEmpty
-                      sx={{
-                        fontSize: '14px',
-                        height: '32px',
-                        '& .MuiOutlinedInput-notchedOutline': {
-                          borderColor: 'transparent',
-                        },
-                        '&:hover .MuiOutlinedInput-notchedOutline': {
-                          borderColor: 'var(--color-primary)',
-                        },
-                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                          borderColor: 'transparent',
-                        },
-                        '&.Mui-focused': {
-                          boxShadow: 'none',
-                        },
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      renderValue={(selected) => {
-                        if (!selected) {
-                          return <span className="text-secondary-text">-</span>
-                        }
-                        const perfil = allPerfis.find((p) => p.id === selected)
-                        const texto = perfil ? perfil.role : perfilNome
-                        return (
-                          <span className=" font-nunito">
-                            {typeof texto === 'string' ? texto : String(texto)}
-                          </span>
-                        )
-                      }}
-                    >
-                      {allPerfis.length === 0 ? (
-                        <MenuItem disabled value="">
-                          <em>Carregando perfis...</em>
-                        </MenuItem>
-                      ) : (
-                        allPerfis.map((perfil) => (
-                          <MenuItem
-                            key={perfil.id}
-                            value={perfil.id}
-                          >
-                            {perfil.role}
-                          </MenuItem>
-                        ))
-                      )}
-                    </Select>
-                  </FormControl>
-                </div>
-                <div className="md:flex-[1] flex justify-end" onClick={(e) => e.stopPropagation()}>
-                  <div
-                    className="tooltip-hover-below flex items-center justify-center"
-                    onClick={(e) => e.stopPropagation()}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onTouchStart={(e) => e.stopPropagation()}
-                    data-tooltip={
-                      usuario.isAtivo()
-                        ? 'Usuário gestor ativo'
-                        : 'Usuário gestor desativado'
-                    }
-                  >
-                    <JiffyIconSwitch
-                      checked={usuario.isAtivo()}
-                      onChange={(e) => {
-                        e.stopPropagation()
-                        handleToggleUsuarioStatus(usuario.getId(), e.target.checked)
-                      }}
-                      disabled={!!togglingStatus[usuario.getId()]}
-                      bordered={false}
-                      size="sm"
-                      className="shrink-0 px-0 py-0"
-                      inputProps={{
-                        'aria-label': usuario.isAtivo()
-                          ? 'Desativar usuário gestor'
-                          : 'Ativar usuário gestor',
-                        onClick: (e) => e.stopPropagation(),
-                      }}
-                    />
-                  </div>
-                </div>
+              <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary md:text-sm">
+                Nome
               </div>
-
-              {/* Layout Mobile - Vertical */}
-              <div 
-                onClick={handleUsuarioRowClick}
-                className="md:hidden py-3 px-1 cursor-pointer"
-              >
-                {/* Cabeçalho com Usuário e Nome */}
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-base font-semibold text-secondary-text">Usuário:</span>
-                  <span className="font-nunito font-semibold text-base text-primary-text">
-                    {usuario.getNome()}
-                  </span>
-                </div>
-
-                {/* Labels dos campos */}
-                <div className="flex items-center mb-2 px-1 gap-2">
-                  <span className="text-[11px] font-semibold text-secondary-text flex-[2] text-left">E-Mail</span>
-                  <span className="text-[11px] font-semibold text-secondary-text flex-1.5 text-left">Perfil</span>
-                  <span className="text-[11px] font-semibold text-secondary-text flex-1 w-12 text-right">Status</span>
-                </div>
-
-                {/* Valores dos campos */}
-                <div className="flex items-center px-1 gap-2">
-                  <div className="flex-[2] text-left min-w-0">
-                    <span className="text-xs text-secondary-text font-nunito break-words">
-                      {usuario.getUsername()}
-                    </span>
-                  </div>
-                  <div 
-                    className="flex-1.5 text-left min-w-0"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <FormControl size="small" sx={{ minWidth: 100, width: '100%' }}>
-                      <Select
-                        value={usuario.getPerfilGestorId() || ''}
-                        onChange={(e) => {
-                          e.stopPropagation()
-                          handlePerfilChange(usuario.getId(), e.target.value)
-                        }}
-                        disabled={!!updatingPerfil[usuario.getId()] || allPerfis.length === 0}
-                        displayEmpty
-                        sx={{
-                          fontSize: '12px',
-                          height: '28px',
-                          '& .MuiOutlinedInput-notchedOutline': {
-                            borderColor: 'transparent',
-                          },
-                          '&:hover .MuiOutlinedInput-notchedOutline': {
-                            borderColor: 'var(--color-primary)',
-                          },
-                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                            borderColor: 'transparent',
-                          },
-                          '&.Mui-focused': {
-                            boxShadow: 'none',
-                          },
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        renderValue={(selected) => {
-                          if (!selected) {
-                            return <span className="text-secondary-text text-xs">-</span>
-                          }
-                          const perfil = allPerfis.find((p) => p.id === selected)
-                          const texto = perfil ? perfil.role : perfilNome
-                          return (
-                            <span className="text-xs ">
-                              {typeof texto === 'string' ? texto : String(texto)}
-                            </span>
-                          )
-                        }}
-                      >
-                        {allPerfis.length === 0 ? (
-                          <MenuItem disabled value="">
-                            <em>Carregando perfis...</em>
-                          </MenuItem>
-                        ) : (
-                          allPerfis.map((perfil) => (
-                            <MenuItem
-                              key={perfil.id}
-                              value={perfil.id}
-                            >
-                              {perfil.role}
-                            </MenuItem>
-                          ))
-                        )}
-                      </Select>
-                    </FormControl>
-                  </div>
-                  <div className="w-12 flex flex-1 justify-end flex-shrink-0">
-                    <div
-                      className="tooltip-hover-below flex items-center justify-center"
-                      onClick={(e) => e.stopPropagation()}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      data-tooltip={
-                        usuario.isAtivo()
-                          ? 'Usuário gestor ativo'
-                          : 'Usuário gestor desativado'
-                      }
-                    >
-                      <JiffyIconSwitch
-                        checked={usuario.isAtivo()}
-                        onChange={(e) => {
-                          e.stopPropagation()
-                          handleToggleUsuarioStatus(usuario.getId(), e.target.checked)
-                        }}
-                        disabled={!!togglingStatus[usuario.getId()]}
-                        bordered={false}
-                        size="sm"
-                        className="shrink-0 px-0 py-0"
-                        inputProps={{
-                          'aria-label': usuario.isAtivo()
-                            ? 'Desativar usuário gestor'
-                            : 'Ativar usuário gestor',
-                          onClick: (e) => e.stopPropagation(),
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
+              <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary md:text-sm">
+                E-mail
+              </div>
+              <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:text-sm">
+                Perfil
               </div>
             </div>
-          )
-        })}
-      </div>
+          </div>
+
+          <div className="min-w-0 max-w-full divide-y divide-gray-100 scrollbar-hide">
+            {usuarios.map(usuario => {
+              const perfilNome = usuario.getPerfilGestorId()
+                ? perfisMap[usuario.getPerfilGestorId()!] ||
+                  usuario.getPerfilGestor()?.role ||
+                  '-'
+                : '-'
+
+              return (
+                <UsuarioGestaoRow
+                  key={usuario.getId()}
+                  usuario={usuario}
+                  perfilNome={perfilNome}
+                  allPerfis={allPerfis}
+                  updatingPerfil={!!updatingPerfil[usuario.getId()]}
+                  onPerfilChange={handlePerfilChange}
+                />
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
 
       <UsuariosGestorTabsModal
         state={tabsModalState}

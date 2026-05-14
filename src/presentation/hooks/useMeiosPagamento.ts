@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { MeioPagamento } from '@/src/domain/entities/MeioPagamento'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
@@ -25,10 +26,11 @@ interface MeiosPagamentoResponse {
 export function useMeiosPagamentoInfinite(params: Omit<MeiosPagamentoQueryParams, 'offset'> = {}) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
   const queryEnabled = !!token && (params.enabled ?? true)
 
   return useInfiniteQuery({
-    queryKey: ['meios-pagamentos', 'infinite', params],
+    queryKey: ['meios-pagamentos', 'infinite', params, empresaId],
     queryFn: async ({ pageParam = 0 }): Promise<{ meiosPagamento: MeioPagamento[]; count: number; nextOffset: number | null }> => {
       if (!token) {
         throw new Error('Token não encontrado')
@@ -83,9 +85,10 @@ export function useMeiosPagamentoInfinite(params: Omit<MeiosPagamentoQueryParams
 export function useMeioPagamento(id: string) {
   const { auth, isAuthenticated } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useQuery<MeioPagamento, ApiError>({
-    queryKey: ['meio-pagamento', id],
+    queryKey: ['meio-pagamento', id, empresaId],
     queryFn: async () => {
       if (!isAuthenticated || !token) {
         throw new Error('Usuário não autenticado ou token ausente.')
@@ -122,6 +125,7 @@ export function useMeioPagamentoMutation() {
   const { auth } = useAuthStore()
   const queryClient = useQueryClient()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useMutation({
     mutationFn: async ({ meioPagamentoId, data, isUpdate }: { meioPagamentoId?: string; data: any; isUpdate: boolean }) => {
