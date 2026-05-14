@@ -147,6 +147,7 @@ export async function GET(request: NextRequest) {
       async (vendaId) => {
         try {
           const resp = await apiClient.request<{
+            valorFinal?: number
             produtosLancados?: Array<{
               produtoId: string
               quantidade: number
@@ -214,15 +215,31 @@ export async function GET(request: NextRequest) {
       }))
       .sort((a, b) => b.quantidade - a.quantidade)
 
+    /**
+     * Faturamento do período deve bater com Top Garçons e demais visões: soma do `valorFinal`
+     * de cada venda (total da comanda). A soma dos `valorFinal` das linhas em `produtosLancados`
+     * costuma ser menor (taxa de serviço, taxa de entrega, desconto global, etc. não repartidos
+     * por item na API).
+     */
+    let valorTotalPeriodoVendas = 0
+    for (const venda of detalhes) {
+      if (!venda) continue
+      const vf = venda.valorFinal
+      if (typeof vf === 'number' && Number.isFinite(vf)) {
+        valorTotalPeriodoVendas += vf
+      }
+    }
+
     let quantidadeTotalPeriodo = 0
-    let valorTotalPeriodo = 0
     for (const row of todasOrdenadas) {
       quantidadeTotalPeriodo += row.quantidade
-      valorTotalPeriodo += row.valorTotal
     }
 
     const items = todasOrdenadas.slice(0, TOP_PRODUTOS_CARD_LIMIT)
-    const totaisPeriodo = { quantidadeTotal: quantidadeTotalPeriodo, valorTotal: valorTotalPeriodo }
+    const totaisPeriodo = {
+      quantidadeTotal: quantidadeTotalPeriodo,
+      valorTotal: valorTotalPeriodoVendas,
+    }
 
     const ttlMs = 30_000
     globalThis.__jiffyTopProdutosCache ??= new Map()
