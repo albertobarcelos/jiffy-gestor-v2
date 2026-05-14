@@ -80,7 +80,7 @@ export function useDashboardTopGarconsQuery({
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
-  const resolvedTimezone = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
+  const resolvedTimezone = timezone?.trim() || 'America/Sao_Paulo'
 
   return useQuery({
     queryKey: [

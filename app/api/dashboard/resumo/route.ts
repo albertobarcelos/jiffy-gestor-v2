@@ -124,37 +124,47 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const periodo = searchParams.get('periodo') || 'hoje'
     const timezone = searchParams.get('timezone') || 'America/Sao_Paulo'
-    
+
+    const mapOpcao: Record<string, string> = {
+      hoje: 'Hoje',
+      ontem: 'Ontem',
+      semana: 'Últimos 7 Dias',
+      '30dias': 'Últimos 30 Dias',
+    }
+    const opcao = mapOpcao[periodo] || 'Hoje'
+
+    function parseIsoDate(s: string | null): Date | null {
+      if (!s?.trim()) return null
+      const d = new Date(s)
+      return Number.isNaN(d.getTime()) ? null : d
+    }
+
     let inicioAtual: Date | null = null
     let fimAtual: Date | null = null
     let inicioAnterior: Date | null = null
     let fimAnterior: Date | null = null
 
-    if (periodo === 'personalizado') {
-      const iniStr = searchParams.get('dataFinalizacaoInicial')
-      const fimStr = searchParams.get('dataFinalizacaoFinal')
-      if (iniStr && fimStr) {
-        inicioAtual = new Date(iniStr)
-        fimAtual = new Date(fimStr)
-        // Desloca 30 dias para trás para o período personalizado
-        const deltaMs = 30 * 86_400_000
-        inicioAnterior = new Date(inicioAtual.getTime() - deltaMs)
-        fimAnterior = new Date(fimAtual.getTime() - deltaMs)
-      }
-    } else {
-      // Mapeia o periodo do frontend para a opção do utilitário
-      const mapOpcao: Record<string, string> = {
-        hoje: 'Hoje',
-        ontem: 'Ontem',
-        semana: 'Últimos 7 Dias',
-        '30dias': 'Últimos 30 Dias',
-      }
-      const opcao = mapOpcao[periodo] || 'Hoje'
-      
+    const iniAtualCli = parseIsoDate(searchParams.get('dataFinalizacaoInicial'))
+    const fimAtualCli = parseIsoDate(searchParams.get('dataFinalizacaoFinal'))
+    if (iniAtualCli && fimAtualCli) {
+      inicioAtual = iniAtualCli
+      fimAtual = fimAtualCli
+    } else if (periodo !== 'personalizado') {
       const atual = calcularPeriodoNoFusoEmpresa(opcao, timezone)
       inicioAtual = atual.inicio
       fimAtual = atual.fim
-      
+    }
+
+    const iniCompCli = parseIsoDate(searchParams.get('dataFinalizacaoInicialComparacao'))
+    const fimCompCli = parseIsoDate(searchParams.get('dataFinalizacaoFinalComparacao'))
+    if (iniCompCli && fimCompCli) {
+      inicioAnterior = iniCompCli
+      fimAnterior = fimCompCli
+    } else if (periodo === 'personalizado' && inicioAtual && fimAtual) {
+      const deltaMs = 30 * 86_400_000
+      inicioAnterior = new Date(inicioAtual.getTime() - deltaMs)
+      fimAnterior = new Date(fimAtual.getTime() - deltaMs)
+    } else if (periodo !== 'personalizado') {
       const anterior = calcularPeriodoAnteriorParaComparacaoNoFusoEmpresa(opcao, timezone)
       if (anterior) {
         inicioAnterior = anterior.inicio
