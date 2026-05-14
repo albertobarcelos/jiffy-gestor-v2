@@ -23,6 +23,7 @@ import {
   MdAccountBalance,
   MdHistory,
   MdPercent,
+  MdAnalytics,
 } from 'react-icons/md'
 import type { IconType } from 'react-icons'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
@@ -192,6 +193,7 @@ export function TopNav() {
           ),
         },
         { name: 'Relatórios Vendas', path: '/relatorios-vendas', icon: MdAssessment },
+        { name: 'Produtos vendidos', path: '/relatorios-produtos-vendidos', icon: MdAnalytics },
         { name: 'Hist. Fechamentos', path: '/historico-fechamento', icon: MdHistory },
         { name: 'Comissões', path: '/vendas/comissoes', icon: MdPercent },
 

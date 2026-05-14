@@ -64,6 +64,11 @@ function isHubPath(p: string | null): boolean {
   return p?.startsWith('/meus-apps') ?? false
 }
 
+/** ERP: sessão da empresa (tenant JWT) é independente da identidade do hub. */
+function isTenantSessionValid(t: ReturnType<typeof useAuthStore.getState>['tenantAuth']): boolean {
+  return t !== null && !t.isExpired()
+}
+
 export function AuthGuard({ children }: AuthGuardProps) {
   const pathname = usePathname()
   const isAuthenticated = useAuthStore(s => s.isAuthenticated)
@@ -130,6 +135,17 @@ export function AuthGuard({ children }: AuthGuardProps) {
       return
     }
 
+    /**
+     * Não usar só `auth` (tenant ?? identidade): se o campo estiver dessincronizado
+     * ou a identidade expirar, `auth.isExpired()` pode derrubar o ERP indevidamente
+     * e disparar `logout()` — que apaga o `tenant-token` em **todas** as abas.
+     */
+    if (isTenantSessionValid(tenantAuth)) {
+      redirectingRef.current = false
+      setAllowed(true)
+      return
+    }
+
     if (!isAuthenticated || auth === null || auth.isExpired()) {
       void invalidateSessionToLogin()
       return
@@ -186,6 +202,9 @@ export function AuthGuard({ children }: AuthGuardProps) {
         }
         return
       }
+      if (isTenantSessionValid(st.tenantAuth)) {
+        return
+      }
       const { isAuthenticated: ok, auth: current } = st
       if (!ok || current === null || current.isExpired()) {
         void invalidateSessionToLogin()
@@ -195,7 +214,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     const intervalId = window.setInterval(checkExpired, SESSAO_POLL_MS)
 
     const st = useAuthStore.getState()
-    const watchAuth = isHub ? st.identityAuth : st.auth
+    const watchAuth = isHub ? st.identityAuth : (st.tenantAuth ?? st.auth)
     let timeoutId: number | undefined
     if (watchAuth) {
       const msAteExp = watchAuth.getExpiresAt().getTime() - Date.now()

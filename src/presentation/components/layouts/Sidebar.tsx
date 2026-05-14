@@ -23,6 +23,21 @@ export function Sidebar() {
   const queryClient = useQueryClient()
   // const { prefetchRoute } = usePrefetch() // prefetchRoute não existe mais
 
+  useEffect(() => {
+    if (
+      pathname === '/relatorios-vendas' ||
+      pathname?.startsWith('/relatorios-vendas/') ||
+      pathname === '/relatorios-produtos-vendidos' ||
+      pathname?.startsWith('/relatorios-produtos-vendidos/')
+    ) {
+      setExpandedMenus(prev => {
+        const next = new Set(prev)
+        next.add('Relatórios')
+        return next
+      })
+    }
+  }, [pathname])
+
   // Prefetch agressivo das rotas mais acessadas na inicialização
   useEffect(() => {
     const routesToPrefetch = [
@@ -103,7 +118,15 @@ export function Sidebar() {
     { name: 'Meu Caixa', path: '/meu-caixa', icon: '💼' },
     { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: '📄' },
     { name: 'Painel do Contador', path: '/painel-contador', icon: '📊' },
-    { name: 'Relatórios', path: '/relatorios-vendas', icon: '📊' },
+    {
+      name: 'Relatórios',
+      path: '#',
+      icon: '📊',
+      children: [
+        { name: 'Vendas PDV', path: '/relatorios-vendas', icon: '📄' },
+        { name: 'Produtos vendidos', path: '/relatorios-produtos-vendidos', icon: '🛒' },
+      ],
+    },
     { name: 'Configurações', path: '/configuracoes', icon: '⚙️' },
   ]
 
