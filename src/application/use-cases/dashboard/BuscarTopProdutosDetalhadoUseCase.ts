@@ -8,18 +8,18 @@ interface TopProdutoApiItem {
 
 interface TopProdutoApiResponse {
   items: TopProdutoApiItem[]
+  totaisPeriodo?: { quantidadeTotal: number; valorTotal: number }
 }
 
 export class BuscarTopProdutosDetalhadoUseCase {
   async execute(
     periodo: string = 'hoje',
-    limit: number = 10,
+    _limit: number = 10,
     periodoInicialCustom?: Date | null,
     periodoFinalCustom?: Date | null
   ): Promise<DashboardTopProduto[]> {
     const params = new URLSearchParams()
     params.append('periodo', periodo)
-    params.append('limit', limit.toString())
 
     // Se datas personalizadas foram fornecidas, passa elas para a API
     if (periodoInicialCustom && periodoFinalCustom) {

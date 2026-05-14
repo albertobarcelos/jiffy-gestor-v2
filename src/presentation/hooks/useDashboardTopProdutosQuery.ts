@@ -11,20 +11,48 @@ type ApiItem = {
 
 type ApiResponse = {
   items: ApiItem[]
+  totaisPeriodo?: { quantidadeTotal: number; valorTotal: number }
+}
+
+export type DashboardTopProdutosTotaisPeriodo = {
+  quantidadeTotal: number
+  valorTotal: number
+}
+
+export type DashboardTopProdutosQueryData = {
+  produtos: DashboardTopProduto[]
+  totaisPeriodo: DashboardTopProdutosTotaisPeriodo
+}
+
+const totaisPeriodoVazio: DashboardTopProdutosTotaisPeriodo = {
+  quantidadeTotal: 0,
+  valorTotal: 0,
+}
+
+function normalizarTotaisPeriodo(raw: ApiResponse['totaisPeriodo']): DashboardTopProdutosTotaisPeriodo {
+  if (!raw || typeof raw !== 'object') return totaisPeriodoVazio
+  const q = raw.quantidadeTotal
+  const v = raw.valorTotal
+  return {
+    quantidadeTotal: typeof q === 'number' && Number.isFinite(q) ? q : 0,
+    valorTotal: typeof v === 'number' && Number.isFinite(v) ? v : 0,
+  }
 }
 
 type Params = {
   periodo: string
-  limit?: number
   periodoInicial?: Date | null
   periodoFinal?: Date | null
+  timezone?: string
   enabled?: boolean
 }
 
-async function fetchTopProdutos(params: Params & { token: string }): Promise<DashboardTopProduto[]> {
+async function fetchTopProdutos(
+  params: Params & { token: string; timezone: string }
+): Promise<DashboardTopProdutosQueryData> {
   const search = new URLSearchParams()
   search.append('periodo', params.periodo)
-  search.append('limit', String(params.limit ?? 10))
+  search.append('timezone', params.timezone)
   if (params.periodoInicial && params.periodoFinal) {
     search.append('dataFinalizacaoInicial', params.periodoInicial.toISOString())
     search.append('dataFinalizacaoFinal', params.periodoFinal.toISOString())
@@ -41,7 +69,7 @@ async function fetchTopProdutos(params: Params & { token: string }): Promise<Das
 
   const payload = data as unknown as ApiResponse
   const items = Array.isArray(payload.items) ? payload.items : []
-  return items.map((item, index) =>
+  const produtos = items.map((item, index) =>
     DashboardTopProduto.create({
       rank: index + 1,
       produto: item.produto,
@@ -49,32 +77,37 @@ async function fetchTopProdutos(params: Params & { token: string }): Promise<Das
       valorTotal: item.valorTotal,
     })
   )
+  return {
+    produtos,
+    totaisPeriodo: normalizarTotaisPeriodo(payload.totaisPeriodo),
+  }
 }
 
 export function useDashboardTopProdutosQuery({
   periodo,
-  limit = 10,
   periodoInicial,
   periodoFinal,
+  timezone,
   enabled = true,
 }: Params) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
+  const resolvedTimezone = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
 
-  return useQuery({
+  return useQuery<DashboardTopProdutosQueryData>({
     queryKey: [
       'dashboard',
       'top-produtos',
       periodo,
-      limit,
       periodoInicial ? periodoInicial.toISOString() : null,
       periodoFinal ? periodoFinal.toISOString() : null,
       empresaId,
+      resolvedTimezone,
     ],
-    queryFn: () => fetchTopProdutos({ periodo, limit, periodoInicial, periodoFinal, enabled, token: token! }),
+    queryFn: () =>
+      fetchTopProdutos({ periodo, periodoInicial, periodoFinal, enabled, token: token!, timezone: resolvedTimezone }),
     enabled: enabled && !!token,
     staleTime: 30_000,
   })
 }
-

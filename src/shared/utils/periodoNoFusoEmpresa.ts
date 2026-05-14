@@ -140,10 +140,16 @@ export function calcularPeriodoNoFusoEmpresa(
     return { inicio: inicioUtc, fim: fimUtc }
   }
 
-  if (opcao === 'Últimos 7 Dias' || opcao === 'Últimos 30 Dias') {
-    const n = opcao === 'Últimos 7 Dias' ? 7 : 30
+  const diasJanelaDeslizante: Record<string, number> = {
+    'Últimos 7 Dias': 7,
+    'Últimos 30 Dias': 30,
+    'Últimos 60 Dias': 60,
+    'Últimos 90 Dias': 90,
+  }
+  const nJanela = diasJanelaDeslizante[opcao]
+  if (typeof nJanela === 'number' && nJanela > 0) {
     const noonHojeUtc = civilNoonUtcFromYmd({ ...hojeYmd, timeZone: tz })
-    const noonInicio = new Date(noonHojeUtc.getTime() - (n - 1) * 86_400_000)
+    const noonInicio = new Date(noonHojeUtc.getTime() - (nJanela - 1) * 86_400_000)
     const ymdInicio = ymdNoFuso(noonInicio, tz)
     const inicioUtc = rangeDiaNoFusoParaUtc({ ...ymdInicio, timeZone: tz }).inicioUtc
     const fimUtc = rangeDiaNoFusoParaUtc({ ...hojeYmd, timeZone: tz }).fimUtc
@@ -180,6 +186,12 @@ export function calcularPeriodoAnteriorParaComparacaoNoFusoEmpresa(
   }
   if (opcao === 'Últimos 30 Dias') {
     return deslocarPeriodoEmDiasCorridosUtc(atual.inicio, atual.fim, 30)
+  }
+  if (opcao === 'Últimos 60 Dias') {
+    return deslocarPeriodoEmDiasCorridosUtc(atual.inicio, atual.fim, 60)
+  }
+  if (opcao === 'Últimos 90 Dias') {
+    return deslocarPeriodoEmDiasCorridosUtc(atual.inicio, atual.fim, 90)
   }
   return null
 }
