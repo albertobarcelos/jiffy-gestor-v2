@@ -107,7 +107,7 @@ export function LoginForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: email.trim() }),
       })
-      if (res.status === 204) {
+      if (res.ok) {
         setResendMessage(
           'Se o e-mail estiver cadastrado e pendente de confirmação, um novo link foi enviado.'
         )

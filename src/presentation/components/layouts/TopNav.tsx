@@ -8,7 +8,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { disconnectEmpresaTab } from '@/src/presentation/utils/disconnectEmpresaTab'
 import { useEmpresaUrlSync } from '@/src/presentation/hooks/useEmpresaUrlSync'
-import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import { EmpresaSwitcherTopNav } from '@/src/presentation/components/layouts/EmpresaSwitcherTopNav'
 import { useQueryClient } from '@tanstack/react-query'
 import { MdDashboard, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose } from 'react-icons/md'
 import { 
@@ -37,7 +37,6 @@ export function TopNav() {
   const pathname = usePathname()
   const router = useRouter()
   const { logoutTenant, getUser } = useAuthStore()
-  const { empresa: empresaLogada, isLoading: carregandoEmpresa } = useEmpresaMe()
   const queryClient = useQueryClient()
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -363,16 +362,7 @@ export function TopNav() {
             )
           })}
 
-          {/* Nome da Empresa Logada (Mobile) */}
-          {!carregandoEmpresa && empresaLogada && (
-            <div className="mt-2 flex items-center gap-3 px-4 py-2 rounded-lg bg-primary/5 border border-primary/10">
-              <MdPointOfSale className="w-5 h-5 text-primary opacity-80" />
-              <div className="flex flex-col min-w-0">
-                <span className="text-xs text-primary/70 font-medium">Empresa Logada</span>
-                <span className="text-sm font-semibold text-primary truncate">{empresaLogada.nomeExibicao}</span>
-              </div>
-            </div>
-          )}
+          <EmpresaSwitcherTopNav variant="mobile" onAfterSelect={closeMobileMenu} />
         </div>
 
         <div className="mt-auto border-t border-gray-200 pt-4 flex items-center gap-3">
@@ -509,15 +499,7 @@ export function TopNav() {
             )
           })}
 
-          {/* Nome da Empresa Logada (Desktop) */}
-          {!carregandoEmpresa && empresaLogada && (
-            <div className="ml-auto mr-2 flex items-center">
-              <span className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-primary border-l" title="Empresa Logada">
-                <MdPointOfSale className="w-5 h-5 opacity-80" />
-                <span className="max-w-[150px] truncate text-base">{empresaLogada.nomeExibicao}</span>
-              </span>
-            </div>
-          )}
+          <EmpresaSwitcherTopNav variant="desktop" />
         </div>
 
         {/* Mobile toggler */}

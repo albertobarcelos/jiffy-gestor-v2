@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { prepareTabSession } from '@/src/shared/utils/tabSession'
+import { fetchAccessTokenEscolherEmpresa } from '@/src/presentation/utils/escolherEmpresaApi'
 import type { ConvitePendente } from '@/src/presentation/components/features/convites/types'
 import { SearchBar } from './components/SearchBar'
 import { MeusAppsFeedGrid } from './components/MeusAppsFeedGrid'
@@ -301,34 +302,10 @@ export default function MeusAppsPage() {
     setFeedGridExpandido(false)
   }, [busca, feedFiltro])
 
-  /** Mesmo fluxo que “Acessar”: POST escolher-empresa + token da empresa no store (aba atual). */
-  const obterTokenEmpresa = useCallback(
-    async (appId: string): Promise<string> => {
-      const idTok = identityAuth?.getAccessToken()
-      const res = await fetch('/api/auth/escolher-empresa', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(idTok ? { Authorization: `Bearer ${idTok}` } : {}),
-        },
-        body: JSON.stringify({ empresaId: appId }),
-      })
-
-      const body = (await res.json().catch(() => ({}))) as { error?: string; accessToken?: string }
-
-      if (!res.ok) {
-        throw new Error(typeof body.error === 'string' ? body.error : `Erro ${res.status}`)
-      }
-
-      if (!body.accessToken) {
-        throw new Error('Resposta sem accessToken')
-      }
-
-      return body.accessToken
-    },
-    [identityAuth]
-  )
+  /** Mesmo fluxo que “Acessar”: POST escolher-empresa (cookie de identidade) + token da empresa. */
+  const obterTokenEmpresa = useCallback(async (appId: string): Promise<string> => {
+    return fetchAccessTokenEscolherEmpresa(appId)
+  }, [])
 
   const removerEmpresaDesvinculada = useCallback(
     (appId: string) => {

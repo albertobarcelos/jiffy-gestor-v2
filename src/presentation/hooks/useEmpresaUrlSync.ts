@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
-import { getEmpresaSlugParam } from '@/src/shared/utils/tabSession'
+import { syncEmpresaUrlQueryFromSession } from '@/src/shared/utils/tabSession'
 
 /**
  * Mantém `?<slug>` na barra de endereço para todas as rotas ERP.
@@ -16,14 +16,6 @@ export function useEmpresaUrlSync() {
   const pathname = usePathname()
 
   useEffect(() => {
-    const slug = getEmpresaSlugParam()
-    if (!slug) return
-
-    const current = window.location.search.slice(1).split('&')[0]
-    if (current === slug) return
-
-    const url = new URL(window.location.href)
-    url.search = slug
-    window.history.replaceState(null, '', url.toString())
+    syncEmpresaUrlQueryFromSession()
   }, [pathname])
 }
