@@ -1,16 +1,14 @@
-import { IAuthRepository } from '@/src/domain/repositories/IAuthRepository'
+import { IAuthRepository, type LoginResult } from '@/src/domain/repositories/IAuthRepository'
+import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
 import { Auth } from '@/src/domain/entities/Auth'
 import { User } from '@/src/domain/entities/User'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 import { decodeToken } from '@/src/shared/utils/validateToken'
 
-type AuthFlow = 'legacy' | 'multi_empresa'
-
 type ApiRecord = Record<string, unknown>
 
-const LEGACY_LOGIN_ENDPOINT = '/api/v1/auth/login/usuario-gestor'
-const MULTI_EMPRESA_LOGIN_ENDPOINT = '/api/v1/auth/login'
-const MULTI_EMPRESA_ESCOLHER_EMPRESA_ENDPOINT = '/api/v1/auth/escolher-empresa'
+const LOGIN_ENDPOINT = '/api/v1/auth/login'
+const ESCOLHER_EMPRESA_ENDPOINT = '/api/v1/auth/escolher-empresa'
 
 function isRecord(value: unknown): value is ApiRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -39,8 +37,8 @@ function getFirstString(source: unknown, paths: string[][]): string | undefined 
 }
 
 /**
- * Implementação do repositório de autenticação
- * Comunica com a API externa
+ * Implementação do repositório de autenticação.
+ * Sempre utiliza o fluxo multi-empresa (identity token + escolher-empresa).
  */
 export class AuthRepository implements IAuthRepository {
   private apiClient: ApiClient
@@ -49,11 +47,9 @@ export class AuthRepository implements IAuthRepository {
     this.apiClient = apiClient || new ApiClient()
   }
 
-  async login(username: string, password: string): Promise<Auth> {
+  async login(username: string, password: string): Promise<LoginResult> {
     try {
-      return this.getAuthFlow() === 'multi_empresa'
-        ? await this.loginMultiEmpresa(username, password)
-        : await this.loginLegacy(username, password)
+      return await this.loginMultiEmpresa(username, password)
     } catch (error) {
       if (error instanceof ApiError) {
         throw new Error(error.message || 'Erro ao realizar login')
@@ -62,45 +58,62 @@ export class AuthRepository implements IAuthRepository {
     }
   }
 
-  private getAuthFlow(): AuthFlow {
-    const rawFlow = (process.env.AUTH_FLOW || process.env.NEXT_PUBLIC_AUTH_FLOW || 'legacy')
-      .trim()
-      .toLowerCase()
+  /**
+   * Converte registro de empresa da API para snapshot usado no hub.
+   */
+  private mapEmpresaGestorItem(company: ApiRecord): LoginEmpresaSnapshot | null {
+    const id = this.getCompanyId(company)
+    const nomeFantasia = getFirstString(company, [
+      ['nomeFantasia'],
+      ['nome'],
+      ['razaoSocial'],
+      ['nomeFantasiaEmpresa'],
+    ])
+    const cnpj = getFirstString(company, [['cnpj'], ['documento'], ['cnpjCpf']])
+    const bloqueado = typeof company.bloqueado === 'boolean' ? company.bloqueado : false
 
-    return ['multi_empresa', 'multi-empresa', 'multiempresa', 'multi_company', 'new'].includes(rawFlow)
-      ? 'multi_empresa'
-      : 'legacy'
+    if (!id || !nomeFantasia || !cnpj) {
+      return null
+    }
+
+    return { id, nomeFantasia, cnpj, bloqueado }
   }
 
-  private async loginLegacy(username: string, password: string): Promise<Auth> {
-    const response = await this.apiClient.post<ApiRecord>(LEGACY_LOGIN_ENDPOINT, {
-      username,
-      password,
-    })
-
-    return this.createAuthFromResponse(response.data, username)
-  }
-
-  private async loginMultiEmpresa(username: string, password: string): Promise<Auth> {
-    const loginResponse = await this.apiClient.post<ApiRecord>(MULTI_EMPRESA_LOGIN_ENDPOINT, {
+  private async loginMultiEmpresa(username: string, password: string): Promise<LoginResult> {
+    const loginResponse = await this.apiClient.post<ApiRecord>(LOGIN_ENDPOINT, {
       username,
       password,
     })
 
     const loginData = loginResponse.data
     const identityToken = this.extractAccessToken(loginData)
+    const companies = this.extractCompanies(loginData)
+
+    if (companies.length > 0 && identityToken) {
+      const empresas = companies
+        .map(c => this.mapEmpresaGestorItem(c))
+        .filter((e): e is LoginEmpresaSnapshot => e !== null)
+
+      if (empresas.length > 0) {
+        return {
+          auth: this.createAuthFromResponse(loginData, username, identityToken),
+          empresas,
+        }
+      }
+    }
+
     const empresaId = this.resolveEmpresaId(loginData)
 
     if (!empresaId) {
       if (identityToken) {
-        return this.createAuthFromResponse(loginData, username, identityToken)
+        return { auth: this.createAuthFromResponse(loginData, username, identityToken) }
       }
 
       throw new Error('Empresa não encontrada na resposta de login')
     }
 
     const escolherEmpresaResponse = await this.apiClient.request<ApiRecord>(
-      MULTI_EMPRESA_ESCOLHER_EMPRESA_ENDPOINT,
+      ESCOLHER_EMPRESA_ENDPOINT,
       {
         method: 'POST',
         headers: identityToken
@@ -119,11 +132,13 @@ export class AuthRepository implements IAuthRepository {
       throw new Error('Token de acesso não recebido ao escolher empresa')
     }
 
-    return this.createAuthFromResponse(
-      this.mergeAuthResponses(loginData, escolherEmpresaData),
-      username,
-      accessToken
-    )
+    return {
+      auth: this.createAuthFromResponse(
+        this.mergeAuthResponses(loginData, escolherEmpresaData),
+        username,
+        accessToken
+      ),
+    }
   }
 
   private createAuthFromResponse(data: unknown, username: string, tokenOverride?: string): Auth {
@@ -351,4 +366,3 @@ export class AuthRepository implements IAuthRepository {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
   }
 }
-

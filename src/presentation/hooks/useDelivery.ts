@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { PedidoDelivery } from '@/src/domain/entities/PedidoDelivery'
 import { MetodoPagamento } from '@/src/domain/entities/MetodoPagamento'
 import { StatusPedido } from '@/src/domain/entities/StatusPedido'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 
 interface ListarPedidosParams {
@@ -21,7 +22,8 @@ export function usePedidosDelivery(
   params: ListarPedidosParams = {},
   tokens?: DeliveryTokens
 ) {
-  const queryKey = ['delivery', 'pedidos', params]
+  const empresaId = useTenantEmpresaId()
+  const queryKey = ['delivery', 'pedidos', params, empresaId]
 
   return useQuery({
     queryKey,
@@ -80,8 +82,10 @@ export function usePedidosDelivery(
  * Hook para listar métodos de pagamento
  */
 export function useMetodosPagamentoDelivery(tokens?: DeliveryTokens) {
+  const empresaId = useTenantEmpresaId()
+
   return useQuery({
-    queryKey: ['delivery', 'metodos-pagamento'],
+    queryKey: ['delivery', 'metodos-pagamento', empresaId],
     queryFn: async (): Promise<MetodoPagamento[]> => {
       if (!tokens?.bearerToken) {
         throw new Error('Token de autenticação não fornecido')

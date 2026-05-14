@@ -1,5 +1,6 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { Taxa } from '@/src/domain/entities/Taxa'
 
 type TaxasQueryParams = {
@@ -18,9 +19,10 @@ type TaxasResponse = {
 export function useTaxasInfinite(params: TaxasQueryParams = {}) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useInfiniteQuery({
-    queryKey: ['taxas', 'infinite', params],
+    queryKey: ['taxas', 'infinite', params, empresaId],
     queryFn: async ({
       pageParam = 0,
     }): Promise<{ taxas: Taxa[]; count: number; nextOffset: number | null }> => {

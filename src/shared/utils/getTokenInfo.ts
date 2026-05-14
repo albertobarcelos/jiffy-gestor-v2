@@ -29,9 +29,7 @@ export function getTokenInfo(request: NextRequest): TokenInfo | null {
     return null
   }
 
-  // Valida token (usa JWT_SECRET se disponível)
-  const jwtSecret = process.env.JWT_SECRET
-  const validation = validateToken(token, jwtSecret)
+  const validation = validateToken(token)
   
   if (!validation.valid || !validation.payload) {
     return null

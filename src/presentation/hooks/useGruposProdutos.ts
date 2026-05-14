@@ -3,6 +3,7 @@
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query'
 import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 import { showToast } from '@/src/shared/utils/toast'
 
@@ -31,10 +32,11 @@ interface GruposProdutosResponse {
 export function useGruposProdutos(params: GruposProdutosQueryParams = {}) {
   const { auth, isAuthenticated } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
   const queryEnabled = isAuthenticated && !!token && (params.enabled ?? true)
 
   return useQuery<GrupoProduto[], ApiError>({
-    queryKey: ['grupos-produtos', params.name, params.ativo],
+    queryKey: ['grupos-produtos', params.name, params.ativo, empresaId],
     queryFn: async () => {
       if (!isAuthenticated || !token) {
         throw new Error('Usuário não autenticado ou token ausente.')
@@ -84,9 +86,10 @@ export function useGruposProdutos(params: GruposProdutosQueryParams = {}) {
 export function useGruposProdutosInfinite(params: Omit<GruposProdutosQueryParams, 'offset'> = {}) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useInfiniteQuery({
-    queryKey: ['grupos-produtos', 'infinite', params],
+    queryKey: ['grupos-produtos', 'infinite', params, empresaId],
     queryFn: async ({ pageParam = 0 }): Promise<{ grupos: GrupoProduto[]; count: number; nextOffset: number | null }> => {
       if (!token) {
         throw new Error('Token não encontrado')

@@ -14,6 +14,7 @@ import {
 } from 'react'
 import { MdArrowBack, MdArrowForward, MdClose } from 'react-icons/md'
 import { Button } from '@/src/presentation/components/ui/button'
+import { cn } from '@/src/shared/utils/cn'
 import { PainelPedidoBackdrop } from './PainelPedidoBackdrop'
 
 const PANEL_MS = { enter: 420, exit: 380 } as const
@@ -433,6 +434,23 @@ export interface JiffySidePanelModalProps {
    * `default`: agrupamento compacto com espaçamento (Anterior/Próximo à esquerda; Cancelar/Salvar à direita).
    */
   footerVariant?: 'default' | 'bar'
+  /**
+   * Quando `true`, não exibe faixa grande com título visível — apenas título em `sr-only` e opcionalmente o botão fechar (ex.: auth com branding no corpo).
+   * @default false
+   */
+  minimalHeader?: boolean
+  /** Com `minimalHeader`, controla se o X aparece. Com cabeçalho padrão, o X continua sempre visível. @default true */
+  showCloseButton?: boolean
+  /**
+   * Sem escurecimento no backdrop (área à esquerda do painel permanece visível — ex.: vídeo em fluxos de login).
+   * @default false
+   */
+  transparentBackdrop?: boolean
+  /**
+   * `glass`: painel inteiro com vidro fosco (login público), sem card branco opaco.
+   * @default 'solid'
+   */
+  panelSurface?: 'solid' | 'glass'
 }
 
 /**
@@ -459,7 +477,12 @@ export function JiffySidePanelModal({
   closeOnEscape = true,
   scrollableBody = true,
   footerVariant = 'default',
+  minimalHeader = false,
+  showCloseButton = true,
+  transparentBackdrop = false,
+  panelSurface = 'solid',
 }: JiffySidePanelModalProps) {
+  const isGlass = panelSurface === 'glass'
   const [internalOpen, setInternalOpen] = useState(open)
 
   useEffect(() => {
@@ -500,12 +523,15 @@ export function JiffySidePanelModal({
       disableEnforceFocus
       disableRestoreFocus
       slots={{ backdrop: PainelPedidoBackdrop }}
+      slotProps={{
+        backdrop: { invisible: transparentBackdrop },
+      }}
       sx={{
         zIndex,
         // Backdrop abaixo do painel — se ambos ficarem em 1300, o overlay cobre o conteúdo e qualquer clique vira backdropClick
         '& .MuiBackdrop-root': {
           zIndex: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          backgroundColor: transparentBackdrop ? 'transparent' : 'rgba(0, 0, 0, 0.5)',
           transition: 'none',
         },
       }}
@@ -519,47 +545,98 @@ export function JiffySidePanelModal({
         unmountOnExit={false}
       >
         <div
-          className={`absolute right-0 top-0 z-[1] flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden rounded-bl-xl rounded-tl-xl bg-white shadow-xl outline-none ${panelClassName}`}
+          className={cn(
+            'absolute right-0 top-0 z-[1] flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden rounded-bl-xl rounded-tl-xl outline-none',
+            isGlass ?
+              'backdrop-blur-md bg-white/30 shadow-[0_10px_30px_rgba(0,0,0,0.15)] border-l-2 border-white'
+            : 'bg-white shadow-xl',
+            panelClassName
+          )}
           role="dialog"
           aria-modal
           aria-labelledby="jiffy-side-panel-title"
         >
-          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-gray-200 px-4 py-3 md:px-6">
-            <div className="min-w-0 flex-1 pr-2">
-              <h2
-                id="jiffy-side-panel-title"
-                className="text-lg font-semibold tracking-wide text-primary-text md:text-2xl"
+          {minimalHeader ? (
+            showCloseButton ? (
+              <div
+                className={cn(
+                  'flex shrink-0 items-center justify-end gap-3 px-4 py-3 md:px-6',
+                  isGlass ? 'border-b border-white/25' : 'border-b border-gray-200'
+                )}
               >
+                <h2 id="jiffy-side-panel-title" className="sr-only">
+                  {title}
+                </h2>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 text-secondary-text hover:bg-gray-100 hover:text-primary-text"
+                  aria-label="Fechar"
+                  onClick={requestClose}
+                >
+                  <MdClose className="h-6 w-6" />
+                </Button>
+              </div>
+            ) : (
+              <h2 id="jiffy-side-panel-title" className="sr-only">
                 {title}
               </h2>
-              {subtitle ? (
-                <p className="mt-1 font-['Nunito',sans-serif] text-sm font-medium uppercase tracking-wide text-primary-text">
-                  {subtitle}
-                </p>
-              ) : null}
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="shrink-0 text-secondary-text hover:bg-gray-100 hover:text-primary-text"
-              aria-label="Fechar"
-              onClick={requestClose}
+            )
+          ) : (
+            <div
+              className={cn(
+                'flex shrink-0 items-start justify-between gap-3 px-4 py-3 md:px-6',
+                isGlass ? 'border-b border-white/25 bg-transparent' : 'border-b border-gray-200'
+              )}
             >
-              <MdClose className="h-6 w-6" />
-            </Button>
-          </div>
+              <div className="min-w-0 flex-1 pr-2">
+                <h2
+                  id="jiffy-side-panel-title"
+                  className="text-lg font-semibold tracking-wide text-primary-text md:text-2xl"
+                >
+                  {title}
+                </h2>
+                {subtitle ? (
+                  <p className="mt-1 font-['Nunito',sans-serif] text-sm font-medium uppercase tracking-wide text-primary-text">
+                    {subtitle}
+                  </p>
+                ) : null}
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="shrink-0 text-secondary-text hover:bg-gray-100 hover:text-primary-text"
+                aria-label="Fechar"
+                onClick={requestClose}
+              >
+                <MdClose className="h-6 w-6" />
+              </Button>
+            </div>
+          )}
 
           {tabsSlot ? (
-            <div className="shrink-0 border-b border-gray-200 bg-white px-2 pt-2 md:px-4">
+            <div
+              className={cn(
+                'shrink-0 border-b px-2 pt-2 md:px-4',
+                isGlass ?
+                  'border-white/25 bg-transparent'
+                : 'border-gray-200 bg-white'
+              )}
+            >
               {tabsSlot}
             </div>
           ) : null}
 
           <div
-            className={`min-h-0 flex-1 px-4 py-2 md:px-0 ${
-              scrollableBody ? 'overflow-y-auto' : 'flex min-h-0 flex-col overflow-hidden'
-            }`}
+            className={cn(
+              'min-h-0 flex-1',
+              scrollableBody ? 'overflow-y-auto' : 'flex min-h-0 flex-col overflow-hidden',
+              isGlass ?
+                'px-4 py-4 sm:px-6 sm:py-6 md:px-8 [@media(max-height:720px)]:px-3 [@media(max-height:720px)]:py-3 [@media(max-height:640px)]:px-2.5 [@media(max-height:640px)]:py-2.5'
+              : 'px-4 py-2 md:px-0'
+            )}
           >
             {children}
           </div>
