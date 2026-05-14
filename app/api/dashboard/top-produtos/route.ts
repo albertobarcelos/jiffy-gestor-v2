@@ -2,14 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 import {
-  agregarProdutosLancadosPorProdutoId,
-  buscarCardapioMiniPorProdutoIds,
-  buscarDetalhesVendasComProdutosLancados,
-  listarIdsVendasFinalizadasNoPeriodo,
-  montarParamsVendasPdvPeriodo,
-  somarValorFinalDasVendas,
-} from '@/src/infrastructure/dashboard/agregarVendasPorProdutoPdv'
-import { lerIntervaloFinalizacaoVendasPdv } from '@/src/shared/utils/parametrosDataFinalizacaoVendasPdv'
+  appendIntervaloFinalizacaoVendasPdv,
+  lerIntervaloFinalizacaoVendasPdv,
+} from '@/src/shared/utils/parametrosDataFinalizacaoVendasPdv'
+import { calcularPeriodoNoFusoEmpresa } from '@/src/shared/utils/periodoNoFusoEmpresa'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -23,13 +19,31 @@ export async function GET(request: NextRequest) {
   }
   const { tokenInfo } = validation
 
-  const paramsComIntervalo = montarParamsVendasPdvPeriodo({
-    requestSearchParams: searchParams,
-    periodo,
-    timezone,
-  })
+  const params = new URLSearchParams()
 
   const intervaloCustom = lerIntervaloFinalizacaoVendasPdv(searchParams)
+  if (intervaloCustom) {
+    appendIntervaloFinalizacaoVendasPdv(params, intervaloCustom)
+  } else {
+    // Mapeia o periodo do frontend para a opção do utilitário
+    const mapOpcao: Record<string, string> = {
+      hoje: 'Hoje',
+      ontem: 'Ontem',
+      semana: 'Últimos 7 Dias',
+      '30dias': 'Últimos 30 Dias',
+      mes: 'Mês Atual',
+      '60dias': 'Últimos 60 Dias',
+      '90dias': 'Últimos 90 Dias',
+    }
+    const opcao = mapOpcao[periodo] || 'Hoje'
+    const { inicio, fim } = calcularPeriodoNoFusoEmpresa(opcao, timezone)
+    
+    if (inicio && fim) {
+      appendIntervaloFinalizacaoVendasPdv(params, { inicial: inicio.toISOString(), final: fim.toISOString() })
+    }
+  }
+
+  params.append('status', 'FINALIZADA')
 
   try {
     const apiClient = new ApiClient()
@@ -55,17 +69,56 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ items: cached.items, totaisPeriodo: cached.totaisPeriodo })
     }
 
-    const vendaIdsArray = await listarIdsVendasFinalizadasNoPeriodo({
-      apiClient,
-      headers,
-      paramsComIntervalo,
-    })
+    // Paginação 100 em 100 até esgotar vendas do período (totais de produto dependem de todas as vendas).
+    const limitPerPage = 100
+    const vendaIds = new Set<string>()
+    let page = 0
+    let totalPages = 1
+
+    while (page < totalPages) {
+      const pageParams = new URLSearchParams(params.toString())
+      pageParams.append('limit', limitPerPage.toString())
+      pageParams.append('offset', (page * limitPerPage).toString())
+
+      const vendasResponse = await apiClient.request<{
+        items?: Array<{ id: string }>
+        count?: number
+        total?: number
+        totalCount?: number
+      }>(`/api/v1/operacao-pdv/vendas?${pageParams.toString()}`, { method: 'GET', headers })
+
+      const items = vendasResponse.data?.items || []
+      items.forEach((v) => {
+        if (v.id) vendaIds.add(v.id)
+      })
+
+      if (page === 0) {
+        const data = vendasResponse.data || {}
+        const totalCount =
+          (typeof data.count === 'number' && Number.isFinite(data.count) ? data.count : null) ??
+          (typeof data.total === 'number' && Number.isFinite(data.total) ? data.total : null) ??
+          (typeof data.totalCount === 'number' && Number.isFinite(data.totalCount) ? data.totalCount : null)
+
+        if (typeof totalCount === 'number' && totalCount > 0) {
+          totalPages = Math.ceil(totalCount / limitPerPage)
+        } else if (items.length < limitPerPage) {
+          totalPages = 1
+        } else {
+          totalPages = 200 // Fallback seguro
+        }
+      }
+
+      if (items.length < limitPerPage) {
+        break
+      }
+
+      page++
+    }
+
+    const vendaIdsArray = Array.from(vendaIds)
 
     if (vendaIdsArray.length === 0) {
-      const vazio = {
-        items: [] as Array<{ produto: string; quantidade: number; valorTotal: number }>,
-        totaisPeriodo: { quantidadeTotal: 0, valorTotal: 0 },
-      }
+      const vazio = { items: [] as Array<{ produto: string; quantidade: number; valorTotal: number }>, totaisPeriodo: { quantidadeTotal: 0, valorTotal: 0 } }
       return NextResponse.json(vazio)
     }
 
@@ -151,18 +204,12 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    const aggregationByProdutoId = agregarProdutosLancadosPorProdutoId(detalhes)
-    const produtoIds = Array.from(aggregationByProdutoId.keys())
-
-    const miniMap = await buscarCardapioMiniPorProdutoIds({
-      apiClient,
-      headers,
-      produtoIds,
-    })
+    const produtoIdToNome = new Map<string, string>()
+    produtoIds.forEach((id, i) => produtoIdToNome.set(id, nomes[i]))
 
     const todasOrdenadas = Array.from(aggregationByProdutoId.entries())
       .map(([produtoId, agg]) => ({
-        produto: miniMap.get(produtoId)?.nome ?? 'Produto Desconhecido',
+        produto: produtoIdToNome.get(produtoId) ?? 'Produto Desconhecido',
         quantidade: agg.quantidade,
         valorTotal: agg.valorTotal,
       }))
@@ -187,7 +234,6 @@ export async function GET(request: NextRequest) {
     for (const row of todasOrdenadas) {
       quantidadeTotalPeriodo += row.quantidade
     }
-    const valorTotalPeriodo = somarValorFinalDasVendas(detalhes)
 
     const items = todasOrdenadas.slice(0, TOP_PRODUTOS_CARD_LIMIT)
     const totaisPeriodo = {
