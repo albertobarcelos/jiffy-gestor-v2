@@ -1,15 +1,12 @@
 import { useMemo, useState, useEffect } from 'react'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
+import { FaMedal, FaTrophy } from 'react-icons/fa'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { formatarMoeda } from './dashboardTextHelpers'
 import { useDashboardTopProdutosQuery } from '@/src/presentation/hooks/useDashboardTopProdutosQuery'
 import { assumirDateComoNoFusoEmpresaParaUtc, calcularPeriodoNoFusoEmpresa } from '@/src/shared/utils/periodoNoFusoEmpresa'
 
-/** Limite ao expandir “Ver todos os produtos” no card Top produtos V2 (API faz slice após agregar). */
-const LIMITE_TOP_PRODUTOS_V2_COMPLETO = 500
-/** No resumo pedimos 11 itens, exibimos 10; o 11º indica que existe lista maior (habilita o botão). */
-const LIMITE_TOP_PRODUTOS_V2_RESUMO = 10
-const LIMITE_TOP_PRODUTOS_V2_RESUMO_FETCH = LIMITE_TOP_PRODUTOS_V2_RESUMO + 1
+const LIMITE_LINHAS_TOP_PRODUTOS = 10
 
 /** Valores do `<select>` de período em Top produtos / Top garçons (espelham o filtro global quando sincronizados). */
 export type FiltroPeriodoTopTabelasV2 = 'hoje' | 'ontem' | 'semana' | '30dias' | 'mes' | 'personalizado'
@@ -17,38 +14,85 @@ export type FiltroPeriodoTopTabelasV2 = 'hoje' | 'ontem' | 'semana' | '30dias' |
 /** Filtro global do topo → valor inicial/alinhado dos selects das tabelas inferiores. */
 export function periodoTopoV2ParaFiltroTabelas(periodoData: string): FiltroPeriodoTopTabelasV2 {
   switch (periodoData) {
-    case 'hoje': return 'hoje'
-    case 'ontem': return 'ontem'
-    case 'semana': return 'semana'
-    case '30dias': return '30dias'
-    case 'personalizado': return 'personalizado'
-    default: return 'hoje'
+    case 'hoje':
+      return 'hoje'
+    case 'ontem':
+      return 'ontem'
+    case 'semana':
+      return 'semana'
+    case '30dias':
+      return '30dias'
+    case 'personalizado':
+      return 'personalizado'
+    default:
+      return 'hoje'
   }
 }
 
 /** Select local do card Top produtos (V2) → rótulo de `calculatePeriodo` (datas na API). */
 function filtroTopProdutoV2ParaOpcaoCalculatePeriodo(filtro: string): string {
   switch (filtro) {
-    case 'hoje': return 'Hoje'
-    case 'ontem': return 'Ontem'
-    case 'semana': return 'Últimos 7 Dias'
-    case '30dias': return 'Últimos 30 Dias'
-    case 'mes': return 'Mês Atual'
-    case 'personalizado': return 'Hoje'
-    default: return 'Hoje'
+    case 'hoje':
+      return 'Hoje'
+    case 'ontem':
+      return 'Ontem'
+    case 'semana':
+      return 'Últimos 7 Dias'
+    case '30dias':
+      return 'Últimos 30 Dias'
+    case 'mes':
+      return 'Mês Atual'
+    case 'personalizado':
+      return 'Hoje'
+    default:
+      return 'Hoje'
   }
+}
+
+/** 1º–3º: troféu/medalhas; 4º em diante: número da posição (igual ao card Top Garçons). */
+function IconeColocacaoTopProduto({ rank }: { rank: number }) {
+  const tamanho = 'h-[18px] w-[18px] md:h-5 md:w-5'
+  if (rank === 1) {
+    return (
+      <span className="flex items-center justify-center" title="1º lugar">
+        <FaTrophy className={`${tamanho} shrink-0 text-amber-500`} aria-hidden />
+      </span>
+    )
+  }
+  if (rank === 2) {
+    return (
+      <span className="flex items-center justify-center" title="2º lugar">
+        <FaMedal className={`${tamanho} shrink-0 text-slate-400`} aria-hidden />
+      </span>
+    )
+  }
+  if (rank === 3) {
+    return (
+      <span className="flex items-center justify-center" title="3º lugar">
+        <FaMedal className={`${tamanho} shrink-0 text-[#B87333]`} aria-hidden />
+      </span>
+    )
+  }
+  return <span className="tabular-nums text-secondary-text">{rank}</span>
 }
 
 /** Mapeia filtro local do card Top produtos → parâmetro `periodo` da API `/dashboard/top-produtos`. */
 function filtroTopProdutoV2ParaApiPeriodo(filtro: string): string {
   switch (filtro) {
-    case 'hoje': return 'hoje'
-    case 'ontem': return 'ontem'
-    case 'semana': return 'semana'
-    case '30dias': return '30dias'
-    case 'mes': return 'mes'
-    case 'personalizado': return 'personalizado'
-    default: return 'hoje'
+    case 'hoje':
+      return 'hoje'
+    case 'ontem':
+      return 'ontem'
+    case 'semana':
+      return 'semana'
+    case '30dias':
+      return '30dias'
+    case 'mes':
+      return 'mes'
+    case 'personalizado':
+      return 'personalizado'
+    default:
+      return 'hoje'
   }
 }
 
@@ -60,6 +104,11 @@ interface DashboardTopProdutosProps {
   dadosAtualizadosEm: number
 }
 
+function pctDoPeriodo(parte: number, totalPeriodo: number): number {
+  if (totalPeriodo <= 0 || !Number.isFinite(parte) || !Number.isFinite(totalPeriodo)) return 0
+  return Math.round((parte / totalPeriodo) * 100)
+}
+
 export function DashboardTopProdutos({
   periodoData,
   periodoPersonalizadoInicio,
@@ -67,13 +116,8 @@ export function DashboardTopProdutos({
   timezoneAgregacao,
   dadosAtualizadosEm,
 }: DashboardTopProdutosProps) {
-  const [modoTopProduto, setModoTopProduto] = useState<'porcentagem' | 'valor'>('porcentagem')
+  const [modoTopProduto, setModoTopProduto] = useState<'quantidade' | 'valor'>('quantidade')
   const [filtroTopProduto, setFiltroTopProduto] = useState<FiltroPeriodoTopTabelasV2>('hoje')
-  const [topProdutosListaCompleta, setTopProdutosListaCompleta] = useState(false)
-
-  useEffect(() => {
-    setTopProdutosListaCompleta(false)
-  }, [filtroTopProduto])
 
   useEffect(() => {
     setFiltroTopProduto(periodoTopoV2ParaFiltroTabelas(periodoData))
@@ -112,78 +156,75 @@ export function DashboardTopProdutos({
   )
 
   const {
-    data: dadosTopProdutos,
+    data: payloadTopProdutos,
     isLoading: carregandoTopProdutos,
     isError: erroTopProdutos,
   } = useDashboardTopProdutosQuery({
     periodo: periodoApiTopProduto,
-    limit: topProdutosListaCompleta
-      ? LIMITE_TOP_PRODUTOS_V2_COMPLETO
-      : LIMITE_TOP_PRODUTOS_V2_RESUMO_FETCH,
     periodoInicial: inicioTopProduto,
     periodoFinal: fimTopProduto,
     timezone: timezoneAgregacao,
     enabled: inicioTopProduto != null && fimTopProduto != null,
   })
 
-  const quantidadeTopProdutosRetornada = dadosTopProdutos?.length ?? 0
-  const verTodosProdutosDesabilitado =
-    carregandoTopProdutos ||
-    erroTopProdutos ||
-    topProdutosListaCompleta ||
-    quantidadeTopProdutosRetornada <= LIMITE_TOP_PRODUTOS_V2_RESUMO
+  const totaisPeriodo = payloadTopProdutos?.totaisPeriodo ?? { quantidadeTotal: 0, valorTotal: 0 }
+  const listaProdutos = payloadTopProdutos?.produtos ?? []
+
+  const listaProdutosOrdenada = useMemo(() => {
+    const copia = [...listaProdutos]
+    if (modoTopProduto === 'valor') {
+      copia.sort((a, b) => b.getValorTotal() - a.getValorTotal())
+    } else {
+      copia.sort((a, b) => b.getQuantidade() - a.getQuantidade())
+    }
+    return copia.slice(0, LIMITE_LINHAS_TOP_PRODUTOS)
+  }, [listaProdutos, modoTopProduto])
 
   const linhasTopProdutosV2 = useMemo(() => {
-    const lista = dadosTopProdutos ?? []
-    const visivel = topProdutosListaCompleta ? lista : lista.slice(0, LIMITE_TOP_PRODUTOS_V2_RESUMO)
-    const somaValor = visivel.reduce((acc, p) => acc + p.getValorTotal(), 0)
+    const visivel = listaProdutosOrdenada
     const linhas = visivel.map((p, i) => {
       const valor = p.getValorTotal()
-      const pct = somaValor > 0 ? Math.round((valor / somaValor) * 100) : 0
+      const qtd = p.getQuantidade()
+      const pctQtd = pctDoPeriodo(qtd, totaisPeriodo.quantidadeTotal)
+      const pctValor = pctDoPeriodo(valor, totaisPeriodo.valorTotal)
       return {
-        id: `${p.getRank()}-${i}-${p.getProduto()}`,
+        id: `top-prod-${i}-${p.getProduto()}`,
+        rank: i + 1,
         vazio: false as const,
         nome: p.getProduto(),
-        qtd: p.getQuantidade(),
+        qtd,
         valor,
-        pct,
+        pctQtd,
+        pctValor,
       }
     })
 
-    if (topProdutosListaCompleta) return linhas
-
-    const faltantes = Math.max(0, LIMITE_TOP_PRODUTOS_V2_RESUMO - linhas.length)
+    const faltantes = Math.max(0, LIMITE_LINHAS_TOP_PRODUTOS - linhas.length)
     if (faltantes === 0) return linhas
 
     return [
       ...linhas,
       ...Array.from({ length: faltantes }, (_, idx) => ({
         id: `top-produto-vazio-${idx}`,
+        rank: linhas.length + idx + 1,
         vazio: true as const,
         nome: '—',
         qtd: 0,
         valor: 0,
-        pct: 0,
+        pctQtd: 0,
+        pctValor: 0,
       })),
     ]
-  }, [dadosTopProdutos, topProdutosListaCompleta])
+  }, [listaProdutosOrdenada, totaisPeriodo.quantidadeTotal, totaisPeriodo.valorTotal])
 
-  const maxValorProduto = useMemo(
-    () => Math.max(...linhasTopProdutosV2.filter(p => !p.vazio).map(p => p.valor), 1),
-    [linhasTopProdutosV2]
+  const pctTop10NaQuantidadePeriodo = pctDoPeriodo(
+    linhasTopProdutosV2.filter(p => !p.vazio).reduce((s, p) => s + p.qtd, 0),
+    totaisPeriodo.quantidadeTotal
   )
-
-  const totaisListaTopProdutosV2 = useMemo(() => {
-    return linhasTopProdutosV2
-      .filter(p => !p.vazio)
-      .reduce(
-        (acc, p) => ({
-          somaValor: acc.somaValor + p.valor,
-          somaQtd: acc.somaQtd + p.qtd,
-        }),
-        { somaValor: 0, somaQtd: 0 }
-      )
-  }, [linhasTopProdutosV2])
+  const pctTop10NoValorPeriodo = pctDoPeriodo(
+    linhasTopProdutosV2.filter(p => !p.vazio).reduce((s, p) => s + p.valor, 0),
+    totaisPeriodo.valorTotal
+  )
 
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-5">
@@ -195,14 +236,14 @@ export function DashboardTopProdutos({
           <div className="inline-flex rounded-lg bg-violet-100/90 p-0.5">
             <button
               type="button"
-              onClick={() => setModoTopProduto('porcentagem')}
+              onClick={() => setModoTopProduto('quantidade')}
               className={`rounded-md px-3 py-1.5 text-xs font-medium transition md:px-4 md:text-sm ${
-                modoTopProduto === 'porcentagem'
+                modoTopProduto === 'quantidade'
                   ? 'bg-secondary text-white shadow-sm'
                   : 'text-primary-text hover:bg-white/60'
               }`}
             >
-              Porcentagem
+              Quantidade
             </button>
             <button
               type="button"
@@ -238,10 +279,11 @@ export function DashboardTopProdutos({
       </div>
 
       <div className="mb-2 flex gap-2 border-b border-gray-200 pb-2 text-[11px] font-medium uppercase tracking-wide text-primary-text md:text-xs">
-        <div className="flex-[1.4] md:flex-[1.6]">Produto</div>
+        <div className="w-7 shrink-0 text-center md:w-8">#</div>
+        <div className="min-w-0 flex-[1.4] md:flex-[1.6]">Produto</div>
         <div className="flex-1 text-center">Quantidade</div>
-        <div className="flex-1 text-center">
-          {modoTopProduto === 'porcentagem' ? 'Porcentagem' : 'Valor (vs. maior)'}
+        <div className="flex-1 text-center" title="Percentual em relação ao total vendido no período selecionado">
+          {modoTopProduto === 'quantidade' ? '% qtd. período' : '% valor período'}
         </div>
         <div className="flex-1 text-right">Valor Total</div>
       </div>
@@ -260,16 +302,16 @@ export function DashboardTopProdutos({
         ) : (
           <>
             {linhasTopProdutosV2.map((p, idx) => {
-              const larguraBarra = p.vazio
+              const pctBarra = p.vazio
                 ? 0
-                : modoTopProduto === 'porcentagem'
-                  ? p.pct
-                  : Math.round((p.valor / maxValorProduto) * 100)
+                : modoTopProduto === 'quantidade'
+                  ? p.pctQtd
+                  : p.pctValor
               const rotuloMeio = p.vazio
                 ? '—'
-                : modoTopProduto === 'porcentagem'
-                  ? `${p.pct}%`
-                  : formatarMoeda(p.valor)
+                : modoTopProduto === 'quantidade'
+                  ? `${p.pctQtd}%`
+                  : `${p.pctValor}%`
               return (
                 <div
                   key={p.id}
@@ -277,6 +319,9 @@ export function DashboardTopProdutos({
                     idx > 0 ? 'border-t border-gray-100' : ''
                   }`}
                 >
+                  <div className="flex w-7 shrink-0 items-center justify-center md:w-8">
+                    <IconeColocacaoTopProduto rank={p.rank} />
+                  </div>
                   <div className="flex min-w-0 flex-[1.4] items-center gap-2 md:flex-[1.6]">
                     <span className="font-regular text-sm uppercase text-primary-text">
                       {p.vazio ? '—' : p.nome}
@@ -295,7 +340,7 @@ export function DashboardTopProdutos({
                     <div className="relative h-4 min-w-0 overflow-hidden rounded-lg bg-alternate/60">
                       <div
                         className="absolute left-0 top-0 z-0 h-full rounded-lg bg-secondary transition-all"
-                        style={{ width: `${Math.min(100, larguraBarra)}%` }}
+                        style={{ width: `${Math.min(100, pctBarra)}%` }}
                       />
                       <span className="font-regular pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-xs tabular-nums text-white">
                         {rotuloMeio}
@@ -309,44 +354,42 @@ export function DashboardTopProdutos({
               )
             })}
             <div className="mt-1 flex items-center gap-2 border-t border-gray-200 py-3 text-sm md:gap-3">
+              <div className="w-7 shrink-0 md:w-8" />
               <div className="flex min-w-0 flex-[1.4] flex-col gap-0.5 md:flex-[1.6]">
-                <span className="text-sm font-semibold text-primary-text">Total</span>
+                <span className="text-sm font-semibold text-primary-text">Total período</span>
               </div>
               <div className="min-w-0 flex-1 text-center text-sm font-semibold text-primary-text">
-                {totaisListaTopProdutosV2.somaQtd}{' '}
+                {totaisPeriodo.quantidadeTotal}{' '}
                 <span className="font-regular text-xs">un</span>
               </div>
               <div className="min-w-0 flex-1">
-                {modoTopProduto === 'porcentagem' ? (
-                  <div className="relative h-4 min-w-0 overflow-hidden rounded-lg bg-gray-200">
-                    <div className="absolute left-0 top-0 z-0 h-full w-full rounded-lg bg-secondary" />
-                    <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-xs font-semibold tabular-nums text-white">
-                      100%
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex h-7 items-center justify-center text-xs text-secondary-text">
-                    —
-                  </div>
-                )}
+                <div className="relative h-4 min-w-0 overflow-hidden rounded-lg bg-alternate/60">
+                  <div
+                    className="absolute left-0 top-0 z-0 h-full rounded-lg bg-secondary transition-all"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        modoTopProduto === 'quantidade' ? pctTop10NaQuantidadePeriodo : pctTop10NoValorPeriodo
+                      )}%`,
+                    }}
+                  />
+                  <span
+                    className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-[10px] font-semibold tabular-nums text-white md:text-xs"
+                    title="Participação do top 10 no total do período"
+                  >
+                    {modoTopProduto === 'quantidade'
+                      ? `${pctTop10NaQuantidadePeriodo}%`
+                      : `${pctTop10NoValorPeriodo}%`}
+                  </span>
+                </div>
               </div>
               <div className="min-w-0 flex-1 text-right text-sm font-semibold text-primary-text">
-                {formatarMoeda(totaisListaTopProdutosV2.somaValor)}
+                {formatarMoeda(totaisPeriodo.valorTotal)}
               </div>
             </div>
           </>
         )}
       </div>
-
-      <button
-        type="button"
-        disabled={verTodosProdutosDesabilitado}
-        onClick={() => setTopProdutosListaCompleta(true)}
-        className="inline-flex items-center gap-1 text-sm font-semibold text-secondary transition hover:text-secondary/85 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-secondary"
-      >
-        Ver todos os produtos
-        <ChevronRight className="h-4 w-4" />
-      </button>
     </section>
   )
 }

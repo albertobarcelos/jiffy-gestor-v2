@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
+import Link from 'next/link'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { FaMedal, FaTrophy } from 'react-icons/fa'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -7,10 +8,8 @@ import { useDashboardTopGarconsQuery } from '@/src/presentation/hooks/useDashboa
 import { assumirDateComoNoFusoEmpresaParaUtc, calcularPeriodoNoFusoEmpresa } from '@/src/shared/utils/periodoNoFusoEmpresa'
 import { FiltroPeriodoTopTabelasV2, periodoTopoV2ParaFiltroTabelas } from './DashboardTopProdutos'
 
-/** Ranking fixo de garçons no card Top Garçons V2 (resumo: 10 linhas). */
+/** Ranking fixo: sempre os 10 garçons com maior valor vendido (BFF com limit=10). */
 const LIMITE_TOP_GARCONS_V2 = 10
-/** Após “Ver todos os usuários”, lista completa (API limita após agregar). */
-const LIMITE_TOP_GARCONS_V2_COMPLETO = 500
 
 /** Select local do card Top garçons (V2) → rótulo de `calculatePeriodo` (datas na API). */
 function filtroTopGarcomV2ParaOpcaoCalculatePeriodo(filtro: string): string {
@@ -81,11 +80,6 @@ export function DashboardTopGarcons({
   dadosAtualizadosEm,
 }: DashboardTopGarconsProps) {
   const [filtroTopGarcom, setFiltroTopGarcom] = useState<FiltroPeriodoTopTabelasV2>('hoje')
-  const [topGarconsListaCompleta, setTopGarconsListaCompleta] = useState(false)
-
-  useEffect(() => {
-    setTopGarconsListaCompleta(false)
-  }, [filtroTopGarcom])
 
   useEffect(() => {
     setFiltroTopGarcom(periodoTopoV2ParaFiltroTabelas(periodoData))
@@ -129,7 +123,7 @@ export function DashboardTopGarcons({
     isError: erroTopGarcons,
   } = useDashboardTopGarconsQuery({
     periodo: periodoApiTopGarcom,
-    limit: topGarconsListaCompleta ? LIMITE_TOP_GARCONS_V2_COMPLETO : LIMITE_TOP_GARCONS_V2,
+    limit: LIMITE_TOP_GARCONS_V2,
     periodoInicial: inicioTopGarcom,
     periodoFinal: fimTopGarcom,
     timezone: timezoneAgregacao,
@@ -137,27 +131,9 @@ export function DashboardTopGarcons({
   })
 
   const dadosTopGarcons = dadosTopGarconsQuery?.garcons ?? []
-  const totalUsuariosComVendasTopGarcons = dadosTopGarconsQuery?.totalUsuariosComVendas ?? 0
-
-  const verTodosGarconsDesabilitado =
-    carregandoTopGarcons ||
-    erroTopGarcons ||
-    topGarconsListaCompleta ||
-    totalUsuariosComVendasTopGarcons <= LIMITE_TOP_GARCONS_V2
 
   const linhasTopGarconsV2 = useMemo(() => {
     const lista = dadosTopGarcons ?? []
-    if (topGarconsListaCompleta) {
-      return lista.map((g, i) => ({
-        key: `garcom-rank-${i + 1}-${g.getNome()}`,
-        rank: i + 1,
-        vazio: false as const,
-        nome: g.getNome(),
-        qtdProdutos: g.getQtdProdutos(),
-        qtdVendas: g.getQtdVendas(),
-        valorTotal: g.getValorTotal(),
-      }))
-    }
     return Array.from({ length: LIMITE_TOP_GARCONS_V2 }, (_, i) => {
       const g = lista[i]
       if (!g) {
@@ -177,7 +153,7 @@ export function DashboardTopGarcons({
         valorTotal: g.getValorTotal(),
       }
     })
-  }, [dadosTopGarcons, topGarconsListaCompleta])
+  }, [dadosTopGarcons])
 
   const totaisTopGarconsV2 = useMemo(() => {
     const lista = dadosTopGarcons ?? []
@@ -237,13 +213,7 @@ export function DashboardTopGarcons({
                 Não foi possível carregar o top garçons.
               </p>
             ) : null}
-            <div
-              className={
-                topGarconsListaCompleta
-                  ? 'scrollbar-hide max-h-[min(70vh,560px)] min-h-0 overflow-y-auto overscroll-y-contain'
-                  : ''
-              }
-            >
+            <div>
               {linhasTopGarconsV2.map((linha, idx) => (
                 <div
                   key={linha.key}
@@ -288,15 +258,13 @@ export function DashboardTopGarcons({
         )}
       </div>
 
-      <button
-        type="button"
-        disabled={verTodosGarconsDesabilitado}
-        onClick={() => setTopGarconsListaCompleta(true)}
-        className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-secondary transition hover:text-secondary/85 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-secondary"
+      <Link
+        href="/vendas/comissoes"
+        className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-secondary transition hover:text-secondary/85"
       >
-        Ver todos os usuários
-        <ChevronRight className="h-4 w-4" />
-      </button>
+        Ver Comissões
+        <ChevronRight className="h-4 w-4" aria-hidden />
+      </Link>
     </section>
   )
 }

@@ -11,7 +11,8 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const periodo = searchParams.get('periodo') || 'hoje'
   const timezone = searchParams.get('timezone') || 'America/Sao_Paulo'
-  const limit = Number(searchParams.get('limit') || '10')
+  /** Card do dashboard: sempre top 10 por quantidade; totais do período vêm da agregação completa. */
+  const TOP_PRODUTOS_CARD_LIMIT = 10
   const validation = validateRequest(request)
   if (!validation.valid || !validation.tokenInfo) {
     return validation.error!
@@ -54,15 +55,21 @@ export async function GET(request: NextRequest) {
     const cacheKey = JSON.stringify({
       empresaId: tokenInfo.empresaId,
       periodo,
-      limit,
+      timezone,
       intervaloCustom: intervaloCustom ?? null,
     })
     const cached = globalThis.__jiffyTopProdutosCache?.get(cacheKey)
-    if (cached && cached.expiresAt > Date.now()) {
-      return NextResponse.json({ items: cached.items })
+    if (
+      cached &&
+      cached.expiresAt > Date.now() &&
+      cached.totaisPeriodo != null &&
+      typeof cached.totaisPeriodo.quantidadeTotal === 'number' &&
+      typeof cached.totaisPeriodo.valorTotal === 'number'
+    ) {
+      return NextResponse.json({ items: cached.items, totaisPeriodo: cached.totaisPeriodo })
     }
 
-    // Buscar todas as vendas finalizadas com paginação
+    // Paginação 100 em 100 até esgotar vendas do período (totais de produto dependem de todas as vendas).
     const limitPerPage = 100
     const vendaIds = new Set<string>()
     let page = 0
@@ -111,7 +118,8 @@ export async function GET(request: NextRequest) {
     const vendaIdsArray = Array.from(vendaIds)
 
     if (vendaIdsArray.length === 0) {
-      return NextResponse.json({ items: [] })
+      const vazio = { items: [] as Array<{ produto: string; quantidade: number; valorTotal: number }>, totaisPeriodo: { quantidadeTotal: 0, valorTotal: 0 } }
+      return NextResponse.json(vazio)
     }
 
     const fetchWithConcurrency = async <T, R>(
@@ -198,20 +206,29 @@ export async function GET(request: NextRequest) {
     const produtoIdToNome = new Map<string, string>()
     produtoIds.forEach((id, i) => produtoIdToNome.set(id, nomes[i]))
 
-    const items = Array.from(aggregationByProdutoId.entries())
+    const todasOrdenadas = Array.from(aggregationByProdutoId.entries())
       .map(([produtoId, agg]) => ({
         produto: produtoIdToNome.get(produtoId) ?? 'Produto Desconhecido',
         quantidade: agg.quantidade,
         valorTotal: agg.valorTotal,
       }))
       .sort((a, b) => b.quantidade - a.quantidade)
-      .slice(0, limit)
+
+    let quantidadeTotalPeriodo = 0
+    let valorTotalPeriodo = 0
+    for (const row of todasOrdenadas) {
+      quantidadeTotalPeriodo += row.quantidade
+      valorTotalPeriodo += row.valorTotal
+    }
+
+    const items = todasOrdenadas.slice(0, TOP_PRODUTOS_CARD_LIMIT)
+    const totaisPeriodo = { quantidadeTotal: quantidadeTotalPeriodo, valorTotal: valorTotalPeriodo }
 
     const ttlMs = 30_000
     globalThis.__jiffyTopProdutosCache ??= new Map()
-    globalThis.__jiffyTopProdutosCache.set(cacheKey, { expiresAt: Date.now() + ttlMs, items })
+    globalThis.__jiffyTopProdutosCache.set(cacheKey, { expiresAt: Date.now() + ttlMs, items, totaisPeriodo })
 
-    return NextResponse.json({ items })
+    return NextResponse.json({ items, totaisPeriodo })
   } catch (error) {
     console.error('Erro ao buscar top produtos:', error)
     if (error instanceof ApiError) {

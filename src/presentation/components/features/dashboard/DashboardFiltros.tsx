@@ -65,7 +65,7 @@ export function DashboardFiltros({
                 color: '#111827',
                 border: '1px solid #e5e7eb',
                 boxShadow: 2,
-                fontSize: '0.8125rem',
+                fontSize: '0.5625rem',
               },
             },
           }}
@@ -79,7 +79,7 @@ export function DashboardFiltros({
               aria-label="Atualizar dados do dashboard"
             >
               <RefreshCw
-                className={`h-4 w-4 ${carregandoEmpresa ? 'animate-spin' : ''}`}
+                className={`h-3 w-3 ${carregandoEmpresa ? 'animate-spin' : ''}`}
                 aria-hidden
               />
             </button>

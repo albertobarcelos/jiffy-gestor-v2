@@ -9,6 +9,7 @@ declare global {
         {
           expiresAt: number
           items: Array<{ produto: string; quantidade: number; valorTotal: number }>
+          totaisPeriodo: { quantidadeTotal: number; valorTotal: number }
         }
       >
     | undefined
