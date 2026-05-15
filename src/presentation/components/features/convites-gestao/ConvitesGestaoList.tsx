@@ -2,13 +2,19 @@
 
 import { useMemo, useState } from 'react'
 import type { ConviteGestaoDTO } from '@/src/application/dto/convites/ConvitesGestaoDTO'
-import type { PerfilGestorOption, UsuarioAceitoInfo } from './hooks/useConvitesGestao'
+import type { PerfilGestorOption, UsuarioAceitoInfo, UsuarioGestorListaItem } from './hooks/useConvitesGestao'
 import { MdSearch } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { ConviteGestaoRow } from './components/ConviteGestaoRow'
+import { GestorSemConviteRow } from './components/GestorSemConviteRow'
+
+type LinhaGestao =
+  | { tipo: 'convite'; convite: ConviteGestaoDTO }
+  | { tipo: 'gestor'; gestor: UsuarioGestorListaItem }
 
 export function ConvitesGestaoList({
   convites,
+  gestoresSemConvite,
   perfisList,
   perfilGestorNomePorId,
   nomePorEmail,
@@ -23,6 +29,7 @@ export function ConvitesGestaoList({
   onEditarGrupos,
 }: {
   convites: ConviteGestaoDTO[]
+  gestoresSemConvite: UsuarioGestorListaItem[]
   perfisList: PerfilGestorOption[]
   perfilGestorNomePorId: Record<string, string>
   nomePorEmail: Record<string, string>
@@ -38,13 +45,33 @@ export function ConvitesGestaoList({
 }) {
   const [busca, setBusca] = useState('')
 
-  const visiveis = useMemo(() => {
+  const linhasVisiveis = useMemo((): LinhaGestao[] => {
     const q = busca.trim().toLowerCase()
-    if (!q) return convites
-    return convites.filter(c => c.email.toLowerCase().includes(q))
-  }, [convites, busca])
+    const convFiltrados = q
+      ? convites.filter(c => c.email.toLowerCase().includes(q))
+      : convites
+    const gestFiltrados = q
+      ? gestoresSemConvite.filter(
+          g =>
+            g.username.toLowerCase().includes(q) ||
+            g.nome.toLowerCase().includes(q) ||
+            (g.perfilGestorName ?? '').toLowerCase().includes(q)
+        )
+      : gestoresSemConvite
+    const gestOrdenados = [...gestFiltrados].sort((a, b) => {
+      const an = (a.nome || a.username).toLowerCase()
+      const bn = (b.nome || b.username).toLowerCase()
+      return an.localeCompare(bn, 'pt-BR')
+    })
+    return [
+      ...convFiltrados.map(convite => ({ tipo: 'convite' as const, convite })),
+      ...gestOrdenados.map(gestor => ({ tipo: 'gestor' as const, gestor })),
+    ]
+  }, [convites, gestoresSemConvite, busca])
 
-  if (loading && convites.length === 0) {
+  const listaVazia = convites.length === 0 && gestoresSemConvite.length === 0
+
+  if (loading && listaVazia) {
     return (
       <div className="flex flex-col items-center justify-center gap-2 py-12">
         <JiffyLoading />
@@ -70,7 +97,7 @@ export function ConvitesGestaoList({
           <MdSearch className="absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-secondary-text" />
           <input
             type="search"
-            placeholder="Buscar por e-mail..."
+            placeholder="Buscar por e-mail, nome ou perfil..."
             value={busca}
             onChange={e => setBusca(e.target.value)}
             className="h-full w-full rounded-lg border border-gray-200 bg-info pl-11 pr-4 font-nunito text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
@@ -78,12 +105,12 @@ export function ConvitesGestaoList({
         </div>
       </div>
 
-      {visiveis.length === 0 ? (
+      {linhasVisiveis.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 bg-white px-6 py-12 text-center">
           <p className="font-nunito text-sm text-secondary-text">
-            {convites.length === 0
-              ? 'Nenhum convite encontrado.'
-              : 'Nenhum convite encontrado para esta busca.'}
+            {listaVazia
+              ? 'Nenhum convite nem gestor extra encontrado.'
+              : 'Nenhum resultado para esta busca.'}
           </p>
         </div>
       ) : (
@@ -91,7 +118,7 @@ export function ConvitesGestaoList({
           <div className="hidden min-w-0 flex-shrink-0 md:block">
             <div className="grid h-11 w-full min-w-0 grid-cols-[minmax(180px,280px)_80px_160px] items-center gap-[10px] border-b border-gray-200 bg-gray-50 px-3 pr-2 md:px-4">
               <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary md:text-sm">
-                Usuários convidados
+                Usuários convidados / gestores
               </div>
               <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary md:text-sm">
                 Situação
@@ -103,7 +130,24 @@ export function ConvitesGestaoList({
           </div>
 
           <div className="min-w-0 max-w-full divide-y divide-gray-100 scrollbar-hide">
-            {visiveis.map(c => {
+            {linhasVisiveis.map(linha => {
+              if (linha.tipo === 'gestor') {
+                const g = linha.gestor
+                return (
+                  <GestorSemConviteRow
+                    key={`gestor-${g.id}`}
+                    gestor={g}
+                    perfisList={perfisList}
+                    perfilGestorNomePorId={perfilGestorNomePorId}
+                    busyAction={busyById[g.id] ?? null}
+                    onPerfilChange={onPerfilChange}
+                    onRemoverVinculo={onRemoverVinculo}
+                    onEditarGrupos={onEditarGrupos}
+                  />
+                )
+              }
+
+              const c = linha.convite
               const emailKey = c.email.toLowerCase().trim()
               const isAceito = c.status.toUpperCase() === 'ACEITO'
               const temUsuario = isAceito && !!usuariosPorEmail[emailKey]
