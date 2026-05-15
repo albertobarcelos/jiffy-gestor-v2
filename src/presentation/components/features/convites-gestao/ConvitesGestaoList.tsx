@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import type { ConviteGestaoDTO } from '@/src/application/dto/convites/ConvitesGestaoDTO'
-import type { PerfilGestorOption, UsuarioAceitoInfo, UsuarioGestorListaItem } from './hooks/useConvitesGestao'
+import type { PerfilGestorOption, UsuarioGestorListaItem } from './hooks/useConvitesGestao'
 import { MdSearch } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { ConviteGestaoRow } from './components/ConviteGestaoRow'
@@ -14,11 +14,9 @@ type LinhaGestao =
 
 export function ConvitesGestaoList({
   convites,
-  gestoresSemConvite,
+  usuariosGestor,
   perfisList,
   perfilGestorNomePorId,
-  nomePorEmail,
-  usuariosPorEmail,
   loading,
   error,
   busyById,
@@ -28,12 +26,12 @@ export function ConvitesGestaoList({
   onRemoverVinculo,
   onEditarGrupos,
 }: {
+  /** Convites com status PENDENTE (sem gestor com o mesmo e-mail). */
   convites: ConviteGestaoDTO[]
-  gestoresSemConvite: UsuarioGestorListaItem[]
+  /** Usuários gestor — fonte principal quando o e-mail existe nas duas tabelas. */
+  usuariosGestor: UsuarioGestorListaItem[]
   perfisList: PerfilGestorOption[]
   perfilGestorNomePorId: Record<string, string>
-  nomePorEmail: Record<string, string>
-  usuariosPorEmail: Record<string, UsuarioAceitoInfo>
   loading: boolean
   error: string | null
   busyById: Record<string, 'cancelar' | 'reenviar' | null>
@@ -47,17 +45,18 @@ export function ConvitesGestaoList({
 
   const linhasVisiveis = useMemo((): LinhaGestao[] => {
     const q = busca.trim().toLowerCase()
-    const convFiltrados = q
-      ? convites.filter(c => c.email.toLowerCase().includes(q))
-      : convites
     const gestFiltrados = q
-      ? gestoresSemConvite.filter(
+      ? usuariosGestor.filter(
           g =>
             g.username.toLowerCase().includes(q) ||
             g.nome.toLowerCase().includes(q) ||
             (g.perfilGestorName ?? '').toLowerCase().includes(q)
         )
-      : gestoresSemConvite
+      : usuariosGestor
+    const convFiltrados = (q
+      ? convites.filter(c => c.email.toLowerCase().includes(q))
+      : convites
+    ).sort((a, b) => a.email.localeCompare(b.email, 'pt-BR'))
     const gestOrdenados = [...gestFiltrados].sort((a, b) => {
       const an = (a.nome || a.username).toLowerCase()
       const bn = (b.nome || b.username).toLowerCase()
@@ -67,9 +66,9 @@ export function ConvitesGestaoList({
       ...convFiltrados.map(convite => ({ tipo: 'convite' as const, convite })),
       ...gestOrdenados.map(gestor => ({ tipo: 'gestor' as const, gestor })),
     ]
-  }, [convites, gestoresSemConvite, busca])
+  }, [convites, usuariosGestor, busca])
 
-  const listaVazia = convites.length === 0 && gestoresSemConvite.length === 0
+  const listaVazia = convites.length === 0 && usuariosGestor.length === 0
 
   if (loading && listaVazia) {
     return (
@@ -109,7 +108,7 @@ export function ConvitesGestaoList({
         <div className="rounded-lg border border-dashed border-gray-300 bg-white px-6 py-12 text-center">
           <p className="font-nunito text-sm text-secondary-text">
             {listaVazia
-              ? 'Nenhum convite nem gestor extra encontrado.'
+              ? 'Nenhum usuário gestor nem convite pendente encontrado.'
               : 'Nenhum resultado para esta busca.'}
           </p>
         </div>
@@ -118,7 +117,7 @@ export function ConvitesGestaoList({
           <div className="hidden min-w-0 flex-shrink-0 md:block">
             <div className="grid h-11 w-full min-w-0 grid-cols-[minmax(180px,280px)_80px_160px] items-center gap-[10px] border-b border-gray-200 bg-gray-50 px-3 pr-2 md:px-4">
               <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary md:text-sm">
-                Usuários convidados / gestores
+                Convites pendentes / Usuários ativos
               </div>
               <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary md:text-sm">
                 Situação
@@ -148,22 +147,16 @@ export function ConvitesGestaoList({
               }
 
               const c = linha.convite
-              const emailKey = c.email.toLowerCase().trim()
-              const isAceito = c.status.toUpperCase() === 'ACEITO'
-              const temUsuario = isAceito && !!usuariosPorEmail[emailKey]
-
               return (
                 <ConviteGestaoRow
                   key={c.id}
                   convite={c}
-                  nomeUsuario={nomePorEmail[emailKey] ?? null}
+                  nomeUsuario={null}
                   perfilNome={perfilGestorNomePorId[c.perfilGestorId] ?? '\u2014'}
-                  perfisList={temUsuario ? perfisList : null}
+                  perfisList={null}
                   busyAction={busyById[c.id] ?? null}
                   onCancelar={onCancelar}
                   onReenviar={onReenviar}
-                  onPerfilChange={temUsuario ? onPerfilChange : undefined}
-                  onRemoverVinculo={temUsuario ? onRemoverVinculo : undefined}
                   onEditarGrupos={onEditarGrupos}
                 />
               )

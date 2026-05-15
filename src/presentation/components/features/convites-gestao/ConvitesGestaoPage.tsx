@@ -14,11 +14,9 @@ export default function ConvitesGestaoPage() {
   const { empresa } = useEmpresaMe()
   const {
     convites,
-    gestoresSemConvite,
+    usuariosGestor,
     perfisList,
     perfilGestorNomePorId,
-    nomePorEmail,
-    usuariosPorEmail,
     loading,
     error,
     busyById,
@@ -116,11 +114,9 @@ export default function ConvitesGestaoPage() {
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 md:px-8 md:pb-8">
         <ConvitesGestaoList
           convites={convites}
-          gestoresSemConvite={gestoresSemConvite}
+          usuariosGestor={usuariosGestor}
           perfisList={perfisList}
           perfilGestorNomePorId={perfilGestorNomePorId}
-          nomePorEmail={nomePorEmail}
-          usuariosPorEmail={usuariosPorEmail}
           loading={loading}
           error={error}
           busyById={busyById}
