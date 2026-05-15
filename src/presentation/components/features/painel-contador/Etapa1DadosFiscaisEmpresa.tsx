@@ -246,8 +246,8 @@ export function Etapa1DadosFiscaisEmpresa() {
             </div>
           )}
 
-          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <p className="font-inter font-medium text-amber-800 text-sm">
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="font-inter font-medium text-red-800 text-sm">
               ⚠️ Após a remoção, não será mais possível emitir notas fiscais até que um novo certificado seja cadastrado.
             </p>
           </div>
@@ -332,15 +332,15 @@ export function Etapa1DadosFiscaisEmpresa() {
                     </div>
                   </div>
                 ) : dadosCompletos === false ? (
-                  <div className="flex items-start gap-2 mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                    <MdWarning className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
+                  <div className="flex items-start gap-2 mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <MdWarning className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
                     <div className="flex-1">
-                      <p className="font-inter font-semibold text-amber-800 text-xs sm:text-sm mb-2">
+                      <p className="font-inter font-semibold text-red-800 text-xs sm:text-sm mb-2">
                         ⚠️ Alguns dados fiscais obrigatórios estão faltando. Clique em "Configurar Dados Fiscais" para completar as informações necessárias.
                       </p>
                       <button
                         onClick={verificarDadosCompletos}
-                        className="flex items-center gap-1 text-amber-700 hover:text-amber-900 text-xs font-medium transition-colors"
+                        className="flex items-center gap-1 text-red-700 hover:text-red-900 text-xs font-medium transition-colors"
                       >
                         <MdRefresh size={14} />
                         Verificar novamente
@@ -406,9 +406,9 @@ export function Etapa1DadosFiscaisEmpresa() {
                   </div>
                 )}
                 {!certificado && (
-                  <div className="flex items-start gap-2 mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                    <MdWarning className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
-                    <p className="font-inter font-medium text-amber-800 text-xs sm:text-sm">
+                  <div className="flex items-start gap-2 mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <MdWarning className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
+                    <p className="font-inter font-medium text-red-800 text-xs sm:text-sm">
                       Nenhum certificado cadastrado. Cadastre um certificado digital para habilitar a emissão de notas fiscais.
                     </p>
                   </div>

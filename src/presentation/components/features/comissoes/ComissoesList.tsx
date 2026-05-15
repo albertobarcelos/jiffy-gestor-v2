@@ -632,7 +632,7 @@ export function ComissoesList() {
         </div>
 
         {taxasPercentualQuery.isFetched && taxasOpts.length === 0 && (
-          <p className="rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
+          <p className="rounded border border-secondary bg-secondary/50 px-2 py-1.5 text-xs text-secondary">
             Nenhuma taxa percentual. Cadastre na aba <strong>Taxas</strong>.
           </p>
         )}
@@ -695,7 +695,7 @@ export function ComissoesList() {
         ) : null}
 
         {mostrarConteudoLista && mergeTruncado && !loadingLista && !listagemErro && modoTodasTaxas ? (
-          <p className="mb-2 mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
+          <p className="mb-2 mt-2 rounded border border-secondary bg-secondary/50 px-2 py-1.5 text-xs text-secondary">
             Atenção: para ao menos uma taxa ainda havia mais dados no fiscal ou o limite interno de páginas foi
             atingido; o total agregado pode estar incompleto. Refine os filtros ou selecione uma taxa específica.
           </p>

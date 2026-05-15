@@ -165,6 +165,14 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logoutTenant: async () => {
+        try {
+          await fetch('/api/auth/logout-tenant', {
+            method: 'POST',
+            credentials: 'include',
+          })
+        } catch (error) {
+          console.error('Erro ao chamar API logout-tenant:', error)
+        }
         clearTabSession()
 
         set(state => ({
@@ -184,6 +192,8 @@ export const useAuthStore = create<AuthState>()(
         } catch (error) {
           console.error('Erro ao chamar API de logout:', error)
         }
+
+        clearTabSession()
 
         set({
           identityAuth: null,
