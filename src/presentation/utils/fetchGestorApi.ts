@@ -39,7 +39,9 @@ function shouldRetryGestorSessionAfter401(pathname: string): boolean {
       rest.startsWith('confirmar-email') ||
       rest.startsWith('redefinir-senha') ||
       rest.startsWith('esqueci-senha') ||
-      rest.startsWith('reenviar-confirmacao')
+      rest.startsWith('reenviar-confirmacao') ||
+      rest === 'me' ||
+      rest.startsWith('me/senha')
     ) {
       return false
     }

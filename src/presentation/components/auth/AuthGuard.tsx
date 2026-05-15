@@ -65,7 +65,10 @@ function isPublicPath(p: string | null): boolean {
 }
 
 function isHubPath(p: string | null): boolean {
-  return p?.startsWith('/meus-apps') ?? false
+  if (!p) return false
+  /** Perfil da conta: só identidade de hub (como Meus Apps), sem empresa nesta aba. */
+  if (p === '/perfil' || p.startsWith('/perfil/')) return true
+  return p.startsWith('/meus-apps')
 }
 
 /**

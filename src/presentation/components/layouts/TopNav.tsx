@@ -8,7 +8,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { disconnectEmpresaTab } from '@/src/presentation/utils/disconnectEmpresaTab'
 import { useEmpresaUrlSync } from '@/src/presentation/hooks/useEmpresaUrlSync'
-import { EmpresaSwitcherTopNav } from '@/src/presentation/components/layouts/EmpresaSwitcherTopNav'
+import { EmpresaSwitcherTopNav } from './EmpresaSwitcherTopNav'
 import { useQueryClient } from '@tanstack/react-query'
 import { MdDashboard, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose } from 'react-icons/md'
 import { 
@@ -162,7 +162,6 @@ export function TopNav() {
       children: [
         { name: 'Perfis PDV', path: '/cadastros/perfis-usuarios-pdv', icon: MdGroup },
         { name: 'Usuários PDV', path: '/cadastros/usuarios', icon: MdPerson },
-        { name: 'Perfis Gestor', path: '/meus-apps/perfis-gestor', icon: MdAccountBalance },
         { name: 'Clientes', path: '/cadastros/clientes', icon: MdPeople },
       ],
     },
@@ -522,11 +521,9 @@ export function TopNav() {
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
           </button>
 
-          {/* User Profile - Agora clicável */}
-          <Link
-            href="/perfil"
-            onMouseEnter={() => handleLinkHover('/perfil')}
-            className="flex min-w-0 max-w-[min(100%,14rem)] flex-col items-end justify-center pl-3 text-right sm:max-w-[min(100%,18rem)] xl:max-w-[min(100%,22rem)] border-l border-gray-200 hover:bg-gray-50 px-2 py-1.5 transition-colors cursor-pointer"
+          {/* Dados do usuário (perfil será acessado noutro local) */}
+          <div
+            className="flex min-w-0 max-w-[min(100%,14rem)] flex-col items-end justify-center pl-3 text-right sm:max-w-[min(100%,18rem)] xl:max-w-[min(100%,22rem)] border-l border-gray-200 px-2 py-1.5"
             title={
               isHydrated
                 ? `${user?.getName() || 'Usuário'}${user?.getEmail() ? ` • ${user.getEmail()}` : ''}`
@@ -539,7 +536,7 @@ export function TopNav() {
             <p className="truncate text-xs text-gray-500">
               {isHydrated && user?.getEmail() ? user.getEmail() : 'Admin'}
             </p>
-          </Link>
+          </div>
 
           {/* Logout */}
           <button

@@ -46,6 +46,8 @@ interface AuthState {
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
   getUser: () => User | null
+  /** Atualiza o nome em memória (identity + tenant) após PATCH `/usuarios/me` — o JWT não muda. */
+  updateSessionUserDisplayName: (name: string) => void
 }
 
 function authFromJson(data: PersistedAuthJSON | null | undefined): Auth | null {
@@ -211,6 +213,26 @@ export const useAuthStore = create<AuthState>()(
       getUser: () => {
         const { identityAuth, tenantAuth } = get()
         return identityAuth?.getUser() ?? tenantAuth?.getUser() ?? null
+      },
+
+      updateSessionUserDisplayName: (name: string) => {
+        const trimmed = name.trim()
+        const displayName = trimmed.length > 0 ? trimmed : undefined
+        set(state => {
+          const patchAuth = (a: Auth | null): Auth | null => {
+            if (!a) return null
+            const u = a.getUser()
+            const newUser = User.create(u.getId(), u.getEmail(), displayName)
+            return Auth.createWithExpiration(a.getAccessToken(), newUser, a.getExpiresAt())
+          }
+          const identityAuth = patchAuth(state.identityAuth)
+          const tenantAuth = patchAuth(state.tenantAuth)
+          return {
+            identityAuth,
+            tenantAuth,
+            auth: tenantAuth ?? identityAuth ?? null,
+          }
+        })
       },
     }),
     {
