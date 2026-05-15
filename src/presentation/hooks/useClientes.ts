@@ -4,6 +4,7 @@ import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 interface ClientesQueryParams {
   q?: string
@@ -42,7 +43,7 @@ export function useClientes(params: ClientesQueryParams = {}) {
       if (params.limit) searchParams.append('limit', params.limit.toString())
       if (params.offset) searchParams.append('offset', params.offset.toString())
 
-      const response = await fetch(`/api/clientes?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/clientes?${searchParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -95,7 +96,7 @@ export function useClientesInfinite(params: Omit<ClientesQueryParams, 'offset'> 
       searchParams.append('limit', limit.toString())
       searchParams.append('offset', pageParam.toString())
 
-      const response = await fetch(`/api/clientes?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/clientes?${searchParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -147,7 +148,7 @@ export function useCliente(id: string) {
         throw new Error('Usuário não autenticado ou token ausente.')
       }
 
-      const response = await fetch(`/api/clientes/${id}`, {
+      const response = await fetchGestorApi(`/api/clientes/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -197,7 +198,7 @@ export function useClienteMutation() {
       const url = isUpdate && clienteId ? `/api/clientes/${clienteId}` : '/api/clientes'
       const method = isUpdate ? 'PUT' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           Authorization: `Bearer ${token}`,

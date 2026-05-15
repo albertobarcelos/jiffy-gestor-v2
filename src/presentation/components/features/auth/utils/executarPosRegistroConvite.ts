@@ -13,7 +13,7 @@ export type ExecutarPosRegistroConviteOptions = {
 }
 
 /**
- * Após `POST /api/auth/usuario/registro` no fluxo de convite: login silencioso, `GET /convites/me`, `POST .../aceitar`.
+ * Após `POST /api/auth/usuario/registro-por-convite` no fluxo de convite: login silencioso, `GET /convites/me`, `POST .../aceitar`.
  * Se o backend ainda exigir confirmação de e-mail, delega a `onPrecisaConfirmarEmail`.
  */
 export async function executarPosRegistroConvite(

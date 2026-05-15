@@ -64,13 +64,7 @@ export function SenhaGestorForcaBar({
       </div>
       <p id={labelId} className="text-xs font-medium text-gray-600" aria-live="polite">
         Força da senha:{' '}
-        <span
-          className={
-            nivel === 'muito_forte' ? 'font-semibold text-[#00B074]' : 'text-gray-900'
-          }
-        >
-          {label}
-        </span>
+        <span className="font-semibold text-primary-text">{label}</span>
       </p>
     </div>
   )

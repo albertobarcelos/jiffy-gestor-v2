@@ -8,7 +8,7 @@ import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
  */
 export async function GET(request: NextRequest) {
   try {
-    const validation = validateRequest(request)
+    const validation = validateRequest(request, { requireEmpresaId: false })
     if (!validation.valid || !validation.tokenInfo) {
       return validation.error!
     }

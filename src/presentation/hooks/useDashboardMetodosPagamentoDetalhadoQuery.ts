@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { DashboardMetodoPagamento } from '@/src/domain/entities/DashboardMetodoPagamento'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 function mapPeriodoToUseCaseFormat(frontendPeriodo: string): string {
   switch (frontendPeriodo) {
@@ -55,7 +56,7 @@ export function useDashboardMetodosPagamentoDetalhadoQuery({
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
       params.append('timezone', timezone)
 
-      const response = await fetch(`/api/dashboard/metodos-pagamento?${params.toString()}`)
+      const response = await fetchGestorApi(`/api/dashboard/metodos-pagamento?${params.toString()}`)
       if (!response.ok) {
         throw new Error('Erro ao buscar métodos de pagamento')
       }

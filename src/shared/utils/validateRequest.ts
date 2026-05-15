@@ -10,16 +10,24 @@ export interface ValidationResult {
   error?: NextResponse
 }
 
+export type ValidateRequestOptions = {
+  /**
+   * Quando `false`, aceita JWT de identidade (hub) sem `empresaId` no payload.
+   * Rotas como alteração de senha global (`/usuarios/me/senha`) usam só o utilizador autenticado.
+   * Default: `true` (rotas multi-empresa).
+   */
+  requireEmpresaId?: boolean
+}
+
 /**
- * Valida token e empresaId em uma requisição
- * Retorna tokenInfo se válido, ou NextResponse com erro se inválido
- * 
- * @param request - Requisição Next.js
- * @returns ValidationResult com tokenInfo ou erro
+ * Valida token e, por defeito, exige `empresaId` no JWT (multi-tenancy ERP).
  */
-export function validateRequest(request: NextRequest): ValidationResult {
+export function validateRequest(
+  request: NextRequest,
+  options?: ValidateRequestOptions
+): ValidationResult {
   const tokenInfo = getTokenInfo(request)
-  
+
   if (!tokenInfo) {
     return {
       valid: false,
@@ -31,8 +39,9 @@ export function validateRequest(request: NextRequest): ValidationResult {
     }
   }
 
-  // Valida que empresaId está presente (requisito para multi-tenancy)
-  if (!tokenInfo.empresaId) {
+  const requireEmpresaId = options?.requireEmpresaId !== false
+
+  if (requireEmpresaId && !tokenInfo.empresaId) {
     return {
       valid: false,
       tokenInfo: null,

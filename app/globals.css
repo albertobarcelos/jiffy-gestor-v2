@@ -129,6 +129,34 @@
     transform: none;
   }
 
+  /* Tooltip acima do gatilho (ex.: ícones de ação em listas com overflow) */
+  .tooltip-hover-above {
+    position: relative;
+  }
+  .tooltip-hover-above::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 2px);
+    right: 0;
+    min-width: max-content;
+    max-width: 220px;
+    background: #ffffff;
+    color: #000000;
+    padding: 6px 10px;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    white-space: pre-line;
+    font-size: 10px;
+    line-height: 1.3;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease-out;
+    z-index: 20;
+  }
+  .tooltip-hover-above:hover::after {
+    opacity: 1;
+  }
+
   /* Preview do card no Kanban ao arrastar: leve inclinação fixa (sem animação — evita tremor visual) */
   .drag-preview-card {
     transform: rotate(-4deg) scale(1.04);

@@ -1,91 +1,45 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import Image from 'next/image'
 import { ArrowLeft, Plus } from 'lucide-react'
-import { showToast } from '@/src/shared/utils/toast'
 import { MeusAppsTopNav } from '@/src/presentation/components/features/meus-apps/components/MeusAppsTopNav'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import { empresaNomeParaSlugUrl } from '@/src/shared/utils/empresaNomeParaSlugUrl'
 import { useConvitesGestao } from './hooks/useConvitesGestao'
 import { ConvitesGestaoList } from './ConvitesGestaoList'
 import { NovoConviteModal } from './components/NovoConviteModal'
 
-/**
- * Gestão de convites emitidos pela empresa (sessão com tenant).
- */
 export default function ConvitesGestaoPage() {
-  const { empresa, isLoading: empresaLoading } = useEmpresaMe()
+  const { empresa } = useEmpresaMe()
   const {
     convites,
+    perfisList,
     perfilGestorNomePorId,
+    nomePorEmail,
+    usuariosPorEmail,
     loading,
     error,
-    fetchConvites,
-    criarConvite,
-    cancelarConvite,
-    reenviarConvite,
+    busyById,
+    handleCriar,
+    handleCancelar,
+    handleReenviar,
+    handlePerfilChange,
+    handleRemoverVinculo,
   } = useConvitesGestao()
 
   const [modalOpen, setModalOpen] = useState(false)
-  const [busyById, setBusyById] = useState<Record<string, 'cancelar' | 'reenviar' | null>>({})
 
-  useEffect(() => {
-    void fetchConvites()
-  }, [fetchConvites])
+  const nomeEmpresa = empresa?.nomeExibicao ?? ''
 
-  const setBusy = useCallback((id: string, action: 'cancelar' | 'reenviar' | null) => {
-    setBusyById(prev => ({ ...prev, [id]: action }))
-  }, [])
+  const handleEditarGrupos = useCallback(() => {
+    if (!nomeEmpresa) return
+    const slug = empresaNomeParaSlugUrl(nomeEmpresa)
+    window.open(`/meus-apps/perfis-gestor/${slug}`, '_blank')
+  }, [nomeEmpresa])
 
-  const handleCancelar = useCallback(
-    async (id: string) => {
-      setBusy(id, 'cancelar')
-      try {
-        await cancelarConvite(id)
-        showToast.success('Convite cancelado.')
-      } catch (e) {
-        showToast.error(e instanceof Error ? e.message : 'Erro ao cancelar')
-      } finally {
-        setBusy(id, null)
-      }
-    },
-    [cancelarConvite, setBusy]
-  )
-
-  const handleReenviar = useCallback(
-    async (id: string) => {
-      setBusy(id, 'reenviar')
-      try {
-        await reenviarConvite(id)
-        showToast.success('Convite atualizado / reenvio processado.')
-      } catch (e) {
-        showToast.error(e instanceof Error ? e.message : 'Erro ao reenviar')
-      } finally {
-        setBusy(id, null)
-      }
-    },
-    [reenviarConvite, setBusy]
-  )
-
-  const handleCriar = useCallback(
-    async (payload: { email: string; perfilGestorId: string }) => {
-      await criarConvite(payload)
-      showToast.success('Convite criado.')
-    },
-    [criarConvite]
-  )
-
-  const nomeEmpresa =
-    empresa?.nomeExibicao ?? (empresaLoading ? 'Carregando…' : 'Empresa')
-
-  /**
-   * Voltar: esta tela costuma abrir em nova aba a partir do hub.
-   * Se a aba do Meus Apps ainda existir (`window.opener`), foca e fecha só esta guia.
-   * Caso contrário, abre o hub numa nova guia, tenta fechar esta; se o navegador bloquear o close, navega aqui.
-   */
   const handleVoltar = useCallback(() => {
-    if (typeof window === 'undefined') {
-      return
-    }
+    if (typeof window === 'undefined') return
 
     try {
       const { opener } = window
@@ -95,7 +49,7 @@ export default function ConvitesGestaoPage() {
         return
       }
     } catch {
-      /* opener indisponível em alguns cenários */
+      /* opener indisponível */
     }
 
     window.open('/meus-apps', '_blank', 'noopener,noreferrer')
@@ -136,33 +90,43 @@ export default function ConvitesGestaoPage() {
           </button>
         </div>
 
-        <div className="mt-6 flex flex-col gap-4 border-b border-gray-200 pb-6 md:mt-8 md:flex-row md:items-center md:justify-between md:gap-8">
-          <div className="min-w-0">
-            <h1 className="font-nunito text-xl font-bold tracking-tight text-primary-text md:text-2xl">
-              {nomeEmpresa}
-            </h1>
-            <p className="mt-1 font-nunito text-sm text-secondary-text">
-              {empresa ? 'Ativo' : empresaLoading ? '…' : '—'}
-            </p>
+        {nomeEmpresa && (
+          <div className="mt-2 flex flex-col gap-4 border-b border-gray-200 pb-2 md:flex-row md:items-center md:justify-between md:gap-8">
+            <div className="min-w-0">
+              <h1 className="text-lg font-normal uppercase tracking-tight text-primary-text md:text-xl">
+                {nomeEmpresa}
+              </h1>
+              <p className="mt-1 text-sm text-secondary-text">Ativo</p>
+            </div>
+            <div className="relative h-36 w-full max-w-[300px] shrink-0 self-start overflow-hidden rounded-lg md:self-center">
+              <Image
+                src="/images/jiffy-login.png"
+                alt="Jiffy"
+                fill
+                className="object-contain p-2"
+                sizes="300px"
+                priority
+              />
+            </div>
           </div>
-          <div
-            className="flex h-28 w-full max-w-[220px] shrink-0 items-center justify-center self-start rounded-lg border border-dashed border-gray-300 bg-white font-nunito text-xs text-secondary-text md:self-center"
-            aria-hidden
-          >
-            Imagem da empresa
-          </div>
-        </div>
+        )}
       </div>
 
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 md:px-8 md:pb-8">
         <ConvitesGestaoList
           convites={convites}
+          perfisList={perfisList}
           perfilGestorNomePorId={perfilGestorNomePorId}
+          nomePorEmail={nomePorEmail}
+          usuariosPorEmail={usuariosPorEmail}
           loading={loading}
           error={error}
           busyById={busyById}
           onCancelar={handleCancelar}
           onReenviar={handleReenviar}
+          onPerfilChange={handlePerfilChange}
+          onRemoverVinculo={handleRemoverVinculo}
+          onEditarGrupos={handleEditarGrupos}
         />
       </div>
 

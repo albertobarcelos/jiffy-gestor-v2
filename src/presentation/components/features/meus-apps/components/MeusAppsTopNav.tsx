@@ -93,11 +93,13 @@ export function MeusAppsTopNav() {
 
         <div className="flex items-center gap-2">
           <div className="hidden items-center gap-2 border-l border-white/90 px-3 py-1.5 text-white/90 md:flex">
-            <div className="flex min-w-0 flex-col items-end text-right leading-tight">
+            <Link
+              href="/perfil"
+              className="flex min-w-0 flex-col items-end text-right leading-tight transition hover:opacity-90"
+              title="Meu perfil"
+            >
               {nomeExibicao ? (
-                <span className="max-w-[220px] truncate text-sm font-medium text-white">
-                  {nomeExibicao}
-                </span>
+                <span className="max-w-[220px] truncate text-sm font-medium text-white">{nomeExibicao}</span>
               ) : null}
               <span
                 className={cn(
@@ -107,7 +109,7 @@ export function MeusAppsTopNav() {
               >
                 {emailUsuario || 'Usuário'}
               </span>
-            </div>
+            </Link>
             <button
               type="button"
               onClick={() => {
@@ -120,17 +122,25 @@ export function MeusAppsTopNav() {
               <LogOut className="h-4 w-4" aria-hidden />
             </button>
           </div>
-          <div className="md:hidden">
+          <div className="flex items-center gap-1 md:hidden">
+            <Link
+              href="/perfil"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-sm font-bold text-white transition hover:bg-white/15"
+              aria-label="Meu perfil"
+              title="Meu perfil"
+            >
+              {userInitial}
+            </Link>
             <button
               type="button"
               onClick={() => {
                 void disconnectHubTab({ logoutHub })
               }}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-sm font-bold text-white transition hover:bg-white/15"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-white/90 transition hover:bg-white/10"
               aria-label="Sair"
               title="Sair"
             >
-              {userInitial}
+              <LogOut className="h-4 w-4" aria-hidden />
             </button>
           </div>
         </div>
