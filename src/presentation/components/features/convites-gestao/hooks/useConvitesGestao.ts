@@ -12,9 +12,13 @@ import {
   atualizarPerfilService,
   removerVinculoService,
 } from '../services/convitesGestaoService'
+import type {
+  PerfilGestorOption,
+  UsuarioAceitoInfo,
+  UsuarioGestorListaItem,
+} from '../services/convitesGestaoService'
 
-export type { PerfilGestorOption, UsuarioAceitoInfo } from '../services/convitesGestaoService'
-import type { PerfilGestorOption, UsuarioAceitoInfo } from '../services/convitesGestaoService'
+export type { PerfilGestorOption, UsuarioAceitoInfo, UsuarioGestorListaItem } from '../services/convitesGestaoService'
 
 export function useConvitesGestao() {
   const auth = useAuthStore(s => s.auth)
@@ -22,6 +26,7 @@ export function useConvitesGestao() {
   const [convites, setConvites] = useState<ConviteGestaoDTO[]>([])
   const [perfisList, setPerfisList] = useState<PerfilGestorOption[]>([])
   const [usuariosPorEmail, setUsuariosPorEmail] = useState<Record<string, UsuarioAceitoInfo>>({})
+  const [gestoresSemConvite, setGestoresSemConvite] = useState<UsuarioGestorListaItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busyById, setBusyById] = useState<Record<string, 'cancelar' | 'reenviar' | null>>({})
@@ -43,10 +48,12 @@ export function useConvitesGestao() {
       setConvites(data.convites)
       setPerfisList(data.perfisList)
       setUsuariosPorEmail(data.usuariosPorEmail)
+      setGestoresSemConvite(data.gestoresSemConvite)
     } catch (e) {
       setConvites([])
       setPerfisList([])
       setUsuariosPorEmail({})
+      setGestoresSemConvite([])
       setError(e instanceof Error ? e.message : 'Erro ao carregar convites')
     } finally {
       setLoading(false)
@@ -66,6 +73,10 @@ export function useConvitesGestao() {
       const token = getToken()
       if (!token) throw new Error('Sessão sem token')
       const criado = await criarConviteService(token, payload)
+      const emailKey = criado.email.toLowerCase().trim()
+      setGestoresSemConvite(prev =>
+        prev.filter(g => g.username.toLowerCase().trim() !== emailKey)
+      )
       setConvites(prev => [criado, ...prev])
       showToast.success('Convite criado.')
     },
@@ -116,13 +127,21 @@ export function useConvitesGestao() {
       if (!info?.id) return
       try {
         await atualizarPerfilService(token, info.id, novoPerfilGestorId)
+        const emailKey = email.toLowerCase().trim()
         setConvites(prev =>
           prev.map(c => {
-            if (c.email.toLowerCase().trim() === email.toLowerCase().trim()) {
+            if (c.email.toLowerCase().trim() === emailKey) {
               return { ...c, perfilGestorId: novoPerfilGestorId }
             }
             return c
           })
+        )
+        setGestoresSemConvite(prev =>
+          prev.map(g =>
+            g.username.toLowerCase().trim() === emailKey
+              ? { ...g, perfilGestorId: novoPerfilGestorId }
+              : g
+          )
         )
         showToast.success('Perfil atualizado.')
       } catch (e) {
@@ -143,6 +162,9 @@ export function useConvitesGestao() {
       try {
         await removerVinculoService(token, info.id)
         setConvites(prev => prev.filter(c => c.email.toLowerCase().trim() !== emailKey))
+        setGestoresSemConvite(prev =>
+          prev.filter(g => g.username.toLowerCase().trim() !== emailKey)
+        )
         setUsuariosPorEmail(prev => {
           const next = { ...prev }
           delete next[emailKey]
@@ -174,6 +196,7 @@ export function useConvitesGestao() {
 
   return {
     convites,
+    gestoresSemConvite,
     perfisList,
     perfilGestorNomePorId,
     nomePorEmail,

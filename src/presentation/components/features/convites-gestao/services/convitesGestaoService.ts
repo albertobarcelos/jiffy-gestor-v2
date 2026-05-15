@@ -5,10 +5,22 @@ export type PerfilGestorOption = { id: string; role: string }
 
 export type UsuarioAceitoInfo = { id: string; nome: string }
 
+/** Item de GET /api/pessoas/usuarios-gestor (lista paginada). */
+export type UsuarioGestorListaItem = {
+  id: string
+  nome: string
+  username: string
+  perfilGestorName: string
+  empresaId: string
+  perfilGestorId: string
+}
+
 export interface ConvitesGestaoData {
   convites: ConviteGestaoDTO[]
   perfisList: PerfilGestorOption[]
   usuariosPorEmail: Record<string, UsuarioAceitoInfo>
+  /** Gestores da empresa sem registro correspondente na lista de convites (mesmo e-mail/username). */
+  gestoresSemConvite: UsuarioGestorListaItem[]
 }
 
 async function parseError(res: Response): Promise<string> {
@@ -62,59 +74,106 @@ async function fetchPerfis(token: string): Promise<PerfilGestorOption[]> {
   return all
 }
 
-async function fetchUsuariosAceitos(
-  token: string,
-  emails: string[]
-): Promise<Record<string, UsuarioAceitoInfo>> {
-  const unique = [...new Set(emails.map(e => e.toLowerCase().trim()).filter(Boolean))]
-  if (unique.length === 0) return {}
+function normalizarNomeGestor(raw: string | undefined): string {
+  const n = (raw ?? '').trim()
+  if (!n || n.toUpperCase() === 'SEM NOME') return ''
+  return n
+}
 
-  const out: Record<string, UsuarioAceitoInfo> = {}
-
-  await Promise.all(
-    unique.map(async email => {
-      try {
-        const params = new URLSearchParams({ q: email, limit: '5', offset: '0' })
-        const res = await fetchGestorApi(`/api/pessoas/usuarios-gestor?${params.toString()}`, {
-          headers: authHeaders(token),
-        })
-        if (!res.ok) return
-        const data = (await res.json()) as { items?: Array<{ id?: string; nome?: string; username?: string }> }
-        const items = data.items ?? []
-        const match = items.find(u => u.username?.toLowerCase().trim() === email)
-        if (match?.id) {
-          const nome = (match.nome && match.nome.trim() && match.nome.trim().toUpperCase() !== 'SEM NOME')
-            ? match.nome.trim()
-            : ''
-          out[email] = { id: match.id, nome }
-        }
-      } catch {
-        /* silencia erro de lookup individual */
-      }
-    })
-  )
-
-  return out
+function parseUsuarioGestorItem(raw: unknown): UsuarioGestorListaItem | null {
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  const id = o.id != null ? String(o.id).trim() : ''
+  const username = o.username != null ? String(o.username).trim() : ''
+  if (!id || !username) return null
+  return {
+    id,
+    username,
+    nome: normalizarNomeGestor(o.nome != null ? String(o.nome) : undefined),
+    perfilGestorName: o.perfilGestorName != null ? String(o.perfilGestorName).trim() : '—',
+    empresaId: o.empresaId != null ? String(o.empresaId).trim() : '',
+    perfilGestorId: o.perfilGestorId != null ? String(o.perfilGestorId).trim() : '',
+  }
 }
 
 /**
- * Carrega todos os dados necessários em paralelo otimizado:
- * - Convites + Perfis em paralelo (não dependem um do outro)
- * - Depois busca usuários aceitos (depende da lista de convites)
+ * Lista todos os usuários gestor (paginação local até esgotar `items`).
+ */
+export async function fetchTodosUsuariosGestor(token: string): Promise<UsuarioGestorListaItem[]> {
+  const all: UsuarioGestorListaItem[] = []
+  const seen = new Set<string>()
+  let offset = 0
+  const limit = 100
+
+  for (let page = 0; page < 500; page++) {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset),
+    })
+    const res = await fetchGestorApi(`/api/pessoas/usuarios-gestor?${params.toString()}`, {
+      headers: authHeaders(token),
+    })
+    if (!res.ok) break
+    const data = (await res.json()) as {
+      items?: unknown[]
+      count?: number
+      hasNext?: boolean
+    }
+    const items = data.items ?? []
+    for (const raw of items) {
+      const parsed = parseUsuarioGestorItem(raw)
+      if (parsed && !seen.has(parsed.id)) {
+        seen.add(parsed.id)
+        all.push(parsed)
+      }
+    }
+    if (items.length === 0) break
+    if (items.length < limit) break
+    if (data.hasNext === false) break
+    offset += items.length
+    if (typeof data.count === 'number' && offset >= data.count) break
+  }
+
+  return all
+}
+
+function buildUsuariosPorEmailDeGestores(
+  gestores: UsuarioGestorListaItem[]
+): Record<string, UsuarioAceitoInfo> {
+  const out: Record<string, UsuarioAceitoInfo> = {}
+  for (const g of gestores) {
+    const key = g.username.toLowerCase().trim()
+    if (!key) continue
+    out[key] = { id: g.id, nome: g.nome }
+  }
+  return out
+}
+
+function buildGestoresSemConvite(
+  gestores: UsuarioGestorListaItem[],
+  convites: ConviteGestaoDTO[]
+): UsuarioGestorListaItem[] {
+  const emailsConvite = new Set(
+    convites.map(c => c.email.toLowerCase().trim()).filter(Boolean)
+  )
+  return gestores.filter(g => !emailsConvite.has(g.username.toLowerCase().trim()))
+}
+
+/**
+ * Carrega convites, perfis e todos os usuários gestor (GET paginado),
+ * depois cruza e-mails de convites com `username` dos gestores.
  */
 export async function carregarDadosCompletos(token: string): Promise<ConvitesGestaoData> {
-  const [convites, perfisList] = await Promise.all([
+  const [convites, perfisList, gestoresTodos] = await Promise.all([
     fetchConvitesList(token),
     fetchPerfis(token),
+    fetchTodosUsuariosGestor(token).catch(() => [] as UsuarioGestorListaItem[]),
   ])
 
-  const emailsAceitos = convites
-    .filter(c => c.status.toUpperCase() === 'ACEITO')
-    .map(c => c.email)
+  const usuariosPorEmail = buildUsuariosPorEmailDeGestores(gestoresTodos)
+  const gestoresSemConvite = buildGestoresSemConvite(gestoresTodos, convites)
 
-  const usuariosPorEmail = await fetchUsuariosAceitos(token, emailsAceitos)
-
-  return { convites, perfisList, usuariosPorEmail }
+  return { convites, perfisList, usuariosPorEmail, gestoresSemConvite }
 }
 
 export async function criarConviteService(
