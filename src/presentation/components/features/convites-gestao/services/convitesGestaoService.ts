@@ -16,11 +16,42 @@ export type UsuarioGestorListaItem = {
 }
 
 export interface ConvitesGestaoData {
-  convites: ConviteGestaoDTO[]
+  /** Todos os convites retornados pela API (estado bruto). */
+  convitesTodos: ConviteGestaoDTO[]
+  /** Todos os usuários gestor da empresa. */
+  usuariosGestor: UsuarioGestorListaItem[]
   perfisList: PerfilGestorOption[]
-  usuariosPorEmail: Record<string, UsuarioAceitoInfo>
-  /** Gestores da empresa sem registro correspondente na lista de convites (mesmo e-mail/username). */
-  gestoresSemConvite: UsuarioGestorListaItem[]
+}
+
+export function emailGestaoKey(value: string): string {
+  return value.toLowerCase().trim()
+}
+
+export function conviteEstaAceito(status: string): boolean {
+  const u = status.trim().toUpperCase()
+  return u === 'ACEITO' || u === 'ACCEPTED'
+}
+
+export function conviteEstaPendente(status: string): boolean {
+  return status.trim().toUpperCase() === 'PENDENTE'
+}
+
+/**
+ * Convites exibidos na lista: só PENDENTE, sem gestor com o mesmo e-mail
+ * (quem já aceitou ou virou gestor aparece na seção de usuários gestor).
+ */
+export function filtrarConvitesParaLista(
+  convites: ConviteGestaoDTO[],
+  gestores: UsuarioGestorListaItem[]
+): ConviteGestaoDTO[] {
+  const emailsGestor = new Set(
+    gestores.map(g => emailGestaoKey(g.username)).filter(Boolean)
+  )
+  return convites.filter(c => {
+    if (!conviteEstaPendente(c.status)) return false
+    const email = emailGestaoKey(c.email)
+    return email.length > 0 && !emailsGestor.has(email)
+  })
 }
 
 async function parseError(res: Response): Promise<string> {
@@ -137,43 +168,30 @@ export async function fetchTodosUsuariosGestor(token: string): Promise<UsuarioGe
   return all
 }
 
-function buildUsuariosPorEmailDeGestores(
+export function buildUsuariosPorEmailDeGestores(
   gestores: UsuarioGestorListaItem[]
 ): Record<string, UsuarioAceitoInfo> {
   const out: Record<string, UsuarioAceitoInfo> = {}
   for (const g of gestores) {
-    const key = g.username.toLowerCase().trim()
+    const key = emailGestaoKey(g.username)
     if (!key) continue
     out[key] = { id: g.id, nome: g.nome }
   }
   return out
 }
 
-function buildGestoresSemConvite(
-  gestores: UsuarioGestorListaItem[],
-  convites: ConviteGestaoDTO[]
-): UsuarioGestorListaItem[] {
-  const emailsConvite = new Set(
-    convites.map(c => c.email.toLowerCase().trim()).filter(Boolean)
-  )
-  return gestores.filter(g => !emailsConvite.has(g.username.toLowerCase().trim()))
-}
-
 /**
- * Carrega convites, perfis e todos os usuários gestor (GET paginado),
- * depois cruza e-mails de convites com `username` dos gestores.
+ * Carrega convites, perfis e todos os usuários gestor (GET paginado).
+ * A lista na UI aplica `filtrarConvitesParaLista` sobre `convitesTodos`.
  */
 export async function carregarDadosCompletos(token: string): Promise<ConvitesGestaoData> {
-  const [convites, perfisList, gestoresTodos] = await Promise.all([
+  const [convitesTodos, perfisList, usuariosGestor] = await Promise.all([
     fetchConvitesList(token),
     fetchPerfis(token),
     fetchTodosUsuariosGestor(token).catch(() => [] as UsuarioGestorListaItem[]),
   ])
 
-  const usuariosPorEmail = buildUsuariosPorEmailDeGestores(gestoresTodos)
-  const gestoresSemConvite = buildGestoresSemConvite(gestoresTodos, convites)
-
-  return { convites, perfisList, usuariosPorEmail, gestoresSemConvite }
+  return { convitesTodos, perfisList, usuariosGestor }
 }
 
 export async function criarConviteService(

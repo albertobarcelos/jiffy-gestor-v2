@@ -51,7 +51,7 @@ function PerfilRadioList({
   )
 }
 
-/** Linha para gestor cadastrado sem convite associado (mesmo fluxo de perfil / remover vínculo). */
+/** Linha de usuário gestor (fonte principal na lista unificada). */
 export function GestorSemConviteRow({
   gestor,
   perfisList,
@@ -173,7 +173,6 @@ export function GestorSemConviteRow({
               {email}
             </span>
           )}
-          <span className="block truncate text-xs text-secondary-text">Gestor (sem convite)</span>
         </div>
         <div className="flex min-w-0 justify-start">
           <span
@@ -198,7 +197,6 @@ export function GestorSemConviteRow({
           ) : (
             <p className="font-nunito text-sm font-normal text-primary-text break-all">{email}</p>
           )}
-          <p className="mt-1 font-nunito text-xs text-secondary-text">Gestor (sem convite)</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center justify-center rounded bg-sky-600 px-2.5 py-0.5 font-nunito text-xs font-normal text-white">
               Ativo
