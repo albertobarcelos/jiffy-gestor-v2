@@ -6,27 +6,32 @@ const senhaGestorField = z
   .min(1, 'Senha é obrigatória')
   .refine(senhaGestorEhValida, { message: SENHA_GESTOR_MENSAGEM_ERRO })
 
-/** POST /auth/usuario/registro */
-export const CreateUsuarioRequestSchema = z
+/** POST /auth/usuario/registro-por-convite — exige conviteId; e-mail não exige confirmação. */
+export const RegistroPorConviteRequestSchema = z
   .object({
     nome: z.string().min(1, 'Nome é obrigatório').trim(),
     username: z.string().min(1).email('E-mail inválido').trim(),
     password: senhaGestorField,
-    /** Alinha com convite pendente no backend (cadastro ativo sem confirmação de e-mail). */
-    conviteId: z.string().min(1).optional(),
+    conviteId: z.string().min(1, 'conviteId é obrigatório no registro por convite'),
   })
   .strict()
 
-export type CreateUsuarioRequestDTO = z.infer<typeof CreateUsuarioRequestSchema>
+export type RegistroPorConviteRequestDTO = z.infer<typeof RegistroPorConviteRequestSchema>
 
-/** POST /auth/usuario/confirmar-email */
-export const ConfirmEmailRequestSchema = z
+/** POST /auth/usuario/auto-registro — sem convite; backend envia e-mail de confirmação. */
+export const AutoRegistroRequestSchema = z
   .object({
-    token: z.string().min(1, 'Token é obrigatório'),
+    nome: z.string().min(1, 'Nome é obrigatório').trim(),
+    username: z.string().min(1).email('E-mail inválido').trim(),
+    password: senhaGestorField,
   })
   .strict()
 
-export type ConfirmEmailRequestDTO = z.infer<typeof ConfirmEmailRequestSchema>
+export type AutoRegistroRequestDTO = z.infer<typeof AutoRegistroRequestSchema>
+
+/** @deprecated Use RegistroPorConviteRequestSchema ou AutoRegistroRequestSchema. */
+export const CreateUsuarioRequestSchema = AutoRegistroRequestSchema
+export type CreateUsuarioRequestDTO = AutoRegistroRequestDTO
 
 /** POST /auth/usuario/reenviar-confirmacao */
 export const ResendConfirmationEmailRequestSchema = z
@@ -42,12 +47,15 @@ export const ForgotPasswordRequestSchema = ResendConfirmationEmailRequestSchema
 
 export type ForgotPasswordRequestDTO = z.infer<typeof ForgotPasswordRequestSchema>
 
-/** POST /auth/usuario/redefinir-senha */
-export const ResetPasswordRequestSchema = z
+/** Corpo de POST /auth/usuario/redefinir-senha (token vai em Authorization: Bearer). */
+export const RedefinirSenhaBodySchema = z
   .object({
-    token: z.string().min(1, 'Token é obrigatório'),
     password: senhaGestorField,
   })
   .strict()
 
-export type ResetPasswordRequestDTO = z.infer<typeof ResetPasswordRequestSchema>
+export type RedefinirSenhaBodyDTO = z.infer<typeof RedefinirSenhaBodySchema>
+
+/** @deprecated Use RedefinirSenhaBodySchema; token não vai mais no body. */
+export const ResetPasswordRequestSchema = RedefinirSenhaBodySchema
+export type ResetPasswordRequestDTO = RedefinirSenhaBodyDTO

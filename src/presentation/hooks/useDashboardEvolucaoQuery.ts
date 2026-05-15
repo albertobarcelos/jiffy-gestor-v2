@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 export type DashboardEvolucaoPoint = {
   data: string
@@ -25,7 +26,7 @@ async function fetchDashboardEvolucao(params: Params & { token: string }): Promi
 
   params.selectedStatuses.forEach(status => search.append('status', status))
 
-  const response = await fetch(`/api/dashboard/evolucao?${search.toString()}`, {
+  const response = await fetchGestorApi(`/api/dashboard/evolucao?${search.toString()}`, {
     headers: { Authorization: `Bearer ${params.token}` },
   })
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>

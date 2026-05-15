@@ -85,13 +85,10 @@ export default function DashboardV2() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const {
-    empresa: empresaLogada,
     timezoneAgregacao,
     isLoading: carregandoEmpresa,
-    error: erroEmpresa,
     refetch: refetchEmpresa,
   } = useEmpresaMe()
-  const [lojaId, setLojaId] = useState('')
   const {
     periodoData,
     periodoPersonalizadoInicio,
@@ -228,9 +225,6 @@ export default function DashboardV2() {
 
   const subtituloAtualizacao = textoUltimaAtualizacao(dadosAtualizadosEm)
 
-  /** Com uma única empresa, o id vem do `/me`; com várias no futuro, prevalece o escolhido em `lojaId` */
-  const valorEmpresaSelect = lojaId || empresaLogada?.id || ''
-
   const handleAtualizarDashboard = () => {
     void queryClient.invalidateQueries({ queryKey: ['dashboard', 'evolucao'] })
     void queryClient.invalidateQueries({ queryKey: ['dashboard', 'metodos-pagamento-detalhado'] })
@@ -259,11 +253,6 @@ export default function DashboardV2() {
         subtituloAtualizacao={subtituloAtualizacao}
         handleAtualizarDashboard={handleAtualizarDashboard}
         carregandoEmpresa={carregandoEmpresa}
-        erroEmpresa={erroEmpresa}
-        empresaLogada={empresaLogada}
-        refetchEmpresa={refetchEmpresa}
-        valorEmpresaSelect={valorEmpresaSelect}
-        setLojaId={setLojaId}
         periodoData={periodoData}
         handlePeriodoDataChange={handlePeriodoDataChange}
         periodoPersonalizadoInicio={periodoPersonalizadoInicio}

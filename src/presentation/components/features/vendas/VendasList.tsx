@@ -129,8 +129,25 @@ const PERIODOS_SELECT_VALIDOS = [
   'Últimos 90 Dias',
 ] as const
 
+/** Mapeia slugs do dashboard V2 / URLs antigas → rótulos do select de relatórios. */
+function mapearPeriodoUrlParaSelect(v: string): string {
+  const t = v.trim()
+  switch (t.toLowerCase()) {
+    case 'hoje':
+      return 'Hoje'
+    case 'semana':
+      return 'Últimos 7 Dias'
+    case '30dias':
+      return 'Últimos 30 Dias'
+    default:
+      return t
+  }
+}
+
 function normalizarPeriodoSelect(v: string | undefined): string {
-  if (v && (PERIODOS_SELECT_VALIDOS as readonly string[]).includes(v)) return v
+  if (!v) return 'Todos'
+  const mapped = mapearPeriodoUrlParaSelect(v)
+  if ((PERIODOS_SELECT_VALIDOS as readonly string[]).includes(mapped)) return mapped
   return 'Todos'
 }
 

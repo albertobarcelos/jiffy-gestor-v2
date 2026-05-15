@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { prepareTabSession } from '@/src/shared/utils/tabSession'
+import { fetchAccessTokenEscolherEmpresa } from '@/src/presentation/utils/escolherEmpresaApi'
 import type { ConvitePendente } from '@/src/presentation/components/features/convites/types'
 import { SearchBar } from './components/SearchBar'
 import { MeusAppsFeedGrid } from './components/MeusAppsFeedGrid'
@@ -23,6 +24,7 @@ import { conviteParaEmpresaSnapshot } from '@/src/presentation/components/featur
 import {
   HUB_SESSAO_TOKEN_MENSAGEM,
   isLikelyHubSessionTokenError,
+  isLikelyVinculoRemovidoError,
 } from './utils/hubSessionTokenFeedback'
 import { appEmpresaCorrespondeBusca, conviteCorrespondeBusca } from './utils/meusAppsBusca'
 import { empresaNomeParaSlugUrl } from '@/src/shared/utils/empresaNomeParaSlugUrl'
@@ -300,39 +302,31 @@ export default function MeusAppsPage() {
     setFeedGridExpandido(false)
   }, [busca, feedFiltro])
 
-  /** Mesmo fluxo que “Acessar”: POST escolher-empresa + token da empresa no store (aba atual). */
-  const obterTokenEmpresa = useCallback(
-    async (appId: string): Promise<string> => {
-      const idTok = identityAuth?.getAccessToken()
-      const res = await fetch('/api/auth/escolher-empresa', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(idTok ? { Authorization: `Bearer ${idTok}` } : {}),
-        },
-        body: JSON.stringify({ empresaId: appId }),
-      })
+  /** Mesmo fluxo que “Acessar”: POST escolher-empresa (cookie de identidade) + token da empresa. */
+  const obterTokenEmpresa = useCallback(async (appId: string): Promise<string> => {
+    return fetchAccessTokenEscolherEmpresa(appId)
+  }, [])
 
-      const body = (await res.json().catch(() => ({}))) as { error?: string; accessToken?: string }
-
-      if (!res.ok) {
-        throw new Error(typeof body.error === 'string' ? body.error : `Erro ${res.status}`)
-      }
-
-      if (!body.accessToken) {
-        throw new Error('Resposta sem accessToken')
-      }
-
-      return body.accessToken
+  const removerEmpresaDesvinculada = useCallback(
+    (appId: string) => {
+      const atual = hubEmpresas ?? []
+      const atualizado = atual.filter(e => e.id !== appId)
+      setHubEmpresas(atualizado)
+      toast.error('Seu vínculo com esta empresa foi removido.', { duration: 5000 })
     },
-    [identityAuth]
+    [hubEmpresas, setHubEmpresas]
   )
 
   const reportErroAcessoEmpresa = useCallback(
-    (e: unknown) => {
+    (e: unknown, appId?: string) => {
       const msg =
         e instanceof Error ? e.message : 'Não foi possível abrir o aplicativo'
+
+      if (appId && isLikelyVinculoRemovidoError(msg)) {
+        removerEmpresaDesvinculada(appId)
+        return
+      }
+
       if (isLikelyHubSessionTokenError(msg)) {
         reportHubSessionIssue(msg)
         setAcessoErro(null)
@@ -340,7 +334,7 @@ export default function MeusAppsPage() {
         setAcessoErro(msg)
       }
     },
-    [reportHubSessionIssue]
+    [reportHubSessionIssue, removerEmpresaDesvinculada]
   )
 
   const handleAcessar = async (appId: string) => {
@@ -357,7 +351,7 @@ export default function MeusAppsPage() {
       const { empParam } = prepareTabSession(token, app?.nome ?? '', appId)
       window.open(`/dashboard?${empParam}`, '_blank')
     } catch (e) {
-      reportErroAcessoEmpresa(e)
+      reportErroAcessoEmpresa(e, appId)
     } finally {
       setBusyAppId(null)
     }
@@ -375,13 +369,13 @@ export default function MeusAppsPage() {
       const token = await obterTokenEmpresa(appId)
       const { empParam } = prepareTabSession(token, app.nome, appId)
       const slug = empresaNomeParaSlugUrl(app.nome)
-      window.open(`/meus-apps/convidar-usuarios/${slug}?${empParam}`, '_blank')
+      window.open(`/meus-apps/gerenciar-usuarios/${slug}?${empParam}`, '_blank')
     } catch (e) {
-      reportErroAcessoEmpresa(e)
+      reportErroAcessoEmpresa(e, appId)
     }
   }
 
-  const handleGerenciarUsuariosGestor = async (appId: string) => {
+  const handleGerenciarPerfisGestor = async (appId: string) => {
     const app = appsBase.find(a => a.id === appId)
     if (!app || app.status === 'inativo') {
       return
@@ -393,9 +387,9 @@ export default function MeusAppsPage() {
       const token = await obterTokenEmpresa(appId)
       const { empParam } = prepareTabSession(token, app.nome, appId)
       const slug = empresaNomeParaSlugUrl(app.nome)
-      window.open(`/meus-apps/usuarios-gestor/${slug}?${empParam}`, '_blank')
+      window.open(`/meus-apps/perfis-gestor/${slug}?${empParam}`, '_blank')
     } catch (e) {
-      reportErroAcessoEmpresa(e)
+      reportErroAcessoEmpresa(e, appId)
     }
   }
 
@@ -530,7 +524,7 @@ export default function MeusAppsPage() {
                 cells={gridCells}
                 onAcessar={handleAcessar}
                 onGerenciarConvites={handleGerenciarConvites}
-                onGerenciarUsuariosGestor={handleGerenciarUsuariosGestor}
+                onGerenciarPerfisGestor={handleGerenciarPerfisGestor}
                 busyAppId={busyAppId}
                 onAceitarConvite={handleAceitarConvite}
                 onRecusarConvite={handleRecusarConvite}
@@ -541,7 +535,7 @@ export default function MeusAppsPage() {
                 items={feedItems}
                 onAcessar={handleAcessar}
                 onGerenciarConvites={handleGerenciarConvites}
-                onGerenciarUsuariosGestor={handleGerenciarUsuariosGestor}
+                onGerenciarPerfisGestor={handleGerenciarPerfisGestor}
                 busyAppId={busyAppId}
                 onAceitarConvite={handleAceitarConvite}
                 onRecusarConvite={handleRecusarConvite}

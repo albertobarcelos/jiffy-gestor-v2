@@ -1052,7 +1052,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
             {exibeAvisoCpfECnpjPreenchidos && (
               <p
                 role="alert"
-                className="text-sm font-nunito rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-950"
+                className="text-sm font-nunito rounded-md border border-secondary bg-secondary/50 px-3 py-2 text-secondary"
               >
                 Informe apenas CPF ou CNPJ — não é possível preencher os dois ao mesmo tempo.
                 Remova um dos campos.

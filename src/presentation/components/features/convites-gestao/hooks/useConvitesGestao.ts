@@ -1,177 +1,194 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { showToast } from '@/src/shared/utils/toast'
 import type { ConviteGestaoDTO } from '@/src/application/dto/convites/ConvitesGestaoDTO'
+import {
+  buildUsuariosPorEmailDeGestores,
+  carregarDadosCompletos,
+  criarConviteService,
+  cancelarConviteService,
+  reenviarConviteService,
+  atualizarPerfilService,
+  removerVinculoService,
+  emailGestaoKey,
+  filtrarConvitesParaLista,
+} from '../services/convitesGestaoService'
+import type {
+  PerfilGestorOption,
+  UsuarioGestorListaItem,
+} from '../services/convitesGestaoService'
 
-async function parseError(res: Response): Promise<string> {
-  const data = await res.json().catch(() => null)
-  if (data && typeof data === 'object' && data !== null && 'error' in data) {
-    return String((data as { error?: unknown }).error)
-  }
-  return `Erro ${res.status}`
-}
+export type { PerfilGestorOption, UsuarioAceitoInfo, UsuarioGestorListaItem } from '../services/convitesGestaoService'
 
-/** Resolve `role` de cada perfil gestor via GET /api/pessoas/perfis-gestor/[id]. */
-async function buscarNomesPerfilGestor(
-  token: string,
-  perfilGestorIds: string[]
-): Promise<Record<string, string>> {
-  const unique = [
-    ...new Set(perfilGestorIds.map(id => String(id).trim()).filter(Boolean)),
-  ]
-  const out: Record<string, string> = {}
-  await Promise.all(
-    unique.map(async id => {
-      try {
-        const res = await fetch(`/api/pessoas/perfis-gestor/${encodeURIComponent(id)}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-        if (!res.ok) {
-          out[id] = '—'
-          return
-        }
-        const data = (await res.json()) as { role?: unknown }
-        const role = typeof data.role === 'string' ? data.role.trim() : ''
-        out[id] = role.length > 0 ? role : '—'
-      } catch {
-        out[id] = '—'
-      }
-    })
-  )
-  return out
-}
-
-/**
- * Chamadas ao BFF de gestão de convites da empresa (token com contexto de empresa).
- */
 export function useConvitesGestao() {
   const auth = useAuthStore(s => s.auth)
 
-  const [convites, setConvites] = useState<ConviteGestaoDTO[]>([])
-  const [perfilGestorNomePorId, setPerfilGestorNomePorId] = useState<Record<string, string>>({})
-  const [loading, setLoading] = useState(false)
+  const [convitesTodos, setConvitesTodos] = useState<ConviteGestaoDTO[]>([])
+  const [usuariosGestor, setUsuariosGestor] = useState<UsuarioGestorListaItem[]>([])
+  const [perfisList, setPerfisList] = useState<PerfilGestorOption[]>([])
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [busyById, setBusyById] = useState<Record<string, 'cancelar' | 'reenviar' | null>>({})
+  const didFetch = useRef(false)
 
   const getToken = useCallback(() => auth?.getAccessToken() ?? null, [auth])
 
-  const fetchConvites = useCallback(async () => {
+  const setBusy = useCallback((id: string, action: 'cancelar' | 'reenviar' | null) => {
+    setBusyById(prev => ({ ...prev, [id]: action }))
+  }, [])
+
+  const convites = useMemo(
+    () => filtrarConvitesParaLista(convitesTodos, usuariosGestor),
+    [convitesTodos, usuariosGestor]
+  )
+
+  const usuariosPorEmail = useMemo(
+    () => buildUsuariosPorEmailDeGestores(usuariosGestor),
+    [usuariosGestor]
+  )
+
+  const fetchAll = useCallback(async () => {
     const token = getToken()
-    if (!token) {
-      setError('Sessão sem token')
-      return
-    }
+    if (!token) return
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/convites', {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-      if (!res.ok) {
-        throw new Error(await parseError(res))
-      }
-      const data = (await res.json()) as ConviteGestaoDTO[]
-      const arr = Array.isArray(data) ? data : []
-      setConvites(arr)
-      const ids = arr.map(c => c.perfilGestorId)
-      setPerfilGestorNomePorId(await buscarNomesPerfilGestor(token, ids))
+      const data = await carregarDadosCompletos(token)
+      setConvitesTodos(data.convitesTodos)
+      setUsuariosGestor(data.usuariosGestor)
+      setPerfisList(data.perfisList)
     } catch (e) {
-      setConvites([])
-      setPerfilGestorNomePorId({})
+      setConvitesTodos([])
+      setUsuariosGestor([])
+      setPerfisList([])
       setError(e instanceof Error ? e.message : 'Erro ao carregar convites')
     } finally {
       setLoading(false)
     }
   }, [getToken])
 
-  const criarConvite = useCallback(
+  useEffect(() => {
+    const token = auth?.getAccessToken()
+    if (!token) return
+    if (didFetch.current) return
+    didFetch.current = true
+    void fetchAll()
+  }, [auth, fetchAll])
+
+  const handleCriar = useCallback(
     async (payload: { email: string; perfilGestorId: string }) => {
       const token = getToken()
-      if (!token) {
-        throw new Error('Sessão sem token')
-      }
-      const res = await fetch('/api/convites', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) {
-        throw new Error(await parseError(res))
-      }
-      const criado = (await res.json()) as ConviteGestaoDTO
-      setConvites(prev => [criado, ...prev])
-      const extras = await buscarNomesPerfilGestor(token, [criado.perfilGestorId])
-      setPerfilGestorNomePorId(prev => ({ ...prev, ...extras }))
-      return criado
+      if (!token) throw new Error('Sessão sem token')
+      const criado = await criarConviteService(token, payload)
+      setConvitesTodos(prev => [criado, ...prev])
+      showToast.success('Convite criado.')
     },
     [getToken]
   )
 
-  const cancelarConvite = useCallback(
+  const handleCancelar = useCallback(
     async (id: string) => {
       const token = getToken()
-      if (!token) {
-        throw new Error('Sessão sem token')
+      if (!token) return
+      setBusy(id, 'cancelar')
+      try {
+        await cancelarConviteService(token, id)
+        setConvitesTodos(prev => prev.filter(c => c.id !== id))
+        showToast.success('Convite cancelado.')
+      } catch (e) {
+        showToast.error(e instanceof Error ? e.message : 'Erro ao cancelar')
+      } finally {
+        setBusy(id, null)
       }
-      const res = await fetch(`/api/convites/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-        credentials: 'include',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-      if (!res.ok && res.status !== 204) {
-        throw new Error(await parseError(res))
-      }
-      setConvites(prev => prev.filter(c => c.id !== id))
     },
-    [getToken]
+    [getToken, setBusy]
   )
 
-  const reenviarConvite = useCallback(
+  const handleReenviar = useCallback(
     async (id: string) => {
       const token = getToken()
-      if (!token) {
-        throw new Error('Sessão sem token')
+      if (!token) return
+      setBusy(id, 'reenviar')
+      try {
+        const atualizado = await reenviarConviteService(token, id)
+        setConvitesTodos(prev => prev.map(c => (c.id === atualizado.id ? atualizado : c)))
+        showToast.success('Convite reenviado.')
+      } catch (e) {
+        showToast.error(e instanceof Error ? e.message : 'Erro ao reenviar')
+      } finally {
+        setBusy(id, null)
       }
-      const res = await fetch(`/api/convites/${encodeURIComponent(id)}/reenviar`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-      if (!res.ok) {
-        throw new Error(await parseError(res))
-      }
-      const atualizado = (await res.json()) as ConviteGestaoDTO
-      setConvites(prev => prev.map(c => (c.id === atualizado.id ? atualizado : c)))
-      return atualizado
     },
-    [getToken]
+    [getToken, setBusy]
   )
+
+  const handlePerfilChange = useCallback(
+    async (email: string, novoPerfilGestorId: string) => {
+      const token = getToken()
+      if (!token) return
+      const emailKey = emailGestaoKey(email)
+      const info = usuariosPorEmail[emailKey]
+      if (!info?.id) return
+      try {
+        await atualizarPerfilService(token, info.id, novoPerfilGestorId)
+        setUsuariosGestor(prev =>
+          prev.map(g =>
+            emailGestaoKey(g.username) === emailKey
+              ? { ...g, perfilGestorId: novoPerfilGestorId }
+              : g
+          )
+        )
+        showToast.success('Perfil atualizado.')
+      } catch (e) {
+        showToast.error(e instanceof Error ? e.message : 'Erro ao atualizar perfil')
+      }
+    },
+    [getToken, usuariosPorEmail]
+  )
+
+  const handleRemoverVinculo = useCallback(
+    async (email: string) => {
+      const token = getToken()
+      if (!token) return
+      const emailKey = emailGestaoKey(email)
+      const info = usuariosPorEmail[emailKey]
+      if (!info?.id) return
+      setBusy(info.id, 'cancelar')
+      try {
+        await removerVinculoService(token, info.id)
+        setUsuariosGestor(prev => prev.filter(g => emailGestaoKey(g.username) !== emailKey))
+        setConvitesTodos(prev => prev.filter(c => emailGestaoKey(c.email) !== emailKey))
+        showToast.success('Vínculo removido com sucesso.')
+      } catch (e) {
+        showToast.error(e instanceof Error ? e.message : 'Erro ao remover vínculo')
+      } finally {
+        setBusy(info.id, null)
+      }
+    },
+    [getToken, usuariosPorEmail, setBusy]
+  )
+
+  const perfilGestorNomePorId = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const p of perfisList) map[p.id] = p.role
+    return map
+  }, [perfisList])
 
   return {
     convites,
-    setConvites,
+    usuariosGestor,
+    perfisList,
     perfilGestorNomePorId,
+    usuariosPorEmail,
     loading,
     error,
-    setError,
-    fetchConvites,
-    criarConvite,
-    cancelarConvite,
-    reenviarConvite,
+    busyById,
+    handleCriar,
+    handleCancelar,
+    handleReenviar,
+    handlePerfilChange,
+    handleRemoverVinculo,
   }
 }

@@ -18,18 +18,27 @@ import {
  * POST /api/auth/escolher-empresa
  */
 function getIdentityTokenParaEscolherEmpresa(request: NextRequest): string | null {
-  const authHeader = request.headers.get('authorization')
-  if (authHeader?.startsWith('Bearer ')) {
-    const t = authHeader.substring(7).trim()
-    if (t.length > 0) {
-      return t
-    }
-  }
-  return (
+  const fromCookie =
     request.cookies.get(AUTH_COOKIE_IDENTITY)?.value ??
     request.cookies.get(AUTH_COOKIE_LEGACY)?.value ??
     null
-  )
+
+  const authHeader = request.headers.get('authorization')
+  let fromBearer: string | null = null
+  if (authHeader?.startsWith('Bearer ')) {
+    const t = authHeader.substring(7).trim()
+    if (t.length > 0) {
+      fromBearer = t
+    }
+  }
+
+  /**
+   * Cookie httpOnly é a fonte estável após login; o cliente às vezes envia no header
+   * o JWT do tenant (Zustand `auth`) por engano, o que gera "token inválido" no hub.
+   * Preferimos o cookie de identidade quando existir.
+   */
+  if (fromCookie) return fromCookie
+  return fromBearer
 }
 
 export async function POST(request: NextRequest) {

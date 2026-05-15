@@ -1,17 +1,34 @@
 'use client'
 
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { senhaGestorEhValida, SENHA_GESTOR_MENSAGEM_ERRO } from '@/src/shared/utils/senhaGestorRules'
 import { showToast } from '@/src/shared/utils/toast'
 import { GestorPasswordField } from '@/src/presentation/components/features/auth/components/GestorPasswordField'
 import { PasswordFieldPressReveal } from '@/src/presentation/components/features/auth/components/PasswordFieldPressReveal'
+import { extrairTokenConfirmacaoEmail } from '@/src/presentation/components/features/auth/utils/confirmacaoEmailUrlToken'
 
 export function RedefinirSenhaForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const token = searchParams.get('token')
+  const [hashTick, setHashTick] = useState(0)
+  const [token, setToken] = useState<string | null>(null)
+
+  useEffect(() => {
+    const onHash = () => setHashTick(n => n + 1)
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [])
+
+  useEffect(() => {
+    setToken(
+      extrairTokenConfirmacaoEmail({
+        searchParams,
+        hashFragment: typeof window !== 'undefined' ? window.location.hash : null,
+      })
+    )
+  }, [searchParams, hashTick])
 
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -39,11 +56,14 @@ export function RedefinirSenhaForm() {
     try {
       const res = await fetch('/api/auth/usuario/redefinir-senha', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ password }),
       })
 
-      if (res.status === 204) {
+      if (res.ok) {
         router.push('/redefinir-senha/sucesso')
         return
       }
@@ -60,7 +80,7 @@ export function RedefinirSenhaForm() {
   if (!token) {
     return (
       <div className="space-y-4 text-center">
-        <p className="text-error text-sm">Link inválido ou incompleto.</p>
+        <p className="text-error text-sm">Link inválido ou incompleto (token ausente na URL).</p>
         <Link href="/login" className="font-semibold text-[var(--color-alternate)] underline">
           Voltar ao login
         </Link>

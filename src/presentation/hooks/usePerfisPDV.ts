@@ -5,6 +5,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 import { showToast } from '@/src/shared/utils/toast'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 interface PerfilPDV {
   id: string
@@ -27,7 +28,7 @@ export function usePerfisPDV() {
         throw new Error('Usuário não autenticado ou token ausente.')
       }
 
-      const response = await fetch('/api/perfis-pdv', {
+      const response = await fetchGestorApi('/api/perfis-pdv', {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',

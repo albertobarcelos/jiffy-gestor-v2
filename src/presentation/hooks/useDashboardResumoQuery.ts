@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 type DashboardResumoMetricas = {
   total: {
@@ -82,7 +83,7 @@ async function fetchDashboardResumo(params: DashboardResumoParams & { token: str
     search.append('dataFinalizacaoFinalComparacao', params.intervaloComparacaoFim.toISOString())
   }
 
-  const response = await fetch(`/api/dashboard/resumo?${search.toString()}`, {
+  const response = await fetchGestorApi(`/api/dashboard/resumo?${search.toString()}`, {
     headers: { Authorization: `Bearer ${params.token}` },
   })
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>

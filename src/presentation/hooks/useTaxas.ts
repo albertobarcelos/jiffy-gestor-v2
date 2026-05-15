@@ -2,6 +2,7 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { Taxa } from '@/src/domain/entities/Taxa'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 type TaxasQueryParams = {
   q?: string
@@ -36,7 +37,7 @@ export function useTaxasInfinite(params: TaxasQueryParams = {}) {
       searchParams.append('limit', limit.toString())
       searchParams.append('offset', pageParam.toString())
 
-      const response = await fetch(`/api/taxas?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/taxas?${searchParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',

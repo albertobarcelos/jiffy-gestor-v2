@@ -18,6 +18,7 @@ export function RegistroForm() {
   const fluxoConvite = searchParams.get('novousuario') === 'true'
   const emailConvite = searchParams.get('email') ?? ''
   const conviteId = searchParams.get('conviteId') ?? ''
+  const isRegistroPorConvite = conviteId.trim().length > 0
 
   const login = useAuthStore(s => s.login)
   const setHubEmpresas = useAuthStore(s => s.setHubEmpresas)
@@ -50,21 +51,33 @@ export function RegistroForm() {
 
     setLoading(true)
     try {
-      const body: {
-        nome: string
-        username: string
-        password: string
-        conviteId?: string
-      } = {
-        nome: nome.trim(),
-        username: email.trim(),
-        password,
-      }
-      if (fluxoConvite && conviteId.trim()) {
-        body.conviteId = conviteId.trim()
+      const conviteIdTrim = conviteId.trim()
+      const isRegistroPorConvite = conviteIdTrim.length > 0
+
+      if (fluxoConvite && !isRegistroPorConvite) {
+        throw new Error(
+          'Link de convite incompleto: falta o identificador do convite (conviteId). Abra o link enviado por e-mail.'
+        )
       }
 
-      const res = await fetch('/api/auth/usuario/registro', {
+      const url = isRegistroPorConvite
+        ? '/api/auth/usuario/registro-por-convite'
+        : '/api/auth/usuario/auto-registro'
+
+      const body = isRegistroPorConvite
+        ? {
+            nome: nome.trim(),
+            username: email.trim(),
+            password,
+            conviteId: conviteIdTrim,
+          }
+        : {
+            nome: nome.trim(),
+            username: email.trim(),
+            password,
+          }
+
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -75,7 +88,7 @@ export function RegistroForm() {
         throw new Error(data.error || 'Não foi possível concluir o cadastro.')
       }
 
-      if (fluxoConvite) {
+      if (isRegistroPorConvite) {
         await executarPosRegistroConvite(email.trim(), password, {
           login,
           setHubEmpresas,
@@ -103,7 +116,7 @@ export function RegistroForm() {
       onSubmit={handleSubmit}
       className="space-y-2 [@media(max-height:720px)]:space-y-2 [@media(max-height:640px)]:space-y-1.5"
     >
-      {fluxoConvite ? (
+      {isRegistroPorConvite ? (
         <p className="text-sm text-gray-800 rounded-lg bg-white/50 border border-white/60 p-3">
           Você foi convidado para uma empresa na Jiffy. Complete o cadastro; em seguida entraremos e aceitaremos o
           convite automaticamente quando possível.
@@ -123,10 +136,10 @@ export function RegistroForm() {
         value={email}
         onChange={e => setEmail(e.target.value)}
         autoComplete="email"
-        readOnly={fluxoConvite && Boolean(emailConvite.trim())}
+        readOnly={isRegistroPorConvite && Boolean(emailConvite.trim())}
         disabled={loading}
         className={
-          fluxoConvite && emailConvite.trim() ? 'cursor-not-allowed opacity-90' : undefined
+          isRegistroPorConvite && emailConvite.trim() ? 'cursor-not-allowed opacity-90' : undefined
         }
       />
       <GestorPasswordField
@@ -155,7 +168,7 @@ export function RegistroForm() {
         disabled={loading}
         className="w-full py-3 px-4 rounded-lg font-semibold text-white bg-[var(--color-secondary)] disabled:opacity-50"
       >
-        {loading ? (fluxoConvite ? 'Entrando…' : 'Cadastrando…') : fluxoConvite ? 'Cadastrar e continuar' : 'Criar conta'}
+        {loading ? (isRegistroPorConvite ? 'Entrando…' : 'Cadastrando…') : isRegistroPorConvite ? 'Cadastrar e continuar' : 'Criar conta'}
       </button>
 
       <p className="text-center text-sm text-gray-700">

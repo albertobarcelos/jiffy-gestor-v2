@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { DashboardTopGarcom } from '@/src/domain/entities/DashboardTopGarcom'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 type ApiItem = {
   usuarioId: string
@@ -40,7 +41,7 @@ async function fetchTopGarcons(params: Params & { token: string; timezone: strin
     search.append('dataFinalizacaoFinal', params.periodoFinal.toISOString())
   }
 
-  const response = await fetch(`/api/dashboard/top-garcons?${search.toString()}`, {
+  const response = await fetchGestorApi(`/api/dashboard/top-garcons?${search.toString()}`, {
     headers: { Authorization: `Bearer ${params.token}` },
   })
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>

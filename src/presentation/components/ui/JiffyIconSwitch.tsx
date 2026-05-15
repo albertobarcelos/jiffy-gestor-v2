@@ -33,8 +33,8 @@ const TRANSITION = `all 0.3s ${EASING}`
 const EFFECT_TRANSITION = 'all 0.3s ease-in-out'
 
 const COLOR_TRACK_OFF = '#dc2626' /* red-600 */
-const COLOR_TRACK_ON = '#16a34a' /* green-600 */
-const COLOR_ICON_CHECK = '#16a34a'
+const COLOR_TRACK_ON = '#00B074' /* green-600 */
+const COLOR_ICON_CHECK = '#00B074'
 const COLOR_ICON_CROSS = '#dc2626'
 
 const SIZES = {

@@ -4,6 +4,7 @@ import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { PerfilUsuario } from '@/src/domain/entities/PerfilUsuario'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 interface PerfisUsuariosQueryParams {
   q?: string
@@ -41,7 +42,7 @@ export function usePerfisUsuariosInfinite(params: Omit<PerfisUsuariosQueryParams
       searchParams.append('limit', limit.toString())
       searchParams.append('offset', pageParam.toString())
 
-      const response = await fetch(`/api/perfis-usuarios-pdv?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/perfis-usuarios-pdv?${searchParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -89,7 +90,7 @@ export function usePerfilUsuario(id: string) {
         throw new Error('Usuário não autenticado ou token ausente.')
       }
 
-      const response = await fetch(`/api/perfis-usuarios-pdv/${id}`, {
+      const response = await fetchGestorApi(`/api/perfis-usuarios-pdv/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -131,7 +132,7 @@ export function usePerfilUsuarioMutation() {
       const url = isUpdate && perfilId ? `/api/perfis-usuarios-pdv/${perfilId}` : '/api/perfis-usuarios-pdv'
       const method = isUpdate ? 'PATCH' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           Authorization: `Bearer ${token}`,

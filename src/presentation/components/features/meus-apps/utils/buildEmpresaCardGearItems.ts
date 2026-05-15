@@ -8,24 +8,24 @@ export function buildEmpresaCardGearItems(
   opts: {
     navDisabled: boolean
     onGerenciarConvites?: (id: string) => void
-    onGerenciarUsuariosGestor?: (id: string) => void
+    onGerenciarPerfisGestor?: (id: string) => void
   }
 ): CardGearMenuItemConfig[] {
   const podeConvidar = !opts.navDisabled && Boolean(opts.onGerenciarConvites)
-  const podeUsuariosGestor = !opts.navDisabled && Boolean(opts.onGerenciarUsuariosGestor)
+  const podePerfis = !opts.navDisabled && Boolean(opts.onGerenciarPerfisGestor)
 
   return [
     {
-      id: 'convidar-usuarios',
-      label: 'Convidar usuários',
+      id: 'gerenciar-usuarios',
+      label: 'Gerenciar Usuários',
       onClick: () => opts.onGerenciarConvites?.(appId),
       disabled: !podeConvidar,
     },
     {
-      id: 'usuarios-gestor',
-      label: 'Usuários gestor',
-      onClick: () => opts.onGerenciarUsuariosGestor?.(appId),
-      disabled: !podeUsuariosGestor,
+      id: 'perfis-gestor',
+      label: 'Perfis Gestor',
+      onClick: () => opts.onGerenciarPerfisGestor?.(appId),
+      disabled: !podePerfis,
     },
   ]
 }
