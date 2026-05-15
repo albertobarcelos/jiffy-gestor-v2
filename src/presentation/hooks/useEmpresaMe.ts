@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { resolverTimezoneAgregacaoEmpresa } from '@/src/shared/utils/timezoneAgregacaoEmpresa'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 /** Resumo da empresa da sessão (mesma rota usada em configurações / painel contador) */
 export interface EmpresaMeResumo {
@@ -42,7 +43,7 @@ export function useEmpresaMe() {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/empresas/me', {
+      const res = await fetchGestorApi('/api/empresas/me', {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) {

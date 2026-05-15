@@ -21,6 +21,7 @@ import { FormControl, InputAdornment, InputLabel, MenuItem, Select, TextField } 
 import { sxEntradaCompactaProdutoSelect } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { TipoVendaIcon } from './TipoVendaIcon'
 import { calculatePeriodo } from '@/src/shared/utils/dateFilters' // Importar calculatePeriodo
+import { calcularPeriodoNoFusoEmpresa } from '@/src/shared/utils/periodoNoFusoEmpresa'
 import { startOfDay } from 'date-fns'
 import type { DateRange } from 'react-day-picker'
 import {
@@ -128,8 +129,25 @@ const PERIODOS_SELECT_VALIDOS = [
   'Últimos 90 Dias',
 ] as const
 
+/** Mapeia slugs do dashboard V2 / URLs antigas → rótulos do select de relatórios. */
+function mapearPeriodoUrlParaSelect(v: string): string {
+  const t = v.trim()
+  switch (t.toLowerCase()) {
+    case 'hoje':
+      return 'Hoje'
+    case 'semana':
+      return 'Últimos 7 Dias'
+    case '30dias':
+      return 'Últimos 30 Dias'
+    default:
+      return t
+  }
+}
+
 function normalizarPeriodoSelect(v: string | undefined): string {
-  if (v && (PERIODOS_SELECT_VALIDOS as readonly string[]).includes(v)) return v
+  if (!v) return 'Todos'
+  const mapped = mapearPeriodoUrlParaSelect(v)
+  if ((PERIODOS_SELECT_VALIDOS as readonly string[]).includes(mapped)) return mapped
   return 'Todos'
 }
 
@@ -319,13 +337,23 @@ function buildVendasListQueryParams(
 
   let inicioFiltro: Date | null = null
   let fimFiltro: Date | null = null
+  /** Presets (Hoje, Últimos N dias, Mês atual): mesma regra do dashboard/BFF — `calcularPeriodoNoFusoEmpresa`. */
+  let intervaloUtcJaNoFusoApi = false
   if (filters.periodoInicial && filters.periodoFinal) {
     inicioFiltro = filters.periodoInicial
     fimFiltro = filters.periodoFinal
   } else if (filters.periodo !== 'Todos') {
-    const { inicio, fim } = calculatePeriodo(filters.periodo)
-    inicioFiltro = inicio
-    fimFiltro = fim
+    const tzParaPresets = args?.timeZoneEmpresa?.trim() || 'America/Sao_Paulo'
+    const noFuso = calcularPeriodoNoFusoEmpresa(filters.periodo, tzParaPresets)
+    if (noFuso.inicio != null && noFuso.fim != null) {
+      inicioFiltro = noFuso.inicio
+      fimFiltro = noFuso.fim
+      intervaloUtcJaNoFusoApi = true
+    } else {
+      const { inicio, fim } = calculatePeriodo(filters.periodo)
+      inicioFiltro = inicio
+      fimFiltro = fim
+    }
   }
   /**
    * Backend: período por data de finalização (`dataFinalizacaoInicial`/`dataFinalizacaoFinal`).
@@ -333,16 +361,26 @@ function buildVendasListQueryParams(
    */
   const usarDatasCriacao = normalizedStatus === 'ABERTA'
   const tzEmpresa = args?.timeZoneEmpresa?.trim() || ''
+  const isoInicioFiltroVendas = (): string => {
+    if (usarDatasCriacao) return inicioFiltro!.toISOString()
+    if (intervaloUtcJaNoFusoApi || !tzEmpresa) return inicioFiltro!.toISOString()
+    return toISOStringNoFusoEmpresa(inicioFiltro!, tzEmpresa)
+  }
+  const isoFimFiltroVendas = (): string => {
+    if (usarDatasCriacao) return fimFiltro!.toISOString()
+    if (intervaloUtcJaNoFusoApi || !tzEmpresa) return fimFiltro!.toISOString()
+    return toISOStringNoFusoEmpresa(fimFiltro!, tzEmpresa)
+  }
   if (inicioFiltro) {
     baseParams.append(
       usarDatasCriacao ? 'dataCriacaoInicial' : 'dataFinalizacaoInicial',
-      usarDatasCriacao || !tzEmpresa ? inicioFiltro.toISOString() : toISOStringNoFusoEmpresa(inicioFiltro, tzEmpresa)
+      isoInicioFiltroVendas()
     )
   }
   if (fimFiltro) {
     baseParams.append(
       usarDatasCriacao ? 'dataCriacaoFinal' : 'dataFinalizacaoFinal',
-      usarDatasCriacao || !tzEmpresa ? fimFiltro.toISOString() : toISOStringNoFusoEmpresa(fimFiltro, tzEmpresa)
+      isoFimFiltroVendas()
     )
   }
 

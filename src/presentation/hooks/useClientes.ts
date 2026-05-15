@@ -1,8 +1,10 @@
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 interface ClientesQueryParams {
   q?: string
@@ -22,8 +24,9 @@ interface ClientesResponse {
 export function useClientes(params: ClientesQueryParams = {}) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  const queryKey = ['clientes', params]
+  const queryKey = ['clientes', params, empresaId]
 
   return useQuery({
     queryKey,
@@ -40,7 +43,7 @@ export function useClientes(params: ClientesQueryParams = {}) {
       if (params.limit) searchParams.append('limit', params.limit.toString())
       if (params.offset) searchParams.append('offset', params.offset.toString())
 
-      const response = await fetch(`/api/clientes?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/clientes?${searchParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -73,9 +76,10 @@ export function useClientes(params: ClientesQueryParams = {}) {
 export function useClientesInfinite(params: Omit<ClientesQueryParams, 'offset'> = {}) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useInfiniteQuery({
-    queryKey: ['clientes', 'infinite', params],
+    queryKey: ['clientes', 'infinite', params, empresaId],
     queryFn: async ({
       pageParam = 0,
     }): Promise<{ clientes: Cliente[]; count: number; nextOffset: number | null }> => {
@@ -92,7 +96,7 @@ export function useClientesInfinite(params: Omit<ClientesQueryParams, 'offset'> 
       searchParams.append('limit', limit.toString())
       searchParams.append('offset', pageParam.toString())
 
-      const response = await fetch(`/api/clientes?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/clientes?${searchParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -135,15 +139,16 @@ export function useClientesInfinite(params: Omit<ClientesQueryParams, 'offset'> 
 export function useCliente(id: string) {
   const { auth, isAuthenticated } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useQuery<Cliente, ApiError>({
-    queryKey: ['cliente', id],
+    queryKey: ['cliente', id, empresaId],
     queryFn: async () => {
       if (!isAuthenticated || !token) {
         throw new Error('Usuário não autenticado ou token ausente.')
       }
 
-      const response = await fetch(`/api/clientes/${id}`, {
+      const response = await fetchGestorApi(`/api/clientes/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -174,6 +179,7 @@ export function useClienteMutation() {
   const { auth } = useAuthStore()
   const queryClient = useQueryClient()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useMutation({
     mutationFn: async ({
@@ -192,7 +198,7 @@ export function useClienteMutation() {
       const url = isUpdate && clienteId ? `/api/clientes/${clienteId}` : '/api/clientes'
       const method = isUpdate ? 'PUT' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           Authorization: `Bearer ${token}`,
@@ -216,7 +222,7 @@ export function useClienteMutation() {
       const previousClientes = queryClient.getQueryData(['clientes', 'infinite'])
 
       if (isUpdate && clienteId) {
-        queryClient.setQueryData(['cliente', clienteId], (old: any) => {
+        queryClient.setQueriesData({ queryKey: ['cliente', clienteId] }, (old: any) => {
           if (!old) return old
           return { ...old, ...data }
         })

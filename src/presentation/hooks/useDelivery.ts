@@ -2,7 +2,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { PedidoDelivery } from '@/src/domain/entities/PedidoDelivery'
 import { MetodoPagamento } from '@/src/domain/entities/MetodoPagamento'
 import { StatusPedido } from '@/src/domain/entities/StatusPedido'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 interface ListarPedidosParams {
   status?: StatusPedido
@@ -21,7 +23,8 @@ export function usePedidosDelivery(
   params: ListarPedidosParams = {},
   tokens?: DeliveryTokens
 ) {
-  const queryKey = ['delivery', 'pedidos', params]
+  const empresaId = useTenantEmpresaId()
+  const queryKey = ['delivery', 'pedidos', params, empresaId]
 
   return useQuery({
     queryKey,
@@ -47,7 +50,7 @@ export function usePedidosDelivery(
         headers['integrador-token'] = tokens.integradorToken
       }
 
-      const response = await fetch(
+      const response = await fetchGestorApi(
         `/api/delivery/pedidos?${searchParams.toString()}`,
         {
           headers,
@@ -80,8 +83,10 @@ export function usePedidosDelivery(
  * Hook para listar métodos de pagamento
  */
 export function useMetodosPagamentoDelivery(tokens?: DeliveryTokens) {
+  const empresaId = useTenantEmpresaId()
+
   return useQuery({
-    queryKey: ['delivery', 'metodos-pagamento'],
+    queryKey: ['delivery', 'metodos-pagamento', empresaId],
     queryFn: async (): Promise<MetodoPagamento[]> => {
       if (!tokens?.bearerToken) {
         throw new Error('Token de autenticação não fornecido')
@@ -96,7 +101,7 @@ export function useMetodosPagamentoDelivery(tokens?: DeliveryTokens) {
         headers['integrador-token'] = tokens.integradorToken
       }
 
-      const response = await fetch('/api/delivery/metodos-pagamento', {
+      const response = await fetchGestorApi('/api/delivery/metodos-pagamento', {
         headers,
       })
 
@@ -146,7 +151,7 @@ export function useAvancarStatusPedido(tokens?: DeliveryTokens) {
         headers['integrador-token'] = tokens.integradorToken
       }
 
-      const response = await fetch(
+      const response = await fetchGestorApi(
         `/api/delivery/pedidos/${encodeURIComponent(pedidoRef)}/avancar-status`,
         {
           method: 'POST',
@@ -202,7 +207,7 @@ export function useCancelarPedido(tokens?: DeliveryTokens) {
         headers['integrador-token'] = tokens.integradorToken
       }
 
-      const response = await fetch(
+      const response = await fetchGestorApi(
         `/api/delivery/pedidos/${encodeURIComponent(pedidoRef)}/cancelar`,
         {
           method: 'POST',
@@ -263,7 +268,7 @@ export function useEnviarParaMotoboy(tokens?: DeliveryTokens) {
         headers['integrador-token'] = tokens.integradorToken
       }
 
-      const response = await fetch(
+      const response = await fetchGestorApi(
         `/api/delivery/pedidos/${encodeURIComponent(pedidoRef)}/enviar-motoboy`,
         {
           method: 'POST',

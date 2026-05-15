@@ -1,8 +1,7 @@
-import { TopNav } from '@/src/presentation/components/layouts/TopNav'
+import { MeusAppsTopNav } from '@/src/presentation/components/features/meus-apps/components/MeusAppsTopNav'
 
 /**
- * Layout da página de perfil
- * Mantém a navegação superior e estrutura do dashboard
+ * Layout da página de perfil — mesma barra do hub (Meus Aplicativos).
  */
 export default function PerfilLayout({
   children,
@@ -11,13 +10,9 @@ export default function PerfilLayout({
 }) {
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navegação superior */}
-      <TopNav />
+      <MeusAppsTopNav />
 
-      {/* Conteúdo principal */}
-      <main>
-        {children}
-      </main>
+      <main>{children}</main>
     </div>
   )
 }

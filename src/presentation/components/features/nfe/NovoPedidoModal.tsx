@@ -25,6 +25,7 @@ import {
   useCancelarNotaFiscalVendaGestor,
 } from '@/src/presentation/hooks/useVendas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { MdArrowForward, MdArrowBack, MdPerson, MdCancel } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
@@ -161,6 +162,7 @@ export function NovoPedidoModal({
   statusFiscalUnificado = null,
 }: NovoPedidoModalProps) {
   const { auth } = useAuthStore()
+  const empresaId = useTenantEmpresaId()
   const createVendaGestor = useCreateVendaGestor()
   const cancelarVendaGestor = useCancelarVendaGestor()
   const cancelarNotaFiscalVendaPdv = useCancelarNotaFiscalVendaPdv()

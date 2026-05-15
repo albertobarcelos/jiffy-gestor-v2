@@ -3,6 +3,8 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 /**
  * Hook genérico para prefetching de dados
@@ -11,6 +13,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 export function usePrefetch() {
   const queryClient = useQueryClient()
   const { auth } = useAuthStore()
+  const empresaId = useTenantEmpresaId()
 
   /**
    * Prefetch de produto por ID
@@ -21,9 +24,9 @@ export function usePrefetch() {
       if (!token) return
 
       queryClient.prefetchQuery({
-        queryKey: ['produto', id],
+        queryKey: ['produto', id, empresaId],
         queryFn: async () => {
-          const response = await fetch(`/api/produtos/${id}`, {
+          const response = await fetchGestorApi(`/api/produtos/${id}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -36,7 +39,7 @@ export function usePrefetch() {
         staleTime: 1000 * 60 * 5,
       })
     },
-    [queryClient, auth]
+    [queryClient, auth, empresaId]
   )
 
   /**
@@ -48,9 +51,9 @@ export function usePrefetch() {
       if (!token) return
 
       queryClient.prefetchQuery({
-        queryKey: ['cliente', id],
+        queryKey: ['cliente', id, empresaId],
         queryFn: async () => {
-          const response = await fetch(`/api/clientes/${id}`, {
+          const response = await fetchGestorApi(`/api/clientes/${id}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -63,7 +66,7 @@ export function usePrefetch() {
         staleTime: 1000 * 60 * 5,
       })
     },
-    [queryClient, auth]
+    [queryClient, auth, empresaId]
   )
 
   /**
@@ -75,9 +78,9 @@ export function usePrefetch() {
       if (!token) return
 
       queryClient.prefetchQuery({
-        queryKey: ['usuario', id],
+        queryKey: ['usuario', id, empresaId],
         queryFn: async () => {
-          const response = await fetch(`/api/usuarios/${id}`, {
+          const response = await fetchGestorApi(`/api/usuarios/${id}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -90,7 +93,7 @@ export function usePrefetch() {
         staleTime: 1000 * 60 * 5,
       })
     },
-    [queryClient, auth]
+    [queryClient, auth, empresaId]
   )
 
   return {

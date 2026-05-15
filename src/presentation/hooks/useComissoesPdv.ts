@@ -1,11 +1,16 @@
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import type {
   ComissaoPdvItemDTO,
   ComissoesPdvListagemResponseDTO,
   OrderByDirectionComissoes,
   OrderByFieldComissoes,
 } from '@/src/application/dto/ComissoesPdvDTO'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+
+/** Máximo aceito pelo fiscal em `GET .../comissoes` (validação: "Number must be less than or equal to 100"). */
+export const COMISSOES_PDV_API_LIMIT_MAX = 100
 
 export type ComissoesPdvFetchParams = {
   taxaId: string
@@ -42,7 +47,7 @@ function mapItem(raw: unknown): ComissaoPdvItemDTO | null {
   }
 }
 
-function mapResponse(data: Record<string, unknown>): ComissoesPdvListagemResponseDTO {
+export function mapComissoesPdvResponse(data: Record<string, unknown>): ComissoesPdvListagemResponseDTO {
   const itemsRaw = data.items
   const items = Array.isArray(itemsRaw)
     ? itemsRaw.map(mapItem).filter((x): x is ComissaoPdvItemDTO => x !== null)
@@ -60,51 +65,127 @@ function mapResponse(data: Record<string, unknown>): ComissoesPdvListagemRespons
 }
 
 /**
- * Relatório de comissões por usuário PDV (taxa percentual obrigatória no backend).
+ * Uma página do relatório de comissões (BFF `/api/relatorios/usuarios-pdv/comissoes`).
+ * Reutilizável no hook e em agregações (ex.: todas as taxas percentuais).
+ */
+export async function fetchComissoesPdvPage(
+  token: string,
+  params: ComissoesPdvFetchParams
+): Promise<ComissoesPdvListagemResponseDTO> {
+  const id = params.taxaId.trim()
+  if (!id) {
+    throw new Error('taxaId é obrigatório.')
+  }
+
+  const offset = Math.max(0, Math.floor(Number(params.offset)) || 0)
+  const limit = Math.min(
+    COMISSOES_PDV_API_LIMIT_MAX,
+    Math.max(1, Math.floor(Number(params.limit)) || 10)
+  )
+
+  const sp = new URLSearchParams()
+  sp.set('taxaId', id)
+  sp.set('offset', String(offset))
+  sp.set('limit', String(limit))
+  if (params.q?.trim()) sp.set('q', params.q.trim())
+  if (params.dataCriacaoInicio) sp.set('dataCriacaoInicio', params.dataCriacaoInicio)
+  if (params.dataCriacaoFim) sp.set('dataCriacaoFim', params.dataCriacaoFim)
+  if (params.dataFinalizacaoInicio) sp.set('dataFinalizacaoInicio', params.dataFinalizacaoInicio)
+  if (params.dataFinalizacaoFim) sp.set('dataFinalizacaoFim', params.dataFinalizacaoFim)
+  if (params.orderByField) sp.set('orderByField', params.orderByField)
+  if (params.orderByDirection) sp.set('orderByDirection', params.orderByDirection)
+
+  const response = await fetchGestorApi(`/api/relatorios/usuarios-pdv/comissoes?${sp.toString()}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  })
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}))
+    const msg =
+      (typeof err.error === 'string' && err.error) ||
+      (typeof err.message === 'string' && err.message) ||
+      `Erro ${response.status}`
+    throw new Error(msg)
+  }
+
+  const raw = (await response.json()) as Record<string, unknown>
+  return mapComissoesPdvResponse(raw)
+}
+
+const COMISSOES_PDV_FETCH_ALL_MAX_PAGES = 500
+
+/**
+ * Busca todas as páginas do relatório para uma taxa (`limit` fixo no máximo fiscal),
+ * para agregação “todas as taxas” no front.
+ */
+export async function fetchComissoesPdvAllItemsForTaxa(
+  token: string,
+  base: Omit<ComissoesPdvFetchParams, 'offset' | 'limit'>
+): Promise<ComissoesPdvListagemResponseDTO> {
+  const pageSize = COMISSOES_PDV_API_LIMIT_MAX
+  const items: ComissaoPdvItemDTO[] = []
+  let offset = 0
+  let lastCount: number | undefined
+  let incompleto = false
+
+  for (let page = 0; page < COMISSOES_PDV_FETCH_ALL_MAX_PAGES; page++) {
+    const res = await fetchComissoesPdvPage(token, {
+      ...base,
+      offset,
+      limit: pageSize,
+    })
+    lastCount = res.count
+    const chunk = res.items ?? []
+    items.push(...chunk)
+
+    if (!res.hasNext) {
+      return {
+        items,
+        count: typeof lastCount === 'number' ? lastCount : items.length,
+        hasNext: false,
+        hasPrevious: false,
+      }
+    }
+
+    offset += pageSize
+
+    if (chunk.length === 0) {
+      break
+    }
+
+    if (page === COMISSOES_PDV_FETCH_ALL_MAX_PAGES - 1) {
+      incompleto = true
+      break
+    }
+  }
+
+  return {
+    items,
+    count: typeof lastCount === 'number' ? lastCount : items.length,
+    hasNext: incompleto,
+    hasPrevious: false,
+  }
+}
+
+/**
+ * Relatório de comissões por usuário PDV (`taxaId` obrigatório na chamada à API; o componente pode agregar várias taxas).
  */
 export function useComissoesPdv(params: ComissoesPdvFetchParams | null) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
   const enabled = Boolean(token && params?.taxaId?.trim())
 
   return useQuery({
-    queryKey: ['comissoes-pdv', params],
+    queryKey: ['comissoes-pdv', params, empresaId],
     queryFn: async (): Promise<ComissoesPdvListagemResponseDTO> => {
       if (!token || !params?.taxaId?.trim()) {
         throw new Error('Sessão ou taxa inválida.')
       }
-
-      const sp = new URLSearchParams()
-      sp.set('taxaId', params.taxaId.trim())
-      sp.set('offset', String(params.offset))
-      sp.set('limit', String(params.limit))
-      if (params.q?.trim()) sp.set('q', params.q.trim())
-      if (params.dataCriacaoInicio) sp.set('dataCriacaoInicio', params.dataCriacaoInicio)
-      if (params.dataCriacaoFim) sp.set('dataCriacaoFim', params.dataCriacaoFim)
-      if (params.dataFinalizacaoInicio)
-        sp.set('dataFinalizacaoInicio', params.dataFinalizacaoInicio)
-      if (params.dataFinalizacaoFim) sp.set('dataFinalizacaoFim', params.dataFinalizacaoFim)
-      if (params.orderByField) sp.set('orderByField', params.orderByField)
-      if (params.orderByDirection) sp.set('orderByDirection', params.orderByDirection)
-
-      const response = await fetch(`/api/relatorios/usuarios-pdv/comissoes?${sp.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}))
-        const msg =
-          (typeof err.error === 'string' && err.error) ||
-          (typeof err.message === 'string' && err.message) ||
-          `Erro ${response.status}`
-        throw new Error(msg)
-      }
-
-      const raw = (await response.json()) as Record<string, unknown>
-      return mapResponse(raw)
+      return fetchComissoesPdvPage(token, params)
     },
     enabled,
     staleTime: 60_000,

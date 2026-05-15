@@ -6,6 +6,9 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { disconnectEmpresaTab } from '@/src/presentation/utils/disconnectEmpresaTab'
+import { useEmpresaUrlSync } from '@/src/presentation/hooks/useEmpresaUrlSync'
+import { EmpresaSwitcherTopNav } from './EmpresaSwitcherTopNav'
 import { useQueryClient } from '@tanstack/react-query'
 import { MdDashboard, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose } from 'react-icons/md'
 import { 
@@ -33,9 +36,11 @@ export function TopNav() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
-  const { logout, getUser } = useAuthStore()
+  const { logoutTenant, getUser } = useAuthStore()
   const queryClient = useQueryClient()
   const menuRef = useRef<HTMLDivElement>(null)
+
+  useEmpresaUrlSync()
   
   // Estado para controlar hidratação (evita hydration mismatch)
   const [isHydrated, setIsHydrated] = useState(false)
@@ -157,8 +162,6 @@ export function TopNav() {
       children: [
         { name: 'Perfis PDV', path: '/cadastros/perfis-usuarios-pdv', icon: MdGroup },
         { name: 'Usuários PDV', path: '/cadastros/usuarios', icon: MdPerson },
-        { name: 'Perfis Gestor', path: '/cadastros/perfis-gestor', icon: MdAccountBalance },
-        { name: 'Usuários Gestor', path: '/cadastros/usuarios-gestor', icon: MdPerson },
         { name: 'Clientes', path: '/cadastros/clientes', icon: MdPeople },
       ],
     },
@@ -235,15 +238,8 @@ export function TopNav() {
   )
 
   const handleLogout = useCallback(async () => {
-    try {
-      queryClient.clear()
-      await logout()
-      window.location.href = '/login'
-    } catch (error) {
-      console.error('Erro ao fazer logout:', error)
-      window.location.href = '/login'
-    }
-  }, [queryClient, logout])
+    await disconnectEmpresaTab({ queryClient, logoutTenant })
+  }, [queryClient, logoutTenant])
 
   useEffect(() => {
     if (isMobileMenuOpen) {
@@ -364,17 +360,12 @@ export function TopNav() {
               </button>
             )
           })}
+
+          <EmpresaSwitcherTopNav variant="mobile" onAfterSelect={closeMobileMenu} />
         </div>
 
         <div className="mt-auto border-t border-gray-200 pt-4 flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center text-white font-semibold">
-            {isHydrated
-              ? user?.getName()?.charAt(0).toUpperCase() ||
-                user?.getEmail()?.charAt(0).toUpperCase() ||
-                'U'
-              : 'U'}
-          </div>
-          <div className="flex-1 min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-gray-900">
               {isHydrated ? user?.getName() || user?.getEmail() || 'Usuário' : 'Usuário'}
             </p>
@@ -506,6 +497,8 @@ export function TopNav() {
               </Link>
             )
           })}
+
+          <EmpresaSwitcherTopNav variant="desktop" />
         </div>
 
         {/* Mobile toggler */}
@@ -528,33 +521,22 @@ export function TopNav() {
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
           </button>
 
-          {/* User Profile - Agora clicável */}
-          <Link
-            href="/perfil"
-            onMouseEnter={() => handleLinkHover('/perfil')}
-            className="flex items-center gap-2 pl-3 border-l border-gray-200 hover:bg-gray-50 rounded-lg px-2 py-1 transition-colors cursor-pointer"
+          {/* Dados do usuário (perfil será acessado noutro local) */}
+          <div
+            className="flex min-w-0 max-w-[min(100%,14rem)] flex-col items-end justify-center pl-3 text-right sm:max-w-[min(100%,18rem)] xl:max-w-[min(100%,22rem)] border-l border-gray-200 px-2 py-1.5"
             title={
               isHydrated
                 ? `${user?.getName() || 'Usuário'}${user?.getEmail() ? ` • ${user.getEmail()}` : ''}`
                 : 'Usuário'
             }
           >
-            <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center">
-              <span className="text-xs font-semibold text-white">
-                {isHydrated
-                  ? user?.getName()?.charAt(0).toUpperCase() || user?.getEmail()?.charAt(0).toUpperCase() || 'U'
-                  : 'U'}
-              </span>
-            </div>
-            <div className="hidden xl:block">
-              <p className="text-sm font-medium text-gray-900">
-                {isHydrated ? user?.getName() || user?.getEmail() || 'Usuário' : 'Usuário'}
-              </p>
-              <p className="text-xs text-gray-500">
-                {isHydrated && user?.getEmail() ? user.getEmail() : 'Admin'}
-              </p>
-            </div>
-          </Link>
+            <p className="truncate text-sm font-medium text-gray-900">
+              {isHydrated ? user?.getName() || user?.getEmail() || 'Usuário' : 'Usuário'}
+            </p>
+            <p className="truncate text-xs text-gray-500">
+              {isHydrated && user?.getEmail() ? user.getEmail() : 'Admin'}
+            </p>
+          </div>
 
           {/* Logout */}
           <button

@@ -1,8 +1,10 @@
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { Usuario } from '@/src/domain/entities/Usuario'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 interface UsuariosQueryParams {
   q?: string
@@ -24,9 +26,10 @@ interface UsuariosResponse {
 export function useUsuariosInfinite(params: Omit<UsuariosQueryParams, 'offset'> = {}) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useInfiniteQuery({
-    queryKey: ['usuarios', 'infinite', params],
+    queryKey: ['usuarios', 'infinite', params, empresaId],
     queryFn: async ({ pageParam = 0 }): Promise<{ usuarios: Usuario[]; count: number; nextOffset: number | null }> => {
       if (!token) {
         throw new Error('Token não encontrado')
@@ -43,7 +46,7 @@ export function useUsuariosInfinite(params: Omit<UsuariosQueryParams, 'offset'> 
       searchParams.append('limit', limit.toString())
       searchParams.append('offset', pageParam.toString())
 
-      const response = await fetch(`/api/usuarios?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/usuarios?${searchParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -82,15 +85,16 @@ export function useUsuariosInfinite(params: Omit<UsuariosQueryParams, 'offset'> 
 export function useUsuario(id: string) {
   const { auth, isAuthenticated } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useQuery<Usuario, ApiError>({
-    queryKey: ['usuario', id],
+    queryKey: ['usuario', id, empresaId],
     queryFn: async () => {
       if (!isAuthenticated || !token) {
         throw new Error('Usuário não autenticado ou token ausente.')
       }
 
-      const response = await fetch(`/api/usuarios/${id}`, {
+      const response = await fetchGestorApi(`/api/usuarios/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -121,6 +125,7 @@ export function useUsuarioMutation() {
   const { auth } = useAuthStore()
   const queryClient = useQueryClient()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useMutation({
     mutationFn: async ({ usuarioId, data, isUpdate }: { usuarioId?: string; data: any; isUpdate: boolean }) => {
@@ -131,7 +136,7 @@ export function useUsuarioMutation() {
       const url = isUpdate && usuarioId ? `/api/usuarios/${usuarioId}` : '/api/usuarios'
       const method = isUpdate ? 'PATCH' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           Authorization: `Bearer ${token}`,
@@ -155,7 +160,7 @@ export function useUsuarioMutation() {
       const previousUsuarios = queryClient.getQueryData(['usuarios', 'infinite'])
 
       if (isUpdate && usuarioId) {
-        queryClient.setQueryData(['usuario', usuarioId], (old: any) => {
+        queryClient.setQueriesData({ queryKey: ['usuario', usuarioId] }, (old: any) => {
           if (!old) return old
           return { ...old, ...data }
         })

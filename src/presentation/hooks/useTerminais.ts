@@ -2,8 +2,10 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 import { showToast } from '@/src/shared/utils/toast'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 interface Terminal {
   id: string
@@ -23,9 +25,10 @@ interface TerminaisQueryParams {
 export function useTerminais(params: TerminaisQueryParams = {}) {
   const { auth, isAuthenticated } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useQuery<Terminal[], ApiError>({
-    queryKey: ['terminais', params.q],
+    queryKey: ['terminais', params.q, empresaId],
     queryFn: async () => {
       if (!isAuthenticated || !token) {
         throw new Error('Usuário não autenticado ou token ausente.')
@@ -36,7 +39,7 @@ export function useTerminais(params: TerminaisQueryParams = {}) {
       if (params.limit) queryParams.append('limit', params.limit.toString())
       queryParams.append('offset', '0')
 
-      const response = await fetch(`/api/terminais?${queryParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/terminais?${queryParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',

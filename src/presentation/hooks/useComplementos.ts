@@ -1,7 +1,9 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { Complemento } from '@/src/domain/entities/Complemento'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 interface ComplementosQueryParams {
   q?: string
@@ -21,9 +23,10 @@ interface ComplementosResponse {
 export function useComplementosInfinite(params: Omit<ComplementosQueryParams, 'offset'> = {}) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useInfiniteQuery({
-    queryKey: ['complementos', 'infinite', params],
+    queryKey: ['complementos', 'infinite', params, empresaId],
     queryFn: async ({ pageParam = 0 }): Promise<{ complementos: Complemento[]; count: number; nextOffset: number | null }> => {
       if (!token) {
         throw new Error('Token não encontrado')
@@ -38,7 +41,7 @@ export function useComplementosInfinite(params: Omit<ComplementosQueryParams, 'o
       searchParams.append('limit', limit.toString())
       searchParams.append('offset', pageParam.toString())
 
-      const response = await fetch(`/api/complementos?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/complementos?${searchParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -77,11 +80,12 @@ export function useComplementosInfinite(params: Omit<ComplementosQueryParams, 'o
 export function useComplementos(params: { ativo?: boolean; limit?: number } = {}) {
   const { auth, isAuthenticated } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
   // Limite alto para telas que listam o catálogo inteiro (ex.: vínculo grupo ↔ complementos)
   const normalizedLimit = Math.min(params.limit ?? 100, 2000)
 
   return useQuery<Complemento[], Error>({
-    queryKey: ['complementos', 'simple', params.ativo, normalizedLimit],
+    queryKey: ['complementos', 'simple', params.ativo, normalizedLimit, empresaId],
     queryFn: async () => {
       if (!isAuthenticated || !token) {
         throw new Error('Usuário não autenticado ou token ausente.')
@@ -94,7 +98,7 @@ export function useComplementos(params: { ativo?: boolean; limit?: number } = {}
       queryParams.append('limit', normalizedLimit.toString())
       queryParams.append('offset', '0')
 
-      const response = await fetch(`/api/complementos?${queryParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/complementos?${queryParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -123,15 +127,16 @@ export function useComplementos(params: { ativo?: boolean; limit?: number } = {}
 export function useComplemento(id: string) {
   const { auth, isAuthenticated } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useQuery<Complemento, Error>({
-    queryKey: ['complemento', id],
+    queryKey: ['complemento', id, empresaId],
     queryFn: async () => {
       if (!isAuthenticated || !token) {
         throw new Error('Usuário não autenticado ou token ausente.')
       }
 
-      const response = await fetch(`/api/complementos/${id}`, {
+      const response = await fetchGestorApi(`/api/complementos/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -158,6 +163,7 @@ export function useComplementoMutation() {
   const { auth } = useAuthStore()
   const queryClient = useQueryClient()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useMutation({
     mutationFn: async ({ complementoId, data, isUpdate }: { complementoId?: string; data: any; isUpdate: boolean }) => {
@@ -168,7 +174,7 @@ export function useComplementoMutation() {
       const url = isUpdate && complementoId ? `/api/complementos/${complementoId}` : '/api/complementos'
       const method = isUpdate ? 'PUT' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           Authorization: `Bearer ${token}`,

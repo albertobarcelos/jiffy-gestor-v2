@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { disconnectEmpresaTab } from '@/src/presentation/utils/disconnectEmpresaTab'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePrefetch } from '@/src/presentation/hooks/usePrefetch'
 
@@ -18,7 +19,7 @@ export function Sidebar() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { logout } = useAuthStore()
+  const { logoutTenant } = useAuthStore()
   const queryClient = useQueryClient()
   // const { prefetchRoute } = usePrefetch() // prefetchRoute não existe mais
 
@@ -252,20 +253,7 @@ export function Sidebar() {
         <div className="p-4 border-t border-info/20">
           <button
             onClick={async () => {
-              try {
-                // Limpar cache do React Query
-                queryClient.clear()
-                
-                // Fazer logout (limpa store, localStorage e chama API para remover cookie)
-                await logout()
-                
-                // Forçar redirecionamento com reload completo para garantir limpeza
-                window.location.href = '/login'
-              } catch (error) {
-                console.error('Erro ao fazer logout:', error)
-                // Mesmo com erro, força redirecionamento
-                window.location.href = '/login'
-              }
+              await disconnectEmpresaTab({ queryClient, logoutTenant })
             }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-info/80 hover:bg-info/10 transition-colors ${
               isCompact ? 'justify-center' : ''

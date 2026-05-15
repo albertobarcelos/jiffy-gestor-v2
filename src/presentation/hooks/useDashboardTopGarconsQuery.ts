@@ -1,5 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { DashboardTopGarcom } from '@/src/domain/entities/DashboardTopGarcom'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 type ApiItem = {
   usuarioId: string
@@ -19,6 +22,7 @@ type Params = {
   limit?: number
   periodoInicial?: Date | null
   periodoFinal?: Date | null
+  timezone?: string
   enabled?: boolean
 }
 
@@ -27,16 +31,19 @@ export type DashboardTopGarconsQueryData = {
   totalUsuariosComVendas: number
 }
 
-async function fetchTopGarcons(params: Params): Promise<DashboardTopGarconsQueryData> {
+async function fetchTopGarcons(params: Params & { token: string; timezone: string }): Promise<DashboardTopGarconsQueryData> {
   const search = new URLSearchParams()
   search.append('periodo', params.periodo)
+  search.append('timezone', params.timezone)
   search.append('limit', String(params.limit ?? 10))
   if (params.periodoInicial && params.periodoFinal) {
     search.append('dataFinalizacaoInicial', params.periodoInicial.toISOString())
     search.append('dataFinalizacaoFinal', params.periodoFinal.toISOString())
   }
 
-  const response = await fetch(`/api/dashboard/top-garcons?${search.toString()}`)
+  const response = await fetchGestorApi(`/api/dashboard/top-garcons?${search.toString()}`, {
+    headers: { Authorization: `Bearer ${params.token}` },
+  })
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
   if (!response.ok) {
     const msg = typeof data.error === 'string' ? data.error : 'Erro ao buscar top garçons.'
@@ -68,8 +75,14 @@ export function useDashboardTopGarconsQuery({
   limit = 10,
   periodoInicial,
   periodoFinal,
+  timezone,
   enabled = true,
 }: Params) {
+  const { auth } = useAuthStore()
+  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
+  const resolvedTimezone = timezone?.trim() || 'America/Sao_Paulo'
+
   return useQuery({
     queryKey: [
       'dashboard',
@@ -78,9 +91,11 @@ export function useDashboardTopGarconsQuery({
       limit,
       periodoInicial ? periodoInicial.toISOString() : null,
       periodoFinal ? periodoFinal.toISOString() : null,
+      empresaId,
+      resolvedTimezone,
     ],
-    queryFn: () => fetchTopGarcons({ periodo, limit, periodoInicial, periodoFinal, enabled }),
-    enabled,
+    queryFn: () => fetchTopGarcons({ periodo, limit, periodoInicial, periodoFinal, enabled, token: token!, timezone: resolvedTimezone }),
+    enabled: enabled && !!token,
     staleTime: 30_000,
   })
 }

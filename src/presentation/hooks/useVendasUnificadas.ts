@@ -1,6 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { showToast } from '@/src/shared/utils/toast'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 /**
  * Primeiro texto não vazio entre candidatos (null, undefined e string só com espaços ignorados).
@@ -263,11 +265,14 @@ function montarSearchParamsVendasUnificadas(
 export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  const queryKey = ['vendas-unificadas', params]
+  const queryKey = ['vendas-unificadas', params, empresaId]
 
   return useQuery({
     queryKey,
+    /** Evita “tela em branco” ao mudar filtros (ex.: primeira busca no Kanban): mantém a lista anterior até o novo GET concluir. */
+    placeholderData: keepPreviousData,
     queryFn: async (): Promise<VendasUnificadasResponse> => {
       if (!token) {
         throw new Error('Token não encontrado')
@@ -295,7 +300,7 @@ export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
         pagina += 1
         const searchParams = montarSearchParamsVendasUnificadas(params, offset, pageSize)
 
-        const response = await fetch(`/api/vendas/unificado?${searchParams.toString()}`, {
+        const response = await fetchGestorApi(`/api/vendas/unificado?${searchParams.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',

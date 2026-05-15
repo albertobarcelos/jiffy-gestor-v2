@@ -1,8 +1,10 @@
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { PerfilUsuario } from '@/src/domain/entities/PerfilUsuario'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 interface PerfisUsuariosQueryParams {
   q?: string
@@ -22,9 +24,10 @@ interface PerfisUsuariosResponse {
 export function usePerfisUsuariosInfinite(params: Omit<PerfisUsuariosQueryParams, 'offset'> = {}) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useInfiniteQuery({
-    queryKey: ['perfis-usuarios-pdv', 'infinite', params],
+    queryKey: ['perfis-usuarios-pdv', 'infinite', params, empresaId],
     queryFn: async ({ pageParam = 0 }): Promise<{ perfis: PerfilUsuario[]; count: number; nextOffset: number | null }> => {
       if (!token) {
         throw new Error('Token não encontrado')
@@ -39,7 +42,7 @@ export function usePerfisUsuariosInfinite(params: Omit<PerfisUsuariosQueryParams
       searchParams.append('limit', limit.toString())
       searchParams.append('offset', pageParam.toString())
 
-      const response = await fetch(`/api/perfis-usuarios-pdv?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/perfis-usuarios-pdv?${searchParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -78,15 +81,16 @@ export function usePerfisUsuariosInfinite(params: Omit<PerfisUsuariosQueryParams
 export function usePerfilUsuario(id: string) {
   const { auth, isAuthenticated } = useAuthStore()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useQuery<PerfilUsuario, ApiError>({
-    queryKey: ['perfil-usuario', id],
+    queryKey: ['perfil-usuario', id, empresaId],
     queryFn: async () => {
       if (!isAuthenticated || !token) {
         throw new Error('Usuário não autenticado ou token ausente.')
       }
 
-      const response = await fetch(`/api/perfis-usuarios-pdv/${id}`, {
+      const response = await fetchGestorApi(`/api/perfis-usuarios-pdv/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -117,6 +121,7 @@ export function usePerfilUsuarioMutation() {
   const { auth } = useAuthStore()
   const queryClient = useQueryClient()
   const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
   return useMutation({
     mutationFn: async ({ perfilId, data, isUpdate }: { perfilId?: string; data: any; isUpdate: boolean }) => {
@@ -127,7 +132,7 @@ export function usePerfilUsuarioMutation() {
       const url = isUpdate && perfilId ? `/api/perfis-usuarios-pdv/${perfilId}` : '/api/perfis-usuarios-pdv'
       const method = isUpdate ? 'PATCH' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           Authorization: `Bearer ${token}`,
