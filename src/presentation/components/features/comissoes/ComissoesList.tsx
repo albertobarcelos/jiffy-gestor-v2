@@ -632,7 +632,7 @@ export function ComissoesList() {
         </div>
 
         {taxasPercentualQuery.isFetched && taxasOpts.length === 0 && (
-          <p className="rounded border border-secondary bg-secondary/50 px-2 py-1.5 text-xs text-secondary">
+          <p className="px-2 py-1.5 text-xs text-secondary-text">
             Nenhuma taxa percentual. Cadastre na aba <strong>Taxas</strong>.
           </p>
         )}
