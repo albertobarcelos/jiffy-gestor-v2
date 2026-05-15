@@ -54,7 +54,7 @@ export function EmpresaSwitcherTopNav({ onAfterSelect, variant }: EmpresaSwitche
           <MdPointOfSale className="h-5 w-5 shrink-0 text-primary-text opacity-80" aria-hidden />
           <div className="flex min-w-0 flex-col">
             <span className="text-xs font-medium text-primary-text/70">Empresa logada</span>
-            <span className="truncate text-sm font-semibold text-primary-text">{empresaLogada.nomeExibicao}</span>
+            <span className="truncate text-xs font-semibold text-primary-text">{empresaLogada.nomeExibicao}</span>
           </div>
         </div>
       )
@@ -67,7 +67,7 @@ export function EmpresaSwitcherTopNav({ onAfterSelect, variant }: EmpresaSwitche
           title="Empresa logada"
         >
           <MdPointOfSale className="h-5 w-5 text-primary-text opacity-80" aria-hidden />
-          <span className="max-w-[150px] truncate text-base text-primary-text">{empresaLogada.nomeExibicao}</span>
+          <span className="max-w-[150px] truncate text-sm text-primary-text">{empresaLogada.nomeExibicao}</span>
         </span>
       </div>
     )
