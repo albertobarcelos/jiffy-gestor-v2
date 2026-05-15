@@ -7,6 +7,7 @@ import type {
   OrderByDirectionComissoes,
   OrderByFieldComissoes,
 } from '@/src/application/dto/ComissoesPdvDTO'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 /** Máximo aceito pelo fiscal em `GET .../comissoes` (validação: "Number must be less than or equal to 100"). */
 export const COMISSOES_PDV_API_LIMIT_MAX = 100
@@ -94,7 +95,7 @@ export async function fetchComissoesPdvPage(
   if (params.orderByField) sp.set('orderByField', params.orderByField)
   if (params.orderByDirection) sp.set('orderByDirection', params.orderByDirection)
 
-  const response = await fetch(`/api/relatorios/usuarios-pdv/comissoes?${sp.toString()}`, {
+  const response = await fetchGestorApi(`/api/relatorios/usuarios-pdv/comissoes?${sp.toString()}`, {
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',

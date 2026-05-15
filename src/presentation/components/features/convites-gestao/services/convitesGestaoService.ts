@@ -1,4 +1,5 @@
 import type { ConviteGestaoDTO } from '@/src/application/dto/convites/ConvitesGestaoDTO'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 export type PerfilGestorOption = { id: string; role: string }
 
@@ -23,7 +24,7 @@ function authHeaders(token: string) {
 }
 
 async function fetchConvitesList(token: string): Promise<ConviteGestaoDTO[]> {
-  const res = await fetch('/api/convites', {
+  const res = await fetchGestorApi('/api/convites', {
     method: 'GET',
     credentials: 'include',
     headers: { Authorization: `Bearer ${token}` },
@@ -40,7 +41,7 @@ async function fetchPerfis(token: string): Promise<PerfilGestorOption[]> {
 
   for (let i = 0; i < 100; i++) {
     const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
-    const res = await fetch(`/api/pessoas/perfis-gestor?${params.toString()}`, {
+    const res = await fetchGestorApi(`/api/pessoas/perfis-gestor?${params.toString()}`, {
       headers: authHeaders(token),
     })
     if (!res.ok) break
@@ -74,7 +75,7 @@ async function fetchUsuariosAceitos(
     unique.map(async email => {
       try {
         const params = new URLSearchParams({ q: email, limit: '5', offset: '0' })
-        const res = await fetch(`/api/pessoas/usuarios-gestor?${params.toString()}`, {
+        const res = await fetchGestorApi(`/api/pessoas/usuarios-gestor?${params.toString()}`, {
           headers: authHeaders(token),
         })
         if (!res.ok) return
@@ -120,7 +121,7 @@ export async function criarConviteService(
   token: string,
   payload: { email: string; perfilGestorId: string }
 ): Promise<ConviteGestaoDTO> {
-  const res = await fetch('/api/convites', {
+  const res = await fetchGestorApi('/api/convites', {
     method: 'POST',
     credentials: 'include',
     headers: authHeaders(token),
@@ -131,7 +132,7 @@ export async function criarConviteService(
 }
 
 export async function cancelarConviteService(token: string, id: string): Promise<void> {
-  const res = await fetch(`/api/convites/${encodeURIComponent(id)}`, {
+  const res = await fetchGestorApi(`/api/convites/${encodeURIComponent(id)}`, {
     method: 'DELETE',
     credentials: 'include',
     headers: { Authorization: `Bearer ${token}` },
@@ -142,7 +143,7 @@ export async function cancelarConviteService(token: string, id: string): Promise
 }
 
 export async function reenviarConviteService(token: string, id: string): Promise<ConviteGestaoDTO> {
-  const res = await fetch(`/api/convites/${encodeURIComponent(id)}/reenviar`, {
+  const res = await fetchGestorApi(`/api/convites/${encodeURIComponent(id)}/reenviar`, {
     method: 'POST',
     credentials: 'include',
     headers: { Authorization: `Bearer ${token}` },
@@ -156,7 +157,7 @@ export async function atualizarPerfilService(
   usuarioGestorId: string,
   novoPerfilGestorId: string
 ): Promise<void> {
-  const res = await fetch(`/api/pessoas/usuarios-gestor/${encodeURIComponent(usuarioGestorId)}`, {
+  const res = await fetchGestorApi(`/api/pessoas/usuarios-gestor/${encodeURIComponent(usuarioGestorId)}`, {
     method: 'PATCH',
     credentials: 'include',
     headers: authHeaders(token),
@@ -166,7 +167,7 @@ export async function atualizarPerfilService(
 }
 
 export async function removerVinculoService(token: string, usuarioGestorId: string): Promise<void> {
-  const res = await fetch(`/api/pessoas/usuarios-gestor/${encodeURIComponent(usuarioGestorId)}`, {
+  const res = await fetchGestorApi(`/api/pessoas/usuarios-gestor/${encodeURIComponent(usuarioGestorId)}`, {
     method: 'DELETE',
     credentials: 'include',
     headers: { Authorization: `Bearer ${token}` },
