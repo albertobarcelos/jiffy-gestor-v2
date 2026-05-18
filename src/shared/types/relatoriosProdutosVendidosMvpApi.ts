@@ -65,3 +65,11 @@ export type RelatorioProdutosVendidosMvpResponseDTO = RelatorioProdutosVendidosR
   rankingsPorProduto: ProdutoRankingAnteriorDTO[]
   mockFlags: RelatorioProdutosVendidosMvpMockFlags
 }
+
+/** 2ª fase: só KPIs comparativos + rankings (após `comparativo=0`). */
+export type RelatorioProdutosVendidosMvpComparativoDTO = {
+  somenteComparativo: true
+  kpis: RelatorioProdutosVendidosMvpKpisDTO
+  rankingsPorProduto: ProdutoRankingAnteriorDTO[]
+  mockFlags: RelatorioProdutosVendidosMvpMockFlags
+}

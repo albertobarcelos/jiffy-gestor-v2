@@ -95,8 +95,10 @@ const iconClass = 'text-[#1E3A8A]'
 export function MvpKpiGrid(props: {
   kpis: RelatorioProdutosVendidosMvpKpisDTO | undefined
   isLoading: boolean
+  /** Deltas do período anterior ainda carregando (2ª fase). */
+  comparativoPendente?: boolean
 }) {
-  const { kpis, isLoading } = props
+  const { kpis, isLoading, comparativoPendente = false } = props
 
   if (isLoading || !kpis) {
     return (
@@ -108,23 +110,29 @@ export function MvpKpiGrid(props: {
     )
   }
 
-  const fatBadge = badgeVariacao(kpis.variacaoPercentualFat)
-  const qtdBadge = badgeVariacao(kpis.variacaoPercentualQuantidade)
-  const ticketBadge = badgeVariacao(kpis.variacaoPercentualTicketMedio)
-  const liderBadge = badgeVariacao(kpis.produtoLiderPercentualVsPeriodoAnterior)
+  const badgePlaceholder = comparativoPendente ? '…' : undefined
+  const fatBadge = badgeVariacao(comparativoPendente ? null : kpis.variacaoPercentualFat)
+  const qtdBadge = badgeVariacao(comparativoPendente ? null : kpis.variacaoPercentualQuantidade)
+  const ticketBadge = badgeVariacao(comparativoPendente ? null : kpis.variacaoPercentualTicketMedio)
+  const liderBadge = badgeVariacao(
+    comparativoPendente ? null : kpis.produtoLiderPercentualVsPeriodoAnterior
+  )
 
-  const rodapeFat =
-    kpis.faturamentoAnterior != null
+  const rodapeFat = comparativoPendente
+    ? 'Atualizando período anterior…'
+    : kpis.faturamentoAnterior != null
       ? `Período anterior: ${formatarMoeda(kpis.faturamentoAnterior)}`
       : 'Sem base no período anterior'
 
-  const rodapeQtd =
-    kpis.quantidadeAnterior != null
+  const rodapeQtd = comparativoPendente
+    ? 'Atualizando período anterior…'
+    : kpis.quantidadeAnterior != null
       ? `Período anterior: ${kpis.quantidadeAnterior.toLocaleString('pt-BR')} un.`
       : 'Sem base no período anterior'
 
-  const rodapeTicket =
-    kpis.ticketMedioPorItemPeriodoAnterior != null
+  const rodapeTicket = comparativoPendente
+    ? 'Atualizando período anterior…'
+    : kpis.ticketMedioPorItemPeriodoAnterior != null
       ? `Período anterior: ${formatarMoeda(kpis.ticketMedioPorItemPeriodoAnterior)}`
       : 'Sem base no período anterior'
 
@@ -138,7 +146,7 @@ export function MvpKpiGrid(props: {
         tituloBase="Faturamento período"
         icon={<MdAttachMoney className={iconClass} size={22} aria-hidden />}
         valor={formatarMoeda(kpis.faturamentoAtual)}
-        badge={fatBadge.badge}
+        badge={badgePlaceholder ?? fatBadge.badge}
         rodape={rodapeFat}
         badgePositivo={fatBadge.badgePositivo}
       />
@@ -146,7 +154,7 @@ export function MvpKpiGrid(props: {
         tituloBase="Unidades vendidas"
         icon={<MdInventory2 className={iconClass} size={22} aria-hidden />}
         valor={kpis.quantidadeVendidaAtual.toLocaleString('pt-BR')}
-        badge={qtdBadge.badge}
+        badge={badgePlaceholder ?? qtdBadge.badge}
         rodape={rodapeQtd}
         badgePositivo={qtdBadge.badgePositivo}
       />
@@ -154,7 +162,7 @@ export function MvpKpiGrid(props: {
         tituloBase="Ticket médio / unidade"
         icon={<MdReceiptLong className={iconClass} size={22} aria-hidden />}
         valor={formatarMoeda(kpis.ticketMedioPorItemNoPeriodo)}
-        badge={ticketBadge.badge}
+        badge={badgePlaceholder ?? ticketBadge.badge}
         rodape={rodapeTicket}
         badgePositivo={ticketBadge.badgePositivo}
       />

@@ -142,7 +142,7 @@ export async function buscarDetalhesVendasComProdutosLancados(args: {
   vendaIds: string[]
   concurrency?: number
 }): Promise<VendaDetalheProdutos[]> {
-  const { apiClient, headers, vendaIds, concurrency = 10 } = args
+  const { apiClient, headers, vendaIds, concurrency = 20 } = args
   if (vendaIds.length === 0) return []
 
   return fetchWithConcurrency(vendaIds, concurrency, async vendaId => {
@@ -237,7 +237,7 @@ export async function buscarCardapioMiniPorProdutoIds(args: {
   produtoIds: string[]
   concurrency?: number
 }): Promise<Map<string, CardapioProdutoMini>> {
-  const { apiClient, headers, produtoIds, concurrency = 10 } = args
+  const { apiClient, headers, produtoIds, concurrency = 20 } = args
   const cache =
     globalThis.__jiffyProdutoCardapioMiniCache ??
     (globalThis.__jiffyProdutoCardapioMiniCache = new Map<string, CardapioProdutoMini>())

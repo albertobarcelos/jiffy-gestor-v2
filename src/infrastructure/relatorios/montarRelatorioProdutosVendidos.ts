@@ -164,7 +164,51 @@ export async function executarRelatorioProdutosVendidosPipeline(
 
   filtradas = [...filtradas].sort((a, b) => compareLinhas(a, b, sort))
 
-  const porValorDesc = [...filtradas].sort((a, b) => b.valorTotal - a.valorTotal)
+  const abcById = calcularAbcPorProdutoId(filtradas, sumValorFiltrado)
+
+  const totalFiltrado = filtradas.length
+  const items = montarItemsRelatorioPagina({
+    linhas: filtradas,
+    miniMap,
+    abcById,
+    offset,
+    limit,
+    valorTotalPeriodoVendas,
+    sumQtdFiltrado,
+    mockAtivo,
+  })
+
+  const body: RelatorioProdutosVendidosResponseDTO = {
+    items,
+    totaisPeriodo: {
+      quantidadeTotal: quantidadeTotalPeriodo,
+      valorTotal: valorTotalPeriodoVendas,
+      skusDistintos,
+    },
+    totalFiltrado,
+    limit,
+    offset,
+    mockAtivo,
+  }
+
+  return {
+    body,
+    detalhes,
+    miniMap,
+    linhasFiltradasOrdenadas: filtradas,
+    sumQtdFiltrado,
+    sumValorFiltrado,
+    valorTotalPeriodoVendas,
+    quantidadeTotalPeriodo,
+    skusDistintos,
+  }
+}
+
+export function calcularAbcPorProdutoId(
+  linhas: LinhaRelatorioProdutoInterna[],
+  sumValorFiltrado: number
+): Map<string, RelatorioProdutoVendidoClasseAbc> {
+  const porValorDesc = [...linhas].sort((a, b) => b.valorTotal - a.valorTotal)
   const abcById = new Map<string, RelatorioProdutoVendidoClasseAbc>()
   let cum = 0
   for (const r of porValorDesc) {
@@ -175,11 +219,33 @@ export async function executarRelatorioProdutosVendidosPipeline(
     else if (prevPct < 95) classe = 'B'
     abcById.set(r.produtoId, classe)
   }
+  return abcById
+}
 
-  const totalFiltrado = filtradas.length
-  const slice = filtradas.slice(offset, offset + limit)
+export function montarItemsRelatorioPagina(args: {
+  linhas: LinhaRelatorioProdutoInterna[]
+  miniMap: Map<string, CardapioProdutoMini>
+  abcById: Map<string, RelatorioProdutoVendidoClasseAbc>
+  offset: number
+  limit: number
+  valorTotalPeriodoVendas: number
+  sumQtdFiltrado: number
+  mockAtivo: boolean
+}): RelatorioProdutoVendidoLinhaDTO[] {
+  const {
+    linhas,
+    miniMap,
+    abcById,
+    offset,
+    limit,
+    valorTotalPeriodoVendas,
+    sumQtdFiltrado,
+    mockAtivo,
+  } = args
 
-  const items: RelatorioProdutoVendidoLinhaDTO[] = slice.map(r => {
+  const slice = linhas.slice(offset, offset + limit)
+
+  return slice.map(r => {
     const precoMedioVenda = r.quantidade > 0 ? r.valorTotal / r.quantidade : 0
     const valorCardapio = miniMap.get(r.produtoId)?.valorCardapio
     const valorCardapioNum =
@@ -215,30 +281,33 @@ export async function executarRelatorioProdutosVendidosPipeline(
       margemBrutaPercentual,
     }
   })
+}
 
-  const body: RelatorioProdutosVendidosResponseDTO = {
+/** Monta `body` paginado reutilizando agregação já em cache (lista infinita). */
+export function montarBodyPaginadoFromAgregado(
+  agregado: ExecRelatorioProdutosVendidosResult,
+  offset: number,
+  limit: number,
+  mockAtivo: boolean
+): RelatorioProdutosVendidosResponseDTO {
+  const abcById = calcularAbcPorProdutoId(agregado.linhasFiltradasOrdenadas, agregado.sumValorFiltrado)
+  const items = montarItemsRelatorioPagina({
+    linhas: agregado.linhasFiltradasOrdenadas,
+    miniMap: agregado.miniMap,
+    abcById,
+    offset,
+    limit,
+    valorTotalPeriodoVendas: agregado.valorTotalPeriodoVendas,
+    sumQtdFiltrado: agregado.sumQtdFiltrado,
+    mockAtivo,
+  })
+  return {
     items,
-    totaisPeriodo: {
-      quantidadeTotal: quantidadeTotalPeriodo,
-      valorTotal: valorTotalPeriodoVendas,
-      skusDistintos,
-    },
-    totalFiltrado,
+    totaisPeriodo: agregado.body.totaisPeriodo,
+    totalFiltrado: agregado.linhasFiltradasOrdenadas.length,
     limit,
     offset,
-    mockAtivo,
-  }
-
-  return {
-    body,
-    detalhes,
-    miniMap,
-    linhasFiltradasOrdenadas: filtradas,
-    sumQtdFiltrado,
-    sumValorFiltrado,
-    valorTotalPeriodoVendas,
-    quantidadeTotalPeriodo,
-    skusDistintos,
+    mockAtivo: agregado.body.mockAtivo,
   }
 }
 

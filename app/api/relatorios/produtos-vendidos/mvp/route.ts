@@ -5,6 +5,7 @@ import { montarParamsVendasPdvPeriodo } from '@/src/infrastructure/dashboard/agr
 import {
   clampIntRelatorio,
   executarRelatorioProdutosVendidosPipeline,
+  montarBodyPaginadoFromAgregado,
   normalizeBuscaRelatorio,
   parseOptionalNumberRelatorio,
   parseSortRelatorio,
@@ -17,6 +18,13 @@ import {
   montarRankingEVariacoes,
 } from '@/src/infrastructure/relatorios/montarRelatorioProdutosVendidosMvpPayload'
 import {
+  buildRelatorioAgregadoCacheKey,
+  getRelatorioAgregadoCache,
+  setRelatorioAgregadoCache,
+  type PipelineOptsForCache,
+  type RelatorioAgregadoCacheEntry,
+} from '@/src/infrastructure/relatorios/relatorioProdutosVendidosAgregadoCache'
+import {
   extrairIntervaloDataFinalizacaoParams,
   novoParamsIntervaloPdv,
   periodoRelatorioSlidingAnterior,
@@ -25,25 +33,194 @@ import {
   computarSerieDiariaValorProdutosFiltrados,
   resolverTopProdutoIdsPorValor,
 } from '@/src/infrastructure/relatorios/serieDiariaProdutosVendidos'
-import type { RelatorioProdutosVendidosMvpResponseDTO } from '@/src/shared/types/relatoriosProdutosVendidosMvpApi'
+import type {
+  ProdutoRankingAnteriorDTO,
+  RelatorioProdutosVendidosMvpResponseDTO,
+} from '@/src/shared/types/relatoriosProdutosVendidosMvpApi'
 
 /**
  * GET /api/relatorios/produtos-vendidos/mvp
  *
- * Resposta estendida (KPIs, participação por grupo, série dia-a-dia dos top produtos por valor,
- * rankings página atual vs período anterior). Contrato paralelo ao relatório clássico (`items`,
- * paginação, totais ABC inalterados no corpo base).
- *
- * Query extra:
- * - `serie=0` desativa a série temporal (menos CPU no BFF mantendo KPIs/participação).
- *
- * Comparativo vs período imediatamente anterior (mesma duração) é omitido quando o período
- * cobre mais de ~95 dias corridos ou quando não há datas no intervalo efetivo.
+ * Performance:
+ * - Agregação cacheada ~90s por empresa + filtros.
+ * - Carga principal: só período atual (`comparativo=0` na 1ª página).
+ * - `somenteComparativo=1`: período anterior em 2ª requisição (usa cache do atual).
+ * - `somentePagina=1` + `offset>0`: paginação em memória.
  */
 const MAX_DIAS_COMPARATIVO_PERIODO_ANTERIOR = 95
 
 function diasAbsIntervaloUtc(a: Date, b: Date): number {
   return Math.ceil(Math.abs(b.getTime() - a.getTime()) / 86_400_000)
+}
+
+function montarSerieTemporal(
+  atual: ExecRelatorioProdutosVendidosResult,
+  timezone: string
+): RelatorioProdutosVendidosMvpResponseDTO['serieTemporal'] {
+  if (atual.detalhes.length === 0) return []
+  const topIds = resolverTopProdutoIdsPorValor(
+    atual.linhasFiltradasOrdenadas.map(r => ({
+      produtoId: r.produtoId,
+      valorTotal: r.valorTotal,
+    }))
+  )
+  const nomePorId = new Map<string, string>()
+  for (const [id, mini] of atual.miniMap.entries()) {
+    const n = mini?.nome?.trim()
+    if (n) nomePorId.set(id, n)
+  }
+  return computarSerieDiariaValorProdutosFiltrados(atual.detalhes, timezone, topIds, nomePorId).serie
+}
+
+function calcularRanking(
+  atual: ExecRelatorioProdutosVendidosResult,
+  anterior: ExecRelatorioProdutosVendidosResult | null,
+  omitirComparativo: boolean
+): ProdutoRankingAnteriorDTO[] {
+  return montarRankingEVariacoes(
+    atual.linhasFiltradasOrdenadas,
+    omitirComparativo || !anterior ? null : anterior.linhasFiltradasOrdenadas
+  )
+}
+
+function rankingsDaPagina(
+  rankingCompleto: ProdutoRankingAnteriorDTO[],
+  produtoIds: Set<string>
+): ProdutoRankingAnteriorDTO[] {
+  return rankingCompleto.filter(r => produtoIds.has(r.produtoId))
+}
+
+async function executarPipelineAnterior(args: {
+  pipelineBase: PipelineOptsForCache
+  intervaloSlot: { inicioUtc: Date; fimUtc: Date }
+}): Promise<ExecRelatorioProdutosVendidosResult> {
+  const { inicioUtc, fimUtc } = periodoRelatorioSlidingAnterior(
+    args.intervaloSlot.inicioUtc,
+    args.intervaloSlot.fimUtc
+  )
+  const paramsAnt = novoParamsIntervaloPdv(inicioUtc.toISOString(), fimUtc.toISOString())
+  return executarRelatorioProdutosVendidosPipeline({
+    ...args.pipelineBase,
+    paramsIntervaloPdV: paramsAnt,
+    limit: 50,
+    offset: 0,
+  })
+}
+
+async function carregarPeriodoAtual(args: {
+  pipelineBase: PipelineOptsForCache
+  incluirSerie: boolean
+  timezone: string
+}): Promise<{
+  atual: ExecRelatorioProdutosVendidosResult
+  serieTemporal: RelatorioProdutosVendidosMvpResponseDTO['serieTemporal']
+  serieSimplificada: boolean
+}> {
+  const atual = await executarRelatorioProdutosVendidosPipeline({
+    ...args.pipelineBase,
+    limit: 50,
+    offset: 0,
+  })
+
+  let serieTemporal: RelatorioProdutosVendidosMvpResponseDTO['serieTemporal'] = []
+  let serieSimplificada = false
+
+  if (args.incluirSerie && atual.detalhes.length > 0) {
+    serieTemporal = montarSerieTemporal(atual, args.timezone)
+    if (
+      serieTemporal.length === 0 &&
+      atual.linhasFiltradasOrdenadas.length > 0 &&
+      atual.valorTotalPeriodoVendas > 0
+    ) {
+      serieSimplificada = true
+    }
+  }
+
+  return { atual, serieTemporal, serieSimplificada }
+}
+
+/** Só período atual; comparativo vem em `somenteComparativo=1`. */
+async function obterAgregadoComCache(args: {
+  cacheKey: string
+  pipelineBase: PipelineOptsForCache
+  intervaloSlot: { inicioUtc: Date; fimUtc: Date } | null
+  diasPeriodo: number
+  timezone: string
+  incluirSerie: boolean
+}): Promise<RelatorioAgregadoCacheEntry> {
+  const cached = getRelatorioAgregadoCache(args.cacheKey)
+  if (cached) return cached
+
+  const loaded = await carregarPeriodoAtual({
+    pipelineBase: args.pipelineBase,
+    incluirSerie: args.incluirSerie,
+    timezone: args.timezone,
+  })
+
+  const omitirComparativo =
+    args.intervaloSlot == null ||
+    args.diasPeriodo > MAX_DIAS_COMPARATIVO_PERIODO_ANTERIOR ||
+    loaded.atual.valorTotalPeriodoVendas <= 0
+
+  const rankingCompleto = calcularRanking(loaded.atual, null, true)
+
+  setRelatorioAgregadoCache(args.cacheKey, {
+    atual: loaded.atual,
+    anterior: null,
+    omitirComparativo,
+    comparativoPronto: omitirComparativo,
+    mockFlags: {
+      serieSimplificada: loaded.serieSimplificada,
+      comparativoPeriodoAnteriorOmitido: omitirComparativo,
+    },
+    serieTemporal: loaded.serieTemporal,
+    rankingCompleto,
+  })
+
+  return getRelatorioAgregadoCache(args.cacheKey)!
+}
+
+async function completarSomenteComparativo(args: {
+  cacheKey: string
+  pipelineBase: PipelineOptsForCache
+  intervaloSlot: { inicioUtc: Date; fimUtc: Date } | null
+  diasPeriodo: number
+}): Promise<RelatorioAgregadoCacheEntry | null> {
+  const cached = getRelatorioAgregadoCache(args.cacheKey)
+  if (!cached) return null
+  if (cached.comparativoPronto) return cached
+
+  let omitirComparativo =
+    args.intervaloSlot == null ||
+    args.diasPeriodo > MAX_DIAS_COMPARATIVO_PERIODO_ANTERIOR ||
+    cached.atual.valorTotalPeriodoVendas <= 0
+
+  let anterior: ExecRelatorioProdutosVendidosResult | null = null
+
+  if (!omitirComparativo && args.intervaloSlot) {
+    anterior = await executarPipelineAnterior({
+      pipelineBase: args.pipelineBase,
+      intervaloSlot: args.intervaloSlot,
+    })
+  } else {
+    omitirComparativo = true
+  }
+
+  const rankingCompleto = calcularRanking(cached.atual, anterior, omitirComparativo)
+
+  setRelatorioAgregadoCache(args.cacheKey, {
+    ...cached,
+    anterior,
+    omitirComparativo,
+    comparativoPronto: true,
+    mockFlags: {
+      ...cached.mockFlags,
+      comparativoPeriodoAnteriorOmitido: omitirComparativo,
+    },
+    rankingCompleto,
+  })
+
+  return getRelatorioAgregadoCache(args.cacheKey)
 }
 
 export async function GET(request: NextRequest) {
@@ -52,6 +229,8 @@ export async function GET(request: NextRequest) {
   const timezone = searchParams.get('timezone') || 'America/Sao_Paulo'
   const sort = parseSortRelatorio(searchParams.get('sort') || 'quantidade_desc')
   const incluirSerie = searchParams.get('serie') !== '0'
+  const somentePagina = searchParams.get('somentePagina') === '1'
+  const somenteComparativo = searchParams.get('somenteComparativo') === '1'
 
   const grupoIdsParam = searchParams.get('grupoIds')?.trim()
   const grupoIdSet =
@@ -75,11 +254,12 @@ export async function GET(request: NextRequest) {
 
   const mockAtivo = searchParams.get('mock') === '1'
 
-  const validation = validateRequest(request)
+  const validation = validateRequest(request, { requireEmpresaId: true })
   if (!validation.valid || !validation.tokenInfo) {
     return validation.error!
   }
   const { tokenInfo } = validation
+  const empresaId = tokenInfo.empresaId!
 
   const paramsIntervaloPdV = montarParamsVendasPdvPeriodo({
     requestSearchParams: searchParams,
@@ -94,7 +274,7 @@ export async function GET(request: NextRequest) {
       'Content-Type': 'application/json',
     }
 
-    const pipelineOpts = {
+    const pipelineBase: PipelineOptsForCache = {
       apiClient,
       headers,
       paramsIntervaloPdV,
@@ -105,93 +285,100 @@ export async function GET(request: NextRequest) {
       qtdMin,
       qtdMax,
       qBusca,
-      limit,
-      offset,
       mockAtivo,
     }
 
-    const atual = await executarRelatorioProdutosVendidosPipeline(pipelineOpts)
+    const cacheKey = buildRelatorioAgregadoCacheKey({
+      empresaId,
+      paramsIntervaloPdV,
+      sort,
+      grupoIdsKey: grupoIdsParam ?? '',
+      valorMin,
+      valorMax,
+      qtdMin,
+      qtdMax,
+      qBusca,
+      timezone,
+    })
 
     const intervaloSlot = extrairIntervaloDataFinalizacaoParams(paramsIntervaloPdV)
-    let diasPeriodo = 0
-    if (intervaloSlot) {
-      diasPeriodo = diasAbsIntervaloUtc(intervaloSlot.inicioUtc, intervaloSlot.fimUtc)
+    const diasPeriodo =
+      intervaloSlot != null
+        ? diasAbsIntervaloUtc(intervaloSlot.inicioUtc, intervaloSlot.fimUtc)
+        : 0
+
+    if (somenteComparativo) {
+      const agregado =
+        (await completarSomenteComparativo({
+          cacheKey,
+          pipelineBase,
+          intervaloSlot,
+          diasPeriodo,
+        })) ??
+        (await obterAgregadoComCache({
+          cacheKey,
+          pipelineBase,
+          intervaloSlot,
+          diasPeriodo,
+          timezone,
+          incluirSerie: false,
+        }))
+
+      return NextResponse.json(
+        {
+          somenteComparativo: true,
+          kpis: montarKpisMvp(agregado.atual, agregado.omitirComparativo ? null : agregado.anterior),
+          rankingsPorProduto: agregado.rankingCompleto,
+          mockFlags: agregado.mockFlags,
+        },
+        { headers: { 'Cache-Control': 'private, max-age=30' } }
+      )
     }
 
-    let omitirComparativo =
-      intervaloSlot == null ||
-      diasPeriodo > MAX_DIAS_COMPARATIVO_PERIODO_ANTERIOR ||
-      atual.valorTotalPeriodoVendas <= 0
+    const agregado = await obterAgregadoComCache({
+      cacheKey,
+      pipelineBase,
+      intervaloSlot,
+      diasPeriodo,
+      timezone,
+      incluirSerie,
+    })
 
-    let anteriorMeta: ExecRelatorioProdutosVendidosResult | null = null
-    if (!omitirComparativo && intervaloSlot) {
-      const { inicioUtc, fimUtc } = periodoRelatorioSlidingAnterior(
-        intervaloSlot.inicioUtc,
-        intervaloSlot.fimUtc
-      )
-      const paramsAnt = novoParamsIntervaloPdv(inicioUtc.toISOString(), fimUtc.toISOString())
-      anteriorMeta = await executarRelatorioProdutosVendidosPipeline({
-        ...pipelineOpts,
-        paramsIntervaloPdV: paramsAnt,
+    const { atual, anterior, omitirComparativo, mockFlags, serieTemporal, rankingCompleto } = agregado
+
+    const basePagina = montarBodyPaginadoFromAgregado(atual, offset, limit, mockAtivo)
+    const idsPagina = new Set(basePagina.items.map(i => i.produtoId))
+    const rankingsPorProduto = rankingsDaPagina(rankingCompleto, idsPagina)
+
+    if (somentePagina) {
+      const bodyLeve: RelatorioProdutosVendidosMvpResponseDTO = {
+        ...basePagina,
+        kpis: montarKpisMvp(atual, omitirComparativo ? null : anterior),
+        participacaoGrupos: [],
+        serieTemporal: [],
+        rankingsPorProduto,
+        mockFlags,
+      }
+      return NextResponse.json(bodyLeve, {
+        headers: { 'Cache-Control': 'private, max-age=30' },
       })
     }
 
-    const kpis = montarKpisMvp(atual, omitirComparativo ? null : anteriorMeta)
-    const participacaoGrupos = montarParticipacaoGrupos(
-      atual.linhasFiltradasOrdenadas,
-      atual.sumValorFiltrado
-    )
-
-    let serieTemporal: RelatorioProdutosVendidosMvpResponseDTO['serieTemporal'] = []
-    let serieSimplificada = false
-
-    if (incluirSerie && atual.detalhes.length > 0) {
-      const topIds = resolverTopProdutoIdsPorValor(
-        atual.linhasFiltradasOrdenadas.map(r => ({
-          produtoId: r.produtoId,
-          valorTotal: r.valorTotal,
-        }))
-      )
-      const nomePorId = new Map<string, string>()
-      for (const [id, mini] of atual.miniMap.entries()) {
-        const n = mini?.nome?.trim()
-        if (n) nomePorId.set(id, n)
-      }
-      serieTemporal = computarSerieDiariaValorProdutosFiltrados(
-        atual.detalhes,
-        timezone,
-        topIds,
-        nomePorId
-      ).serie
-      if (
-        serieTemporal.length === 0 &&
-        atual.linhasFiltradasOrdenadas.length > 0 &&
-        atual.valorTotalPeriodoVendas > 0
-      ) {
-        serieSimplificada = true
-      }
-    }
-
-    const rankingCompleto = montarRankingEVariacoes(
-      atual.linhasFiltradasOrdenadas,
-      omitirComparativo || !anteriorMeta ? null : anteriorMeta.linhasFiltradasOrdenadas
-    )
-    const idsPagina = new Set(atual.body.items.map(i => i.produtoId))
-    const rankingsPorProduto = rankingCompleto.filter(r => idsPagina.has(r.produtoId))
-
     const body: RelatorioProdutosVendidosMvpResponseDTO = combinarPayloadMvp({
-      base: atual.body,
-      kpis,
-      participacaoGrupos,
-      serieTemporal,
+      base: basePagina,
+      kpis: montarKpisMvp(atual, omitirComparativo ? null : anterior),
+      participacaoGrupos: montarParticipacaoGrupos(
+        atual.linhasFiltradasOrdenadas,
+        atual.sumValorFiltrado
+      ),
+      serieTemporal: incluirSerie ? serieTemporal : [],
       rankings: rankingsPorProduto,
-      mockFlags: {
-        serieSimplificada,
-        comparativoPeriodoAnteriorOmitido: omitirComparativo,
-      },
+      mockFlags,
     })
 
-    return NextResponse.json(body)
+    return NextResponse.json(body, {
+      headers: { 'Cache-Control': 'private, max-age=30' },
+    })
   } catch (error) {
     console.error('Erro em /api/relatorios/produtos-vendidos/mvp:', error)
     if (error instanceof ApiError) {

@@ -10,7 +10,10 @@ import {
 } from 'recharts'
 import { ChevronDown } from 'lucide-react'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
-import { useDashboardEvolucaoComparativoQuery } from '@/src/presentation/hooks/useDashboardEvolucaoComparativoQuery'
+import {
+  useDashboardEvolucaoComparativoAnteriorQuery,
+  useDashboardEvolucaoComparativoQuery,
+} from '@/src/presentation/hooks/useDashboardEvolucaoComparativoQuery'
 import { formatarMoeda } from './dashboardTextHelpers'
 
 export type AgregacaoGraficoV2 = 'dia' | 'intervalo_60' | 'intervalo_30' | 'intervalo_15'
@@ -142,7 +145,7 @@ export function DashboardGraficoComparativo({
       : undefined
 
   const {
-    data: dadosEvolucaoComparativo,
+    data: dadosEvolucaoBase,
     isLoading: carregandoGraficoComparativo,
     isError: erroGraficoComparativo,
   } = useDashboardEvolucaoComparativoQuery({
@@ -152,6 +155,17 @@ export function DashboardGraficoComparativo({
     periodoFinal: periodoPersonalizadoFim,
     intervaloHora: intervaloHoraEvolucao,
   })
+
+  const { data: dadosEvolucaoComparativoCompleto } = useDashboardEvolucaoComparativoAnteriorQuery({
+    periodo: periodoData,
+    timezone: timezoneAgregacao,
+    periodoInicial: periodoPersonalizadoInicio,
+    periodoFinal: periodoPersonalizadoFim,
+    intervaloHora: intervaloHoraEvolucao,
+    dadosBaseProntos: !carregandoGraficoComparativo && dadosEvolucaoBase !== undefined,
+  })
+
+  const dadosEvolucaoComparativo = dadosEvolucaoComparativoCompleto ?? dadosEvolucaoBase
 
   const dadosGraficoFormatados = useMemo(() => {
     if (!dadosEvolucaoComparativo) return []
