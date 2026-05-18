@@ -118,7 +118,9 @@ export function montarKpisMvp(
 ): RelatorioProdutosVendidosMvpKpisDTO {
   const fatAtual = atualMeta.valorTotalPeriodoVendas
   const qtdAtual = atualMeta.quantidadeTotalPeriodo
-  const ticketMedio = qtdAtual > 0 ? fatAtual / qtdAtual : 0
+  const ticketMedioAtual = qtdAtual > 0 ? fatAtual / qtdAtual : 0
+  let ticketMedioAnterior: number | null = null
+  let ticketMedioVariacaoPct: number | null = null
 
   const orden = [...atualMeta.linhasFiltradasOrdenadas].sort((a, b) => b.quantidade - a.quantidade)
   const liderNome = orden[0]?.nome ?? '—'
@@ -135,6 +137,8 @@ export function montarKpisMvp(
     qtdPrev = anteriorMeta.quantidadeTotalPeriodo
     fatVariacaoPct = variacaoPct(fatAtual, fatPrev)
     qtdVariacaoPct = variacaoPct(qtdAtual, qtdPrev)
+    ticketMedioAnterior = qtdPrev > 0 ? fatPrev / qtdPrev : 0
+    ticketMedioVariacaoPct = variacaoPct(ticketMedioAtual, ticketMedioAnterior)
 
     const atualLiderId = orden[0]?.produtoId
     if (atualLiderId) {
@@ -179,7 +183,9 @@ export function montarKpisMvp(
     quantidadeVendidaAtual: qtdAtual,
     quantidadeAnterior: qtdPrev,
     variacaoPercentualQuantidade: qtdVariacaoPct,
-    ticketMedioPorItemNoPeriodo: ticketMedio,
+    ticketMedioPorItemNoPeriodo: ticketMedioAtual,
+    ticketMedioPorItemPeriodoAnterior: ticketMedioAnterior,
+    variacaoPercentualTicketMedio: ticketMedioVariacaoPct,
     produtoLiderNomeQuantidade: liderNome,
     produtoLiderQuantidadeUnidades: liderQtd,
     produtoLiderPercentualVsPeriodoAnterior: liderCrescPct,

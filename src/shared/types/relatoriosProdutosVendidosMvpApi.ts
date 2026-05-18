@@ -32,6 +32,8 @@ export interface RelatorioProdutosVendidosMvpKpisDTO {
   variacaoPercentualQuantidade: number | null
   /** Faturamento / unidades do período (base PDV inteiro no período) */
   ticketMedioPorItemNoPeriodo: number
+  ticketMedioPorItemPeriodoAnterior: number | null
+  variacaoPercentualTicketMedio: number | null
   produtoLiderNomeQuantidade: string
   produtoLiderQuantidadeUnidades: number
   produtoLiderPercentualVsPeriodoAnterior: number | null
@@ -51,7 +53,6 @@ export interface ProdutoRankingAnteriorDTO {
 
 export interface RelatorioProdutosVendidosMvpMockFlags {
   serieSimplificada?: boolean
-  insightsHeuristicos?: boolean
   /** Comparativo vs período anterior omitido (ex.: período muito longo ou sem intervalo definido). */
   comparativoPeriodoAnteriorOmitido?: boolean
 }

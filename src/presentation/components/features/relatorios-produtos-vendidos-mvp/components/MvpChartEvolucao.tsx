@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, type CSSProperties } from 'react'
 import {
   CartesianGrid,
   Line,
@@ -13,7 +13,20 @@ import {
 import type { RelatorioProdutosVendidosMvpSerieDiaDTO } from '@/src/shared/types/relatoriosProdutosVendidosMvpApi'
 import { formatarMoeda, formatarDiaDm, formatoTickYReais } from '../utils/mvpFormatPt'
 
-const CORES_LINHA = ['#530CA3', '#006699', '#00B074', '#FF9800', '#DC2626']
+const TOP_PRODUTOS_SERIE = 10
+
+const CORES_LINHA = [
+  '#530CA3',
+  '#006699',
+  '#00B074',
+  '#FF9800',
+  '#DC2626',
+  '#14B8A6',
+  '#B4DD2B',
+  '#003366',
+  '#8338EC',
+  '#E85D04',
+]
 
 function ordenarIdsSerieTemporal(serie: RelatorioProdutosVendidosMvpSerieDiaDTO[]): {
   produtoId: string
@@ -39,17 +52,75 @@ function ordenarIdsSerieTemporal(serie: RelatorioProdutosVendidosMvpSerieDiaDTO[
 
   return ordered.map(pid => ({
     produtoId: pid,
-    nomeLegenda: nomePorId.get(pid)?.trim() || `SKU ${pid.slice(0, 6)}`,
+    nomeLegenda: nomePorId.get(pid)?.trim() || `Produto ${pid.slice(0, 6)}`,
   }))
+}
+
+const tooltipContainerStyle: CSSProperties = {
+  borderRadius: 8,
+  fontSize: 12,
+  backgroundColor: 'rgba(255, 255, 255, 0.42)',
+  border: '1px solid rgba(0, 0, 0, 0.08)',
+  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
+  backdropFilter: 'blur(2px)',
+  padding: '8px 10px',
+  maxHeight: 280,
+  overflowY: 'auto',
+}
+
+type EvolucaoTooltipPayloadItem = {
+  color?: string
+  stroke?: string
+  name?: string
+  value?: number | string
+  dataKey?: string | number
+}
+
+function EvolucaoTooltipContent({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean
+  payload?: EvolucaoTooltipPayloadItem[]
+  label?: string
+}) {
+  if (!active || !payload?.length) return null
+
+  return (
+    <div className="font-nunito" style={tooltipContainerStyle}>
+      <p className="mb-1.5 text-xs font-semibold text-primary-text">Dia {label}</p>
+      <ul className="space-y-0.5">
+        {payload.map((entry: EvolucaoTooltipPayloadItem) => {
+          const cor = entry.color ?? entry.stroke ?? '#171A1C'
+          const valor = typeof entry.value === 'number' ? formatarMoeda(entry.value) : '—'
+          return (
+            <li
+              key={entry.dataKey ?? entry.name}
+              className="flex items-center gap-1.5 text-xs leading-snug"
+              style={{ color: cor }}
+            >
+              <span
+                className="inline-block h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: cor }}
+                aria-hidden
+              />
+              <span className="min-w-0 flex-1 truncate">{entry.name}</span>
+              <span className="shrink-0 font-medium tabular-nums">{valor}</span>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
 }
 
 export function MvpChartEvolucao(props: {
   serieTemporal: RelatorioProdutosVendidosMvpSerieDiaDTO[] | undefined
   serieSimplificada?: boolean
   isLoading: boolean
-  desabilitadoUsuario?: boolean
 }) {
-  const { serieTemporal = [], serieSimplificada, isLoading, desabilitadoUsuario } = props
+  const { serieTemporal = [], serieSimplificada, isLoading } = props
 
   const idsOrdenados = useMemo(() => ordenarIdsSerieTemporal(serieTemporal), [serieTemporal])
 
@@ -68,17 +139,9 @@ export function MvpChartEvolucao(props: {
     })
   }, [serieTemporal, idsOrdenados])
 
-  if (desabilitadoUsuario) {
-    return (
-      <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-900">
-        Série temporal desativada. Ative “Carregar série temporal” nos filtros para ver a evolução diária.
-      </div>
-    )
-  }
-
   if (isLoading) {
     return (
-      <div className="flex h-[300px] items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800">
+      <div className="font-nunito flex h-[300px] items-center justify-center rounded-lg border-2 bg-info text-sm text-secondary-text">
         Carregando evolução diária…
       </div>
     )
@@ -86,7 +149,7 @@ export function MvpChartEvolucao(props: {
 
   if (!chartRows.length) {
     return (
-      <div className="rounded-xl border border-dashed border-gray-200 bg-white p-6 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-900">
+      <div className="font-nunito rounded-lg border-2 border-dashed border-custom-2 bg-info p-6 text-center text-sm text-secondary-text">
         Sem pontos para o gráfico: não há valores diários nos produtos destacados neste período.
       </div>
     )
@@ -105,17 +168,17 @@ export function MvpChartEvolucao(props: {
   const domainY: [number, number] = [0, Math.max(maxValor * 1.08, 50)]
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-        Evolução diária (top por valor · filtrados)
+    <div className="rounded-lg border-2 bg-info p-4">
+      <h3 className="font-exo text-sm font-semibold text-primary">
+        Evolução diária (top {TOP_PRODUTOS_SERIE} por valor · filtrados)
       </h3>
       {serieSimplificada ? (
-        <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+        <p className="font-nunito mt-1 text-xs text-warning">
           Pode não haver data de finalização nas vendas detalhadas — verifique períodos grandes ou buracos nos
           metadados.
         </p>
       ) : (
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+        <p className="font-nunito mt-1 text-xs text-secondary-text">
           Valores de linha são soma das linhas de produtos por dia (fuso da empresa).
         </p>
       )}
@@ -130,11 +193,7 @@ export function MvpChartEvolucao(props: {
               width={72}
               tick={{ fontSize: 11 }}
             />
-            <Tooltip
-              formatter={(v: number) => formatarMoeda(v)}
-              labelFormatter={(l: string) => `Dia ${l}`}
-              contentStyle={{ borderRadius: 8, fontSize: 12 }}
-            />
+            <Tooltip content={<EvolucaoTooltipContent />} />
             {idsOrdenados.map((def, idx) => (
               <Line
                 key={def.produtoId}

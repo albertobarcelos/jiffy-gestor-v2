@@ -47,7 +47,7 @@ export function montarParamsVendasPdvPeriodo(args: {
   const intervaloCustom = lerIntervaloFinalizacaoVendasPdv(requestSearchParams)
   if (intervaloCustom) {
     appendIntervaloFinalizacaoVendasPdv(params, intervaloCustom)
-  } else {
+  } else if (periodo !== 'todos') {
     const opcao = MAP_OPCAO_PERIODO[periodo] || 'Hoje'
     const { inicio, fim } = calcularPeriodoNoFusoEmpresa(opcao, timezone)
     if (inicio && fim) {

@@ -150,8 +150,7 @@ export async function GET(request: NextRequest) {
         atual.linhasFiltradasOrdenadas.map(r => ({
           produtoId: r.produtoId,
           valorTotal: r.valorTotal,
-        })),
-        5
+        }))
       )
       const nomePorId = new Map<string, string>()
       for (const [id, mini] of atual.miniMap.entries()) {
@@ -187,7 +186,6 @@ export async function GET(request: NextRequest) {
       serieTemporal,
       rankings: rankingsPorProduto,
       mockFlags: {
-        insightsHeuristicos: true,
         serieSimplificada,
         comparativoPeriodoAnteriorOmitido: omitirComparativo,
       },

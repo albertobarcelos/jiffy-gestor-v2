@@ -1,5 +1,6 @@
 /**
- * Contrato do BFF `GET /api/relatorios/produtos-vendidos`.
+ * Contrato base do relatório de produtos vendidos (itens paginados, ABC, totais).
+ * Consumido pelo BFF `GET /api/relatorios/produtos-vendidos/mvp`.
  * Alinhado à visão futura `GET /api/v1/relatorios/top-produtos` (ver docs/dashboard-v2-melhorias-top-produtos.md).
  */
 

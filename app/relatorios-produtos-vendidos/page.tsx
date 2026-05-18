@@ -1,7 +1,7 @@
 'use client'
 
-import { RelatoriosProdutosVendidosPage } from '@/src/presentation/components/features/relatorios-produtos-vendidos/RelatoriosProdutosVendidosPage'
+import { RelatoriosProdutosVendidosMvpPage } from '@/src/presentation/components/features/relatorios-produtos-vendidos-mvp/RelatoriosProdutosVendidosMvpPage'
 
 export default function RelatoriosProdutosVendidosRoutePage() {
-  return <RelatoriosProdutosVendidosPage />
+  return <RelatoriosProdutosVendidosMvpPage />
 }

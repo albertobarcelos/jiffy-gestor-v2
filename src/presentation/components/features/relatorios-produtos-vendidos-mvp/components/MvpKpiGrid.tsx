@@ -1,33 +1,96 @@
 'use client'
 
-import { ArrowDownRight, ArrowUpRight, Minus, Package } from 'lucide-react'
+import type { ReactNode } from 'react'
+import {
+  MdAttachMoney,
+  MdInventory2,
+  MdReceiptLong,
+  MdTrendingUp,
+  MdWorkspacePremium,
+} from 'react-icons/md'
 import type { RelatorioProdutosVendidosMvpKpisDTO } from '@/src/shared/types/relatoriosProdutosVendidosMvpApi'
 import { formatarMoeda, formatarVariacaoPct } from '../utils/mvpFormatPt'
 
-function DeltaBadge({ pct }: { pct: number | null }) {
+function badgeVariacao(pct: number | null | undefined): { badge: string; badgePositivo: boolean } {
   if (pct == null || !Number.isFinite(pct)) {
-    return <span className="text-xs text-gray-400">—</span>
+    return { badge: '—', badgePositivo: true }
   }
-  const up = pct > 0.05
   const down = pct < -0.05
-  const Icon = up ? ArrowUpRight : down ? ArrowDownRight : Minus
-  const cls = up ? 'text-emerald-600' : down ? 'text-red-600' : 'text-gray-500'
+  return {
+    badge: formatarVariacaoPct(pct),
+    badgePositivo: !down,
+  }
+}
+
+function MvpMetricCard({
+  tituloBase,
+  icon,
+  valor,
+  badge,
+  rodape,
+  badgePositivo = true,
+  valorGrande = true,
+}: {
+  tituloBase: string
+  icon: ReactNode
+  valor: string
+  badge?: string
+  rodape: string
+  badgePositivo?: boolean
+  /** Nomes longos de produto usam tipografia um pouco menor */
+  valorGrande?: boolean
+}) {
   return (
-    <span className={`inline-flex items-center gap-0.5 text-xs font-semibold ${cls}`}>
-      <Icon className="h-3.5 w-3.5" />
-      {formatarVariacaoPct(pct)}
-    </span>
+    <div className="min-w-[260px] flex-1 rounded-xl border border-gray-200 bg-white p-2">
+      <div className="flex items-center gap-2">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100/90 text-primary md:h-8 md:w-8">
+          {icon}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-primary-text">{tituloBase}</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span
+              className={`font-semibold tracking-tight text-primary-text ${
+                valorGrande
+                  ? 'text-sm md:text-base'
+                  : 'line-clamp-2 text-sm md:text-base'
+              }`}
+            >
+              {valor}
+            </span>
+            {badge != null && badge !== '' ? (
+              <span
+                className={`shrink-0 rounded-md px-1 py-0.5 text-xs font-medium text-white ${
+                  badgePositivo ? 'bg-[#00B074]' : 'bg-[#D92D20]'
+                }`}
+              >
+                {badge}
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-1 text-xs leading-snug text-[#006699]">{rodape}</p>
+        </div>
+      </div>
+    </div>
   )
 }
 
 function KpiSkeleton() {
   return (
-    <div className="animate-pulse rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800">
-      <div className="h-3 w-24 rounded bg-gray-200 dark:bg-gray-700" />
-      <div className="mt-3 h-8 w-32 rounded bg-gray-200 dark:bg-gray-700" />
+    <div className="min-w-[280px] flex-1 animate-pulse rounded-2xl border border-gray-200 bg-white p-2">
+      <div className="flex items-center gap-4">
+        <div className="h-12 w-12 shrink-0 rounded-full bg-violet-100/90 md:h-14 md:w-14" />
+        <div className="flex flex-1 flex-col gap-2">
+          <div className="h-5 w-32 rounded bg-gray-200" />
+          <div className="h-8 w-24 rounded bg-gray-200" />
+          <div className="h-3 w-40 rounded bg-gray-200" />
+        </div>
+      </div>
     </div>
   )
 }
+
+const iconClass = 'text-[#1E3A8A]'
 
 export function MvpKpiGrid(props: {
   kpis: RelatorioProdutosVendidosMvpKpisDTO | undefined
@@ -37,72 +100,84 @@ export function MvpKpiGrid(props: {
 
   if (isLoading || !kpis) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
+      <>
+        {Array.from({ length: 5 }).map((_, i) => (
           <KpiSkeleton key={i} />
         ))}
-      </div>
+      </>
     )
   }
 
-  const cards = [
-    {
-      label: 'Faturamento período',
-      valor: formatarMoeda(kpis.faturamentoAtual),
-      extra: <DeltaBadge pct={kpis.variacaoPercentualFat} />,
-    },
-    {
-      label: 'Unidades vendidas',
-      valor: kpis.quantidadeVendidaAtual.toLocaleString('pt-BR'),
-      extra: <DeltaBadge pct={kpis.variacaoPercentualQuantidade} />,
-    },
-    {
-      label: 'Ticket médio por unidade',
-      valor: formatarMoeda(kpis.ticketMedioPorItemNoPeriodo),
-      extra: <span className="text-xs text-gray-400">Base período inteiro PDV</span>,
-    },
-    {
-      label: 'Líder em quantidade',
-      valor: kpis.produtoLiderNomeQuantidade,
-      extra: (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-800 dark:bg-violet-950 dark:text-violet-200">
-            <Package className="h-3 w-3" />
-            {kpis.produtoLiderQuantidadeUnidades.toLocaleString('pt-BR')} un.
-          </span>
-          <DeltaBadge pct={kpis.produtoLiderPercentualVsPeriodoAnterior} />
-        </div>
-      ),
-    },
-  ]
+  const fatBadge = badgeVariacao(kpis.variacaoPercentualFat)
+  const qtdBadge = badgeVariacao(kpis.variacaoPercentualQuantidade)
+  const ticketBadge = badgeVariacao(kpis.variacaoPercentualTicketMedio)
+  const liderBadge = badgeVariacao(kpis.produtoLiderPercentualVsPeriodoAnterior)
+
+  const rodapeFat =
+    kpis.faturamentoAnterior != null
+      ? `Período anterior: ${formatarMoeda(kpis.faturamentoAnterior)}`
+      : 'Sem base no período anterior'
+
+  const rodapeQtd =
+    kpis.quantidadeAnterior != null
+      ? `Período anterior: ${kpis.quantidadeAnterior.toLocaleString('pt-BR')} un.`
+      : 'Sem base no período anterior'
+
+  const rodapeTicket =
+    kpis.ticketMedioPorItemPeriodoAnterior != null
+      ? `Período anterior: ${formatarMoeda(kpis.ticketMedioPorItemPeriodoAnterior)}`
+      : 'Sem base no período anterior'
 
   const growthNome = kpis.produtoComMaiorCrescimentoNome
   const growthPct = kpis.produtoComMaiorCrescimentoPct
+  const growthBadge = badgeVariacao(growthPct)
 
   return (
-    <div className="space-y-3">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {cards.map(c => (
-          <div
-            key={c.label}
-            className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900"
-          >
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              {c.label}
-            </p>
-            <p className="mt-2 text-lg font-bold text-gray-900 dark:text-gray-50">{c.valor}</p>
-            <div className="mt-2">{c.extra}</div>
-          </div>
-        ))}
-      </div>
+    <>
+      <MvpMetricCard
+        tituloBase="Faturamento período"
+        icon={<MdAttachMoney className={iconClass} size={22} aria-hidden />}
+        valor={formatarMoeda(kpis.faturamentoAtual)}
+        badge={fatBadge.badge}
+        rodape={rodapeFat}
+        badgePositivo={fatBadge.badgePositivo}
+      />
+      <MvpMetricCard
+        tituloBase="Unidades vendidas"
+        icon={<MdInventory2 className={iconClass} size={22} aria-hidden />}
+        valor={kpis.quantidadeVendidaAtual.toLocaleString('pt-BR')}
+        badge={qtdBadge.badge}
+        rodape={rodapeQtd}
+        badgePositivo={qtdBadge.badgePositivo}
+      />
+      <MvpMetricCard
+        tituloBase="Ticket médio / unidade"
+        icon={<MdReceiptLong className={iconClass} size={22} aria-hidden />}
+        valor={formatarMoeda(kpis.ticketMedioPorItemNoPeriodo)}
+        badge={ticketBadge.badge}
+        rodape={rodapeTicket}
+        badgePositivo={ticketBadge.badgePositivo}
+      />
+      <MvpMetricCard
+        tituloBase="Líder em quantidade"
+        icon={<MdWorkspacePremium className={iconClass} size={22} aria-hidden />}
+        valor={kpis.produtoLiderNomeQuantidade}
+        //badge={liderBadge.badge}
+        rodape={`${kpis.produtoLiderQuantidadeUnidades.toLocaleString('pt-BR')} un. no período`}
+        badgePositivo={liderBadge.badgePositivo}
+        valorGrande={false}
+      />
       {growthNome != null && growthPct != null ? (
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          <span className="font-medium text-gray-800 dark:text-gray-200">{growthNome}</span> registrou o maior
-          crescimento de unidades versus o período anterior imediato (aprox.&nbsp;
-          <span className="font-semibold text-emerald-700 dark:text-emerald-400">{formatarVariacaoPct(growthPct)}</span>
-          ).
-        </p>
+        <MvpMetricCard
+          tituloBase="Maior crescimento"
+          icon={<MdTrendingUp className={iconClass} size={22} aria-hidden />}
+          valor={growthNome}
+          badge={growthBadge.badge}
+          rodape="vs. período anterior (unidades)"
+          badgePositivo={growthBadge.badgePositivo}
+          valorGrande={false}
+        />
       ) : null}
-    </div>
+    </>
   )
 }

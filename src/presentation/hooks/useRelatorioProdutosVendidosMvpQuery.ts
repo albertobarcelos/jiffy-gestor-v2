@@ -1,10 +1,17 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useQuery,
+  type InfiniteData,
+} from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import type { RelatorioProdutosVendidosSort } from '@/src/shared/types/relatoriosProdutosVendidosApi'
 import type { RelatorioProdutosVendidosMvpResponseDTO } from '@/src/shared/types/relatoriosProdutosVendidosMvpApi'
+
+export const RELATORIO_MVP_LIST_PAGE_SIZE = 50
 
 export type RelatorioProdutosVendidosMvpQueryParams = {
   periodo: string
@@ -20,8 +27,6 @@ export type RelatorioProdutosVendidosMvpQueryParams = {
   buscaNome: string
   limit: number
   offset: number
-  mockMargem: boolean
-  incluirSerie: boolean
   enabled?: boolean
 }
 
@@ -34,7 +39,6 @@ async function fetchRelatorioMvp(
   search.append('sort', params.sort)
   search.append('limit', String(params.limit))
   search.append('offset', String(params.offset))
-  if (!params.incluirSerie) search.append('serie', '0')
 
   if (params.periodoInicial && params.periodoFinal) {
     search.append('dataFinalizacaoInicial', params.periodoInicial.toISOString())
@@ -53,7 +57,6 @@ async function fetchRelatorioMvp(
   if (qmax) search.append('qtdMax', qmax)
   const q = params.buscaNome.trim()
   if (q) search.append('q', q)
-  if (params.mockMargem) search.append('mock', '1')
 
   const response = await fetch(`/api/relatorios/produtos-vendidos/mvp?${search.toString()}`, {
     headers: { Authorization: `Bearer ${params.token}` },
@@ -94,8 +97,6 @@ export function useRelatorioProdutosVendidosMvpQuery(params: RelatorioProdutosVe
       params.buscaNome,
       params.limit,
       params.offset,
-      params.mockMargem,
-      params.incluirSerie,
       empresaId,
     ],
     queryFn: () =>
@@ -106,5 +107,67 @@ export function useRelatorioProdutosVendidosMvpQuery(params: RelatorioProdutosVe
       }),
     enabled: enabled && !!token,
     staleTime: 30_000,
+  })
+}
+
+export type RelatorioProdutosVendidosMvpInfiniteParams = Omit<
+  RelatorioProdutosVendidosMvpQueryParams,
+  'limit' | 'offset'
+>
+
+export function useRelatorioProdutosVendidosMvpInfiniteQuery(
+  params: RelatorioProdutosVendidosMvpInfiniteParams
+) {
+  const { auth } = useAuthStore()
+  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
+  const resolvedTimezone = params.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
+  const enabled = params.enabled !== false
+
+  const inicioKey = params.periodoInicial ? params.periodoInicial.toISOString() : null
+  const fimKey = params.periodoFinal ? params.periodoFinal.toISOString() : null
+  const grupoKey = params.grupoIds.slice().sort().join('|')
+
+  return useInfiniteQuery<
+    RelatorioProdutosVendidosMvpResponseDTO,
+    Error,
+    InfiniteData<RelatorioProdutosVendidosMvpResponseDTO>,
+    readonly unknown[],
+    number
+  >({
+    queryKey: [
+      'relatorios',
+      'produtos-vendidos-mvp',
+      'infinite',
+      params.periodo,
+      inicioKey,
+      fimKey,
+      resolvedTimezone,
+      params.sort,
+      grupoKey,
+      params.valorMin,
+      params.valorMax,
+      params.qtdMin,
+      params.qtdMax,
+      params.buscaNome,
+      empresaId,
+    ],
+    queryFn: ({ pageParam }) =>
+      fetchRelatorioMvp({
+        ...params,
+        limit: RELATORIO_MVP_LIST_PAGE_SIZE,
+        offset: pageParam,
+        token: token!,
+        timezone: resolvedTimezone,
+      }),
+    initialPageParam: 0,
+    getNextPageParam: lastPage => {
+      const next = lastPage.offset + lastPage.items.length
+      if (next >= lastPage.totalFiltrado) return undefined
+      return next
+    },
+    enabled: enabled && !!token,
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
   })
 }

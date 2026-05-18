@@ -36,7 +36,8 @@ function dataFinalizacaoVenda(raw: Record<string, unknown>): Date | null {
   return null
 }
 
-const TOP_SERIE_PADRAO = 5
+/** Alinhado ao top 10 do gráfico de participação por grupo (MVP). */
+const TOP_SERIE_PADRAO = 10
 
 /**
  * Agrega `valorFinal` por dia (fuso empresa) e por produto, limitando aos IDs em `produtoIdsTop`.

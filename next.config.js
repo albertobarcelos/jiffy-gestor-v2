@@ -3,6 +3,20 @@ const path = require('path')
 
 const nextConfig = {
   reactStrictMode: true,
+  async redirects() {
+    return [
+      {
+        source: '/relatorios-produtos-vendidos-mvp',
+        destination: '/relatorios-produtos-vendidos',
+        permanent: true,
+      },
+      {
+        source: '/relatorios-produtos-vendidos-mvp/:path*',
+        destination: '/relatorios-produtos-vendidos/:path*',
+        permanent: true,
+      },
+    ]
+  },
   // Desabilitar ESLint durante build (apenas durante desenvolvimento)
   eslint: {
     ignoreDuringBuilds: false, // Manter ativo mas não bloquear por warnings
