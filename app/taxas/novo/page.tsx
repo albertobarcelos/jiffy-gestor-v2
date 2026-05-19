@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
+import { configuracoesTabPath } from '@/src/shared/constants/configuracoesRoutes'
 
 /** Fluxo migrado para painel lateral na lista (`?modalNovaTaxaOpen=true`). */
 export default function NovaTaxaLegacyPage() {
-  redirect('/cadastros/taxas?modalNovaTaxaOpen=true')
+  redirect(`${configuracoesTabPath('taxas')}?modalNovaTaxaOpen=true`)
 }

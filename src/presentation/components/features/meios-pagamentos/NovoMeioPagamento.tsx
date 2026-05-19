@@ -269,7 +269,7 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
         }
       } else {
         alert(isEditing ? 'Meio de pagamento atualizado com sucesso!' : 'Meio de pagamento criado com sucesso!')
-        router.push('/configuracoes?tab=meios-pagamentos')
+        router.push('/configuracoes/meios-pagamentos')
       }
     } catch (error) {
       console.error('Erro ao salvar meio de pagamento:', error)
@@ -280,7 +280,7 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
   }
 
   const handleCancel = () => {
-    router.push('/configuracoes?tab=meios-pagamentos')
+    router.push('/configuracoes/meios-pagamentos')
   }
 
   useImperativeHandle(

@@ -6,6 +6,11 @@ const nextConfig = {
   async redirects() {
     return [
       {
+        source: '/cadastros/:path*',
+        destination: '/:path*',
+        permanent: true,
+      },
+      {
         source: '/relatorios-produtos-vendidos-mvp',
         destination: '/relatorios-produtos-vendidos',
         permanent: true,

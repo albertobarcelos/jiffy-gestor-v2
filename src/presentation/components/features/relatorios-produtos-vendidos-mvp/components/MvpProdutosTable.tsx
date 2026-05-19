@@ -1,10 +1,47 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import type { RelatorioProdutoVendidoLinhaDTO } from '@/src/shared/types/relatoriosProdutosVendidosApi'
 import type { ProdutoRankingAnteriorDTO } from '@/src/shared/types/relatoriosProdutosVendidosMvpApi'
 import { formatarMoeda, formatarVariacaoPct } from '../utils/mvpFormatPt'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+
+/** Linha da lista — mesmo padrão flex de GruposComplementosList e demais telas. */
+const ROW_FLEX = 'flex w-full min-w-0 items-center gap-[10px] px-2'
+
+const COL_INDEX = 'w-6 shrink-0 tabular-nums'
+const COL_ABC = 'w-9 shrink-0'
+const COL_PRODUTO = 'min-w-0 flex-[2]'
+const COL_FLEX = 'min-w-0 flex-1'
+const COL_FLEX_RIGHT = `${COL_FLEX} text-right`
+
+const COL_VAR_QTD_TITLE =
+  'Variação percentual da quantidade vendida em relação ao período anterior (mesmos filtros)'
+const COL_VAR_FAT_TITLE =
+  'Variação percentual do faturamento em relação ao período anterior (mesmos filtros)'
+
+function ThCell({
+  children,
+  className = '',
+  title,
+}: {
+  children: ReactNode
+  className?: string
+  title?: string
+}) {
+  return (
+    <div className={className} title={title}>
+      {children}
+    </div>
+  )
+}
+
+function variacaoPctTextClass(p: number | null | undefined): string {
+  if (p == null || !Number.isFinite(p)) return 'text-primary-text'
+  if (p < 0) return 'text-red-500'
+  if (p > 0) return 'text-accent5'
+  return 'text-primary-text'
+}
 
 function BadgeAbc({ classe }: { classe: RelatorioProdutoVendidoLinhaDTO['classeAbc'] }) {
   const base = 'inline-flex min-w-[1.75rem] justify-center rounded px-1.5 py-0.5 text-xs font-bold'
@@ -131,16 +168,24 @@ export function MvpProdutosTable(props: {
 
   return (
     <div className={shellClass}>
-      <div className="font-nunito hidden shrink-0 gap-2 rounded-t-lg bg-custom-2 py-2 text-xs font-semibold text-primary-text md:flex md:px-3 md:text-sm">
-        <div className="w-8 shrink-0">#</div>
-        <div className="w-10 shrink-0">ABC</div>
-        <div className="min-w-[140px] flex-[2]">Produto</div>
-        <div className="hidden min-w-[100px] flex-1 lg:block">Grupo</div>
-        <div className="w-14 shrink-0 text-right">Qtd</div>
-        <div className="w-16 shrink-0 text-right">Δ qtd</div>
-        <div className="w-16 shrink-0 text-right">Δ fat.</div>
-        <div className="w-24 shrink-0 text-right">Faturamento</div>
-        <div className="w-20 shrink-0 text-right">P. médio</div>
+      <div className="hidden shrink-0 md:block">
+        <div
+          className={`font-nunito ${ROW_FLEX} h-10 rounded-t-lg bg-custom-2 text-xs font-semibold text-primary-text md:text-sm`}
+        >
+          <ThCell className={COL_INDEX}>#</ThCell>
+          <ThCell className={COL_ABC}>ABC</ThCell>
+          <ThCell className={COL_PRODUTO}>Produto</ThCell>
+          <ThCell className={`${COL_FLEX} hidden lg:block`}>Grupo</ThCell>
+          <ThCell className={COL_FLEX_RIGHT}>Qtd</ThCell>
+          <ThCell className={`${COL_FLEX_RIGHT} leading-tight`} title={COL_VAR_QTD_TITLE}>
+            <span className="block">% Qtd</span>
+          </ThCell>
+          <ThCell className={`${COL_FLEX_RIGHT} leading-tight`} title={COL_VAR_FAT_TITLE}>
+            <span className="block">% Faturamento</span>
+          </ThCell>
+          <ThCell className={COL_FLEX_RIGHT}>Faturamento</ThCell>
+          <ThCell className={COL_FLEX_RIGHT}>Preço médio</ThCell>
+        </div>
       </div>
 
       <div
@@ -152,37 +197,43 @@ export function MvpProdutosTable(props: {
           return (
             <div
               key={row.produtoId}
-              className={`font-nunito mb-0.5 flex min-w-[720px] items-center gap-2 rounded-lg py-1.5 transition-colors hover:bg-primary/10 md:px-2 ${
+              className={`font-nunito ${ROW_FLEX} mb-0.5 rounded-lg py-1.5 transition-colors hover:bg-primary/10 ${
                 isZebraEven ? 'bg-white' : 'bg-gray-50'
               }`}
             >
-              <div className="w-8 shrink-0 tabular-nums text-secondary-text">{idx + 1}</div>
-              <div className="w-10 shrink-0">
+              <div className={`${COL_INDEX} text-secondary-text`}>{idx + 1}</div>
+              <div className={COL_ABC}>
                 <BadgeAbc classe={row.classeAbc} />
               </div>
-              <div className="min-w-[140px] flex-[2]">
+              <div className={COL_PRODUTO}>
                 <span className="line-clamp-2 text-sm font-medium text-primary-text" title={row.nome}>
                   {row.nome}
                 </span>
               </div>
-              <div className="hidden min-w-[100px] flex-1 lg:block">
+              <div className={`${COL_FLEX} hidden lg:block`}>
                 <span className="line-clamp-2 text-xs text-secondary-text" title={row.grupoNome ?? ''}>
                   {row.grupoNome ?? '—'}
                 </span>
               </div>
-              <div className="w-14 shrink-0 text-right tabular-nums text-sm text-primary-text">
+              <div className={`${COL_FLEX_RIGHT} text-sm tabular-nums text-primary-text`}>
                 {row.quantidade.toLocaleString('pt-BR')}
               </div>
-              <div className="w-16 shrink-0 text-right text-xs tabular-nums text-primary-text">
+              <div
+                className={`${COL_FLEX_RIGHT} text-xs tabular-nums ${variacaoPctTextClass(row.ranking?.variacaoQtdPct)}`}
+                title={COL_VAR_QTD_TITLE}
+              >
                 {formatarVariacaoPct(row.ranking?.variacaoQtdPct)}
               </div>
-              <div className="w-16 shrink-0 text-right text-xs tabular-nums text-primary-text">
+              <div
+                className={`${COL_FLEX_RIGHT} text-xs tabular-nums ${variacaoPctTextClass(row.ranking?.variacaoValorPct)}`}
+                title={COL_VAR_FAT_TITLE}
+              >
                 {formatarVariacaoPct(row.ranking?.variacaoValorPct)}
               </div>
-              <div className="w-24 shrink-0 text-right text-sm tabular-nums text-primary-text">
+              <div className={`${COL_FLEX_RIGHT} text-sm tabular-nums text-primary-text`}>
                 {formatarMoeda(row.valorTotal)}
               </div>
-              <div className="w-20 shrink-0 text-right text-sm tabular-nums text-primary-text">
+              <div className={`${COL_FLEX_RIGHT} text-sm tabular-nums text-primary-text`}>
                 {formatarMoeda(row.precoMedioVenda)}
               </div>
             </div>
