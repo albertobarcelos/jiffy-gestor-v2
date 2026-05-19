@@ -14,6 +14,7 @@ import {
 } from './relatoriosProdutosVendidosFilters'
 import type { ProdutoRankingAnteriorDTO } from '@/src/shared/types/relatoriosProdutosVendidosMvpApi'
 import type { RelatorioProdutoVendidoLinhaDTO } from '@/src/shared/types/relatoriosProdutosVendidosApi'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { MvpFiltersBar } from './components/MvpFiltersBar'
 import { MvpKpiGrid } from './components/MvpKpiGrid'
 import { MvpChartParticipacao } from './components/MvpChartParticipacao'
@@ -21,7 +22,7 @@ import { MvpChartEvolucao } from './components/MvpChartEvolucao'
 import { MvpProdutosTable } from './components/MvpProdutosTable'
 
 const defaultFiltros: RelatoriosProdutosVendidosFiltersValues = {
-  filtroPeriodo: '30dias',
+  filtroPeriodo: 'hoje',
   periodoPersonalizadoInicio: null,
   periodoPersonalizadoFim: null,
   sort: 'quantidade_desc',
@@ -65,6 +66,7 @@ export function RelatoriosProdutosVendidosMvpPage() {
     data,
     isLoading,
     isFetching,
+    isPlaceholderData,
     isError,
     error,
     fetchNextPage,
@@ -163,7 +165,10 @@ export function RelatoriosProdutosVendidosMvpPage() {
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
-  const kpisLoading = isLoading && !firstPage
+  /** KPIs + gráficos + tabela: um único loading central até a 1ª página (ou novo filtro). */
+  const conteudoPrincipalCarregando =
+    isLoading || (isFetching && (isPlaceholderData || !firstPage))
+
   const kpisComparativoPendente =
     !!firstPage &&
     !firstPage.mockFlags?.comparativoPeriodoAnteriorOmitido &&
@@ -181,13 +186,6 @@ export function RelatoriosProdutosVendidosMvpPage() {
       <div className="h-[1px] flex-shrink-0 border-t-2 border-primary/70" />
 
       <div className="bg-primary-background rounded-b-lg rounded-t-lg">
-        {mockFlagsExibicao?.comparativoPeriodoAnteriorOmitido ? (
-          <div className="mx-2 mt-2 rounded-lg border-2 border-warning/40 bg-info px-4 py-3 text-sm text-primary-text">
-            Comparativo com o período anterior imediato foi omitido (período muito longo, sem vendas no filtro
-            atual ou intervalo indisponível). KPIs e deltas de tabela refletem apenas o período selecionado.
-          </div>
-        ) : null}
-
         <MvpFiltersBar
           values={filtros}
           onChange={handleFiltrosFieldChange}
@@ -198,34 +196,38 @@ export function RelatoriosProdutosVendidosMvpPage() {
           grupos={gruposOptions}
         />
 
-        <div className="scrollbar-thin m-1 flex gap-1 overflow-x-auto pb-1">
-          <MvpKpiGrid
-            kpis={kpisExibicao}
-            isLoading={kpisLoading}
-            comparativoPendente={kpisComparativoPendente}
-          />
-        </div>
+        {conteudoPrincipalCarregando ? (
+          <div className="flex min-h-[min(50vh,32rem)] items-center justify-center py-12">
+            <JiffyLoading />
+          </div>
+        ) : isError ? (
+          <div className="font-nunito m-4 rounded-lg border-2 border-red-200 bg-red-50 px-4 py-6 text-center text-sm text-red-700">
+            {error instanceof Error ? error.message : 'Erro ao carregar relatório.'}
+          </div>
+        ) : (
+          <>
+            <div className="scrollbar-thin m-1 flex gap-1 overflow-x-auto pb-1">
+              <MvpKpiGrid kpis={kpisExibicao} comparativoPendente={kpisComparativoPendente} />
+            </div>
 
-        <div className="m-1 grid gap-2 xl:grid-cols-2">
-          <MvpChartParticipacao dados={firstPage?.participacaoGrupos} isLoading={kpisLoading} />
-          <MvpChartEvolucao
-            serieTemporal={firstPage?.serieTemporal}
-            serieSimplificada={mockFlagsExibicao?.serieSimplificada}
-            isLoading={kpisLoading}
-          />
-        </div>
+            <div className="m-1 grid gap-2 xl:grid-cols-2">
+              <MvpChartParticipacao dados={firstPage?.participacaoGrupos} />
+              <MvpChartEvolucao
+                serieTemporal={firstPage?.serieTemporal}
+                serieSimplificada={mockFlagsExibicao?.serieSimplificada}
+              />
+            </div>
 
-        <MvpProdutosTable
-          items={listItems}
-          rankingsPorProduto={rankingsPorProduto}
-          totalFiltrado={totalFiltrado}
-          isLoading={(isLoading || isFetching) && listItems.length === 0}
-          isFetchingNextPage={isFetchingNextPage}
-          hasNextPage={hasNextPage ?? false}
-          onLoadMore={handleLoadMore}
-          isError={isError}
-          errorMessage={error instanceof Error ? error.message : undefined}
-        />
+            <MvpProdutosTable
+              items={listItems}
+              rankingsPorProduto={rankingsPorProduto}
+              totalFiltrado={totalFiltrado}
+              isFetchingNextPage={isFetchingNextPage}
+              hasNextPage={hasNextPage ?? false}
+              onLoadMore={handleLoadMore}
+            />
+          </>
+        )}
       </div>
     </div>
   )

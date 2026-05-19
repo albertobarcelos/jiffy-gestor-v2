@@ -21,23 +21,17 @@ export function MvpProdutosTable(props: {
   items: RelatorioProdutoVendidoLinhaDTO[]
   rankingsPorProduto: ProdutoRankingAnteriorDTO[]
   totalFiltrado: number
-  isLoading: boolean
   isFetchingNextPage: boolean
   hasNextPage: boolean
   onLoadMore: () => void
-  isError: boolean
-  errorMessage?: string
 }) {
   const {
     items,
     rankingsPorProduto,
     totalFiltrado,
-    isLoading,
     isFetchingNextPage,
     hasNextPage,
     onLoadMore,
-    isError,
-    errorMessage,
   } = props
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -113,35 +107,19 @@ export function MvpProdutosTable(props: {
 
     container.addEventListener('wheel', onWheel, { passive: true })
     return () => container.removeEventListener('wheel', onWheel)
-  }, [rows.length, isLoading, isError])
+  }, [rows.length])
 
   useEffect(() => {
-    if (!hasNextPage || isLoading || isFetchingNextPage) return
+    if (!hasNextPage || isFetchingNextPage) return
     const container = scrollContainerRef.current
     if (!container) return
     if (container.scrollHeight <= container.clientHeight + 8) {
       onLoadMore()
     }
-  }, [hasNextPage, isLoading, isFetchingNextPage, onLoadMore, rows.length])
+  }, [hasNextPage, isFetchingNextPage, onLoadMore, rows.length])
 
   const shellClass =
     'm-1 flex h-[90vh] min-h-[min(90vh,32rem)] flex-col overflow-hidden rounded-lg bg-info'
-
-  if (isLoading && rows.length === 0) {
-    return (
-      <div className={`${shellClass} items-center justify-center`}>
-        <JiffyLoading />
-      </div>
-    )
-  }
-
-  if (isError && rows.length === 0) {
-    return (
-      <div className={`${shellClass} justify-center p-4`}>
-        <p className="text-sm text-error">{errorMessage ?? 'Não foi possível carregar o relatório de produtos vendidos.'}</p>
-      </div>
-    )
-  }
 
   if (!rows.length) {
     return (

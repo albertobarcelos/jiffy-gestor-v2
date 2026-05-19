@@ -190,7 +190,7 @@ export function TopNav() {
           ),
         },
         { name: 'Relatórios Vendas', path: '/relatorios-vendas', icon: MdAssessment },
-        { name: 'Produtos vendidos', path: '/relatorios-produtos-vendidos', icon: MdAnalytics },
+        { name: 'Relatório Produtoss', path: '/relatorios-produtos-vendidos', icon: MdAnalytics },
         { name: 'Hist. Fechamentos', path: '/historico-fechamento', icon: MdHistory },
         { name: 'Comissões', path: '/vendas/comissoes', icon: MdPercent },
 

@@ -118,9 +118,8 @@ function EvolucaoTooltipContent({
 export function MvpChartEvolucao(props: {
   serieTemporal: RelatorioProdutosVendidosMvpSerieDiaDTO[] | undefined
   serieSimplificada?: boolean
-  isLoading: boolean
 }) {
-  const { serieTemporal = [], serieSimplificada, isLoading } = props
+  const { serieTemporal = [], serieSimplificada } = props
 
   const idsOrdenados = useMemo(() => ordenarIdsSerieTemporal(serieTemporal), [serieTemporal])
 
@@ -138,14 +137,6 @@ export function MvpChartEvolucao(props: {
       return base
     })
   }, [serieTemporal, idsOrdenados])
-
-  if (isLoading) {
-    return (
-      <div className="font-nunito flex h-[300px] items-center justify-center rounded-lg border-2 bg-info text-sm text-secondary-text">
-        Carregando evolução diária…
-      </div>
-    )
-  }
 
   if (!chartRows.length) {
     return (

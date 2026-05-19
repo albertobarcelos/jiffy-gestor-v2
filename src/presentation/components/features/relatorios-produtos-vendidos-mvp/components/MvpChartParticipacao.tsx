@@ -23,9 +23,8 @@ const PALETA_GRUPOS = [
 
 export function MvpChartParticipacao(props: {
   dados: RelatorioParticipacaoGrupoDTO[] | undefined
-  isLoading: boolean
 }) {
-  const { dados, isLoading } = props
+  const { dados } = props
 
   const chartData = useMemo(() => {
     if (!dados?.length) return []
@@ -54,14 +53,6 @@ export function MvpChartParticipacao(props: {
       }
     })
   }, [dados])
-
-  if (isLoading) {
-    return (
-      <div className="font-nunito flex h-[280px] items-center justify-center rounded-lg border-2 bg-info text-sm text-secondary-text">
-        Carregando participação por grupo…
-      </div>
-    )
-  }
 
   if (!chartData.length) {
     return (
