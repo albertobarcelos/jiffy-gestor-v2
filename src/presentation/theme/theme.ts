@@ -124,6 +124,36 @@ export const theme = createTheme({
         },
       },
     },
+    MuiOutlinedInput: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8,
+          '&:hover .MuiOutlinedInput-notchedOutline': {
+            borderWidth: '1px',
+          },
+          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+            borderWidth: '1px',
+          },
+        },
+        notchedOutline: {
+          borderWidth: '1px',
+          borderStyle: 'solid',
+          borderColor: 'rgba(0, 0, 0, 0.23)',
+        },
+      },
+    },
+    MuiInputLabel: {
+      styleOverrides: {
+        root: {
+          color: 'var(--color-primary-text)',
+        },
+        outlined: {
+          '&.Mui-focused': {
+            color: 'var(--color-primary-text)',
+          },
+        },
+      },
+    },
     MuiTextField: {
       styleOverrides: {
         root: {

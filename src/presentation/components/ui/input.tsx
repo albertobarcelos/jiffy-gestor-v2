@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { TextField, TextFieldProps } from '@mui/material'
+import { sxCampoOutlinedPadrao } from '@/src/shared/theme/muiOutlinedFieldSx'
 
 export interface InputProps extends Omit<TextFieldProps, 'variant'> {
   variant?: 'outlined' | 'filled' | 'standard'
@@ -14,13 +15,26 @@ export interface InputProps extends Omit<TextFieldProps, 'variant'> {
 }
 
 /**
- * Componente Input usando Material UI TextField.
- * Padrão visual alinhado ao Select (Radix UI):
- * - size="small" → altura ~40px (h-10)
- * - borderRadius: 6px → equivalente ao rounded-md do Tailwind
+ * TextField outlined padrão do gestor: label na borda, borda visível (compatível com Tailwind + MUI layers).
  */
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ variant = 'outlined', value, size, min, max, step, maxLength, minLength, pattern, inputProps, ...props }, ref) => {
+  (
+    {
+      variant = 'outlined',
+      value,
+      size,
+      min,
+      max,
+      step,
+      maxLength,
+      minLength,
+      pattern,
+      inputProps,
+      sx,
+      ...props
+    },
+    ref
+  ) => {
     const normalizedValue = value === null || value === undefined ? '' : value
 
     const mergedInputProps = {
@@ -32,7 +46,12 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       ...(minLength !== undefined && { minLength }),
       ...(pattern !== undefined && { pattern }),
     }
-    
+
+    const mergedSx =
+      variant === 'outlined'
+        ? [sxCampoOutlinedPadrao, ...(Array.isArray(sx) ? sx : sx != null ? [sx] : [])]
+        : sx
+
     return (
       <TextField
         ref={ref}
@@ -41,6 +60,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         value={normalizedValue}
         size={size}
         inputProps={mergedInputProps}
+        sx={mergedSx}
         {...props}
       />
     )
@@ -48,4 +68,3 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
 )
 
 Input.displayName = 'Input'
-

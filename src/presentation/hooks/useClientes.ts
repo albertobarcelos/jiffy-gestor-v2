@@ -229,7 +229,10 @@ export function useCriarClienteRapido() {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ nome, telefone }),
+        body: JSON.stringify({
+          nome,
+          telefone: telefone.replace(/\D/g, ''),
+        }),
       })
 
       if (!response.ok) {

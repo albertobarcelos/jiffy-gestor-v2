@@ -15,6 +15,7 @@ import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
 import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
 import { showToast } from '@/src/shared/utils/toast'
+import { extrairDigitosTelefone, formatarTelefoneBr } from '@/src/shared/utils/telefoneBr'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { MdSearch, MdClear, MdPerson, MdLocationOn, MdReceiptLong } from 'react-icons/md'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
@@ -163,7 +164,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
       razaoSocial: (razaoSocial || '').trim(),
       cpf: cpf.replace(/\D/g, ''),
       cnpj: cnpj.replace(/\D/g, ''),
-      telefone: telefone.replace(/\D/g, ''),
+      telefone: extrairDigitosTelefone(telefone),
       email: (email || '').trim(),
       nomeFantasia: (nomeFantasia || '').trim(),
       indicadorInscricaoEstadual: (indicadorInscricaoEstadual || '').trim(),
@@ -285,7 +286,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
           
           // Formata telefone ao carregar
           const telefoneValue = cliente.getTelefone() || ''
-          setTelefone(telefoneValue ? formatTelefone(telefoneValue) : '')
+          setTelefone(telefoneValue ? formatarTelefoneBr(telefoneValue) : '')
           
           setEmail(cliente.getEmail() || '')
           setNomeFantasia(cliente.getNomeFantasia() || '')
@@ -370,17 +371,6 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
         /(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,
         '$1.$2.$3/$4-$5'
       )
-    }
-    return value
-  }
-
-  const formatTelefone = (value: string) => {
-    const numbers = value.replace(/\D/g, '')
-    if (numbers.length <= 11) {
-      if (numbers.length <= 10) {
-        return numbers.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3')
-      }
-      return numbers.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3')
     }
     return value
   }
@@ -621,7 +611,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
     const cpfLimpo = cpf.replace(/\D/g, '')
     const cnpjLimpo = cnpj.replace(/\D/g, '')
 
-    const telefoneLimpo = telefone.replace(/\D/g, '')
+    const telefoneLimpo = extrairDigitosTelefone(telefone)
     // API externa exige DDD + número completo (10 fixo ou 11 celular no Brasil)
     if (telefoneLimpo.length > 0 && telefoneLimpo.length !== 10 && telefoneLimpo.length !== 11) {
       showToast.error(
@@ -1063,7 +1053,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
               <Input
                 label="Telefone"
                 value={telefone}
-                onChange={(e) => setTelefone(formatTelefone(e.target.value))}
+                onChange={e => setTelefone(formatarTelefoneBr(e.target.value))}
                 placeholder="(00) 00000-0000"
                 inputProps={{ maxLength: 15 }}
                 size="small"

@@ -1582,7 +1582,7 @@ export function NovoPedidoModal({
 
   const adicionarProduto = (produtoId: string) => {
     const produto =
-      catalogoProdutosPorIdRef.current[produtoId] ??
+      catalogoProdutosPorId[produtoId] ??
       produtosList.find(p => p.getId() === produtoId)
     if (!produto) return
 
@@ -1747,7 +1747,7 @@ export function NovoPedidoModal({
 
     // Buscar o produto atualizado da lista / catálogo para verificar permiteDesconto e permiteAcrescimo
     const produtoEntity =
-      catalogoProdutosPorIdRef.current[produtoAtual.produtoId] ??
+      catalogoProdutosPorId[produtoAtual.produtoId] ??
       produtosList.find(p => p.getId() === produtoAtual.produtoId)
     const permiteDesconto = produtoEntity?.permiteDescontoAtivo() || false
     const permiteAcrescimo = produtoEntity?.permiteAcrescimoAtivo() || false
