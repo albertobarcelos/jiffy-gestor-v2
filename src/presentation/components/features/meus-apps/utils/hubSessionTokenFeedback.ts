@@ -14,3 +14,13 @@ export function isLikelyHubSessionTokenError(message: string): boolean {
     m.includes('sessao expirada')
   )
 }
+
+export function isLikelyVinculoRemovidoError(message: string): boolean {
+  const m = message.trim().toLowerCase()
+  if (!m) return false
+  return (
+    m.includes('não possui acesso') ||
+    m.includes('nao possui acesso') ||
+    m.includes('empresa bloqueada')
+  )
+}

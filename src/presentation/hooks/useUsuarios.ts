@@ -4,6 +4,7 @@ import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { Usuario } from '@/src/domain/entities/Usuario'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 interface UsuariosQueryParams {
   q?: string
@@ -47,7 +48,7 @@ export function useUsuariosInfinite(params: Omit<UsuariosQueryParams, 'offset'> 
       searchParams.append('limit', limit.toString())
       searchParams.append('offset', pageParam.toString())
 
-      const response = await fetch(`/api/usuarios?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/usuarios?${searchParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -95,7 +96,7 @@ export function useUsuario(id: string) {
         throw new Error('Usuário não autenticado ou token ausente.')
       }
 
-      const response = await fetch(`/api/usuarios/${id}`, {
+      const response = await fetchGestorApi(`/api/usuarios/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -137,7 +138,7 @@ export function useUsuarioMutation() {
       const url = isUpdate && usuarioId ? `/api/usuarios/${usuarioId}` : '/api/usuarios'
       const method = isUpdate ? 'PATCH' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           Authorization: `Bearer ${token}`,

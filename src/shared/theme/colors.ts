@@ -29,6 +29,8 @@ export const colors = {
   accent2: '#C34848', // Vermelho
   accent3: '#61BBE8', // Azul claro
   accent4: '#057CB8', // Azul
+  /** Mantém o mesmo token que `--color-accent5` em `app/globals.css` */
+  accent5: '#00B074', // Verde
 
   // Estados
   success: '#14AE5C', // Verde
@@ -89,6 +91,7 @@ export const tailwindColors = {
   accent2: colors.accent2,
   accent3: colors.accent3,
   accent4: colors.accent4,
+  accent5: colors.accent5,
   success: colors.success,
   warning: colors.warning,
   error: colors.error,

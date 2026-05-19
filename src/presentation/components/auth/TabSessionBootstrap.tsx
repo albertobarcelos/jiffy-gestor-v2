@@ -89,10 +89,8 @@ export function TabSessionBootstrap() {
 
   useEffect(() => {
     const pending = fallbackRef.current
-    if (!pending || !identityAuth) return
+    if (!pending) return
     fallbackRef.current = null
-
-    const idTok = identityAuth.getAccessToken()
 
     void (async () => {
       try {
@@ -101,7 +99,6 @@ export function TabSessionBootstrap() {
           credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
-            ...(idTok ? { Authorization: `Bearer ${idTok}` } : {}),
           },
           body: JSON.stringify({ empresaId: pending.empresaId }),
         })
@@ -113,7 +110,7 @@ export function TabSessionBootstrap() {
 
         bootstrapTabSessionManually(data.accessToken, pending.empParam)
 
-        const prev = identityAuth.getUser()
+        const prev = useAuthStore.getState().getUser()
         const auth = buildAuthFromAccessToken(
           data.accessToken,
           prev ? { id: prev.getId(), email: prev.getEmail(), name: prev.getName() } : undefined

@@ -29,10 +29,14 @@ export async function loginViaApiRoute(
 
   if (!response.ok || !data.success) {
     const errMsg = typeof data.error === 'string' ? data.error : ''
+    const needsEmailConfirmation =
+      /e-mail\s+n[aã]o\s+confirm|email\s+n[aã]o\s+confirm|e-?mail\s+n[aã]o\s+confirmad|conta\s+n[aã]o\s+confirmad|pendente\s+de\s+confirma|confirme\s+seu\s+e-?mail|confirmar\s+seu\s+e-?mail|verifique\s+sua\s+caixa/i.test(
+        errMsg
+      )
     return {
       ok: false,
       error: errMsg || 'Erro ao fazer login',
-      needsEmailConfirmation: /não confirmado|nao confirmado|confirmar seu e-mail/i.test(errMsg),
+      needsEmailConfirmation,
     }
   }
 

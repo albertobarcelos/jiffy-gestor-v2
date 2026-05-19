@@ -5,6 +5,7 @@ import { Input } from '@/src/presentation/components/ui/input'
 import { Switch } from '@/src/presentation/components/ui/switch'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
+import { colors } from '@/src/shared/theme/colors'
 
 /** Mesmo estilo do input de valor em `ModalLancamentoProdutoPainel` */
 const sxValorPainelOutlined = {
@@ -36,6 +37,36 @@ const sxValorPainelOutlined = {
     fontSize: '0.875rem',
     textAlign: 'right',
     fontWeight: 600,
+  },
+} as const
+
+const sxSwitchDesconto = {
+  '& .MuiSwitch-switchBase': {
+    color: '#d32f2f',
+  },
+  '& .MuiSwitch-switchBase.Mui-checked': {
+    color: '#d32f2f',
+  },
+  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+    backgroundColor: '#d32f2f',
+  },
+  '& .MuiSwitch-track': {
+    backgroundColor: '#d32f2f',
+  },
+} as const
+
+const sxSwitchAcrescimo = {
+  '& .MuiSwitch-switchBase': {
+    color: colors.accent5,
+  },
+  '& .MuiSwitch-switchBase.Mui-checked': {
+    color: colors.accent5,
+  },
+  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+    backgroundColor: colors.accent5,
+  },
+  '& .MuiSwitch-track': {
+    backgroundColor: colors.accent5,
   },
 } as const
 
@@ -230,13 +261,35 @@ export function PainelEdicaoProdutoLinhaPedido({
             >
               <MdRemove className="h-5 w-5" />
             </button>
-            <div className="min-w-[60px] text-center text-2xl font-semibold text-gray-900">
-              {quantidadeEdicao.toFixed(0)}
-            </div>
+            <input
+              id="edicao-painel-quantidade"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              aria-label="Quantidade"
+              value={quantidadeEdicao.toFixed(0)}
+              onChange={e => {
+                const digits = e.target.value.replace(/\D/g, '')
+                if (digits === '') {
+                  onQuantidadeEdicaoChange(1)
+                  return
+                }
+                const v = parseInt(digits, 10)
+                if (Number.isFinite(v)) {
+                  onQuantidadeEdicaoChange(Math.max(1, v))
+                }
+              }}
+              onBlur={() => {
+                if (!Number.isFinite(quantidadeEdicao) || quantidadeEdicao < 1) {
+                  onQuantidadeEdicaoChange(1)
+                }
+              }}
+              className="min-w-[72px] max-w-[140px] rounded-lg border border-gray-300 bg-white px-2 py-2 text-center text-2xl font-semibold text-gray-900 tabular-nums outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
+            />
             <button
               type="button"
               onClick={() => onQuantidadeEdicaoChange(quantidadeEdicao + 1)}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-white transition-colors hover:bg-green-600"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-accent5 text-white transition-colors hover:brightness-95 active:brightness-90"
             >
               <MdAdd className="h-5 w-5" />
             </button>
@@ -259,25 +312,8 @@ export function PainelEdicaoProdutoLinhaPedido({
                     onEhAcrescimoChange(e.target.checked)
                     onValorDescontoAcrescimoChange('0')
                   }}
-                  color={ehAcrescimo ? 'success' : 'error'}
-                  sx={
-                    !ehAcrescimo
-                      ? {
-                          '& .MuiSwitch-switchBase': {
-                            color: '#d32f2f',
-                          },
-                          '& .MuiSwitch-switchBase.Mui-checked': {
-                            color: '#d32f2f',
-                          },
-                          '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                            backgroundColor: '#d32f2f',
-                          },
-                          '& .MuiSwitch-track': {
-                            backgroundColor: '#d32f2f',
-                          },
-                        }
-                      : undefined
-                  }
+                  color="default"
+                  sx={ehAcrescimo ? sxSwitchAcrescimo : sxSwitchDesconto}
                 />
               </div>
 

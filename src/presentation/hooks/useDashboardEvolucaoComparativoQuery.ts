@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 export type LinhaComparacaoChartRow = {
   labelEixo: string
@@ -29,7 +30,7 @@ async function fetchDashboardEvolucaoComparativo(params: Params & { token: strin
   }
   if (typeof params.intervaloHora === 'number') search.append('intervaloHora', String(params.intervaloHora))
 
-  const response = await fetch(`/api/dashboard/evolucao-comparativo?${search.toString()}`, {
+  const response = await fetchGestorApi(`/api/dashboard/evolucao-comparativo?${search.toString()}`, {
     headers: { Authorization: `Bearer ${params.token}` },
   })
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>

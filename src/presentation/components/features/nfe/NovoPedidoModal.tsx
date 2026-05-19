@@ -436,6 +436,8 @@ export function NovoPedidoModal({
   const [clienteId, setClienteId] = useState<string>('')
   const [clienteNome, setClienteNome] = useState<string>('')
   const [produtos, setProdutos] = useState<ProdutoSelecionado[]>([])
+  /** Catálogo acumulado por id (todos os grupos visitados no passo 2 + GET /api/produtos/:id). Desacopla ações da linha do `grupoSelecionadoId`. */
+  const [catalogoProdutosPorId, setCatalogoProdutosPorId] = useState<Record<string, Produto>>({})
   const [pagamentos, setPagamentos] = useState<PagamentoSelecionado[]>([])
   const [meioPagamentoId, setMeioPagamentoId] = useState<string>('')
   const [valorRecebido, setValorRecebido] = useState<string>('')
@@ -1579,8 +1581,12 @@ export function NovoPedidoModal({
   }
 
   const adicionarProduto = (produtoId: string) => {
-    const produto = produtosList.find(p => p.getId() === produtoId)
+    const produto =
+      catalogoProdutosPorIdRef.current[produtoId] ??
+      produtosList.find(p => p.getId() === produtoId)
     if (!produto) return
+
+    setCatalogoProdutosPorId(prev => ({ ...prev, [produto.getId()]: produto }))
 
     const mostrarAlterarPreco = produto.permiteAlterarPrecoAtivo()
     const mostrarComplementos =
@@ -1668,14 +1674,16 @@ export function NovoPedidoModal({
         },
       ])
     }
+    setCatalogoProdutosPorId(prev => ({ ...prev, [produto.getId()]: produto }))
     // Fechamento e limpeza de `produtoParaLancamentoPainel` ficam no painel (onOpenChange + onAfterClose)
   }
 
   /** Abre o painel de lançamento para ajustar complementos/preço em linha já na lista */
-  const abrirModalComplementosProdutoExistente = (index: number) => {
+  const abrirModalComplementosProdutoExistente = async (index: number) => {
     const produtoSelecionado = produtos[index]
-    const produto = produtosList.find(p => p.getId() === produtoSelecionado.produtoId)
+    if (!produtoSelecionado) return
 
+    const produto = await carregarProdutoNoCatalogoSeNecessario(produtoSelecionado.produtoId)
     if (!produto) return
 
     setIndiceLinhaPainelProduto(index)
@@ -1684,10 +1692,13 @@ export function NovoPedidoModal({
   }
 
   // Função para abrir modal de edição de produto
-  const abrirModalEdicaoProduto = (index: number) => {
+  const abrirModalEdicaoProduto = async (index: number) => {
     const produto = produtos[index]
-    // Buscar o produto atualizado da lista de produtos para verificar permiteDesconto e permiteAcrescimo
-    const produtoEntity = produtosList.find(p => p.getId() === produto.produtoId)
+    const produtoEntity = await carregarProdutoNoCatalogoSeNecessario(produto.produtoId)
+    if (!produtoEntity) {
+      showToast.error('Não foi possível obter os dados do produto para edição.')
+      return
+    }
     const permiteDesconto = produtoEntity?.permiteDescontoAtivo() || false
     const permiteAcrescimo = produtoEntity?.permiteAcrescimoAtivo() || false
 
@@ -1734,8 +1745,10 @@ export function NovoPedidoModal({
     const novosProdutos = [...produtos]
     const produtoAtual = novosProdutos[produtoIndexEdicao]
 
-    // Buscar o produto atualizado da lista para verificar permiteDesconto e permiteAcrescimo
-    const produtoEntity = produtosList.find(p => p.getId() === produtoAtual.produtoId)
+    // Buscar o produto atualizado da lista / catálogo para verificar permiteDesconto e permiteAcrescimo
+    const produtoEntity =
+      catalogoProdutosPorIdRef.current[produtoAtual.produtoId] ??
+      produtosList.find(p => p.getId() === produtoAtual.produtoId)
     const permiteDesconto = produtoEntity?.permiteDescontoAtivo() || false
     const permiteAcrescimo = produtoEntity?.permiteAcrescimoAtivo() || false
     const permiteAlterarPreco = produtoEntity?.permiteAlterarPrecoAtivo() ?? false
@@ -2319,13 +2332,7 @@ export function NovoPedidoModal({
     setDataVenda('')
     setNomeUsuario('')
     nomeUsuarioCarregadoNoCicloRef.current = false
-
-    // Limpar timeouts de long press de complementos
-    if (longPressComplementoTimeoutRef.current) {
-      clearTimeout(longPressComplementoTimeoutRef.current)
-      longPressComplementoTimeoutRef.current = null
-    }
-    longPressComplementoIndexRef.current = null
+    setCatalogoProdutosPorId({})
     setIsLoadingVenda(false)
   }
 
@@ -3824,11 +3831,6 @@ export function NovoPedidoModal({
                         {produtos.map((produto, index) => {
                           // calcularTotalProduto já inclui complementos e desconto/acréscimo
                           const totalProdutoComComplementos = calcularTotalProduto(produto)
-                          const produtoEntityAcoes = produtosList.find(
-                            p => p.getId() === produto.produtoId
-                          )
-                          // Botão sempre que o produto estiver na lista do grupo (modal permite vincular complementos ao produto)
-                          const exibirBotaoComplementos = !!produtoEntityAcoes
 
                           return (
                             <div key={index} className="space-y-0">
@@ -3852,7 +3854,7 @@ export function NovoPedidoModal({
                                   longPressIndexRef.current = index
                                   longPressTimeoutRef.current = setTimeout(() => {
                                     if (longPressIndexRef.current === index) {
-                                      abrirModalEdicaoProduto(index)
+                                      void abrirModalEdicaoProduto(index)
                                     }
                                   }, 800) // 800ms para long press
                                 }}
@@ -4017,7 +4019,7 @@ export function NovoPedidoModal({
                                 >
                                   <div className="flex h-6 w-6 shrink-0 items-center justify-center">
                                     <button
-                                      onClick={() => abrirModalEdicaoProduto(index)}
+                                      onClick={() => void abrirModalEdicaoProduto(index)}
                                       type="button"
                                       title="Editar produto"
                                       className="flex h-5 w-5 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-gray-200"
@@ -4026,20 +4028,16 @@ export function NovoPedidoModal({
                                     </button>
                                   </div>
                                   <div className="flex h-6 w-6 shrink-0 items-center justify-center">
-                                    {exibirBotaoComplementos ? (
-                                      <button
-                                        onClick={() =>
-                                          abrirModalComplementosProdutoExistente(index)
-                                        }
-                                        type="button"
-                                        className="flex h-5 w-5 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-gray-200"
-                                        title="Complementos (editar ou vincular)"
-                                      >
-                                        <MdLaunch className="h-4 w-4 text-primary" />
-                                      </button>
-                                    ) : (
-                                      <span className="block h-6 w-6 shrink-0" aria-hidden />
-                                    )}
+                                    <button
+                                      onClick={() =>
+                                        void abrirModalComplementosProdutoExistente(index)
+                                      }
+                                      type="button"
+                                      className="flex h-5 w-5 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-gray-200"
+                                      title="Complementos (editar ou vincular)"
+                                    >
+                                      <MdLaunch className="h-4 w-4 text-primary" />
+                                    </button>
                                   </div>
                                   <div className="flex h-5 w-5 shrink-0 items-center justify-center">
                                     <button
@@ -4078,16 +4076,10 @@ export function NovoPedidoModal({
                                         return
                                       }
 
-                                      // Verificar se o produto permite editar complementos
-                                      const produtoEntity = produtosList.find(
-                                        p => p.getId() === produto.produtoId
-                                      )
-                                      if (!produtoEntity) return
-
                                       longPressComplementoIndexRef.current = index
                                       longPressComplementoTimeoutRef.current = setTimeout(() => {
                                         if (longPressComplementoIndexRef.current === index) {
-                                          abrirModalComplementosProdutoExistente(index)
+                                          void abrirModalComplementosProdutoExistente(index)
                                         }
                                       }, 800) // 800ms para long press
                                     }}
@@ -5724,18 +5716,33 @@ export function NovoPedidoModal({
             title={produtos[produtoIndexEdicao].nome}
             produtoLinha={produtos[produtoIndexEdicao]}
             permiteAlterarPreco={
-              produtosList.find(p => p.getId() === produtos[produtoIndexEdicao].produtoId)
-                ?.permiteAlterarPrecoAtivo() ?? false
+              (() => {
+                const id = produtos[produtoIndexEdicao].produtoId
+                return (
+                  catalogoProdutosPorId[id] ??
+                  produtosList.find(p => p.getId() === id)
+                )?.permiteAlterarPrecoAtivo() ?? false
+              })()
             }
             valorUnitarioInput={valorUnitarioEdicaoPainel}
             onValorUnitarioInputChange={setValorUnitarioEdicaoPainel}
             permiteDesconto={
-              produtosList.find(p => p.getId() === produtos[produtoIndexEdicao].produtoId)
-                ?.permiteDescontoAtivo() ?? false
+              (() => {
+                const id = produtos[produtoIndexEdicao].produtoId
+                return (
+                  catalogoProdutosPorId[id] ??
+                  produtosList.find(p => p.getId() === id)
+                )?.permiteDescontoAtivo() ?? false
+              })()
             }
             permiteAcrescimo={
-              produtosList.find(p => p.getId() === produtos[produtoIndexEdicao].produtoId)
-                ?.permiteAcrescimoAtivo() ?? false
+              (() => {
+                const id = produtos[produtoIndexEdicao].produtoId
+                return (
+                  catalogoProdutosPorId[id] ??
+                  produtosList.find(p => p.getId() === id)
+                )?.permiteAcrescimoAtivo() ?? false
+              })()
             }
             quantidadeEdicao={quantidadeEdicao}
             onQuantidadeEdicaoChange={setQuantidadeEdicao}

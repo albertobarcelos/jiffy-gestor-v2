@@ -3,6 +3,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 
 import type { DashboardEvolucaoPoint } from '@/src/presentation/hooks/useDashboardEvolucaoQuery'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 const ISO_DIA = /^\d{4}-\d{2}-\d{2}$/
 
@@ -155,7 +156,7 @@ async function fetchFaturamentoPorDia(params: Params & { token: string }): Promi
   search.append('dataFinalizacaoFinal', fim.toISOString())
   search.append('status', 'FINALIZADA')
 
-  const response = await fetch(`/api/dashboard/evolucao?${search.toString()}`, {
+  const response = await fetchGestorApi(`/api/dashboard/evolucao?${search.toString()}`, {
     headers: { Authorization: `Bearer ${params.token}` },
   })
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>

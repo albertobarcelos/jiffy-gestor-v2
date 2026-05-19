@@ -62,7 +62,7 @@ export function useEmpresaMe() {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/empresas/me', {
+      const res = await fetchGestorApi('/api/empresas/me', {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) {

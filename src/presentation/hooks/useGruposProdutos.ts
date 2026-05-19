@@ -6,6 +6,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 import { showToast } from '@/src/shared/utils/toast'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 interface GruposProdutosQueryParams {
   name?: string
@@ -50,7 +51,7 @@ export function useGruposProdutos(params: GruposProdutosQueryParams = {}) {
       if (params.limit) queryParams.append('limit', params.limit.toString())
       queryParams.append('offset', '0')
 
-      const response = await fetch(`/api/grupos-produtos?${queryParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/grupos-produtos?${queryParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -104,7 +105,7 @@ export function useGruposProdutosInfinite(params: Omit<GruposProdutosQueryParams
       searchParams.append('limit', limit.toString())
       searchParams.append('offset', pageParam.toString())
 
-      const response = await fetch(`/api/grupos-produtos?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/grupos-produtos?${searchParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',

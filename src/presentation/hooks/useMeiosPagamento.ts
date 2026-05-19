@@ -4,6 +4,7 @@ import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { MeioPagamento } from '@/src/domain/entities/MeioPagamento'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 interface MeiosPagamentoQueryParams {
   q?: string
@@ -45,7 +46,7 @@ export function useMeiosPagamentoInfinite(params: Omit<MeiosPagamentoQueryParams
       searchParams.append('limit', limit.toString())
       searchParams.append('offset', pageParam.toString())
 
-      const response = await fetch(`/api/meios-pagamentos?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/meios-pagamentos?${searchParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -94,7 +95,7 @@ export function useMeioPagamento(id: string) {
         throw new Error('Usuário não autenticado ou token ausente.')
       }
 
-      const response = await fetch(`/api/meios-pagamentos/${id}`, {
+      const response = await fetchGestorApi(`/api/meios-pagamentos/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -136,7 +137,7 @@ export function useMeioPagamentoMutation() {
       const url = isUpdate && meioPagamentoId ? `/api/meios-pagamentos/${meioPagamentoId}` : '/api/meios-pagamentos'
       const method = isUpdate ? 'PUT' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           Authorization: `Bearer ${token}`,

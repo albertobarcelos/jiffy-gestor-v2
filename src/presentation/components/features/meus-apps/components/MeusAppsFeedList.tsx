@@ -26,7 +26,7 @@ export function MeusAppsFeedList({
   items,
   onAcessar,
   onGerenciarConvites,
-  onGerenciarUsuariosGestor,
+  onGerenciarPerfisGestor,
   busyAppId,
   onAceitarConvite,
   onRecusarConvite,
@@ -35,7 +35,7 @@ export function MeusAppsFeedList({
   items: MeusAppsFeedItem[]
   onAcessar: (appId: string) => void
   onGerenciarConvites?: (appId: string) => void
-  onGerenciarUsuariosGestor?: (appId: string) => void
+  onGerenciarPerfisGestor?: (appId: string) => void
   busyAppId?: string | null
   onAceitarConvite: (id: string) => void
   onRecusarConvite: (id: string) => void
@@ -60,7 +60,7 @@ export function MeusAppsFeedList({
             app={item.app}
             onAcessar={onAcessar}
             onGerenciarConvites={onGerenciarConvites}
-            onGerenciarUsuariosGestor={onGerenciarUsuariosGestor}
+            onGerenciarPerfisGestor={onGerenciarPerfisGestor}
             busyAppId={busyAppId}
             locked={locked}
           />
@@ -74,14 +74,14 @@ function EmpresaListRow({
   app,
   onAcessar,
   onGerenciarConvites,
-  onGerenciarUsuariosGestor,
+  onGerenciarPerfisGestor,
   busyAppId,
   locked,
 }: {
   app: MeusApp
   onAcessar: (appId: string) => void
   onGerenciarConvites?: (appId: string) => void
-  onGerenciarUsuariosGestor?: (appId: string) => void
+  onGerenciarPerfisGestor?: (appId: string) => void
   busyAppId?: string | null
   locked: boolean
 }) {
@@ -93,7 +93,7 @@ function EmpresaListRow({
   const gearItems = buildEmpresaCardGearItems(app.id, {
     navDisabled,
     onGerenciarConvites,
-    onGerenciarUsuariosGestor,
+    onGerenciarPerfisGestor,
   })
 
   return (

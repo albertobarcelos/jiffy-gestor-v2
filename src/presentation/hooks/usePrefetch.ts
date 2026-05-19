@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 /**
  * Hook genérico para prefetching de dados
@@ -25,7 +26,7 @@ export function usePrefetch() {
       queryClient.prefetchQuery({
         queryKey: ['produto', id, empresaId],
         queryFn: async () => {
-          const response = await fetch(`/api/produtos/${id}`, {
+          const response = await fetchGestorApi(`/api/produtos/${id}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -52,7 +53,7 @@ export function usePrefetch() {
       queryClient.prefetchQuery({
         queryKey: ['cliente', id, empresaId],
         queryFn: async () => {
-          const response = await fetch(`/api/clientes/${id}`, {
+          const response = await fetchGestorApi(`/api/clientes/${id}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -79,7 +80,7 @@ export function usePrefetch() {
       queryClient.prefetchQuery({
         queryKey: ['usuario', id, empresaId],
         queryFn: async () => {
-          const response = await fetch(`/api/usuarios/${id}`, {
+          const response = await fetchGestorApi(`/api/usuarios/${id}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',

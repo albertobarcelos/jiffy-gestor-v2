@@ -28,7 +28,7 @@ export function useNfes() {
       }
 
       // TODO: Implementar chamada à API quando disponível
-      // const response = await fetch('/api/nfes', {
+      // const response = await fetchGestorApi('/api/nfes', {
       //   headers: { Authorization: `Bearer ${token}` },
       // })
       // const data = await response.json()
@@ -262,7 +262,7 @@ export function useNfeMutation() {
       }
 
       // TODO: Implementar chamada à API quando disponível
-      // const response = await fetch(`/api/nfes/${nfeId}`, {
+      // const response = await fetchGestorApi(`/api/nfes/${nfeId}`, {
       //   method: 'PATCH',
       //   headers: {
       //     Authorization: `Bearer ${token}`,

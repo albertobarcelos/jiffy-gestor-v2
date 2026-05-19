@@ -2,13 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
+import type { Auth } from '@/src/domain/entities/Auth'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { buildAuthFromAccessToken } from '@/src/shared/utils/buildAuthFromAccessToken'
+import { getTabTenantToken, hasSessionNonce } from '@/src/shared/utils/tabSession'
+import { fetchTenantRefreshAccessToken } from '@/src/shared/utils/fetchTenantRefreshAccessToken'
+import { syncTenantAccessTokenClient } from '@/src/presentation/utils/syncTenantAccessTokenClient'
 import {
   SESSION_STORAGE_HUB_LOGOUT_SELF,
   SESSION_STORAGE_TENANT_LOGOUT_SELF,
 } from '@/src/shared/constants/sessionCoordinator'
-import { hasSessionNonce } from '@/src/shared/utils/tabSession'
 
 function isHubLogoutInitiatorTab(): boolean {
   if (typeof window === 'undefined') return false
@@ -61,7 +65,38 @@ function isPublicPath(p: string | null): boolean {
 }
 
 function isHubPath(p: string | null): boolean {
-  return p?.startsWith('/meus-apps') ?? false
+  if (!p) return false
+  /** Perfil da conta: só identidade de hub (como Meus Apps), sem empresa nesta aba. */
+  if (p === '/perfil' || p.startsWith('/perfil/')) return true
+  return p.startsWith('/meus-apps')
+}
+
+/**
+ * JWT da empresa (tenant) ainda válido nesta aba — Zustand e/ou `sessionStorage` (prepareTabSession).
+ * Independente do JWT de identidade (hub).
+ */
+function getActiveTenantAuthOrNull(): Auth | null {
+  const st = useAuthStore.getState()
+  const t = st.tenantAuth
+  if (t !== null && !t.isExpired()) {
+    return t
+  }
+  const raw = getTabTenantToken()
+  if (!raw) return null
+  try {
+    const u = st.identityAuth?.getUser()
+    const built = buildAuthFromAccessToken(
+      raw,
+      u ? { id: u.getId(), email: u.getEmail(), name: u.getName() } : undefined
+    )
+    return built.isExpired() ? null : built
+  } catch {
+    return null
+  }
+}
+
+function isTenantSessionAlive(): boolean {
+  return getActiveTenantAuthOrNull() !== null
 }
 
 export function AuthGuard({ children }: AuthGuardProps) {
@@ -117,7 +152,8 @@ export function AuthGuard({ children }: AuthGuardProps) {
     const isHub = isHubPath(pathname)
 
     if (isHub) {
-      if (identityAuth !== null && !identityAuth.isExpired()) {
+      const tenantAlive = isTenantSessionAlive()
+      if ((identityAuth !== null && !identityAuth.isExpired()) || tenantAlive) {
         redirectingRef.current = false
         setAllowed(true)
         return
@@ -130,9 +166,45 @@ export function AuthGuard({ children }: AuthGuardProps) {
       return
     }
 
-    if (!isAuthenticated || auth === null || auth.isExpired()) {
-      void invalidateSessionToLogin()
+    /**
+     * ERP: sessão da empresa (tenant JWT) é independente do JWT de identidade (hub).
+     * Se `identityAuth` expirou mas ainda há tenant válido no Zustand ou no sessionStorage,
+     * não chamar `logout()` — antes `auth` podia cair no identity expirado e limpava tudo,
+     * disparando EmpresaSessionLostGate em abas com empresa aberta.
+     */
+    const tenantAliveErp = isTenantSessionAlive()
+    if (tenantAliveErp) {
+      const built = getActiveTenantAuthOrNull()
+      if (built && useAuthStore.getState().tenantAuth === null) {
+        useAuthStore.getState().setTenantAuth(built)
+      }
+      redirectingRef.current = false
+      setAllowed(true)
       return
+    }
+
+    if (!isAuthenticated || auth === null || auth.isExpired()) {
+      let cancelled = false
+      void (async () => {
+        const refreshed = await fetchTenantRefreshAccessToken()
+        if (cancelled) {
+          return
+        }
+        if (refreshed) {
+          try {
+            syncTenantAccessTokenClient(refreshed)
+            redirectingRef.current = false
+            setAllowed(true)
+          } catch {
+            void invalidateSessionToLogin()
+          }
+          return
+        }
+        void invalidateSessionToLogin()
+      })()
+      return () => {
+        cancelled = true
+      }
     }
 
     if (!tenantAuth && !hasSessionNonce()) {
@@ -180,22 +252,45 @@ export function AuthGuard({ children }: AuthGuardProps) {
         if (isHubLogoutInitiatorTab()) {
           return
         }
+        if (isTenantSessionAlive()) {
+          return
+        }
         const id = st.identityAuth
         if (id === null || id.isExpired()) {
           redirectHubSemIdentidade()
         }
         return
       }
+      if (isTenantSessionAlive()) {
+        const built = getActiveTenantAuthOrNull()
+        if (built && st.tenantAuth === null) {
+          useAuthStore.getState().setTenantAuth(built)
+        }
+        return
+      }
       const { isAuthenticated: ok, auth: current } = st
       if (!ok || current === null || current.isExpired()) {
-        void invalidateSessionToLogin()
+        void (async () => {
+          const refreshed = await fetchTenantRefreshAccessToken()
+          if (refreshed) {
+            try {
+              syncTenantAccessTokenClient(refreshed)
+            } catch {
+              void invalidateSessionToLogin()
+            }
+            return
+          }
+          void invalidateSessionToLogin()
+        })()
       }
     }
 
     const intervalId = window.setInterval(checkExpired, SESSAO_POLL_MS)
 
     const st = useAuthStore.getState()
-    const watchAuth = isHub ? st.identityAuth : st.auth
+    const tenantA = getActiveTenantAuthOrNull()
+    /** Mesma prioridade hub/ERP: expiração do tenant (empresa) não deve seguir o relógio do identity. */
+    const watchAuth = tenantA ?? st.identityAuth
     let timeoutId: number | undefined
     if (watchAuth) {
       const msAteExp = watchAuth.getExpiresAt().getTime() - Date.now()
@@ -215,12 +310,16 @@ export function AuthGuard({ children }: AuthGuardProps) {
     allowed,
     auth,
     identityAuth,
+    tenantAuth,
     pathname,
     invalidateSessionToLogin,
     redirectHubSemIdentidade,
   ])
 
   if (!isRehydrated || !allowed) {
+    if (isHubPath(pathname)) {
+      return <div className="min-h-screen bg-[#fafafa]" />
+    }
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <JiffyLoading />
