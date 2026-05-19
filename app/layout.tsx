@@ -35,7 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="pt-BR" className={generalSans.variable}>
       {/* suppressHydrationWarning: extensões (ex. ColorZilla) injetam atributos no body e disparam falso positivo de hidratação */}
       <body className={`${generalSans.className} antialiased`} suppressHydrationWarning>
-        <AppRouterCacheProvider options={{ enableCssLayer: true }}>
+        <AppRouterCacheProvider>
           <QueryProvider>
             <ThemeProvider>
               <AuthStorageCrossTabSync />

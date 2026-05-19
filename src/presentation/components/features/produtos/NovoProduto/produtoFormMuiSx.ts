@@ -1,9 +1,20 @@
-import {
-  sxOutlinedInputBorda,
-  sxOutlinedLabelTextoEscuro,
-} from '@/src/shared/theme/muiOutlinedFieldSx'
-
-export { sxOutlinedLabelTextoEscuro }
+/**
+ * Estilos MUI alinhados a NovoComplemento / NovoGrupo: label na borda (outlined), texto escuro.
+ */
+export const sxOutlinedLabelTextoEscuro = {
+  '& .MuiInputLabel-root': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiInputLabel-root.Mui-focused': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiInputLabel-root.MuiInputLabel-shrink': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiFormLabel-asterisk': {
+    color: 'var(--color-error)',
+  },
+} as const
 
 const entradaCompactaInput = {
   padding: '10px',
@@ -24,14 +35,12 @@ const entradaCompactaSelect = {
 /** TextField / Input outlined */
 export const sxEntradaCompactaProduto = {
   ...sxOutlinedLabelTextoEscuro,
-  ...sxOutlinedInputBorda,
   '& .MuiOutlinedInput-input': entradaCompactaInput,
 } as const
 
 /** FormControl + Select */
 export const sxEntradaCompactaProdutoSelect = {
   ...sxOutlinedLabelTextoEscuro,
-  ...sxOutlinedInputBorda,
   '& .MuiOutlinedInput-input': entradaCompactaInput,
   '& .MuiSelect-select': entradaCompactaSelect,
   '& .MuiOutlinedInput-root': {

@@ -8,7 +8,19 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
 import { Input } from '@/src/presentation/components/ui/input'
 import { MenuItem } from '@mui/material'
-import { sxCampoOutlinedPadrao } from '@/src/shared/theme/muiOutlinedFieldSx'
+
+/** Labels outlined — alinhado a NovoMeioPagamento / EditarTerminais */
+const sxOutlinedLabelTextoEscuro = {
+  '& .MuiInputLabel-root': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiInputLabel-root.Mui-focused': {
+    color: 'var(--color-primary-text)',
+  },
+  '& .MuiInputLabel-root.MuiInputLabel-shrink': {
+    color: 'var(--color-primary-text)',
+  },
+} as const
 
 const entradaCompactaInput = {
   padding: '12px 10px',
@@ -25,10 +37,13 @@ const entradaCompactaSelect = {
 } as const
 
 const sxEntradaEmpresa = {
-  ...sxCampoOutlinedPadrao,
+  ...sxOutlinedLabelTextoEscuro,
   '& .MuiOutlinedInput-root': {
     backgroundColor: 'transparent',
     borderRadius: '8px',
+  },
+  '& .MuiOutlinedInput-notchedOutline': {
+    borderColor: 'rgba(0, 0, 0, 0.23)',
   },
   '& .MuiOutlinedInput-input': entradaCompactaInput,
   '& .MuiOutlinedInput-input.Mui-disabled': {
