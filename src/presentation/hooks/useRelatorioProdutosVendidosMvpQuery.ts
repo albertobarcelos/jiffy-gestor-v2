@@ -262,7 +262,7 @@ async function fetchRelatorioMvpComparativo(
 
 
 
-function buildRelatorioMvpQueryKeyPrefix(
+export function buildRelatorioMvpQueryKeyPrefix(
 
   empresaId: string | null,
 

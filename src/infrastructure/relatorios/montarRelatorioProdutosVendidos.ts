@@ -39,7 +39,6 @@ export type ExecRelatorioProdutosVendidosInput = {
   qBusca: string | null
   limit: number
   offset: number
-  mockAtivo: boolean
 }
 
 export type ExecRelatorioProdutosVendidosResult = {
@@ -70,7 +69,6 @@ export async function executarRelatorioProdutosVendidosPipeline(
     qBusca,
     limit,
     offset,
-    mockAtivo,
   } = opts
 
   const vendaIdsArray = await listarIdsVendasFinalizadasNoPeriodo({
@@ -84,10 +82,10 @@ export async function executarRelatorioProdutosVendidosPipeline(
       body: {
         items: [],
         totaisPeriodo: { quantidadeTotal: 0, valorTotal: 0, skusDistintos: 0 },
+        totaisFiltrados: { quantidade: 0, valor: 0 },
         totalFiltrado: 0,
         limit,
         offset,
-        mockAtivo,
       },
       detalhes: [],
       miniMap: new Map(),
@@ -175,7 +173,6 @@ export async function executarRelatorioProdutosVendidosPipeline(
     limit,
     valorTotalPeriodoVendas,
     sumQtdFiltrado,
-    mockAtivo,
   })
 
   const body: RelatorioProdutosVendidosResponseDTO = {
@@ -185,10 +182,13 @@ export async function executarRelatorioProdutosVendidosPipeline(
       valorTotal: valorTotalPeriodoVendas,
       skusDistintos,
     },
+    totaisFiltrados: {
+      quantidade: sumQtdFiltrado,
+      valor: sumValorFiltrado,
+    },
     totalFiltrado,
     limit,
     offset,
-    mockAtivo,
   }
 
   return {
@@ -230,7 +230,6 @@ export function montarItemsRelatorioPagina(args: {
   limit: number
   valorTotalPeriodoVendas: number
   sumQtdFiltrado: number
-  mockAtivo: boolean
 }): RelatorioProdutoVendidoLinhaDTO[] {
   const {
     linhas,
@@ -240,7 +239,6 @@ export function montarItemsRelatorioPagina(args: {
     limit,
     valorTotalPeriodoVendas,
     sumQtdFiltrado,
-    mockAtivo,
   } = args
 
   const slice = linhas.slice(offset, offset + limit)
@@ -260,11 +258,6 @@ export function montarItemsRelatorioPagina(args: {
       valorTotalPeriodoVendas > 0 ? (r.valorTotal / valorTotalPeriodoVendas) * 100 : 0
     const percentualUnidades = sumQtdFiltrado > 0 ? (r.quantidade / sumQtdFiltrado) * 100 : 0
 
-    let margemBrutaPercentual: number | null = null
-    if (mockAtivo) {
-      margemBrutaPercentual = 18 + (hashProdutoId(r.produtoId) % 25)
-    }
-
     return {
       produtoId: r.produtoId,
       nome: r.nome,
@@ -278,7 +271,6 @@ export function montarItemsRelatorioPagina(args: {
       classeAbc: abcById.get(r.produtoId) ?? 'C',
       valorCardapio: valorCardapioNum,
       deltaPrecoVsCardapioPercentual,
-      margemBrutaPercentual,
     }
   })
 }
@@ -287,8 +279,7 @@ export function montarItemsRelatorioPagina(args: {
 export function montarBodyPaginadoFromAgregado(
   agregado: ExecRelatorioProdutosVendidosResult,
   offset: number,
-  limit: number,
-  mockAtivo: boolean
+  limit: number
 ): RelatorioProdutosVendidosResponseDTO {
   const abcById = calcularAbcPorProdutoId(agregado.linhasFiltradasOrdenadas, agregado.sumValorFiltrado)
   const items = montarItemsRelatorioPagina({
@@ -299,15 +290,17 @@ export function montarBodyPaginadoFromAgregado(
     limit,
     valorTotalPeriodoVendas: agregado.valorTotalPeriodoVendas,
     sumQtdFiltrado: agregado.sumQtdFiltrado,
-    mockAtivo,
   })
   return {
     items,
     totaisPeriodo: agregado.body.totaisPeriodo,
+    totaisFiltrados: {
+      quantidade: agregado.sumQtdFiltrado,
+      valor: agregado.sumValorFiltrado,
+    },
     totalFiltrado: agregado.linhasFiltradasOrdenadas.length,
     limit,
     offset,
-    mockAtivo: agregado.body.mockAtivo,
   }
 }
 
@@ -363,10 +356,3 @@ function compareLinhas(
   }
 }
 
-function hashProdutoId(id: string): number {
-  let h = 0
-  for (let i = 0; i < id.length; i++) {
-    h = (h * 31 + id.charCodeAt(i)) | 0
-  }
-  return Math.abs(h)
-}

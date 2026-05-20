@@ -39,6 +39,10 @@ export interface RelatorioProdutosVendidosMvpKpisDTO {
   produtoLiderPercentualVsPeriodoAnterior: number | null
   produtoComMaiorCrescimentoNome: string | null
   produtoComMaiorCrescimentoPct: number | null
+  /** SKUs distintos após filtros (mesmo recorte da tabela). */
+  produtosDistintosAtual: number
+  produtosDistintosAnterior: number | null
+  variacaoPercentualProdutosDistintos: number | null
 }
 
 export interface ProdutoRankingAnteriorDTO {
@@ -72,4 +76,17 @@ export type RelatorioProdutosVendidosMvpComparativoDTO = {
   kpis: RelatorioProdutosVendidosMvpKpisDTO
   rankingsPorProduto: ProdutoRankingAnteriorDTO[]
   mockFlags: RelatorioProdutosVendidosMvpMockFlags
+}
+
+/** Bloco SPA: participação por grupo (`somenteParticipacao=1`). */
+export type RelatorioProdutosVendidosMvpParticipacaoDTO = {
+  somenteParticipacao: true
+  participacaoGrupos: RelatorioParticipacaoGrupoDTO[]
+}
+
+/** Bloco SPA: série diária (`somenteSerie=1`). */
+export type RelatorioProdutosVendidosMvpSerieDTO = {
+  somenteSerie: true
+  serieTemporal: RelatorioProdutosVendidosMvpSerieDiaDTO[]
+  mockFlags: Pick<RelatorioProdutosVendidosMvpMockFlags, 'serieSimplificada'>
 }

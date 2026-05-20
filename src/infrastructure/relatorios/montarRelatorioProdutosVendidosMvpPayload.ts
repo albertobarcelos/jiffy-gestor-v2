@@ -176,6 +176,14 @@ export function montarKpisMvp(
     produtosComCrescimentoValor = Math.round(g0.pct * 10) / 10
   }
 
+  const produtosDistintosAtual = atualMeta.linhasFiltradasOrdenadas.length
+  let produtosDistintosAnterior: number | null = null
+  let produtosDistintosVariacaoPct: number | null = null
+  if (anteriorMeta) {
+    produtosDistintosAnterior = anteriorMeta.linhasFiltradasOrdenadas.length
+    produtosDistintosVariacaoPct = variacaoPct(produtosDistintosAtual, produtosDistintosAnterior)
+  }
+
   return {
     faturamentoAtual: fatAtual,
     faturamentoAnterior: fatPrev,
@@ -191,6 +199,9 @@ export function montarKpisMvp(
     produtoLiderPercentualVsPeriodoAnterior: liderCrescPct,
     produtoComMaiorCrescimentoNome: produtosComCrescimentoNome,
     produtoComMaiorCrescimentoPct: produtosComCrescimentoValor,
+    produtosDistintosAtual,
+    produtosDistintosAnterior,
+    variacaoPercentualProdutosDistintos: produtosDistintosVariacaoPct,
   }
 }
 

@@ -37,6 +37,7 @@ import type {
   ProdutoRankingAnteriorDTO,
   RelatorioProdutosVendidosMvpResponseDTO,
 } from '@/src/shared/types/relatoriosProdutosVendidosMvpApi'
+import type { RelatorioProdutosVendidosTotaisFiltradosDTO } from '@/src/shared/types/relatoriosProdutosVendidosApi'
 
 /**
  * GET /api/relatorios/produtos-vendidos/mvp
@@ -45,6 +46,8 @@ import type {
  * - Agregação cacheada ~90s por empresa + filtros.
  * - Carga principal: só período atual (`comparativo=0` na 1ª página).
  * - `somenteComparativo=1`: período anterior em 2ª requisição (usa cache do atual).
+ * - `somenteParticipacao=1` / `somenteSerie=1`: blocos SPA sob demanda (cache do período atual).
+ * - `participacao=0` / `serie=0` na carga base: lista leve sem gráficos.
  * - `somentePagina=1` + `offset>0`: paginação em memória.
  */
 const MAX_DIAS_COMPARATIVO_PERIODO_ANTERIOR = 95
@@ -139,6 +142,59 @@ async function carregarPeriodoAtual(args: {
   return { atual, serieTemporal, serieSimplificada }
 }
 
+function totaisFiltradosFromAgregado(atual: ExecRelatorioProdutosVendidosResult): RelatorioProdutosVendidosTotaisFiltradosDTO {
+  return {
+    quantidade: atual.sumQtdFiltrado,
+    valor: atual.sumValorFiltrado,
+  }
+}
+
+/** Preenche série no cache na 1ª abertura do painel (SPA). */
+async function garantirSerieNoAgregado(args: {
+  cacheKey: string
+  timezone: string
+}): Promise<{
+  serieTemporal: RelatorioProdutosVendidosMvpResponseDTO['serieTemporal']
+  serieSimplificada: boolean
+}> {
+  const cached = getRelatorioAgregadoCache(args.cacheKey)
+  if (!cached) {
+    return { serieTemporal: [], serieSimplificada: false }
+  }
+
+  if (cached.serieTemporal.length > 0) {
+    return {
+      serieTemporal: cached.serieTemporal,
+      serieSimplificada: cached.mockFlags.serieSimplificada ?? false,
+    }
+  }
+
+  let serieTemporal: RelatorioProdutosVendidosMvpResponseDTO['serieTemporal'] = []
+  let serieSimplificada = false
+
+  if (cached.atual.detalhes.length > 0) {
+    serieTemporal = montarSerieTemporal(cached.atual, args.timezone)
+    if (
+      serieTemporal.length === 0 &&
+      cached.atual.linhasFiltradasOrdenadas.length > 0 &&
+      cached.atual.valorTotalPeriodoVendas > 0
+    ) {
+      serieSimplificada = true
+    }
+  }
+
+  setRelatorioAgregadoCache(args.cacheKey, {
+    ...cached,
+    serieTemporal,
+    mockFlags: {
+      ...cached.mockFlags,
+      serieSimplificada,
+    },
+  })
+
+  return { serieTemporal, serieSimplificada }
+}
+
 /** Só período atual; comparativo vem em `somenteComparativo=1`. */
 async function obterAgregadoComCache(args: {
   cacheKey: string
@@ -228,9 +284,12 @@ export async function GET(request: NextRequest) {
   const periodo = searchParams.get('periodo') || 'hoje'
   const timezone = searchParams.get('timezone') || 'America/Sao_Paulo'
   const sort = parseSortRelatorio(searchParams.get('sort') || 'quantidade_desc')
-  const incluirSerie = searchParams.get('serie') !== '0'
+  const incluirSerie = searchParams.get('serie') === '1'
+  const incluirParticipacao = searchParams.get('participacao') === '1'
   const somentePagina = searchParams.get('somentePagina') === '1'
   const somenteComparativo = searchParams.get('somenteComparativo') === '1'
+  const somenteParticipacao = searchParams.get('somenteParticipacao') === '1'
+  const somenteSerie = searchParams.get('somenteSerie') === '1'
 
   const grupoIdsParam = searchParams.get('grupoIds')?.trim()
   const grupoIdSet =
@@ -251,8 +310,6 @@ export async function GET(request: NextRequest) {
 
   const limit = clampIntRelatorio(searchParams.get('limit'), 50, 1, 200)
   const offset = clampIntRelatorio(searchParams.get('offset'), 0, 0, 50_000)
-
-  const mockAtivo = searchParams.get('mock') === '1'
 
   const validation = validateRequest(request, { requireEmpresaId: true })
   if (!validation.valid || !validation.tokenInfo) {
@@ -285,7 +342,6 @@ export async function GET(request: NextRequest) {
       qtdMin,
       qtdMax,
       qBusca,
-      mockAtivo,
     }
 
     const cacheKey = buildRelatorioAgregadoCacheKey({
@@ -306,6 +362,53 @@ export async function GET(request: NextRequest) {
       intervaloSlot != null
         ? diasAbsIntervaloUtc(intervaloSlot.inicioUtc, intervaloSlot.fimUtc)
         : 0
+
+    if (somenteParticipacao) {
+      const agregado = await obterAgregadoComCache({
+        cacheKey,
+        pipelineBase,
+        intervaloSlot,
+        diasPeriodo,
+        timezone,
+        incluirSerie: false,
+      })
+
+      return NextResponse.json(
+        {
+          somenteParticipacao: true,
+          participacaoGrupos: montarParticipacaoGrupos(
+            agregado.atual.linhasFiltradasOrdenadas,
+            agregado.atual.sumValorFiltrado
+          ),
+        },
+        { headers: { 'Cache-Control': 'private, max-age=30' } }
+      )
+    }
+
+    if (somenteSerie) {
+      await obterAgregadoComCache({
+        cacheKey,
+        pipelineBase,
+        intervaloSlot,
+        diasPeriodo,
+        timezone,
+        incluirSerie: false,
+      })
+
+      const { serieTemporal, serieSimplificada } = await garantirSerieNoAgregado({
+        cacheKey,
+        timezone,
+      })
+
+      return NextResponse.json(
+        {
+          somenteSerie: true,
+          serieTemporal,
+          mockFlags: { serieSimplificada },
+        },
+        { headers: { 'Cache-Control': 'private, max-age=30' } }
+      )
+    }
 
     if (somenteComparativo) {
       const agregado =
@@ -346,7 +449,7 @@ export async function GET(request: NextRequest) {
 
     const { atual, anterior, omitirComparativo, mockFlags, serieTemporal, rankingCompleto } = agregado
 
-    const basePagina = montarBodyPaginadoFromAgregado(atual, offset, limit, mockAtivo)
+    const basePagina = montarBodyPaginadoFromAgregado(atual, offset, limit)
     const idsPagina = new Set(basePagina.items.map(i => i.produtoId))
     const rankingsPorProduto = rankingsDaPagina(rankingCompleto, idsPagina)
 
@@ -365,12 +468,14 @@ export async function GET(request: NextRequest) {
     }
 
     const body: RelatorioProdutosVendidosMvpResponseDTO = combinarPayloadMvp({
-      base: basePagina,
+      base: {
+        ...basePagina,
+        totaisFiltrados: totaisFiltradosFromAgregado(atual),
+      },
       kpis: montarKpisMvp(atual, omitirComparativo ? null : anterior),
-      participacaoGrupos: montarParticipacaoGrupos(
-        atual.linhasFiltradasOrdenadas,
-        atual.sumValorFiltrado
-      ),
+      participacaoGrupos: incluirParticipacao
+        ? montarParticipacaoGrupos(atual.linhasFiltradasOrdenadas, atual.sumValorFiltrado)
+        : [],
       serieTemporal: incluirSerie ? serieTemporal : [],
       rankings: rankingsPorProduto,
       mockFlags,

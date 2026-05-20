@@ -26,11 +26,6 @@ export interface RelatorioProdutoVendidoLinhaDTO {
   valorCardapio: number | null
   /** ((precoMedioVenda - valorCardapio) / valorCardapio) * 100; null se sem preço de cardápio. */
   deltaPrecoVsCardapioPercentual: number | null
-  /**
-   * Reservado para CMV/custo — hoje null; com `mock=1` o BFF pode preencher valores fictícios
-   * até existir fonte no backend.
-   */
-  margemBrutaPercentual: number | null
 }
 
 export interface RelatorioProdutosVendidosTotaisDTO {
@@ -39,12 +34,17 @@ export interface RelatorioProdutosVendidosTotaisDTO {
   skusDistintos: number
 }
 
+/** Totais do conjunto após filtros (grupo, busca, faixas) — distinto de `totaisPeriodo` (PDV inteiro). */
+export interface RelatorioProdutosVendidosTotaisFiltradosDTO {
+  quantidade: number
+  valor: number
+}
+
 export interface RelatorioProdutosVendidosResponseDTO {
   items: RelatorioProdutoVendidoLinhaDTO[]
   totaisPeriodo: RelatorioProdutosVendidosTotaisDTO
+  totaisFiltrados: RelatorioProdutosVendidosTotaisFiltradosDTO
   totalFiltrado: number
   limit: number
   offset: number
-  /** Quando true, `margemBrutaPercentual` pode vir preenchida com mock. */
-  mockAtivo: boolean
 }

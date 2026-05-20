@@ -94,6 +94,13 @@ export const sxRelatorioFiltroTextFieldMoeda = {
     height: 30,
     minHeight: 30,
   },
+  '& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button': {
+    WebkitAppearance: 'none',
+    margin: 0,
+  },
+  '& input[type=number]': {
+    MozAppearance: 'textfield',
+  },
 } as const
 
 export const sxRelatorioFiltroTextFieldNumero = {

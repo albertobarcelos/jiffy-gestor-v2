@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import {
   MdAttachMoney,
+  MdCategory,
   MdInventory2,
   MdReceiptLong,
   MdTrendingUp,
@@ -93,6 +94,9 @@ export function MvpKpiGrid(props: {
   const liderBadge = badgeVariacao(
     comparativoPendente ? null : kpis.produtoLiderPercentualVsPeriodoAnterior
   )
+  const skusBadge = badgeVariacao(
+    comparativoPendente ? null : kpis.variacaoPercentualProdutosDistintos
+  )
 
   const rodapeFat = comparativoPendente
     ? 'Atualizando período anterior…'
@@ -111,6 +115,12 @@ export function MvpKpiGrid(props: {
     : kpis.ticketMedioPorItemPeriodoAnterior != null
       ? `Período anterior: ${formatarMoeda(kpis.ticketMedioPorItemPeriodoAnterior)}`
       : 'Sem base no período anterior'
+
+  const rodapeSkus = comparativoPendente
+    ? 'Atualizando período anterior…'
+    : kpis.produtosDistintosAnterior != null
+      ? `Período anterior: ${kpis.produtosDistintosAnterior.toLocaleString('pt-BR')} produtos`
+      : 'Com os filtros aplicados no período'
 
   const growthNome = kpis.produtoComMaiorCrescimentoNome
   const growthPct = kpis.produtoComMaiorCrescimentoPct
@@ -133,6 +143,14 @@ export function MvpKpiGrid(props: {
         badge={badgePlaceholder ?? qtdBadge.badge}
         rodape={rodapeQtd}
         badgePositivo={qtdBadge.badgePositivo}
+      />
+      <MvpMetricCard
+        tituloBase="Produtos distintos"
+        icon={<MdCategory className={iconClass} size={22} aria-hidden />}
+        valor={(kpis.produtosDistintosAtual ?? 0).toLocaleString('pt-BR')}
+        badge={badgePlaceholder ?? skusBadge.badge}
+        rodape={rodapeSkus}
+        badgePositivo={skusBadge.badgePositivo}
       />
       <MvpMetricCard
         tituloBase="Ticket médio / unidade"

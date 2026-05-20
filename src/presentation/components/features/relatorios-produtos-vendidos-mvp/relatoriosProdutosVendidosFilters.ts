@@ -50,6 +50,33 @@ export function filtroRelatorioParaApiPeriodo(f: FiltroPeriodoRelatorio): string
   }
 }
 
+export type MvpColunaOrdenavel = 'quantidade' | 'faturamento'
+
+export function alternarSortPorColuna(
+  atual: RelatorioProdutosVendidosSort,
+  coluna: MvpColunaOrdenavel
+): RelatorioProdutosVendidosSort {
+  if (coluna === 'quantidade') {
+    if (!sortAtivoNaColuna(atual, 'quantidade')) return 'quantidade_desc'
+    return atual === 'quantidade_asc' ? 'quantidade_desc' : 'quantidade_asc'
+  }
+  if (!sortAtivoNaColuna(atual, 'faturamento')) return 'valor_desc'
+  return atual === 'valor_asc' ? 'valor_desc' : 'valor_asc'
+}
+
+export function sortEhAsc(sort: RelatorioProdutosVendidosSort): boolean {
+  return sort.endsWith('_asc')
+}
+
+export function sortAtivoNaColuna(
+  sort: RelatorioProdutosVendidosSort,
+  coluna: MvpColunaOrdenavel
+): boolean {
+  return coluna === 'quantidade'
+    ? sort.startsWith('quantidade')
+    : sort.startsWith('valor')
+}
+
 export interface RelatoriosProdutosVendidosFiltersValues {
   filtroPeriodo: FiltroPeriodoRelatorio
   periodoPersonalizadoInicio: Date | null

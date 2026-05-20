@@ -16,6 +16,13 @@ export function formatarVariacaoPct(p: number | null | undefined, digits = 1): s
   return `${sig}${rounded.toLocaleString('pt-BR', { maximumFractionDigits: digits })}%`
 }
 
+/** Participação no total filtrado (sem sinal +/−). */
+export function formatarPercentualParticipacao(p: number | null | undefined, digits = 1): string {
+  if (p == null || !Number.isFinite(p)) return '—'
+  const rounded = digits === 0 ? Math.round(p) : Math.round(p * 10 ** digits) / 10 ** digits
+  return `${rounded.toLocaleString('pt-BR', { maximumFractionDigits: digits })}%`
+}
+
 export function formatoTickYReais(v: number): string {
   const arred = Math.round(v)
   if (arred >= 1000) {
