@@ -165,8 +165,15 @@ export class BuscarEvolucaoVendasUseCase {
     const canceladasDailyMap = new Map<string, number>()
 
     allVendasData.forEach((venda: any) => {
-      // Usa dataFinalizacao se disponível, caso contrário usa dataCriacao como fallback
-      const saleDate = new Date(venda.dataFinalizacao || venda.dataCriacao)
+      const rawData =
+        typeof venda.dataFinalizacao === 'string' && venda.dataFinalizacao
+          ? venda.dataFinalizacao
+          : typeof venda.dataCancelamento === 'string' && venda.dataCancelamento
+            ? venda.dataCancelamento
+            : ''
+      if (!rawData) return
+      const saleDate = new Date(rawData)
+      if (Number.isNaN(saleDate.getTime())) return
       const year = saleDate.getFullYear()
       const month = (saleDate.getMonth() + 1).toString().padStart(2, '0')
       const day = saleDate.getDate().toString().padStart(2, '0')
@@ -244,11 +251,19 @@ export class BuscarEvolucaoVendasUseCase {
         effectiveEndDate.setHours(23, 59, 59, 999)
       }
     } else if (allVendasData.length > 0) {
-      // Se o período for 'todos', determina o intervalo de datas a partir dos dados obtidos
-      // Usa dataFinalizacao se disponível, caso contrário usa dataCriacao como fallback
-      const dates = allVendasData.map(
-        (venda: any) => new Date(venda.dataFinalizacao || venda.dataCriacao)
-      )
+      // Se o período for 'todos', determina o intervalo a partir de finalização ou cancelamento
+      const dates = allVendasData
+        .map((venda: any) => {
+          const raw =
+            typeof venda.dataFinalizacao === 'string' && venda.dataFinalizacao
+              ? venda.dataFinalizacao
+              : typeof venda.dataCancelamento === 'string' && venda.dataCancelamento
+                ? venda.dataCancelamento
+                : ''
+          return raw ? new Date(raw) : null
+        })
+        .filter((d): d is Date => d != null && !Number.isNaN(d.getTime()))
+      if (dates.length === 0) return []
       effectiveStartDate = new Date(Math.min(...dates.map(date => date.getTime())))
       effectiveEndDate = new Date(Math.max(...dates.map(date => date.getTime())))
       effectiveStartDate.setHours(0, 0, 0, 0)

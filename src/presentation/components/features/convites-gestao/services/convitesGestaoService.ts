@@ -1,13 +1,57 @@
 import type { ConviteGestaoDTO } from '@/src/application/dto/convites/ConvitesGestaoDTO'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 export type PerfilGestorOption = { id: string; role: string }
 
 export type UsuarioAceitoInfo = { id: string; nome: string }
 
+/** Item de GET /api/pessoas/usuarios-gestor (lista paginada). */
+export type UsuarioGestorListaItem = {
+  id: string
+  nome: string
+  username: string
+  perfilGestorName: string
+  empresaId: string
+  perfilGestorId: string
+}
+
 export interface ConvitesGestaoData {
-  convites: ConviteGestaoDTO[]
+  /** Todos os convites retornados pela API (estado bruto). */
+  convitesTodos: ConviteGestaoDTO[]
+  /** Todos os usuários gestor da empresa. */
+  usuariosGestor: UsuarioGestorListaItem[]
   perfisList: PerfilGestorOption[]
-  usuariosPorEmail: Record<string, UsuarioAceitoInfo>
+}
+
+export function emailGestaoKey(value: string): string {
+  return value.toLowerCase().trim()
+}
+
+export function conviteEstaAceito(status: string): boolean {
+  const u = status.trim().toUpperCase()
+  return u === 'ACEITO' || u === 'ACCEPTED'
+}
+
+export function conviteEstaPendente(status: string): boolean {
+  return status.trim().toUpperCase() === 'PENDENTE'
+}
+
+/**
+ * Convites exibidos na lista: só PENDENTE, sem gestor com o mesmo e-mail
+ * (quem já aceitou ou virou gestor aparece na seção de usuários gestor).
+ */
+export function filtrarConvitesParaLista(
+  convites: ConviteGestaoDTO[],
+  gestores: UsuarioGestorListaItem[]
+): ConviteGestaoDTO[] {
+  const emailsGestor = new Set(
+    gestores.map(g => emailGestaoKey(g.username)).filter(Boolean)
+  )
+  return convites.filter(c => {
+    if (!conviteEstaPendente(c.status)) return false
+    const email = emailGestaoKey(c.email)
+    return email.length > 0 && !emailsGestor.has(email)
+  })
 }
 
 async function parseError(res: Response): Promise<string> {
@@ -23,7 +67,7 @@ function authHeaders(token: string) {
 }
 
 async function fetchConvitesList(token: string): Promise<ConviteGestaoDTO[]> {
-  const res = await fetch('/api/convites', {
+  const res = await fetchGestorApi('/api/convites', {
     method: 'GET',
     credentials: 'include',
     headers: { Authorization: `Bearer ${token}` },
@@ -40,7 +84,7 @@ async function fetchPerfis(token: string): Promise<PerfilGestorOption[]> {
 
   for (let i = 0; i < 100; i++) {
     const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
-    const res = await fetch(`/api/pessoas/perfis-gestor?${params.toString()}`, {
+    const res = await fetchGestorApi(`/api/pessoas/perfis-gestor?${params.toString()}`, {
       headers: authHeaders(token),
     })
     if (!res.ok) break
@@ -61,66 +105,100 @@ async function fetchPerfis(token: string): Promise<PerfilGestorOption[]> {
   return all
 }
 
-async function fetchUsuariosAceitos(
-  token: string,
-  emails: string[]
-): Promise<Record<string, UsuarioAceitoInfo>> {
-  const unique = [...new Set(emails.map(e => e.toLowerCase().trim()).filter(Boolean))]
-  if (unique.length === 0) return {}
+function normalizarNomeGestor(raw: string | undefined): string {
+  const n = (raw ?? '').trim()
+  if (!n || n.toUpperCase() === 'SEM NOME') return ''
+  return n
+}
 
-  const out: Record<string, UsuarioAceitoInfo> = {}
+function parseUsuarioGestorItem(raw: unknown): UsuarioGestorListaItem | null {
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  const id = o.id != null ? String(o.id).trim() : ''
+  const username = o.username != null ? String(o.username).trim() : ''
+  if (!id || !username) return null
+  return {
+    id,
+    username,
+    nome: normalizarNomeGestor(o.nome != null ? String(o.nome) : undefined),
+    perfilGestorName: o.perfilGestorName != null ? String(o.perfilGestorName).trim() : '—',
+    empresaId: o.empresaId != null ? String(o.empresaId).trim() : '',
+    perfilGestorId: o.perfilGestorId != null ? String(o.perfilGestorId).trim() : '',
+  }
+}
 
-  await Promise.all(
-    unique.map(async email => {
-      try {
-        const params = new URLSearchParams({ q: email, limit: '5', offset: '0' })
-        const res = await fetch(`/api/pessoas/usuarios-gestor?${params.toString()}`, {
-          headers: authHeaders(token),
-        })
-        if (!res.ok) return
-        const data = (await res.json()) as { items?: Array<{ id?: string; nome?: string; username?: string }> }
-        const items = data.items ?? []
-        const match = items.find(u => u.username?.toLowerCase().trim() === email)
-        if (match?.id) {
-          const nome = (match.nome && match.nome.trim() && match.nome.trim().toUpperCase() !== 'SEM NOME')
-            ? match.nome.trim()
-            : ''
-          out[email] = { id: match.id, nome }
-        }
-      } catch {
-        /* silencia erro de lookup individual */
-      }
+/**
+ * Lista todos os usuários gestor (paginação local até esgotar `items`).
+ */
+export async function fetchTodosUsuariosGestor(token: string): Promise<UsuarioGestorListaItem[]> {
+  const all: UsuarioGestorListaItem[] = []
+  const seen = new Set<string>()
+  let offset = 0
+  const limit = 100
+
+  for (let page = 0; page < 500; page++) {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset),
     })
-  )
+    const res = await fetchGestorApi(`/api/pessoas/usuarios-gestor?${params.toString()}`, {
+      headers: authHeaders(token),
+    })
+    if (!res.ok) break
+    const data = (await res.json()) as {
+      items?: unknown[]
+      count?: number
+      hasNext?: boolean
+    }
+    const items = data.items ?? []
+    for (const raw of items) {
+      const parsed = parseUsuarioGestorItem(raw)
+      if (parsed && !seen.has(parsed.id)) {
+        seen.add(parsed.id)
+        all.push(parsed)
+      }
+    }
+    if (items.length === 0) break
+    if (items.length < limit) break
+    if (data.hasNext === false) break
+    offset += items.length
+    if (typeof data.count === 'number' && offset >= data.count) break
+  }
 
+  return all
+}
+
+export function buildUsuariosPorEmailDeGestores(
+  gestores: UsuarioGestorListaItem[]
+): Record<string, UsuarioAceitoInfo> {
+  const out: Record<string, UsuarioAceitoInfo> = {}
+  for (const g of gestores) {
+    const key = emailGestaoKey(g.username)
+    if (!key) continue
+    out[key] = { id: g.id, nome: g.nome }
+  }
   return out
 }
 
 /**
- * Carrega todos os dados necessários em paralelo otimizado:
- * - Convites + Perfis em paralelo (não dependem um do outro)
- * - Depois busca usuários aceitos (depende da lista de convites)
+ * Carrega convites, perfis e todos os usuários gestor (GET paginado).
+ * A lista na UI aplica `filtrarConvitesParaLista` sobre `convitesTodos`.
  */
 export async function carregarDadosCompletos(token: string): Promise<ConvitesGestaoData> {
-  const [convites, perfisList] = await Promise.all([
+  const [convitesTodos, perfisList, usuariosGestor] = await Promise.all([
     fetchConvitesList(token),
     fetchPerfis(token),
+    fetchTodosUsuariosGestor(token).catch(() => [] as UsuarioGestorListaItem[]),
   ])
 
-  const emailsAceitos = convites
-    .filter(c => c.status.toUpperCase() === 'ACEITO')
-    .map(c => c.email)
-
-  const usuariosPorEmail = await fetchUsuariosAceitos(token, emailsAceitos)
-
-  return { convites, perfisList, usuariosPorEmail }
+  return { convitesTodos, perfisList, usuariosGestor }
 }
 
 export async function criarConviteService(
   token: string,
   payload: { email: string; perfilGestorId: string }
 ): Promise<ConviteGestaoDTO> {
-  const res = await fetch('/api/convites', {
+  const res = await fetchGestorApi('/api/convites', {
     method: 'POST',
     credentials: 'include',
     headers: authHeaders(token),
@@ -131,7 +209,7 @@ export async function criarConviteService(
 }
 
 export async function cancelarConviteService(token: string, id: string): Promise<void> {
-  const res = await fetch(`/api/convites/${encodeURIComponent(id)}`, {
+  const res = await fetchGestorApi(`/api/convites/${encodeURIComponent(id)}`, {
     method: 'DELETE',
     credentials: 'include',
     headers: { Authorization: `Bearer ${token}` },
@@ -142,7 +220,7 @@ export async function cancelarConviteService(token: string, id: string): Promise
 }
 
 export async function reenviarConviteService(token: string, id: string): Promise<ConviteGestaoDTO> {
-  const res = await fetch(`/api/convites/${encodeURIComponent(id)}/reenviar`, {
+  const res = await fetchGestorApi(`/api/convites/${encodeURIComponent(id)}/reenviar`, {
     method: 'POST',
     credentials: 'include',
     headers: { Authorization: `Bearer ${token}` },
@@ -156,7 +234,7 @@ export async function atualizarPerfilService(
   usuarioGestorId: string,
   novoPerfilGestorId: string
 ): Promise<void> {
-  const res = await fetch(`/api/pessoas/usuarios-gestor/${encodeURIComponent(usuarioGestorId)}`, {
+  const res = await fetchGestorApi(`/api/pessoas/usuarios-gestor/${encodeURIComponent(usuarioGestorId)}`, {
     method: 'PATCH',
     credentials: 'include',
     headers: authHeaders(token),
@@ -166,7 +244,7 @@ export async function atualizarPerfilService(
 }
 
 export async function removerVinculoService(token: string, usuarioGestorId: string): Promise<void> {
-  const res = await fetch(`/api/pessoas/usuarios-gestor/${encodeURIComponent(usuarioGestorId)}`, {
+  const res = await fetchGestorApi(`/api/pessoas/usuarios-gestor/${encodeURIComponent(usuarioGestorId)}`, {
     method: 'DELETE',
     credentials: 'include',
     headers: { Authorization: `Bearer ${token}` },

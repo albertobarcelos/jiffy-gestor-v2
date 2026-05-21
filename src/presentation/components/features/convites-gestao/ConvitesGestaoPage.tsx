@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useState } from 'react'
+import Image from 'next/image'
 import { ArrowLeft, Plus } from 'lucide-react'
 import { MeusAppsTopNav } from '@/src/presentation/components/features/meus-apps/components/MeusAppsTopNav'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
@@ -13,10 +14,9 @@ export default function ConvitesGestaoPage() {
   const { empresa } = useEmpresaMe()
   const {
     convites,
+    usuariosGestor,
     perfisList,
     perfilGestorNomePorId,
-    nomePorEmail,
-    usuariosPorEmail,
     loading,
     error,
     busyById,
@@ -97,11 +97,15 @@ export default function ConvitesGestaoPage() {
               </h1>
               <p className="mt-1 text-sm text-secondary-text">Ativo</p>
             </div>
-            <div
-              className="flex h-28 w-full max-w-[220px] shrink-0 items-center justify-center self-start rounded-lg border border-dashed border-gray-300 bg-white font-nunito text-xs text-secondary-text md:self-center"
-              aria-hidden
-            >
-              Imagem da empresa
+            <div className="relative h-36 w-full max-w-[300px] shrink-0 self-start overflow-hidden rounded-lg md:self-center">
+              <Image
+                src="/images/jiffy-login.png"
+                alt="Jiffy"
+                fill
+                className="object-contain p-2"
+                sizes="300px"
+                priority
+              />
             </div>
           </div>
         )}
@@ -110,10 +114,9 @@ export default function ConvitesGestaoPage() {
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 md:px-8 md:pb-8">
         <ConvitesGestaoList
           convites={convites}
+          usuariosGestor={usuariosGestor}
           perfisList={perfisList}
           perfilGestorNomePorId={perfilGestorNomePorId}
-          nomePorEmail={nomePorEmail}
-          usuariosPorEmail={usuariosPorEmail}
           loading={loading}
           error={error}
           busyById={busyById}

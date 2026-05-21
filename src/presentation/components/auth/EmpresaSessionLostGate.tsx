@@ -19,7 +19,7 @@ export function EmpresaSessionLostGate() {
   const skipInitialSync = useRef(true)
 
   useEffect(() => {
-    if (!pathname || pathname.startsWith('/meus-apps')) {
+    if (!pathname || pathname.startsWith('/meus-apps') || pathname === '/perfil' || pathname.startsWith('/perfil/')) {
       prevTenant.current = tenantAuth
       skipInitialSync.current = true
       return

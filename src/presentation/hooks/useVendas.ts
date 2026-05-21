@@ -4,6 +4,7 @@ import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 import { useCallback, useRef } from 'react'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 /**
  * Extrai o motivo de rejeição (xMotivo) do XML de retorno da SEFAZ
@@ -145,7 +146,7 @@ async function resolveFiscalEmissionConfig(
       'Content-Type': 'application/json',
     }
 
-    const numeracaoResponse = await fetch(`/api/v1/fiscal/configuracoes/emissao?modelo=${modelo}`, {
+    const numeracaoResponse = await fetchGestorApi(`/api/v1/fiscal/configuracoes/emissao?modelo=${modelo}`, {
       headers: authHeaders,
     })
 
@@ -188,7 +189,7 @@ async function resolveFiscalEmissionConfig(
       }> = []
 
       for (const ambiente of ambientes) {
-        const response = await fetch(
+        const response = await fetchGestorApi(
           `/api/v1/fiscal/configuracoes/emissao/${modelo}?ambiente=${ambiente}`,
           { headers: authHeaders }
         )
@@ -234,7 +235,7 @@ async function resolveFiscalEmissionConfig(
     }
     const ambiente: FiscalEmissionResolvedConfig['ambiente'] = ambienteConfigurado
 
-    const empresaFiscalResponse = await fetch('/api/v1/fiscal/empresas-fiscais/me', {
+    const empresaFiscalResponse = await fetchGestorApi('/api/v1/fiscal/empresas-fiscais/me', {
       headers: authHeaders,
     })
 
@@ -346,7 +347,7 @@ export function useVendas(params: VendasQueryParams = {}) {
       if (params.limit) searchParams.append('limit', params.limit.toString())
       if (params.offset) searchParams.append('offset', params.offset.toString())
 
-      const response = await fetch(`/api/vendas?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/vendas?${searchParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -394,7 +395,7 @@ export function useVenda(id: string) {
         throw new Error('Usuário não autenticado ou token ausente.')
       }
 
-      const response = await fetch(`/api/vendas/${id}`, {
+      const response = await fetchGestorApi(`/api/vendas/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -432,7 +433,7 @@ export function useCreateVenda() {
         throw new Error('Token não encontrado')
       }
 
-      const response = await fetch('/api/vendas', {
+      const response = await fetchGestorApi('/api/vendas', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -484,7 +485,7 @@ export function useCreateVendaGestor() {
         throw new Error('Token não encontrado')
       }
 
-      const response = await fetch('/api/vendas/gestor', {
+      const response = await fetchGestorApi('/api/vendas/gestor', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -532,7 +533,7 @@ export function useUpdateVenda() {
         throw new Error('Token não encontrado')
       }
 
-      const response = await fetch(`/api/vendas/${id}`, {
+      const response = await fetchGestorApi(`/api/vendas/${id}`, {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -582,7 +583,7 @@ export function useDuplicateVenda() {
           ? `/api/vendas/gestor/${params.id}/duplicar`
           : `/api/vendas/${params.id}/duplicar`
 
-      const response = await fetch(path, {
+      const response = await fetchGestorApi(path, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -638,7 +639,7 @@ export function useMarcarEmissaoFiscal() {
           ? `/api/vendas/gestor/${params.id}`
           : `/api/vendas/${params.id}`
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -694,7 +695,7 @@ export function useDesmarcarEmissaoFiscal() {
           ? `/api/vendas/gestor/${params.id}`
           : `/api/vendas/${params.id}`
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -761,7 +762,7 @@ export function useVincularClienteNaVenda() {
         body.solicitarEmissaoFiscal = params.solicitarEmissaoFiscal
       }
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -811,7 +812,7 @@ export function useEmitirNfe() {
 
       const fiscalConfig = await resolveFiscalEmissionConfig(token, modelo)
 
-      const response = await fetch(`/api/vendas/${id}/emitir-nota`, {
+      const response = await fetchGestorApi(`/api/vendas/${id}/emitir-nota`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -908,7 +909,7 @@ export function useEmitirNfeGestor() {
 
       const fiscalConfig = await resolveFiscalEmissionConfig(token, modelo)
 
-      const response = await fetch(`/api/vendas/gestor/${id}/emitir-nota`, {
+      const response = await fetchGestorApi(`/api/vendas/gestor/${id}/emitir-nota`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -1011,7 +1012,7 @@ export function useReemitirNfe() {
         throw new Error('documentId é obrigatório para reemissão.')
       }
 
-      const response = await fetch(`/api/vendas/${id}/reemitir`, {
+      const response = await fetchGestorApi(`/api/vendas/${id}/reemitir`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -1077,7 +1078,7 @@ export function useReemitirNfeGestor() {
         throw new Error('documentId é obrigatório para reemissão.')
       }
 
-      const response = await fetch(`/api/vendas/gestor/${id}/reemitir`, {
+      const response = await fetchGestorApi(`/api/vendas/gestor/${id}/reemitir`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -1142,7 +1143,7 @@ export function useCancelarVendaGestor() {
         throw new Error('Justificativa deve ter no mínimo 15 caracteres')
       }
 
-      const response = await fetch(`/api/vendas/gestor/${id}/cancelar`, {
+      const response = await fetchGestorApi(`/api/vendas/gestor/${id}/cancelar`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -1192,7 +1193,7 @@ export function useCancelarNotaFiscalVendaPdv() {
         throw new Error('Justificativa deve ter no mínimo 15 caracteres')
       }
 
-      const response = await fetch(`/api/vendas/${id}/cancelar-nota`, {
+      const response = await fetchGestorApi(`/api/vendas/${id}/cancelar-nota`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -1242,7 +1243,7 @@ export function useCancelarNotaFiscalVendaGestor() {
         throw new Error('Justificativa deve ter no mínimo 15 caracteres')
       }
 
-      const response = await fetch(`/api/vendas/gestor/${id}/cancelar-nota`, {
+      const response = await fetchGestorApi(`/api/vendas/gestor/${id}/cancelar-nota`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -1289,7 +1290,7 @@ export function useExcluirVendaGestor() {
         throw new Error('Token não encontrado')
       }
 
-      const response = await fetch(`/api/vendas/gestor/${id}/excluir`, {
+      const response = await fetchGestorApi(`/api/vendas/gestor/${id}/excluir`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,

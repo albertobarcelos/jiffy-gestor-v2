@@ -401,7 +401,6 @@ export function FiscalFlowKanban() {
   const [statusFiscalFilter, setStatusFiscalFilter] = useState<string>('')
   const [filtrosVisiveisMobile, setFiltrosVisiveisMobile] = useState(false)
   const [isDatasModalOpen, setIsDatasModalOpen] = useState(false)
-  const debounceSearchRef = useRef<NodeJS.Timeout | undefined>(undefined)
   /** Edição de cliente (lápis no card): mesmo painel que ClientesList / SeletorClienteModal */
   const [clienteTabsModalState, setClienteTabsModalState] = useState<ClientesTabsModalState>({
     open: false,
@@ -452,15 +451,9 @@ export function FiscalFlowKanban() {
     COM_NFE: 'desc',
   })
 
-  // Debounce da busca (q)
-  useEffect(() => {
-    if (debounceSearchRef.current) clearTimeout(debounceSearchRef.current)
-    debounceSearchRef.current = setTimeout(() => {
-      setSearchQuery(searchInput.trim())
-    }, 400)
-    return () => {
-      if (debounceSearchRef.current) clearTimeout(debounceSearchRef.current)
-    }
+  /** Aplica o texto do campo à busca (API `q` + filtro local). Só em Enter ou blur do input. */
+  const aplicarTermoBuscaDoCampo = useCallback(() => {
+    setSearchQuery(searchInput.trim())
   }, [searchInput])
 
   // Sincronizar período com datas quando mudar o dropdown (exceto Datas Personalizadas)
@@ -1136,9 +1129,16 @@ export function FiscalFlowKanban() {
               <input
                 type="text"
                 placeholder="Digite o código ou cliente"
+                title="Pressione Enter ou clique fora do campo para buscar"
                 value={searchInput}
                 onChange={e => setSearchInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && refetch()}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    aplicarTermoBuscaDoCampo()
+                  }
+                }}
+                onBlur={aplicarTermoBuscaDoCampo}
                 className="font-nunito h-8 w-full rounded-lg border bg-info pl-6 pr-4 text-sm shadow-sm"
               />
             </div>

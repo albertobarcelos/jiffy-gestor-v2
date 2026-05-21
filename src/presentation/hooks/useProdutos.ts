@@ -4,6 +4,7 @@ import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { Produto } from '@/src/domain/entities/Produto'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 interface ProdutosQueryParams {
   name?: string
@@ -67,7 +68,7 @@ export function useProdutos(params: ProdutosQueryParams = {}) {
       if (params.limit) searchParams.append('limit', params.limit.toString())
       if (params.offset) searchParams.append('offset', params.offset.toString())
 
-      const response = await fetch(`/api/produtos?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/produtos?${searchParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -141,7 +142,7 @@ export function useProdutosInfinite(params: Omit<ProdutosQueryParams, 'offset'> 
       searchParams.append('limit', limit.toString())
       searchParams.append('offset', pageParam.toString())
 
-      const response = await fetch(`/api/produtos?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/produtos?${searchParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -203,7 +204,7 @@ export function useProduto(id: string) {
         throw new Error('Usuário não autenticado ou token ausente.')
       }
 
-      const response = await fetch(`/api/produtos/${id}`, {
+      const response = await fetchGestorApi(`/api/produtos/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -245,7 +246,7 @@ export function useProdutoMutation() {
       const url = isUpdate && produtoId ? `/api/produtos/${produtoId}` : '/api/produtos'
       const method = isUpdate ? 'PUT' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           Authorization: `Bearer ${token}`,

@@ -6,6 +6,16 @@ import {
 import { empresaNomeParaSlugUrl } from '@/src/shared/utils/empresaNomeParaSlugUrl'
 
 /**
+ * Segmento de query usado na URL da aba ERP (ex.: `nexsyn-ab12cd34`):
+ * slug do nome + 8 primeiros hex do id (sem hífens).
+ */
+export function buildEmpresaUrlParam(empresaNome: string, empresaId: string): string {
+  const slug = empresaNomeParaSlugUrl(empresaNome)
+  const shortId = empresaId.replace(/-/g, '').slice(0, 8)
+  return `${slug}-${shortId}`
+}
+
+/**
  * Grava access token + nome da empresa no localStorage temporário para que a
  * nova aba (aberta com `noopener`) possa consumir no boot.
  *
@@ -18,9 +28,7 @@ export function prepareTabSession(
   empresaId: string
 ): { nonce: string; empParam: string } {
   const nonce = crypto.randomUUID()
-  const slug = empresaNomeParaSlugUrl(empresaNome)
-  const shortId = empresaId.replace(/-/g, '').slice(0, 8)
-  const empParam = `${slug}-${shortId}`
+  const empParam = buildEmpresaUrlParam(empresaNome, empresaId)
 
   const key = `jiffy:pending-session:${nonce}`
   try {
@@ -120,6 +128,44 @@ export function getEmpresaSlugParam(): string | null {
   } catch {
     return null
   }
+}
+
+/**
+ * Chaves que são o token de empresa na query (`{nome-url}-{8chars}`), como em `TabSessionBootstrap.getEmpParam`.
+ * O sufixo são os 8 primeiros caracteres do id **sem hífen** (não é só hex — UUID pode gerar letras como `u`).
+ * `URLSearchParams` serializa valor vazio como `chave=`; o nome da chave nunca contém `=`.
+ */
+function isEmpresaSlugQueryKey(key: string, sessionSlug: string): boolean {
+  if (!key || key.includes('=')) return false
+  if (key === sessionSlug) return true
+  return /^.+-[a-z0-9]{8}$/i.test(key)
+}
+
+/** Alinha a query: sempre `?<slugDaSessão>[&outrosParams]` sem duplicar slug nem perder `periodo`, etc. */
+export function syncEmpresaUrlQueryFromSession(): void {
+  if (typeof window === 'undefined') return
+  const slug = getEmpresaSlugParam()
+  if (!slug) return
+
+  const sp = new URLSearchParams(window.location.search)
+  const rest = new URLSearchParams()
+  for (const [key, value] of sp.entries()) {
+    if (isEmpresaSlugQueryKey(key, slug)) {
+      continue
+    }
+    rest.append(key, value)
+  }
+
+  const tail = rest.toString()
+  const newSearch = tail ? `${slug}&${tail}` : slug
+  const cur = window.location.search.slice(1)
+  if (cur === newSearch) {
+    return
+  }
+
+  const url = new URL(window.location.href)
+  url.search = newSearch
+  window.history.replaceState(null, '', url.toString())
 }
 
 /**

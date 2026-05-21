@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueries } from '@tanstack/react-query'
 import type { DateRange } from 'react-day-picker'
 import { startOfDay } from 'date-fns'
 import { MdSearch } from 'react-icons/md'
@@ -11,10 +11,11 @@ import { FaturamentoRangeCalendar } from '@/src/presentation/components/ui/Fatur
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
-import { useComissoesPdv } from '@/src/presentation/hooks/useComissoesPdv'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useComissoesPdv, fetchComissoesPdvAllItemsForTaxa } from '@/src/presentation/hooks/useComissoesPdv'
 import type { ComissoesPdvFetchParams } from '@/src/presentation/hooks/useComissoesPdv'
 import type {
+  ComissaoPdvItemDTO,
   OrderByFieldComissoes,
   OrderByDirectionComissoes,
 } from '@/src/application/dto/ComissoesPdvDTO'
@@ -54,6 +55,61 @@ const fmtBrl = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
 
 const fmtInt = (v: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(v)
+
+/** Agrega linhas do mesmo usuário PDV (soma métricas de várias taxas). */
+function mergeComissoesPorUsuario(rows: ComissaoPdvItemDTO[]): ComissaoPdvItemDTO[] {
+  const map = new Map<string, ComissaoPdvItemDTO>()
+  for (const row of rows) {
+    const id = row.usuarioPdvId
+    const prev = map.get(id)
+    if (!prev) {
+      map.set(id, { ...row })
+      continue
+    }
+    map.set(id, {
+      usuarioPdvId: id,
+      nomeUsuarioPdv: row.nomeUsuarioPdv || prev.nomeUsuarioPdv,
+      valorTotalVendasParticipadas: prev.valorTotalVendasParticipadas + row.valorTotalVendasParticipadas,
+      valorBaseTaxaUsuario: prev.valorBaseTaxaUsuario + row.valorBaseTaxaUsuario,
+      countVendasParticipadas: prev.countVendasParticipadas + row.countVendasParticipadas,
+      valorTotalComissao: prev.valorTotalComissao + row.valorTotalComissao,
+    })
+  }
+  return Array.from(map.values())
+}
+
+function ordenarComissoes(
+  rows: ComissaoPdvItemDTO[],
+  field: OrderByFieldComissoes,
+  direction: OrderByDirectionComissoes
+): ComissaoPdvItemDTO[] {
+  const m = direction === 'asc' ? 1 : -1
+  const out = [...rows]
+  out.sort((a, b) => {
+    let c = 0
+    switch (field) {
+      case 'nomeUsuarioPdv':
+        c = a.nomeUsuarioPdv.localeCompare(b.nomeUsuarioPdv, undefined, { sensitivity: 'base' })
+        break
+      case 'valorTotalVendasParticipadas':
+        c = a.valorTotalVendasParticipadas - b.valorTotalVendasParticipadas
+        break
+      case 'valorBaseTaxaUsuario':
+        c = a.valorBaseTaxaUsuario - b.valorBaseTaxaUsuario
+        break
+      case 'countVendasParticipadas':
+        c = a.countVendasParticipadas - b.countVendasParticipadas
+        break
+      case 'valorTotalComissao':
+        c = a.valorTotalComissao - b.valorTotalComissao
+        break
+      default:
+        c = 0
+    }
+    return c * m
+  })
+  return out
+}
 
 type FiltrosUI = {
   q: string
@@ -110,7 +166,7 @@ function textoPeriodoResumo(ini: string, fim: string): string {
 }
 
 /**
- * Relatório de comissões por PDV — taxa percentual obrigatória; filtros alinhados à API fiscal.
+ * Relatório de comissões por PDV — por padrão agrega todas as taxas percentuais; o select filtra por uma taxa.
  * Layout no padrão das listas em Configurações (ex.: Taxas).
  */
 export function ComissoesList() {
@@ -119,7 +175,7 @@ export function ComissoesList() {
   const token = auth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
 
-  const [taxaId, setTaxaId] = useState('')
+  const [taxaFiltro, setTaxaFiltro] = useState('')
   const [draft, setDraft] = useState<FiltrosUI>(FILTROS_INICIAIS)
   const [active, setActive] = useState<FiltrosUI>(FILTROS_INICIAIS)
   const [offset, setOffset] = useState(0)
@@ -134,13 +190,11 @@ export function ComissoesList() {
   const [rascunhoHoraFim, setRascunhoHoraFim] = useState('23:59')
 
   useEffect(() => {
-    setDraft(FILTROS_INICIAIS)
-    setActive(FILTROS_INICIAIS)
     setOffset(0)
-  }, [taxaId])
+  }, [taxaFiltro])
 
   const fetchParams = useMemo((): ComissoesPdvFetchParams | null => {
-    const id = taxaId.trim()
+    const id = taxaFiltro.trim()
     if (!id) return null
     const p: ComissoesPdvFetchParams = {
       taxaId: id,
@@ -156,7 +210,7 @@ export function ComissoesList() {
     if (active.finalIni) p.dataFinalizacaoInicio = dateLocalToIsoInicio(active.finalIni)
     if (active.finalFim) p.dataFinalizacaoFim = dateLocalToIsoFim(active.finalFim)
     return p
-  }, [taxaId, offset, active])
+  }, [taxaFiltro, offset, active])
 
   const { data, isLoading, isFetching, error } = useComissoesPdv(fetchParams)
 
@@ -197,9 +251,68 @@ export function ComissoesList() {
 
   const taxasOpts = taxasPercentualQuery.data ?? []
 
+  const mergeApiFilters = useMemo(() => {
+    const p: Pick<
+      ComissoesPdvFetchParams,
+      'q' | 'dataCriacaoInicio' | 'dataCriacaoFim' | 'dataFinalizacaoInicio' | 'dataFinalizacaoFim'
+    > = {}
+    const qTrim = active.q.trim()
+    if (qTrim) p.q = qTrim
+    if (active.criacaoIni) p.dataCriacaoInicio = dateLocalToIsoInicio(active.criacaoIni)
+    if (active.criacaoFim) p.dataCriacaoFim = dateLocalToIsoFim(active.criacaoFim)
+    if (active.finalIni) p.dataFinalizacaoInicio = dateLocalToIsoInicio(active.finalIni)
+    if (active.finalFim) p.dataFinalizacaoFim = dateLocalToIsoFim(active.finalFim)
+    return p
+  }, [active.q, active.criacaoIni, active.criacaoFim, active.finalIni, active.finalFim])
+
+  const comissoesPorTaxaQueries = useQueries({
+    queries: taxasOpts.map(taxa => ({
+      queryKey: ['comissoes-pdv', 'todas-taxas', taxa.getId(), empresaId, mergeApiFilters],
+      queryFn: () =>
+        fetchComissoesPdvAllItemsForTaxa(token!, {
+          taxaId: taxa.getId(),
+          orderByField: 'nomeUsuarioPdv',
+          orderByDirection: 'asc',
+          ...mergeApiFilters,
+        }),
+      enabled: Boolean(token && taxaFiltro === '' && taxasOpts.length > 0),
+      staleTime: 60_000,
+    })),
+  })
+
+  const mergeSnapshot = comissoesPorTaxaQueries.map(q => `${q.fetchStatus}:${q.dataUpdatedAt}`).join('|')
+
+  const modoTodasTaxas = taxaFiltro === ''
+
+  const linhasTodasTaxasOrdenadas = useMemo(() => {
+    if (!modoTodasTaxas) return null
+    const all = comissoesPorTaxaQueries.flatMap(q => q.data?.items ?? [])
+    return ordenarComissoes(
+      mergeComissoesPorUsuario(all),
+      active.orderByField,
+      active.orderByDirection
+    )
+  }, [modoTodasTaxas, mergeSnapshot, active.orderByField, active.orderByDirection, comissoesPorTaxaQueries])
+
+  const mergeErrorMsg = useMemo(() => {
+    if (!modoTodasTaxas) return null
+    const err = comissoesPorTaxaQueries.find(q => q.error)?.error
+    if (!err) return null
+    return err instanceof Error ? err.message : String(err)
+  }, [modoTodasTaxas, mergeSnapshot, comissoesPorTaxaQueries])
+
+  const mergeLoading =
+    modoTodasTaxas &&
+    taxasOpts.length > 0 &&
+    comissoesPorTaxaQueries.some(q => q.isPending || q.isFetching)
+
+  const mergeTruncado =
+    modoTodasTaxas && comissoesPorTaxaQueries.some(q => q.data?.hasNext === true)
+
   /** Aplica busca automaticamente após pequena pausa ao digitar. */
   useEffect(() => {
-    if (!taxaId) return
+    if (!taxasPercentualQuery.isFetched) return
+    if (taxasOpts.length === 0) return
     if (draft.q === active.q) return
 
     const timer = setTimeout(() => {
@@ -208,9 +321,9 @@ export function ComissoesList() {
     }, SEARCH_DEBOUNCE_MS)
 
     return () => clearTimeout(timer)
-  }, [active.q, draft.q, taxaId])
+  }, [active.q, draft.q, taxasOpts.length, taxasPercentualQuery.isFetched])
 
-  /** Reseta filtros opcionais (mantém taxa selecionada). */
+  /** Reseta busca, períodos e ordenação (mantém “Todas as taxas” ou a taxa escolhida no select). */
   const limparTodosFiltros = useCallback(() => {
     setDraft(FILTROS_INICIAIS)
     setActive(FILTROS_INICIAIS)
@@ -227,10 +340,27 @@ export function ComissoesList() {
     return partes.join(' · ')
   }, [draft.criacaoIni, draft.criacaoFim, draft.finalIni, draft.finalFim])
 
-  const itens = data?.items ?? []
-  const hasNext = data?.hasNext === true
-  const hasPrevious = data?.hasPrevious === true
-  const totalRegistros = data?.count
+  const itens = useMemo(() => {
+    if (modoTodasTaxas) {
+      const linhas = linhasTodasTaxasOrdenadas
+      if (!linhas) return []
+      return linhas.slice(offset, offset + PAGE_SIZE)
+    }
+    return data?.items ?? []
+  }, [modoTodasTaxas, linhasTodasTaxasOrdenadas, offset, data?.items])
+
+  const hasNext = modoTodasTaxas
+    ? offset + PAGE_SIZE < (linhasTodasTaxasOrdenadas?.length ?? 0)
+    : data?.hasNext === true
+
+  const hasPrevious = modoTodasTaxas ? offset > 0 : data?.hasPrevious === true
+
+  const totalRegistros = modoTodasTaxas ? (linhasTodasTaxasOrdenadas?.length ?? 0) : data?.count
+
+  const listagemErro =
+    modoTodasTaxas ? mergeErrorMsg : error instanceof Error ? error.message : error ? String(error) : null
+
+  const mostrarConteudoLista = modoTodasTaxas ? taxasOpts.length > 0 : Boolean(taxaFiltro.trim())
 
   const irProxima = useCallback(() => {
     if (hasNext) setOffset(o => o + PAGE_SIZE)
@@ -290,7 +420,11 @@ export function ComissoesList() {
     setPainelIntervalo(null)
   }, [painelIntervalo, rascunhoIntervaloRange])
 
-  const loadingLista = Boolean(taxaId && (isLoading || isFetching))
+  const loadingLista =
+    taxasPercentualQuery.isLoading ||
+    (modoTodasTaxas
+      ? taxasOpts.length > 0 && mergeLoading
+      : Boolean(taxaFiltro && (isLoading || isFetching)))
 
   const inputCompact =
     'focus:border-primary h-8 w-full min-w-0 rounded-md border border-gray-200 bg-white px-2 text-xs text-primary-text focus:outline-none md:text-sm'
@@ -315,15 +449,15 @@ export function ComissoesList() {
               htmlFor="comissoes-taxa"
               className="mb-0.5 block text-[10px] uppercase font-semibold tracking-wide text-secondary-text"
             >
-              Taxa %
+              Filtrar por taxa
             </label>
             <select
               id="comissoes-taxa"
-              value={taxaId}
-              onChange={e => setTaxaId(e.target.value)}
+              value={taxaFiltro}
+              onChange={e => setTaxaFiltro(e.target.value)}
               className={`${inputCompact} h-9`}
             >
-              <option value="">Selecione…</option>
+              <option value="">Todas as taxas</option>
               {taxasOpts.map(t => (
                 <option key={t.getId()} value={t.getId()}>
                   {t.getNome()} —{' '}
@@ -498,7 +632,7 @@ export function ComissoesList() {
         </div>
 
         {taxasPercentualQuery.isFetched && taxasOpts.length === 0 && (
-          <p className="rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
+          <p className="px-2 py-1.5 text-xs text-secondary-text">
             Nenhuma taxa percentual. Cadastre na aba <strong>Taxas</strong>.
           </p>
         )}
@@ -548,27 +682,26 @@ export function ComissoesList() {
 
       {/* Lista: ocupa o restante da aba e rola só aqui */}
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-2 pb-3 pt-2 md:px-[30px]">
-        {!taxaId && (
-          <div className="flex items-center justify-center py-16">
-            <p className="text-secondary-text">
-              Selecione uma taxa percentual para carregar o relatório.
-            </p>
-          </div>
-        )}
-
-        {taxaId && error && (
+        {mostrarConteudoLista && listagemErro ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-            {error instanceof Error ? error.message : 'Erro ao carregar comissões.'}
+            {listagemErro}
           </div>
-        )}
+        ) : null}
 
-        {taxaId && loadingLista && (
+        {mostrarConteudoLista && loadingLista ? (
           <div className="flex justify-center py-12">
             <JiffyLoading />
           </div>
-        )}
+        ) : null}
 
-        {taxaId && !loadingLista && !error && (
+        {mostrarConteudoLista && mergeTruncado && !loadingLista && !listagemErro && modoTodasTaxas ? (
+          <p className="mb-2 mt-2 rounded border border-secondary bg-secondary/50 px-2 py-1.5 text-xs text-secondary">
+            Atenção: para ao menos uma taxa ainda havia mais dados no fiscal ou o limite interno de páginas foi
+            atingido; o total agregado pode estar incompleto. Refine os filtros ou selecione uma taxa específica.
+          </p>
+        ) : null}
+
+        {mostrarConteudoLista && !loadingLista && !listagemErro ? (
           <>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-secondary-text">
@@ -648,7 +781,7 @@ export function ComissoesList() {
               )}
             </div>
           </>
-        )}
+        ) : null}
       </div>
     </div>
   )

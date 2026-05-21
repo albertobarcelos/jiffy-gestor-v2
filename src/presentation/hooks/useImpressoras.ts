@@ -4,6 +4,7 @@ import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { Impressora } from '@/src/domain/entities/Impressora'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 interface ImpressorasQueryParams {
   q?: string
@@ -41,7 +42,7 @@ export function useImpressorasInfinite(params: Omit<ImpressorasQueryParams, 'off
       searchParams.append('limit', limit.toString())
       searchParams.append('offset', pageParam.toString())
 
-      const response = await fetch(`/api/impressoras?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/impressoras?${searchParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -89,7 +90,7 @@ export function useImpressora(id: string) {
         throw new Error('Usuário não autenticado ou token ausente.')
       }
 
-      const response = await fetch(`/api/impressoras/${id}`, {
+      const response = await fetchGestorApi(`/api/impressoras/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -131,7 +132,7 @@ export function useImpressoraMutation() {
       const url = isUpdate && impressoraId ? `/api/impressoras/${impressoraId}` : '/api/impressoras'
       const method = isUpdate ? 'PUT' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           Authorization: `Bearer ${token}`,

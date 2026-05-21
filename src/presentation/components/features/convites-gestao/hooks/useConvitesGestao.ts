@@ -5,23 +5,29 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import type { ConviteGestaoDTO } from '@/src/application/dto/convites/ConvitesGestaoDTO'
 import {
+  buildUsuariosPorEmailDeGestores,
   carregarDadosCompletos,
   criarConviteService,
   cancelarConviteService,
   reenviarConviteService,
   atualizarPerfilService,
   removerVinculoService,
+  emailGestaoKey,
+  filtrarConvitesParaLista,
+} from '../services/convitesGestaoService'
+import type {
+  PerfilGestorOption,
+  UsuarioGestorListaItem,
 } from '../services/convitesGestaoService'
 
-export type { PerfilGestorOption, UsuarioAceitoInfo } from '../services/convitesGestaoService'
-import type { PerfilGestorOption, UsuarioAceitoInfo } from '../services/convitesGestaoService'
+export type { PerfilGestorOption, UsuarioAceitoInfo, UsuarioGestorListaItem } from '../services/convitesGestaoService'
 
 export function useConvitesGestao() {
   const auth = useAuthStore(s => s.auth)
 
-  const [convites, setConvites] = useState<ConviteGestaoDTO[]>([])
+  const [convitesTodos, setConvitesTodos] = useState<ConviteGestaoDTO[]>([])
+  const [usuariosGestor, setUsuariosGestor] = useState<UsuarioGestorListaItem[]>([])
   const [perfisList, setPerfisList] = useState<PerfilGestorOption[]>([])
-  const [usuariosPorEmail, setUsuariosPorEmail] = useState<Record<string, UsuarioAceitoInfo>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busyById, setBusyById] = useState<Record<string, 'cancelar' | 'reenviar' | null>>({})
@@ -33,6 +39,16 @@ export function useConvitesGestao() {
     setBusyById(prev => ({ ...prev, [id]: action }))
   }, [])
 
+  const convites = useMemo(
+    () => filtrarConvitesParaLista(convitesTodos, usuariosGestor),
+    [convitesTodos, usuariosGestor]
+  )
+
+  const usuariosPorEmail = useMemo(
+    () => buildUsuariosPorEmailDeGestores(usuariosGestor),
+    [usuariosGestor]
+  )
+
   const fetchAll = useCallback(async () => {
     const token = getToken()
     if (!token) return
@@ -40,13 +56,13 @@ export function useConvitesGestao() {
     setError(null)
     try {
       const data = await carregarDadosCompletos(token)
-      setConvites(data.convites)
+      setConvitesTodos(data.convitesTodos)
+      setUsuariosGestor(data.usuariosGestor)
       setPerfisList(data.perfisList)
-      setUsuariosPorEmail(data.usuariosPorEmail)
     } catch (e) {
-      setConvites([])
+      setConvitesTodos([])
+      setUsuariosGestor([])
       setPerfisList([])
-      setUsuariosPorEmail({})
       setError(e instanceof Error ? e.message : 'Erro ao carregar convites')
     } finally {
       setLoading(false)
@@ -66,7 +82,7 @@ export function useConvitesGestao() {
       const token = getToken()
       if (!token) throw new Error('Sessão sem token')
       const criado = await criarConviteService(token, payload)
-      setConvites(prev => [criado, ...prev])
+      setConvitesTodos(prev => [criado, ...prev])
       showToast.success('Convite criado.')
     },
     [getToken]
@@ -79,7 +95,7 @@ export function useConvitesGestao() {
       setBusy(id, 'cancelar')
       try {
         await cancelarConviteService(token, id)
-        setConvites(prev => prev.filter(c => c.id !== id))
+        setConvitesTodos(prev => prev.filter(c => c.id !== id))
         showToast.success('Convite cancelado.')
       } catch (e) {
         showToast.error(e instanceof Error ? e.message : 'Erro ao cancelar')
@@ -97,7 +113,7 @@ export function useConvitesGestao() {
       setBusy(id, 'reenviar')
       try {
         const atualizado = await reenviarConviteService(token, id)
-        setConvites(prev => prev.map(c => (c.id === atualizado.id ? atualizado : c)))
+        setConvitesTodos(prev => prev.map(c => (c.id === atualizado.id ? atualizado : c)))
         showToast.success('Convite reenviado.')
       } catch (e) {
         showToast.error(e instanceof Error ? e.message : 'Erro ao reenviar')
@@ -112,17 +128,17 @@ export function useConvitesGestao() {
     async (email: string, novoPerfilGestorId: string) => {
       const token = getToken()
       if (!token) return
-      const info = usuariosPorEmail[email.toLowerCase().trim()]
+      const emailKey = emailGestaoKey(email)
+      const info = usuariosPorEmail[emailKey]
       if (!info?.id) return
       try {
         await atualizarPerfilService(token, info.id, novoPerfilGestorId)
-        setConvites(prev =>
-          prev.map(c => {
-            if (c.email.toLowerCase().trim() === email.toLowerCase().trim()) {
-              return { ...c, perfilGestorId: novoPerfilGestorId }
-            }
-            return c
-          })
+        setUsuariosGestor(prev =>
+          prev.map(g =>
+            emailGestaoKey(g.username) === emailKey
+              ? { ...g, perfilGestorId: novoPerfilGestorId }
+              : g
+          )
         )
         showToast.success('Perfil atualizado.')
       } catch (e) {
@@ -136,18 +152,14 @@ export function useConvitesGestao() {
     async (email: string) => {
       const token = getToken()
       if (!token) return
-      const emailKey = email.toLowerCase().trim()
+      const emailKey = emailGestaoKey(email)
       const info = usuariosPorEmail[emailKey]
       if (!info?.id) return
       setBusy(info.id, 'cancelar')
       try {
         await removerVinculoService(token, info.id)
-        setConvites(prev => prev.filter(c => c.email.toLowerCase().trim() !== emailKey))
-        setUsuariosPorEmail(prev => {
-          const next = { ...prev }
-          delete next[emailKey]
-          return next
-        })
+        setUsuariosGestor(prev => prev.filter(g => emailGestaoKey(g.username) !== emailKey))
+        setConvitesTodos(prev => prev.filter(c => emailGestaoKey(c.email) !== emailKey))
         showToast.success('Vínculo removido com sucesso.')
       } catch (e) {
         showToast.error(e instanceof Error ? e.message : 'Erro ao remover vínculo')
@@ -164,19 +176,11 @@ export function useConvitesGestao() {
     return map
   }, [perfisList])
 
-  const nomePorEmail = useMemo(() => {
-    const map: Record<string, string> = {}
-    for (const [email, info] of Object.entries(usuariosPorEmail)) {
-      if (info.nome) map[email] = info.nome
-    }
-    return map
-  }, [usuariosPorEmail])
-
   return {
     convites,
+    usuariosGestor,
     perfisList,
     perfilGestorNomePorId,
-    nomePorEmail,
     usuariosPorEmail,
     loading,
     error,
