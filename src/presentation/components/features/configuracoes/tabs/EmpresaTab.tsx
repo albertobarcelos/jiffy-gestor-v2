@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { showToast } from '@/src/shared/utils/toast'
@@ -9,6 +9,11 @@ import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-auto
 import { Input } from '@/src/presentation/components/ui/input'
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
 import { MenuItem } from '@mui/material'
+import { LogoImpressaoCropModal } from '../LogoImpressaoCropModal'
+import {
+  LOGO_IMPRESSAO_HEIGHT,
+  LOGO_IMPRESSAO_WIDTH,
+} from '@/src/presentation/utils/logoImpressaoCrop'
 
 /** Labels outlined — alinhado a NovoMeioPagamento / EditarTerminais */
 const sxOutlinedLabelTextoEscuro = {
@@ -109,6 +114,25 @@ const FUSOS_IANA_BRASIL = [
 const MAX_LOGO_IMPRESSAO_BYTES = 1024 * 1024
 const LOGO_IMPRESSAO_ACCEPT = 'image/png,image/jpeg,image/webp'
 
+/** Moldura 280×150 — `object-contain` evita distorção; largura fixa no desktop. */
+function LogoImpressaoPreviewImage({ src, alt }: { src: string; alt: string }) {
+  return (
+    <div
+      className="w-full overflow-hidden rounded-sm bg-white"
+      style={{ aspectRatio: `${LOGO_IMPRESSAO_WIDTH} / ${LOGO_IMPRESSAO_HEIGHT}` }}
+    >
+      <img
+        src={src}
+        alt={alt}
+        className="block h-full w-full object-contain object-center"
+        draggable={false}
+      />
+    </div>
+  )
+}
+
+const LOGO_COLUNA_LARGURA_CLASS = 'w-full shrink-0 lg:w-[280px]'
+
 /**
  * Tab de Empresa - Edição de dados da empresa
  */
@@ -116,7 +140,7 @@ export function EmpresaTab() {
   const { auth } = useAuthStore()
   const [empresa, setEmpresa] = useState<Cliente | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isEditing, setIsEditing] = useState(true)
+  const [isEditing, setIsEditing] = useState(false)
 
   // Campos do formulário
   const [cnpj, setCnpj] = useState('')
@@ -148,7 +172,12 @@ export function EmpresaTab() {
   /** Utilizador pediu remoção da logo guardada; DELETE só ao Salvar. */
   const [pendingRemoveLogoOnSave, setPendingRemoveLogoOnSave] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isSavingLogo, setIsSavingLogo] = useState(false)
   const logoFileInputRef = useRef<HTMLInputElement>(null)
+  const [logoCropModalOpen, setLogoCropModalOpen] = useState(false)
+  const [logoCropImageSrc, setLogoCropImageSrc] = useState<string | null>(null)
+  /** Ficheiro original antes do recorte (permite reabrir o modal de crop). */
+  const logoCropSourceFileRef = useRef<File | null>(null)
 
   // Ref para rastrear o último valor de cidade usado para buscar código IBGE
   const ultimaCidadeBuscada = useRef<string>('')
@@ -173,6 +202,14 @@ export function EmpresaTab() {
       }
     }
   }, [serverLogoObjectUrl])
+
+  useEffect(() => {
+    return () => {
+      if (logoCropImageSrc) {
+        URL.revokeObjectURL(logoCropImageSrc)
+      }
+    }
+  }, [logoCropImageSrc])
 
   const refreshSavedLogoImpressao = async (token: string) => {
     setServerLogoObjectUrl(prev => {
@@ -199,27 +236,72 @@ export function EmpresaTab() {
   const clearPendingLogo = () => {
     setPendingLogoFile(null)
     setPendingLogoPreviewUrl(null)
+    logoCropSourceFileRef.current = null
     if (logoFileInputRef.current) {
       logoFileInputRef.current.value = ''
     }
   }
 
-  const assignPendingLogoFromFile = (file: File) => {
+  const closeLogoCropModal = () => {
+    setLogoCropModalOpen(false)
+    setLogoCropImageSrc(prev => {
+      if (prev) URL.revokeObjectURL(prev)
+      return null
+    })
+    if (logoFileInputRef.current) {
+      logoFileInputRef.current.value = ''
+    }
+  }
+
+  const validateLogoSourceFile = (file: File): boolean => {
     if (file.size > MAX_LOGO_IMPRESSAO_BYTES) {
       showToast.error('Arquivo muito grande. Máximo 1 MB.')
-      return
+      return false
     }
     const tiposPermitidos = ['image/png', 'image/jpeg', 'image/webp']
     if (!tiposPermitidos.includes(file.type)) {
       showToast.error('Formato inválido. Use PNG, JPEG ou WEBP.')
-      return
+      return false
     }
+    return true
+  }
+
+  const openLogoCropFromFile = (file: File) => {
+    if (!validateLogoSourceFile(file)) return
+    logoCropSourceFileRef.current = file
+    setLogoCropImageSrc(prev => {
+      if (prev) URL.revokeObjectURL(prev)
+      return URL.createObjectURL(file)
+    })
+    setLogoCropModalOpen(true)
+  }
+
+  const handleLogoCropConfirm = (file: File) => {
+    closeLogoCropModal()
+    setPendingLogoPreviewUrl(prev => {
+      if (prev) URL.revokeObjectURL(prev)
+      return URL.createObjectURL(file)
+    })
     setPendingLogoFile(file)
-    setPendingLogoPreviewUrl(URL.createObjectURL(file))
     setPendingRemoveLogoOnSave(false)
-    if (logoFileInputRef.current) {
-      logoFileInputRef.current.value = ''
-    }
+  }
+
+  const logoBusy = isSavingLogo || isSaving
+
+  const hasLogoPendingChanges = useMemo(
+    () => !!pendingLogoFile || pendingRemoveLogoOnSave,
+    [pendingLogoFile, pendingRemoveLogoOnSave]
+  )
+
+  const handleLogoFileInput = (files: FileList | null) => {
+    if (logoBusy || !files?.length) return
+    openLogoCropFromFile(files[0])
+  }
+
+  const handleReopenLogoCrop = () => {
+    const source = logoCropSourceFileRef.current
+    if (!source || logoBusy) return
+    openLogoCropFromFile(source)
   }
 
   const loadEmpresa = async () => {
@@ -450,9 +532,75 @@ export function EmpresaTab() {
     }
   }
 
-  const handleLogoFileInput = (files: FileList | null) => {
-    if (!isEditing || isSaving || !files?.length) return
-    assignPendingLogoFromFile(files[0])
+  const persistLogoImpressaoChanges = useCallback(
+    async (token: string): Promise<{ ok: true } | { ok: false; message: string }> => {
+      const snapshotLogo = pendingLogoFile
+      const snapshotRemove = pendingRemoveLogoOnSave
+      const hadServerLogoBeforeLogoOps = serverHasLogo
+
+      if (snapshotLogo) {
+        if (hadServerLogoBeforeLogoOps) {
+          const delBeforePost = await deleteLogoImpressaoFromApi(token)
+          if (!delBeforePost.ok) {
+            return { ok: false, message: delBeforePost.message }
+          }
+        }
+        const logoResult = await uploadLogoImpressaoToApi(snapshotLogo, token)
+        if (!logoResult.ok) {
+          return { ok: false, message: logoResult.message }
+        }
+        clearPendingLogo()
+        setPendingRemoveLogoOnSave(false)
+        await refreshSavedLogoImpressao(token)
+        return { ok: true }
+      }
+
+      if (snapshotRemove && hadServerLogoBeforeLogoOps) {
+        const delResult = await deleteLogoImpressaoFromApi(token)
+        if (!delResult.ok) {
+          return { ok: false, message: delResult.message }
+        }
+        setPendingRemoveLogoOnSave(false)
+        setServerHasLogo(false)
+        setServerLogoObjectUrl(prev => {
+          if (prev) URL.revokeObjectURL(prev)
+          return null
+        })
+        return { ok: true }
+      }
+
+      return { ok: true }
+    },
+    [pendingLogoFile, pendingRemoveLogoOnSave, serverHasLogo]
+  )
+
+  const handleSaveLogo = async () => {
+    if (!hasLogoPendingChanges || logoBusy) return
+    const token = auth?.getAccessToken()
+    if (!token) return
+
+    setIsSavingLogo(true)
+    try {
+      const hadUpload = !!pendingLogoFile
+      const hadRemove = pendingRemoveLogoOnSave
+
+      const result = await persistLogoImpressaoChanges(token)
+      if (!result.ok) {
+        showToast.error(result.message)
+        return
+      }
+
+      if (hadUpload) {
+        showToast.success('Logo de impressão atualizada com sucesso!')
+      } else if (hadRemove) {
+        showToast.success('Logo de impressão removida.')
+      }
+    } catch (error) {
+      console.error('Erro ao salvar logo de impressão:', error)
+      showToast.error('Erro ao salvar logo de impressão')
+    } finally {
+      setIsSavingLogo(false)
+    }
   }
 
   const markServerLogoRemovalOnSave = () => {
@@ -462,6 +610,24 @@ export function EmpresaTab() {
       if (prev) URL.revokeObjectURL(prev)
       return null
     })
+  }
+
+  /**
+   * Lixeira na pré-visualização nova: descarta o upload pendente.
+   * Se a logo do servidor ainda está só oculta (URL em memória), volta a exibi-la.
+   * Se já tinha fluxo “remover logo guardada”, reabre Desfazer / Trocar / Salvar logo.
+   */
+  const handleLogoTrashClick = () => {
+    if (pendingLogoPreviewUrl) {
+      clearPendingLogo()
+      if (serverHasLogo && !serverLogoObjectUrl) {
+        setPendingRemoveLogoOnSave(true)
+      }
+      return
+    }
+    if (serverLogoObjectUrl) {
+      markServerLogoRemovalOnSave()
+    }
   }
 
   const undoServerLogoRemoval = async () => {
@@ -588,55 +754,9 @@ export function EmpresaTab() {
           return
         }
 
-        const snapshotLogo = pendingLogoFile
-        const snapshotRemove = pendingRemoveLogoOnSave
-        const hadServerLogoBeforeLogoOps = serverHasLogo
-
-        if (snapshotLogo) {
-          if (hadServerLogoBeforeLogoOps) {
-            const delBeforePost = await deleteLogoImpressaoFromApi(token)
-            if (!delBeforePost.ok) {
-              showToast.success('Dados da empresa salvos.')
-              showToast.error(delBeforePost.message)
-              await loadEmpresa()
-              return
-            }
-          }
-          const logoResult = await uploadLogoImpressaoToApi(snapshotLogo, token)
-          if (!logoResult.ok) {
-            showToast.success('Dados da empresa salvos.')
-            showToast.error(logoResult.message)
-            await loadEmpresa()
-            return
-          }
-          clearPendingLogo()
-          setPendingRemoveLogoOnSave(false)
-        } else if (snapshotRemove && hadServerLogoBeforeLogoOps) {
-          const delResult = await deleteLogoImpressaoFromApi(token)
-          if (!delResult.ok) {
-            showToast.success('Dados da empresa salvos.')
-            showToast.error(delResult.message)
-            await loadEmpresa()
-            return
-          }
-          setPendingRemoveLogoOnSave(false)
-          setServerHasLogo(false)
-          setServerLogoObjectUrl(prev => {
-            if (prev) URL.revokeObjectURL(prev)
-            return null
-          })
-        }
-
-        let toastMsg = 'Empresa atualizada com sucesso!'
-        if (snapshotLogo) {
-          toastMsg = 'Empresa e logo de impressão atualizadas com sucesso!'
-        } else if (snapshotRemove && hadServerLogoBeforeLogoOps) {
-          toastMsg = 'Empresa atualizada; logo de impressão removida.'
-        }
-
         setIsEditing(false)
         await loadEmpresa()
-        showToast.success(toastMsg)
+        showToast.success('Empresa atualizada com sucesso!')
       } catch (error) {
         console.error('Erro ao salvar empresa:', error)
         showToast.error('Erro ao salvar empresa')
@@ -699,12 +819,21 @@ export function EmpresaTab() {
           )}
         </div>
 
-        <div className="space-y-4 bg-info px-1 md:px-[18px]">
-          {/* Dados Básicos */}
+        <div className="space-y-2 bg-info px-1 md:px-[18px]">
+          {/* Dados Básicos + Logo (títulos na mesma linha em desktop) */}
           <div>
-            <h4 className="font-nunito mb-2 text-lg font-semibold text-primary">Dados Básicos</h4>
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-              <div className="min-w-0 flex-1 space-y-4">
+            <div className="mb-2 flex flex-col gap-1 lg:flex-row lg:items-baseline lg:gap-4">
+              <h4 className="font-nunito min-w-0 flex-1 text-lg font-semibold text-primary">
+                Dados Básicos
+              </h4>
+              <h4
+                className={`font-nunito text-lg font-semibold text-primary ${LOGO_COLUNA_LARGURA_CLASS}`}
+              >
+                Logo de impressão
+              </h4>
+            </div>
+            <div className="flex flex-col gap-7 lg:flex-row lg:items-start">
+              <div className="min-w-0 flex-1 space-y-7">
                 <Input
                   label="CNPJ"
                   value={cnpj}
@@ -713,7 +842,7 @@ export function EmpresaTab() {
                   size="small"
                   sx={sxEntradaEmpresa}
                 />
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-7 md:grid-cols-2">
                   <Input
                     label="Razão Social"
                     value={razaoSocial}
@@ -750,24 +879,24 @@ export function EmpresaTab() {
                 </div>
               </div>
 
-              <div className="w-full shrink-0 lg:w-[min(320px,38%)] lg:min-w-[260px] lg:self-start">
+              <div className={LOGO_COLUNA_LARGURA_CLASS}>
                 <input
                   ref={logoFileInputRef}
                   type="file"
                   accept={LOGO_IMPRESSAO_ACCEPT}
                   className="sr-only"
-                  disabled={!isEditing || isSaving}
+                  disabled={logoBusy}
                   onChange={e => handleLogoFileInput(e.target.files)}
                   aria-hidden
                 />
                 <div
                   onDragEnter={e => {
-                    if (!isEditing || isSaving) return
+                    if (logoBusy) return
                     e.preventDefault()
                     setLogoDragActive(true)
                   }}
                   onDragOver={e => {
-                    if (!isEditing || isSaving) return
+                    if (logoBusy) return
                     e.preventDefault()
                     e.dataTransfer.dropEffect = 'copy'
                   }}
@@ -777,42 +906,52 @@ export function EmpresaTab() {
                     setLogoDragActive(false)
                   }}
                   onDrop={e => {
-                    if (!isEditing || isSaving) return
+                    if (logoBusy) return
                     e.preventDefault()
                     setLogoDragActive(false)
                     handleLogoFileInput(e.dataTransfer.files)
                   }}
-                  className={`relative flex max-h-[320px] min-h-[140px] flex-col overflow-hidden rounded-lg border-2 border-dashed transition-colors lg:max-h-[16.25rem] ${
+                  className={`relative flex w-full flex-col overflow-hidden rounded-lg border-2 border-dashed transition-colors ${
+                    pendingLogoPreviewUrl || serverLogoObjectUrl
+                      ? 'p-1.5'
+                      : 'min-h-[150px]'
+                  } ${
                     logoDragActive
                       ? 'border-primary bg-primary/10'
                       : 'border-neutral-400/80 bg-white/50'
-                  } ${!isEditing || isSaving ? 'opacity-60' : ''}`}
+                  } ${logoBusy ? 'pointer-events-none opacity-60' : ''}`}
                 >
                   {pendingLogoPreviewUrl ? (
-                    <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-1.5 px-2 pb-2 pt-1">
-                      {isEditing && !isSaving && (
+                    <div className="relative flex w-full flex-col gap-1">
+                      <div className="relative w-full">
                         <button
                           type="button"
-                          title="Descartar imagem selecionada"
-                          aria-label="Descartar imagem selecionada"
+                          title="Descartar alteração"
+                          aria-label="Descartar alteração"
                           onClick={e => {
                             e.stopPropagation()
-                            clearPendingLogo()
+                            handleLogoTrashClick()
                           }}
                           className="absolute right-0.5 top-0.5 z-10 inline-flex h-7 w-7 items-center justify-center rounded-md bg-white/90 text-neutral-600 shadow-sm ring-1 ring-black/5 transition-colors hover:bg-red-50 hover:text-red-700"
                         >
                           <DeleteOutlineRoundedIcon sx={{ fontSize: 20 }} />
                         </button>
-                      )}
-                      <img
-                        src={pendingLogoPreviewUrl}
-                        alt="Pré-visualização da logo de impressão"
-                        className="mx-auto max-h-[7.75rem] w-auto max-w-full shrink object-contain lg:max-h-[8.25rem]"
-                      />
-                      <p className="line-clamp-2 max-w-full px-1 text-center text-[10px] leading-snug text-secondary-text">
-                        Será enviada ao clicar em <span className="font-semibold">Salvar</span>.
-                      </p>
-                      {isEditing && !isSaving && (
+                        <LogoImpressaoPreviewImage
+                          src={pendingLogoPreviewUrl}
+                          alt="Pré-visualização da logo de impressão"
+                        />
+                      </div>
+                      <div className="flex flex-wrap items-center justify-center gap-1 mt-2">
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation()
+                            handleReopenLogoCrop()
+                          }}
+                          className="rounded border border-primary bg-primary/10 px-2 py-0.5 font-exo text-[11px] font-medium leading-tight text-primary hover:bg-primary/15"
+                        >
+                          Ajustar recorte
+                        </button>
                         <button
                           type="button"
                           onClick={e => {
@@ -823,18 +962,28 @@ export function EmpresaTab() {
                         >
                           Trocar imagem
                         </button>
-                      )}
+                        {hasLogoPendingChanges && (
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.stopPropagation()
+                              void handleSaveLogo()
+                            }}
+                            disabled={logoBusy}
+                            className="rounded bg-primary px-2.5 py-0.5 font-exo text-[11px] font-medium leading-tight text-white hover:bg-primary/90 disabled:opacity-50"
+                          >
+                            {isSavingLogo ? 'Salvando…' : 'Salvar'}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ) : pendingRemoveLogoOnSave ? (
-                    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-3 py-4 text-center">
-                      <span className="font-nunito text-sm font-semibold text-primary">
-                        Logo de impressão
-                      </span>
+                    <div className="flex w-full flex-col items-center justify-center gap-2 py-3 text-center">
                       <p className="text-xs leading-snug text-secondary-text">
                         A logo guardada será <span className="font-semibold">removida</span> ao clicar em{' '}
-                        <span className="font-semibold">Salvar</span>.
+                        <span className="font-semibold">Salvar logo</span>.
                       </p>
-                      {isEditing && !isSaving && (
+                      <div className="flex flex-wrap items-center justify-center gap-1.5">
                         <button
                           type="button"
                           onClick={e => {
@@ -845,33 +994,6 @@ export function EmpresaTab() {
                         >
                           Desfazer
                         </button>
-                      )}
-                    </div>
-                  ) : serverLogoObjectUrl ? (
-                    <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-1.5 px-2 pb-2 pt-1">
-                      {isEditing && !isSaving && (
-                        <button
-                          type="button"
-                          title="Remover logo de impressão"
-                          aria-label="Remover logo de impressão"
-                          onClick={e => {
-                            e.stopPropagation()
-                            markServerLogoRemovalOnSave()
-                          }}
-                          className="absolute right-0.5 top-0.5 z-10 inline-flex h-7 w-7 items-center justify-center rounded-md bg-white/90 text-neutral-600 shadow-sm ring-1 ring-black/5 transition-colors hover:bg-red-50 hover:text-red-700"
-                        >
-                          <DeleteOutlineRoundedIcon sx={{ fontSize: 20 }} />
-                        </button>
-                      )}
-                      <img
-                        src={serverLogoObjectUrl}
-                        alt="Logo de impressão atual"
-                        className="mx-auto max-h-[7.75rem] w-auto max-w-full shrink object-contain lg:max-h-[8.25rem]"
-                      />
-                      {!isEditing && (
-                        <p className="text-center text-[10px] text-secondary-text">Logo atual</p>
-                      )}
-                      {isEditing && !isSaving && (
                         <button
                           type="button"
                           onClick={e => {
@@ -882,36 +1004,80 @@ export function EmpresaTab() {
                         >
                           Trocar imagem
                         </button>
-                      )}
+                        {hasLogoPendingChanges && (
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.stopPropagation()
+                              void handleSaveLogo()
+                            }}
+                            disabled={logoBusy}
+                            className="rounded bg-primary px-2.5 py-0.5 font-exo text-[11px] font-medium leading-tight text-white hover:bg-primary/90 disabled:opacity-50"
+                          >
+                            {isSavingLogo ? 'Salvando…' : 'Salvar'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ) : serverLogoObjectUrl ? (
+                    <div className="relative flex w-full flex-col gap-1">
+                      <div className="relative w-full">
+                        <button
+                          type="button"
+                          title="Remover logo de impressão"
+                          aria-label="Remover logo de impressão"
+                          onClick={e => {
+                            e.stopPropagation()
+                            handleLogoTrashClick()
+                          }}
+                          className="absolute right-0.5 top-0.5 z-10 inline-flex h-7 w-7 items-center justify-center rounded-md bg-white/90 text-neutral-600 shadow-sm ring-1 ring-black/5 transition-colors hover:bg-red-50 hover:text-red-700"
+                        >
+                          <DeleteOutlineRoundedIcon sx={{ fontSize: 20 }} />
+                        </button>
+                        <LogoImpressaoPreviewImage
+                          src={serverLogoObjectUrl}
+                          alt="Logo de impressão atual"
+                        />
+                      </div>
+                      <div className="flex flex-wrap items-center justify-center gap-1">
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation()
+                            logoFileInputRef.current?.click()
+                          }}
+                          className="rounded border border-primary bg-primary/10 px-2 py-0.5 font-exo text-[11px] font-medium leading-tight text-primary hover:bg-primary/15"
+                        >
+                          Trocar imagem
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div
                       role="button"
-                      tabIndex={isEditing && !isSaving ? 0 : -1}
+                      tabIndex={logoBusy ? -1 : 0}
                       onKeyDown={e => {
-                        if (!isEditing || isSaving) return
+                        if (logoBusy) return
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault()
                           logoFileInputRef.current?.click()
                         }
                       }}
                       onClick={() => {
-                        if (!isEditing || isSaving) return
+                        if (logoBusy) return
                         logoFileInputRef.current?.click()
                       }}
-                      className={`flex min-h-0 flex-1 cursor-pointer flex-col items-center justify-center gap-1.5 px-3 py-4 text-center hover:border-primary/50 ${
-                        !isEditing || isSaving ? 'pointer-events-none cursor-not-allowed' : ''
+                      className={`flex min-h-[150px] cursor-pointer flex-col items-center justify-center gap-1 px-2 py-3 text-center hover:border-primary/50 ${
+                        logoBusy ? 'pointer-events-none cursor-not-allowed' : ''
                       }`}
                     >
                       <span className="font-nunito text-sm font-semibold text-primary">
-                        Logo de impressão
+                        Adicionar logo
                       </span>
                       <span className="text-[11px] leading-snug text-secondary-text">
-                        {isSaving
+                        {isSavingLogo
                           ? 'Salvando…'
-                          : isEditing
-                            ? 'Arraste ou clique (PNG, JPEG ou WEBP, até 1 MB). Envio ao Salvar.'
-                            : 'Sem logo. Clique em Editar para adicionar.'}
+                          : 'Arraste ou clique · 280×150 px'}
                       </span>
                     </div>
                   )}
@@ -923,7 +1089,7 @@ export function EmpresaTab() {
           {/* Endereço */}
           <div>
             <h4 className="font-nunito mb-2 text-lg font-semibold text-primary">Endereço</h4>
-            <div className="space-y-4">
+            <div className="space-y-6">
               {/* Linha 1: CEP + Rua */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <Input
@@ -1075,6 +1241,13 @@ export function EmpresaTab() {
           </div>
         </div>
       </div>
+
+      <LogoImpressaoCropModal
+        open={logoCropModalOpen}
+        imageSrc={logoCropImageSrc}
+        onClose={closeLogoCropModal}
+        onConfirm={handleLogoCropConfirm}
+      />
     </div>
   )
 }
