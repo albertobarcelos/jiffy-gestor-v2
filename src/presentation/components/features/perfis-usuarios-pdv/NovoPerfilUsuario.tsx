@@ -887,7 +887,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
         }
       } else {
         showToast.success(isEditing ? 'Perfil atualizado com sucesso!' : 'Perfil criado com sucesso!')
-        router.push('/cadastros/perfis-usuarios-pdv')
+        router.push('/perfis-usuarios-pdv')
       }
     } catch (error) {
       console.error('Erro ao salvar perfil:', error)
@@ -910,7 +910,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
     if (isEmbedded) {
       onCancel?.()
     } else {
-      router.push('/cadastros/perfis-usuarios-pdv')
+      router.push('/perfis-usuarios-pdv')
     }
   }
 

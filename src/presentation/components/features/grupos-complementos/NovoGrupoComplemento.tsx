@@ -321,7 +321,7 @@ export const NovoGrupoComplemento = forwardRef<
         onClose?.()
       } else {
         setTimeout(() => {
-          router.push('/cadastros/grupos-complementos')
+          router.push('/grupos-complementos')
         }, 500)
       }
     } catch (error) {
@@ -369,7 +369,7 @@ export const NovoGrupoComplemento = forwardRef<
     if (isEmbedded) {
       onClose?.()
     } else {
-      router.push('/cadastros/grupos-complementos')
+      router.push('/grupos-complementos')
     }
   }
 

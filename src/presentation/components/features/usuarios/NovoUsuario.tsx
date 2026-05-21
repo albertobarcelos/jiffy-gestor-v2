@@ -410,7 +410,7 @@ export const NovoUsuario = forwardRef<NovoUsuarioHandle, NovoUsuarioProps>(funct
           onCloseAfterSave?.()
         }
       } else {
-        router.push('/cadastros/usuarios')
+        router.push('/usuarios')
       }
     } catch (error) {
       console.error('Erro ao salvar usuário:', error)
@@ -425,7 +425,7 @@ export const NovoUsuario = forwardRef<NovoUsuarioHandle, NovoUsuarioProps>(funct
     if (isEmbedded) {
       onCancel?.()
     } else {
-      router.push('/cadastros/usuarios')
+      router.push('/usuarios')
     }
   }
 

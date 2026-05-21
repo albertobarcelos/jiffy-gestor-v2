@@ -1,25 +1,18 @@
-'use client'
+import { redirect } from 'next/navigation'
+import {
+  configuracoesTabPath,
+  resolveConfiguracoesTabFromLegacyQuery,
+} from '@/src/shared/constants/configuracoesRoutes'
 
-import dynamic from 'next/dynamic'
-import { Suspense } from 'react'
-import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
+type SearchParams = Promise<{ tab?: string }>
 
-// Dynamic import para code-splitting
-const ConfiguracoesView = dynamic(
-  () => import('@/src/presentation/components/features/configuracoes/ConfiguracoesView').then((mod) => ({ default: mod.ConfiguracoesView })),
-  {
-    ssr: false,
-    loading: () => <PageLoading />,
-  }
-)
-
-export default function ConfiguracoesPage() {
-  return (
-    <div className="h-full">
-      <Suspense fallback={<PageLoading />}>
-        <ConfiguracoesView />
-      </Suspense>
-    </div>
-  )
+/** `/configuracoes` → `/configuracoes/empresa` (ou aba legada em `?tab=`). */
+export default async function ConfiguracoesIndexPage({
+  searchParams,
+}: {
+  searchParams: SearchParams
+}) {
+  const { tab } = await searchParams
+  const slug = resolveConfiguracoesTabFromLegacyQuery(tab)
+  redirect(configuracoesTabPath(slug))
 }
-

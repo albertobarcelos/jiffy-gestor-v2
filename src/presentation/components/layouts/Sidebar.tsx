@@ -23,13 +23,28 @@ export function Sidebar() {
   const queryClient = useQueryClient()
   // const { prefetchRoute } = usePrefetch() // prefetchRoute não existe mais
 
+  useEffect(() => {
+    if (
+      pathname === '/relatorios-vendas' ||
+      pathname?.startsWith('/relatorios-vendas/') ||
+      pathname === '/relatorios-produtos-vendidos' ||
+      pathname?.startsWith('/relatorios-produtos-vendidos/')
+    ) {
+      setExpandedMenus(prev => {
+        const next = new Set(prev)
+        next.add('Relatórios')
+        return next
+      })
+    }
+  }, [pathname])
+
   // Prefetch agressivo das rotas mais acessadas na inicialização
   useEffect(() => {
     const routesToPrefetch = [
-      '/cadastros/grupos-complementos',
-      '/cadastros/complementos',
+      '/grupos-complementos',
+      '/complementos',
       '/produtos',
-      '/cadastros/grupos-produtos',
+      '/grupos-produtos',
       '/estoque',
     ]
     
@@ -66,10 +81,10 @@ export function Sidebar() {
         newExpanded.add(menuName)
         // Quando expandir "Cadastros", prefetch das rotas mais acessadas
         if (menuName === 'Cadastros') {
-          // prefetchRoute('/cadastros/grupos-complementos')
-          // prefetchRoute('/cadastros/complementos')
+          // prefetchRoute('/grupos-complementos')
+          // prefetchRoute('/complementos')
           // prefetchRoute('/produtos')
-          // prefetchRoute('/cadastros/grupos-produtos')
+          // prefetchRoute('/grupos-produtos')
         }
       }
       setExpandedMenus(newExpanded)
@@ -84,7 +99,7 @@ export function Sidebar() {
       path: '#',
       icon: '📋',
       children: [
-        { name: 'Grupo Produtos', path: '/cadastros/grupos-produtos', icon: '📦' },
+        { name: 'Grupo Produtos', path: '/grupos-produtos', icon: '📦' },
         { name: 'Produtos', path: '/produtos', icon: '🛍️' },
         { name: 'Grupo Complementos', path: '/cadastros/grupos-complementos', icon: '📋' },
         { name: 'Complementos', path: '/cadastros/complementos', icon: '➕' },
@@ -95,7 +110,7 @@ export function Sidebar() {
         { name: 'Impressoras', path: '/cadastros/impressoras', icon: '🖨️' },
         {
           name: 'Meios de Pagamentos',
-          path: '/configuracoes?tab=meios-pagamentos',
+          path: '/configuracoes/meios-pagamentos',
           icon: '💳',
         },
       ],
@@ -104,8 +119,16 @@ export function Sidebar() {
     { name: 'Meu Caixa', path: '/meu-caixa', icon: '💼' },
     { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: '📄' },
     { name: 'Painel do Contador', path: '/painel-contador', icon: '📊' },
-    { name: 'Relatórios', path: '/relatorios-vendas', icon: '📊' },
-    { name: 'Configurações', path: '/configuracoes', icon: '⚙️' },
+    {
+      name: 'Relatórios',
+      path: '#',
+      icon: '📊',
+      children: [
+        { name: 'Vendas PDV', path: '/relatorios-vendas', icon: '📄' },
+        { name: 'Produtos vendidos', path: '/relatorios-produtos-vendidos', icon: '🛒' },
+      ],
+    },
+    { name: 'Configurações', path: '/configuracoes/empresa', icon: '⚙️' },
   ]
 
   const isMenuActive = (item: typeof menuItems[0]) => {

@@ -295,7 +295,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
       if (isEmbedded) {
         onSaved?.()
       } else {
-        router.push('/cadastros/complementos')
+        router.push('/complementos')
       }
     } catch (error) {
       console.error('Erro ao salvar complemento:', error)
@@ -338,7 +338,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
     if (isEmbedded) {
       onCancel?.()
     } else {
-      router.push('/cadastros/complementos')
+      router.push('/complementos')
     }
   }
 

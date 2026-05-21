@@ -2,48 +2,35 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 import {
-  appendIntervaloFinalizacaoVendasPdv,
-  lerIntervaloFinalizacaoVendasPdv,
-} from '@/src/shared/utils/parametrosDataFinalizacaoVendasPdv'
-import { calcularPeriodoNoFusoEmpresa } from '@/src/shared/utils/periodoNoFusoEmpresa'
+  agregarProdutosLancadosPorProdutoId,
+  buscarCardapioMiniPorProdutoIds,
+  somarValorFinalDasVendas,
+} from '@/src/infrastructure/dashboard/agregarVendasPorProdutoPdv'
+import {
+  buildDashboardVendasPeriodoCacheKey,
+  obterDetalhesVendasFinalizadasPeriodo,
+} from '@/src/infrastructure/dashboard/dashboardVendasPeriodoCache'
+import { montarParamsDashboardVendasPeriodo } from '@/src/infrastructure/dashboard/montarParamsDashboardPeriodo'
+
+const TOP_PRODUTOS_CARD_LIMIT = 10
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const periodo = searchParams.get('periodo') || 'hoje'
   const timezone = searchParams.get('timezone') || 'America/Sao_Paulo'
-  /** Card do dashboard: sempre top 10 por quantidade; totais do período vêm da agregação completa. */
-  const TOP_PRODUTOS_CARD_LIMIT = 10
+
   const validation = validateRequest(request)
   if (!validation.valid || !validation.tokenInfo) {
     return validation.error!
   }
   const { tokenInfo } = validation
 
-  const params = new URLSearchParams()
-
-  const intervaloCustom = lerIntervaloFinalizacaoVendasPdv(searchParams)
-  if (intervaloCustom) {
-    appendIntervaloFinalizacaoVendasPdv(params, intervaloCustom)
-  } else {
-    // Mapeia o periodo do frontend para a opção do utilitário
-    const mapOpcao: Record<string, string> = {
-      hoje: 'Hoje',
-      ontem: 'Ontem',
-      semana: 'Últimos 7 Dias',
-      '30dias': 'Últimos 30 Dias',
-      mes: 'Mês Atual',
-      '60dias': 'Últimos 60 Dias',
-      '90dias': 'Últimos 90 Dias',
-    }
-    const opcao = mapOpcao[periodo] || 'Hoje'
-    const { inicio, fim } = calcularPeriodoNoFusoEmpresa(opcao, timezone)
-    
-    if (inicio && fim) {
-      appendIntervaloFinalizacaoVendasPdv(params, { inicial: inicio.toISOString(), final: fim.toISOString() })
-    }
-  }
-
-  params.append('status', 'FINALIZADA')
+  const params = montarParamsDashboardVendasPeriodo({
+    requestSearchParams: searchParams,
+    periodo,
+    timezone,
+    status: 'FINALIZADA',
+  })
 
   try {
     const apiClient = new ApiClient()
@@ -52,200 +39,61 @@ export async function GET(request: NextRequest) {
       'Content-Type': 'application/json',
     }
 
-    const cacheKey = JSON.stringify({
-      empresaId: tokenInfo.empresaId,
-      periodo,
-      timezone,
-      intervaloCustom: intervaloCustom ?? null,
+    const cacheKey = buildDashboardVendasPeriodoCacheKey({
+      empresaId: tokenInfo.empresaId ?? '',
+      paramsComIntervalo: params,
     })
-    const cached = globalThis.__jiffyTopProdutosCache?.get(cacheKey)
-    if (
-      cached &&
-      cached.expiresAt > Date.now() &&
-      cached.totaisPeriodo != null &&
-      typeof cached.totaisPeriodo.quantidadeTotal === 'number' &&
-      typeof cached.totaisPeriodo.valorTotal === 'number'
-    ) {
-      return NextResponse.json({ items: cached.items, totaisPeriodo: cached.totaisPeriodo })
-    }
 
-    // Paginação 100 em 100 até esgotar vendas do período (totais de produto dependem de todas as vendas).
-    const limitPerPage = 100
-    const vendaIds = new Set<string>()
-    let page = 0
-    let totalPages = 1
+    const detalhes = await obterDetalhesVendasFinalizadasPeriodo({
+      apiClient,
+      headers,
+      paramsComIntervalo: params,
+      cacheKey,
+    })
 
-    while (page < totalPages) {
-      const pageParams = new URLSearchParams(params.toString())
-      pageParams.append('limit', limitPerPage.toString())
-      pageParams.append('offset', (page * limitPerPage).toString())
-
-      const vendasResponse = await apiClient.request<{
-        items?: Array<{ id: string }>
-        count?: number
-        total?: number
-        totalCount?: number
-      }>(`/api/v1/operacao-pdv/vendas?${pageParams.toString()}`, { method: 'GET', headers })
-
-      const items = vendasResponse.data?.items || []
-      items.forEach((v) => {
-        if (v.id) vendaIds.add(v.id)
+    if (detalhes.length === 0) {
+      return NextResponse.json({
+        items: [] as Array<{ produto: string; quantidade: number; valorTotal: number }>,
+        totaisPeriodo: { quantidadeTotal: 0, valorTotal: 0 },
       })
-
-      if (page === 0) {
-        const data = vendasResponse.data || {}
-        const totalCount =
-          (typeof data.count === 'number' && Number.isFinite(data.count) ? data.count : null) ??
-          (typeof data.total === 'number' && Number.isFinite(data.total) ? data.total : null) ??
-          (typeof data.totalCount === 'number' && Number.isFinite(data.totalCount) ? data.totalCount : null)
-
-        if (typeof totalCount === 'number' && totalCount > 0) {
-          totalPages = Math.ceil(totalCount / limitPerPage)
-        } else if (items.length < limitPerPage) {
-          totalPages = 1
-        } else {
-          totalPages = 200 // Fallback seguro
-        }
-      }
-
-      if (items.length < limitPerPage) {
-        break
-      }
-
-      page++
     }
 
-    const vendaIdsArray = Array.from(vendaIds)
-
-    if (vendaIdsArray.length === 0) {
-      const vazio = { items: [] as Array<{ produto: string; quantidade: number; valorTotal: number }>, totaisPeriodo: { quantidadeTotal: 0, valorTotal: 0 } }
-      return NextResponse.json(vazio)
-    }
-
-    const fetchWithConcurrency = async <T, R>(
-      items: T[],
-      concurrency: number,
-      handler: (item: T) => Promise<R>
-    ): Promise<R[]> => {
-      const results: R[] = new Array(items.length)
-      let idx = 0
-
-      const workers = Array.from({ length: Math.max(1, concurrency) }, async () => {
-        while (idx < items.length) {
-          const current = idx++
-          results[current] = await handler(items[current])
-        }
-      })
-
-      await Promise.all(workers)
-      return results
-    }
-
-    const detalhes = await fetchWithConcurrency(
-      vendaIdsArray,
-      10,
-      async (vendaId) => {
-        try {
-          const resp = await apiClient.request<{
-            valorFinal?: number
-            produtosLancados?: Array<{
-              produtoId: string
-              quantidade: number
-              valorFinal: number
-              removido?: boolean
-            }>
-          }>(`/api/v1/operacao-pdv/vendas/${vendaId}`, { method: 'GET', headers })
-          return resp.data
-        } catch {
-          return null
-        }
-      }
-    )
-
-    const aggregationByProdutoId = new Map<string, { quantidade: number; valorTotal: number }>()
-
-    for (const venda of detalhes) {
-      if (!venda?.produtosLancados) continue
-      for (const p of venda.produtosLancados) {
-        if (!p?.produtoId) continue
-        /* Itens cancelados/removidos da comanda não contam como venda efetiva. */
-        if (p.removido === true) continue
-        const existing = aggregationByProdutoId.get(p.produtoId)
-        const quantidade = typeof p.quantidade === 'number' ? p.quantidade : 0
-        const valorTotal = typeof p.valorFinal === 'number' ? p.valorFinal : 0
-        if (existing) {
-          existing.quantidade += quantidade
-          existing.valorTotal += valorTotal
-        } else {
-          aggregationByProdutoId.set(p.produtoId, { quantidade, valorTotal })
-        }
-      }
-    }
-
+    const aggregationByProdutoId = agregarProdutosLancadosPorProdutoId(detalhes)
     const produtoIds = Array.from(aggregationByProdutoId.keys())
-    const nomesCache: Map<string, string> =
-      globalThis.__jiffyProdutoNomeCache ?? (globalThis.__jiffyProdutoNomeCache = new Map())
 
-    const nomes = await fetchWithConcurrency(produtoIds, 10, async (produtoId) => {
-      const cachedName = nomesCache.get(produtoId)
-      if (cachedName) return cachedName
-      try {
-        const resp = await apiClient.request<{ nome?: string }>(`/api/v1/cardapio/produtos/${produtoId}`, {
-          method: 'GET',
-          headers,
-        })
-        const nome = resp.data?.nome ?? 'Produto Desconhecido'
-        nomesCache.set(produtoId, nome)
-        return nome
-      } catch {
-        const nome = 'Produto Desconhecido'
-        nomesCache.set(produtoId, nome)
-        return nome
-      }
+    const miniMap = await buscarCardapioMiniPorProdutoIds({
+      apiClient,
+      headers,
+      produtoIds,
+      concurrency: 20,
     })
-
-    const produtoIdToNome = new Map<string, string>()
-    produtoIds.forEach((id, i) => produtoIdToNome.set(id, nomes[i]))
 
     const todasOrdenadas = Array.from(aggregationByProdutoId.entries())
       .map(([produtoId, agg]) => ({
-        produto: produtoIdToNome.get(produtoId) ?? 'Produto Desconhecido',
+        produto: miniMap.get(produtoId)?.nome ?? 'Produto Desconhecido',
         quantidade: agg.quantidade,
         valorTotal: agg.valorTotal,
       }))
       .sort((a, b) => b.quantidade - a.quantidade)
 
-    /**
-     * Faturamento do período deve bater com Top Garçons e demais visões: soma do `valorFinal`
-     * de cada venda (total da comanda). A soma dos `valorFinal` das linhas em `produtosLancados`
-     * costuma ser menor (taxa de serviço, taxa de entrega, desconto global, etc. não repartidos
-     * por item na API).
-     */
-    let valorTotalPeriodoVendas = 0
-    for (const venda of detalhes) {
-      if (!venda) continue
-      const vf = venda.valorFinal
-      if (typeof vf === 'number' && Number.isFinite(vf)) {
-        valorTotalPeriodoVendas += vf
-      }
-    }
-
+    const valorTotalPeriodoVendas = somarValorFinalDasVendas(detalhes)
     let quantidadeTotalPeriodo = 0
     for (const row of todasOrdenadas) {
       quantidadeTotalPeriodo += row.quantidade
     }
 
     const items = todasOrdenadas.slice(0, TOP_PRODUTOS_CARD_LIMIT)
-    const totaisPeriodo = {
-      quantidadeTotal: quantidadeTotalPeriodo,
-      valorTotal: valorTotalPeriodoVendas,
-    }
 
-    const ttlMs = 30_000
-    globalThis.__jiffyTopProdutosCache ??= new Map()
-    globalThis.__jiffyTopProdutosCache.set(cacheKey, { expiresAt: Date.now() + ttlMs, items, totaisPeriodo })
-
-    return NextResponse.json({ items, totaisPeriodo })
+    return NextResponse.json(
+      {
+        items,
+        totaisPeriodo: {
+          quantidadeTotal: quantidadeTotalPeriodo,
+          valorTotal: valorTotalPeriodoVendas,
+        },
+      },
+      { headers: { 'Cache-Control': 'private, max-age=30' } }
+    )
   } catch (error) {
     console.error('Erro ao buscar top produtos:', error)
     if (error instanceof ApiError) {

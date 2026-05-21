@@ -145,7 +145,7 @@ function mapearPeriodoUrlParaSelect(v: string): string {
 }
 
 function normalizarPeriodoSelect(v: string | undefined): string {
-  if (!v) return 'Todos'
+  if (!v) return 'Hoje'
   const mapped = mapearPeriodoUrlParaSelect(v)
   if ((PERIODOS_SELECT_VALIDOS as readonly string[]).includes(mapped)) return mapped
   return 'Todos'
