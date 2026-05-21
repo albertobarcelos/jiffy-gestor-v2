@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import type {
+  RelatorioProdutosVendidosMvpParticipacaoAbcDTO,
   RelatorioProdutosVendidosMvpParticipacaoDTO,
   RelatorioProdutosVendidosMvpSerieDTO,
 } from '@/src/shared/types/relatoriosProdutosVendidosMvpApi'
@@ -85,6 +86,24 @@ async function fetchBlocoParticipacao(
   return data as unknown as RelatorioProdutosVendidosMvpParticipacaoDTO
 }
 
+async function fetchBlocoParticipacaoAbc(
+  params: RelatorioMvpBlocoQueryParams & { token: string; timezone: string }
+): Promise<RelatorioProdutosVendidosMvpParticipacaoAbcDTO> {
+  const search = new URLSearchParams()
+  appendFiltrosBloco(search, params, params.timezone)
+  search.append('somenteParticipacaoAbc', '1')
+
+  const response = await fetch(`/api/relatorios/produtos-vendidos/mvp?${search.toString()}`, {
+    headers: { Authorization: `Bearer ${params.token}` },
+  })
+  const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
+  if (!response.ok) {
+    const msg = typeof data.error === 'string' ? data.error : 'Erro ao carregar distribuição ABC.'
+    throw new Error(msg)
+  }
+  return data as unknown as RelatorioProdutosVendidosMvpParticipacaoAbcDTO
+}
+
 async function fetchBlocoSerie(
   params: RelatorioMvpBlocoQueryParams & { token: string; timezone: string }
 ): Promise<RelatorioProdutosVendidosMvpSerieDTO> {
@@ -118,6 +137,30 @@ export function useRelatorioProdutosVendidosMvpParticipacaoQuery(params: Relator
     ],
     queryFn: () =>
       fetchBlocoParticipacao({
+        ...params,
+        token: token!,
+        timezone: resolvedTimezone,
+      }),
+    enabled: enabled && !!token && params.dadosBaseProntos,
+    staleTime: 30_000,
+  })
+}
+
+/** SPA: distribuição ABC — só quando o modal está aberto. */
+export function useRelatorioProdutosVendidosMvpParticipacaoAbcQuery(params: RelatorioMvpBlocoQueryParams) {
+  const { auth } = useAuthStore()
+  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
+  const resolvedTimezone = params.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
+  const enabled = params.enabled !== false
+
+  return useQuery({
+    queryKey: [
+      ...buildRelatorioMvpQueryKeyPrefix(empresaId, filtrosKeyParams(params, resolvedTimezone)),
+      'bloco-participacao-abc',
+    ],
+    queryFn: () =>
+      fetchBlocoParticipacaoAbc({
         ...params,
         token: token!,
         timezone: resolvedTimezone,

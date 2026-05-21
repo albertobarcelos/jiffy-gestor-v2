@@ -91,8 +91,9 @@ export function MvpFiltersBar({
       </div>
 
       <div
-        className={`flex flex-wrap items-end justify-center gap-x-2 gap-y-3 rounded-t-lg bg-custom-2 px-2 pb-2 pt-3 md:justify-start ${filtrosVisiveis}`}
+        className={`flex flex-wrap items-end justify-between gap-x-2 gap-y-3 rounded-t-lg bg-custom-2 px-2 pb-2 pt-3 ${filtrosVisiveis}`}
       >
+        <div className="flex flex-wrap items-end justify-center gap-x-2 gap-y-3 md:justify-start">
         <FormControl size="small" variant="outlined" sx={{ ...sxRelatorioFiltroSelectBase, minWidth: 200 }}>
           <InputLabel id="mvp-filtro-grupo-label" shrink>
             Grupo de produtos
@@ -182,45 +183,6 @@ export function MvpFiltersBar({
           InputLabelProps={{ shrink: true }}
         />
 
-        <span className="font-exo shrink-0 self-center text-sm text-primary">Período:</span>
-        <FormControl size="small" sx={sxRelatorioFiltroSelectPeriodo}>
-          <Select
-            value={values.filtroPeriodo}
-            onChange={e =>
-              set({
-                filtroPeriodo: e.target.value as FiltroPeriodoRelatorio,
-                periodoPersonalizadoInicio: null,
-                periodoPersonalizadoFim: null,
-              })
-            }
-          >
-            {OPCOES_PERIODO_RELATORIO_MVP.map(op => (
-              <MenuItem key={op.value} value={op.value}>
-                {op.label}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-
-        <button
-          type="button"
-          onClick={() => setIsDatasModalOpen(true)}
-          className="font-nunito flex h-8 shrink-0 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
-        >
-          <MdCalendarToday size={18} />
-          Por datas
-        </button>
-        {values.periodoPersonalizadoInicio && values.periodoPersonalizadoFim ? (
-          <div className="flex shrink-0 flex-col gap-0 self-center text-[11px] leading-snug text-primary/85 sm:text-xs">
-            <span className="whitespace-nowrap">
-              Dt. Ini.: {formatarDataHoraFiltroCurta(values.periodoPersonalizadoInicio)}
-            </span>
-            <span className="whitespace-nowrap">
-              Dt. Fim: {formatarDataHoraFiltroCurta(values.periodoPersonalizadoFim)}
-            </span>
-          </div>
-        ) : null}
-
         <button
           type="button"
           onClick={onLimpar}
@@ -237,6 +199,48 @@ export function MvpFiltersBar({
         >
           Aplicar filtros
         </button>
+        </div>
+
+        <div className="flex flex-wrap items-end justify-end gap-x-2 gap-y-3">
+          <span className="font-exo shrink-0 self-center text-sm text-primary">Período:</span>
+          <FormControl size="small" sx={sxRelatorioFiltroSelectPeriodo}>
+            <Select
+              value={values.filtroPeriodo}
+              onChange={e =>
+                set({
+                  filtroPeriodo: e.target.value as FiltroPeriodoRelatorio,
+                  periodoPersonalizadoInicio: null,
+                  periodoPersonalizadoFim: null,
+                })
+              }
+            >
+              {OPCOES_PERIODO_RELATORIO_MVP.map(op => (
+                <MenuItem key={op.value} value={op.value}>
+                  {op.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <button
+            type="button"
+            onClick={() => setIsDatasModalOpen(true)}
+            className="font-nunito flex h-8 shrink-0 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
+          >
+            <MdCalendarToday size={18} />
+            Por datas
+          </button>
+          {values.periodoPersonalizadoInicio && values.periodoPersonalizadoFim ? (
+            <div className="flex shrink-0 flex-col gap-0 self-center text-[11px] leading-snug text-primary/85 sm:text-xs">
+              <span className="whitespace-nowrap">
+                Dt. Ini.: {formatarDataHoraFiltroCurta(values.periodoPersonalizadoInicio)}
+              </span>
+              <span className="whitespace-nowrap">
+                Dt. Fim: {formatarDataHoraFiltroCurta(values.periodoPersonalizadoFim)}
+              </span>
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <MvpPorDatasModal

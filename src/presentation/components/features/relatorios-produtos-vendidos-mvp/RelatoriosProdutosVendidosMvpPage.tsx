@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { assumirDateComoNoFusoEmpresaParaUtc } from '@/src/shared/utils/periodoNoFusoEmpresa'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
@@ -9,6 +9,7 @@ import {
   useRelatorioProdutosVendidosMvpInfiniteQuery,
 } from '@/src/presentation/hooks/useRelatorioProdutosVendidosMvpQuery'
 import {
+  useRelatorioProdutosVendidosMvpParticipacaoAbcQuery,
   useRelatorioProdutosVendidosMvpParticipacaoQuery,
   useRelatorioProdutosVendidosMvpSerieQuery,
 } from '@/src/presentation/hooks/useRelatorioProdutosVendidosMvpBlocosQuery'
@@ -24,14 +25,17 @@ import type {
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { MvpFiltersBar } from './components/MvpFiltersBar'
 import { MvpKpiGrid } from './components/MvpKpiGrid'
+import { MvpChartAbc } from './components/MvpChartAbc'
 import { MvpChartParticipacao } from './components/MvpChartParticipacao'
 import { MvpChartEvolucao } from './components/MvpChartEvolucao'
 import { MvpProdutosTable } from './components/MvpProdutosTable'
 import { MvpRelatorioToolbarActions } from './components/MvpToolbar'
 import { MvpPersonalizarDrawer } from './components/MvpPersonalizarDrawer'
 import { MvpPainelAsync } from './components/MvpPainelAsync'
+import { MvpChartModal } from './components/MvpChartModal'
+import { useMvpChartTipos } from './hooks/useMvpChartTipos'
 import { useMvpPersonalizacao } from './hooks/useMvpPersonalizacao'
-import type { MvpColunaId, MvpPaineisVisibilidade, MvpPersonalizacaoLayout } from './mvpPersonalizacao'
+import type { MvpColunaId, MvpPersonalizacaoLayout } from './mvpPersonalizacao'
 
 const defaultFiltros: RelatoriosProdutosVendidosFiltersValues = {
   filtroPeriodo: 'hoje',
@@ -57,8 +61,14 @@ export function RelatoriosProdutosVendidosMvpPage() {
   const [filtros, setFiltros] = useState<RelatoriosProdutosVendidosFiltersValues>(defaultFiltros)
   const [filtrosQuery, setFiltrosQuery] = useState<RelatoriosProdutosVendidosFiltersValues>(defaultFiltros)
   const [drawerAberto, setDrawerAberto] = useState(false)
+  const [modalGrafico, setModalGrafico] = useState<'grupos' | 'abc' | 'evolucao' | null>(null)
+
+  const modalGruposAberto = modalGrafico === 'grupos'
+  const modalAbcAberto = modalGrafico === 'abc'
+  const modalEvolucaoAberto = modalGrafico === 'evolucao'
 
   const { layout, persistLayout, patchPaineis } = useMvpPersonalizacao()
+  const { tipoGrupos, tipoEvolucao, setTipoGrupos, setTipoEvolucao } = useMvpChartTipos()
 
   const { data: gruposData, isLoading: gruposLoading } = useGruposProdutos({ limit: 500, ativo: true })
   const gruposOptions = useMemo(
@@ -81,6 +91,8 @@ export function RelatoriosProdutosVendidosMvpPage() {
     return assumirDateComoNoFusoEmpresaParaUtc(filtrosQuery.periodoPersonalizadoFim, tz)
   }, [temIntervaloPorDatas, filtrosQuery.periodoPersonalizadoFim, tz])
 
+  const [totalProdutosEsperado, setTotalProdutosEsperado] = useState<number | undefined>(undefined)
+
   const filtrosApi = useMemo(
     () => ({
       periodo: periodoApi,
@@ -94,8 +106,9 @@ export function RelatoriosProdutosVendidosMvpPage() {
       qtdMin: filtrosQuery.qtdMin,
       qtdMax: filtrosQuery.qtdMax,
       buscaNome: filtrosQuery.buscaNome,
+      totalProdutosEsperado,
     }),
-    [periodoApi, periodoInicialApi, periodoFinalApi, tz, filtrosQuery]
+    [periodoApi, periodoInicialApi, periodoFinalApi, tz, filtrosQuery, totalProdutosEsperado]
   )
 
   const {
@@ -138,7 +151,18 @@ export function RelatoriosProdutosVendidosMvpPage() {
   } = useRelatorioProdutosVendidosMvpParticipacaoQuery({
     ...filtrosApi,
     dadosBaseProntos,
-    enabled: layout.paineis.participacao,
+    enabled: modalGruposAberto,
+  })
+
+  const {
+    data: participacaoAbcData,
+    isFetching: participacaoAbcFetching,
+    error: participacaoAbcError,
+    refetch: refetchParticipacaoAbc,
+  } = useRelatorioProdutosVendidosMvpParticipacaoAbcQuery({
+    ...filtrosApi,
+    dadosBaseProntos,
+    enabled: modalAbcAberto,
   })
 
   const {
@@ -149,11 +173,27 @@ export function RelatoriosProdutosVendidosMvpPage() {
   } = useRelatorioProdutosVendidosMvpSerieQuery({
     ...filtrosApi,
     dadosBaseProntos,
-    enabled: layout.paineis.evolucao,
+    enabled: modalEvolucaoAberto,
   })
 
   const kpisExibicao = comparativoData?.kpis ?? firstPage?.kpis
   const mockFlagsExibicao = comparativoData?.mockFlags ?? firstPage?.mockFlags
+
+  useEffect(() => {
+    setTotalProdutosEsperado(undefined)
+  }, [filtrosQuery])
+
+  useEffect(() => {
+    const total =
+      comparativoData?.kpis?.produtosDistintosAtual ?? firstPage?.kpis?.produtosDistintosAtual
+    if (total != null && total !== totalProdutosEsperado) {
+      setTotalProdutosEsperado(total)
+    }
+  }, [
+    comparativoData?.kpis?.produtosDistintosAtual,
+    firstPage?.kpis?.produtosDistintosAtual,
+    totalProdutosEsperado,
+  ])
 
   const listItems = useMemo((): RelatorioProdutoVendidoLinhaDTO[] => {
     return data?.pages.flatMap(p => p.items) ?? []
@@ -172,7 +212,15 @@ export function RelatoriosProdutosVendidosMvpPage() {
     return [...map.values()]
   }, [comparativoData, data])
 
-  const totalFiltrado = firstPage?.totalFiltrado ?? 0
+  const totalFiltrado = useMemo(() => {
+    const pages = data?.pages ?? []
+    const fromPages = pages.length ? Math.max(...pages.map(p => p.totalFiltrado ?? 0)) : 0
+    const fromKpi = kpisExibicao?.produtosDistintosAtual ?? 0
+    return Math.max(fromPages, fromKpi)
+  }, [data, kpisExibicao])
+
+  const temMaisProdutosNaLista = listItems.length < totalFiltrado
+  const hasNextPageEfetivo = (hasNextPage ?? false) || temMaisProdutosNaLista
 
   const onAplicar = useCallback(() => {
     setFiltrosQuery(filtros)
@@ -211,32 +259,58 @@ export function RelatoriosProdutosVendidosMvpPage() {
   }, [])
 
   const handleLoadMore = useCallback(() => {
-    if (hasNextPage && !isFetchingNextPage) {
-      void fetchNextPage()
-    }
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+    if (isFetchingNextPage || !hasNextPageEfetivo) return
+    void fetchNextPage()
+  }, [hasNextPageEfetivo, isFetchingNextPage, fetchNextPage])
+
+  /**
+   * Quando o comparativo revela o total (ex.: 163) depois das 2 primeiras páginas,
+   * `getNextPageParam` passa a indicar mais páginas — dispara uma busca sem loop infinito.
+   */
+  useEffect(() => {
+    if (!dadosBaseProntos || isLoading || isFetchingNextPage) return
+    if (totalProdutosEsperado == null || listItems.length >= totalFiltrado) return
+    if (!(hasNextPage ?? false)) return
+    void fetchNextPage()
+  }, [totalProdutosEsperado])
 
   const handleAtualizar = useCallback(() => {
     void refetch()
     if (precisaComparativo) void refetchComparativo()
-    if (layout.paineis.participacao) void refetchParticipacao()
-    if (layout.paineis.evolucao) void refetchSerie()
+    if (modalGruposAberto) void refetchParticipacao()
+    if (modalAbcAberto) void refetchParticipacaoAbc()
+    if (modalEvolucaoAberto) void refetchSerie()
   }, [
     refetch,
     refetchComparativo,
     refetchParticipacao,
+    refetchParticipacaoAbc,
     refetchSerie,
     precisaComparativo,
-    layout.paineis.participacao,
-    layout.paineis.evolucao,
+    modalGruposAberto,
+    modalAbcAberto,
+    modalEvolucaoAberto,
   ])
 
-  const handleTogglePainel = useCallback(
-    (key: keyof MvpPaineisVisibilidade) => {
-      patchPaineis({ [key]: !layout.paineis[key] })
-    },
-    [layout.paineis, patchPaineis]
-  )
+  const handleToggleKpis = useCallback(() => {
+    patchPaineis({ kpis: !layout.paineis.kpis })
+  }, [layout.paineis.kpis, patchPaineis])
+
+  const handleToggleModalGrupos = useCallback(() => {
+    setModalGrafico(prev => (prev === 'grupos' ? null : 'grupos'))
+  }, [])
+
+  const handleToggleModalAbc = useCallback(() => {
+    setModalGrafico(prev => (prev === 'abc' ? null : 'abc'))
+  }, [])
+
+  const handleToggleModalEvolucao = useCallback(() => {
+    setModalGrafico(prev => (prev === 'evolucao' ? null : 'evolucao'))
+  }, [])
+
+  const handleFecharModalGrafico = useCallback(() => {
+    setModalGrafico(null)
+  }, [])
 
   const handleAplicarPersonalizacao = useCallback(
     (next: MvpPersonalizacaoLayout) => {
@@ -257,13 +331,14 @@ export function RelatoriosProdutosVendidosMvpPage() {
   const atualizando =
     isFetching ||
     (precisaComparativo && comparativoFetching) ||
-    (layout.paineis.participacao && participacaoFetching) ||
-    (layout.paineis.evolucao && serieFetching)
+    (modalGruposAberto && participacaoFetching) ||
+    (modalAbcAberto && participacaoAbcFetching) ||
+    (modalEvolucaoAberto && serieFetching)
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex w-full flex-col py-1">
-        <p className="px-[30px] text-lg font-semibold text-primary">Produtos vendidos</p>
+        <p className="px-[30px] text-lg font-semibold text-primary">Relatórios de Produtos Vendidos</p>
       </div>
       <div className="h-[1px] flex-shrink-0 border-t-2 border-primary/70" />
 
@@ -281,8 +356,14 @@ export function RelatoriosProdutosVendidosMvpPage() {
               onAtualizar={handleAtualizar}
               atualizando={atualizando}
               onPersonalizar={() => setDrawerAberto(true)}
-              paineis={layout.paineis}
-              onTogglePainel={handleTogglePainel}
+              kpisVisivel={layout.paineis.kpis}
+              onToggleKpis={handleToggleKpis}
+              modalGruposAberto={modalGruposAberto}
+              onToggleModalGrupos={handleToggleModalGrupos}
+              modalAbcAberto={modalAbcAberto}
+              onToggleModalAbc={handleToggleModalAbc}
+              modalEvolucaoAberto={modalEvolucaoAberto}
+              onToggleModalEvolucao={handleToggleModalEvolucao}
             />
           }
         />
@@ -309,41 +390,6 @@ export function RelatoriosProdutosVendidosMvpPage() {
               </MvpPainelAsync>
             ) : null}
 
-            {layout.paineis.participacao || layout.paineis.evolucao ? (
-              <div
-                className={`m-1 grid gap-2 ${
-                  layout.paineis.participacao && layout.paineis.evolucao
-                    ? 'xl:grid-cols-2'
-                    : 'grid-cols-1'
-                }`}
-              >
-                {layout.paineis.participacao ? (
-                  <MvpPainelAsync
-                    loading={participacaoFetching && !participacaoData}
-                    error={participacaoError}
-                    minHeightClass="min-h-[min(24rem,45vh)]"
-                  >
-                    <MvpChartParticipacao dados={participacaoData?.participacaoGrupos} />
-                  </MvpPainelAsync>
-                ) : null}
-                {layout.paineis.evolucao ? (
-                  <MvpPainelAsync
-                    loading={serieFetching && !serieData}
-                    error={serieError}
-                    minHeightClass="min-h-[min(24rem,45vh)]"
-                  >
-                    <MvpChartEvolucao
-                      serieTemporal={serieData?.serieTemporal}
-                      serieSimplificada={
-                        serieData?.mockFlags?.serieSimplificada ??
-                        mockFlagsExibicao?.serieSimplificada
-                      }
-                    />
-                  </MvpPainelAsync>
-                ) : null}
-              </div>
-            ) : null}
-
             <MvpProdutosTable
               items={listItems}
               rankingsPorProduto={rankingsPorProduto}
@@ -352,7 +398,7 @@ export function RelatoriosProdutosVendidosMvpPage() {
               sort={filtrosQuery.sort}
               onSortChange={handleSortChange}
               isFetchingNextPage={isFetchingNextPage}
-              hasNextPage={hasNextPage ?? false}
+              hasNextPage={hasNextPageEfetivo}
               onLoadMore={handleLoadMore}
             />
           </>
@@ -365,6 +411,62 @@ export function RelatoriosProdutosVendidosMvpPage() {
         layout={layout}
         onAplicar={handleAplicarPersonalizacao}
       />
+
+      <MvpChartModal
+        open={modalGruposAberto}
+        onClose={handleFecharModalGrafico}
+        title="Participação por grupos"
+      >
+        <MvpPainelAsync
+          loading={participacaoFetching && !participacaoData}
+          error={participacaoError}
+          minHeightClass="min-h-[min(24rem,50vh)]"
+        >
+          <MvpChartParticipacao
+            dados={participacaoData?.participacaoGrupos}
+            tipoGrafico={tipoGrupos}
+            onTipoGraficoChange={setTipoGrupos}
+          />
+        </MvpPainelAsync>
+      </MvpChartModal>
+
+      <MvpChartModal
+        open={modalAbcAberto}
+        onClose={handleFecharModalGrafico}
+        title="Distribuição de Curvas ABC"
+      >
+        <MvpPainelAsync
+          loading={participacaoAbcFetching && !participacaoAbcData}
+          error={participacaoAbcError}
+          minHeightClass="min-h-[min(24rem,50vh)]"
+        >
+          <MvpChartAbc dados={participacaoAbcData?.participacaoAbc} />
+        </MvpPainelAsync>
+      </MvpChartModal>
+
+      <MvpChartModal
+        open={modalEvolucaoAberto}
+        onClose={handleFecharModalGrafico}
+        title="Evolução diária"
+      >
+        <MvpPainelAsync
+          loading={serieFetching && !serieData}
+          error={serieError}
+          minHeightClass="min-h-[min(24rem,50vh)]"
+        >
+          <MvpChartEvolucao
+            serieTemporal={serieData?.serieTemporal}
+            serieSimplificada={
+              serieData?.mockFlags?.serieSimplificada ?? mockFlagsExibicao?.serieSimplificada
+            }
+            serieGranularidade={
+              serieData?.mockFlags?.serieGranularidade ?? mockFlagsExibicao?.serieGranularidade
+            }
+            tipoGrafico={tipoEvolucao}
+            onTipoGraficoChange={setTipoEvolucao}
+          />
+        </MvpPainelAsync>
+      </MvpChartModal>
     </div>
   )
 }

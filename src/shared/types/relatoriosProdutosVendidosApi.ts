@@ -47,4 +47,8 @@ export interface RelatorioProdutosVendidosResponseDTO {
   totalFiltrado: number
   limit: number
   offset: number
+  /** Há mais linhas após esta página (paginação em memória no BFF). */
+  temMais?: boolean
+  /** Próximo offset sugerido; null quando não há mais itens. */
+  nextOffset?: number | null
 }

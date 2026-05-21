@@ -5,11 +5,10 @@ import {
   MdBarChart,
   MdDonutLarge,
   MdInsights,
+  MdPieChart,
   MdRefresh,
   MdTune,
 } from 'react-icons/md'
-import type { MvpPaineisVisibilidade } from '../mvpPersonalizacao'
-
 function TogglePainelBtn({
   active,
   onClick,
@@ -41,33 +40,57 @@ function TogglePainelBtn({
   )
 }
 
-/** KPIs, gráficos, personalizar e atualizar — alinhado à barra de filtros. */
+/** KPIs, gráficos (modal), personalizar e atualizar — alinhado à barra de filtros. */
 export function MvpRelatorioToolbarActions(props: {
   onAtualizar: () => void
   atualizando: boolean
   onPersonalizar: () => void
-  paineis: MvpPaineisVisibilidade
-  onTogglePainel: (key: keyof MvpPaineisVisibilidade) => void
+  kpisVisivel: boolean
+  onToggleKpis: () => void
+  modalGruposAberto: boolean
+  onToggleModalGrupos: () => void
+  modalEvolucaoAberto: boolean
+  onToggleModalEvolucao: () => void
+  modalAbcAberto: boolean
+  onToggleModalAbc: () => void
 }) {
-  const { onAtualizar, atualizando, onPersonalizar, paineis, onTogglePainel } = props
+  const {
+    onAtualizar,
+    atualizando,
+    onPersonalizar,
+    kpisVisivel,
+    onToggleKpis,
+    modalGruposAberto,
+    onToggleModalGrupos,
+    modalEvolucaoAberto,
+    onToggleModalEvolucao,
+    modalAbcAberto,
+    onToggleModalAbc,
+  } = props
 
   return (
     <div className="font-nunito ml-1 flex shrink-0 flex-wrap items-center gap-1.5 border-l border-primary/20 pl-2">
       <TogglePainelBtn
-        active={paineis.kpis}
-        onClick={() => onTogglePainel('kpis')}
+        active={kpisVisivel}
+        onClick={onToggleKpis}
         icon={<MdInsights size={18} />}
         label="KPIs"
       />
       <TogglePainelBtn
-        active={paineis.participacao}
-        onClick={() => onTogglePainel('participacao')}
+        active={modalGruposAberto}
+        onClick={onToggleModalGrupos}
         icon={<MdDonutLarge size={18} />}
         label="Grupos"
       />
       <TogglePainelBtn
-        active={paineis.evolucao}
-        onClick={() => onTogglePainel('evolucao')}
+        active={modalAbcAberto}
+        onClick={onToggleModalAbc}
+        icon={<MdPieChart size={18} />}
+        label="ABC"
+      />
+      <TogglePainelBtn
+        active={modalEvolucaoAberto}
+        onClick={onToggleModalEvolucao}
         icon={<MdBarChart size={18} />}
         label="Evolução"
       />

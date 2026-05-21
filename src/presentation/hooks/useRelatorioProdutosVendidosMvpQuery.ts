@@ -416,7 +416,13 @@ export type RelatorioProdutosVendidosMvpInfiniteParams = Omit<
 
   'limit' | 'offset'
 
->
+> & {
+  /**
+   * Total de produtos (ex.: KPI do comparativo) quando as páginas da lista
+   * ainda reportam `temMais: false` ou `totalFiltrado` menor que o real.
+   */
+  totalProdutosEsperado?: number
+}
 
 
 
@@ -512,14 +518,32 @@ export function useRelatorioProdutosVendidosMvpInfiniteQuery(
 
     initialPageParam: 0,
 
-    getNextPageParam: lastPage => {
+    getNextPageParam: (lastPage, allPages) => {
+      const carregados = allPages.reduce((acc, page) => acc + page.items.length, 0)
 
-      const next = lastPage.offset + lastPage.items.length
+      const totalEsperado = Math.max(
+        0,
+        params.totalProdutosEsperado ?? 0,
+        lastPage.totalFiltrado ?? 0,
+        lastPage.kpis?.produtosDistintosAtual ?? 0,
+        ...allPages.map(p => p.totalFiltrado ?? 0),
+        ...allPages.map(p => p.kpis?.produtosDistintosAtual ?? 0)
+      )
 
-      if (next >= lastPage.totalFiltrado) return undefined
+      if (carregados >= totalEsperado) return undefined
 
-      return next
+      if (lastPage.items.length === 0) {
+        const offsetsJaPedidos = new Set(allPages.map(p => p.offset ?? 0))
+        const proximoOffset = lastPage.nextOffset ?? carregados
+        if (offsetsJaPedidos.has(proximoOffset)) return undefined
+        return proximoOffset
+      }
 
+      if (lastPage.temMais && lastPage.nextOffset != null && lastPage.nextOffset >= carregados) {
+        return lastPage.nextOffset
+      }
+
+      return carregados
     },
 
     enabled: enabled && !!token,

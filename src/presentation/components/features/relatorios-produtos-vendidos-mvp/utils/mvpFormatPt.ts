@@ -1,4 +1,5 @@
 import { formatarMoeda } from '@/src/presentation/components/features/dashboard/dashboardTextHelpers'
+import type { RelatorioSerieGranularidade } from '@/src/shared/types/relatoriosProdutosVendidosMvpApi'
 
 export { formatarMoeda }
 
@@ -7,6 +8,19 @@ export function formatarDiaDm(isoDay: string): string {
   const m = isoDay.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/)
   if (!m) return isoDay
   return `${m[3]}/${m[2]}`
+}
+
+/** Rótulo do bucket da série temporal (dia ou hora no fuso da empresa). */
+export function formatarRotuloSerieEvolucao(
+  bucket: string,
+  granularidade: RelatorioSerieGranularidade = 'dia'
+): string {
+  if (granularidade === 'hora') {
+    const m = bucket.trim().match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2})$/)
+    if (m) return `${m[4]}h`
+    return bucket
+  }
+  return formatarDiaDm(bucket)
 }
 
 export function formatarVariacaoPct(p: number | null | undefined, digits = 1): string {

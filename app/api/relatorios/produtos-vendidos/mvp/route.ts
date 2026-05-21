@@ -14,12 +14,14 @@ import {
 import {
   combinarPayloadMvp,
   montarKpisMvp,
+  montarParticipacaoAbc,
   montarParticipacaoGrupos,
   montarRankingEVariacoes,
 } from '@/src/infrastructure/relatorios/montarRelatorioProdutosVendidosMvpPayload'
 import {
   buildRelatorioAgregadoCacheKey,
   getRelatorioAgregadoCache,
+  obterRelatorioAgregadoComSingleFlight,
   setRelatorioAgregadoCache,
   type PipelineOptsForCache,
   type RelatorioAgregadoCacheEntry,
@@ -30,9 +32,11 @@ import {
   periodoRelatorioSlidingAnterior,
 } from '@/src/infrastructure/relatorios/periodoRelatorioDeslizante'
 import {
-  computarSerieDiariaValorProdutosFiltrados,
+  computarSerieValorProdutosFiltrados,
+  resolverGranularidadeSerie,
   resolverTopProdutoIdsPorValor,
 } from '@/src/infrastructure/relatorios/serieDiariaProdutosVendidos'
+import type { RelatorioSerieGranularidade } from '@/src/shared/types/relatoriosProdutosVendidosMvpApi'
 import type {
   ProdutoRankingAnteriorDTO,
   RelatorioProdutosVendidosMvpResponseDTO,
@@ -46,7 +50,7 @@ import type { RelatorioProdutosVendidosTotaisFiltradosDTO } from '@/src/shared/t
  * - Agregação cacheada ~90s por empresa + filtros.
  * - Carga principal: só período atual (`comparativo=0` na 1ª página).
  * - `somenteComparativo=1`: período anterior em 2ª requisição (usa cache do atual).
- * - `somenteParticipacao=1` / `somenteSerie=1`: blocos SPA sob demanda (cache do período atual).
+ * - `somenteParticipacao=1` / `somenteParticipacaoAbc=1` / `somenteSerie=1`: blocos SPA sob demanda.
  * - `participacao=0` / `serie=0` na carga base: lista leve sem gráficos.
  * - `somentePagina=1` + `offset>0`: paginação em memória.
  */
@@ -58,9 +62,15 @@ function diasAbsIntervaloUtc(a: Date, b: Date): number {
 
 function montarSerieTemporal(
   atual: ExecRelatorioProdutosVendidosResult,
-  timezone: string
-): RelatorioProdutosVendidosMvpResponseDTO['serieTemporal'] {
-  if (atual.detalhes.length === 0) return []
+  timezone: string,
+  paramsIntervaloPdV: URLSearchParams
+): {
+  serie: RelatorioProdutosVendidosMvpResponseDTO['serieTemporal']
+  granularidade: RelatorioSerieGranularidade
+} {
+  if (atual.detalhes.length === 0) {
+    return { serie: [], granularidade: resolverGranularidadeSerie(paramsIntervaloPdV, timezone) }
+  }
   const topIds = resolverTopProdutoIdsPorValor(
     atual.linhasFiltradasOrdenadas.map(r => ({
       produtoId: r.produtoId,
@@ -72,7 +82,15 @@ function montarSerieTemporal(
     const n = mini?.nome?.trim()
     if (n) nomePorId.set(id, n)
   }
-  return computarSerieDiariaValorProdutosFiltrados(atual.detalhes, timezone, topIds, nomePorId).serie
+  const granularidade = resolverGranularidadeSerie(paramsIntervaloPdV, timezone)
+  const { serie } = computarSerieValorProdutosFiltrados(
+    atual.detalhes,
+    timezone,
+    topIds,
+    { granularidade, paramsIntervaloPdV },
+    nomePorId
+  )
+  return { serie, granularidade }
 }
 
 function calcularRanking(
@@ -118,6 +136,7 @@ async function carregarPeriodoAtual(args: {
   atual: ExecRelatorioProdutosVendidosResult
   serieTemporal: RelatorioProdutosVendidosMvpResponseDTO['serieTemporal']
   serieSimplificada: boolean
+  serieGranularidade: RelatorioSerieGranularidade
 }> {
   const atual = await executarRelatorioProdutosVendidosPipeline({
     ...args.pipelineBase,
@@ -127,9 +146,15 @@ async function carregarPeriodoAtual(args: {
 
   let serieTemporal: RelatorioProdutosVendidosMvpResponseDTO['serieTemporal'] = []
   let serieSimplificada = false
+  let serieGranularidade = resolverGranularidadeSerie(
+    args.pipelineBase.paramsIntervaloPdV,
+    args.timezone
+  )
 
   if (args.incluirSerie && atual.detalhes.length > 0) {
-    serieTemporal = montarSerieTemporal(atual, args.timezone)
+    const montado = montarSerieTemporal(atual, args.timezone, args.pipelineBase.paramsIntervaloPdV)
+    serieTemporal = montado.serie
+    serieGranularidade = montado.granularidade
     if (
       serieTemporal.length === 0 &&
       atual.linhasFiltradasOrdenadas.length > 0 &&
@@ -139,7 +164,7 @@ async function carregarPeriodoAtual(args: {
     }
   }
 
-  return { atual, serieTemporal, serieSimplificada }
+  return { atual, serieTemporal, serieSimplificada, serieGranularidade }
 }
 
 function totaisFiltradosFromAgregado(atual: ExecRelatorioProdutosVendidosResult): RelatorioProdutosVendidosTotaisFiltradosDTO {
@@ -153,27 +178,37 @@ function totaisFiltradosFromAgregado(atual: ExecRelatorioProdutosVendidosResult)
 async function garantirSerieNoAgregado(args: {
   cacheKey: string
   timezone: string
+  paramsIntervaloPdV: URLSearchParams
 }): Promise<{
   serieTemporal: RelatorioProdutosVendidosMvpResponseDTO['serieTemporal']
   serieSimplificada: boolean
+  serieGranularidade: RelatorioSerieGranularidade
 }> {
   const cached = getRelatorioAgregadoCache(args.cacheKey)
   if (!cached) {
-    return { serieTemporal: [], serieSimplificada: false }
+    return { serieTemporal: [], serieSimplificada: false, serieGranularidade: 'dia' }
   }
 
   if (cached.serieTemporal.length > 0) {
     return {
       serieTemporal: cached.serieTemporal,
       serieSimplificada: cached.mockFlags.serieSimplificada ?? false,
+      serieGranularidade: cached.mockFlags.serieGranularidade ?? 'dia',
     }
   }
 
   let serieTemporal: RelatorioProdutosVendidosMvpResponseDTO['serieTemporal'] = []
   let serieSimplificada = false
+  let serieGranularidade: RelatorioSerieGranularidade = 'dia'
 
   if (cached.atual.detalhes.length > 0) {
-    serieTemporal = montarSerieTemporal(cached.atual, args.timezone)
+    const montado = montarSerieTemporal(
+      cached.atual,
+      args.timezone,
+      args.paramsIntervaloPdV
+    )
+    serieTemporal = montado.serie
+    serieGranularidade = montado.granularidade
     if (
       serieTemporal.length === 0 &&
       cached.atual.linhasFiltradasOrdenadas.length > 0 &&
@@ -189,10 +224,11 @@ async function garantirSerieNoAgregado(args: {
     mockFlags: {
       ...cached.mockFlags,
       serieSimplificada,
+      serieGranularidade,
     },
   })
 
-  return { serieTemporal, serieSimplificada }
+  return { serieTemporal, serieSimplificada, serieGranularidade }
 }
 
 /** Só período atual; comparativo vem em `somenteComparativo=1`. */
@@ -204,36 +240,39 @@ async function obterAgregadoComCache(args: {
   timezone: string
   incluirSerie: boolean
 }): Promise<RelatorioAgregadoCacheEntry> {
-  const cached = getRelatorioAgregadoCache(args.cacheKey)
-  if (cached) return cached
+  return obterRelatorioAgregadoComSingleFlight(args.cacheKey, async () => {
+    const loaded = await carregarPeriodoAtual({
+      pipelineBase: args.pipelineBase,
+      incluirSerie: args.incluirSerie,
+      timezone: args.timezone,
+    })
 
-  const loaded = await carregarPeriodoAtual({
-    pipelineBase: args.pipelineBase,
-    incluirSerie: args.incluirSerie,
-    timezone: args.timezone,
+    const omitirComparativo =
+      args.intervaloSlot == null ||
+      args.diasPeriodo > MAX_DIAS_COMPARATIVO_PERIODO_ANTERIOR ||
+      loaded.atual.valorTotalPeriodoVendas <= 0
+
+    const rankingCompleto = calcularRanking(loaded.atual, null, true)
+
+    const entry: Omit<RelatorioAgregadoCacheEntry, 'expiresAt'> = {
+      atual: loaded.atual,
+      anterior: null,
+      omitirComparativo,
+      comparativoPronto: omitirComparativo,
+      mockFlags: {
+        serieSimplificada: loaded.serieSimplificada,
+        serieGranularidade: loaded.serieGranularidade,
+        comparativoPeriodoAnteriorOmitido: omitirComparativo,
+      },
+      serieTemporal: loaded.serieTemporal,
+      rankingCompleto,
+    }
+
+    setRelatorioAgregadoCache(args.cacheKey, entry)
+    const stored = getRelatorioAgregadoCache(args.cacheKey)
+    if (!stored) throw new Error('Falha ao gravar cache do relatório de produtos vendidos.')
+    return stored
   })
-
-  const omitirComparativo =
-    args.intervaloSlot == null ||
-    args.diasPeriodo > MAX_DIAS_COMPARATIVO_PERIODO_ANTERIOR ||
-    loaded.atual.valorTotalPeriodoVendas <= 0
-
-  const rankingCompleto = calcularRanking(loaded.atual, null, true)
-
-  setRelatorioAgregadoCache(args.cacheKey, {
-    atual: loaded.atual,
-    anterior: null,
-    omitirComparativo,
-    comparativoPronto: omitirComparativo,
-    mockFlags: {
-      serieSimplificada: loaded.serieSimplificada,
-      comparativoPeriodoAnteriorOmitido: omitirComparativo,
-    },
-    serieTemporal: loaded.serieTemporal,
-    rankingCompleto,
-  })
-
-  return getRelatorioAgregadoCache(args.cacheKey)!
 }
 
 async function completarSomenteComparativo(args: {
@@ -289,6 +328,7 @@ export async function GET(request: NextRequest) {
   const somentePagina = searchParams.get('somentePagina') === '1'
   const somenteComparativo = searchParams.get('somenteComparativo') === '1'
   const somenteParticipacao = searchParams.get('somenteParticipacao') === '1'
+  const somenteParticipacaoAbc = searchParams.get('somenteParticipacaoAbc') === '1'
   const somenteSerie = searchParams.get('somenteSerie') === '1'
 
   const grupoIdsParam = searchParams.get('grupoIds')?.trim()
@@ -385,6 +425,30 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    if (somenteParticipacaoAbc) {
+      const agregado = await obterAgregadoComCache({
+        cacheKey,
+        pipelineBase,
+        intervaloSlot,
+        diasPeriodo,
+        timezone,
+        incluirSerie: false,
+      })
+
+      const { atual } = agregado
+      return NextResponse.json(
+        {
+          somenteParticipacaoAbc: true,
+          participacaoAbc: montarParticipacaoAbc(
+            atual.linhasFiltradasOrdenadas,
+            atual.sumValorFiltrado,
+            atual.sumQtdFiltrado
+          ),
+        },
+        { headers: { 'Cache-Control': 'private, max-age=30' } }
+      )
+    }
+
     if (somenteSerie) {
       await obterAgregadoComCache({
         cacheKey,
@@ -395,16 +459,17 @@ export async function GET(request: NextRequest) {
         incluirSerie: false,
       })
 
-      const { serieTemporal, serieSimplificada } = await garantirSerieNoAgregado({
+      const { serieTemporal, serieSimplificada, serieGranularidade } = await garantirSerieNoAgregado({
         cacheKey,
         timezone,
+        paramsIntervaloPdV: paramsIntervaloPdV,
       })
 
       return NextResponse.json(
         {
           somenteSerie: true,
           serieTemporal,
-          mockFlags: { serieSimplificada },
+          mockFlags: { serieSimplificada, serieGranularidade },
         },
         { headers: { 'Cache-Control': 'private, max-age=30' } }
       )

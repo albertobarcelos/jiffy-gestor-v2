@@ -1,12 +1,19 @@
 import type {
   ProdutoRankingAnteriorDTO,
+  RelatorioParticipacaoAbcDTO,
   RelatorioParticipacaoGrupoDTO,
   RelatorioProdutosVendidosMvpKpisDTO,
   RelatorioProdutosVendidosMvpResponseDTO,
 } from '@/src/shared/types/relatoriosProdutosVendidosMvpApi'
-import type { RelatorioProdutosVendidosResponseDTO } from '@/src/shared/types/relatoriosProdutosVendidosApi'
-import type { LinhaRelatorioProdutoInterna } from '@/src/infrastructure/relatorios/montarRelatorioProdutosVendidos'
-import type { ExecRelatorioProdutosVendidosResult } from '@/src/infrastructure/relatorios/montarRelatorioProdutosVendidos'
+import type {
+  RelatorioProdutoVendidoClasseAbc,
+  RelatorioProdutosVendidosResponseDTO,
+} from '@/src/shared/types/relatoriosProdutosVendidosApi'
+import {
+  calcularAbcPorProdutoId,
+  type ExecRelatorioProdutosVendidosResult,
+  type LinhaRelatorioProdutoInterna,
+} from '@/src/infrastructure/relatorios/montarRelatorioProdutosVendidos'
 
 function variacaoPct(atual: number, anterior: number): number | null {
   if (!Number.isFinite(anterior) || anterior === 0) return null
@@ -38,6 +45,51 @@ export function montarParticipacaoGrupos(
     valorTotal: v.valor,
     pct: base > 0 ? (v.valor / base) * 100 : 0,
   }))
+}
+
+const CLASSES_ABC_ORDEM: RelatorioProdutoVendidoClasseAbc[] = ['A', 'B', 'C']
+
+/** Distribuição A/B/C por faturamento, SKUs e unidades no recorte filtrado. */
+export function montarParticipacaoAbc(
+  linhas: LinhaRelatorioProdutoInterna[],
+  sumValorFiltrado: number,
+  sumQtdFiltrado: number
+): RelatorioParticipacaoAbcDTO[] {
+  if (linhas.length === 0) return []
+
+  const abcById = calcularAbcPorProdutoId(linhas, sumValorFiltrado)
+  const acc: Record<
+    RelatorioProdutoVendidoClasseAbc,
+    { qtdProdutos: number; valorTotal: number; quantidade: number }
+  > = {
+    A: { qtdProdutos: 0, valorTotal: 0, quantidade: 0 },
+    B: { qtdProdutos: 0, valorTotal: 0, quantidade: 0 },
+    C: { qtdProdutos: 0, valorTotal: 0, quantidade: 0 },
+  }
+
+  for (const r of linhas) {
+    const classe = abcById.get(r.produtoId) ?? 'C'
+    acc[classe].qtdProdutos += 1
+    acc[classe].valorTotal += r.valorTotal
+    acc[classe].quantidade += r.quantidade
+  }
+
+  const totalSkus = linhas.length
+  const baseValor = sumValorFiltrado > 0 ? sumValorFiltrado : 0
+  const baseQtd = sumQtdFiltrado > 0 ? sumQtdFiltrado : 0
+
+  return CLASSES_ABC_ORDEM.map(classe => {
+    const b = acc[classe]
+    return {
+      classe,
+      qtdProdutos: b.qtdProdutos,
+      pctProdutos: totalSkus > 0 ? (b.qtdProdutos / totalSkus) * 100 : 0,
+      valorTotal: b.valorTotal,
+      pctFaturamento: baseValor > 0 ? (b.valorTotal / baseValor) * 100 : 0,
+      quantidade: b.quantidade,
+      pctUnidades: baseQtd > 0 ? (b.quantidade / baseQtd) * 100 : 0,
+    }
+  })
 }
 
 function mapProdutoValorQtd(lines: LinhaRelatorioProdutoInterna[]): Map<string, { q: number; v: number }> {

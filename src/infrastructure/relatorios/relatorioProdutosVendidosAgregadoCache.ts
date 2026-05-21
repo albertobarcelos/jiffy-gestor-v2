@@ -22,6 +22,7 @@ export type RelatorioAgregadoCacheEntry = {
 
 type GlobalCache = typeof globalThis & {
   __jiffyRelatorioProdutosAgregadoCache?: Map<string, RelatorioAgregadoCacheEntry>
+  __jiffyRelatorioAgregadoInflight?: Map<string, Promise<RelatorioAgregadoCacheEntry>>
 }
 
 function getStore(): Map<string, RelatorioAgregadoCacheEntry> {
@@ -81,6 +82,32 @@ export function setRelatorioAgregadoCache(key: string, entry: Omit<RelatorioAgre
       if (now > v.expiresAt) store.delete(k)
     }
   }
+}
+
+/**
+ * Evita corridas: várias requisições (página 0 + página 1 em paralelo) não devem
+ * gravar agregações parciais diferentes no cache.
+ */
+export function obterRelatorioAgregadoComSingleFlight(
+  key: string,
+  factory: () => Promise<RelatorioAgregadoCacheEntry>
+): Promise<RelatorioAgregadoCacheEntry> {
+  const hit = getRelatorioAgregadoCache(key)
+  if (hit) return Promise.resolve(hit)
+
+  const g = globalThis as GlobalCache
+  if (!g.__jiffyRelatorioAgregadoInflight) {
+    g.__jiffyRelatorioAgregadoInflight = new Map()
+  }
+
+  const existente = g.__jiffyRelatorioAgregadoInflight.get(key)
+  if (existente) return existente
+
+  const promessa = factory().finally(() => {
+    g.__jiffyRelatorioAgregadoInflight?.delete(key)
+  })
+  g.__jiffyRelatorioAgregadoInflight.set(key, promessa)
+  return promessa
 }
 
 export type PipelineOptsForCache = Omit<ExecRelatorioProdutosVendidosInput, 'limit' | 'offset'>

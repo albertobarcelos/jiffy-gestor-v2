@@ -25,25 +25,26 @@ import {
   type MvpColunaId,
 } from '../mvpPersonalizacao'
 
-/** Linha com largura pelo conteúdo — permite scroll horizontal quando há muitas colunas. */
-const ROW_FLEX =
-  'flex w-max min-w-full items-center gap-x-3 gap-y-1 px-3'
+/** Grade estilo planilha (bordas visíveis, sem cantos arredondados nas linhas). */
+const GRID_BORDER = 'border border-[#d0d7de]'
+const TH_BASE = `${GRID_BORDER} bg-[#f3f4f6] px-2 py-1.5 text-xs font-semibold text-primary-text align-middle`
+const TD_BASE = `${GRID_BORDER} px-2 py-1.5 align-middle`
 
-/** Largura mínima por coluna (evita espremer; tabela ultrapassa a viewport se necessário). */
-const COL_WIDTH: Record<MvpColunaId, string> = {
-  index: 'w-10 min-w-[2.5rem] shrink-0 tabular-nums',
-  abc: 'w-11 min-w-[2.75rem] shrink-0',
-  produto: 'w-52 min-w-[12rem] max-w-[16rem] shrink-0',
-  grupo: 'w-36 min-w-[7rem] max-w-[11rem] shrink-0',
-  quantidade: 'w-24 min-w-[4.75rem] shrink-0 text-right tabular-nums',
-  varQtd: 'w-28 min-w-[6.75rem] shrink-0 text-right tabular-nums',
-  varFat: 'w-28 min-w-[6.75rem] shrink-0 text-right tabular-nums',
-  faturamento: 'w-28 min-w-[6.5rem] shrink-0 text-right tabular-nums',
-  precoMedio: 'w-28 min-w-[6.25rem] shrink-0 text-right tabular-nums',
-  pctUnidades: 'w-24 min-w-[5.5rem] shrink-0 text-right tabular-nums',
-  pctFaturamento: 'w-24 min-w-[5.5rem] shrink-0 text-right tabular-nums',
-  valorCardapio: 'w-28 min-w-[6.5rem] shrink-0 text-right tabular-nums',
-  deltaPrecoVsCardapio: 'w-24 min-w-[5.75rem] shrink-0 text-right tabular-nums',
+/** Largura mínima por coluna — tabela pode ultrapassar a viewport (scroll horizontal). */
+const COL_ALIGN: Record<MvpColunaId, string> = {
+  index: 'w-10 min-w-[2.5rem] text-center tabular-nums',
+  abc: 'w-11 min-w-[2.75rem] text-center',
+  produto: 'w-52 min-w-[12rem] max-w-[16rem] text-left',
+  grupo: 'w-36 min-w-[7rem] max-w-[11rem] text-left',
+  quantidade: 'w-24 min-w-[4.75rem] text-right tabular-nums',
+  varQtd: 'w-28 min-w-[6.75rem] text-right tabular-nums',
+  varFat: 'w-28 min-w-[6.75rem] text-right tabular-nums',
+  faturamento: 'w-28 min-w-[6.5rem] text-right tabular-nums',
+  precoMedio: 'w-28 min-w-[6.25rem] text-right tabular-nums',
+  pctUnidades: 'w-24 min-w-[5.5rem] text-right tabular-nums',
+  pctFaturamento: 'w-24 min-w-[5.5rem] text-right tabular-nums',
+  valorCardapio: 'w-28 min-w-[6.5rem] text-right tabular-nums',
+  deltaPrecoVsCardapio: 'w-24 min-w-[5.75rem] text-right tabular-nums',
 }
 
 const COL_VAR_QTD_TITLE =
@@ -55,22 +56,6 @@ const COLUNA_LABEL: Record<MvpColunaId, string> = Object.fromEntries(
   MVP_COLUNA_CATALOGO.map(c => [c.id, c.label])
 ) as Record<MvpColunaId, string>
 
-function ThCell({
-  children,
-  className = '',
-  title,
-}: {
-  children: ReactNode
-  className?: string
-  title?: string
-}) {
-  return (
-    <div className={className} title={title}>
-      {children}
-    </div>
-  )
-}
-
 function variacaoPctTextClass(p: number | null | undefined): string {
   if (p == null || !Number.isFinite(p)) return 'text-primary-text'
   if (p < 0) return 'text-red-500'
@@ -79,7 +64,7 @@ function variacaoPctTextClass(p: number | null | undefined): string {
 }
 
 function BadgeAbc({ classe }: { classe: RelatorioProdutoVendidoLinhaDTO['classeAbc'] }) {
-  const base = 'inline-flex min-w-[1.75rem] justify-center rounded px-1.5 py-0.5 text-xs font-bold'
+  const base = 'inline-flex min-w-[1.75rem] justify-center px-1.5 py-0.5 text-xs font-bold'
   if (classe === 'A') {
     return <span className={`${base} bg-accent5/20 text-accent5`}>A</span>
   }
@@ -89,8 +74,8 @@ function BadgeAbc({ classe }: { classe: RelatorioProdutoVendidoLinhaDTO['classeA
   return <span className={`${base} bg-red-500/20 text-red-500`}>C</span>
 }
 
-function colClass(id: MvpColunaId): string {
-  return COL_WIDTH[id]
+function colAlign(id: MvpColunaId): string {
+  return COL_ALIGN[id]
 }
 
 type RowComRanking = RelatorioProdutoVendidoLinhaDTO & {
@@ -145,6 +130,19 @@ function headerTitle(id: MvpColunaId): string | undefined {
   return meta?.hint
 }
 
+function tdExtraClass(id: MvpColunaId, row: RowComRanking): string {
+  if (id === 'varQtd') {
+    return `text-xs ${variacaoPctTextClass(row.ranking?.variacaoQtdPct)}`
+  }
+  if (id === 'varFat') {
+    return `text-xs ${variacaoPctTextClass(row.ranking?.variacaoValorPct)}`
+  }
+  if (id !== 'produto' && id !== 'index' && id !== 'abc' && id !== 'grupo') {
+    return 'text-sm text-primary-text'
+  }
+  return ''
+}
+
 const COLUNA_SORT_MAP: Partial<Record<MvpColunaId, MvpColunaOrdenavel>> = {
   quantidade: 'quantidade',
   faturamento: 'faturamento',
@@ -169,7 +167,7 @@ function MvpColunaSortButton({
     <button
       type="button"
       onClick={() => onSortChange(alternarSortPorColuna(sort, coluna))}
-      className={`inline-flex shrink-0 items-center justify-center rounded p-0.5 transition-colors hover:bg-primary/15 ${
+      className={`inline-flex shrink-0 items-center justify-center p-0.5 transition-colors hover:bg-primary/15 ${
         ativo ? 'text-primary' : 'text-secondary-text/70'
       }`}
       aria-label={`Ordenar por ${colunaLabel} em ordem ${ordemLabel}. Clique para alternar.`}
@@ -294,9 +292,8 @@ export function MvpProdutosTable(props: {
     }
   }, [hasNextPage, isFetchingNextPage, onLoadMore, rows.length])
 
-  /** Altura atual vira teto; com poucas linhas o bloco acompanha o conteúdo. */
   const shellClass =
-    'm-1 flex max-h-[min(90vh,32rem)] flex-col overflow-hidden rounded-lg bg-info'
+    'm-1 flex max-h-[min(90vh,32rem)] flex-col overflow-hidden border border-[#d0d7de] bg-white'
 
   if (!rows.length) {
     return (
@@ -312,98 +309,77 @@ export function MvpProdutosTable(props: {
     <div className={shellClass}>
       <div
         ref={scrollContainerRef}
-        className="scrollbar-thin max-h-[calc(min(90vh,32rem)-2.75rem)] overflow-auto overscroll-contain px-1 py-1"
+        className="scrollbar-thin max-h-[calc(min(90vh,32rem)-2.75rem)] overflow-auto overscroll-contain"
       >
-        <div className="w-max min-w-full">
-          <div
-            className={`font-nunito ${ROW_FLEX} sticky top-0 z-10 min-h-10 rounded-t-lg bg-custom-2 py-2 text-xs font-semibold text-primary-text shadow-sm md:text-sm`}
-          >
-            {colunas.map(id => {
-              const colunaSort = COLUNA_SORT_MAP[id]
-              return (
-                <ThCell
-                  key={id}
-                  className={colClass(id)}
-                  title={headerTitle(id)}
-                >
-                  {colunaSort ? (
-                    <span className="flex items-center justify-end gap-0.5">
-                      <span className="whitespace-nowrap">{COLUNA_LABEL[id]}</span>
-                      <MvpColunaSortButton
-                        coluna={colunaSort}
-                        sort={sort}
-                        onSortChange={onSortChange}
-                      />
-                    </span>
-                  ) : id === 'varQtd' || id === 'varFat' ? (
-                    <span className="block whitespace-normal leading-tight">{COLUNA_LABEL[id]}</span>
-                  ) : (
-                    <span className="block whitespace-nowrap">{COLUNA_LABEL[id]}</span>
-                  )}
-                </ThCell>
-              )
-            })}
-          </div>
-
-          {rows.map((row, idx) => {
-            const isZebraEven = idx % 2 === 0
-            return (
-              <div
+        <table className="font-nunito w-max min-w-full border-collapse bg-white text-sm">
+          <thead className="sticky top-0 z-10">
+            <tr>
+              {colunas.map(id => {
+                const colunaSort = COLUNA_SORT_MAP[id]
+                return (
+                  <th
+                    key={id}
+                    scope="col"
+                    className={`${TH_BASE} ${colAlign(id)}`}
+                    title={headerTitle(id)}
+                  >
+                    {colunaSort ? (
+                      <span className="inline-flex w-full items-center justify-end gap-0.5">
+                        <span className="whitespace-nowrap">{COLUNA_LABEL[id]}</span>
+                        <MvpColunaSortButton
+                          coluna={colunaSort}
+                          sort={sort}
+                          onSortChange={onSortChange}
+                        />
+                      </span>
+                    ) : id === 'varQtd' || id === 'varFat' ? (
+                      <span className="block whitespace-normal leading-tight">{COLUNA_LABEL[id]}</span>
+                    ) : (
+                      <span className="block whitespace-nowrap">{COLUNA_LABEL[id]}</span>
+                    )}
+                  </th>
+                )
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, idx) => (
+              <tr
                 key={row.produtoId}
-                className={`font-nunito ${ROW_FLEX} mb-0.5 rounded-lg py-2 transition-colors hover:bg-primary/10 ${
-                  isZebraEven ? 'bg-white' : 'bg-gray-50'
+                className={`transition-colors hover:bg-[#e8f4fc] ${
+                  idx % 2 === 1 ? 'bg-[#fafafa]' : 'bg-white'
                 }`}
               >
                 {colunas.map(id => {
                   const isVar = id === 'varQtd' || id === 'varFat'
-                  const cell = renderCell(id, row, idx)
                   return (
-                    <div
+                    <td
                       key={id}
-                      className={`${colClass(id)} ${
-                        isVar
-                          ? `text-xs ${variacaoPctTextClass(
-                              id === 'varQtd'
-                                ? row.ranking?.variacaoQtdPct
-                                : row.ranking?.variacaoValorPct
-                            )}`
-                          : id !== 'produto' && id !== 'index' && id !== 'abc' && id !== 'grupo'
-                            ? 'text-sm text-primary-text'
-                            : ''
-                      }`}
+                      className={`${TD_BASE} ${colAlign(id)} ${tdExtraClass(id, row)}`}
                       title={isVar ? headerTitle(id) : undefined}
                     >
-                      {cell}
-                    </div>
+                      {renderCell(id, row, idx)}
+                    </td>
                   )
                 })}
-              </div>
-            )
-          })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
-          {isFetchingNextPage ? (
-            <div className="flex justify-center py-4" aria-busy="true">
-              <JiffyLoading />
-            </div>
-          ) : null}
-        </div>
+        {isFetchingNextPage ? (
+          <div className="flex justify-center border-t border-[#d0d7de] bg-white py-4" aria-busy="true">
+            <JiffyLoading />
+          </div>
+        ) : null}
       </div>
 
       {exibirRodapeContagem && totalFiltrado > 0 ? (
-        <p className="font-nunito shrink-0 border-t border-primary/10 px-3 py-2 text-xs text-secondary-text">
+        <p className="font-nunito shrink-0 border-t border-[#d0d7de] bg-[#f9fafb] px-3 py-2 text-xs text-secondary-text">
           Exibindo {rows.length} de {totalFiltrado} produtos
           {hasNextPage ? ' — role para carregar mais' : ''}
-          {muitasColunas ? ' — role horizontalmente para ver todas as colunas' : ''}
         </p>
-      ) : hasNextPage ? (
-        <p className="font-nunito shrink-0 border-t border-primary/10 px-3 py-2 text-xs text-secondary-text">
-          Role para carregar mais produtos
-          {muitasColunas ? ' — role horizontalmente para ver todas as colunas' : ''}
-        </p>
-      ) : muitasColunas ? (
-        <p className="font-nunito shrink-0 border-t border-primary/10 px-3 py-2 text-xs text-secondary-text">
-          Role horizontalmente para ver todas as colunas
-        </p>
+      
       ) : null}
     </div>
   )

@@ -13,6 +13,41 @@ import {
   type MvpPersonalizacaoLayout,
 } from '../mvpPersonalizacao'
 
+const sxBotaoAplicar = {
+  bgcolor: 'var(--color-primary)',
+  color: '#fff',
+  '&:hover': {
+    bgcolor: 'var(--color-primary)',
+    opacity: 0.92,
+  },
+}
+
+const sxBotaoOutlinedPrimary = {
+  borderColor: 'var(--color-primary)',
+  color: 'var(--color-primary)',
+  '&:hover': {
+    borderColor: 'var(--color-primary)',
+    bgcolor: 'rgba(0, 51, 102, 0.08)',
+  },
+}
+
+const sxBotaoTextPrimary = {
+  color: 'var(--color-primary)',
+  '&:hover': {
+    bgcolor: 'rgba(0, 51, 102, 0.08)',
+  },
+}
+
+const sxCheckboxPrimary = {
+  color: 'var(--color-primary)',
+  '&.Mui-checked': {
+    color: 'var(--color-primary)',
+  },
+  '&.MuiCheckbox-indeterminate': {
+    color: 'var(--color-primary)',
+  },
+}
+
 export function MvpPersonalizarDrawer(props: {
   open: boolean
   onClose: () => void
@@ -50,7 +85,7 @@ export function MvpPersonalizarDrawer(props: {
       <Box className="font-nunito flex h-full flex-col bg-info p-4">
         <h2 className="text-lg font-semibold text-primary-text">Personalizar relatório</h2>
         <p className="mt-1 text-xs text-secondary-text">
-          Escolha as colunas da tabela. KPIs e gráficos são exibidos pelos botões na barra superior.
+          Escolha as colunas da tabela para exibição no relatório. 
           As preferências são salvas neste navegador.
         </p>
 
@@ -67,8 +102,10 @@ export function MvpPersonalizarDrawer(props: {
                 >
                   <Checkbox
                     size="small"
+                    color="primary"
                     checked={checked}
                     disabled={locked}
+                    sx={sxCheckboxPrimary}
                     onChange={() =>
                       setDraft(prev => ({
                         ...prev,
@@ -89,13 +126,19 @@ export function MvpPersonalizarDrawer(props: {
         </div>
 
         <div className="mt-4 flex flex-col gap-2 border-t border-primary/10 pt-4">
-          <Button variant="contained" fullWidth onClick={handleAplicar}>
+          <Button variant="contained" color="primary" fullWidth sx={sxBotaoAplicar} onClick={handleAplicar}>
             Aplicar
           </Button>
-          <Button variant="outlined" fullWidth onClick={handleRestaurar}>
+          <Button
+            variant="outlined"
+            color="primary"
+            fullWidth
+            sx={sxBotaoOutlinedPrimary}
+            onClick={handleRestaurar}
+          >
             Restaurar padrão
           </Button>
-          <Button variant="text" fullWidth onClick={onClose}>
+          <Button variant="text" color="primary" fullWidth sx={sxBotaoTextPrimary} onClick={onClose}>
             Cancelar
           </Button>
         </div>

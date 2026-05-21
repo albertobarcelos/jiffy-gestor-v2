@@ -6,7 +6,6 @@ import {
   MdCategory,
   MdInventory2,
   MdReceiptLong,
-  MdTrendingUp,
   MdWorkspacePremium,
 } from 'react-icons/md'
 import type { RelatorioProdutosVendidosMvpKpisDTO } from '@/src/shared/types/relatoriosProdutosVendidosMvpApi'
@@ -122,10 +121,6 @@ export function MvpKpiGrid(props: {
       ? `Período anterior: ${kpis.produtosDistintosAnterior.toLocaleString('pt-BR')} produtos`
       : 'Com os filtros aplicados no período'
 
-  const growthNome = kpis.produtoComMaiorCrescimentoNome
-  const growthPct = kpis.produtoComMaiorCrescimentoPct
-  const growthBadge = badgeVariacao(growthPct)
-
   return (
     <>
       <MvpMetricCard
@@ -169,17 +164,6 @@ export function MvpKpiGrid(props: {
         badgePositivo={liderBadge.badgePositivo}
         valorGrande={false}
       />
-      {growthNome != null && growthPct != null ? (
-        <MvpMetricCard
-          tituloBase="Maior crescimento"
-          icon={<MdTrendingUp className={iconClass} size={22} aria-hidden />}
-          valor={growthNome}
-          badge={growthBadge.badge}
-          rodape="vs. período anterior (unidades)"
-          badgePositivo={growthBadge.badgePositivo}
-          valorGrande={false}
-        />
-      ) : null}
     </>
   )
 }

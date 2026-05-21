@@ -1,4 +1,7 @@
-import type { RelatorioProdutosVendidosResponseDTO } from '@/src/shared/types/relatoriosProdutosVendidosApi'
+import type {
+  RelatorioProdutoVendidoClasseAbc,
+  RelatorioProdutosVendidosResponseDTO,
+} from '@/src/shared/types/relatoriosProdutosVendidosApi'
 
 export interface ProdutoSerieValor {
   produtoId: string
@@ -7,8 +10,10 @@ export interface ProdutoSerieValor {
   nome?: string
 }
 
+export type RelatorioSerieGranularidade = 'dia' | 'hora'
+
 export interface RelatorioProdutosVendidosMvpSerieDiaDTO {
-  /** Dia `YYYY-MM-DD` no fuso da empresa */
+  /** Bucket no fuso da empresa: `YYYY-MM-DD` (dia) ou `YYYY-MM-DDTHH` (hora, HH 00–23). */
   dia: string
   valores: ProdutoSerieValor[]
   /** Soma dos valores dos produtos incluídos na série neste dia */
@@ -21,6 +26,17 @@ export interface RelatorioParticipacaoGrupoDTO {
   nomeGrupo: string
   valorTotal: number
   pct: number
+}
+
+/** Agregação por classe ABC (curva de Pareto no faturamento filtrado). */
+export interface RelatorioParticipacaoAbcDTO {
+  classe: RelatorioProdutoVendidoClasseAbc
+  qtdProdutos: number
+  pctProdutos: number
+  valorTotal: number
+  pctFaturamento: number
+  quantidade: number
+  pctUnidades: number
 }
 
 export interface RelatorioProdutosVendidosMvpKpisDTO {
@@ -57,6 +73,8 @@ export interface ProdutoRankingAnteriorDTO {
 
 export interface RelatorioProdutosVendidosMvpMockFlags {
   serieSimplificada?: boolean
+  /** `hora` quando o período filtrado é um único dia civil (ex.: Hoje). */
+  serieGranularidade?: RelatorioSerieGranularidade
   /** Comparativo vs período anterior omitido (ex.: período muito longo ou sem intervalo definido). */
   comparativoPeriodoAnteriorOmitido?: boolean
 }
@@ -84,9 +102,15 @@ export type RelatorioProdutosVendidosMvpParticipacaoDTO = {
   participacaoGrupos: RelatorioParticipacaoGrupoDTO[]
 }
 
-/** Bloco SPA: série diária (`somenteSerie=1`). */
+/** Bloco SPA: distribuição ABC (`somenteParticipacaoAbc=1`). */
+export type RelatorioProdutosVendidosMvpParticipacaoAbcDTO = {
+  somenteParticipacaoAbc: true
+  participacaoAbc: RelatorioParticipacaoAbcDTO[]
+}
+
+/** Bloco SPA: série temporal (`somenteSerie=1`). */
 export type RelatorioProdutosVendidosMvpSerieDTO = {
   somenteSerie: true
   serieTemporal: RelatorioProdutosVendidosMvpSerieDiaDTO[]
-  mockFlags: Pick<RelatorioProdutosVendidosMvpMockFlags, 'serieSimplificada'>
+  mockFlags: Pick<RelatorioProdutosVendidosMvpMockFlags, 'serieSimplificada' | 'serieGranularidade'>
 }

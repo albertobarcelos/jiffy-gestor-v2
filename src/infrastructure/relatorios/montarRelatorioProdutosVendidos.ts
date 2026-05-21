@@ -291,6 +291,9 @@ export function montarBodyPaginadoFromAgregado(
     valorTotalPeriodoVendas: agregado.valorTotalPeriodoVendas,
     sumQtdFiltrado: agregado.sumQtdFiltrado,
   })
+  const totalFiltrado = agregado.linhasFiltradasOrdenadas.length
+  const proximoOffset = offset + items.length
+
   return {
     items,
     totaisPeriodo: agregado.body.totaisPeriodo,
@@ -298,9 +301,11 @@ export function montarBodyPaginadoFromAgregado(
       quantidade: agregado.sumQtdFiltrado,
       valor: agregado.sumValorFiltrado,
     },
-    totalFiltrado: agregado.linhasFiltradasOrdenadas.length,
+    totalFiltrado,
     limit,
     offset,
+    temMais: proximoOffset < totalFiltrado,
+    nextOffset: proximoOffset < totalFiltrado ? proximoOffset : null,
   }
 }
 

@@ -77,7 +77,8 @@ async function fetchWithConcurrency<T, R>(
 }
 
 /**
- * Lista todos os IDs de vendas FINALIZADAS no período (paginação interna 100 em 100).
+ * Lista todos os IDs de vendas FINALIZADAS no período (paginação interna; limite 50 por página
+ * para compatibilidade com APIs que capam abaixo de 100).
  */
 export async function listarIdsVendasFinalizadasNoPeriodo(args: {
   apiClient: ApiClient
@@ -88,15 +89,16 @@ export async function listarIdsVendasFinalizadasNoPeriodo(args: {
   const params = new URLSearchParams(paramsComIntervalo.toString())
   params.append('status', 'FINALIZADA')
 
-  const limitPerPage = 100
+  const limitPerPage = 50
+  const maxPagesSemTotal = 400
   const vendaIds = new Set<string>()
   let page = 0
-  let totalPages = 1
+  let totalPages: number | null = null
 
-  while (page < totalPages) {
+  while (totalPages == null ? page < maxPagesSemTotal : page < totalPages) {
     const pageParams = new URLSearchParams(params.toString())
     pageParams.append('limit', limitPerPage.toString())
-    pageParams.append('offset', (page * limitPerPage).toString())
+    pageParams.append('offset', String(page * limitPerPage))
 
     const vendasResponse = await apiClient.request<{
       items?: Array<{ id: string }>
@@ -106,6 +108,8 @@ export async function listarIdsVendasFinalizadasNoPeriodo(args: {
     }>(`/api/v1/operacao-pdv/vendas?${pageParams.toString()}`, { method: 'GET', headers })
 
     const items = vendasResponse.data?.items || []
+    if (items.length === 0) break
+
     items.forEach(v => {
       if (v.id) vendaIds.add(v.id)
     })
@@ -119,17 +123,10 @@ export async function listarIdsVendasFinalizadasNoPeriodo(args: {
 
       if (typeof totalCount === 'number' && totalCount > 0) {
         totalPages = Math.ceil(totalCount / limitPerPage)
-      } else if (items.length < limitPerPage) {
-        totalPages = 1
-      } else {
-        totalPages = 200
       }
     }
 
-    if (items.length < limitPerPage) {
-      break
-    }
-
+    if (items.length < limitPerPage) break
     page++
   }
 
