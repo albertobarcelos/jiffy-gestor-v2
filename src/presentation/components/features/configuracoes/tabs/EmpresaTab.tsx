@@ -981,7 +981,7 @@ export function EmpresaTab() {
                     <div className="flex w-full flex-col items-center justify-center gap-2 py-3 text-center">
                       <p className="text-xs leading-snug text-secondary-text">
                         A logo guardada será <span className="font-semibold">removida</span> ao clicar em{' '}
-                        <span className="font-semibold">Salvar logo</span>.
+                        <span className="font-semibold">Salvar</span>.
                       </p>
                       <div className="flex flex-wrap items-center justify-center gap-1.5">
                         <button
