@@ -26,10 +26,10 @@ export function Sidebar() {
   // Prefetch agressivo das rotas mais acessadas na inicialização
   useEffect(() => {
     const routesToPrefetch = [
-      '/cadastros/grupos-complementos',
-      '/cadastros/complementos',
+      '/grupos-complementos',
+      '/complementos',
       '/produtos',
-      '/cadastros/grupos-produtos',
+      '/grupos-produtos',
       '/estoque',
     ]
     
@@ -66,10 +66,10 @@ export function Sidebar() {
         newExpanded.add(menuName)
         // Quando expandir "Cadastros", prefetch das rotas mais acessadas
         if (menuName === 'Cadastros') {
-          // prefetchRoute('/cadastros/grupos-complementos')
-          // prefetchRoute('/cadastros/complementos')
+          // prefetchRoute('/grupos-complementos')
+          // prefetchRoute('/complementos')
           // prefetchRoute('/produtos')
-          // prefetchRoute('/cadastros/grupos-produtos')
+          // prefetchRoute('/grupos-produtos')
         }
       }
       setExpandedMenus(newExpanded)
@@ -84,14 +84,14 @@ export function Sidebar() {
       path: '#',
       icon: '📋',
       children: [
-        { name: 'Grupo Produtos', path: '/cadastros/grupos-produtos', icon: '📦' },
+        { name: 'Grupo Produtos', path: '/grupos-produtos', icon: '📦' },
         { name: 'Produtos', path: '/produtos', icon: '🛍️' },
-        { name: 'Grupo Complementos', path: '/cadastros/grupos-complementos', icon: '📋' },
-        { name: 'Complementos', path: '/cadastros/complementos', icon: '➕' },
-        { name: 'Usuários', path: '/cadastros/usuarios', icon: '👤' },
-        { name: 'Perfis de Usuários', path: '/cadastros/perfis-usuarios', icon: '👥' },
-        { name: 'Clientes', path: '/cadastros/clientes', icon: '👥' },
-        { name: 'Impressoras', path: '/cadastros/impressoras', icon: '🖨️' },
+        { name: 'Grupo Complementos', path: '/grupos-complementos', icon: '📋' },
+        { name: 'Complementos', path: '/complementos', icon: '➕' },
+        { name: 'Usuários', path: '/usuarios', icon: '👤' },
+        { name: 'Perfis de Usuários', path: '/perfis-usuarios-pdv', icon: '👥' },
+        { name: 'Clientes', path: '/clientes', icon: '👥' },
+        { name: 'Impressoras', path: '/impressoras', icon: '🖨️' },
         {
           name: 'Meios de Pagamentos',
           path: '/configuracoes?tab=meios-pagamentos',

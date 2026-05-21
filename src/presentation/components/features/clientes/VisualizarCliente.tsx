@@ -190,7 +190,7 @@ export function VisualizarCliente({
                 if (onClose) {
                   onClose()
                 } else {
-                  router.push('/cadastros/clientes')
+                  router.push('/clientes')
                 }
               }}
               variant="outlined"

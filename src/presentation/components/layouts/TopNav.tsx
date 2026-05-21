@@ -56,11 +56,11 @@ export function TopNav() {
   // Prefetch agressivo das rotas mais acessadas na inicialização
   useEffect(() => {
     const routesToPrefetch = [
-      '/cadastros/grupos-complementos',
-      '/cadastros/complementos',
-      '/cadastros/taxas',
+      '/grupos-complementos',
+      '/complementos',
+      '/taxas',
       '/produtos',
-      '/cadastros/grupos-produtos',
+      '/grupos-produtos',
       '/estoque',
       '/pedidos-clientes',
     ]
@@ -149,10 +149,10 @@ export function TopNav() {
       path: '#',
       icon: MdShoppingBag,
       children: [
-        { name: 'Grupo de Produtos', path: '/cadastros/grupos-produtos', icon: MdCategory },
+        { name: 'Grupo de Produtos', path: '/grupos-produtos', icon: MdCategory },
         { name: 'Produtos', path: '/produtos', icon: MdShoppingBag },
-        { name: 'Grupo de Complementos', path: '/cadastros/grupos-complementos', icon: MdCategory },
-        { name: 'Complementos', path: '/cadastros/complementos', icon: MdAddCircle },
+        { name: 'Grupo de Complementos', path: '/grupos-complementos', icon: MdCategory },
+        { name: 'Complementos', path: '/complementos', icon: MdAddCircle },
       ],
     },
     {
@@ -160,9 +160,9 @@ export function TopNav() {
       path: '#',
       icon: MdPeople,
       children: [
-        { name: 'Perfis PDV', path: '/cadastros/perfis-usuarios-pdv', icon: MdGroup },
-        { name: 'Usuários PDV', path: '/cadastros/usuarios', icon: MdPerson },
-        { name: 'Clientes', path: '/cadastros/clientes', icon: MdPeople },
+        { name: 'Perfis PDV', path: '/perfis-usuarios-pdv', icon: MdGroup },
+        { name: 'Usuários PDV', path: '/usuarios', icon: MdPerson },
+        { name: 'Clientes', path: '/clientes', icon: MdPeople },
       ],
     },
     {

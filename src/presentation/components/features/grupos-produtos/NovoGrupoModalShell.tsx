@@ -12,7 +12,7 @@ interface NovoGrupoModalShellProps {
 }
 
 /**
- * Páginas `/cadastros/grupos-produtos/novo` e `.../editar` — mesmo shell do modal da lista (`JiffySidePanelModal`).
+ * Páginas `/grupos-produtos/novo` e `.../editar` — mesmo shell do modal da lista (`JiffySidePanelModal`).
  */
 export function NovoGrupoModalShell({ grupoId }: NovoGrupoModalShellProps) {
   const router = useRouter()
@@ -40,7 +40,7 @@ export function NovoGrupoModalShell({ grupoId }: NovoGrupoModalShellProps) {
   const ngRef = useRef<NovoGrupoHandle>(null)
 
   const handleClose = () => {
-    router.push('/cadastros/grupos-produtos')
+    router.push('/grupos-produtos')
     router.refresh()
     queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false })
     queryClient.invalidateQueries({ queryKey: ['produtos', 'infinite'] })

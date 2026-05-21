@@ -1190,7 +1190,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
             onCloseAfterSave?.()
           }
         } else {
-          router.push('/cadastros/impressoras')
+          router.push('/impressoras')
         }
       } catch (error) {
         console.error('Erro ao salvar impressora:', error)
@@ -1222,7 +1222,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
               if (window.history.length > 1) {
                 router.back()
               } else {
-                router.push('/cadastros/impressoras')
+                router.push('/impressoras')
               }
             }
           }
@@ -1235,7 +1235,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
           if (window.history.length > 1) {
             router.back()
           } else {
-            router.push('/cadastros/impressoras')
+            router.push('/impressoras')
           }
         }
       }
