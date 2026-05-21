@@ -171,7 +171,7 @@ Lógica central: `VendaUnificadaDTO.getEtapaKanban()` (`useVendasUnificadas.ts`)
 | Origem | `''` \| `PDV` \| `GESTOR` \| `DELIVERY` |
 | Status fiscal | String enviada à API |
 
-**Dados:** `useVendasUnificadas(params)` — pagina todas as páginas (100 itens) até esgotar.
+**Dados:** `useVendasUnificadasInfinite(params)` — primeira página de **50** vendas; mais páginas ao rolar coluna ou pré-carga silenciosa em segundo plano. Busca/filtros (`q`, período, origem, status fiscal) vão na API e aplicam-se a **todo** o dataset.
 
 **Efeito colateral:** vendas `REJEITADA` com `solicitarEmissaoFiscal === false` são reativadas automaticamente via `useMarcarEmissaoFiscal` (toast informativo).
 

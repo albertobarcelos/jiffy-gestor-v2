@@ -8,10 +8,12 @@ export function DroppableColumnContent({
   columnId,
   children,
   className,
+  onScroll,
 }: {
   columnId: string
   children: ReactNode
   className?: string
+  onScroll?: (event: React.UIEvent<HTMLDivElement>) => void
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: columnId })
   const showDropSlotPendente = columnId === 'PENDENTE_EMISSAO' && isOver
@@ -38,7 +40,7 @@ export function DroppableColumnContent({
                 : ''
 
   return (
-    <div ref={setNodeRef} className={`${className ?? ''} ${isOverClass}`}>
+    <div ref={setNodeRef} onScroll={onScroll} className={`${className ?? ''} ${isOverClass}`}>
       {showDropSlotPendente && (
         <div className="mb-2 flex min-h-[72px] items-center justify-center rounded-lg border-2 border-dashed border-yellow-400 bg-yellow-50/90 text-sm font-medium text-yellow-700 transition-all">
           Solte aqui para marcar para emissão

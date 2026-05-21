@@ -19,7 +19,10 @@ import {
   useEmitirNfeGestor,
   useTransicaoVendaGestor,
 } from '@/src/presentation/hooks/useVendas'
-import { useVendasUnificadas } from '@/src/presentation/hooks/useVendasUnificadas'
+import {
+  flattenVendasUnificadasInfinite,
+  useVendasUnificadasInfinite,
+} from '@/src/presentation/hooks/useVendasUnificadas'
 import {
   MdReceipt,
   MdSchedule,
@@ -51,7 +54,6 @@ import type {
 import {
   COLUNAS_ENTREGA_OPERACIONAIS,
   COLUNAS_KANBAN_DESTINO_PIN,
-  filtrarPorBusca,
   ordenarVendasKanbanPorCriterio,
   vendaBloqueadaParaEmissaoInterativa,
 } from './kanban/fiscalFlowKanban.rules'
@@ -71,6 +73,7 @@ import {
   type VendaSelecionadaParaEmissao,
 } from './kanban/useFiscalEmissaoKanban'
 import { useImpressaoDelivery } from '@/src/presentation/hooks/useImpressaoDelivery'
+import { useKanbanColumnScrollLoadMore } from './kanban/useKanbanColumnScrollLoadMore'
 
 /**
  * Componente Kanban para gerenciamento de pedidos e emissão fiscal.
@@ -175,12 +178,50 @@ export function FiscalFlowKanban() {
     rejeitadaReativacaoJaTentadaIdsRef.current = new Set()
   }, [vendasUnificadasQueryKeyFingerprint])
 
-  // Buscar vendas unificadas (PDV + Gestor) com filtros da API
   const {
-    data: vendasUnificadasData,
+    data: vendasUnificadasInfiniteData,
     isLoading,
+    isFetching,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
     refetch,
-  } = useVendasUnificadas(vendasUnificadasQueryParams)
+  } = useVendasUnificadasInfinite(vendasUnificadasQueryParams)
+
+  const { items: todasVendasCarregadas, totalCount: totalVendasApi } = useMemo(
+    () => flattenVendasUnificadasInfinite(vendasUnificadasInfiniteData),
+    [vendasUnificadasInfiniteData]
+  )
+
+  const temMaisVendasParaCarregar = useMemo(() => {
+    if (hasNextPage) return true
+    if (totalVendasApi > 0 && todasVendasCarregadas.length < totalVendasApi) return true
+    return false
+  }, [hasNextPage, totalVendasApi, todasVendasCarregadas.length])
+
+  const handleCarregarMaisVendas = useCallback(() => {
+    if (isFetchingNextPage || !temMaisVendasParaCarregar) return
+    void fetchNextPage()
+  }, [isFetchingNextPage, temMaisVendasParaCarregar, fetchNextPage])
+
+  const { onColumnScroll } = useKanbanColumnScrollLoadMore(handleCarregarMaisVendas)
+
+  /** Pré-carga silenciosa: após os primeiros 50, busca o restante em segundo plano (SPA). */
+  useEffect(() => {
+    if (isLoading || isFetchingNextPage || !temMaisVendasParaCarregar) return
+    if (!todasVendasCarregadas.length) return
+    const t = window.setTimeout(() => {
+      void fetchNextPage()
+    }, 400)
+    return () => window.clearTimeout(t)
+  }, [
+    isLoading,
+    isFetchingNextPage,
+    temMaisVendasParaCarregar,
+    todasVendasCarregadas.length,
+    vendasUnificadasQueryKeyFingerprint,
+    fetchNextPage,
+  ])
 
   const marcarEmissaoFiscal = useMarcarEmissaoFiscal()
   const desmarcarEmissaoFiscal = useDesmarcarEmissaoFiscal()
@@ -224,12 +265,12 @@ export function FiscalFlowKanban() {
   useEffect(() => {
     if (
       isLoading ||
-      !vendasUnificadasData?.items?.length ||
+      !todasVendasCarregadas.length ||
       rejeitadaReativacaoEmAndamentoRef.current
     )
       return
 
-    const pendentes = vendasUnificadasData.items.filter(v => {
+    const pendentes = todasVendasCarregadas.filter(v => {
       const rejeitada =
         String(v.statusFiscal ?? '')
           .trim()
@@ -276,23 +317,21 @@ export function FiscalFlowKanban() {
     return () => {
       cancelled = true
     }
-  }, [isLoading, vendasUnificadasData, marcarEmissaoFiscal])
+  }, [isLoading, todasVendasCarregadas, marcarEmissaoFiscal])
 
   // Só PointerSensor: em touch, pointermove fica no document (melhor que TouchSensor no alvo + scroll).
   // TouchSensor junto com PointerSensor gerava gesto “travado” no mobile; distance evita arraste ao rolar.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 10 } }))
 
-  // Todas as vendas unificadas retornadas pela API (já filtradas por q, período, origem, statusFiscal no backend)
-  const todasVendas: Venda[] = vendasUnificadasData?.items || []
-
-  const vendasFiltradasPorTipo: Venda[] = filtrarPorBusca(todasVendas, searchQuery)
+  /** API já aplica `q`, período, origem e statusFiscal — busca em todo o dataset, não só páginas carregadas. */
+  const todasVendas: Venda[] = todasVendasCarregadas
 
   const vendasFiltradasPorModoKanban = useMemo((): Venda[] => {
     if (modoKanbanVendas === 'delivery') {
-      return vendasFiltradasPorTipo.filter(v => v.isPedidoEntregaGestor())
+      return todasVendas.filter(v => v.isPedidoEntregaGestor())
     }
-    return vendasFiltradasPorTipo.filter(v => !v.isPedidoEntregaGestor())
-  }, [modoKanbanVendas, vendasFiltradasPorTipo])
+    return todasVendas.filter(v => !v.isPedidoEntregaGestor())
+  }, [modoKanbanVendas, todasVendas])
 
   // Colunas fixas do Kanban (entrega → fiscal)
   const getColumns = (): KanbanColumn[] => [
@@ -617,7 +656,16 @@ export function FiscalFlowKanban() {
     return ordenadas
   }
 
-  if (isLoading) {
+  const mostrarLoadingInicial = isLoading && todasVendasCarregadas.length === 0
+
+  const rodapeCarregamentoColuna =
+    isFetchingNextPage || (temMaisVendasParaCarregar && isFetching) ? (
+      <div className="flex justify-center py-2">
+        <span className="text-[11px] text-gray-500">Carregando mais vendas…</span>
+      </div>
+    ) : null
+
+  if (mostrarLoadingInicial) {
     return (
       <div className="flex h-full items-center justify-center bg-gray-50">
         <JiffyLoading />
@@ -648,6 +696,14 @@ export function FiscalFlowKanban() {
         onAbrirConfiguracoesDelivery={() => setDeliveryConfiguracoesOpen(true)}
         onAbrirNovoPedido={handleAbrirNovoPedido}
       />
+
+      {temMaisVendasParaCarregar && todasVendas.length > 0 && (
+        <p className="border-b border-gray-200 bg-white px-3 py-1.5 text-center text-[11px] text-gray-600">
+          Exibindo {todasVendas.length}
+          {totalVendasApi > todasVendas.length ? ` de ${totalVendasApi}` : ''} vendas
+          {isFetchingNextPage ? ' — carregando…' : ' — role uma coluna para carregar mais'}
+        </p>
+      )}
 
       <DeliveryConfiguracoesModal
         open={deliveryConfiguracoesOpen}
@@ -686,6 +742,8 @@ export function FiscalFlowKanban() {
                       [columnId]: prev[columnId] === 'asc' ? 'desc' : 'asc',
                     }))
                   }
+                  onColumnScroll={onColumnScroll}
+                  columnFooter={rodapeCarregamentoColuna}
                 >
                   {columnVendas.map((venda: Venda) => (
                     <FiscalKanbanVendaCard

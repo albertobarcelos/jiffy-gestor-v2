@@ -982,6 +982,40 @@ export function NovoPedidoModal({
       .filter(p => p.isAtivo())
       .sort((a, b) => a.getNome().localeCompare(b.getNome()))
   }, [buscaProdutoFiltrada, produtosBuscadosData, produtosPorGrupoData])
+
+  /** Resolve `Produto` do cache, da grade/busca ou via GET `/api/produtos/:id`. */
+  const carregarProdutoNoCatalogoSeNecessario = useCallback(
+    async (produtoId: string): Promise<Produto | null> => {
+      const emCache =
+        catalogoProdutosPorId[produtoId] ?? produtosList.find(p => p.getId() === produtoId)
+      if (emCache) {
+        setCatalogoProdutosPorId(prev =>
+          prev[produtoId] ? prev : { ...prev, [emCache.getId()]: emCache }
+        )
+        return emCache
+      }
+
+      if (!token) return null
+
+      try {
+        const response = await fetch(`/api/produtos/${encodeURIComponent(produtoId)}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+        if (!response.ok) return null
+        const data = await response.json()
+        const entity = Produto.fromJSON(data)
+        setCatalogoProdutosPorId(prev => ({ ...prev, [entity.getId()]: entity }))
+        return entity
+      } catch {
+        return null
+      }
+    },
+    [catalogoProdutosPorId, produtosList, token]
+  )
+
   const meiosPagamento = useMemo(() => {
     if (!meiosPagamentoData?.pages) return []
     return meiosPagamentoData.pages.flatMap(page => page.meiosPagamento || [])

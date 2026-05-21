@@ -79,7 +79,7 @@ function periodoV2ParaQueryRelatorios(periodoData: string): string | null {
 }
 /**
  * Nova visão geral do dashboard (layout Figma).
- * Conteúdo abaixo do TopNav — navegação global fica no layout `app/dashboard/layout.tsx`.
+ * Conteúdo abaixo do TopNav — shell global em `app/(erp)/layout.tsx` (ErpAppShell).
  */
 export default function DashboardV2() {
   const router = useRouter()

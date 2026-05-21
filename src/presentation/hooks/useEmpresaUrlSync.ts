@@ -9,7 +9,7 @@ import { syncEmpresaUrlQueryFromSession } from '@/src/shared/utils/tabSession'
  *
  * Usa `window.history.replaceState` para atualizar a URL silenciosamente,
  * sem disparar navegação React nem re-renders adicionais.
- * Montado no layout do dashboard; em cada mudança de pathname, garante
+ * Montado no TopNav (shell ERP); em cada mudança de pathname, garante
  * que o slug esteja presente como query string (sem chave nomeada).
  */
 export function useEmpresaUrlSync() {

@@ -1,4 +1,8 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  type InfiniteData,
+} from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { showToast } from '@/src/shared/utils/toast'
@@ -263,10 +267,9 @@ export function resolveModeloParaEmitirNota(v: VendaUnificadaDTO): 55 | 65 | nul
  * Parâmetros alinhados ao contrato do backend GET /vendas/unificado:
  * - origem, statusFiscal, dataCriacaoInicial, dataCriacaoFinal
  * - dataFinalizacaoInicio, dataFinalizacaoFim
- * - q (busca)
- * Paginação: `useVendasUnificadas` obtém **todas** as páginas (100 itens por requisição até acabar).
+ * - q (busca no servidor — pesquisa em todo o dataset, não só itens já carregados)
  */
-interface VendasUnificadasQueryParams {
+export interface VendasUnificadasQueryParams {
   origem?: 'PDV' | 'GESTOR' | 'DELIVERY'
   statusFiscal?: string
   dataCriacaoInicial?: string // ISO (filtro por data de criação)
@@ -287,8 +290,11 @@ interface VendasUnificadasResponse {
   items: VendaUnificadaDTO[]
 }
 
-/** Tamanho máximo por requisição (API); busca completa é feita em páginas de 100 em 100. */
-export const VENDAS_UNIFICADAS_PAGE_SIZE = 100
+/** Tamanho de cada página no Kanban (Pedidos de Clientes). */
+export const VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE = 50
+
+/** @deprecated Use VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE */
+export const VENDAS_UNIFICADAS_PAGE_SIZE = VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE
 
 /** Converte um item bruto da API em DTO (reutilizado em cada página). */
 function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): VendaUnificadaDTO {
@@ -321,7 +327,7 @@ function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): VendaUnif
   )
 }
 
-function montarSearchParamsVendasUnificadas(
+export function montarSearchParamsVendasUnificadas(
   params: VendasUnificadasQueryParams,
   offset: number,
   limit: number
@@ -342,137 +348,147 @@ function montarSearchParamsVendasUnificadas(
   return searchParams
 }
 
+/** Uma página da API (itens já mapeados para DTO). */
+export async function fetchVendasUnificadasPagina(
+  params: VendasUnificadasQueryParams,
+  offset: number,
+  limit: number,
+  token: string
+): Promise<VendasUnificadasResponse> {
+  const searchParams = montarSearchParamsVendasUnificadas(params, offset, limit)
+
+  const response = await fetchGestorApi(`/api/vendas/unificado?${searchParams.toString()}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    cache: 'no-store',
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    const errorMessage =
+      errorData.error || errorData.message || `Erro ${response.status}: ${response.statusText}`
+    throw new Error(errorMessage)
+  }
+
+  const data = await response.json()
+  const rawItems = (data.items || []) as Record<string, unknown>[]
+  const items = rawItems.map(mapItemJsonParaVendaUnificadaDTO)
+
+  return {
+    items,
+    count: typeof data.count === 'number' ? data.count : items.length,
+    page: data.page ?? 1,
+    limit: data.limit ?? limit,
+    totalPages: data.totalPages ?? 1,
+    hasNext: data.hasNext ?? false,
+    hasPrevious: data.hasPrevious ?? false,
+  }
+}
+
+function deduplicarPaginasVendas(
+  pages: VendasUnificadasResponse[]
+): { items: VendaUnificadaDTO[]; totalCount: number } {
+  const ids = new Set<string>()
+  const items: VendaUnificadaDTO[] = []
+  for (const page of pages) {
+    for (const item of page.items) {
+      if (!ids.has(item.id)) {
+        ids.add(item.id)
+        items.push(item)
+      }
+    }
+  }
+  const totalCount = Math.max(
+    0,
+    ...pages.map(p => (typeof p.count === 'number' ? p.count : 0)),
+    items.length
+  )
+  return { items, totalCount }
+}
+
+function getNextOffsetVendasUnificadas(
+  lastPage: VendasUnificadasResponse,
+  allPages: VendasUnificadasResponse[]
+): number | undefined {
+  const { items: carregadosItens } = deduplicarPaginasVendas(allPages)
+  const carregados = carregadosItens.length
+  const total = typeof lastPage.count === 'number' ? lastPage.count : 0
+
+  if (total > 0 && carregados >= total) return undefined
+
+  if (lastPage.items.length === 0) return undefined
+
+  const idsAnteriores = new Set<string>()
+  for (let i = 0; i < allPages.length - 1; i++) {
+    for (const item of allPages[i].items) idsAnteriores.add(item.id)
+  }
+  const novosNaUltima =
+    lastPage.items.length > 0
+      ? lastPage.items.filter(item => !idsAnteriores.has(item.id))
+      : []
+  if (lastPage.items.length > 0 && novosNaUltima.length === 0) {
+    if (process.env.NODE_ENV === 'development') {
+      // eslint-disable-next-line no-console
+      console.warn(
+        '[useVendasUnificadasInfinite] Página duplicada (offset ignorado na API?). Parando paginação.'
+      )
+    }
+    return undefined
+  }
+
+  if (!lastPage.hasNext && lastPage.items.length < VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE) {
+    return undefined
+  }
+
+  return carregados
+}
+
 /**
- * Hook para buscar vendas unificadas (PDV + Gestor) com React Query.
- * Busca páginas de 100 em 100 até `hasNext` ser false ou até critérios de parada seguros:
- * total já atingiu `count` da API, já passou `totalPages` (se não houver count), ou página só repete ids.
+ * Vendas unificadas com paginação infinita (Kanban).
+ * Primeira página (50) exibe rápido; demais páginas via scroll ou pré-carga silenciosa.
  */
-export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
+export function useVendasUnificadasInfinite(params: VendasUnificadasQueryParams) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
 
-  const queryKey = ['vendas-unificadas', params, empresaId]
+  const queryKey = ['vendas-unificadas-infinite', params, empresaId]
 
-  return useQuery({
+  return useInfiniteQuery<
+    VendasUnificadasResponse,
+    Error,
+    InfiniteData<VendasUnificadasResponse>,
+    readonly unknown[],
+    number
+  >({
     queryKey,
-    /** Evita “tela em branco” ao mudar filtros (ex.: primeira busca no Kanban): mantém a lista anterior até o novo GET concluir. */
     placeholderData: keepPreviousData,
-    queryFn: async (): Promise<VendasUnificadasResponse> => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
-      const pageSize = VENDAS_UNIFICADAS_PAGE_SIZE
-      const todosItens: VendaUnificadaDTO[] = []
-      const idsJaRecebidos = new Set<string>()
-      let offset = 0
-      let totalCount = 0
-      /** `count` numérico na 1ª página da API — usado para parar mesmo com hasNext errado */
-      let totalCountDaApi: number | null = null
-      /** `totalPages` na 1ª página — só usado se não houver count confiável */
-      let totalPagesDaApi: number | null = null
-      let primeiraPaginaMeta: {
-        page: number
-        totalPages: number
-        hasPrevious: boolean
-      } | null = null
-
-      const maxPaginas = 500
-      let pagina = 0
-
-      while (pagina < maxPaginas) {
-        pagina += 1
-        const searchParams = montarSearchParamsVendasUnificadas(params, offset, pageSize)
-
-        const response = await fetchGestorApi(`/api/vendas/unificado?${searchParams.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          cache: 'no-store',
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          const errorMessage =
-            errorData.error ||
-            errorData.message ||
-            `Erro ${response.status}: ${response.statusText}`
-          throw new Error(errorMessage)
-        }
-
-        const data = await response.json()
-        const rawItems = (data.items || []) as Record<string, unknown>[]
-        const batch = rawItems.map(mapItemJsonParaVendaUnificadaDTO)
-
-        if (pagina === 1) {
-          if (typeof data.count === 'number' && data.count >= 0) {
-            totalCountDaApi = data.count
-          }
-          if (typeof data.totalPages === 'number' && data.totalPages > 0) {
-            totalPagesDaApi = data.totalPages
-          }
-          totalCount =
-            totalCountDaApi !== null ? totalCountDaApi : batch.length > 0 ? batch.length : 0
-          primeiraPaginaMeta = {
-            page: data.page ?? 1,
-            totalPages: data.totalPages ?? 1,
-            hasPrevious: data.hasPrevious ?? false,
-          }
-        }
-
-        // Backend pode ignorar offset: mesma página repetida → evita loop enorme / hasNext mentiroso
-        const novosNaPagina =
-          batch.length > 0 ? batch.filter(item => !idsJaRecebidos.has(item.id)) : []
-
-        if (batch.length > 0 && novosNaPagina.length === 0) {
-          if (process.env.NODE_ENV === 'development') {
-            // eslint-disable-next-line no-console
-            console.warn(
-              '[useVendasUnificadas] Página duplicada (ids já recebidos). Provável offset ignorado na API. Parando paginação.'
-            )
-          }
-          break
-        }
-
-        for (const item of novosNaPagina) {
-          idsJaRecebidos.add(item.id)
-        }
-        todosItens.push(...novosNaPagina)
-
-        if (totalCountDaApi !== null && todosItens.length >= totalCountDaApi) {
-          break
-        }
-
-        if (totalCountDaApi === null && totalPagesDaApi !== null && pagina >= totalPagesDaApi) {
-          break
-        }
-
-        const hasNext = data.hasNext ?? false
-        if (!hasNext || batch.length === 0 || batch.length < pageSize) {
-          break
-        }
-
-        offset += pageSize
-      }
-
-      return {
-        items: todosItens,
-        count: totalCountDaApi !== null ? totalCountDaApi : Math.max(totalCount, todosItens.length),
-        page: primeiraPaginaMeta?.page ?? 1,
-        limit: todosItens.length,
-        totalPages: primeiraPaginaMeta?.totalPages ?? 1,
-        hasNext: false,
-        hasPrevious: primeiraPaginaMeta?.hasPrevious ?? false,
-      }
-    },
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) =>
+      fetchVendasUnificadasPagina(
+        params,
+        pageParam,
+        VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE,
+        token!
+      ),
+    getNextPageParam: (lastPage, allPages) => getNextOffsetVendasUnificadas(lastPage, allPages),
     enabled: !!token,
-    // Herda QueryProvider: staleTime 5min, refetchOnWindowFocus false, refetchOnMount false.
-    // Não redefinir staleTime curto nem refetchOnWindowFocus aqui: ao fechar modal o foco volta à janela
-    // e disparava novo GET em toda vez (dados stale após 30s).
     refetchOnReconnect: true,
-    // Polling por status fiscal (PENDENTE / EMITINDO / etc.) desativado: usar botão Atualizar no Kanban.
     refetchInterval: false,
   })
+}
+
+/** @deprecated Preferir `useVendasUnificadasInfinite` no Kanban. */
+export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
+  return useVendasUnificadasInfinite(params)
+}
+
+/** Achata páginas do infinite query e deduplica por id. */
+export function flattenVendasUnificadasInfinite(
+  data: InfiniteData<VendasUnificadasResponse> | undefined
+): { items: VendaUnificadaDTO[]; totalCount: number } {
+  if (!data?.pages?.length) return { items: [], totalCount: 0 }
+  return deduplicarPaginasVendas(data.pages)
 }
