@@ -58,18 +58,18 @@ export const MVP_COLUNA_CATALOGO: { id: MvpColunaId; label: string; hint?: strin
   { id: 'quantidade', label: 'Quantidade' },
   {
     id: 'varQtd',
-    label: '% Qtd',
+    label: '% Qtd (Per. anterior)',
     hint: 'Variação percentual da quantidade em relação ao período anterior',
   },
   {
     id: 'varFat',
-    label: '% Fat.',
+    label: '% Fat. (Per. anterior)',
     hint: 'Variação percentual do faturamento em relação ao período anterior',
   },
   { id: 'faturamento', label: 'Faturamento' },
   { id: 'precoMedio', label: 'Preço médio' },
-  { id: 'pctUnidades', label: '% un.', hint: 'Participação em unidades no conjunto filtrado' },
-  { id: 'pctFaturamento', label: '% fat.', hint: 'Participação em faturamento no conjunto filtrado' },
+  { id: 'pctUnidades', label: '% Qtd. (no Período)', hint: 'Participação em quantidade no conjunto filtrado' },
+  { id: 'pctFaturamento', label: '% Fat. (no Período)', hint: 'Participação em faturamento no conjunto filtrado' },
   { id: 'valorCardapio', label: 'Preço cardápio' },
   { id: 'deltaPrecoVsCardapio', label: 'Δ% vs cardápio' },
 ]
