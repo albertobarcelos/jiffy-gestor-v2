@@ -1,4 +1,4 @@
-import type { Area } from 'react-easy-crop'
+import type { MediaSize } from 'react-easy-crop'
 
 /** Dimensões finais da logo de impressão (alinhado ao backend `LogoImpressaoPolicy`). */
 export const LOGO_IMPRESSAO_WIDTH = 280
@@ -12,6 +12,12 @@ export const LOGO_CROP_DISPLAY_HEIGHT = 150
 export const LOGO_CROP_CONTAINER_WIDTH = 360
 export const LOGO_CROP_CONTAINER_HEIGHT = 200
 
+/** Limites da moldura de recorte no modal (px CSS). */
+export const LOGO_CROP_FRAME_MIN_WIDTH = 48
+export const LOGO_CROP_FRAME_MIN_HEIGHT = 28
+
+export type CropFrameSize = { width: number; height: number }
+
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image()
@@ -21,78 +27,123 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   })
 }
 
-/** Converte área em % (react-easy-crop) para pixels na imagem original. */
-function cropPercentToNaturalPixels(
-  image: HTMLImageElement,
-  croppedAreaPercentages: Area
-): { x: number; y: number; width: number; height: number } {
-  const nw = image.naturalWidth
-  const nh = image.naturalHeight
-  return {
-    x: Math.round((croppedAreaPercentages.x / 100) * nw),
-    y: Math.round((croppedAreaPercentages.y / 100) * nh),
-    width: Math.round((croppedAreaPercentages.width / 100) * nw),
-    height: Math.round((croppedAreaPercentages.height / 100) * nh),
-  }
+function clampPercent(value: number): number {
+  return Math.min(100, Math.max(0, value))
 }
 
 /**
- * Coloca o recorte no canvas 280×150: centralizado, proporção mantida, sem ampliar.
- * Imagens menores que o cupom ganham margens transparentes; maiores são reduzidas.
+ * Pixels na imagem original a partir da moldura (CSS), media exibida e pan.
+ * Evita o teto de 100% do react-easy-crop quando a moldura é maior que a imagem no ecrã.
  */
-function composeLogoImpressaoCanvas(
-  cropCanvas: HTMLCanvasElement,
-  cropWidth: number,
-  cropHeight: number
-): HTMLCanvasElement {
-  const scale = Math.min(
-    LOGO_IMPRESSAO_WIDTH / cropWidth,
-    LOGO_IMPRESSAO_HEIGHT / cropHeight,
-    1
-  )
-  const scaledW = Math.round(cropWidth * scale)
-  const scaledH = Math.round(cropHeight * scale)
-  const offsetX = Math.floor((LOGO_IMPRESSAO_WIDTH - scaledW) / 2)
-  const offsetY = Math.floor((LOGO_IMPRESSAO_HEIGHT - scaledH) / 2)
+export function getLogoCropNaturalArea(
+  crop: { x: number; y: number },
+  mediaSize: MediaSize,
+  cropFrameSize: CropFrameSize,
+  zoom: number
+): { x: number; y: number; width: number; height: number } {
+  const mediaW = mediaSize.width
+  const mediaH = mediaSize.height
+  const naturalW = mediaSize.naturalWidth
+  const naturalH = mediaSize.naturalHeight
+  const frameW = cropFrameSize.width / zoom
+  const frameH = cropFrameSize.height / zoom
 
-  const outCanvas = document.createElement('canvas')
-  outCanvas.width = LOGO_IMPRESSAO_WIDTH
-  outCanvas.height = LOGO_IMPRESSAO_HEIGHT
-  const outCtx = outCanvas.getContext('2d')
-  if (!outCtx) {
-    throw new Error('Não foi possível processar a imagem.')
-  }
-  outCtx.clearRect(0, 0, LOGO_IMPRESSAO_WIDTH, LOGO_IMPRESSAO_HEIGHT)
-  outCtx.imageSmoothingEnabled = true
-  outCtx.imageSmoothingQuality = 'high'
-  outCtx.drawImage(
-    cropCanvas,
-    0,
-    0,
-    cropWidth,
-    cropHeight,
-    offsetX,
-    offsetY,
-    scaledW,
-    scaledH
+  const overlapW = Math.min(frameW, mediaW)
+  const overlapH = Math.min(frameH, mediaH)
+
+  const width = Math.round((overlapW / mediaW) * naturalW)
+  const height = Math.round((overlapH / mediaH) * naturalH)
+
+  const xPercent = clampPercent(
+    (((mediaW - frameW) / 2 - crop.x / zoom) / mediaW) * 100
   )
-  return outCanvas
+  const yPercent = clampPercent(
+    (((mediaH - frameH) / 2 - crop.y / zoom) / mediaH) * 100
+  )
+
+  const x = Math.round(
+    Math.min(Math.max(0, (xPercent / 100) * naturalW), Math.max(0, naturalW - width))
+  )
+  const y = Math.round(
+    Math.min(Math.max(0, (yPercent / 100) * naturalH), Math.max(0, naturalH - height))
+  )
+
+  return { x, y, width, height }
 }
 
 /**
- * Recorta a área visível no modal (via %) e exporta PNG 280×150 com alpha.
- * Usa percentagens — alinhado ao cálculo do react-easy-crop com `cropSize` fixo.
+ * Tamanho final do PNG = moldura (px), limitada ao cupom (280×150) e à imagem recortada.
+ * Moldura 100×50 → ficheiro 100×50; imagem 200×200 com moldura máxima → 200×150.
+ */
+export function getLogoOutputDimensions(
+  cropFrameSize: CropFrameSize,
+  naturalCrop?: { width: number; height: number }
+): { width: number; height: number } {
+  let width = Math.min(cropFrameSize.width, LOGO_IMPRESSAO_WIDTH)
+  let height = Math.min(cropFrameSize.height, LOGO_IMPRESSAO_HEIGHT)
+  if (naturalCrop) {
+    width = Math.min(width, naturalCrop.width)
+    height = Math.min(height, naturalCrop.height)
+  }
+  return {
+    width: Math.max(1, Math.round(width)),
+    height: Math.max(1, Math.round(height)),
+  }
+}
+
+/** Estima px de saída (igual ao que será gravado ao aplicar). */
+export function estimateOutputSizeFromCropFrame(
+  crop: { x: number; y: number },
+  mediaSize: MediaSize,
+  cropFrameSize: CropFrameSize,
+  zoom: number
+): { width: number; height: number } {
+  const naturalCrop = getLogoCropNaturalArea(crop, mediaSize, cropFrameSize, zoom)
+  return getLogoOutputDimensions(cropFrameSize, naturalCrop)
+}
+
+export function clampCropFrameSize(
+  size: CropFrameSize,
+  max: CropFrameSize
+): CropFrameSize {
+  return {
+    width: Math.min(
+      max.width,
+      Math.max(LOGO_CROP_FRAME_MIN_WIDTH, Math.round(size.width))
+    ),
+    height: Math.min(
+      max.height,
+      Math.max(LOGO_CROP_FRAME_MIN_HEIGHT, Math.round(size.height))
+    ),
+  }
+}
+
+export async function loadLogoImageNaturalSize(
+  src: string
+): Promise<{ width: number; height: number }> {
+  const image = await loadImage(src)
+  return { width: image.naturalWidth, height: image.naturalHeight }
+}
+
+/**
+ * Recorta o que está dentro da moldura e grava PNG com o tamanho da moldura (até 280×150).
  */
 export async function cropImageToLogoImpressao(
   imageSrc: string,
-  croppedAreaPercentages: Area
+  cropFrameSize: CropFrameSize,
+  naturalArea: { x: number; y: number; width: number; height: number }
 ): Promise<File> {
   const image = await loadImage(imageSrc)
-  const { x, y, width, height } = cropPercentToNaturalPixels(image, croppedAreaPercentages)
+  const { x, y, width, height } = naturalArea
 
   if (width <= 0 || height <= 0) {
     throw new Error('Área de recorte inválida.')
   }
+
+  const { width: outW, height: outH } = getLogoOutputDimensions(cropFrameSize, {
+    width,
+    height,
+  })
 
   const cropCanvas = document.createElement('canvas')
   cropCanvas.width = width
@@ -103,7 +154,16 @@ export async function cropImageToLogoImpressao(
   }
   cropCtx.drawImage(image, x, y, width, height, 0, 0, width, height)
 
-  const outCanvas = composeLogoImpressaoCanvas(cropCanvas, width, height)
+  const outCanvas = document.createElement('canvas')
+  outCanvas.width = outW
+  outCanvas.height = outH
+  const outCtx = outCanvas.getContext('2d')
+  if (!outCtx) {
+    throw new Error('Não foi possível processar a imagem.')
+  }
+  outCtx.imageSmoothingEnabled = true
+  outCtx.imageSmoothingQuality = 'high'
+  outCtx.drawImage(cropCanvas, 0, 0, width, height, 0, 0, outW, outH)
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     outCanvas.toBlob(

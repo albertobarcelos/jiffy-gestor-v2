@@ -1077,7 +1077,7 @@ export function EmpresaTab() {
                       <span className="text-[11px] leading-snug text-secondary-text">
                         {isSavingLogo
                           ? 'Salvando…'
-                          : 'Arraste ou clique · 280×150 px'}
+                          : 'Arraste ou clique · máx. 280×150 px (tamanho do recorte)'}
                       </span>
                     </div>
                   )}

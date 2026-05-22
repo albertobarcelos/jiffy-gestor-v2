@@ -5,21 +5,19 @@ import {
   LOGO_CROP_DISPLAY_HEIGHT,
   LOGO_CROP_DISPLAY_WIDTH,
   LOGO_IMPRESSAO_ASPECT,
+  type CropFrameSize,
 } from '@/src/presentation/utils/logoImpressaoCrop'
 
 const CONTAINER_PADDING = 24
 
-export type CropDisplaySize = { width: number; height: number }
-
 /**
- * Mantém a moldura de recorte com tamanho visual estável (280×150 quando couber).
- * Em ecrãs estreitos, reduz proporcionalmente sem mudar o aspecto.
+ * Tamanho máximo da moldura no contentor (referência 280×150; encolhe em ecrãs estreitos).
  */
-export function useLogoCropDisplaySize(
+export function useMaxCropFrameSize(
   containerRef: RefObject<HTMLDivElement | null>,
   enabled: boolean
-): CropDisplaySize {
-  const [cropSize, setCropSize] = useState<CropDisplaySize>({
+): CropFrameSize {
+  const [maxSize, setMaxSize] = useState<CropFrameSize>({
     width: LOGO_CROP_DISPLAY_WIDTH,
     height: LOGO_CROP_DISPLAY_HEIGHT,
   })
@@ -46,7 +44,7 @@ export function useLogoCropDisplaySize(
         h = Math.floor(w / LOGO_IMPRESSAO_ASPECT)
       }
 
-      setCropSize(prev =>
+      setMaxSize(prev =>
         prev.width === w && prev.height === h ? prev : { width: w, height: h }
       )
     }
@@ -57,7 +55,7 @@ export function useLogoCropDisplaySize(
     return () => ro.disconnect()
   }, [containerRef, enabled])
 
-  return cropSize
+  return maxSize
 }
 
 export const logoCropContainerStyle: React.CSSProperties = {

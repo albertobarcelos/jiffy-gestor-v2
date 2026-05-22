@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Cropper, { type Area } from 'react-easy-crop'
+import Cropper, { type MediaSize } from 'react-easy-crop'
 import {
   Dialog,
   DialogContent,
@@ -11,17 +11,21 @@ import {
   DialogTitle,
 } from '@/src/presentation/components/ui/dialog'
 import {
-  LOGO_IMPRESSAO_ASPECT,
   LOGO_IMPRESSAO_HEIGHT,
   LOGO_IMPRESSAO_WIDTH,
+  clampCropFrameSize,
   cropImageToLogoImpressao,
+  estimateOutputSizeFromCropFrame,
+  getLogoCropNaturalArea,
   LOGO_CROP_DISPLAY_HEIGHT,
   LOGO_CROP_DISPLAY_WIDTH,
+  type CropFrameSize,
 } from '@/src/presentation/utils/logoImpressaoCrop'
 import { showToast } from '@/src/shared/utils/toast'
+import { LogoCropFrameHandles } from './LogoCropFrameHandles'
 import {
   logoCropContainerStyle,
-  useLogoCropDisplaySize,
+  useMaxCropFrameSize,
 } from './useLogoCropDisplaySize'
 
 /** Zoom menor que 1 = afastar; maior que 1 = aproximar. */
@@ -43,34 +47,73 @@ export function LogoImpressaoCropModal({
 }: LogoImpressaoCropModalProps) {
   const [crop, setCrop] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
+  const [cropFrameSize, setCropFrameSize] = useState<CropFrameSize>({
+    width: LOGO_CROP_DISPLAY_WIDTH,
+    height: LOGO_CROP_DISPLAY_HEIGHT,
+  })
   const [cropAreaReady, setCropAreaReady] = useState(false)
   const [isApplying, setIsApplying] = useState(false)
+  const [outputSizeLabel, setOutputSizeLabel] = useState<string | null>(null)
   const cropContainerRef = useRef<HTMLDivElement>(null)
-  const cropDisplaySize = useLogoCropDisplaySize(cropContainerRef, open && !!imageSrc)
-  /** Percentagens da moldura — fonte de verdade no momento de Aplicar (evita estado React atrasado). */
-  const croppedAreaPercentRef = useRef<Area | null>(null)
+  const maxCropFrameSize = useMaxCropFrameSize(cropContainerRef, open && !!imageSrc)
+  const mediaSizeRef = useRef<MediaSize | null>(null)
 
   useEffect(() => {
     if (!open) {
       setCrop({ x: 0, y: 0 })
       setZoom(1)
-      croppedAreaPercentRef.current = null
       setCropAreaReady(false)
       setIsApplying(false)
+      setOutputSizeLabel(null)
+      mediaSizeRef.current = null
+      return
     }
-  }, [open])
+  }, [open, imageSrc])
 
-  const syncCropArea = useCallback((areaPercent: Area, _areaPixels: Area) => {
-    croppedAreaPercentRef.current = areaPercent
-    setCropAreaReady(true)
-  }, [])
+  useEffect(() => {
+    if (!open || !imageSrc) return
+    setCropFrameSize(maxCropFrameSize)
+  }, [open, imageSrc, maxCropFrameSize.width, maxCropFrameSize.height])
+
+  useEffect(() => {
+    setCropFrameSize(prev => clampCropFrameSize(prev, maxCropFrameSize))
+  }, [maxCropFrameSize.width, maxCropFrameSize.height])
+
+  const refreshOutputLabel = useCallback(() => {
+    const media = mediaSizeRef.current
+    if (!media) {
+      setOutputSizeLabel(null)
+      return
+    }
+    const { width, height } = estimateOutputSizeFromCropFrame(crop, media, cropFrameSize, zoom)
+    const capped =
+      width >= LOGO_IMPRESSAO_WIDTH || height >= LOGO_IMPRESSAO_HEIGHT
+        ? ` (limite ${LOGO_IMPRESSAO_WIDTH}×${LOGO_IMPRESSAO_HEIGHT} ao salvar)`
+        : ''
+    setOutputSizeLabel(`${width} × ${height} px${capped}`)
+  }, [crop, cropFrameSize, zoom])
+
+  useEffect(() => {
+    if (!open || !imageSrc || !mediaSizeRef.current) return
+    refreshOutputLabel()
+  }, [open, imageSrc, crop, cropFrameSize, zoom, refreshOutputLabel])
+
+  const handleMediaLoaded = useCallback(
+    (media: MediaSize) => {
+      mediaSizeRef.current = media
+      setCropAreaReady(true)
+      refreshOutputLabel()
+    },
+    [refreshOutputLabel]
+  )
 
   const handleApply = async () => {
-    const areaPercent = croppedAreaPercentRef.current
-    if (!imageSrc || !areaPercent) return
+    const media = mediaSizeRef.current
+    if (!imageSrc || !media) return
     setIsApplying(true)
     try {
-      const file = await cropImageToLogoImpressao(imageSrc, areaPercent)
+      const naturalArea = getLogoCropNaturalArea(crop, media, cropFrameSize, zoom)
+      const file = await cropImageToLogoImpressao(imageSrc, cropFrameSize, naturalArea)
       onConfirm(file)
     } catch (e) {
       console.error('Erro ao recortar logo:', e)
@@ -92,11 +135,11 @@ export function LogoImpressaoCropModal({
       <DialogHeader>
         <DialogTitle>Ajustar logo de impressão</DialogTitle>
         <DialogDescription>
-          - A moldura abaixo tem sempre o tamanho ({LOGO_CROP_DISPLAY_WIDTH}×
-          {LOGO_CROP_DISPLAY_HEIGHT} px).
+          - Arraste a imagem (zoom abaixo) e redimensione a moldura pelas bordas e cantos.
           <p>
-            - A imagem final terá {LOGO_IMPRESSAO_WIDTH}×{LOGO_IMPRESSAO_HEIGHT} px; logos
-            menores ficam centradas com margens transparentes (sem ampliar).
+            - Largura e altura do recorte são independentes (até {LOGO_IMPRESSAO_WIDTH}×
+            {LOGO_IMPRESSAO_HEIGHT} px). A imagem salva terá esse tamanho em pixels, sem margens
+            vazias.
           </p>
           <p>- O servidor converte para preto e branco ao salvar.</p>
         </DialogDescription>
@@ -105,39 +148,58 @@ export function LogoImpressaoCropModal({
       <DialogContent sx={{ overflow: 'hidden' }}>
         <div
           ref={cropContainerRef}
-          className="relative mx-auto overflow-hidden rounded-lg bg-neutral-900"
+          className="relative mx-auto overflow-hidden rounded-lg bg-primary"
           style={logoCropContainerStyle}
         >
           {imageSrc ? (
-            <Cropper
-              image={imageSrc}
-              crop={crop}
-              zoom={zoom}
-              minZoom={LOGO_CROP_MIN_ZOOM}
-              maxZoom={LOGO_CROP_MAX_ZOOM}
-              aspect={LOGO_IMPRESSAO_ASPECT}
-              cropSize={cropDisplaySize}
-              onCropChange={setCrop}
-              onZoomChange={setZoom}
-              onCropAreaChange={syncCropArea}
-              onCropComplete={syncCropArea}
-              objectFit="contain"
-              showGrid
-              style={{
-                cropAreaStyle: {
-                  border: '2px solid rgba(255,255,255,0.95)',
-                },
-              }}
-            />
+            <>
+              <Cropper
+                image={imageSrc}
+                crop={crop}
+                zoom={zoom}
+                minZoom={LOGO_CROP_MIN_ZOOM}
+                maxZoom={LOGO_CROP_MAX_ZOOM}
+                cropSize={cropFrameSize}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onMediaLoaded={handleMediaLoaded}
+                onCropAreaChange={() => setCropAreaReady(true)}
+                onCropComplete={() => setCropAreaReady(true)}
+                objectFit="contain"
+                showGrid
+                style={{
+                  containerStyle: {
+                    backgroundColor: 'var(--color-primary)',
+                  },
+                  cropAreaStyle: {
+                    border: 'none',
+                    boxShadow: 'none',
+                  },
+                }}
+              />
+              <LogoCropFrameHandles
+                size={cropFrameSize}
+                maxSize={maxCropFrameSize}
+                onSizeChange={setCropFrameSize}
+                disabled={isApplying}
+              />
+            </>
           ) : null}
         </div>
         <p className="mt-2 text-center font-nunito text-[10px] text-secondary-text">
-          Moldura fixa: {LOGO_CROP_DISPLAY_WIDTH} × {LOGO_CROP_DISPLAY_HEIGHT} px (proporção do cupom)
+          Moldura até {maxCropFrameSize.width} × {maxCropFrameSize.height} px (máx. cupom{' '}
+          {LOGO_CROP_DISPLAY_WIDTH}×{LOGO_CROP_DISPLAY_HEIGHT})
+          {outputSizeLabel ? (
+            <>
+              <br />
+              Tamanho estimado do recorte: <span className="font-semibold">{outputSizeLabel}</span>
+            </>
+          ) : null}
         </p>
 
-        <div className="mt-4 space-y-1">
+        <div className="mt-4">
           <div className="flex items-center gap-3">
-            <span className="shrink-0 font-nunito text-xs text-secondary-text">Zoom</span>
+            <span className="w-28 shrink-0 font-nunito text-xs text-secondary-text">Zoom</span>
             <input
               type="range"
               min={LOGO_CROP_MIN_ZOOM}
@@ -145,10 +207,14 @@ export function LogoImpressaoCropModal({
               step={0.05}
               value={zoom}
               onChange={e => setZoom(Number(e.target.value))}
-              className="h-2 w-full cursor-pointer accent-[var(--color-primary)]"
+              className="h-2 min-w-0 flex-1 cursor-pointer accent-[var(--color-primary)]"
               aria-label="Zoom da imagem"
             />
           </div>
+          <p className="mt-2 font-nunito text-[10px] text-secondary-text">
+            Moldura atual: {cropFrameSize.width} × {cropFrameSize.height} px — arraste as alças
+            brancas nas bordas.
+          </p>
         </div>
       </DialogContent>
 
