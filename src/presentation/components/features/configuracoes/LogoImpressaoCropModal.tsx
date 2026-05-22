@@ -16,6 +16,7 @@ import {
   clampCropFrameSize,
   cropImageToLogoImpressao,
   estimateOutputSizeFromCropFrame,
+  getInitialCropFrameSize,
   getLogoCropNaturalArea,
   LOGO_CROP_DISPLAY_HEIGHT,
   LOGO_CROP_DISPLAY_WIDTH,
@@ -72,8 +73,11 @@ export function LogoImpressaoCropModal({
 
   useEffect(() => {
     if (!open || !imageSrc) return
-    setCropFrameSize(maxCropFrameSize)
-  }, [open, imageSrc, maxCropFrameSize.width, maxCropFrameSize.height])
+    setCropFrameSize({
+      width: LOGO_CROP_DISPLAY_WIDTH,
+      height: LOGO_CROP_DISPLAY_HEIGHT,
+    })
+  }, [open, imageSrc])
 
   useEffect(() => {
     setCropFrameSize(prev => clampCropFrameSize(prev, maxCropFrameSize))
@@ -86,11 +90,16 @@ export function LogoImpressaoCropModal({
       return
     }
     const { width, height } = estimateOutputSizeFromCropFrame(crop, media, cropFrameSize, zoom)
-    const capped =
+    const atCupomLimit =
       width >= LOGO_IMPRESSAO_WIDTH || height >= LOGO_IMPRESSAO_HEIGHT
-        ? ` (limite ${LOGO_IMPRESSAO_WIDTH}×${LOGO_IMPRESSAO_HEIGHT} ao salvar)`
+    const smallerThanFrame =
+      width < cropFrameSize.width || height < cropFrameSize.height
+    const suffix = atCupomLimit
+      ? ` (limite ${LOGO_IMPRESSAO_WIDTH}×${LOGO_IMPRESSAO_HEIGHT} ao salvar)`
+      : smallerThanFrame
+        ? ' (sem ampliar — moldura maior que o recorte)'
         : ''
-    setOutputSizeLabel(`${width} × ${height} px${capped}`)
+    setOutputSizeLabel(`${width} × ${height} px${suffix}`)
   }, [crop, cropFrameSize, zoom])
 
   useEffect(() => {
@@ -101,10 +110,11 @@ export function LogoImpressaoCropModal({
   const handleMediaLoaded = useCallback(
     (media: MediaSize) => {
       mediaSizeRef.current = media
+      setCropFrameSize(getInitialCropFrameSize(media, maxCropFrameSize))
+      setCrop({ x: 0, y: 0 })
       setCropAreaReady(true)
-      refreshOutputLabel()
     },
-    [refreshOutputLabel]
+    [maxCropFrameSize]
   )
 
   const handleApply = async () => {
@@ -134,14 +144,16 @@ export function LogoImpressaoCropModal({
     >
       <DialogHeader>
         <DialogTitle>Ajustar logo de impressão</DialogTitle>
-        <DialogDescription>
-          - Arraste a imagem (zoom abaixo) e redimensione a moldura pelas bordas e cantos.
-          <p>
+        <DialogDescription className="space-y-1">
+          <span className="block">
+            - Arraste a imagem (zoom abaixo) e redimensione a moldura pelas bordas e cantos.
+          </span>
+          <span className="block">
             - Largura e altura do recorte são independentes (até {LOGO_IMPRESSAO_WIDTH}×
-            {LOGO_IMPRESSAO_HEIGHT} px). A imagem salva terá esse tamanho em pixels, sem margens
-            vazias.
-          </p>
-          <p>- O servidor converte para preto e branco ao salvar.</p>
+            {LOGO_IMPRESSAO_HEIGHT} px). Imagens menores ajustam a moldura ao importar; o ficheiro
+            não é ampliado além do recorte real.
+          </span>
+          <span className="block">- O servidor converte para preto e branco ao salvar.</span>
         </DialogDescription>
       </DialogHeader>
 

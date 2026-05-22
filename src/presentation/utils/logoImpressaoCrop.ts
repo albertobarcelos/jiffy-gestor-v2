@@ -72,19 +72,40 @@ export function getLogoCropNaturalArea(
 }
 
 /**
- * Tamanho final do PNG = moldura (px), limitada ao cupom (280×150) e à imagem recortada.
- * Moldura 100×50 → ficheiro 100×50; imagem 200×200 com moldura máxima → 200×150.
+ * Moldura inicial ao importar: encaixa na imagem sem ultrapassar o máximo do cupom.
+ */
+export function getInitialCropFrameSize(
+  media: MediaSize,
+  maxFrame: CropFrameSize
+): CropFrameSize {
+  return clampCropFrameSize(
+    {
+      width: Math.min(maxFrame.width, media.naturalWidth, LOGO_IMPRESSAO_WIDTH),
+      height: Math.min(maxFrame.height, media.naturalHeight, LOGO_IMPRESSAO_HEIGHT),
+    },
+    maxFrame
+  )
+}
+
+/**
+ * Tamanho final do PNG: moldura (px), limites do cupom, recorte e imagem original.
+ * Nunca amplia — só reduz quando a moldura ou o máximo exigem.
  */
 export function getLogoOutputDimensions(
   cropFrameSize: CropFrameSize,
-  naturalCrop?: { width: number; height: number }
+  naturalCrop: { width: number; height: number },
+  naturalImageSize?: { width: number; height: number }
 ): { width: number; height: number } {
-  let width = Math.min(cropFrameSize.width, LOGO_IMPRESSAO_WIDTH)
-  let height = Math.min(cropFrameSize.height, LOGO_IMPRESSAO_HEIGHT)
-  if (naturalCrop) {
-    width = Math.min(width, naturalCrop.width)
-    height = Math.min(height, naturalCrop.height)
-  }
+  const capW = naturalImageSize
+    ? Math.min(LOGO_IMPRESSAO_WIDTH, naturalImageSize.width)
+    : LOGO_IMPRESSAO_WIDTH
+  const capH = naturalImageSize
+    ? Math.min(LOGO_IMPRESSAO_HEIGHT, naturalImageSize.height)
+    : LOGO_IMPRESSAO_HEIGHT
+
+  const width = Math.min(cropFrameSize.width, capW, naturalCrop.width)
+  const height = Math.min(cropFrameSize.height, capH, naturalCrop.height)
+
   return {
     width: Math.max(1, Math.round(width)),
     height: Math.max(1, Math.round(height)),
@@ -99,7 +120,10 @@ export function estimateOutputSizeFromCropFrame(
   zoom: number
 ): { width: number; height: number } {
   const naturalCrop = getLogoCropNaturalArea(crop, mediaSize, cropFrameSize, zoom)
-  return getLogoOutputDimensions(cropFrameSize, naturalCrop)
+  return getLogoOutputDimensions(cropFrameSize, naturalCrop, {
+    width: mediaSize.naturalWidth,
+    height: mediaSize.naturalHeight,
+  })
 }
 
 export function clampCropFrameSize(
@@ -126,7 +150,7 @@ export async function loadLogoImageNaturalSize(
 }
 
 /**
- * Recorta o que está dentro da moldura e grava PNG com o tamanho da moldura (até 280×150).
+ * Recorta o que está dentro da moldura e grava PNG (sem ampliar além do recorte natural).
  */
 export async function cropImageToLogoImpressao(
   imageSrc: string,
@@ -140,10 +164,11 @@ export async function cropImageToLogoImpressao(
     throw new Error('Área de recorte inválida.')
   }
 
-  const { width: outW, height: outH } = getLogoOutputDimensions(cropFrameSize, {
-    width,
-    height,
-  })
+  const { width: outW, height: outH } = getLogoOutputDimensions(
+    cropFrameSize,
+    { width, height },
+    { width: image.naturalWidth, height: image.naturalHeight }
+  )
 
   const cropCanvas = document.createElement('canvas')
   cropCanvas.width = width
@@ -163,7 +188,11 @@ export async function cropImageToLogoImpressao(
   }
   outCtx.imageSmoothingEnabled = true
   outCtx.imageSmoothingQuality = 'high'
-  outCtx.drawImage(cropCanvas, 0, 0, width, height, 0, 0, outW, outH)
+  if (outW === width && outH === height) {
+    outCtx.drawImage(cropCanvas, 0, 0)
+  } else {
+    outCtx.drawImage(cropCanvas, 0, 0, width, height, 0, 0, outW, outH)
+  }
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     outCanvas.toBlob(
