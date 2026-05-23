@@ -1,13 +1,19 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
 import { Input } from '@/src/presentation/components/ui/input'
+import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
 import { MenuItem } from '@mui/material'
+import { LogoImpressaoCropModal } from '../LogoImpressaoCropModal'
+import {
+  LOGO_IMPRESSAO_HEIGHT,
+  LOGO_IMPRESSAO_WIDTH,
+} from '@/src/presentation/utils/logoImpressaoCrop'
 
 /** Labels outlined — alinhado a NovoMeioPagamento / EditarTerminais */
 const sxOutlinedLabelTextoEscuro = {
@@ -105,6 +111,28 @@ const FUSOS_IANA_BRASIL = [
   { id: 'America/Rio_Branco', label: 'America/Rio Branco (AC)' },
 ]
 
+const MAX_LOGO_IMPRESSAO_BYTES = 1024 * 1024
+const LOGO_IMPRESSAO_ACCEPT = 'image/png,image/jpeg,image/webp'
+
+/** Moldura 280×150 — `object-contain` evita distorção; largura fixa no desktop. */
+function LogoImpressaoPreviewImage({ src, alt }: { src: string; alt: string }) {
+  return (
+    <div
+      className="w-full overflow-hidden rounded-sm bg-white"
+      style={{ aspectRatio: `${LOGO_IMPRESSAO_WIDTH} / ${LOGO_IMPRESSAO_HEIGHT}` }}
+    >
+      <img
+        src={src}
+        alt={alt}
+        className="block h-full w-full object-contain object-center"
+        draggable={false}
+      />
+    </div>
+  )
+}
+
+const LOGO_COLUNA_LARGURA_CLASS = 'w-full shrink-0 lg:w-[280px]'
+
 /**
  * Tab de Empresa - Edição de dados da empresa
  */
@@ -112,7 +140,7 @@ export function EmpresaTab() {
   const { auth } = useAuthStore()
   const [empresa, setEmpresa] = useState<Cliente | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isEditing, setIsEditing] = useState(true)
+  const [isEditing, setIsEditing] = useState(false)
 
   // Campos do formulário
   const [cnpj, setCnpj] = useState('')
@@ -134,6 +162,23 @@ export function EmpresaTab() {
   /** Snapshot de `parametroEmpresa` para PATCH preservar tipos impressão/cobrança etc. */
   const [parametroEmpresaDraft, setParametroEmpresaDraft] = useState<Record<string, unknown>>({})
 
+  const [logoDragActive, setLogoDragActive] = useState(false)
+  /** Arquivo escolhido localmente; só é enviado ao API ao clicar em Salvar. */
+  const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null)
+  const [pendingLogoPreviewUrl, setPendingLogoPreviewUrl] = useState<string | null>(null)
+  /** Pré-visualização da logo já persistida no servidor (GET). */
+  const [serverLogoObjectUrl, setServerLogoObjectUrl] = useState<string | null>(null)
+  const [serverHasLogo, setServerHasLogo] = useState(false)
+  /** Utilizador pediu remoção da logo guardada; DELETE só ao Salvar. */
+  const [pendingRemoveLogoOnSave, setPendingRemoveLogoOnSave] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isSavingLogo, setIsSavingLogo] = useState(false)
+  const logoFileInputRef = useRef<HTMLInputElement>(null)
+  const [logoCropModalOpen, setLogoCropModalOpen] = useState(false)
+  const [logoCropImageSrc, setLogoCropImageSrc] = useState<string | null>(null)
+  /** Ficheiro original antes do recorte (permite reabrir o modal de crop). */
+  const logoCropSourceFileRef = useRef<File | null>(null)
+
   // Ref para rastrear o último valor de cidade usado para buscar código IBGE
   const ultimaCidadeBuscada = useRef<string>('')
 
@@ -141,6 +186,123 @@ export function EmpresaTab() {
     loadEmpresa()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    return () => {
+      if (pendingLogoPreviewUrl) {
+        URL.revokeObjectURL(pendingLogoPreviewUrl)
+      }
+    }
+  }, [pendingLogoPreviewUrl])
+
+  useEffect(() => {
+    return () => {
+      if (serverLogoObjectUrl) {
+        URL.revokeObjectURL(serverLogoObjectUrl)
+      }
+    }
+  }, [serverLogoObjectUrl])
+
+  useEffect(() => {
+    return () => {
+      if (logoCropImageSrc) {
+        URL.revokeObjectURL(logoCropImageSrc)
+      }
+    }
+  }, [logoCropImageSrc])
+
+  const refreshSavedLogoImpressao = async (token: string) => {
+    setServerLogoObjectUrl(prev => {
+      if (prev) URL.revokeObjectURL(prev)
+      return null
+    })
+    try {
+      const res = await fetch('/api/empresas/me/logo-impressao', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) {
+        const blob = await res.blob()
+        setServerLogoObjectUrl(URL.createObjectURL(blob))
+        setServerHasLogo(true)
+      } else {
+        setServerHasLogo(false)
+      }
+    } catch (e) {
+      console.error('Erro ao carregar logo de impressão:', e)
+      setServerHasLogo(false)
+    }
+  }
+
+  const clearPendingLogo = () => {
+    setPendingLogoFile(null)
+    setPendingLogoPreviewUrl(null)
+    logoCropSourceFileRef.current = null
+    if (logoFileInputRef.current) {
+      logoFileInputRef.current.value = ''
+    }
+  }
+
+  const closeLogoCropModal = () => {
+    setLogoCropModalOpen(false)
+    setLogoCropImageSrc(prev => {
+      if (prev) URL.revokeObjectURL(prev)
+      return null
+    })
+    if (logoFileInputRef.current) {
+      logoFileInputRef.current.value = ''
+    }
+  }
+
+  const validateLogoSourceFile = (file: File): boolean => {
+    if (file.size > MAX_LOGO_IMPRESSAO_BYTES) {
+      showToast.error('Arquivo muito grande. Máximo 1 MB.')
+      return false
+    }
+    const tiposPermitidos = ['image/png', 'image/jpeg', 'image/webp']
+    if (!tiposPermitidos.includes(file.type)) {
+      showToast.error('Formato inválido. Use PNG, JPEG ou WEBP.')
+      return false
+    }
+    return true
+  }
+
+  const openLogoCropFromFile = (file: File) => {
+    if (!validateLogoSourceFile(file)) return
+    logoCropSourceFileRef.current = file
+    setLogoCropImageSrc(prev => {
+      if (prev) URL.revokeObjectURL(prev)
+      return URL.createObjectURL(file)
+    })
+    setLogoCropModalOpen(true)
+  }
+
+  const handleLogoCropConfirm = (file: File) => {
+    closeLogoCropModal()
+    setPendingLogoPreviewUrl(prev => {
+      if (prev) URL.revokeObjectURL(prev)
+      return URL.createObjectURL(file)
+    })
+    setPendingLogoFile(file)
+    setPendingRemoveLogoOnSave(false)
+  }
+
+  const logoBusy = isSavingLogo || isSaving
+
+  const hasLogoPendingChanges = useMemo(
+    () => !!pendingLogoFile || pendingRemoveLogoOnSave,
+    [pendingLogoFile, pendingRemoveLogoOnSave]
+  )
+
+  const handleLogoFileInput = (files: FileList | null) => {
+    if (logoBusy || !files?.length) return
+    openLogoCropFromFile(files[0])
+  }
+
+  const handleReopenLogoCrop = () => {
+    const source = logoCropSourceFileRef.current
+    if (!source || logoBusy) return
+    openLogoCropFromFile(source)
+  }
 
   const loadEmpresa = async () => {
     const token = auth?.getAccessToken()
@@ -223,6 +385,8 @@ export function EmpresaTab() {
           )
           setEmpresa(empresaData)
         }
+
+        await refreshSavedLogoImpressao(token)
       } else {
         console.error(
           'Erro na resposta da API:',
@@ -308,6 +472,171 @@ export function EmpresaTab() {
     }
   }
 
+  type UploadLogoResult = { ok: true } | { ok: false; message: string }
+
+  const uploadLogoImpressaoToApi = async (file: File, token: string): Promise<UploadLogoResult> => {
+    if (file.size > MAX_LOGO_IMPRESSAO_BYTES) {
+      return { ok: false, message: 'Arquivo muito grande. Máximo 1 MB.' }
+    }
+    const tiposPermitidos = ['image/png', 'image/jpeg', 'image/webp']
+    if (!tiposPermitidos.includes(file.type)) {
+      return { ok: false, message: 'Formato inválido. Use PNG, JPEG ou WEBP.' }
+    }
+
+    try {
+      const body = new FormData()
+      body.append('file', file)
+      const response = await fetch('/api/empresas/me/logo-impressao', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body,
+      })
+      const responseData = await response.json().catch(() => ({}))
+
+      if (response.ok) {
+        return { ok: true }
+      }
+      const msg =
+        (typeof responseData.error === 'string' && responseData.error) ||
+        (typeof responseData.message === 'string' && responseData.message) ||
+        `Erro ${response.status}`
+      return { ok: false, message: msg }
+    } catch (error) {
+      console.error('Erro ao enviar logo de impressão:', error)
+      return { ok: false, message: 'Falha ao enviar a logo.' }
+    }
+  }
+
+  const deleteLogoImpressaoFromApi = async (token: string): Promise<UploadLogoResult> => {
+    try {
+      const response = await fetch('/api/empresas/me/logo-impressao', {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      if (response.ok || response.status === 204 || response.status === 404) {
+        return { ok: true }
+      }
+      const responseData = await response.json().catch(() => ({}))
+      const msg =
+        (typeof responseData.error === 'string' && responseData.error) ||
+        (typeof responseData.message === 'string' && responseData.message) ||
+        `Erro ${response.status}`
+      return { ok: false, message: msg }
+    } catch (error) {
+      console.error('Erro ao remover logo de impressão:', error)
+      return { ok: false, message: 'Falha ao remover a logo.' }
+    }
+  }
+
+  const persistLogoImpressaoChanges = useCallback(
+    async (token: string): Promise<{ ok: true } | { ok: false; message: string }> => {
+      const snapshotLogo = pendingLogoFile
+      const snapshotRemove = pendingRemoveLogoOnSave
+      const hadServerLogoBeforeLogoOps = serverHasLogo
+
+      if (snapshotLogo) {
+        if (hadServerLogoBeforeLogoOps) {
+          const delBeforePost = await deleteLogoImpressaoFromApi(token)
+          if (!delBeforePost.ok) {
+            return { ok: false, message: delBeforePost.message }
+          }
+        }
+        const logoResult = await uploadLogoImpressaoToApi(snapshotLogo, token)
+        if (!logoResult.ok) {
+          return { ok: false, message: logoResult.message }
+        }
+        clearPendingLogo()
+        setPendingRemoveLogoOnSave(false)
+        await refreshSavedLogoImpressao(token)
+        return { ok: true }
+      }
+
+      if (snapshotRemove && hadServerLogoBeforeLogoOps) {
+        const delResult = await deleteLogoImpressaoFromApi(token)
+        if (!delResult.ok) {
+          return { ok: false, message: delResult.message }
+        }
+        setPendingRemoveLogoOnSave(false)
+        setServerHasLogo(false)
+        setServerLogoObjectUrl(prev => {
+          if (prev) URL.revokeObjectURL(prev)
+          return null
+        })
+        return { ok: true }
+      }
+
+      return { ok: true }
+    },
+    [pendingLogoFile, pendingRemoveLogoOnSave, serverHasLogo]
+  )
+
+  const handleSaveLogo = async () => {
+    if (!hasLogoPendingChanges || logoBusy) return
+    const token = auth?.getAccessToken()
+    if (!token) return
+
+    setIsSavingLogo(true)
+    try {
+      const hadUpload = !!pendingLogoFile
+      const hadRemove = pendingRemoveLogoOnSave
+
+      const result = await persistLogoImpressaoChanges(token)
+      if (!result.ok) {
+        showToast.error(result.message)
+        return
+      }
+
+      if (hadUpload) {
+        showToast.success('Logo de impressão atualizada com sucesso!')
+      } else if (hadRemove) {
+        showToast.success('Logo de impressão removida.')
+      }
+    } catch (error) {
+      console.error('Erro ao salvar logo de impressão:', error)
+      showToast.error('Erro ao salvar logo de impressão')
+    } finally {
+      setIsSavingLogo(false)
+    }
+  }
+
+  const markServerLogoRemovalOnSave = () => {
+    if (!serverHasLogo) return
+    setPendingRemoveLogoOnSave(true)
+    setServerLogoObjectUrl(prev => {
+      if (prev) URL.revokeObjectURL(prev)
+      return null
+    })
+  }
+
+  /**
+   * Lixeira na pré-visualização nova: descarta o upload pendente.
+   * Se a logo do servidor ainda está só oculta (URL em memória), volta a exibi-la.
+   * Se já tinha fluxo “remover logo guardada”, reabre Desfazer / Trocar / Salvar logo.
+   */
+  const handleLogoTrashClick = () => {
+    if (pendingLogoPreviewUrl) {
+      clearPendingLogo()
+      if (serverHasLogo && !serverLogoObjectUrl) {
+        setPendingRemoveLogoOnSave(true)
+      }
+      return
+    }
+    if (serverLogoObjectUrl) {
+      markServerLogoRemovalOnSave()
+    }
+  }
+
+  const undoServerLogoRemoval = async () => {
+    const t = auth?.getAccessToken()
+    if (!t) return
+    setPendingRemoveLogoOnSave(false)
+    await refreshSavedLogoImpressao(t)
+  }
+
   const handleSave = async () => {
     const token = auth?.getAccessToken()
     if (!token || !empresa) {
@@ -315,119 +644,125 @@ export function EmpresaTab() {
       return
     }
 
-    // Validar cidade antes de salvar
-    if (cidade && estado) {
-      // Se já temos código IBGE, significa que uma cidade foi selecionada da lista
-      // e podemos confiar que o nome está correto
-      if (codigoCidadeIbge) {
-        // Cidade já foi selecionada da lista e código IBGE está disponível
-        // Não precisa validar novamente, apenas garantir que o nome está correto
-        if (ultimaCidadeBuscada.current && ultimaCidadeBuscada.current !== cidade.trim()) {
-          // Se o nome no formulário não corresponde ao nome oficial selecionado,
-          // atualizar com o nome oficial
-          setCidade(ultimaCidadeBuscada.current)
-        }
-      } else {
-        // Se não tem código IBGE, validar via API
-        // Usar o nome da cidade do formulário, mas se tivermos ultimaCidadeBuscada, usar ela
-        const nomeCidadeParaValidar = ultimaCidadeBuscada.current || cidade.trim()
+    setIsSaving(true)
+    try {
+      // Validar cidade antes de salvar
+      if (cidade && estado) {
+        // Se já temos código IBGE, significa que uma cidade foi selecionada da lista
+        // e podemos confiar que o nome está correto
+        if (codigoCidadeIbge) {
+          // Cidade já foi selecionada da lista e código IBGE está disponível
+          // Não precisa validar novamente, apenas garantir que o nome está correto
+          if (ultimaCidadeBuscada.current && ultimaCidadeBuscada.current !== cidade.trim()) {
+            // Se o nome no formulário não corresponde ao nome oficial selecionado,
+            // atualizar com o nome oficial
+            setCidade(ultimaCidadeBuscada.current)
+          }
+        } else {
+          // Se não tem código IBGE, validar via API
+          // Usar o nome da cidade do formulário, mas se tivermos ultimaCidadeBuscada, usar ela
+          const nomeCidadeParaValidar = ultimaCidadeBuscada.current || cidade.trim()
 
-        try {
-          const response = await fetch(
-            `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(nomeCidadeParaValidar)}&uf=${estado}`
-          )
-          if (response.ok) {
-            const data = await response.json()
-            if (!data.valido) {
-              showToast.error(
-                `Cidade "${nomeCidadeParaValidar}" não encontrada no estado ${estado}. Por favor, selecione uma cidade válida.`
-              )
-              return
+          try {
+            const response = await fetch(
+              `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(nomeCidadeParaValidar)}&uf=${estado}`
+            )
+            if (response.ok) {
+              const data = await response.json()
+              if (!data.valido) {
+                showToast.error(
+                  `Cidade "${nomeCidadeParaValidar}" não encontrada no estado ${estado}. Por favor, selecione uma cidade válida.`
+                )
+                return
+              }
+              // Buscar código IBGE se não estiver definido
+              if (!codigoCidadeIbge) {
+                await buscarCodigoIbge(nomeCidadeParaValidar, estado)
+              }
+              // Atualizar formulário com o nome oficial se diferente
+              if (nomeCidadeParaValidar !== cidade.trim()) {
+                setCidade(nomeCidadeParaValidar)
+              }
             }
-            // Buscar código IBGE se não estiver definido
+          } catch (error) {
+            console.error('Erro ao validar cidade:', error)
+            // Continuar mesmo se a validação falhar (pode ser problema de rede)
+            // Tentar buscar código IBGE mesmo assim
             if (!codigoCidadeIbge) {
               await buscarCodigoIbge(nomeCidadeParaValidar, estado)
             }
-            // Atualizar formulário com o nome oficial se diferente
-            if (nomeCidadeParaValidar !== cidade.trim()) {
-              setCidade(nomeCidadeParaValidar)
-            }
-          }
-        } catch (error) {
-          console.error('Erro ao validar cidade:', error)
-          // Continuar mesmo se a validação falhar (pode ser problema de rede)
-          // Tentar buscar código IBGE mesmo assim
-          if (!codigoCidadeIbge) {
-            await buscarCodigoIbge(nomeCidadeParaValidar, estado)
           }
         }
       }
-    }
 
-    try {
-      // Monta o body apenas com campos que têm valor
-      const body: Record<string, any> = {}
+      try {
+        // Monta o body apenas com campos que têm valor
+        const body: Record<string, any> = {}
 
-      if (cnpj) body.cnpj = cnpj
-      if (razaoSocial) body.razaoSocial = razaoSocial
-      if (nomeFantasia) body.nomeFantasia = nomeFantasia
-      if (email) body.email = email
-      if (telefone) body.telefone = telefone
+        if (cnpj) body.cnpj = cnpj
+        if (razaoSocial) body.razaoSocial = razaoSocial
+        if (nomeFantasia) body.nomeFantasia = nomeFantasia
+        if (email) body.email = email
+        if (telefone) body.telefone = telefone
 
-      // Monta o endereço apenas se houver pelo menos um campo preenchido
-      const endereco: Record<string, any> = {}
-      if (cep) endereco.cep = cep
-      if (rua) endereco.rua = rua
-      if (numero) endereco.numero = numero
-      if (complemento) endereco.complemento = complemento
-      if (bairro) endereco.bairro = bairro
-      // Usar o nome oficial da cidade se disponível, senão usar o valor do formulário
-      const nomeCidadeParaSalvar = ultimaCidadeBuscada.current || cidade
-      if (nomeCidadeParaSalvar) endereco.cidade = nomeCidadeParaSalvar
-      if (estado) endereco.estado = estado
-      if (codigoCidadeIbge) endereco.codigoCidadeIbge = codigoCidadeIbge
+        // Monta o endereço apenas se houver pelo menos um campo preenchido
+        const endereco: Record<string, any> = {}
+        if (cep) endereco.cep = cep
+        if (rua) endereco.rua = rua
+        if (numero) endereco.numero = numero
+        if (complemento) endereco.complemento = complemento
+        if (bairro) endereco.bairro = bairro
+        // Usar o nome oficial da cidade se disponível, senão usar o valor do formulário
+        const nomeCidadeParaSalvar = ultimaCidadeBuscada.current || cidade
+        if (nomeCidadeParaSalvar) endereco.cidade = nomeCidadeParaSalvar
+        if (estado) endereco.estado = estado
+        if (codigoCidadeIbge) endereco.codigoCidadeIbge = codigoCidadeIbge
 
-      // Adiciona endereco ao body apenas se houver pelo menos um campo
-      if (Object.keys(endereco).length > 0) {
-        body.endereco = endereco
-      }
+        // Adiciona endereco ao body apenas se houver pelo menos um campo
+        if (Object.keys(endereco).length > 0) {
+          body.endereco = endereco
+        }
 
-      /* PATCH: `parametroEmpresa.timezone` — preserva outros campos já retornados pela API. */
-      const parametroEmpresa: Record<string, unknown> = { ...parametroEmpresaDraft }
-      if (timezone.trim()) {
-        parametroEmpresa.timezone = timezone.trim()
-      } else {
-        delete parametroEmpresa.timezone
-      }
-      if (Object.keys(parametroEmpresa).length > 0) {
-        body.parametroEmpresa = parametroEmpresa
-      }
+        /* PATCH: `parametroEmpresa.timezone` — preserva outros campos já retornados pela API. */
+        const parametroEmpresa: Record<string, unknown> = { ...parametroEmpresaDraft }
+        if (timezone.trim()) {
+          parametroEmpresa.timezone = timezone.trim()
+        } else {
+          delete parametroEmpresa.timezone
+        }
+        if (Object.keys(parametroEmpresa).length > 0) {
+          body.parametroEmpresa = parametroEmpresa
+        }
 
-      console.log('Enviando dados:', body)
+        console.log('Enviando dados:', body)
 
-      const response = await fetch(`/api/empresas/${empresa.getId()}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      })
+        const response = await fetch(`/api/empresas/${empresa.getId()}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(body),
+        })
 
-      const responseData = await response.json().catch(() => ({}))
+        const responseData = await response.json().catch(() => ({}))
 
-      if (response.ok) {
+        if (!response.ok) {
+          console.error('Erro na resposta:', response.status, responseData)
+          const errorMessage = responseData.error || responseData.message || 'Erro desconhecido'
+          showToast.error(`Erro ao atualizar empresa: ${errorMessage}`)
+          return
+        }
+
         setIsEditing(false)
         await loadEmpresa()
         showToast.success('Empresa atualizada com sucesso!')
-      } else {
-        console.error('Erro na resposta:', response.status, responseData)
-        const errorMessage = responseData.error || responseData.message || 'Erro desconhecido'
-        showToast.error(`Erro ao atualizar empresa: ${errorMessage}`)
+      } catch (error) {
+        console.error('Erro ao salvar empresa:', error)
+        showToast.error('Erro ao salvar empresa')
       }
-    } catch (error) {
-      console.error('Erro ao salvar empresa:', error)
-      showToast.error('Erro ao salvar empresa')
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -461,17 +796,22 @@ export function EmpresaTab() {
             <div className="flex flex-col gap-2 md:flex-row">
               <button
                 onClick={handleSave}
-                disabled={cidadeValida === false && cidade.length > 0}
+                disabled={
+                  isSaving || (cidadeValida === false && cidade.length > 0)
+                }
                 className="flex h-8 items-center gap-2 rounded-lg bg-primary px-6 font-exo text-sm font-medium text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <span>✓</span> Salvar
+                <span>✓</span> {isSaving ? 'Salvando…' : 'Salvar'}
               </button>
               <button
                 onClick={() => {
+                  clearPendingLogo()
+                  setPendingRemoveLogoOnSave(false)
                   setIsEditing(false)
                   loadEmpresa()
                 }}
-                className="h-8 rounded-lg border border-primary bg-primary/10 px-6 font-exo text-sm font-medium text-primary transition-colors hover:bg-primary/15"
+                disabled={isSaving}
+                className="h-8 rounded-lg border border-primary bg-primary/10 px-6 font-exo text-sm font-medium text-primary transition-colors hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Cancelar
               </button>
@@ -479,59 +819,277 @@ export function EmpresaTab() {
           )}
         </div>
 
-        <div className="space-y-4 bg-info px-1 md:px-[18px]">
-          {/* Dados Básicos */}
+        <div className="space-y-2 bg-info px-1 md:px-[18px]">
+          {/* Dados Básicos + Logo (títulos na mesma linha em desktop) */}
           <div>
-            <h4 className="font-nunito mb-2 text-lg font-semibold text-primary">Dados Básicos</h4>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <Input
-                label="CNPJ"
-                value={cnpj}
-                onChange={e => setCnpj(maiusculasPt(e.target.value))}
-                disabled={!isEditing}
-                size="small"
-                sx={sxEntradaEmpresa}
-              />
-              <Input
-                label="Razão Social"
-                value={razaoSocial}
-                onChange={e => setRazaoSocial(maiusculasPt(e.target.value))}
-                disabled={!isEditing}
-                size="small"
-                sx={sxEntradaEmpresa}
-              />
-              <Input
-                label="Nome Fantasia"
-                value={nomeFantasia}
-                onChange={e => setNomeFantasia(maiusculasPt(e.target.value))}
-                disabled={!isEditing}
-                size="small"
-                sx={sxEntradaEmpresa}
-              />
-              <Input
-                type="email"
-                label="Email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                disabled={!isEditing}
-                size="small"
-                sx={sxEntradaEmpresa}
-              />
-              <Input
-                label="Telefone"
-                value={telefone}
-                onChange={e => setTelefone(maiusculasPt(e.target.value))}
-                disabled={!isEditing}
-                size="small"
-                sx={sxEntradaEmpresa}
-              />
+            <div className="mb-2 flex flex-col gap-1 lg:flex-row lg:items-baseline lg:gap-4">
+              <h4 className="font-nunito min-w-0 flex-1 text-lg font-semibold text-primary">
+                Dados Básicos
+              </h4>
+              <h4
+                className={`font-nunito text-lg font-semibold text-primary ${LOGO_COLUNA_LARGURA_CLASS}`}
+              >
+                Logo de impressão
+              </h4>
+            </div>
+            <div className="flex flex-col gap-7 lg:flex-row lg:items-start">
+              <div className="min-w-0 flex-1 space-y-7">
+                <Input
+                  label="CNPJ"
+                  value={cnpj}
+                  onChange={e => setCnpj(maiusculasPt(e.target.value))}
+                  disabled={!isEditing}
+                  size="small"
+                  sx={sxEntradaEmpresa}
+                />
+                <div className="grid grid-cols-1 gap-7 md:grid-cols-2">
+                  <Input
+                    label="Razão Social"
+                    value={razaoSocial}
+                    onChange={e => setRazaoSocial(maiusculasPt(e.target.value))}
+                    disabled={!isEditing}
+                    size="small"
+                    sx={sxEntradaEmpresa}
+                  />
+                  <Input
+                    label="Nome Fantasia"
+                    value={nomeFantasia}
+                    onChange={e => setNomeFantasia(maiusculasPt(e.target.value))}
+                    disabled={!isEditing}
+                    size="small"
+                    sx={sxEntradaEmpresa}
+                  />
+                  <Input
+                    label="Telefone"
+                    value={telefone}
+                    onChange={e => setTelefone(maiusculasPt(e.target.value))}
+                    disabled={!isEditing}
+                    size="small"
+                    sx={sxEntradaEmpresa}
+                  />
+                  <Input
+                    type="email"
+                    label="Email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    disabled={!isEditing}
+                    size="small"
+                    sx={sxEntradaEmpresa}
+                  />
+                </div>
+              </div>
+
+              <div className={LOGO_COLUNA_LARGURA_CLASS}>
+                <input
+                  ref={logoFileInputRef}
+                  type="file"
+                  accept={LOGO_IMPRESSAO_ACCEPT}
+                  className="sr-only"
+                  disabled={logoBusy}
+                  onChange={e => handleLogoFileInput(e.target.files)}
+                  aria-hidden
+                />
+                <div
+                  onDragEnter={e => {
+                    if (logoBusy) return
+                    e.preventDefault()
+                    setLogoDragActive(true)
+                  }}
+                  onDragOver={e => {
+                    if (logoBusy) return
+                    e.preventDefault()
+                    e.dataTransfer.dropEffect = 'copy'
+                  }}
+                  onDragLeave={e => {
+                    e.preventDefault()
+                    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
+                    setLogoDragActive(false)
+                  }}
+                  onDrop={e => {
+                    if (logoBusy) return
+                    e.preventDefault()
+                    setLogoDragActive(false)
+                    handleLogoFileInput(e.dataTransfer.files)
+                  }}
+                  className={`relative flex w-full flex-col overflow-hidden rounded-lg border-2 border-dashed transition-colors ${
+                    pendingLogoPreviewUrl || serverLogoObjectUrl
+                      ? 'p-1.5'
+                      : 'min-h-[150px]'
+                  } ${
+                    logoDragActive
+                      ? 'border-primary bg-primary/10'
+                      : 'border-neutral-400/80 bg-white/50'
+                  } ${logoBusy ? 'pointer-events-none opacity-60' : ''}`}
+                >
+                  {pendingLogoPreviewUrl ? (
+                    <div className="relative flex w-full flex-col gap-1">
+                      <div className="relative w-full">
+                        <button
+                          type="button"
+                          title="Descartar alteração"
+                          aria-label="Descartar alteração"
+                          onClick={e => {
+                            e.stopPropagation()
+                            handleLogoTrashClick()
+                          }}
+                          className="absolute right-0.5 top-0.5 z-10 inline-flex h-7 w-7 items-center justify-center rounded-md bg-white/90 text-neutral-600 shadow-sm ring-1 ring-black/5 transition-colors hover:bg-red-50 hover:text-red-700"
+                        >
+                          <DeleteOutlineRoundedIcon sx={{ fontSize: 20 }} />
+                        </button>
+                        <LogoImpressaoPreviewImage
+                          src={pendingLogoPreviewUrl}
+                          alt="Pré-visualização da logo de impressão"
+                        />
+                      </div>
+                      <div className="flex flex-wrap items-center justify-center gap-1 mt-2">
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation()
+                            handleReopenLogoCrop()
+                          }}
+                          className="rounded border border-primary bg-primary/10 px-2 py-0.5 font-exo text-[11px] font-medium leading-tight text-primary hover:bg-primary/15"
+                        >
+                          Ajustar recorte
+                        </button>
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation()
+                            logoFileInputRef.current?.click()
+                          }}
+                          className="rounded border border-primary bg-primary/10 px-2 py-0.5 font-exo text-[11px] font-medium leading-tight text-primary hover:bg-primary/15"
+                        >
+                          Trocar imagem
+                        </button>
+                        {hasLogoPendingChanges && (
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.stopPropagation()
+                              void handleSaveLogo()
+                            }}
+                            disabled={logoBusy}
+                            className="rounded bg-primary px-2.5 py-0.5 font-exo text-[11px] font-medium leading-tight text-white hover:bg-primary/90 disabled:opacity-50"
+                          >
+                            {isSavingLogo ? 'Salvando…' : 'Salvar'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ) : pendingRemoveLogoOnSave ? (
+                    <div className="flex w-full flex-col items-center justify-center gap-2 py-3 text-center">
+                      <p className="text-xs leading-snug text-secondary-text">
+                        A logo guardada será <span className="font-semibold">removida</span> ao clicar em{' '}
+                        <span className="font-semibold">Salvar</span>.
+                      </p>
+                      <div className="flex flex-wrap items-center justify-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation()
+                            void undoServerLogoRemoval()
+                          }}
+                          className="rounded border border-primary bg-primary/10 px-2 py-0.5 font-exo text-[11px] font-medium leading-tight text-primary hover:bg-primary/15"
+                        >
+                          Desfazer
+                        </button>
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation()
+                            logoFileInputRef.current?.click()
+                          }}
+                          className="rounded border border-primary bg-primary/10 px-2 py-0.5 font-exo text-[11px] font-medium leading-tight text-primary hover:bg-primary/15"
+                        >
+                          Trocar imagem
+                        </button>
+                        {hasLogoPendingChanges && (
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.stopPropagation()
+                              void handleSaveLogo()
+                            }}
+                            disabled={logoBusy}
+                            className="rounded bg-primary px-2.5 py-0.5 font-exo text-[11px] font-medium leading-tight text-white hover:bg-primary/90 disabled:opacity-50"
+                          >
+                            {isSavingLogo ? 'Salvando…' : 'Salvar'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ) : serverLogoObjectUrl ? (
+                    <div className="relative flex w-full flex-col gap-1">
+                      <div className="relative w-full">
+                        <button
+                          type="button"
+                          title="Remover logo de impressão"
+                          aria-label="Remover logo de impressão"
+                          onClick={e => {
+                            e.stopPropagation()
+                            handleLogoTrashClick()
+                          }}
+                          className="absolute right-0.5 top-0.5 z-10 inline-flex h-7 w-7 items-center justify-center rounded-md bg-white/90 text-neutral-600 shadow-sm ring-1 ring-black/5 transition-colors hover:bg-red-50 hover:text-red-700"
+                        >
+                          <DeleteOutlineRoundedIcon sx={{ fontSize: 20 }} />
+                        </button>
+                        <LogoImpressaoPreviewImage
+                          src={serverLogoObjectUrl}
+                          alt="Logo de impressão atual"
+                        />
+                      </div>
+                      <div className="flex flex-wrap items-center justify-center gap-1">
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation()
+                            logoFileInputRef.current?.click()
+                          }}
+                          className="rounded border border-primary bg-primary/10 px-2 py-0.5 font-exo text-[11px] font-medium leading-tight text-primary hover:bg-primary/15"
+                        >
+                          Trocar imagem
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      role="button"
+                      tabIndex={logoBusy ? -1 : 0}
+                      onKeyDown={e => {
+                        if (logoBusy) return
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          logoFileInputRef.current?.click()
+                        }
+                      }}
+                      onClick={() => {
+                        if (logoBusy) return
+                        logoFileInputRef.current?.click()
+                      }}
+                      className={`flex min-h-[150px] cursor-pointer flex-col items-center justify-center gap-1 px-2 py-3 text-center hover:border-primary/50 ${
+                        logoBusy ? 'pointer-events-none cursor-not-allowed' : ''
+                      }`}
+                    >
+                      <span className="font-nunito text-sm font-semibold text-primary">
+                        Adicionar logo
+                      </span>
+                      <span className="text-[11px] leading-snug text-secondary-text">
+                        {isSavingLogo
+                          ? 'Salvando…'
+                          : 'Arraste ou clique · máx. 280×150 px (tamanho do recorte)'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Endereço */}
           <div>
             <h4 className="font-nunito mb-2 text-lg font-semibold text-primary">Endereço</h4>
-            <div className="space-y-4">
+            <div className="space-y-6">
               {/* Linha 1: CEP + Rua */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <Input
@@ -683,6 +1241,13 @@ export function EmpresaTab() {
           </div>
         </div>
       </div>
+
+      <LogoImpressaoCropModal
+        open={logoCropModalOpen}
+        imageSrc={logoCropImageSrc}
+        onClose={closeLogoCropModal}
+        onConfirm={handleLogoCropConfirm}
+      />
     </div>
   )
 }

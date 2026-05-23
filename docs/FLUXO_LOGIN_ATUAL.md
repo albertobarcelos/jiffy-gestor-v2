@@ -268,7 +268,7 @@ O Swagger menciona que, para convites pendentes, deve-se chamar:
 
 > A anotação também menciona o `user.id` “de cada item” em convites; precisa confirmar o shape real desses endpoints quando você enviar os contratos.
 
-**Gestão de convites pela empresa (outro contrato):** listar/criar/cancelar/reenviar convites **emitidos** pela empresa usa `GET|POST /convites`, `DELETE /convites/{id}`, etc., com sessão no **contexto da empresa** — ver [CONVITES_ME_VS_EMPRESA.md](./CONVITES_ME_VS_EMPRESA.md) e a UI `/cadastros/convites-gestor`.
+**Gestão de convites pela empresa (outro contrato):** listar/criar/cancelar/reenviar convites **emitidos** pela empresa usa `GET|POST /convites`, `DELETE /convites/{id}`, etc., com sessão no **contexto da empresa** — ver [CONVITES_ME_VS_EMPRESA.md](./CONVITES_ME_VS_EMPRESA.md) e a UI `/convites-gestor`.
 
 ---
 
