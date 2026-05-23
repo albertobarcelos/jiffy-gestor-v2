@@ -22,6 +22,7 @@ export const ERP_ROUTE_PREFIXES = [
   '/vendas',
   '/relatorios',
   '/relatorios-vendas',
+  '/relatorios-produtos-vendidos',
   '/painel-contador',
   '/historico-fechamento',
   '/configuracoes',
