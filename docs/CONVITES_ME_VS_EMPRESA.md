@@ -15,7 +15,7 @@ Dois fluxos distintos coexistem no BFF e na API externa.
   - `DELETE /api/convites/:id` → cancelar
   - `POST /api/convites/:id/reenviar` → reenviar / renovar prazo
 - **Token:** **access token no contexto da empresa** (JWT com `empresaId` / sessão de tenant), o mesmo tipo exigido por `validateRequest` nas rotas internas do ERP (ex.: cadastros).
-- **Uso na UI:** **`/cadastros/convites-gestor`** — criar convite, listar, cancelar e reenviar convites **da empresa autenticada**.
+- **Uso na UI:** **`/convites-gestor`** — criar convite, listar, cancelar e reenviar convites **da empresa autenticada**.
 
 ## Resumo
 

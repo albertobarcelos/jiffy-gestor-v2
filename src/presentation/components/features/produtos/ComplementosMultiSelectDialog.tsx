@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/src/presentation/components/ui/dialog'
 import { Complemento } from '@/src/domain/entities/Complemento'
+import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -20,7 +21,8 @@ import {
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { cn } from '@/src/shared/utils/cn'
 
-interface GrupoComplemento {
+/** Grupo vinculado ao produto (estado local da aba). */
+interface GrupoComplementoItem {
   id: string
   nome: string
   complementos: Complemento[]
@@ -40,7 +42,7 @@ interface GrupoCatalogoItem {
 const LISTAGEM_PAGE_SIZE = 100
 
 /** Mesmo shape do GET produto e do GET grupo — evita duplicar lógica de parse */
-function mapApiGrupoToGrupoComplemento(grupo: any): GrupoComplemento {
+function mapApiGrupoToGrupoComplemento(grupo: any): GrupoComplementoItem {
   return {
     id: grupo.id?.toString() || '',
     nome: grupo.nome?.toString() || '',
@@ -130,7 +132,7 @@ export function ComplementosMultiSelectDialog({
   isEmbedded = false,
 }: ComplementosMultiSelectDialogProps) {
   const { auth } = useAuthStore()
-  const [groups, setGroups] = useState<GrupoComplemento[]>([])
+  const [groups, setGroups] = useState<GrupoComplementoItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   /** Só o switch deste grupo fica desabilitado durante o PATCH (evita “congelar” toda a lista). */
@@ -146,6 +148,9 @@ export function ComplementosMultiSelectDialog({
   >({})
   const [loadingDetalheGrupoId, setLoadingDetalheGrupoId] = useState<string | null>(null)
   const [togglingComplementoId, setTogglingComplementoId] = useState<string | null>(null)
+  const [abrindoGrupoComplementosId, setAbrindoGrupoComplementosId] = useState<string | null>(
+    null
+  )
   const [gruposTabsModalState, setGruposTabsModalState] =
     useState<GruposComplementosTabsModalState>({
       open: false,
@@ -193,7 +198,7 @@ export function ComplementosMultiSelectDialog({
         }
 
         const produto = await response.json()
-        const grupos: GrupoComplemento[] = (produto.gruposComplementos || []).map((grupo: any) =>
+        const grupos: GrupoComplementoItem[] = (produto.gruposComplementos || []).map((grupo: any) =>
           mapApiGrupoToGrupoComplemento(grupo)
         )
 
@@ -288,6 +293,7 @@ export function ComplementosMultiSelectDialog({
       setDetalhesComplementosCache({})
       setLoadingDetalheGrupoId(null)
       setTogglingComplementoId(null)
+      setAbrindoGrupoComplementosId(null)
       sessionCatalogOrderRef.current = null
       setSessionOrderTick(0)
     }
@@ -313,7 +319,7 @@ export function ComplementosMultiSelectDialog({
 
   /** Um único GET por grupo — reutilizado ao expandir catálogo e após vínculo (substitui GET produto inteiro). */
   const fetchGrupoComplementoPorId = useCallback(
-    async (grupoId: string): Promise<GrupoComplemento | null> => {
+    async (grupoId: string): Promise<GrupoComplementoItem | null> => {
       const token = auth?.getAccessToken()
       if (!token) return null
       try {
@@ -464,7 +470,7 @@ export function ComplementosMultiSelectDialog({
         if (options?.optimisticPreApplied) {
           if (addedIds.length > 0) {
             const carregados = await Promise.all(addedIds.map(gid => fetchGrupoComplementoPorId(gid)))
-            const novos = carregados.filter((g): g is GrupoComplemento => g !== null)
+            const novos = carregados.filter((g): g is GrupoComplementoItem => g !== null)
             if (novos.length === addedIds.length) {
               setGroups(prev =>
                 prev.map(g => {
@@ -490,7 +496,7 @@ export function ComplementosMultiSelectDialog({
 
           if (addedIds.length > 0) {
             const carregados = await Promise.all(addedIds.map(gid => fetchGrupoComplementoPorId(gid)))
-            const novos = carregados.filter((g): g is GrupoComplemento => g !== null)
+            const novos = carregados.filter((g): g is GrupoComplementoItem => g !== null)
             if (novos.length === addedIds.length) {
               setGroups(prev => [...prev, ...novos])
             } else {
@@ -665,6 +671,80 @@ export function ComplementosMultiSelectDialog({
     })
   }, [])
 
+  /** Atualiza complementos do grupo na lista do produto após vincular no modal de cadastro. */
+  const atualizarComplementosDoGrupoNaLista = useCallback(
+    async (grupoId: string) => {
+      const grupoMapeado = await fetchGrupoComplementoPorId(grupoId)
+      if (!grupoMapeado) return
+
+      setGroups(prev =>
+        prev.map(g =>
+          g.id === grupoId
+            ? {
+                ...g,
+                nome: grupoMapeado.nome,
+                complementos: grupoMapeado.complementos,
+                obrigatorio: grupoMapeado.obrigatorio,
+                qtdMinima: grupoMapeado.qtdMinima,
+                qtdMaxima: grupoMapeado.qtdMaxima,
+              }
+            : g
+        )
+      )
+      setDetalhesComplementosCache(prev => ({
+        ...prev,
+        [grupoId]: grupoMapeado.complementos,
+      }))
+    },
+    [fetchGrupoComplementoPorId]
+  )
+
+  const handleOpenGrupoComplementosTab = useCallback(
+    async (grupoId: string, grupoNome?: string) => {
+      if (salvandoGrupoId !== null || abrindoGrupoComplementosId !== null) return
+
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      setAbrindoGrupoComplementosId(grupoId)
+      try {
+        const response = await fetch(`/api/grupos-complementos/${grupoId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          cache: 'no-store',
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || errorData.error || 'Erro ao carregar o grupo')
+        }
+
+        const grupo = GrupoComplemento.fromJSON(await response.json())
+        setGruposTabsModalState({
+          open: true,
+          tab: 'complementos',
+          mode: 'edit',
+          grupo,
+        })
+      } catch (err) {
+        console.error(err)
+        showToast.error(
+          err instanceof Error
+            ? err.message
+            : `Erro ao abrir complementos do grupo${grupoNome ? ` "${grupoNome}"` : ''}.`
+        )
+      } finally {
+        setAbrindoGrupoComplementosId(null)
+      }
+    },
+    [auth, salvandoGrupoId, abrindoGrupoComplementosId]
+  )
+
   const handleCloseGruposTabsModal = useCallback(() => {
     setGruposTabsModalState(prev => ({
       ...prev,
@@ -680,17 +760,31 @@ export function ComplementosMultiSelectDialog({
   }, [])
 
   const handleGruposTabsReload = useCallback(async () => {
+    const grupoId = gruposTabsModalState.grupo?.getId()
     await Promise.all([loadGroups({ silent: true }), loadSelectableGroups()])
-  }, [loadGroups, loadSelectableGroups])
+    if (grupoId) {
+      await atualizarComplementosDoGrupoNaLista(grupoId)
+    }
+  }, [
+    loadGroups,
+    loadSelectableGroups,
+    gruposTabsModalState.grupo,
+    atualizarComplementosDoGrupoNaLista,
+  ])
 
   const handleGruposTabsClose = useCallback(() => {
+    const grupoId = gruposTabsModalState.grupo?.getId()
     setGruposTabsModalState(prev => ({
       ...prev,
       open: false,
     }))
-    // Recarrega vínculos sem cobrir a lista com o spinner completo
-    void loadGroups({ silent: true })
-  }, [loadGroups])
+    void (async () => {
+      await loadGroups({ silent: true })
+      if (grupoId) {
+        await atualizarComplementosDoGrupoNaLista(grupoId)
+      }
+    })()
+  }, [loadGroups, gruposTabsModalState.grupo, atualizarComplementosDoGrupoNaLista])
 
   const renderCatalogoGruposCard = () => (
     <div className="mb-4 flex min-h-0 flex-col rounded-lg border border-[#E6E9F4] bg-white p-2 shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
@@ -746,34 +840,43 @@ export function ComplementosMultiSelectDialog({
 
                   return (
                     <li key={grupo.id}>
-                      <div className="flex items-center justify-between gap-1 px-2 py-1.5 hover:bg-white/80">
-                        <button
-                          type="button"
-                          onClick={() => toggleGrupoExpanded(grupo.id)}
-                          className="flex min-w-0 flex-1 items-start gap-1 rounded-md py-2 text-left outline-none ring-primary focus-visible:ring-2"
-                          aria-expanded={expandido}
-                          aria-controls={`grupo-comp-list-${grupo.id}`}
-                          id={`grupo-comp-trigger-${grupo.id}`}
-                        >
-                          <MdKeyboardArrowDown
-                            className={cn(
-                              'mt-0.5 shrink-0 text-secondary-text transition-transform duration-200',
-                              expandido ? 'rotate-0' : '-rotate-90'
-                            )}
-                            size={20}
-                            aria-hidden
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="font-nunito truncate text-xs font-medium text-primary-text">
-                              {grupo.nome || 'Grupo'}
-                            </p>
-                            {grupo.obrigatorio ? (
-                              <span className="mt-0.5 inline-flex rounded-full bg-primary/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-primary">
-                                Obrigatório
-                              </span>
-                            ) : null}
-                          </div>
-                        </button>
+                      <div className="flex items-center justify-between gap-2 px-2 py-1.5 hover:bg-white/80">
+                        <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden">
+                          <button
+                            type="button"
+                            onClick={() => toggleGrupoExpanded(grupo.id)}
+                            className="shrink-0 rounded-md p-2 outline-none ring-primary focus-visible:ring-2"
+                            aria-expanded={expandido}
+                            aria-controls={`grupo-comp-list-${grupo.id}`}
+                            aria-label={expandido ? 'Recolher complementos' : 'Expandir complementos'}
+                          >
+                            <MdKeyboardArrowDown
+                              className={cn(
+                                'text-secondary-text transition-transform duration-200',
+                                expandido ? 'rotate-0' : '-rotate-90'
+                              )}
+                              size={20}
+                              aria-hidden
+                            />
+                          </button>
+                            <button
+                              type="button"
+                              onClick={() => toggleGrupoExpanded(grupo.id)}
+                              className="min-w-0 shrink overflow-hidden rounded-md py-2 text-left outline-none ring-primary focus-visible:ring-2"
+                              id={`grupo-comp-trigger-${grupo.id}`}
+                              aria-expanded={expandido}
+                              aria-controls={`grupo-comp-list-${grupo.id}`}
+                            >
+                              <p className="font-nunito truncate text-xs font-medium text-primary-text">
+                                {grupo.nome || 'Grupo'}
+                              </p>
+                              {grupo.obrigatorio ? (
+                                <span className="mt-0.5 inline-flex rounded-full bg-primary/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-primary">
+                                  Obrigatório
+                                </span>
+                              ) : null}
+                            </button>
+                        </div>
                         <div
                           className="shrink-0 self-center"
                           onClick={e => e.stopPropagation()}
@@ -810,12 +913,26 @@ export function ComplementosMultiSelectDialog({
                             <div className="flex justify-center py-10">
                               <JiffyLoading />
                             </div>
-                          ) : complementosOrdenados.length === 0 ? (
-                            <p className="text-center text-sm text-secondary-text">
-                              Nenhum complemento neste grupo.
-                            </p>
                           ) : (
                             <>
+                              <button
+                                type="button"
+                                onClick={e => {
+                                  e.stopPropagation()
+                                  void handleOpenGrupoComplementosTab(grupo.id, grupo.nome)
+                                }}
+                                disabled={
+                                  salvandoGrupoId !== null ||
+                                  abrindoGrupoComplementosId === grupo.id
+                                }
+                                className="mb-1 flex items-center justify-start bg-white px-1 py-1 text-[11px] text-primary disabled:cursor-not-allowed disabled:opacity-50">
+                                  + Adicionar complementos
+                              </button>
+                              {complementosOrdenados.length === 0 ? (
+                                <p className="py-2 text-center text-xs text-secondary-text">
+                                  Nenhum complemento neste grupo.
+                                </p>
+                              ) : null}
                               {complementosOrdenados.map(comp => (
                                 <div
                                   key={comp.getId()}

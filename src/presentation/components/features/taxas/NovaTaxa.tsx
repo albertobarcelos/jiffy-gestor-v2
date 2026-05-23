@@ -631,7 +631,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
       if (isEmbedded) {
         onSaved?.()
       } else {
-        router.push('/configuracoes/taxas')
+        router.push('/taxas')
       }
     } catch (er) {
       console.error(taxaEditId ? 'Erro ao atualizar taxa:' : 'Erro ao criar taxa:', er)
@@ -684,7 +684,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
     if (isEmbedded) {
       onCancel?.()
     } else {
-      router.push('/configuracoes/taxas')
+      router.push('/taxas')
     }
   }
 

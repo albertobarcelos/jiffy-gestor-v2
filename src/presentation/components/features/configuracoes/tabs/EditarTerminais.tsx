@@ -98,6 +98,31 @@ interface TerminalPreferences {
   compartilharMesas: boolean
   fiscalAtivo?: boolean
   leitorHabilitado?: boolean
+  senhaNumeroMin?: number
+  senhaNumeroMax?: number
+  senhaProximoNumero?: number
+}
+
+function parseSenhaNumeroInput(valor: string): number | null {
+  const trimmed = valor.trim()
+  if (!trimmed) return null
+  const n = Number.parseInt(trimmed, 10)
+  if (!Number.isFinite(n) || n <= 0) return null
+  return n
+}
+
+/** Bloqueia 0 e caracteres inválidos; permite vazio enquanto edita. */
+function normalizeSenhaNumeroInput(valor: string): string {
+  const digits = valor.replace(/\D/g, '')
+  if (digits === '') return ''
+  const n = Number.parseInt(digits, 10)
+  if (!Number.isFinite(n) || n <= 0) return ''
+  return String(n)
+}
+
+function formatSenhaNumeroFromApi(valor: number | undefined | null): string {
+  if (typeof valor !== 'number' || !Number.isFinite(valor) || valor <= 0) return ''
+  return String(Math.trunc(valor))
 }
 
 /**
@@ -126,6 +151,9 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
   const [compartilhaValue, setCompartilhaValue] = useState(false)
   const [fiscalAtivoValue, setFiscalAtivoValue] = useState(false)
   const [leitorCodigoBarrasValue, setLeitorCodigoBarrasValue] = useState(false)
+  const [senhaNumeroMin, setSenhaNumeroMin] = useState('')
+  const [senhaNumeroMax, setSenhaNumeroMax] = useState('')
+  const [senhaProximoNumero, setSenhaProximoNumero] = useState('')
   const [impressoraSelecionadaId, setImpressoraSelecionadaId] = useState<string>('')
 
   // Estados de UI
@@ -142,6 +170,9 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
       compartilhaValue,
       fiscalAtivoValue,
       leitorCodigoBarrasValue,
+      senhaNumeroMin,
+      senhaNumeroMax,
+      senhaProximoNumero,
       impressoraSelecionadaId: impressoraSelecionadaId || '',
     })
   }, [
@@ -151,6 +182,9 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
     compartilhaValue,
     fiscalAtivoValue,
     leitorCodigoBarrasValue,
+    senhaNumeroMin,
+    senhaNumeroMax,
+    senhaProximoNumero,
     impressoraSelecionadaId,
   ])
 
@@ -293,6 +327,9 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
       setCompartilhaValue(data.compartilharMesas || false)
       setFiscalAtivoValue(!!data.fiscalAtivo)
       setLeitorCodigoBarrasValue(!!data.leitorHabilitado)
+      setSenhaNumeroMin(formatSenhaNumeroFromApi(data.senhaNumeroMin))
+      setSenhaNumeroMax(formatSenhaNumeroFromApi(data.senhaNumeroMax))
+      setSenhaProximoNumero(formatSenhaNumeroFromApi(data.senhaProximoNumero))
       if (data.impressoraFinalizacao?.id) {
         setImpressoraSelecionadaId(data.impressoraFinalizacao.id)
       }
@@ -381,6 +418,12 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
         fiscalAtivo: fiscalAtivoValue,
         leitorHabilitado: leitorCodigoBarrasValue,
       }
+      const min = parseSenhaNumeroInput(senhaNumeroMin)
+      const max = parseSenhaNumeroInput(senhaNumeroMax)
+      const proximo = parseSenhaNumeroInput(senhaProximoNumero)
+      if (min !== null) fields.senhaNumeroMin = min
+      if (max !== null) fields.senhaNumeroMax = max
+      if (proximo !== null) fields.senhaProximoNumero = proximo
       if (impressoraSelecionadaId) {
         fields.impressoraFinalizacaoId = impressoraSelecionadaId
       }
@@ -607,6 +650,52 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                     size="sm"
                     className="w-full flex-row items-start justify-between gap-3"
                     inputProps={{ 'aria-label': 'Leitor de código de barras no terminal' }}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 w-full">
+                <div className="mb-3 flex items-center gap-5">
+                  <h3 className="shrink-0 font-exo text-sm font-semibold text-primary-text">
+                    Configurar senha
+                  </h3>
+                  <div className="h-px min-w-0 flex-1 bg-primary/40" aria-hidden />
+                </div>
+                <div className="flex flex-col gap-4 md:flex-row">
+                  <Input
+                    label="Número Min"
+                    type="number"
+                    value={senhaNumeroMin}
+                    onChange={e => setSenhaNumeroMin(normalizeSenhaNumeroInput(e.target.value))}
+                    size="small"
+                    className="bg-info flex-1"
+                    sx={sxEntradaTerminal}
+                    InputLabelProps={{ shrink: true }}
+                    inputProps={{ min: 1, step: 1, inputMode: 'numeric' }}
+                  />
+                  <Input
+                    label="Número Máx"
+                    type="number"
+                    value={senhaNumeroMax}
+                    onChange={e => setSenhaNumeroMax(normalizeSenhaNumeroInput(e.target.value))}
+                    size="small"
+                    className="bg-info flex-1"
+                    sx={sxEntradaTerminal}
+                    InputLabelProps={{ shrink: true }}
+                    inputProps={{ min: 1, step: 1, inputMode: 'numeric' }}
+                  />
+                  <Input
+                    label="Próximo Número"
+                    type="number"
+                    value={senhaProximoNumero}
+                    onChange={e =>
+                      setSenhaProximoNumero(normalizeSenhaNumeroInput(e.target.value))
+                    }
+                    size="small"
+                    className="bg-info flex-1"
+                    sx={sxEntradaTerminal}
+                    InputLabelProps={{ shrink: true }}
+                    inputProps={{ min: 1, step: 1, inputMode: 'numeric' }}
                   />
                 </div>
               </div>

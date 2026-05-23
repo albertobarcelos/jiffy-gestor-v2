@@ -1,5 +1,5 @@
 /**
- * Inventário de rotas do shell ERP (Fase 0).
+ * Inventário de rotas do shell ERP (Fase 2).
  * Route group `app/(erp)/` não altera URLs — apenas agrupa layout com TopNav único.
  */
 
@@ -27,7 +27,6 @@ export const ERP_ROUTE_PREFIXES = [
   '/historico-fechamento',
   '/configuracoes',
   '/cadastro-por-planilha',
-  '/cadastros',
 ] as const
 
 /** Rotas com navegação própria — fora do `(erp)`. */

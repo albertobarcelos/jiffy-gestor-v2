@@ -91,9 +91,9 @@ export function MvpFiltersBar({
       </div>
 
       <div
-        className={`flex flex-wrap items-end justify-between gap-x-2 gap-y-3 rounded-t-lg bg-custom-2 px-2 pb-2 pt-3 ${filtrosVisiveis}`}
+        className={`flex flex-wrap items-end justify-between gap-x-1 gap-y-3 rounded-t-lg bg-custom-2 px-2 pb-2 pt-3 ${filtrosVisiveis}`}
       >
-        <div className="flex flex-wrap items-end justify-center gap-x-2 gap-y-3 md:justify-start">
+        <div className="flex flex-wrap items-end justify-center gap-x-1 gap-y-3 md:justify-start">
         <FormControl size="small" variant="outlined" sx={{ ...sxRelatorioFiltroSelectBase, minWidth: 200 }}>
           <InputLabel id="mvp-filtro-grupo-label" shrink>
             Grupo de produtos
@@ -186,7 +186,7 @@ export function MvpFiltersBar({
         <button
           type="button"
           onClick={onLimpar}
-          className="font-nunito flex h-8 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
+          className="font-nunito flex h-8 items-center justify-center gap-1 rounded-lg bg-primary px-3 text-sm text-white transition-colors hover:bg-primary/90"
         >
           <MdFilterAltOff size={18} aria-hidden />
           Limpar
@@ -195,7 +195,7 @@ export function MvpFiltersBar({
         <button
           type="button"
           onClick={onAplicar}
-          className="font-nunito flex h-8 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
+          className="font-nunito flex h-8 items-center rounded-lg bg-primary px-3 text-sm text-white transition-colors hover:bg-primary/90"
         >
           Aplicar filtros
         </button>
@@ -225,7 +225,7 @@ export function MvpFiltersBar({
           <button
             type="button"
             onClick={() => setIsDatasModalOpen(true)}
-            className="font-nunito flex h-8 shrink-0 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
+            className="font-nunito flex h-8 shrink-0 items-center gap-1 rounded-lg bg-primary px-3 text-sm text-white transition-colors hover:bg-primary/90"
           >
             <MdCalendarToday size={18} />
             Por datas

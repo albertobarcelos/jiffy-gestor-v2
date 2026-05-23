@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
-import { configuracoesTabPath } from '@/src/shared/constants/configuracoesRoutes'
 
-/** Rota antiga: lista de meios de pagamento em Configurações. */
+/** Rota antiga: lista de meios de pagamento em Configurações → Meios de pagamento. */
 export default function MeiosPagamentosLegacyPage() {
-  redirect(configuracoesTabPath('meios-pagamentos'))
+  redirect('/configuracoes?tab=meios-pagamentos')
 }
+

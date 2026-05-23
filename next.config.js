@@ -1,6 +1,40 @@
 /** @type {import('next').NextConfig} */
 const path = require('path')
 
+/** Rotas ERP migradas de `/cadastros/*` para `/*` (Fase 1). */
+const ERP_LEGACY_CADASTROS_SEGMENTS = [
+  'clientes',
+  'usuarios',
+  'perfis-usuarios-pdv',
+  'grupos-produtos',
+  'grupos-complementos',
+  'complementos',
+  'taxas',
+  'impressoras',
+  'meios-pagamentos',
+  'convites-gestor',
+]
+
+const cadastrosLegacyRedirects = [
+  {
+    source: '/cadastros/taxas/novo',
+    destination: '/taxas?modalNovaTaxaOpen=true',
+    permanent: true,
+  },
+  ...ERP_LEGACY_CADASTROS_SEGMENTS.flatMap(segment => [
+    {
+      source: `/cadastros/${segment}`,
+      destination: `/${segment}`,
+      permanent: true,
+    },
+    {
+      source: `/cadastros/${segment}/:path*`,
+      destination: `/${segment}/:path*`,
+      permanent: true,
+    },
+  ]),
+]
+
 const nextConfig = {
   reactStrictMode: true,
   async redirects() {
