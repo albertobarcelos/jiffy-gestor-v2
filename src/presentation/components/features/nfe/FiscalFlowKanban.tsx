@@ -37,8 +37,10 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { NovoPedidoModal } from './NovoPedidoModal'
 import { DeliveryConfiguracoesModal } from './DeliveryConfiguracoesModal'
 import type { TipoPedido } from './EscolhaTipoPedidoModal'
-import { EscolheDatasModal } from '@/src/presentation/components/features/vendas/EscolheDatasModal'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
+import { FaturamentoRangeCalendar } from '@/src/presentation/components/ui/FaturamentoRangeCalendar'
+import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import {
   ClientesTabsModal,
   ClientesTabsModalState,
@@ -88,25 +90,43 @@ export function FiscalFlowKanban() {
     searchInput,
     setSearchInput,
     searchQuery,
-    periodo,
-    setPeriodo,
-    periodoInicial,
-    periodoFinal,
-    dataFinalizacaoPeriodo,
-    setDataFinalizacaoPeriodo,
+    dataCriacaoInicio,
+    dataCriacaoFim,
+    dataFinalizacaoInicio,
+    dataFinalizacaoFim,
     origemFilter,
     setOrigemFilter,
-    statusFiscalFilter,
-    setStatusFiscalFilter,
     filtrosVisiveisMobile,
     setFiltrosVisiveisMobile,
-    isDatasModalOpen,
-    setIsDatasModalOpen,
+    modalCriacaoDatasAberto,
+    setModalCriacaoDatasAberto,
+    rascunhoCriacaoRange,
+    mesCalendarioCriacao,
+    setMesCalendarioCriacao,
+    rascunhoHoraCriacaoInicio,
+    setRascunhoHoraCriacaoInicio,
+    rascunhoHoraCriacaoFim,
+    setRascunhoHoraCriacaoFim,
+    modalFinalizacaoDatasAberto,
+    setModalFinalizacaoDatasAberto,
+    rascunhoFinalizacaoRange,
+    mesCalendarioFinalizacao,
+    setMesCalendarioFinalizacao,
+    rascunhoHoraFinalizacaoInicio,
+    setRascunhoHoraFinalizacaoInicio,
+    rascunhoHoraFinalizacaoFim,
+    setRascunhoHoraFinalizacaoFim,
     vendasUnificadasQueryParams,
     vendasUnificadasQueryKeyFingerprint,
     handleClearFilters,
-    handleConfirmDatas,
+    abrirModalCriacaoDatas,
+    handleRascunhoCriacaoRangeChange,
+    aplicarCriacaoDatas,
+    abrirModalFinalizacaoDatas,
+    handleRascunhoFinalizacaoRangeChange,
+    aplicarFinalizacaoDatas,
   } = useFiscalKanbanFilters()
+  const { timezoneAgregacao } = useEmpresaMe()
 
   /** Edição de cliente (lápis no card): mesmo painel que ClientesList / SeletorClienteModal */
   const [clienteTabsModalState, setClienteTabsModalState] = useState<ClientesTabsModalState>({
@@ -683,13 +703,12 @@ export function FiscalFlowKanban() {
         onToggleFiltrosMobile={() => setFiltrosVisiveisMobile(prev => !prev)}
         origemFilter={origemFilter}
         onOrigemFilterChange={setOrigemFilter}
-        dataFinalizacaoPeriodo={dataFinalizacaoPeriodo}
-        onDataFinalizacaoPeriodoChange={setDataFinalizacaoPeriodo}
-        periodo={periodo}
-        onPeriodoChange={setPeriodo}
-        statusFiscalFilter={statusFiscalFilter}
-        onStatusFiscalFilterChange={setStatusFiscalFilter}
-        onOpenDatasModal={() => setIsDatasModalOpen(true)}
+        dataCriacaoInicio={dataCriacaoInicio}
+        dataCriacaoFim={dataCriacaoFim}
+        onOpenCriacaoDatas={abrirModalCriacaoDatas}
+        dataFinalizacaoInicio={dataFinalizacaoInicio}
+        dataFinalizacaoFim={dataFinalizacaoFim}
+        onOpenFinalizacaoDatas={abrirModalFinalizacaoDatas}
         onClearFilters={handleClearFilters}
         modoKanbanVendas={modoKanbanVendas}
         onModoKanbanVendasChange={setModoKanbanVendas}
@@ -709,6 +728,78 @@ export function FiscalFlowKanban() {
         open={deliveryConfiguracoesOpen}
         onClose={() => setDeliveryConfiguracoesOpen(false)}
       />
+
+      <JiffySidePanelModal
+        open={modalCriacaoDatasAberto}
+        onClose={() => setModalCriacaoDatasAberto(false)}
+        title="Escolha o período de criação"
+        panelClassName="!bg-[#f9fafb] w-[45vw] min-w-[260px] max-w-[min(100vw-1rem,95vw)] sm:min-w-[280px]"
+        scrollableBody={false}
+        footerSlot={
+          <button
+            type="button"
+            disabled={!rascunhoCriacaoRange?.from || !rascunhoCriacaoRange?.to}
+            onClick={aplicarCriacaoDatas}
+            className="rounded-b-l-lg font-nunito flex h-full w-full items-center justify-center bg-primary text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Aplicar
+          </button>
+        }
+      >
+        <div className="flex min-h-0 w-full flex-1 flex-col items-stretch justify-start overflow-x-auto overflow-y-auto">
+          <FaturamentoRangeCalendar
+            embutidoNoModal
+            embutidoFundoClaro
+            range={rascunhoCriacaoRange}
+            onRangeChange={handleRascunhoCriacaoRangeChange}
+            month={mesCalendarioCriacao}
+            onMonthChange={setMesCalendarioCriacao}
+            timeZoneEmpresa={timezoneAgregacao}
+            horaInicio={rascunhoHoraCriacaoInicio}
+            horaFim={rascunhoHoraCriacaoFim}
+            onHorariosChange={(hi, hf) => {
+              setRascunhoHoraCriacaoInicio(hi)
+              setRascunhoHoraCriacaoFim(hf)
+            }}
+          />
+        </div>
+      </JiffySidePanelModal>
+
+      <JiffySidePanelModal
+        open={modalFinalizacaoDatasAberto}
+        onClose={() => setModalFinalizacaoDatasAberto(false)}
+        title="Escolha o período de finalização"
+        panelClassName="!bg-[#f9fafb] w-[45vw] min-w-[260px] max-w-[min(100vw-1rem,95vw)] sm:min-w-[280px]"
+        scrollableBody={false}
+        footerSlot={
+          <button
+            type="button"
+            disabled={!rascunhoFinalizacaoRange?.from || !rascunhoFinalizacaoRange?.to}
+            onClick={aplicarFinalizacaoDatas}
+            className="rounded-b-l-lg font-nunito flex h-full w-full items-center justify-center bg-primary text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Aplicar
+          </button>
+        }
+      >
+        <div className="flex min-h-0 w-full flex-1 flex-col items-stretch justify-start overflow-x-auto overflow-y-auto">
+          <FaturamentoRangeCalendar
+            embutidoNoModal
+            embutidoFundoClaro
+            range={rascunhoFinalizacaoRange}
+            onRangeChange={handleRascunhoFinalizacaoRangeChange}
+            month={mesCalendarioFinalizacao}
+            onMonthChange={setMesCalendarioFinalizacao}
+            timeZoneEmpresa={timezoneAgregacao}
+            horaInicio={rascunhoHoraFinalizacaoInicio}
+            horaFim={rascunhoHoraFinalizacaoFim}
+            onHorariosChange={(hi, hf) => {
+              setRascunhoHoraFinalizacaoInicio(hi)
+              setRascunhoHoraFinalizacaoFim(hf)
+            }}
+          />
+        </div>
+      </JiffySidePanelModal>
 
       {/* Kanban Board */}
       <div className="scrollbar-thin mb-[10px] min-h-0 flex-1 overflow-x-auto p-2 pb-4">
@@ -830,17 +921,6 @@ export function FiscalFlowKanban() {
           tabelaOrigemVenda={pedidoVisualizacaoContext.tabelaOrigem}
           statusFiscalUnificado={pedidoVisualizacaoContext.statusFiscal}
           modoVisualizacao={true}
-        />
-      )}
-
-      {/* Modal de datas personalizadas (período por data de criação) */}
-      {isDatasModalOpen && (
-        <EscolheDatasModal
-          open={isDatasModalOpen}
-          onClose={() => setIsDatasModalOpen(false)}
-          onConfirm={handleConfirmDatas}
-          dataInicial={periodoInicial}
-          dataFinal={periodoFinal}
         />
       )}
 

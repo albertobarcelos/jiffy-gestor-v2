@@ -2,8 +2,8 @@
 
 > **Documento vivo** — descreve o comportamento atual do código. Ao alterar `FiscalFlowKanban`, `NovoPedidoModal` ou módulos em `./kanban/`, atualize as seções afetadas e a data no rodapé.
 
-**Última revisão:** 2026-05-18  
-**Rota:** `/pedidos-clientes` → `app/pedidos-clientes/page.tsx`  
+**Última revisão:** 2026-05-25  
+**Rota:** `/pedidos-clientes` → `app/(erp)/pedidos-clientes/page.tsx`  
 **Componente raiz:** `src/presentation/components/features/nfe/FiscalFlowKanban.tsx`
 
 ---
@@ -53,7 +53,7 @@ Funcionalidades centrais:
 ## 2. Arquitetura de arquivos
 
 ```
-app/pedidos-clientes/page.tsx          # dynamic import do Kanban (ssr: false)
+app/(erp)/pedidos-clientes/page.tsx    # dynamic import do Kanban (ssr: false)
 src/presentation/components/features/nfe/
 ├── FiscalFlowKanban.tsx               # Orquestrador principal
 ├── NovoPedidoModal.tsx                # Wizard criar/editar/visualizar pedido (~5.8k linhas)
@@ -66,8 +66,9 @@ src/presentation/components/features/nfe/
     ├── types.ts                       # Venda, ColunaKanbanId, filtros
     ├── fiscalFlowKanban.rules.ts      # Regras colunas, drag, estilos card, ordenação
     ├── fiscalFlowKanban.storage.ts    # localStorage modo + pin por coluna
-    ├── useFiscalKanbanFilters.ts      # Busca, períodos, origem, status fiscal
+    ├── useFiscalKanbanFilters.ts      # Busca, data de criação personalizada, data de finalização e origem
     ├── useKanbanPinning.ts            # Card fixado no topo após drag
+    ├── useKanbanColumnScrollLoadMore.ts # Scroll por coluna dispara carregamento incremental
     ├── useEntregaTransicoesKanban.ts  # Avançar etapa / drag entrega
     ├── useFiscalEmissaoKanban.ts      # Emitir/reemitir + etapa “fantasma” COM_NFE
     ├── FiscalKanbanToolbar.tsx
@@ -165,15 +166,16 @@ Lógica central: `VendaUnificadaDTO.getEtapaKanban()` (`useVendasUnificadas.ts`)
 
 | Filtro | Comportamento |
 |--------|----------------|
-| Busca (`q`) | Debounce 400ms → API + filtro local `filtrarPorBusca` |
-| Período criação | Hoje, 7 dias, mês, personalizado (`EscolheDatasModal`) |
-| Período finalização | Idem, campos `dataFinalizacaoInicio/Fim` |
-| Origem | `''` \| `PDV` \| `GESTOR` \| `DELIVERY` |
-| Status fiscal | String enviada à API |
+| Busca (`q`) | Debounce 400ms → API (a busca vale para todo o dataset, não só páginas carregadas) |
+| Data criação | Botão **Por datas** abre painel lateral com `FaturamentoRangeCalendar` (mesmo padrão do Dashboard) e envia `dataCriacaoInicial/Final` |
+| Data finalização | Botão **Por datas** abre painel lateral com `FaturamentoRangeCalendar` e envia `dataFinalizacaoInicio/Fim` |
+| Origem | `''` \| `PDV` \| `GESTOR` (Delivery/Balcão é controlado pelo toggle do quadro, não pelo select de origem) |
 
-**Dados:** `useVendasUnificadasInfinite(params)` — primeira página de **50** vendas; mais páginas ao rolar coluna ou pré-carga silenciosa em segundo plano. Busca/filtros (`q`, período, origem, status fiscal) vão na API e aplicam-se a **todo** o dataset.
+**Dados:** `useVendasUnificadasInfinite(params)` — primeira página de **50** vendas; mais páginas ao rolar coluna ou pré-carga silenciosa em segundo plano. Busca/filtros (`q`, data de criação, data de finalização e origem) vão na API e aplicam-se a **todo** o dataset.
 
 **Efeito colateral:** vendas `REJEITADA` com `solicitarEmissaoFiscal === false` são reativadas automaticamente via `useMarcarEmissaoFiscal` (toast informativo).
+
+**Ordenação por coluna:** cada coluna possui select **Ordem** (`Data`, `Nº da venda`, `Cliente`) e botão de direção crescente/decrescente. O estado fica em memória na página e reinicia no reload; o pin do último card movido continua persistido em `localStorage`.
 
 ---
 
@@ -378,6 +380,7 @@ Botão **Avançar etapa** no card (`FiscalKanbanVendaCard`) e drag entre colunas
 | `useFinalzarVendaGestor` | Finalizar gestor |
 | `useImpressaoDelivery` | Tickets pós-transição |
 | `useEmpresaMe` | Nome, prefs impressão, template |
+| `useKanbanColumnScrollLoadMore` | Detecta scroll próximo ao fim da coluna e chama `fetchNextPage()` |
 
 **BFF gestor (exemplos):** rotas em `app/api/vendas/...` — ver hooks em `useVendas.ts`.
 
@@ -409,6 +412,7 @@ Botão **Avançar etapa** no card (`FiscalKanbanVendaCard`) e drag entre colunas
 
 | Data | Alteração |
 |------|-----------|
+| 2026-05-25 | Atualização pós-migração para `app/(erp)`: rota canônica, filtros atuais (Data criação e Data finalização por calendário personalizado, sem Status fiscal), ordenação por coluna e carregamento incremental por scroll |
 | 2026-05-18 | Documento inicial: mapeamento FiscalFlowKanban + NovoPedido (balcão/entrega) + kanban/ + hooks |
 
 ---

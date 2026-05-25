@@ -1,6 +1,6 @@
 'use client'
 
-import { FormControl, MenuItem, Select } from '@mui/material'
+import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
 import {
   MdAdd,
   MdCalendarToday,
@@ -11,7 +11,7 @@ import {
   MdSettings,
 } from 'react-icons/md'
 import { KanbanModoVendasToggle, type ModoKanbanVendas } from '../KanbanModoVendasToggle'
-import type { OrigemFiltro, PeriodoOpcao } from './types'
+import type { OrigemFiltro } from './types'
 
 interface FiscalKanbanToolbarProps {
   searchInput: string
@@ -21,13 +21,12 @@ interface FiscalKanbanToolbarProps {
   onToggleFiltrosMobile: () => void
   origemFilter: OrigemFiltro
   onOrigemFilterChange: (value: OrigemFiltro) => void
-  dataFinalizacaoPeriodo: PeriodoOpcao
-  onDataFinalizacaoPeriodoChange: (value: PeriodoOpcao) => void
-  periodo: PeriodoOpcao
-  onPeriodoChange: (value: PeriodoOpcao) => void
-  statusFiscalFilter: string
-  onStatusFiscalFilterChange: (value: string) => void
-  onOpenDatasModal: () => void
+  dataCriacaoInicio: Date | null
+  dataCriacaoFim: Date | null
+  onOpenCriacaoDatas: () => void
+  dataFinalizacaoInicio: Date | null
+  dataFinalizacaoFim: Date | null
+  onOpenFinalizacaoDatas: () => void
   onClearFilters: () => void
   modoKanbanVendas: ModoKanbanVendas
   onModoKanbanVendasChange: (value: ModoKanbanVendas) => void
@@ -35,19 +34,77 @@ interface FiscalKanbanToolbarProps {
   onAbrirNovoPedido: () => void
 }
 
-const PERIODO_OPTIONS: PeriodoOpcao[] = [
-  'Todos',
-  'Hoje',
-  'Ontem',
-  'Últimos 7 Dias',
-  'Mês Atual',
-  'Mês Passado',
-  'Últimos 30 Dias',
-  'Últimos 60 Dias',
-  'Últimos 90 Dias',
-]
-
 const KANBAN_BUTTON_COLOR = '#530CA3'
+
+const sxKanbanFiltroSelect = {
+  minWidth: 140,
+  '& .MuiOutlinedInput-root': {
+    height: 32,
+    minHeight: 32,
+    borderRadius: '8px',
+    backgroundColor: 'var(--color-info)',
+    fontFamily: '"Nunito", sans-serif',
+    '& .MuiOutlinedInput-notchedOutline': {
+      borderColor: 'rgba(0, 0, 0, 0.23)',
+      borderWidth: 1,
+    },
+    '&:hover .MuiOutlinedInput-notchedOutline': {
+      borderColor: 'rgba(0, 0, 0, 0.23)',
+    },
+    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+      borderColor: 'var(--color-primary)',
+      borderWidth: 1,
+    },
+  },
+  '& .MuiInputLabel-root': {
+    color: 'var(--color-secondary-text)',
+    fontFamily: '"Nunito", sans-serif',
+    fontSize: '0.875rem',
+    fontWeight: 300,
+  },
+  '& .MuiInputLabel-root.Mui-focused, & .MuiInputLabel-root.MuiInputLabel-shrink': {
+    color: 'var(--color-secondary-text)',
+    fontWeight: 300,
+  },
+} as const
+
+const MESES_ABREV = [
+  'jan',
+  'fev',
+  'mar',
+  'abr',
+  'mai',
+  'jun',
+  'jul',
+  'ago',
+  'set',
+  'out',
+  'nov',
+  'dez',
+] as const
+
+function formatarDataHoraFiltroCurta(date: Date): string {
+  const dia = String(date.getDate()).padStart(2, '0')
+  const mes = MESES_ABREV[date.getMonth()]
+  const h = String(date.getHours()).padStart(2, '0')
+  const min = String(date.getMinutes()).padStart(2, '0')
+  return `${dia}-${mes} ${h}:${min}`
+}
+
+function PeriodoSelecionadoResumo({
+  inicio,
+  fim,
+}: {
+  inicio: Date
+  fim: Date
+}) {
+  return (
+    <div className="flex shrink-0 flex-col gap-0 text-[11px] leading-snug text-primary/85 sm:text-xs">
+      <span className="whitespace-nowrap">Dt. Ini.: {formatarDataHoraFiltroCurta(inicio)}</span>
+      <span className="whitespace-nowrap">Dt. Fim: {formatarDataHoraFiltroCurta(fim)}</span>
+    </div>
+  )
+}
 
 export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
   const {
@@ -58,13 +115,12 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
     onToggleFiltrosMobile,
     origemFilter,
     onOrigemFilterChange,
-    dataFinalizacaoPeriodo,
-    onDataFinalizacaoPeriodoChange,
-    periodo,
-    onPeriodoChange,
-    statusFiscalFilter,
-    onStatusFiscalFilterChange,
-    onOpenDatasModal,
+    dataCriacaoInicio,
+    dataCriacaoFim,
+    onOpenCriacaoDatas,
+    dataFinalizacaoInicio,
+    dataFinalizacaoFim,
+    onOpenFinalizacaoDatas,
     onClearFilters,
     modoKanbanVendas,
     onModoKanbanVendasChange,
@@ -73,7 +129,7 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
   } = props
 
   return (
-    <div className="bg-primary-background flex-shrink-0 rounded-b-lg rounded-t-lg md:px-2">
+    <div className="bg-primary-background mt-2 flex-shrink-0 rounded-b-lg rounded-t-lg">
       <div className="flex justify-end py-2 sm:hidden">
         <button
           type="button"
@@ -91,9 +147,7 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
         className={`flex flex-wrap items-end justify-center gap-x-1 gap-y-4 rounded-t-lg bg-custom-2 px-1 pb-2 pt-1.5 md:justify-start ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
       >
         <div className="flex flex-col gap-1">
-          <label className="font-nunito pl-2 text-xs text-secondary-text">Pesquisar</label>
-
-          <div className="relative w-full max-w-full px-1 lg:max-w-[250px]">
+          <div className="relative w-[250px] px-1 lg:w-[300px]">
             <MdSearch
               className="absolute left-2 top-1/2 -translate-y-1/2 text-secondary-text"
               size={20}
@@ -110,18 +164,17 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="font-nunito text-xs text-secondary-text">Origem</label>
-          <FormControl size="small" sx={{ minWidth: 140 }}>
+          <FormControl size="small" variant="outlined" sx={sxKanbanFiltroSelect}>
+            <InputLabel id="kanban-filtro-origem-label" shrink>
+              Origem
+            </InputLabel>
             <Select
+              labelId="kanban-filtro-origem-label"
+              label="Origem"
               value={origemFilter}
               onChange={e => onOrigemFilterChange(e.target.value as OrigemFiltro)}
               displayEmpty
-              sx={{
-                height: '32px',
-                borderRadius: '8px',
-                backgroundColor: 'var(--color-info)',
-                '& .MuiOutlinedInput-notchedOutline': { borderColor: 'transparent' },
-              }}
+              className="font-nunito"
             >
               <MenuItem value="">Todos</MenuItem>
               <MenuItem value="PDV">PDV</MenuItem>
@@ -131,83 +184,40 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="font-nunito text-xs text-secondary-text">Data finalização</label>
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <Select
-              value={dataFinalizacaoPeriodo}
-              onChange={e => onDataFinalizacaoPeriodoChange(e.target.value as PeriodoOpcao)}
-              sx={{
-                height: '32px',
-                backgroundColor: '#FFFFFF',
-                '& .MuiOutlinedInput-notchedOutline': { borderColor: 'transparent' },
-              }}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onOpenFinalizacaoDatas}
+              className="font-nunito flex h-8 items-center gap-2 rounded-lg px-2 text-sm text-white transition-colors"
+              style={{ backgroundColor: KANBAN_BUTTON_COLOR }}
             >
-              {PERIODO_OPTIONS.map(option => (
-                <MenuItem key={option} value={option}>
-                  {option}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+              <MdCalendarToday size={18} className="shrink-0" />
+              Data Finalização
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="font-nunito text-xs text-secondary-text">Data criação</label>
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <Select
-              value={periodo}
-              onChange={e => onPeriodoChange(e.target.value as PeriodoOpcao)}
-              sx={{
-                height: '32px',
-                backgroundColor: '#FFFFFF',
-                '& .MuiOutlinedInput-notchedOutline': { borderColor: 'transparent' },
-              }}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onOpenCriacaoDatas}
+              className="font-nunito flex h-8 items-center gap-2 rounded-lg px-2 text-sm text-white transition-colors"
+              style={{ backgroundColor: KANBAN_BUTTON_COLOR }}
             >
-              {PERIODO_OPTIONS.map(option => (
-                <MenuItem key={option} value={option}>
-                  {option}
-                </MenuItem>
-              ))}
-              <MenuItem value="Datas Personalizadas">Datas personalizadas</MenuItem>
-            </Select>
-          </FormControl>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="font-nunito text-xs text-secondary-text">Status fiscal</label>
-          <FormControl size="small" sx={{ minWidth: 160 }}>
-            <Select
-              value={statusFiscalFilter}
-              onChange={e => onStatusFiscalFilterChange(e.target.value)}
-              displayEmpty
-              sx={{
-                height: '32px',
-                backgroundColor: '#FFFFFF',
-                '& .MuiOutlinedInput-notchedOutline': { borderColor: 'transparent' },
-              }}
-            >
-              <MenuItem value="">Todos</MenuItem>
-              <MenuItem value="PENDENTE">Pendente</MenuItem>
-              <MenuItem value="PENDENTE_EMISSAO">Pendente emissão</MenuItem>
-              <MenuItem value="EMITINDO">Emitindo</MenuItem>
-              <MenuItem value="EMITIDA">Emitida</MenuItem>
-              <MenuItem value="REJEITADA">Rejeitada</MenuItem>
-              <MenuItem value="CANCELADA">Cancelada</MenuItem>
-            </Select>
-          </FormControl>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="font-nunito text-xs text-secondary-text">Período (criação)</label>
-          <button
-            type="button"
-            onClick={onOpenDatasModal}
-            className="font-nunito flex h-8 items-center gap-2 rounded-lg px-4 text-sm text-white transition-colors"
-            style={{ backgroundColor: KANBAN_BUTTON_COLOR }}
-          >
-            <MdCalendarToday size={18} />
-            Por datas
-          </button>
+              <MdCalendarToday size={18} className="shrink-0" />
+              Data Criação
+            </button>
+            {dataFinalizacaoInicio && dataFinalizacaoFim ? (
+              <PeriodoSelecionadoResumo
+                inicio={dataFinalizacaoInicio}
+                fim={dataFinalizacaoFim}
+              />
+            ) : null}
+            {dataCriacaoInicio && dataCriacaoFim ? (
+              <PeriodoSelecionadoResumo inicio={dataCriacaoInicio} fim={dataCriacaoFim} />
+            ) : null}
+          </div>
         </div>
 
         <button
