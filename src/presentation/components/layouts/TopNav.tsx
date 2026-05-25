@@ -164,8 +164,6 @@ export function TopNav() {
         { name: 'Perfis PDV', path: '/perfis-usuarios-pdv', icon: MdGroup },
         { name: 'Usuários PDV', path: '/usuarios', icon: MdPerson },
         { name: 'Entregadores', path: '/entregadores', icon: MdDeliveryDining },
-        { name: 'Perfis Gestor', path: '/cadastros/perfis-gestor', icon: MdAccountBalance },
-        { name: 'Usuários Gestor', path: '/meus-apps/usuarios-gestor', icon: MdPerson },
         { name: 'Clientes', path: '/clientes', icon: MdPeople },
       ],
     },
