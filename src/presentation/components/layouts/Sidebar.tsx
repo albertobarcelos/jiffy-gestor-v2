@@ -104,7 +104,7 @@ export function Sidebar() {
         { name: 'Grupo Complementos', path: '/cadastros/grupos-complementos', icon: '📋' },
         { name: 'Complementos', path: '/cadastros/complementos', icon: '➕' },
         { name: 'Usuários', path: '/cadastros/usuarios', icon: '👤' },
-        { name: 'Entregadores', path: '/cadastros/entregadores', icon: '🛵' },
+        { name: 'Entregadores', path: '/entregadores', icon: '🛵' },
         { name: 'Perfis de Usuários', path: '/cadastros/perfis-usuarios', icon: '👥' },
         { name: 'Clientes', path: '/cadastros/clientes', icon: '👥' },
         { name: 'Impressoras', path: '/cadastros/impressoras', icon: '🖨️' },

@@ -161,12 +161,12 @@ export function TopNav() {
       path: '#',
       icon: MdPeople,
       children: [
-        { name: 'Perfis PDV', path: '/cadastros/perfis-usuarios-pdv', icon: MdGroup },
-        { name: 'Usuários PDV', path: '/cadastros/usuarios', icon: MdPerson },
-        { name: 'Entregadores', path: '/cadastros/entregadores', icon: MdDeliveryDining },
+        { name: 'Perfis PDV', path: '/perfis-usuarios-pdv', icon: MdGroup },
+        { name: 'Usuários PDV', path: '/usuarios', icon: MdPerson },
+        { name: 'Entregadores', path: '/entregadores', icon: MdDeliveryDining },
         { name: 'Perfis Gestor', path: '/cadastros/perfis-gestor', icon: MdAccountBalance },
         { name: 'Usuários Gestor', path: '/meus-apps/usuarios-gestor', icon: MdPerson },
-        { name: 'Clientes', path: '/cadastros/clientes', icon: MdPeople },
+        { name: 'Clientes', path: '/clientes', icon: MdPeople },
       ],
     },
     {

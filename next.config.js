@@ -5,6 +5,7 @@ const path = require('path')
 const ERP_LEGACY_CADASTROS_SEGMENTS = [
   'clientes',
   'usuarios',
+  'entregadores',
   'perfis-usuarios-pdv',
   'grupos-produtos',
   'grupos-complementos',
