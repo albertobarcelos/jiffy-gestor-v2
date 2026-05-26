@@ -226,14 +226,15 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
               <Button
                 size="sm"
                 variant="outlined"
-                className="flex-1 min-w-0 !border-gray-300 !text-gray-700 hover:!bg-gray-50"
-                sx={{ py: 0.375, px: 1, minHeight: 'auto' }}
-                startIcon={<MdPrint size={14} />}
+                className="!min-w-0 !border-gray-300 !px-2 !text-gray-700 hover:!bg-gray-50"
+                sx={{ py: 0.375, minHeight: 'auto' }}
                 onClick={() =>
                   onReimprimirCupomDelivery(venda, column.id as ColunaKanbanId)
                 }
+                title="Reimprimir"
+                aria-label="Reimprimir"
               >
-                Reimprimir
+                <MdPrint size={16} />
               </Button>
             )}
 

@@ -5,7 +5,6 @@ import {
 } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
-import { showToast } from '@/src/shared/utils/toast'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 /**
@@ -265,13 +264,15 @@ export function resolveModeloParaEmitirNota(v: VendaUnificadaDTO): 55 | 65 | nul
 
 /**
  * Parâmetros alinhados ao contrato do backend GET /vendas/unificado:
- * - origem, statusFiscal, dataCriacaoInicial, dataCriacaoFinal
+ * - origem, statusFiscal, periodoInicial, periodoFinal
  * - dataFinalizacaoInicio, dataFinalizacaoFim
  * - q (busca no servidor — pesquisa em todo o dataset, não só itens já carregados)
  */
 export interface VendasUnificadasQueryParams {
   origem?: 'PDV' | 'GESTOR' | 'DELIVERY'
   statusFiscal?: string
+  periodoInicial?: string
+  periodoFinal?: string
   dataCriacaoInicial?: string // ISO (filtro por data de criação)
   dataCriacaoFinal?: string
   dataFinalizacaoInicio?: string // ISO date string
@@ -280,7 +281,7 @@ export interface VendasUnificadasQueryParams {
 }
 
 /** Resposta do backend: PaginationResult<VendaUnificadaDTO> */
-interface VendasUnificadasResponse {
+export interface VendasUnificadasResponse {
   count: number
   page: number
   limit: number
@@ -335,9 +336,10 @@ export function montarSearchParamsVendasUnificadas(
   const searchParams = new URLSearchParams()
   if (params.origem) searchParams.append('origem', params.origem)
   if (params.statusFiscal) searchParams.append('statusFiscal', params.statusFiscal)
-  if (params.dataCriacaoInicial)
-    searchParams.append('dataCriacaoInicial', params.dataCriacaoInicial)
-  if (params.dataCriacaoFinal) searchParams.append('dataCriacaoFinal', params.dataCriacaoFinal)
+  const periodoInicial = params.periodoInicial ?? params.dataCriacaoInicial
+  const periodoFinal = params.periodoFinal ?? params.dataCriacaoFinal
+  if (periodoInicial) searchParams.append('periodoInicial', periodoInicial)
+  if (periodoFinal) searchParams.append('periodoFinal', periodoFinal)
   if (params.dataFinalizacaoInicio)
     searchParams.append('dataFinalizacaoInicio', params.dataFinalizacaoInicio)
   if (params.dataFinalizacaoFim)
@@ -353,7 +355,8 @@ export async function fetchVendasUnificadasPagina(
   params: VendasUnificadasQueryParams,
   offset: number,
   limit: number,
-  token: string
+  token: string,
+  signal?: AbortSignal
 ): Promise<VendasUnificadasResponse> {
   const searchParams = montarSearchParamsVendasUnificadas(params, offset, limit)
 
@@ -363,6 +366,7 @@ export async function fetchVendasUnificadasPagina(
       'Content-Type': 'application/json',
     },
     cache: 'no-store',
+    signal,
   })
 
   if (!response.ok) {
@@ -408,7 +412,7 @@ function deduplicarPaginasVendas(
   return { items, totalCount }
 }
 
-function getNextOffsetVendasUnificadas(
+export function getNextOffsetVendasUnificadas(
   lastPage: VendasUnificadasResponse,
   allPages: VendasUnificadasResponse[]
 ): number | undefined {
@@ -454,7 +458,7 @@ export function useVendasUnificadasInfinite(params: VendasUnificadasQueryParams)
   const token = auth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
 
-  const queryKey = ['vendas-unificadas-infinite', params, empresaId]
+  const queryKey = vendasUnificadasInfiniteQueryKey(params, empresaId)
 
   return useInfiniteQuery<
     VendasUnificadasResponse,
@@ -466,18 +470,28 @@ export function useVendasUnificadasInfinite(params: VendasUnificadasQueryParams)
     queryKey,
     placeholderData: keepPreviousData,
     initialPageParam: 0,
-    queryFn: ({ pageParam }) =>
+    queryFn: ({ pageParam, signal }) =>
       fetchVendasUnificadasPagina(
         params,
         pageParam,
         VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE,
-        token!
+        token!,
+        signal
       ),
     getNextPageParam: (lastPage, allPages) => getNextOffsetVendasUnificadas(lastPage, allPages),
     enabled: !!token,
     refetchOnReconnect: true,
     refetchInterval: false,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
   })
+}
+
+export function vendasUnificadasInfiniteQueryKey(
+  params: VendasUnificadasQueryParams,
+  empresaId: string | null
+) {
+  return ['vendas-unificadas', 'infinite', empresaId, params] as const
 }
 
 /** @deprecated Preferir `useVendasUnificadasInfinite` no Kanban. */

@@ -1,14 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { startOfDay } from 'date-fns'
+import { endOfDay, startOfDay } from 'date-fns'
 import type { DateRange } from 'react-day-picker'
 import { formatarHoraParaInputCalendar } from '@/src/presentation/components/features/dashboard/dashboardTextHelpers'
 import { primeiroMesQuadroDuploCalendario } from '@/src/shared/utils/calendarioIntervaloFaturamento'
 import { combinarIntervaloCalendarParaDatas } from '@/src/shared/utils/intervaloCalendarioComHoras'
 import type { OrigemFiltro } from './types'
 
+function criarIntervaloHoje() {
+  const hoje = new Date()
+  return {
+    inicio: startOfDay(hoje),
+    fim: endOfDay(hoje),
+  }
+}
+
 export function useFiscalKanbanFilters() {
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const intervaloCriacaoPadrao = useMemo(() => criarIntervaloHoje(), [])
   const [dataCriacaoInicio, setDataCriacaoInicio] = useState<Date | null>(null)
   const [dataCriacaoFim, setDataCriacaoFim] = useState<Date | null>(null)
   const [dataFinalizacaoInicio, setDataFinalizacaoInicio] = useState<Date | null>(null)
@@ -45,8 +54,14 @@ export function useFiscalKanbanFilters() {
     }
   }, [searchInput])
 
-  const dataCriacaoInicioISO = dataCriacaoInicio?.toISOString() ?? undefined
-  const dataCriacaoFimISO = dataCriacaoFim?.toISOString() ?? undefined
+  const deveUsarCriacaoPadrao =
+    !dataCriacaoInicio && !dataCriacaoFim && !dataFinalizacaoInicio && !dataFinalizacaoFim
+  const dataCriacaoInicioConsulta =
+    dataCriacaoInicio ?? (deveUsarCriacaoPadrao ? intervaloCriacaoPadrao.inicio : null)
+  const dataCriacaoFimConsulta =
+    dataCriacaoFim ?? (deveUsarCriacaoPadrao ? intervaloCriacaoPadrao.fim : null)
+  const dataCriacaoInicioISO = dataCriacaoInicioConsulta?.toISOString() ?? undefined
+  const dataCriacaoFimISO = dataCriacaoFimConsulta?.toISOString() ?? undefined
   const dataFinalizacaoInicioISO = dataFinalizacaoInicio?.toISOString() ?? undefined
   const dataFinalizacaoFimISO = dataFinalizacaoFim?.toISOString() ?? undefined
 
@@ -74,12 +89,13 @@ export function useFiscalKanbanFilters() {
   const handleClearFilters = useCallback(() => {
     setSearchInput('')
     setSearchQuery('')
+    const periodoHoje = criarIntervaloHoje()
     setDataCriacaoInicio(null)
     setDataCriacaoFim(null)
     setDataFinalizacaoInicio(null)
     setDataFinalizacaoFim(null)
     setOrigemFilter('')
-    const hoje = startOfDay(new Date())
+    const hoje = periodoHoje.inicio
     setRascunhoCriacaoRange({ from: hoje, to: hoje })
     setMesCalendarioCriacao(primeiroMesQuadroDuploCalendario(hoje))
     setRascunhoHoraCriacaoInicio('00:00')

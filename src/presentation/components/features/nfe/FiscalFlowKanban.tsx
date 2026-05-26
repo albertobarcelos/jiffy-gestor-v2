@@ -155,6 +155,14 @@ export function FiscalFlowKanban() {
   const [modoKanbanVendas, setModoKanbanVendas] = useState<ModoKanbanVendas>(() =>
     lerModoKanbanVendasDoStorage()
   )
+  const [vendasVisiveisPorModo, setVendasVisiveisPorModo] = useState<
+    Record<ModoKanbanVendas, Venda[]>
+  >({
+    delivery: [],
+    balcao: [],
+  })
+  const contextoVisivelRef = useRef('')
+  const ignorarProximaSincronizacaoAutomaticaRef = useRef(false)
 
   useEffect(() => {
     try {
@@ -201,11 +209,11 @@ export function FiscalFlowKanban() {
   const {
     data: vendasUnificadasInfiniteData,
     isLoading,
-    isFetching,
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage,
     refetch,
+    isPlaceholderData,
   } = useVendasUnificadasInfinite(vendasUnificadasQueryParams)
 
   const { items: todasVendasCarregadas, totalCount: totalVendasApi } = useMemo(
@@ -221,8 +229,14 @@ export function FiscalFlowKanban() {
 
   const handleCarregarMaisVendas = useCallback(() => {
     if (isFetchingNextPage || !temMaisVendasParaCarregar) return
+    ignorarProximaSincronizacaoAutomaticaRef.current = false
     void fetchNextPage()
   }, [isFetchingNextPage, temMaisVendasParaCarregar, fetchNextPage])
+
+  const handleAtualizarListagem = useCallback(() => {
+    ignorarProximaSincronizacaoAutomaticaRef.current = false
+    void refetch()
+  }, [refetch])
 
   const { onColumnScroll } = useKanbanColumnScrollLoadMore(handleCarregarMaisVendas)
 
@@ -231,8 +245,9 @@ export function FiscalFlowKanban() {
     if (isLoading || isFetchingNextPage || !temMaisVendasParaCarregar) return
     if (!todasVendasCarregadas.length) return
     const t = window.setTimeout(() => {
+      ignorarProximaSincronizacaoAutomaticaRef.current = true
       void fetchNextPage()
-    }, 400)
+    }, 1200)
     return () => window.clearTimeout(t)
   }, [
     isLoading,
@@ -261,6 +276,7 @@ export function FiscalFlowKanban() {
   } = useEntregaTransicoesKanban({
     executarTransicao: payload => transicaoVendaGestor.mutateAsync(payload),
     refetch: async () => {
+      ignorarProximaSincronizacaoAutomaticaRef.current = false
       await refetch()
     },
     onAfterTransicaoSucesso: async ({ venda, acoesExecutadas }) => {
@@ -343,15 +359,104 @@ export function FiscalFlowKanban() {
   // TouchSensor junto com PointerSensor gerava gesto “travado” no mobile; distance evita arraste ao rolar.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 10 } }))
 
-  /** API já aplica `q`, período, origem e statusFiscal — busca em todo o dataset, não só páginas carregadas. */
-  const todasVendas: Venda[] = todasVendasCarregadas
+  const separarVendasPorModo = useCallback((vendas: Venda[]) => {
+    const delivery: Venda[] = []
+    const balcao: Venda[] = []
+
+    vendas.forEach(venda => {
+      if (venda.isPedidoEntregaGestor()) {
+        delivery.push(venda)
+      } else {
+        balcao.push(venda)
+      }
+    })
+
+    return { delivery, balcao }
+  }, [])
+
+  const assinaturaVendaKanban = useCallback((venda: Venda) => {
+    return [
+      venda.id,
+      venda.getEtapaKanban(),
+      venda.statusEtapaOperacional ?? '',
+      venda.dataUltimaModificacao ?? '',
+      venda.dataFinalizacao ?? '',
+      venda.dataCancelamento ?? '',
+      venda.solicitarEmissaoFiscal ? '1' : '0',
+      venda.statusFiscal ?? '',
+      venda.documentoFiscalId ?? '',
+      venda.numeroFiscal ?? '',
+      venda.dataEmissaoFiscal ?? '',
+      venda.valorFinal,
+      venda.cliente?.id ?? '',
+      venda.cliente?.nome ?? '',
+    ].join('|')
+  }, [])
+
+  const totalVendasVisiveisModoAtual = vendasVisiveisPorModo[modoKanbanVendas].length
+
+  /**
+   * Mantém a UI do modo ativo estável enquanto a paginação automática aquece o cache.
+   * Ao trocar modo/filtros, sincroniza imediatamente com o que já foi carregado.
+   */
+  useEffect(() => {
+    if (isLoading || isPlaceholderData) return
+
+    const contextoAtual = `${vendasUnificadasQueryKeyFingerprint}:${modoKanbanVendas}`
+    const contextoMudou = contextoVisivelRef.current !== contextoAtual
+    const vendasSeparadas = separarVendasPorModo(todasVendasCarregadas)
+    const vendasDoModoAtual = vendasSeparadas[modoKanbanVendas]
+    const encontrouPrimeirosItensDoModo =
+      totalVendasVisiveisModoAtual === 0 && vendasDoModoAtual.length > 0
+
+    if (!contextoMudou && isFetchingNextPage) return
+
+    if (
+      ignorarProximaSincronizacaoAutomaticaRef.current &&
+      !contextoMudou &&
+      !encontrouPrimeirosItensDoModo
+    ) {
+      ignorarProximaSincronizacaoAutomaticaRef.current = false
+      return
+    }
+
+    ignorarProximaSincronizacaoAutomaticaRef.current = false
+    contextoVisivelRef.current = contextoAtual
+    setVendasVisiveisPorModo(prev => {
+      const atuais = prev[modoKanbanVendas]
+      const mesmasVendas =
+        atuais.length === vendasDoModoAtual.length &&
+        atuais.every((venda, index) => {
+          const proximaVenda = vendasDoModoAtual[index]
+          if (!proximaVenda) return false
+          return assinaturaVendaKanban(venda) === assinaturaVendaKanban(proximaVenda)
+        })
+
+      if (mesmasVendas) return prev
+
+      return {
+        ...prev,
+        [modoKanbanVendas]: vendasDoModoAtual,
+      }
+    })
+  }, [
+    isLoading,
+    isPlaceholderData,
+    isFetchingNextPage,
+    modoKanbanVendas,
+    assinaturaVendaKanban,
+    separarVendasPorModo,
+    todasVendasCarregadas,
+    totalVendasVisiveisModoAtual,
+    vendasUnificadasQueryKeyFingerprint,
+  ])
+
+  /** API aplica filtros globais; o modo ativo usa um snapshot visual separado. */
+  const todasVendas: Venda[] = vendasVisiveisPorModo[modoKanbanVendas]
 
   const vendasFiltradasPorModoKanban = useMemo((): Venda[] => {
-    if (modoKanbanVendas === 'delivery') {
-      return todasVendas.filter(v => v.isPedidoEntregaGestor())
-    }
-    return todasVendas.filter(v => !v.isPedidoEntregaGestor())
-  }, [modoKanbanVendas, todasVendas])
+    return todasVendas
+  }, [todasVendas])
 
   // Colunas fixas do Kanban (entrega → fiscal)
   const getColumns = (): KanbanColumn[] => [
@@ -676,14 +781,7 @@ export function FiscalFlowKanban() {
     return ordenadas
   }
 
-  const mostrarLoadingInicial = isLoading && todasVendasCarregadas.length === 0
-
-  const rodapeCarregamentoColuna =
-    isFetchingNextPage || (temMaisVendasParaCarregar && isFetching) ? (
-      <div className="flex justify-center py-2">
-        <span className="text-[11px] text-gray-500">Carregando mais vendas…</span>
-      </div>
-    ) : null
+  const mostrarLoadingInicial = isLoading && todasVendas.length === 0
 
   if (mostrarLoadingInicial) {
     return (
@@ -698,7 +796,7 @@ export function FiscalFlowKanban() {
       <FiscalKanbanToolbar
         searchInput={searchInput}
         onSearchInputChange={setSearchInput}
-        onRefresh={() => void refetch()}
+        onRefresh={handleAtualizarListagem}
         filtrosVisiveisMobile={filtrosVisiveisMobile}
         onToggleFiltrosMobile={() => setFiltrosVisiveisMobile(prev => !prev)}
         origemFilter={origemFilter}
@@ -715,14 +813,6 @@ export function FiscalFlowKanban() {
         onAbrirConfiguracoesDelivery={() => setDeliveryConfiguracoesOpen(true)}
         onAbrirNovoPedido={handleAbrirNovoPedido}
       />
-
-      {temMaisVendasParaCarregar && todasVendas.length > 0 && (
-        <p className="border-b border-gray-200 bg-white px-3 py-1.5 text-center text-[11px] text-gray-600">
-          Exibindo {todasVendas.length}
-          {totalVendasApi > todasVendas.length ? ` de ${totalVendasApi}` : ''} vendas
-          {isFetchingNextPage ? ' — carregando…' : ' — role uma coluna para carregar mais'}
-        </p>
-      )}
 
       <DeliveryConfiguracoesModal
         open={deliveryConfiguracoesOpen}
@@ -834,7 +924,6 @@ export function FiscalFlowKanban() {
                     }))
                   }
                   onColumnScroll={onColumnScroll}
-                  columnFooter={rodapeCarregamentoColuna}
                 >
                   {columnVendas.map((venda: Venda) => (
                     <FiscalKanbanVendaCard

@@ -3,6 +3,7 @@
 import React from 'react'
 import { MdDeliveryDining, MdPointOfSale } from 'react-icons/md'
 import { RiBeerFill } from 'react-icons/ri'
+import { TbPaperBag } from 'react-icons/tb'
 
 interface TipoVendaIconProps {
   tipoVenda: 'mesa' | 'balcao' | 'gestor' | 'entrega' | 'retirada'
@@ -219,12 +220,21 @@ export function TipoVendaIcon({
         }}
         {...(title ? { 'data-tooltip': title } : {})}
       >
-        <MdDeliveryDining
-          size={Math.round(beerIconSize * 0.82)}
-          color={corEntrega}
-          className="block shrink-0"
-          aria-hidden
-        />
+        {tipoVenda === 'retirada' ? (
+          <TbPaperBag
+            size={Math.round(beerIconSize * 0.82)}
+            color={corEntrega}
+            className="block shrink-0"
+            aria-hidden
+          />
+        ) : (
+          <MdDeliveryDining
+            size={Math.round(beerIconSize * 0.82)}
+            color={corEntrega}
+            className="block shrink-0"
+            aria-hidden
+          />
+        )}
         <span
           className="mt-1 whitespace-nowrap font-medium"
           style={{ color: corEntrega, fontSize: `${entregaTextSize}px`, lineHeight: 1 }}
