@@ -34,7 +34,7 @@ import {
 } from 'react-icons/md'
 import { EmitirNfeModal } from './EmitirNfeModal'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
-import { NovoPedidoModal } from './NovoPedidoModal'
+import { NovoPedidoModal } from './novo-pedido/NovoPedidoModal'
 import { DeliveryConfiguracoesModal } from './DeliveryConfiguracoesModal'
 import type { TipoPedido } from './EscolhaTipoPedidoModal'
 import { showToast } from '@/src/shared/utils/toast'
