@@ -207,7 +207,7 @@ export function PainelEdicaoProdutoLinhaPedido({
         cancelLabel: 'Cancelar',
         cancelVariant: 'primaryTint10',
         onCancel: onClose,
-        barActionOrder: ['save', 'cancel'],
+        barActionOrder: ['cancel', 'save'],
       }}
     >
       <div className="bg-gray-50 px-4 py-4 md:px-6">

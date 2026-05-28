@@ -79,22 +79,24 @@ export function formatarDescontoAcrescimo(produto: ProdutoSelecionado): string {
   if (produto.tipoDesconto && produto.valorDesconto) {
     if (produto.tipoDesconto === 'porcentagem') {
       const pct = produto.valorDesconto
-      return `Desc. ${Number.isInteger(pct) ? pct : formatarNumeroComMilhar(pct)}%`
+      const pctFormatado = Number.isInteger(pct) ? String(pct) : formatarNumeroComMilhar(pct)
+      return `-${pctFormatado}%`
     }
     const valorDesconto = produto.valorDesconto
     if (valorDesconto > 0) {
-      return `Desc. -${formatarNumeroComMilhar(valorDesconto)}`
+      return `-${formatarNumeroComMilhar(valorDesconto)}`
     }
   }
 
   if (produto.tipoAcrescimo && produto.valorAcrescimo) {
     if (produto.tipoAcrescimo === 'porcentagem') {
       const pct = produto.valorAcrescimo
-      return `Acres. ${Number.isInteger(pct) ? pct : formatarNumeroComMilhar(pct)}%`
+      const pctFormatado = Number.isInteger(pct) ? String(pct) : formatarNumeroComMilhar(pct)
+      return `+${pctFormatado}%`
     }
     const valorAcrescimo = produto.valorAcrescimo
     if (valorAcrescimo > 0) {
-      return `Acres. +${formatarNumeroComMilhar(valorAcrescimo)}`
+      return `+${formatarNumeroComMilhar(valorAcrescimo)}`
     }
   }
 

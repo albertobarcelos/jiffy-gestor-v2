@@ -7,5 +7,5 @@ interface PedidoProdutosStepProps {
 }
 
 export function PedidoProdutosStep({ children }: PedidoProdutosStepProps) {
-  return <div className="flex min-h-0 flex-1 flex-col gap-2 py-2">{children}</div>
+  return <div className="flex min-h-0 flex-1 flex-col py-2">{children}</div>
 }

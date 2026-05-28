@@ -1,12 +1,13 @@
 ﻿'use client'
 
+import { DropdownMenu, DropdownMenuItem } from '@/src/presentation/components/ui/dropdown-menu'
 import { Button } from '@/src/presentation/components/ui/button'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { Label } from '@/src/presentation/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/presentation/components/ui/select'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
-import { MdAccessTime, MdArrowBack, MdAttachMoney, MdClear, MdCreditCard, MdDelete, MdDeliveryDining, MdEdit, MdExpandLess, MdExpandMore, MdLaunch, MdPersonOutline, MdQrCode, MdSearch, MdStore } from 'react-icons/md'
+import { MdAccessTime, MdAdd, MdArrowBack, MdAttachMoney, MdClear, MdCreditCard, MdDelete, MdDeliveryDining, MdEdit, MdLaunch, MdMoreVert, MdPersonOutline, MdQrCode, MdRemove, MdSearch, MdStore } from 'react-icons/md'
 import { EntregaClienteSelector } from '../../EntregaClienteSelector'
 import { PedidoInformacoesStep } from './PedidoInformacoesStep'
 import { PedidoPagamentoStep } from './PedidoPagamentoStep'
@@ -41,7 +42,6 @@ export function PedidoWizardStepsView() {
     fluxoPagamentoEntrega,
     grupoSelecionadoId,
     grupos,
-    gruposExpandido,
     gruposScrollRef,
     handleAbrirEdicaoClienteEntrega,
     handleAbrirEdicaoProdutoDetalhes,
@@ -90,7 +90,6 @@ export function PedidoWizardStepsView() {
     setEhPorcentagem,
     setEntregadorId,
     setGrupoSelecionadoId,
-    setGruposExpandido,
     setMeioPagamentoId,
     setFluxoPagamentoEntrega,
     setMoradaEntregaSelecionada,
@@ -220,7 +219,7 @@ export function PedidoWizardStepsView() {
                     <div className="mt-3 grid gap-3 md:grid-cols-3">
                       <div className="rounded-lg border border-primary/15 bg-white p-3">
                         <div className="mb-2 flex items-center gap-2">
-                          <MdAccessTime className="h-4 w-4 text-primary" />
+                          <MdAccessTime className="h-5 w-5 text-primary" />
                           <Label className="text-sm font-semibold text-primary-text">
                             Tempo previsto
                           </Label>
@@ -240,14 +239,11 @@ export function PedidoWizardStepsView() {
                             ))}
                           </SelectContent>
                         </Select>
-                        <p className="mt-1 text-xs text-secondary-text">
-                          Enviado como <code>tempoPrevistoMinutos</code>; o backend calcula a previsão.
-                        </p>
                       </div>
 
                       <div className="rounded-lg border border-primary/15 bg-white p-3">
                         <div className="mb-2 flex items-center gap-2">
-                          <MdDeliveryDining className="h-4 w-4 text-primary" />
+                          <MdDeliveryDining className="h-5 w-5 text-primary" />
                           <Label className="text-sm font-semibold text-primary-text">
                             Entregador
                           </Label>
@@ -281,14 +277,11 @@ export function PedidoWizardStepsView() {
                             ))}
                           </SelectContent>
                         </Select>
-                        <p className="mt-1 text-xs text-secondary-text">
-                          Somente usuários PDV ativos do tipo entregador.
-                        </p>
                       </div>
 
                       <div className="rounded-lg border border-primary/15 bg-white p-3">
                         <div className="mb-2 flex items-center gap-2">
-                          <MdAttachMoney className="h-4 w-4 text-primary" />
+                          <MdAttachMoney className="h-5 w-5 text-primary" />
                           <Label className="text-sm font-semibold text-primary-text">
                             Taxa de entrega
                           </Label>
@@ -320,11 +313,6 @@ export function PedidoWizardStepsView() {
                             ))}
                           </SelectContent>
                         </Select>
-                        <p className="mt-1 text-xs text-secondary-text">
-                          {taxaEntregaSelecionada
-                            ? `Produtos ${transformarParaReal(subtotalProdutos)} + taxa ${transformarParaReal(valorTaxaEntrega)} = ${transformarParaReal(totalProdutos)}.`
-                            : 'Selecione uma taxa cadastrada do tipo entrega.'}
-                        </p>
                       </div>
                     </div>
                     )}
@@ -338,40 +326,15 @@ export function PedidoWizardStepsView() {
               ((tipoInicioPedido !== 'entrega' && currentStep === 1) ||
                 (tipoInicioPedido === 'entrega' && currentStep === 1)) && (
               <PedidoProdutosStep>
-                {/* Campo de pesquisa de produtos */}
-                <div className="flex-shrink-0">
-                  <div className="relative">
-                    <MdSearch className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Pesquisar produto pelo nome..."
-                      value={buscaProdutoTexto}
-                      onChange={(e) => setBuscaProdutoTexto(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                    />
-                    {buscaProdutoTexto.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setBuscaProdutoTexto('')}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        <MdClear className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Área de Edição de Produtos Selecionados: altura fixa quando grupos visíveis, cresce quando grupos ocultos */}
-                <div
-                  className={`scrollbar-thin overflow-y-auto rounded-lg border bg-gray-50 ${
-                    gruposExpandido ? 'h-48 flex-shrink-0' : 'min-h-64 flex-1'
-                  }`}
-                >
+                <div className="flex min-h-0 flex-1 gap-1">
+                  {/* Coluna esquerda: itens do pedido (um pouco mais larga) */}
+                  <div className="flex min-h-0 min-w-0 flex-[3] flex-col gap-2">
+                <div className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto rounded-lg border bg-gray-50">
                   {produtos.length > 0 ? (
                     <div className="p-2">
                       {/* Cabeçalho da tabela */}
                       <div className="mb-2 flex gap-2 border-b border-gray-300 pb-2">
-                        <div className="flex w-[60px] flex-shrink-0 items-center justify-center">
+                        <div className="flex w-[72px] flex-shrink-0 items-center justify-center">
                           <span className="text-center text-xs font-semibold text-gray-700">
                             Qtd
                           </span>
@@ -384,18 +347,18 @@ export function PedidoWizardStepsView() {
                             Desc./Acres.
                           </span>
                         </div>
-                        <div className="flex flex-1 justify-end">
+                        <div className="flex flex-[1.5] justify-end">
                           <span className="text-right text-xs font-semibold text-gray-700">
                             Val Unit.
                           </span>
                         </div>
-                        <div className="flex flex-1 justify-end">
+                        <div className="flex flex-[1.5] justify-end">
                           <span className="text-right text-xs font-semibold text-gray-700">
                             Total
                           </span>
                         </div>
-                        <div className="flex flex-1 justify-end">
-                          <span className="mr-2 text-xs font-semibold text-gray-700">Ações</span>
+                        <div className="flex w-[44px] flex-shrink-0 items-center justify-end">
+                          <span className="text-xs font-semibold text-gray-700">Ações</span>
                         </div>
                       </div>
                       {/* Linhas de produtos */}
@@ -403,6 +366,7 @@ export function PedidoWizardStepsView() {
                         {produtos.map((produto: any, index: number) => {
                           // calcularTotalProduto já inclui complementos e desconto/acréscimo
                           const totalProdutoComComplementos = calcularTotalProduto(produto)
+                          const qtdProdKey = `qtd-prod-${index}`
 
                           return (
                             <div key={index} className="space-y-0">
@@ -448,22 +412,95 @@ export function PedidoWizardStepsView() {
                                 }}
                               >
                                 {/* Quantidade */}
-                                <div className="w-[60px] flex-shrink-0">
+                                <div className="flex w-[72px] flex-shrink-0 items-center justify-center gap-0.5">
+                                  <button
+                                    type="button"
+                                    aria-label="Diminuir quantidade"
+                                    disabled={Math.floor(produto.quantidade) <= 1}
+                                    onClick={e => {
+                                      e.stopPropagation()
+                                      const qtdAtual = Math.floor(produto.quantidade)
+                                      atualizarProduto(index, 'quantidade', Math.max(1, qtdAtual - 1))
+                                      setValoresEmEdicao((prev: Record<string | number, string>) => {
+                                        const next = { ...prev }
+                                        delete next[qtdProdKey]
+                                        return next
+                                      })
+                                    }}
+                                    className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-gray-300 bg-white text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                  >
+                                    <MdRemove className="h-3 w-3" />
+                                  </button>
                                   <input
-                                    type="number"
-                                    min={1}
-                                    value={Math.floor(produto.quantidade)}
+                                    type="text"
+                                    inputMode="numeric"
+                                    aria-label="Quantidade"
+                                    value={
+                                      valoresEmEdicao[qtdProdKey] !== undefined
+                                        ? valoresEmEdicao[qtdProdKey]
+                                        : String(Math.floor(produto.quantidade))
+                                    }
+                                    onClick={e => e.stopPropagation()}
                                     onChange={e => {
-                                      const valor = parseInt(e.target.value) || 1
-                                      atualizarProduto(index, 'quantidade', Math.max(1, valor))
+                                      e.stopPropagation()
+                                      const digits = e.target.value.replace(/\D/g, '')
+                                      setValoresEmEdicao((prev: Record<string | number, string>) => ({
+                                        ...prev,
+                                        [qtdProdKey]: digits,
+                                      }))
+                                      if (digits !== '') {
+                                        const valor = parseInt(digits, 10)
+                                        if (Number.isFinite(valor) && valor >= 1) {
+                                          atualizarProduto(index, 'quantidade', valor)
+                                        }
+                                      }
                                     }}
-                                    style={{
-                                      MozAppearance: 'textfield',
-                                      WebkitAppearance: 'none',
-                                      appearance: 'none',
+                                    onFocus={e => {
+                                      e.stopPropagation()
+                                      setValoresEmEdicao((prev: Record<string | number, string>) => ({
+                                        ...prev,
+                                        [qtdProdKey]: String(Math.floor(produto.quantidade)),
+                                      }))
+                                      setTimeout(() => e.target.select(), 0)
                                     }}
-                                    className="h-7 w-full border-0 bg-transparent p-1 text-center text-xs focus:bg-white focus:ring-1 focus:ring-primary [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                    onBlur={e => {
+                                      e.stopPropagation()
+                                      const digits = e.target.value.replace(/\D/g, '')
+                                      const valor = parseInt(digits, 10)
+                                      const qtdFinal =
+                                        Number.isFinite(valor) && valor >= 1 ? valor : 1
+                                      atualizarProduto(index, 'quantidade', qtdFinal)
+                                      setValoresEmEdicao((prev: Record<string | number, string>) => {
+                                        const next = { ...prev }
+                                        delete next[qtdProdKey]
+                                        return next
+                                      })
+                                    }}
+                                    onKeyDown={e => {
+                                      e.stopPropagation()
+                                      if (e.key === 'Enter') {
+                                        e.currentTarget.blur()
+                                      }
+                                    }}
+                                    className="h-5 w-6 min-w-0 border-0 bg-transparent p-0 text-center text-xs tabular-nums text-gray-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary"
                                   />
+                                  <button
+                                    type="button"
+                                    aria-label="Aumentar quantidade"
+                                    onClick={e => {
+                                      e.stopPropagation()
+                                      const qtdAtual = Math.floor(produto.quantidade)
+                                      atualizarProduto(index, 'quantidade', qtdAtual + 1)
+                                      setValoresEmEdicao((prev: Record<string | number, string>) => {
+                                        const next = { ...prev }
+                                        delete next[qtdProdKey]
+                                        return next
+                                      })
+                                    }}
+                                    className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-gray-300 bg-white text-gray-600 transition-colors hover:bg-gray-100"
+                                  >
+                                    <MdAdd className="h-3 w-3" />
+                                  </button>
                                 </div>
                                 {/* Nome do Produto */}
                                 <div className="min-w-0 flex-[4]">
@@ -478,7 +515,7 @@ export function PedidoWizardStepsView() {
                                   </span>
                                 </div>
                                 {/* Valor Unitário */}
-                                <div className="flex-1">
+                                <div className="flex-[1.5]">
                                   <input
                                     type="text"
                                     value={
@@ -578,56 +615,63 @@ export function PedidoWizardStepsView() {
                                   />
                                 </div>
                                 {/* Total */}
-                                <div className="flex-1">
+                                <div className="flex-[1.5]">
                                   <span className="block text-right text-xs font-semibold text-gray-900">
                                     R$ {formatarNumeroComMilhar(totalProdutoComComplementos)}
                                   </span>
                                 </div>
-                                {/* Ações: colunas fixas (editar | complementos | excluir) */}
+                                {/* Ações: menu compacto + remover */}
                                 <div
-                                  className="flex w-[76px] flex-shrink-0 items-center justify-end gap-0"
+                                  className="flex w-[44px] shrink-0 items-center justify-end gap-0"
                                   role="group"
                                   aria-label="Ações do produto"
+                                  onClick={e => e.stopPropagation()}
+                                  onMouseDown={e => e.stopPropagation()}
                                 >
-                                  <div className="flex h-6 w-6 shrink-0 items-center justify-center">
-                                    <button
+                                  <DropdownMenu
+                                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                                    transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                                    trigger={
+                                      <button
+                                        type="button"
+                                        aria-label="Mais ações do produto"
+                                        className="flex h-5 w-4 shrink-0 items-center justify-center rounded border-0 p-0 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-700"
+                                      >
+                                        <MdMoreVert className="h-4 w-4" />
+                                      </button>
+                                    }
+                                  >
+                                    <DropdownMenuItem
+                                      icon={<MdEdit className="h-4 w-4 text-primary" />}
                                       onClick={() => void abrirModalEdicaoProduto(index)}
-                                      type="button"
-                                      title="Editar produto"
-                                      className="flex h-5 w-5 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-gray-200"
                                     >
-                                      <MdEdit className="h-4 w-4 text-primary" />
-                                    </button>
-                                  </div>
-                                  <div className="flex h-6 w-6 shrink-0 items-center justify-center">
-                                    <button
+                                      <span className="text-xs">Editar produto</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      icon={<MdLaunch className="h-4 w-4 text-primary" />}
                                       onClick={() =>
                                         void abrirModalComplementosProdutoExistente(index)
                                       }
-                                      type="button"
-                                      className="flex h-5 w-5 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-gray-200"
-                                      title="Complementos (editar ou vincular)"
                                     >
-                                      <MdLaunch className="h-4 w-4 text-primary" />
-                                    </button>
-                                  </div>
-                                  <div className="flex h-5 w-5 shrink-0 items-center justify-center">
-                                    <button
-                                      onClick={() => removerProduto(index)}
-                                      type="button"
-                                      title="Remover produto"
-                                      className="flex h-6 w-6 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-red-100"
-                                    >
-                                      <MdDelete className="h-4 w-4 text-red-500" />
-                                    </button>
-                                  </div>
+                                      <span className="text-xs">Editar complementos</span>
+                                    </DropdownMenuItem>
+                                  </DropdownMenu>
+                                  <button
+                                    onClick={() => removerProduto(index)}
+                                    type="button"
+                                    title="Remover produto"
+                                    aria-label="Remover produto"
+                                    className="flex h-4 w-4 shrink-0 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-red-100"
+                                  >
+                                    <MdDelete className="h-4 w-4 text-red-500" />
+                                  </button>
                                 </div>
                               </div>
 
                               {/* Linhas dos Complementos */}
                               {produto.complementos.map((complemento: any, compIndex: number) => {
                                 const compKey = `comp-${index}-${complemento.grupoId}-${complemento.id}`
-                                const valorEmEdicao = valoresEmEdicao[compKey]
+                                const qtdCompKey = `qtd-${compKey}`
 
                                 return (
                                   <div
@@ -673,27 +717,115 @@ export function PedidoWizardStepsView() {
                                     }}
                                   >
                                     {/* Quantidade do Complemento */}
-                                    <div className="w-[60px] flex-shrink-0 pl-4">
-                                      <input
-                                        type="number"
-                                        min={1}
-                                        value={complemento.quantidade}
-                                        onChange={e => {
-                                          const valor = parseInt(e.target.value) || 1
+                                    <div className="flex w-[72px] flex-shrink-0 items-center justify-center gap-0.5 pl-2">
+                                      <button
+                                        type="button"
+                                        aria-label="Diminuir quantidade do complemento"
+                                        disabled={Math.floor(complemento.quantidade) <= 1}
+                                        onClick={e => {
+                                          e.stopPropagation()
+                                          const qtdAtual = Math.floor(complemento.quantidade)
                                           atualizarComplemento(
                                             index,
                                             compIndex,
                                             'quantidade',
-                                            Math.max(1, valor)
+                                            Math.max(1, qtdAtual - 1)
                                           )
+                                          setValoresEmEdicao((prev: Record<string | number, string>) => {
+                                            const next = { ...prev }
+                                            delete next[qtdCompKey]
+                                            return next
+                                          })
                                         }}
-                                        style={{
-                                          MozAppearance: 'textfield',
-                                          WebkitAppearance: 'none',
-                                          appearance: 'none',
+                                        className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-gray-300 bg-white text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                      >
+                                        <MdRemove className="h-3 w-3" />
+                                      </button>
+                                      <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        aria-label="Quantidade do complemento"
+                                        value={
+                                          valoresEmEdicao[qtdCompKey] !== undefined
+                                            ? valoresEmEdicao[qtdCompKey]
+                                            : String(Math.floor(complemento.quantidade))
+                                        }
+                                        onClick={e => e.stopPropagation()}
+                                        onChange={e => {
+                                          e.stopPropagation()
+                                          const digits = e.target.value.replace(/\D/g, '')
+                                          setValoresEmEdicao((prev: Record<string | number, string>) => ({
+                                            ...prev,
+                                            [qtdCompKey]: digits,
+                                          }))
+                                          if (digits !== '') {
+                                            const valor = parseInt(digits, 10)
+                                            if (Number.isFinite(valor) && valor >= 1) {
+                                              atualizarComplemento(
+                                                index,
+                                                compIndex,
+                                                'quantidade',
+                                                valor
+                                              )
+                                            }
+                                          }
                                         }}
-                                        className="h-5 w-full border-0 bg-transparent px-1 text-right text-xs focus:bg-white focus:ring-1 focus:ring-primary [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                        onFocus={e => {
+                                          e.stopPropagation()
+                                          setValoresEmEdicao((prev: Record<string | number, string>) => ({
+                                            ...prev,
+                                            [qtdCompKey]: String(Math.floor(complemento.quantidade)),
+                                          }))
+                                          setTimeout(() => e.target.select(), 0)
+                                        }}
+                                        onBlur={e => {
+                                          e.stopPropagation()
+                                          const digits = e.target.value.replace(/\D/g, '')
+                                          const valor = parseInt(digits, 10)
+                                          const qtdFinal =
+                                            Number.isFinite(valor) && valor >= 1 ? valor : 1
+                                          atualizarComplemento(
+                                            index,
+                                            compIndex,
+                                            'quantidade',
+                                            qtdFinal
+                                          )
+                                          setValoresEmEdicao((prev: Record<string | number, string>) => {
+                                            const next = { ...prev }
+                                            delete next[qtdCompKey]
+                                            return next
+                                          })
+                                        }}
+                                        onKeyDown={e => {
+                                          e.stopPropagation()
+                                          if (e.key === 'Enter') {
+                                            e.currentTarget.blur()
+                                          }
+                                        }}
+                                        className="h-5 w-6 min-w-0 border-0 bg-transparent p-0 text-center text-xs tabular-nums text-gray-600 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary"
                                       />
+                                      <button
+                                        type="button"
+                                        aria-label="Aumentar quantidade do complemento"
+                                        onClick={e => {
+                                          e.stopPropagation()
+                                          const qtdAtual = Math.floor(complemento.quantidade)
+                                          atualizarComplemento(
+                                            index,
+                                            compIndex,
+                                            'quantidade',
+                                            qtdAtual + 1
+                                          )
+                                          setValoresEmEdicao((prev: Record<string | number, string>) => {
+                                            const next = { ...prev }
+                                            delete next[qtdCompKey]
+                                            return next
+                                          })
+                                        }}
+                                        className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-gray-300 bg-white text-gray-600 transition-colors hover:bg-gray-100"
+                                      >
+                                        <MdAdd className="h-3 w-3" />
+                                      </button>
                                     </div>
                                     {/* Nome do Complemento com indentação */}
                                     <div className="min-w-0 flex-[4] pl-4">
@@ -704,7 +836,7 @@ export function PedidoWizardStepsView() {
                                     {/* Espaço vazio para Desconto/Acréscimo (complementos não têm) */}
                                     <div className="flex-1"></div>
                                     {/* Valor Unitário do Complemento - Apenas exibição */}
-                                    <div className="flex-1">
+                                    <div className="flex-[1.5]">
                                       <span className="block text-right text-xs leading-tight text-gray-600">
                                         {formatarValorComplemento(
                                           complemento.valor,
@@ -713,21 +845,23 @@ export function PedidoWizardStepsView() {
                                       </span>
                                     </div>
                                     {/* Espaço vazio onde seria o Total (complementos não têm total próprio) */}
-                                    <div className="flex-1"></div>
-                                    {/* Mesma grade de ações da linha do produto: remove alinhado à coluna Exc. */}
-                                    <div className="flex w-[76px] flex-shrink-0 items-center justify-end gap-0.5">
-                                      <span className="block h-6 w-6 shrink-0" aria-hidden />
-                                      <span className="block h-6 w-6 shrink-0" aria-hidden />
-                                      <div className="flex h-6 w-6 shrink-0 items-center justify-center">
-                                        <button
-                                          onClick={() => removerComplemento(index, compIndex)}
-                                          type="button"
-                                          title="Remover complemento"
-                                          className="flex h-6 w-6 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-red-50"
-                                        >
-                                          <MdClear className="h-3.5 w-3.5 text-red-500" />
-                                        </button>
-                                      </div>
+                                    <div className="flex-[1.5]"></div>
+                                    {/* Ações: alinhado à coluna do produto (espaço do menu + remover) */}
+                                    <div
+                                      className="flex w-[44px] shrink-0 items-center justify-end gap-0"
+                                      onClick={e => e.stopPropagation()}
+                                      onMouseDown={e => e.stopPropagation()}
+                                    >
+                                      <span className="block h-5 w-5 shrink-0" aria-hidden />
+                                      <button
+                                        onClick={() => removerComplemento(index, compIndex)}
+                                        type="button"
+                                        title="Remover complemento"
+                                        aria-label="Remover complemento"
+                                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-red-50"
+                                      >
+                                        <MdClear className="h-3.5 w-3.5 text-red-500" />
+                                      </button>
                                     </div>
                                   </div>
                                 )
@@ -744,57 +878,66 @@ export function PedidoWizardStepsView() {
                   )}
                 </div>
 
-                {/* Total do Pedido */}
-                <div className="flex flex-shrink-0 items-center justify-end gap-2">
+                <div className="flex shrink-0 items-center justify-end gap-2 border-t border-gray-200 bg-white px-2 py-2">
                   <span className="text-sm font-semibold text-gray-700">Total do Pedido:</span>
                   <span className="text-lg font-semibold text-primary">
                     {transformarParaReal(totalProdutos)}
                   </span>
                 </div>
+                  </div>
 
-                {/* Seção recolhível: Grupos de produtos — ao ocultar, a área de produtos selecionados acima ganha mais altura */}
-                <div className="flex-shrink-0 overflow-hidden rounded-lg border bg-gray-50">
-                  <button
-                    type="button"
-                    onClick={() => setGruposExpandido(!gruposExpandido)}
-                    className="flex w-full items-center justify-between gap-2 border-b border-gray-200/50 px-3 py-2 text-left transition-colors hover:bg-gray-100/80"
-                    aria-expanded={gruposExpandido}
-                  >
-                    <span className="text-sm font-semibold text-gray-700">Grupos de produtos</span>
-                    <span className="ml-auto flex items-center gap-2">
-                      {gruposExpandido ? (
-                        <>
-                          <span className="text-xs text-gray-500">Ocultar</span>
-                          <MdExpandLess className="h-5 w-5 flex-shrink-0 text-gray-600" />
-                        </>
-                      ) : (
-                        <>
-                          <span className="text-xs text-gray-500">Mostrar grupos</span>
-                          <MdExpandMore className="h-5 w-5 flex-shrink-0 text-gray-600" />
-                        </>
-                      )}
-                    </span>
-                  </button>
-                  {gruposExpandido && (
-                    <div className="space-y-2 px-3 pb-3 pt-1">
+                  {/* Coluna direita: busca + catálogo (grupos e produtos) */}
+                  <div className="flex min-h-0 min-w-0 flex-[2] flex-col gap-2">
+                <div className="shrink-0">
+                  <div className="relative">
+                    <MdSearch className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Pesquisar produto pelo nome..."
+                      value={buscaProdutoTexto}
+                      onChange={(e) => setBuscaProdutoTexto(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                    {buscaProdutoTexto.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setBuscaProdutoTexto('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        <MdClear className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-gray-50">
+                  <div className="flex w-full items-center gap-2 border-b border-gray-200/50 px-3 py-2">
+                    {grupoSelecionadoId && (
+                      <Button
+                        variant="outlined"
+                        size="sm"
+                        onClick={() => setGrupoSelecionadoId(null)}
+                        type="button"
+                        aria-label="Voltar aos grupos"
+                        className="flex h-7 min-h-[28px] min-w-[28px] shrink-0 items-center justify-center p-0"
+                        sx={{
+                          borderColor: 'var(--color-primary)',
+                          padding: '2px 2px',
+                          color: 'var(--color-primary)',
+                        }}
+                      >
+                        <MdArrowBack className="h-4 w-4 text-primary" />Voltar
+                      </Button>
+                    )}
+                    <span className="text-sm font-semibold text-primary">Grupos de produtos</span>
+                  </div>
+                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 pb-3 pt-1">
                       {/* Grid ou Lista Horizontal de Grupos - Ocultar durante busca */}
                       {buscaProdutoTexto.length < 2 && (
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            {!grupoSelecionadoId ? (
-                              <Label className="text-sm text-gray-600">Selecione um grupo:</Label>
-                            ) : (
-                              <Button
-                                variant="outlined"
-                                size="sm"
-                                onClick={() => setGrupoSelecionadoId(null)}
-                                type="button"
-                                className="flex h-7 min-h-[28px] min-w-[28px] items-center justify-center p-0"
-                              >
-                                <MdArrowBack className="h-4 w-4" /> Voltar aos grupos
-                              </Button>
-                            )}
-                          </div>
+                        <div className="shrink-0 space-y-2">
+                          {!grupoSelecionadoId && (
+                            <Label className="text-sm text-gray-600">Selecione um grupo:</Label>
+                          )}
                           {isLoadingGruposVenda ? (
                             <div className="py-4 text-center text-gray-500">
                               <JiffyLoading />
@@ -805,7 +948,7 @@ export function PedidoWizardStepsView() {
                             </div>
                           ) : !grupoSelecionadoId ? (
                             // Grid de Grupos (quando nenhum grupo está selecionado)
-                            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
+                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                               {grupos.map((grupo: any) => {
                                 const corHex = grupo.getCorHex()
                                 const iconName = grupo.getIconName()
@@ -813,21 +956,16 @@ export function PedidoWizardStepsView() {
                                   <div key={grupo.getId()} className="relative">
                                     <button
                                       onClick={() => setGrupoSelecionadoId(grupo.getId())}
-                                      className="flex aspect-square w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border-2 p-2 text-center transition-all hover:opacity-80"
+                                      className="flex aspect-square w-full min-w-0 flex-col items-center justify-start gap-1 overflow-hidden rounded-lg border-2 p-1.5 pt-2 text-center transition-all hover:opacity-80"
                                       style={{
                                         borderColor: corHex,
                                         backgroundColor: `${corHex}15`,
                                       }}
                                     >
-                                      <div
-                                        className="flex h-[40px] w-[40px] flex-shrink-0 items-center justify-center"
-                                        style={{
-                                          borderColor: corHex,
-                                        }}
-                                      >
-                                        <DinamicIcon iconName={iconName} color={corHex} size={34} />
+                                      <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center">
+                                        <DinamicIcon iconName={iconName} color={corHex} size={26} />
                                       </div>
-                                      <div className="line-clamp-2 w-full overflow-hidden text-ellipsis px-1 text-[10px] font-medium text-gray-900">
+                                      <div className="line-clamp-2 min-h-0 w-full flex-1 px-0.5 text-[10px] font-medium leading-tight text-gray-900">
                                         {grupo.getNome()}
                                       </div>
                                     </button>
@@ -836,10 +974,10 @@ export function PedidoWizardStepsView() {
                               })}
                             </div>
                           ) : (
-                            // Lista Horizontal de Grupos (quando um grupo está selecionado)
+                            // Lista horizontal com 2 linhas de grupos (após escolher um grupo)
                             <div
                               ref={gruposScrollRef}
-                              className="scrollbar-thin flex cursor-grab select-none gap-3 overflow-x-auto pb-2 active:cursor-grabbing"
+                              className="scrollbar-thin grid auto-cols-[5rem] grid-flow-col grid-rows-[5rem_5rem] gap-x-1 gap-y-1.5 cursor-grab select-none overflow-x-auto pb-2 active:cursor-grabbing"
                               style={{ scrollbarWidth: 'thin' }}
                               onMouseDown={handleMouseDown}
                               onMouseMove={handleMouseMove}
@@ -851,37 +989,33 @@ export function PedidoWizardStepsView() {
                                 const iconName = grupo.getIconName()
                                 const isSelected = grupoSelecionadoId === grupo.getId()
                                 return (
-                                  <div
-                                    key={grupo.getId()}
-                                    className="relative flex-shrink-0"
-                                    style={{ width: '100px' }}
-                                  >
+                                  <div key={grupo.getId()} className="relative h-[5rem] min-w-0">
                                     <button
-                                      onClick={e => {
-                                        // Só executar o clique se não houve movimento significativo durante o arraste
+                                      type="button"
+                                      onClick={() => {
                                         if (!hasMovedRef.current && !isDragging) {
                                           setGrupoSelecionadoId(grupo.getId())
                                         }
                                       }}
-                                      onMouseDown={e => {
-                                        // Permitir que o evento propague para o container para iniciar o arraste
-                                        // O onClick só será executado se não houver movimento
-                                      }}
-                                      className="pointer-events-auto flex aspect-square h-full w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border-2 p-2 text-center transition-all"
+                                      className="pointer-events-auto flex h-[5rem] w-[5rem] flex-col items-center justify-start gap-0.5 overflow-hidden rounded-lg border-2 p-1 pt-1.5 text-center transition-all"
                                       style={{
                                         borderColor: corHex,
                                         backgroundColor: isSelected ? corHex : `${corHex}15`,
                                         color: isSelected ? '#ffffff' : '#1f2937',
                                       }}
                                     >
-                                      <div className="flex h-[40px] w-[40px] flex-shrink-0 items-center justify-center">
+                                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center">
                                         <DinamicIcon
                                           iconName={iconName}
                                           color={isSelected ? '#ffffff' : corHex}
-                                          size={34}
+                                          size={26}
                                         />
                                       </div>
-                                      <div className="line-clamp-2 w-full overflow-hidden text-ellipsis px-1 text-[10px] font-medium">
+                                      <div
+                                        className={`line-clamp-2 min-h-0 w-full flex-1 px-0.5 text-[10px] font-medium leading-tight ${
+                                          isSelected ? 'text-white' : 'text-gray-900'
+                                        }`}
+                                      >
                                         {grupo.getNome()}
                                       </div>
                                     </button>
@@ -910,8 +1044,8 @@ export function PedidoWizardStepsView() {
                               : isLoadingProdutos
 
                           return (
-                            <div className="space-y-2">
-                              <Label className="text-sm text-gray-600">
+                            <div className="flex min-h-0 flex-1 flex-col space-y-2">
+                              <Label className="shrink-0 text-sm text-gray-600">
                                 {tituloGrade}
                                 {buscaProdutoTexto.length < 2 && (
                                   <span className="font-semibold">{grupoSelecionado?.getNome()}</span>
@@ -934,7 +1068,7 @@ export function PedidoWizardStepsView() {
                                 </div>
                               ) : (
                                 <div
-                                  className="grid max-h-60 grid-cols-3 gap-2 overflow-y-auto rounded-lg border p-2 sm:grid-cols-4 md:grid-cols-7"
+                                  className="scrollbar-thin grid min-h-0 flex-1 auto-rows-min grid-cols-3 content-start gap-2 overflow-y-auto rounded-lg border p-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4"
                                   style={{
                                     backgroundColor: `${corHexGrupo}15`,
                                   }}
@@ -973,8 +1107,9 @@ export function PedidoWizardStepsView() {
                             </div>
                           )
                         })()}
-                    </div>
-                  )}
+                  </div>
+                </div>
+                  </div>
                 </div>
               </PedidoProdutosStep>
             )}
@@ -986,27 +1121,29 @@ export function PedidoWizardStepsView() {
                 <div className="rounded-lg border bg-gray-50 px-4">
                   <div className="flex items-center justify-between gap-3">
                     <h3 className="text-lg font-semibold">Informações do Pedido</h3>
-                    <Button
-                      type="button"
-                      variant="outlined"
-                      size="sm"
-                      onClick={() => setSeletorClienteOpen(true)}
-                      className="h-6 shrink-0 px-1 text-xs font-semibold text-white"
-                      sx={{
-                        backgroundColor: 'var(--color-primary)',
-                        borderColor: 'var(--color-primary)',
-                        color: '#fff',
-                        padding: '4px',
-                        '&:hover': {
+                    {tipoInicioPedido !== 'entrega' && (
+                      <Button
+                        type="button"
+                        variant="outlined"
+                        size="sm"
+                        onClick={() => setSeletorClienteOpen(true)}
+                        className="h-6 shrink-0 px-1 text-xs font-semibold text-white"
+                        sx={{
                           backgroundColor: 'var(--color-primary)',
                           borderColor: 'var(--color-primary)',
-                          opacity: 0.9,
-                        },
-                      }}
-                    >
-                      <MdPersonOutline className="mr-1 h-4 w-4 text-white" />
-                      {nomeClienteResumo ? 'Alterar Cliente' : 'Vincular Cliente'}
-                    </Button>
+                          color: '#fff',
+                          padding: '4px',
+                          '&:hover': {
+                            backgroundColor: 'var(--color-primary)',
+                            borderColor: 'var(--color-primary)',
+                            opacity: 0.9,
+                          },
+                        }}
+                      >
+                        <MdPersonOutline className="mr-1 h-4 w-4 text-white" />
+                        {nomeClienteResumo ? 'Alterar Cliente' : 'Vincular Cliente'}
+                      </Button>
+                    )}
                   </div>
                   <div className="text-sm">
                     <div className="flex justify-between rounded-lg bg-white px-1">
@@ -1219,7 +1356,7 @@ export function PedidoWizardStepsView() {
                       <div className="border-t pt-2 text-sm">
                         <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
                           <span className="font-semibold text-gray-700">
-                            Total Recebido (Efetivo):
+                            Total Recebido{tipoInicioPedido === 'entrega' ? ' (Efetivo)' : ''}:
                           </span>
                           <span className="text-base font-semibold text-green-700">
                             {transformarParaReal(totalPagamentos)}

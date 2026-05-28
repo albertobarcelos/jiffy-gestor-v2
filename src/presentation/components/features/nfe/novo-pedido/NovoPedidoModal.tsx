@@ -138,8 +138,6 @@ export function NovoPedidoModal({
     useState<TipoAtendimentoDelivery>('entrega')
   const [grupoSelecionadoId, setGrupoSelecionadoId] = useState<string | null>(null)
   const [buscaProdutoTexto, setBuscaProdutoTexto] = useState<string>('')
-  // Lista de grupos recolhível no passo 2: quando oculta, a área de produtos selecionados aumenta
-  const [gruposExpandido, setGruposExpandido] = useState(true)
   const [seletorClienteOpen, setSeletorClienteOpen] = useState(false)
   const [tooltipGrupoId, setTooltipGrupoId] = useState<string | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null)
@@ -2570,7 +2568,6 @@ export function NovoPedidoModal({
     formatarValorRecebido,
     grupoSelecionadoId,
     grupos,
-    gruposExpandido,
     gruposScrollRef,
     handleAbrirEdicaoClienteEntrega,
     handleAbrirEdicaoProdutoDetalhes,
@@ -2653,7 +2650,6 @@ export function NovoPedidoModal({
     setEntregadorId,
     setFluxoPagamentoEntrega,
     setGrupoSelecionadoId,
-    setGruposExpandido,
     setMeioPagamentoId,
     setIndiceLinhaPainelProduto,
     setJustificativaCancelamento,
@@ -2756,10 +2752,16 @@ export function NovoPedidoModal({
             maxHeight: '100vh',
             margin: 0,
             marginLeft: 'auto',
-            // Mesma escala de largura que `GruposComplementosTabsModal` (panelClassName responsivo)
-            width: { xs: '95vw', sm: '90vw', md: 'min(900px, 45vw)' },
+            width: estaNoPassoProdutos
+              ? { xs: '95vw', sm: '90vw', md: 'min(1000px, 65vw)' }
+              : { xs: '95vw', sm: '90vw', md: '45vw' },
             maxWidth: '100vw',
-            borderRadius: 0,
+            borderTopLeftRadius: '0.75rem',
+            borderBottomLeftRadius: '0.75rem',
+            borderTopRightRadius: 0,
+            borderBottomRightRadius: 0,
+            overflow: 'hidden',
+            transition: 'width 0.25s ease',
           },
         }}
       >
@@ -2798,7 +2800,7 @@ export function NovoPedidoModal({
               padding: '0 24px',
               minHeight: 0,
             }}
-            className="scrollbar-thin"
+            className="scrollbar-thin flex min-h-0 flex-1 flex-col"
           >
             {/* Loading em modo visualização - não mostrar steps até carregar */}
             {modoVisualizacao && isLoadingVenda && (

@@ -152,9 +152,27 @@ export interface DropdownMenuItemProps extends React.ComponentPropsWithoutRef<ty
 }
 
 export const DropdownMenuItem = React.forwardRef<HTMLLIElement, DropdownMenuItemProps>(
-  ({ icon, children, ...props }, ref) => {
+  ({ icon, children, onClick, ...props }, ref) => {
+    const context = React.useContext(DropdownMenuContext)
+
+    const handleClick = (event: React.MouseEvent<HTMLLIElement>) => {
+      event.stopPropagation()
+
+      if (context) {
+        context.onClose()
+        if (onClick) {
+          window.setTimeout(() => {
+            onClick(event)
+          }, 120)
+        }
+        return
+      }
+
+      onClick?.(event)
+    }
+
     return (
-      <MuiMenuItem ref={ref} {...props}>
+      <MuiMenuItem ref={ref} onClick={handleClick} {...props}>
         {icon && <ListItemIcon>{icon}</ListItemIcon>}
         <ListItemText>{children}</ListItemText>
       </MuiMenuItem>

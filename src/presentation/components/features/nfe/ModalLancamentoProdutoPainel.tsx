@@ -391,18 +391,6 @@ export function ModalLancamentoProdutoPainel({
             <div className="min-w-0 border-r border-gray-200">
               <Button
                 type="button"
-                variant="contained"
-                color="primary"
-                onClick={handleConfirmar}
-                className="h-12 min-h-12 w-full font-semibold shadow-none"
-                sx={footerSavePrimaryBarSx(true)}
-              >
-                Confirmar
-              </Button>
-            </div>
-            <div className="min-w-0">
-              <Button
-                type="button"
                 variant="outlined"
                 color="inherit"
                 onClick={() => onOpenChange(false)}
@@ -410,6 +398,18 @@ export function ModalLancamentoProdutoPainel({
                 sx={footerBarPrimaryMutedSx(false)}
               >
                 Cancelar
+              </Button>
+            </div>
+            <div className="min-w-0">
+              <Button
+                type="button"
+                variant="contained"
+                color="primary"
+                onClick={handleConfirmar}
+                className="h-12 min-h-12 w-full font-semibold shadow-none"
+                sx={footerSavePrimaryBarSx(true)}
+              >
+                Confirmar
               </Button>
             </div>
           </div>

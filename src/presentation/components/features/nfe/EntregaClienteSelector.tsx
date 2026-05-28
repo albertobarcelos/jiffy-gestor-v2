@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { MdSearch, MdAddLocation, MdEdit, MdLocationOn, MdPhone, MdPerson, MdCheckCircle } from 'react-icons/md'
 import { Button } from '@/src/presentation/components/ui/button'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { Label } from '@/src/presentation/components/ui/label'
 import { showToast } from '@/src/shared/utils/toast'
 import {
@@ -505,23 +506,20 @@ export function EntregaClienteSelector({
               <input
                 type="text"
                 value={
-                  buscandoCliente
-                    ? 'Buscando cliente...'
-                    : clienteVinculado
-                      ? clienteVinculado.nome
-                      : nomeDigitado
+                  clienteVinculado
+                    ? clienteVinculado.nome
+                    : nomeDigitado
                 }
                 onChange={e => {
-                  if (buscandoCliente) return
                   if (clienteVinculado) {
                     onClienteVinculado(null)
                     setClienteNaoEncontrado(false)
                   }
                   setNomeDigitado(e.target.value)
                 }}
-                readOnly={!!clienteVinculado || buscandoCliente}
+                readOnly={!!clienteVinculado}
                 placeholder="Ex.: João Silva"
-                autoFocus={!buscandoCliente}
+                autoFocus
                 title={
                   clienteVinculado?.id
                     ? 'Clique para editar o cadastro do cliente.'
@@ -530,8 +528,6 @@ export function EntregaClienteSelector({
                 className={`w-full rounded-md border py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-0 ${
                   clienteVinculado
                     ? 'cursor-pointer select-none border-green-400 bg-green-50 text-green-800'
-                    : buscandoCliente
-                      ? 'cursor-wait border-primary/30 bg-gray-50 text-secondary-text'
                     : 'border-primary/30 bg-white'
                 }`}
                 onMouseDown={e => {
@@ -557,9 +553,6 @@ export function EntregaClienteSelector({
                   }
                 }}
               />
-              {buscandoCliente && (
-                <span className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              )}
             </div>
             {clienteVinculado && (
               <p className="mt-1 flex items-center gap-1 text-xs text-green-700">
@@ -568,11 +561,11 @@ export function EntregaClienteSelector({
               </p>
             )}
             {clienteNaoEncontrado && !clienteVinculado && (
-              <p className="mt-1 text-xs text-amber-600">
+              <p className="mt-1 text-xs text-secondary">
                 Cliente não encontrado.{' '}
                 <button
                   type="button"
-                  className="font-semibold text-primary underline"
+                  className="font-semibold text-secondary underline"
                   onClick={handleAbrirPainelCliente}
                 >
                   Cadastrar
@@ -622,7 +615,7 @@ export function EntregaClienteSelector({
               title="Buscar cliente e endereços"
             >
               {buscando || buscandoCliente ? (
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                <JiffyLoading size={20} className="gap-0 py-0" />
               ) : (
                 <MdSearch className="h-4 w-4 text-primary" />
               )}
