@@ -58,11 +58,21 @@ export function useHorizontalDragScroll<T extends HTMLElement>() {
     // O movimento real é tratado pelos listeners globais.
   }, [])
 
+  /** Roda do mouse (eixo Y) desloca a faixa horizontal quando há overflow. */
+  const handleWheel = useCallback((event: React.WheelEvent<T>) => {
+    const el = scrollRef.current
+    if (!el || el.scrollWidth <= el.clientWidth) return
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return
+    el.scrollLeft += event.deltaY
+    event.preventDefault()
+  }, [])
+
   return {
     scrollRef,
     isDragging,
     hasMovedRef,
     handleMouseDown,
+    handleWheel,
     handleMouseMove: noopMouseHandler,
     handleMouseUp: noopMouseHandler,
     handleMouseLeave: noopMouseHandler,

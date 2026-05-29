@@ -12,6 +12,7 @@ interface NovoPedidoHeaderProps {
   abaDetalhesPedido: AbaDetalhesPedido
   onAbaDetalhesPedidoChange: (aba: AbaDetalhesPedido) => void
   podeExibirAbaNotaFiscal: boolean
+  podeExibirAbaDadosEntrega: boolean
 }
 
 export function NovoPedidoHeader({
@@ -22,6 +23,7 @@ export function NovoPedidoHeader({
   abaDetalhesPedido,
   onAbaDetalhesPedidoChange,
   podeExibirAbaNotaFiscal,
+  podeExibirAbaDadosEntrega,
 }: NovoPedidoHeaderProps) {
   const deveMostrarAbas = currentStep === 4 && !isLoadingVenda
 
@@ -46,6 +48,7 @@ export function NovoPedidoHeader({
           abaSelecionada={abaDetalhesPedido}
           onAbaChange={onAbaDetalhesPedidoChange}
           podeExibirAbaNotaFiscal={podeExibirAbaNotaFiscal}
+          podeExibirAbaDadosEntrega={podeExibirAbaDadosEntrega}
         />
       )}
     </div>

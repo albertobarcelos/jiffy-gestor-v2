@@ -73,6 +73,12 @@ import {
   statusFiscalPermiteCancelarNota,
 } from './novoPedidoFiscalHelpers'
 import {
+  mapDetalhesEntregaFromVendaApi,
+  mergeClienteDetalhesEntrega,
+  resolverTaxaEntregaDetalhe,
+  taxaEntregaTemValor,
+} from './novoPedidoDetalheHelpers'
+import {
   getUltimoEntregadorSelecionado,
   statusPadraoNovoPedido,
 } from './novoPedidoTextHelpers'
@@ -195,6 +201,8 @@ export function NovoPedidoModal({
     setAbaDetalhesPedido,
     detalhesPedidoMeta,
     setDetalhesPedidoMeta,
+    detalhesEntregaPedido,
+    setDetalhesEntregaPedido,
     nomesUsuariosPedido,
     setNomesUsuariosPedido,
     nomesMeiosPagamentoPedido,
@@ -253,11 +261,25 @@ export function NovoPedidoModal({
     origemTextoApiDetalhe,
   ])
 
+  const podeExibirAbaDadosEntrega = useMemo(() => {
+    if (!modoVisualizacao) return false
+    const tipo = String(detalhesPedidoMeta?.tipoVenda ?? '')
+      .trim()
+      .toLowerCase()
+    return tipo === 'entrega'
+  }, [modoVisualizacao, detalhesPedidoMeta?.tipoVenda])
+
   useEffect(() => {
     if (currentStep === 4 && abaDetalhesPedido === 'notaFiscal' && !podeExibirAbaNotaFiscal) {
       setAbaDetalhesPedido('infoPedido')
     }
-  }, [currentStep, abaDetalhesPedido, podeExibirAbaNotaFiscal])
+  }, [currentStep, abaDetalhesPedido, podeExibirAbaNotaFiscal, setAbaDetalhesPedido])
+
+  useEffect(() => {
+    if (currentStep === 4 && abaDetalhesPedido === 'dadosEntrega' && !podeExibirAbaDadosEntrega) {
+      setAbaDetalhesPedido('infoPedido')
+    }
+  }, [currentStep, abaDetalhesPedido, podeExibirAbaDadosEntrega, setAbaDetalhesPedido])
 
   // Estado para controlar valores em edição (índice do produto ou chave do complemento -> valor string)
   const [valoresEmEdicao, setValoresEmEdicao] = useState<Record<string | number, string>>({})
@@ -291,6 +313,7 @@ export function NovoPedidoModal({
     isDragging,
     hasMovedRef,
     handleMouseDown,
+    handleWheel: handleGruposWheel,
     handleMouseMove,
     handleMouseUp,
     handleMouseLeave,
@@ -574,7 +597,7 @@ export function NovoPedidoModal({
         }))
         .filter((item: UsuarioPdvEntregadorOption) => item.id && item.nome)
     },
-    enabled: open && !modoVisualizacao && pedidoComEntrega,
+    enabled: open && (pedidoComEntrega || Boolean(modoVisualizacao)),
     staleTime: 1000 * 60 * 5,
     retry: 1,
     refetchOnWindowFocus: false,
@@ -1653,6 +1676,7 @@ export function NovoPedidoModal({
     setOrigemTextoApiDetalhe(null)
     setStatusVendaTextoApiDetalhe(null)
     setDetalhesPedidoMeta(null)
+    setDetalhesEntregaPedido(null)
     setNomesUsuariosPedido({})
     setNomesMeiosPagamentoPedido({})
     setResumoFinanceiroDetalhes(null)
@@ -1877,23 +1901,83 @@ export function NovoPedidoModal({
           setStatus('ABERTA')
         }
 
-        // Cliente
-        if (vendaData.clienteId) {
-          setClienteId(vendaData.clienteId)
-          // Buscar nome do cliente
-          try {
-            const clienteResponse = await fetch(`/api/clientes/${vendaData.clienteId}`, {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
-            })
-            if (clienteResponse.ok) {
-              const clienteData = await clienteResponse.json()
-              setClienteNome(clienteData.nome || clienteData.name || '')
+        const tipoVendaCarregada = String(vendaData.tipoVenda ?? '')
+          .trim()
+          .toLowerCase()
+        if (tipoVendaCarregada === 'entrega') {
+          let detalhesEntrega = mapDetalhesEntregaFromVendaApi(
+            vendaData as Record<string, unknown>
+          )
+          const clienteIdVenda = String(vendaData.clienteId ?? '').trim()
+          if (clienteIdVenda) {
+            setClienteId(clienteIdVenda)
+            try {
+              const clienteResponse = await fetch(`/api/clientes/${clienteIdVenda}`, {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+              })
+              if (clienteResponse.ok) {
+                const clienteData = await clienteResponse.json()
+                setClienteNome(
+                  clienteData.nome ||
+                    clienteData.name ||
+                    detalhesEntrega.clienteNome ||
+                    ''
+                )
+                detalhesEntrega =
+                  mergeClienteDetalhesEntrega(detalhesEntrega, clienteData) ?? detalhesEntrega
+              }
+            } catch (error) {
+              console.error('Erro ao buscar dados do cliente:', error)
             }
-          } catch (error) {
-            console.error('Erro ao buscar nome do cliente:', error)
+          } else if (detalhesEntrega.clienteNome) {
+            setClienteNome(detalhesEntrega.clienteNome)
+          }
+
+          const entregadorIdVenda = String(vendaData.entregadorId ?? '').trim()
+          if (entregadorIdVenda) {
+            try {
+              const entregadorResponse = await fetch(`/api/usuarios/${entregadorIdVenda}`, {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+              })
+              if (entregadorResponse.ok) {
+                const entregadorData = await entregadorResponse.json()
+                const nomeEntregador = String(
+                  entregadorData.nome ?? entregadorData.name ?? ''
+                ).trim()
+                if (nomeEntregador) {
+                  detalhesEntrega = { ...detalhesEntrega, entregadorNome: nomeEntregador }
+                }
+              }
+            } catch (error) {
+              console.error('Erro ao buscar entregador:', error)
+            }
+          }
+
+          setDetalhesEntregaPedido(detalhesEntrega)
+        } else {
+          setDetalhesEntregaPedido(null)
+          if (vendaData.clienteId) {
+            setClienteId(vendaData.clienteId)
+            try {
+              const clienteResponse = await fetch(`/api/clientes/${vendaData.clienteId}`, {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+              })
+              if (clienteResponse.ok) {
+                const clienteData = await clienteResponse.json()
+                setClienteNome(clienteData.nome || clienteData.name || '')
+              }
+            } catch (error) {
+              console.error('Erro ao buscar nome do cliente:', error)
+            }
           }
         }
 
@@ -1917,7 +2001,7 @@ export function NovoPedidoModal({
         setVendaGestorJaCancelada(Boolean(vendaData.dataCancelamento || vendaData.canceladoPorId))
 
         // Produtos - Verificar tanto produtosLancados quanto produtos
-        // A API pode retornar em qualquer um dos formatos
+        let totalDosItensResumo: number | null = null
         const produtosRaw = vendaData.produtosLancados || vendaData.produtos
 
         if (produtosRaw && Array.isArray(produtosRaw)) {
@@ -2073,8 +2157,7 @@ export function NovoPedidoModal({
           console.log('✅ Produtos mapeados:', produtosMapeados)
           setProdutos(produtosMapeados)
 
-          // Resumo financeiro alinhado ao DetalhesVendas.tsx:
-          // A) total itens lançados (inclui removidos), B) itens cancelados, C) A-B, descontos e acréscimos
+          // Resumo financeiro: A) itens lançados, B) taxas entrega, C) cancelados, D) A+B-C
           const vendaCancelada = Boolean(vendaData.dataCancelamento || vendaData.canceladoPorId)
           let totalItensLancados = 0
           let totalItensCancelados = 0
@@ -2121,11 +2204,13 @@ export function NovoPedidoModal({
 
           setResumoFinanceiroDetalhes({
             totalItensLancados,
+            totalTaxasEntrega: 0,
             totalItensCancelados,
             totalDosItens: totalItensLancados - totalItensCancelados,
             totalDescontosConta,
             totalAcrescimosConta,
           })
+          totalDosItensResumo = totalItensLancados - totalItensCancelados
         } else {
           console.warn(
             '⚠️ Nenhum produto encontrado na resposta da API. Campos disponíveis:',
@@ -2133,6 +2218,37 @@ export function NovoPedidoModal({
           )
           setProdutos([])
           setResumoFinanceiroDetalhes(null)
+        }
+
+        if (tipoVendaCarregada === 'entrega') {
+          const taxaEntrega = await resolverTaxaEntregaDetalhe(
+            vendaData as Record<string, unknown>,
+            token,
+            totalDosItensResumo
+          )
+          const totalTaxasEntrega =
+            taxaEntregaTemValor(taxaEntrega) && taxaEntrega?.valor != null
+              ? Number(taxaEntrega.valor)
+              : 0
+
+          if (totalTaxasEntrega > 0) {
+            setResumoFinanceiroDetalhes(prev =>
+              prev
+                ? {
+                    ...prev,
+                    totalTaxasEntrega,
+                    totalDosItens:
+                      prev.totalItensLancados + totalTaxasEntrega - prev.totalItensCancelados,
+                  }
+                : null
+            )
+          }
+
+          if (taxaEntrega) {
+            setDetalhesEntregaPedido(prev =>
+              prev ? { ...prev, taxaEntrega } : { taxaEntrega }
+            )
+          }
         }
 
         // Pagamentos efetivos ou cobrança prevista da entrega.
@@ -2180,10 +2296,9 @@ export function NovoPedidoModal({
         const idsUsuarios = new Set<string>()
         ;[vendaData.abertoPorId, vendaData.ultimoResponsavelId, vendaData.canceladoPorId].forEach(
           (id: unknown) => {
-            const v = String(id || '').trim()
-            if (v) idsUsuarios.add(v)
-          }
-        )
+          const v = String(id || '').trim()
+          if (v) idsUsuarios.add(v)
+        })
         ;(vendaData.produtosLancados || vendaData.produtos || []).forEach((prod: any) => {
           const lancadoPorId = String(prod?.lancadoPorId || '').trim()
           const removidoPorId = String(prod?.removidoPorId || '').trim()
@@ -2552,6 +2667,7 @@ export function NovoPedidoModal({
     currentStep,
     dataVenda,
     detalhesPedidoMeta,
+    detalhesEntregaPedido,
     ehAcrescimo,
     ehPorcentagem,
     empresa,
@@ -2578,6 +2694,7 @@ export function NovoPedidoModal({
     handleConfirmarCancelamentoVenda,
     handleConfirmarSaida,
     handleMouseDown,
+    handleGruposWheel,
     handleMouseDownMeiosPagamento,
     handleMouseLeave,
     handleMouseMove,
@@ -2621,6 +2738,7 @@ export function NovoPedidoModal({
     pagamentos,
     pagamentosVisiveisNaAbaDetalhes,
     podeEditarPagamentoEntregaEmAberto,
+    podeExibirAbaDadosEntrega,
     podeExibirAbaNotaFiscal,
     pedidoComEntrega,
     pedidoComRetirada,
@@ -2753,7 +2871,7 @@ export function NovoPedidoModal({
             margin: 0,
             marginLeft: 'auto',
             width: estaNoPassoProdutos
-              ? { xs: '95vw', sm: '90vw', md: 'min(1000px, 65vw)' }
+              ? { xs: '95vw', sm: '90vw', md: '75vw' }
               : { xs: '95vw', sm: '90vw', md: '45vw' },
             maxWidth: '100vw',
             borderTopLeftRadius: '0.75rem',
@@ -2785,6 +2903,7 @@ export function NovoPedidoModal({
             abaDetalhesPedido={abaDetalhesPedido}
             onAbaDetalhesPedidoChange={setAbaDetalhesPedido}
             podeExibirAbaNotaFiscal={podeExibirAbaNotaFiscal}
+            podeExibirAbaDadosEntrega={podeExibirAbaDadosEntrega}
           />
           <NovoPedidoStepper
             currentStep={currentStep}

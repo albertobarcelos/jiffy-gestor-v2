@@ -7,11 +7,13 @@ import { abrirDocumentoFiscalPdf, tipoDocFiscalFromModelo } from '@/src/presenta
 import { showToast } from '@/src/shared/utils/toast'
 import { MdCreditCard, MdDelete } from 'react-icons/md'
 import { pagamentoComDestaqueCanceladoDetalhes } from '../novoPedidoPagamentoHelpers'
+import { taxaEntregaTemValor } from '../novoPedidoDetalheHelpers'
 import { statusFiscalEhEmitida, rotuloOrigemParaExibicao } from '../novoPedidoFiscalHelpers'
 import { PedidoDetalhesInfo } from './PedidoDetalhesInfo'
 import { PedidoDetalhesNotaFiscal } from './PedidoDetalhesNotaFiscal'
 import { PedidoDetalhesPagamentos } from './PedidoDetalhesPagamentos'
 import { PedidoDetalhesProdutos } from './PedidoDetalhesProdutos'
+import { PedidoDetalhesEntrega } from './PedidoDetalhesEntrega'
 import { useNovoPedidoContext } from '../context/NovoPedidoContext'
 
 export function PedidoDetalhesView() {
@@ -57,6 +59,7 @@ export function PedidoDetalhesView() {
     dataVenda,
     clienteNome,
     detalhesPedidoMeta,
+    detalhesEntregaPedido,
   } = useNovoPedidoContext()
 
   return (
@@ -179,6 +182,13 @@ export function PedidoDetalhesView() {
                   </PedidoDetalhesNotaFiscal>
                 ) : (
                   <>
+                    {abaDetalhesPedido === 'dadosEntrega' && (
+                      <PedidoDetalhesEntrega
+                        role="tabpanel"
+                        aria-labelledby="tab-detalhes-dados-entrega"
+                      />
+                    )}
+
                     {abaDetalhesPedido === 'infoPedido' && (
                       <PedidoDetalhesInfo
                         role="tabpanel"
@@ -475,13 +485,26 @@ export function PedidoDetalhesView() {
 
                     {/* Total do Pedido */}
                     {abaDetalhesPedido === 'listaProdutos' && (
-                      <div className="flex items-center justify-end gap-2">
-                        <span className="text-sm font-semibold text-gray-700">
-                          Total do Pedido:
-                        </span>
-                        <span className="text-lg font-semibold text-primary">
-                          {transformarParaReal(totalProdutos)}
-                        </span>
+                      <div className="space-y-2">
+                        {taxaEntregaTemValor(detalhesEntregaPedido?.taxaEntrega) && (
+                          <div className="flex items-center justify-end gap-2 text-sm">
+                            <span className="font-semibold text-gray-700">Taxa de entrega:</span>
+                            <span className="font-semibold text-primary">
+                              +{' '}
+                              {transformarParaReal(
+                                Number(detalhesEntregaPedido?.taxaEntrega?.valor)
+                              )}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-end gap-2">
+                          <span className="text-sm font-semibold text-gray-700">
+                            Total do Pedido:
+                          </span>
+                          <span className="text-lg font-semibold text-primary">
+                            {transformarParaReal(totalProdutos)}
+                          </span>
+                        </div>
                       </div>
                     )}
 
@@ -496,7 +519,15 @@ export function PedidoDetalhesView() {
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-700">B - Total de itens cancelados (-)</span>
+                            <span className="text-gray-700">B - Taxas de entrega (+)</span>
+                            <span className="font-semibold text-gray-900">
+                              {formatarNumeroComMilhar(
+                                resumoFinanceiroDetalhes.totalTaxasEntrega
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-700">C - Total de itens cancelados (-)</span>
                             <span className="font-semibold text-gray-900 line-through">
                               {formatarNumeroComMilhar(
                                 resumoFinanceiroDetalhes.totalItensCancelados
@@ -504,7 +535,9 @@ export function PedidoDetalhesView() {
                             </span>
                           </div>
                           <div className="mt-1 flex justify-between border-t pt-1.5">
-                            <span className="text-gray-700">C - Total dos itens (A - B)</span>
+                            <span className="text-gray-700">
+                              D - Total de itens (A + B - C)
+                            </span>
                             <span className="font-semibold text-gray-900">
                               {formatarNumeroComMilhar(resumoFinanceiroDetalhes.totalDosItens)}
                             </span>

@@ -1,6 +1,7 @@
 'use client'
 
-import { MdArrowForward, MdEdit, MdPrint } from 'react-icons/md'
+import { useState } from 'react'
+import { MdArrowForward, MdEdit, MdPrint, MdVisibility } from 'react-icons/md'
 import { Button } from '@/src/presentation/components/ui/button'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
@@ -9,6 +10,7 @@ import { StatusFiscalBadge } from '../StatusFiscalBadge'
 import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
 import { DraggableVendaCard } from './DraggableVendaCard'
 import { KanbanCardAcaoButton } from './KanbanCardAcaoButton'
+import { PedidoEntregaQuickViewPopover } from './PedidoEntregaQuickViewPopover'
 import type { ColunaKanbanId, KanbanColumn, Venda } from './types'
 import {
   COLUNAS_ENTREGA_OPERACIONAIS,
@@ -53,6 +55,7 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
     onEmitirNfe,
     onReimprimirCupomDelivery,
   } = props
+  const [entregaQuickViewAnchor, setEntregaQuickViewAnchor] = useState<HTMLElement | null>(null)
   const valorFormatado = transformarParaReal(venda.valorFinal)
   const clienteNome = venda.cliente?.nome?.trim() ? venda.cliente.nome : LABEL_SEM_CLIENTE
 
@@ -102,6 +105,15 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
     venda,
     acaoFiscalEmAndamentoPorVenda
   )
+
+  const exibirQuickViewEntrega = venda.isPedidoEntregaGestor()
+  const tabelaOrigemQuickView =
+    venda.tabelaOrigem === 'venda_gestor' ? 'venda_gestor' : 'venda'
+  const colunaAtual = column.id as ColunaKanbanId
+  const podeImprimirQuickView =
+    modoKanbanVendas === 'delivery' &&
+    Boolean(onReimprimirCupomDelivery) &&
+    COLUNAS_ENTREGA_OPERACIONAIS.includes(colunaAtual)
 
   return (
     <DraggableVendaCard venda={venda} column={column}>
@@ -238,6 +250,23 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
               </Button>
             )}
 
+          {exibirQuickViewEntrega && (
+            <Button
+              size="sm"
+              variant="outlined"
+              className="!min-w-0 !border-gray-300 !px-2 !text-gray-700 hover:!bg-gray-50"
+              sx={{ py: 0.375, minHeight: 'auto' }}
+              title="Ver dados da entrega"
+              aria-label="Ver dados da entrega"
+              onClick={e => {
+                e.stopPropagation()
+                setEntregaQuickViewAnchor(e.currentTarget)
+              }}
+            >
+              <MdVisibility size={16} />
+            </Button>
+          )}
+
           {deveExibirBotaoEmitirNotaNoKanban(
             column.id as ColunaKanbanId,
             venda,
@@ -300,6 +329,23 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
             )}
         </div>
       </div>
+
+      {exibirQuickViewEntrega && (
+        <PedidoEntregaQuickViewPopover
+          vendaId={venda.id}
+          tabelaOrigem={tabelaOrigemQuickView}
+          colunaAtual={colunaAtual}
+          anchorEl={entregaQuickViewAnchor}
+          open={Boolean(entregaQuickViewAnchor)}
+          onClose={() => setEntregaQuickViewAnchor(null)}
+          podeImprimir={podeImprimirQuickView}
+          onImprimir={
+            podeImprimirQuickView && onReimprimirCupomDelivery
+              ? () => onReimprimirCupomDelivery(venda, colunaAtual)
+              : undefined
+          }
+        />
+      )}
     </DraggableVendaCard>
   )
 }

@@ -94,7 +94,49 @@ export type OrigemVenda = 'GESTOR' | 'IFOOD' | 'RAPPI' | 'OUTROS'
 export type StatusVenda = 'ABERTA' | 'FINALIZADA' | 'PENDENTE_EMISSAO'
 export type FluxoPagamentoEntrega = 'cobrar_entregador' | 'ja_pago'
 export type TipoAtendimentoDelivery = 'entrega' | 'retirada'
-export type AbaDetalhesPedido = 'infoPedido' | 'listaProdutos' | 'pagamentos' | 'notaFiscal'
+export type AbaDetalhesPedido =
+  | 'infoPedido'
+  | 'dadosEntrega'
+  | 'listaProdutos'
+  | 'pagamentos'
+  | 'notaFiscal'
+
+export interface EnderecoEntregaDetalhe {
+  cep?: string | null
+  rua?: string | null
+  numero?: string | null
+  bairro?: string | null
+  cidade?: string | null
+  estado?: string | null
+  complemento?: string | null
+  referencia?: string | null
+}
+
+/** Taxa de entrega resolvida no detalhe (snapshot da venda ou GET `/api/taxas/{id}`). */
+export interface TaxaEntregaDetalhe {
+  taxaId?: string | null
+  nome?: string | null
+  valor?: number | null
+}
+
+/** Snapshot da entrega no modo detalhe (GET gestor). */
+export interface DetalhesEntregaPedido {
+  entregadorId?: string | null
+  /** Nome resolvido via usuário PDV (`/api/usuarios/{id}`), não usuário gestor. */
+  entregadorNome?: string | null
+  clienteNome?: string | null
+  clienteCpfCnpj?: string | null
+  clienteCelular?: string | null
+  enderecoEntrega?: EnderecoEntregaDetalhe | null
+  observacaoPedido?: string | null
+  previsaoEntrega?: string | null
+  dataInicioPreparo?: string | null
+  dataPronto?: string | null
+  dataSaidaEntrega?: string | null
+  /** Troco persistido na venda (`troco` na raiz do GET). */
+  trocoApi?: number | null
+  taxaEntrega?: TaxaEntregaDetalhe | null
+}
 
 export interface UsuarioPdvEntregadorOption {
   id: string
@@ -124,6 +166,7 @@ export interface DetalhesPedidoMeta {
 
 export interface ResumoFinanceiroDetalhes {
   totalItensLancados: number
+  totalTaxasEntrega: number
   totalItensCancelados: number
   totalDosItens: number
   totalDescontosConta: number

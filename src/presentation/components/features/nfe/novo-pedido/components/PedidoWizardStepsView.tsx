@@ -46,6 +46,7 @@ export function PedidoWizardStepsView() {
     handleAbrirEdicaoClienteEntrega,
     handleAbrirEdicaoProdutoDetalhes,
     handleMouseDown,
+    handleGruposWheel,
     handleMouseDownMeiosPagamento,
     handleMouseLeave,
     handleMouseMove,
@@ -132,6 +133,9 @@ export function PedidoWizardStepsView() {
   } = useNovoPedidoContext()
   const nomeClienteResumo =
     tipoInicioPedido === 'entrega' ? (clienteEntregaVinculado?.nome ?? '') : clienteNome
+  const rotuloAcaoClienteBalcao = nomeClienteResumo?.trim()
+    ? 'Editar cliente'
+    : 'Vincular Cliente'
   const restanteALancarExibicao = pedidoEntregaAceitaPagamentoPendente
     ? valorAPagarLancamento
     : valorAPagar
@@ -327,8 +331,8 @@ export function PedidoWizardStepsView() {
                 (tipoInicioPedido === 'entrega' && currentStep === 1)) && (
               <PedidoProdutosStep>
                 <div className="flex min-h-0 flex-1 gap-1">
-                  {/* Coluna esquerda: itens do pedido (um pouco mais larga) */}
-                  <div className="flex min-h-0 min-w-0 flex-[3] flex-col gap-2">
+                  {/* Coluna esquerda: itens do pedido */}
+                  <div className="flex min-h-0 min-w-0 flex-[2] flex-col gap-2">
                 <div className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto rounded-lg border bg-gray-50">
                   {produtos.length > 0 ? (
                     <div className="p-2">
@@ -886,7 +890,7 @@ export function PedidoWizardStepsView() {
                 </div>
                   </div>
 
-                  {/* Coluna direita: busca + catálogo (grupos e produtos) */}
+                  {/* Coluna direita: busca + catálogo (grupos e produtos) — mais larga */}
                   <div className="flex min-h-0 min-w-0 flex-[2] flex-col gap-2">
                 <div className="shrink-0">
                   <div className="relative">
@@ -931,10 +935,10 @@ export function PedidoWizardStepsView() {
                     )}
                     <span className="text-sm font-semibold text-primary">Grupos de produtos</span>
                   </div>
-                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 pb-3 pt-1">
+                    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-3 pb-3 pt-1">
                       {/* Grid ou Lista Horizontal de Grupos - Ocultar durante busca */}
                       {buscaProdutoTexto.length < 2 && (
-                        <div className="shrink-0 space-y-2">
+                        <div className="min-w-0 w-full shrink-0 space-y-2">
                           {!grupoSelecionadoId && (
                             <Label className="text-sm text-gray-600">Selecione um grupo:</Label>
                           )}
@@ -948,7 +952,8 @@ export function PedidoWizardStepsView() {
                             </div>
                           ) : !grupoSelecionadoId ? (
                             // Grid de Grupos (quando nenhum grupo está selecionado)
-                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                            <div className="scrollbar-thin max-h-[26.5rem] min-w-0 w-full overflow-y-auto overscroll-y-contain pr-1">
+                              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5">
                               {grupos.map((grupo: any) => {
                                 const corHex = grupo.getCorHex()
                                 const iconName = grupo.getIconName()
@@ -962,8 +967,8 @@ export function PedidoWizardStepsView() {
                                         backgroundColor: `${corHex}15`,
                                       }}
                                     >
-                                      <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center">
-                                        <DinamicIcon iconName={iconName} color={corHex} size={26} />
+                                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center">
+                                        <DinamicIcon iconName={iconName} color={corHex} size={30} />
                                       </div>
                                       <div className="line-clamp-2 min-h-0 w-full flex-1 px-0.5 text-[10px] font-medium leading-tight text-gray-900">
                                         {grupo.getNome()}
@@ -972,14 +977,17 @@ export function PedidoWizardStepsView() {
                                   </div>
                                 )
                               })}
+                              </div>
                             </div>
                           ) : (
                             // Lista horizontal com 2 linhas de grupos (após escolher um grupo)
+                            <div className="min-w-0 w-full max-w-full overflow-hidden">
                             <div
                               ref={gruposScrollRef}
-                              className="scrollbar-thin grid auto-cols-[5rem] grid-flow-col grid-rows-[5rem_5rem] gap-x-1 gap-y-1.5 cursor-grab select-none overflow-x-auto pb-2 active:cursor-grabbing"
+                              className="scrollbar-thin grid w-full min-w-0 max-w-full auto-cols-[5rem] grid-flow-col grid-rows-[5rem_5rem] gap-x-1 gap-y-1.5 cursor-grab select-none overflow-x-auto overflow-y-hidden pb-2 active:cursor-grabbing"
                               style={{ scrollbarWidth: 'thin' }}
                               onMouseDown={handleMouseDown}
+                              onWheel={handleGruposWheel}
                               onMouseMove={handleMouseMove}
                               onMouseUp={handleMouseUp}
                               onMouseLeave={handleMouseLeave}
@@ -1022,6 +1030,7 @@ export function PedidoWizardStepsView() {
                                   </div>
                                 )
                               })}
+                            </div>
                             </div>
                           )}
                         </div>
@@ -1068,7 +1077,7 @@ export function PedidoWizardStepsView() {
                                 </div>
                               ) : (
                                 <div
-                                  className="scrollbar-thin grid min-h-0 flex-1 auto-rows-min grid-cols-3 content-start gap-2 overflow-y-auto rounded-lg border p-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4"
+                                  className="scrollbar-thin grid min-h-0 flex-1 auto-rows-min grid-cols-3 content-start gap-2 overflow-y-auto rounded-lg border p-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-5"
                                   style={{
                                     backgroundColor: `${corHexGrupo}15`,
                                   }}
@@ -1124,24 +1133,41 @@ export function PedidoWizardStepsView() {
                     {tipoInicioPedido !== 'entrega' && (
                       <Button
                         type="button"
-                        variant="outlined"
+                        variant="contained"
                         size="sm"
                         onClick={() => setSeletorClienteOpen(true)}
-                        className="h-6 shrink-0 px-1 text-xs font-semibold text-white"
+                        title={rotuloAcaoClienteBalcao}
+                        aria-label={rotuloAcaoClienteBalcao}
+                        className="flex h-8 min-h-8 w-8 min-w-8 shrink-0 items-center justify-center p-0"
                         sx={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 32,
+                          height: 32,
+                          minWidth: 32,
+                          minHeight: 32,
+                          padding: 0,
+                          lineHeight: 0,
                           backgroundColor: 'var(--color-primary)',
                           borderColor: 'var(--color-primary)',
                           color: '#fff',
-                          padding: '4px',
+                          boxShadow: 'none',
+                          '& svg': {
+                            width: 20,
+                            height: 20,
+                            color: '#fff',
+                            fill: 'currentColor',
+                          },
                           '&:hover': {
                             backgroundColor: 'var(--color-primary)',
                             borderColor: 'var(--color-primary)',
+                            boxShadow: 'none',
                             opacity: 0.9,
                           },
                         }}
                       >
-                        <MdPersonOutline className="mr-1 h-4 w-4 text-white" />
-                        {nomeClienteResumo ? 'Alterar Cliente' : 'Vincular Cliente'}
+                        <MdPersonOutline aria-hidden />
                       </Button>
                     )}
                   </div>

@@ -395,7 +395,7 @@ export function ModalLancamentoProdutoPainel({
                 color="inherit"
                 onClick={() => onOpenChange(false)}
                 className="h-12 min-h-12 w-full font-semibold shadow-none"
-                sx={footerBarPrimaryMutedSx(false)}
+                sx={footerBarPrimaryMutedSx(true)}
               >
                 Cancelar
               </Button>
@@ -407,7 +407,7 @@ export function ModalLancamentoProdutoPainel({
                 color="primary"
                 onClick={handleConfirmar}
                 className="h-12 min-h-12 w-full font-semibold shadow-none"
-                sx={footerSavePrimaryBarSx(true)}
+                sx={footerSavePrimaryBarSx(false)}
               >
                 Confirmar
               </Button>

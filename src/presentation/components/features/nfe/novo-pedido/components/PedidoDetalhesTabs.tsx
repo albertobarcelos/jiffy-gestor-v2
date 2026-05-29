@@ -6,10 +6,12 @@ interface PedidoDetalhesTabsProps {
   abaSelecionada: AbaDetalhesPedido
   onAbaChange: (aba: AbaDetalhesPedido) => void
   podeExibirAbaNotaFiscal: boolean
+  podeExibirAbaDadosEntrega: boolean
 }
 
 const ABAS_DETALHES: Array<{ id: AbaDetalhesPedido; label: string; tabId: string }> = [
   { id: 'infoPedido', label: 'Info Pedidos', tabId: 'tab-detalhes-info-pedido' },
+  { id: 'dadosEntrega', label: 'Dados da Entrega', tabId: 'tab-detalhes-dados-entrega' },
   { id: 'listaProdutos', label: 'Lista Produtos', tabId: 'tab-detalhes-lista-produtos' },
   { id: 'pagamentos', label: 'Pagamentos', tabId: 'tab-detalhes-pagamentos' },
   { id: 'notaFiscal', label: 'Nota Fiscal', tabId: 'tab-detalhes-nota-fiscal' },
@@ -19,6 +21,7 @@ export function PedidoDetalhesTabs({
   abaSelecionada,
   onAbaChange,
   podeExibirAbaNotaFiscal,
+  podeExibirAbaDadosEntrega,
 }: PedidoDetalhesTabsProps) {
   return (
     <div
@@ -26,7 +29,11 @@ export function PedidoDetalhesTabs({
       role="tablist"
       aria-label="Seções dos detalhes do pedido"
     >
-      {ABAS_DETALHES.filter(aba => aba.id !== 'notaFiscal' || podeExibirAbaNotaFiscal).map(aba => (
+      {ABAS_DETALHES.filter(aba => {
+        if (aba.id === 'notaFiscal') return podeExibirAbaNotaFiscal
+        if (aba.id === 'dadosEntrega') return podeExibirAbaDadosEntrega
+        return true
+      }).map(aba => (
         <button
           key={aba.id}
           type="button"

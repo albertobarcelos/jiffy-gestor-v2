@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type {
   AbaDetalhesPedido,
+  DetalhesEntregaPedido,
   DetalhesPedidoMeta,
   ResumoFinanceiroDetalhes,
   ResumoFiscalVenda,
@@ -11,6 +12,9 @@ import type {
 export function useNovoPedidoDetalhe() {
   const [abaDetalhesPedido, setAbaDetalhesPedido] = useState<AbaDetalhesPedido>('infoPedido')
   const [detalhesPedidoMeta, setDetalhesPedidoMeta] = useState<DetalhesPedidoMeta | null>(null)
+  const [detalhesEntregaPedido, setDetalhesEntregaPedido] = useState<DetalhesEntregaPedido | null>(
+    null
+  )
   const [nomesUsuariosPedido, setNomesUsuariosPedido] = useState<Record<string, string>>({})
   const [nomesMeiosPagamentoPedido, setNomesMeiosPagamentoPedido] =
     useState<Record<string, string>>({})
@@ -27,6 +31,8 @@ export function useNovoPedidoDetalhe() {
     setAbaDetalhesPedido,
     detalhesPedidoMeta,
     setDetalhesPedidoMeta,
+    detalhesEntregaPedido,
+    setDetalhesEntregaPedido,
     nomesUsuariosPedido,
     setNomesUsuariosPedido,
     nomesMeiosPagamentoPedido,
