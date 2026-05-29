@@ -41,6 +41,7 @@ import { showToast } from '@/src/shared/utils/toast'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { FaturamentoRangeCalendar } from '@/src/presentation/components/ui/FaturamentoRangeCalendar'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
 import {
   ClientesTabsModal,
   ClientesTabsModalState,
@@ -70,6 +71,7 @@ import { FiscalKanbanVendaCard } from './kanban/FiscalKanbanVendaCard'
 import { useFiscalKanbanFilters } from './kanban/useFiscalKanbanFilters'
 import { useKanbanPinning } from './kanban/useKanbanPinning'
 import { useEntregaTransicoesKanban } from './kanban/useEntregaTransicoesKanban'
+import { resolverEntregadorIdVendaKanban } from './kanban/entregadorKanbanStore'
 import {
   useFiscalEmissaoKanban,
   type VendaSelecionadaParaEmissao,
@@ -127,6 +129,8 @@ export function FiscalFlowKanban() {
     aplicarFinalizacaoDatas,
   } = useFiscalKanbanFilters()
   const { timezoneAgregacao } = useEmpresaMe()
+  const { auth } = useAuthStore()
+  const [entregadorPorVendaId, setEntregadorPorVendaId] = useState<Record<string, string>>({})
 
   /** Edição de cliente (lápis no card): mesmo painel que ClientesList / SeletorClienteModal */
   const [clienteTabsModalState, setClienteTabsModalState] = useState<ClientesTabsModalState>({
@@ -267,6 +271,21 @@ export function FiscalFlowKanban() {
   const transicaoVendaGestor = useTransicaoVendaGestor()
   const { processarAposTransicoes, reimprimirCupomEntrega } = useImpressaoDelivery()
 
+  const verificarEntregadorAntesDespachar = useCallback(
+    async (venda: Venda) => {
+      const token = auth?.getAccessToken()
+      if (!token) return false
+      const entregadorId = await resolverEntregadorIdVendaKanban({
+        vendaId: venda.id,
+        tabelaOrigem: venda.tabelaOrigem === 'venda_gestor' ? 'venda_gestor' : 'venda',
+        token,
+        cacheLocal: entregadorPorVendaId,
+      })
+      return Boolean(entregadorId)
+    },
+    [auth, entregadorPorVendaId]
+  )
+
   const {
     avancandoEtapaIds,
     timestampsEtapaEntregaLocal,
@@ -282,6 +301,7 @@ export function FiscalFlowKanban() {
     onAfterTransicaoSucesso: async ({ venda, acoesExecutadas }) => {
       await processarAposTransicoes(venda, acoesExecutadas)
     },
+    verificarEntregadorAntesDespachar,
   })
 
   const { acaoFiscalEmAndamentoPorVenda, getEtapaKanbanParaExibicao, handleEmitirNfe } =
@@ -946,6 +966,10 @@ export function FiscalFlowKanban() {
                               void reimprimirCupomEntrega(vendaAtual, colunaAtual)
                           : undefined
                       }
+                      entregadorVinculadoId={entregadorPorVendaId[venda.id] ?? null}
+                      onEntregadorAtualizado={(vendaId, entregadorId) => {
+                        setEntregadorPorVendaId(prev => ({ ...prev, [vendaId]: entregadorId }))
+                      }}
                     />
                   ))}
                 </FiscalKanbanColumn>

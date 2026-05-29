@@ -7,12 +7,12 @@ import { Label } from '@/src/presentation/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/presentation/components/ui/select'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
-import { MdAccessTime, MdAdd, MdArrowBack, MdAttachMoney, MdClear, MdCreditCard, MdDelete, MdDeliveryDining, MdEdit, MdLaunch, MdMoreVert, MdPersonOutline, MdQrCode, MdRemove, MdSearch, MdStore } from 'react-icons/md'
+import { MdAccessTime, MdAdd, MdArrowBack, MdAttachMoney, MdClear, MdCreditCard, MdDelete, MdEdit, MdLaunch, MdMoreVert, MdPersonOutline, MdQrCode, MdRemove, MdSearch, MdStore } from 'react-icons/md'
 import { EntregaClienteSelector } from '../../EntregaClienteSelector'
 import { PedidoInformacoesStep } from './PedidoInformacoesStep'
 import { PedidoPagamentoStep } from './PedidoPagamentoStep'
 import { PedidoProdutosStep } from './PedidoProdutosStep'
-import { SEM_ENTREGADOR_VALUE, SEM_TAXA_ENTREGA_VALUE, setUltimoEntregadorSelecionado, TEMPOS_PREVISTOS_ENTREGA } from '../novoPedidoTextHelpers'
+import { SEM_TAXA_ENTREGA_VALUE, TEMPOS_PREVISTOS_ENTREGA } from '../novoPedidoTextHelpers'
 import { useNovoPedidoContext } from '../context/NovoPedidoContext'
 
 export function PedidoWizardStepsView() {
@@ -32,9 +32,6 @@ export function PedidoWizardStepsView() {
     ehAcrescimo,
     ehPorcentagem,
     empresa,
-    entregadorId,
-    entregadores,
-    entregadoresQuery,
     formatarDescontoAcrescimo,
     formatarNumeroComMilhar,
     formatarValorComplemento,
@@ -89,7 +86,6 @@ export function PedidoWizardStepsView() {
     setClienteEntregaVinculado,
     setEhAcrescimo,
     setEhPorcentagem,
-    setEntregadorId,
     setGrupoSelecionadoId,
     setMeioPagamentoId,
     setFluxoPagamentoEntrega,
@@ -220,7 +216,7 @@ export function PedidoWizardStepsView() {
                       </div>
                     ) : null}
                     {pedidoComEntrega && (
-                    <div className="mt-3 grid gap-3 md:grid-cols-3">
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
                       <div className="rounded-lg border border-primary/15 bg-white p-3">
                         <div className="mb-2 flex items-center gap-2">
                           <MdAccessTime className="h-5 w-5 text-primary" />
@@ -239,44 +235,6 @@ export function PedidoWizardStepsView() {
                             {TEMPOS_PREVISTOS_ENTREGA.map(minutos => (
                               <SelectItem key={minutos} value={String(minutos)}>
                                 {minutos} minutos
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="rounded-lg border border-primary/15 bg-white p-3">
-                        <div className="mb-2 flex items-center gap-2">
-                          <MdDeliveryDining className="h-5 w-5 text-primary" />
-                          <Label className="text-sm font-semibold text-primary-text">
-                            Entregador
-                          </Label>
-                        </div>
-                        <Select
-                          value={entregadorId || SEM_ENTREGADOR_VALUE}
-                          onValueChange={value => {
-                            const novoEntregadorId = value === SEM_ENTREGADOR_VALUE ? '' : value
-                            setEntregadorId(novoEntregadorId)
-                            setUltimoEntregadorSelecionado(novoEntregadorId)
-                          }}
-                          disabled={entregadoresQuery.isLoading}
-                        >
-                          <SelectTrigger className="border-primary/30 bg-white">
-                            <SelectValue
-                              placeholder={
-                                entregadoresQuery.isLoading
-                                  ? 'Carregando entregadores...'
-                                  : 'Selecionar entregador'
-                              }
-                            />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={SEM_ENTREGADOR_VALUE}>
-                              Sem entregador definido
-                            </SelectItem>
-                            {entregadores.map((entregador: any) => (
-                              <SelectItem key={entregador.id} value={entregador.id}>
-                                {entregador.nome}
                               </SelectItem>
                             ))}
                           </SelectContent>

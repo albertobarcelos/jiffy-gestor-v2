@@ -1,10 +1,11 @@
-import { mapearPagamentoDetalheVenda } from '../novo-pedido/novoPedidoPagamentoHelpers'
+import { mapearPagamentoDetalheVenda, pagamentoEstaCancelado } from '../novo-pedido/novoPedidoPagamentoHelpers'
 import {
   calcularTotalDosItensResumoEntrega,
+  formatarTipoPagamentoDetalhe,
   mapDetalhesEntregaFromVendaApi,
   mergeClienteDetalhesEntrega,
-  resolverTaxaEntregaDetalhe,
-  taxaEntregaTemValor,
+  resolverTaxaEntregaValorSync,
+  resolverTrocoLevarPedidoEntrega,
 } from '../novo-pedido/novoPedidoDetalheHelpers'
 import type { DetalhesEntregaPedido, FluxoPagamentoEntrega, PagamentoSelecionado } from '../novo-pedido/types'
 
@@ -21,11 +22,40 @@ export interface PedidoKanbanQuickViewData {
   detalhesEntrega: DetalhesEntregaPedido
   clienteNome: string
   nomeEntregador: string
+  telefoneEntregador: string | null
   produtos: ProdutoKanbanQuickView[]
   totalItens: number
   taxaEntrega: number
+  totalAReceber: number
   troco: number
   fluxoPagamentoEntrega: FluxoPagamentoEntrega
+  tipoPagamento: string
+}
+
+const QUICK_VIEW_CACHE = new Map<string, PedidoKanbanQuickViewData>()
+const QUICK_VIEW_INFLIGHT = new Map<string, Promise<PedidoKanbanQuickViewData>>()
+
+const FETCH_HEADERS = (token: string) => ({
+  Authorization: `Bearer ${token}`,
+  'Content-Type': 'application/json',
+})
+
+function quickViewCacheKey(vendaId: string, tabelaOrigem: 'venda' | 'venda_gestor'): string {
+  return `${tabelaOrigem}:${vendaId}`
+}
+
+export function obterPedidoKanbanQuickViewCache(args: {
+  vendaId: string
+  tabelaOrigem: 'venda' | 'venda_gestor'
+}): PedidoKanbanQuickViewData | null {
+  return QUICK_VIEW_CACHE.get(quickViewCacheKey(args.vendaId, args.tabelaOrigem)) ?? null
+}
+
+function calcularTotalAReceberPagamentos(pagamentos: PagamentoSelecionado[]): number {
+  const total = pagamentos
+    .filter(p => !pagamentoEstaCancelado(p))
+    .reduce((sum, p) => sum + (Number(p.valor) || 0), 0)
+  return total > 0 ? Math.round(total * 100) / 100 : 0
 }
 
 function resolverFluxoPagamentoEntrega(
@@ -80,7 +110,63 @@ function mapearProdutosKanbanQuickView(vendaData: Record<string, unknown>): Prod
     })
 }
 
-export async function carregarPedidoKanbanQuickView(args: {
+async function resolverNomesMeiosPagamentoQuickView(args: {
+  pagamentosApi: unknown[]
+  meiosCobrancaApi: Record<string, unknown>[]
+  token: string
+}): Promise<Record<string, string>> {
+  const { pagamentosApi, meiosCobrancaApi, token } = args
+  const mapMeios: Record<string, string> = {}
+  const idsMeios = new Set<string>()
+
+  for (const pagRaw of pagamentosApi) {
+    if (!pagRaw || typeof pagRaw !== 'object') continue
+    const pag = pagRaw as Record<string, unknown>
+    const meioId = String(pag.meioPagamentoId ?? pag.meio_pagamento_id ?? '').trim()
+    if (meioId) idsMeios.add(meioId)
+
+    const meioObj = pag.meioPagamento
+    if (meioObj && typeof meioObj === 'object') {
+      const nome = String((meioObj as Record<string, unknown>).nome ?? '').trim()
+      if (meioId && nome) mapMeios[meioId] = nome
+    }
+  }
+
+  for (const meio of meiosCobrancaApi) {
+    const meioId = String(meio.meioPagamentoId ?? meio.id ?? '').trim()
+    if (meioId) idsMeios.add(meioId)
+    const nome = String(meio.nome ?? meio.nomeMeioPagamento ?? '').trim()
+    if (meioId && nome) mapMeios[meioId] = nome
+  }
+
+  await Promise.all(
+    Array.from(idsMeios)
+      .filter(meioId => !mapMeios[meioId])
+      .map(async meioId => {
+        const data = await fetchJsonRecord(`/api/meios-pagamentos/${meioId}`, token)
+        if (!data) return
+        const nome = String(data.nome ?? data.name ?? '').trim()
+        if (nome) mapMeios[meioId] = nome
+      })
+  )
+
+  return mapMeios
+}
+
+async function fetchJsonRecord(
+  url: string,
+  token: string
+): Promise<Record<string, unknown> | null> {
+  try {
+    const response = await fetch(url, { headers: FETCH_HEADERS(token) })
+    if (!response.ok) return null
+    return (await response.json()) as Record<string, unknown>
+  } catch {
+    return null
+  }
+}
+
+async function carregarPedidoKanbanQuickViewInterno(args: {
   vendaId: string
   tabelaOrigem: 'venda' | 'venda_gestor'
   token: string
@@ -89,15 +175,10 @@ export async function carregarPedidoKanbanQuickView(args: {
 
   const urlVenda =
     tabelaOrigem === 'venda'
-      ? `/api/vendas/${vendaId}?incluirFiscal=true`
-      : `/api/vendas/gestor/${vendaId}?incluirFiscal=true`
+      ? `/api/vendas/${vendaId}?incluirFiscal=false`
+      : `/api/vendas/gestor/${vendaId}?incluirFiscal=false`
 
-  const response = await fetch(urlVenda, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  })
+  const response = await fetch(urlVenda, { headers: FETCH_HEADERS(token) })
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}))
@@ -113,64 +194,39 @@ export async function carregarPedidoKanbanQuickView(args: {
   let clienteNome = detalhesEntrega.clienteNome?.trim() || ''
 
   const clienteIdVenda = String(vendaData.clienteId ?? '').trim()
-  if (clienteIdVenda) {
-    try {
-      const clienteResponse = await fetch(`/api/clientes/${clienteIdVenda}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      })
-      if (clienteResponse.ok) {
-        const clienteData = (await clienteResponse.json()) as Record<string, unknown>
-        clienteNome =
-          String(clienteData.nome ?? clienteData.name ?? '').trim() ||
-          clienteNome ||
-          '—'
-        detalhesEntrega =
-          mergeClienteDetalhesEntrega(detalhesEntrega, clienteData) ?? detalhesEntrega
-      }
-    } catch {
-      // mantém snapshot da venda
-    }
+  const entregadorIdVenda = String(vendaData.entregadorId ?? '').trim()
+
+  const [clienteData, entregadorData] = await Promise.all([
+    clienteIdVenda
+      ? fetchJsonRecord(`/api/clientes/${clienteIdVenda}`, token)
+      : Promise.resolve(null),
+    entregadorIdVenda
+      ? fetchJsonRecord(`/api/usuarios/${entregadorIdVenda}`, token)
+      : Promise.resolve(null),
+  ])
+
+  if (clienteData) {
+    clienteNome =
+      String(clienteData.nome ?? clienteData.name ?? '').trim() ||
+      clienteNome ||
+      '—'
+    detalhesEntrega = mergeClienteDetalhesEntrega(detalhesEntrega, clienteData) ?? detalhesEntrega
   }
 
   let nomeEntregador = detalhesEntrega.entregadorNome?.trim() || ''
-  const entregadorIdVenda = String(vendaData.entregadorId ?? '').trim()
-  if (entregadorIdVenda) {
-    try {
-      const entregadorResponse = await fetch(`/api/usuarios/${entregadorIdVenda}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      })
-      if (entregadorResponse.ok) {
-        const entregadorData = (await entregadorResponse.json()) as Record<string, unknown>
-        nomeEntregador = String(entregadorData.nome ?? entregadorData.name ?? '').trim()
-        if (nomeEntregador) {
-          detalhesEntrega = { ...detalhesEntrega, entregadorNome: nomeEntregador }
-        }
-      }
-    } catch {
-      // mantém snapshot
+  let telefoneEntregador: string | null = null
+
+  if (entregadorData) {
+    nomeEntregador = String(entregadorData.nome ?? entregadorData.name ?? '').trim()
+    const telefone = String(entregadorData.telefone ?? entregadorData.celular ?? '').trim()
+    telefoneEntregador = telefone || null
+    if (nomeEntregador) {
+      detalhesEntrega = { ...detalhesEntrega, entregadorNome: nomeEntregador }
     }
   }
 
   const totalItens = calcularTotalDosItensResumoEntrega(vendaData)
-  const taxaEntregaDetalhe = await resolverTaxaEntregaDetalhe(vendaData, token, totalItens)
-  const taxaEntrega = taxaEntregaTemValor(taxaEntregaDetalhe)
-    ? Number(taxaEntregaDetalhe?.valor)
-    : 0
-  if (taxaEntregaDetalhe) {
-    detalhesEntrega = { ...detalhesEntrega, taxaEntrega: taxaEntregaDetalhe }
-  }
-
-  const trocoRaw = vendaData.troco
-  const troco =
-    trocoRaw !== undefined && trocoRaw !== null && !Number.isNaN(Number(trocoRaw))
-      ? Number(trocoRaw)
-      : detalhesEntrega.trocoApi ?? 0
+  const taxaEntrega = resolverTaxaEntregaValorSync(vendaData, totalItens)
 
   const numeroVendaRaw = vendaData.numeroVenda
   const numeroVenda =
@@ -212,6 +268,15 @@ export async function carregarPedidoKanbanQuickView(args: {
     pagamentoEntregaApi
   )
 
+  const troco = resolverTrocoLevarPedidoEntrega(vendaData, pagamentos)
+  const totalAReceber = calcularTotalAReceberPagamentos(pagamentos)
+  const nomesMeiosPagamento = await resolverNomesMeiosPagamentoQuickView({
+    pagamentosApi,
+    meiosCobrancaApi,
+    token,
+  })
+  const tipoPagamento = formatarTipoPagamentoDetalhe(pagamentos, [], nomesMeiosPagamento)
+
   return {
     numeroVenda,
     codigoVenda,
@@ -219,10 +284,49 @@ export async function carregarPedidoKanbanQuickView(args: {
     detalhesEntrega,
     clienteNome: clienteNome || '—',
     nomeEntregador: nomeEntregador || '—',
+    telefoneEntregador,
     produtos: mapearProdutosKanbanQuickView(vendaData),
     totalItens,
     taxaEntrega,
+    totalAReceber,
     troco: troco > 0 ? troco : 0,
     fluxoPagamentoEntrega,
+    tipoPagamento,
   }
+}
+
+export async function carregarPedidoKanbanQuickView(args: {
+  vendaId: string
+  tabelaOrigem: 'venda' | 'venda_gestor'
+  token: string
+  /** Quando true, ignora cache em memória e busca dados frescos. */
+  forcarAtualizacao?: boolean
+}): Promise<PedidoKanbanQuickViewData> {
+  const { vendaId, tabelaOrigem, token, forcarAtualizacao = false } = args
+  const cacheKey = quickViewCacheKey(vendaId, tabelaOrigem)
+
+  if (!forcarAtualizacao) {
+    const cached = QUICK_VIEW_CACHE.get(cacheKey)
+    if (cached) return cached
+
+    const inflight = QUICK_VIEW_INFLIGHT.get(cacheKey)
+    if (inflight) return inflight
+  }
+
+  const promise = carregarPedidoKanbanQuickViewInterno({ vendaId, tabelaOrigem, token })
+    .then(resultado => {
+      QUICK_VIEW_CACHE.set(cacheKey, resultado)
+      return resultado
+    })
+    .finally(() => {
+      QUICK_VIEW_INFLIGHT.delete(cacheKey)
+    })
+
+  QUICK_VIEW_INFLIGHT.set(cacheKey, promise)
+  return promise
+}
+
+export function invalidarPedidoKanbanQuickViewCache(vendaId: string): void {
+  QUICK_VIEW_CACHE.delete(quickViewCacheKey(vendaId, 'venda'))
+  QUICK_VIEW_CACHE.delete(quickViewCacheKey(vendaId, 'venda_gestor'))
 }

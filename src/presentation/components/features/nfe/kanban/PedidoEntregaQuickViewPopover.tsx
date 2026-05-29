@@ -7,6 +7,7 @@ import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { PedidoKanbanQuickViewConteudo } from './PedidoKanbanQuickViewConteudo'
 import {
   carregarPedidoKanbanQuickView,
+  obterPedidoKanbanQuickViewCache,
   type PedidoKanbanQuickViewData,
 } from './carregarPedidoKanbanQuickView'
 import type { ColunaKanbanId } from './types'
@@ -15,22 +16,20 @@ interface PedidoEntregaQuickViewPopoverProps {
   vendaId: string
   tabelaOrigem: 'venda' | 'venda_gestor'
   colunaAtual: ColunaKanbanId
+  tipoVenda: 'entrega' | 'retirada'
   anchorEl: HTMLElement | null
   open: boolean
   onClose: () => void
-  podeImprimir?: boolean
-  onImprimir?: () => void
 }
 
 export function PedidoEntregaQuickViewPopover({
   vendaId,
   tabelaOrigem,
   colunaAtual,
+  tipoVenda,
   anchorEl,
   open,
   onClose,
-  podeImprimir = false,
-  onImprimir,
 }: PedidoEntregaQuickViewPopoverProps) {
   const { auth } = useAuthStore()
   const { empresa } = useEmpresaMe()
@@ -45,17 +44,29 @@ export function PedidoEntregaQuickViewPopover({
       return
     }
 
-    setLoading(true)
-    setErro(null)
+    const cacheLocal = obterPedidoKanbanQuickViewCache({ vendaId, tabelaOrigem })
+    if (cacheLocal) {
+      setDados(cacheLocal)
+      setErro(null)
+      setLoading(false)
+    } else {
+      setDados(null)
+      setLoading(true)
+      setErro(null)
+    }
+
     try {
       const resultado = await carregarPedidoKanbanQuickView({
         vendaId,
         tabelaOrigem,
         token,
+        forcarAtualizacao: Boolean(cacheLocal),
       })
       setDados(resultado)
     } catch (error) {
-      setDados(null)
+      if (!cacheLocal) {
+        setDados(null)
+      }
       setErro(error instanceof Error ? error.message : 'Erro ao carregar dados do pedido')
     } finally {
       setLoading(false)
@@ -64,7 +75,6 @@ export function PedidoEntregaQuickViewPopover({
 
   useEffect(() => {
     if (!open) {
-      setDados(null)
       setErro(null)
       setLoading(false)
       return
@@ -111,8 +121,7 @@ export function PedidoEntregaQuickViewPopover({
             dados={dados}
             nomeEmpresa={empresa?.nomeExibicao ?? 'Empresa'}
             colunaAtual={colunaAtual}
-            podeImprimir={podeImprimir}
-            onImprimir={onImprimir}
+            tipoVenda={tipoVenda}
           />
         )}
       </div>

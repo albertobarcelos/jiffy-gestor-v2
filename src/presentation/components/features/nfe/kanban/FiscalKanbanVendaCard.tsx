@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { MdArrowForward, MdEdit, MdPrint, MdVisibility } from 'react-icons/md'
+import { MdArrowForward, MdDeliveryDining, MdEdit, MdPrint, MdVisibility } from 'react-icons/md'
 import { Button } from '@/src/presentation/components/ui/button'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
@@ -11,6 +11,7 @@ import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
 import { DraggableVendaCard } from './DraggableVendaCard'
 import { KanbanCardAcaoButton } from './KanbanCardAcaoButton'
 import { PedidoEntregaQuickViewPopover } from './PedidoEntregaQuickViewPopover'
+import { AtribuirEntregadorKanbanPainel } from './AtribuirEntregadorKanbanPainel'
 import type { ColunaKanbanId, KanbanColumn, Venda } from './types'
 import {
   COLUNAS_ENTREGA_OPERACIONAIS,
@@ -39,6 +40,8 @@ interface FiscalKanbanVendaCardProps {
   onEmitirNfe: (venda: Venda) => void
   /** Modo delivery: reimprime cupom (mesmo layout da automática). */
   onReimprimirCupomDelivery?: (venda: Venda, colunaAtual: ColunaKanbanId) => void
+  entregadorVinculadoId?: string | null
+  onEntregadorAtualizado?: (vendaId: string, entregadorId: string) => void
 }
 
 export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
@@ -54,8 +57,11 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
     onAvancarEtapa,
     onEmitirNfe,
     onReimprimirCupomDelivery,
+    entregadorVinculadoId = null,
+    onEntregadorAtualizado,
   } = props
   const [entregaQuickViewAnchor, setEntregaQuickViewAnchor] = useState<HTMLElement | null>(null)
+  const [atribuirEntregadorOpen, setAtribuirEntregadorOpen] = useState(false)
   const valorFormatado = transformarParaReal(venda.valorFinal)
   const clienteNome = venda.cliente?.nome?.trim() ? venda.cliente.nome : LABEL_SEM_CLIENTE
 
@@ -110,10 +116,14 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
   const tabelaOrigemQuickView =
     venda.tabelaOrigem === 'venda_gestor' ? 'venda_gestor' : 'venda'
   const colunaAtual = column.id as ColunaKanbanId
-  const podeImprimirQuickView =
+  const tipoVendaQuickView =
+    (venda.tipoVenda ?? '').trim().toLowerCase() === 'retirada' ? 'retirada' : 'entrega'
+  const exibirAtribuirEntregador =
     modoKanbanVendas === 'delivery' &&
-    Boolean(onReimprimirCupomDelivery) &&
+    tipoVendaStr === 'entrega' &&
+    venda.isPedidoEntregaGestor() &&
     COLUNAS_ENTREGA_OPERACIONAIS.includes(colunaAtual)
+  const entregadorJaVinculado = Boolean(entregadorVinculadoId?.trim())
 
   return (
     <DraggableVendaCard venda={venda} column={column}>
@@ -250,6 +260,35 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
               </Button>
             )}
 
+          {exibirAtribuirEntregador && (
+            <Button
+              size="sm"
+              variant="outlined"
+              className={`!min-w-0 !px-2 hover:!bg-gray-50 ${
+                entregadorJaVinculado
+                  ? '!border-secondary !text-secondary'
+                  : '!border-gray-300 !text-gray-700'
+              }`}
+              sx={{ py: 0.375, minHeight: 'auto' }}
+              title={
+                entregadorJaVinculado
+                  ? 'Alterar entregador'
+                  : 'Vincular entregador'
+              }
+              aria-label={
+                entregadorJaVinculado
+                  ? 'Alterar entregador'
+                  : 'Vincular entregador'
+              }
+              onClick={e => {
+                e.stopPropagation()
+                setAtribuirEntregadorOpen(true)
+              }}
+            >
+              <MdDeliveryDining size={16} />
+            </Button>
+          )}
+
           {exibirQuickViewEntrega && (
             <Button
               size="sm"
@@ -330,20 +369,27 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
         </div>
       </div>
 
+      {exibirAtribuirEntregador && (
+        <AtribuirEntregadorKanbanPainel
+          open={atribuirEntregadorOpen}
+          venda={venda}
+          entregadorVinculadoId={entregadorVinculadoId}
+          onClose={() => setAtribuirEntregadorOpen(false)}
+          onSalvo={(vendaId, entregadorId) => {
+            onEntregadorAtualizado?.(vendaId, entregadorId)
+          }}
+        />
+      )}
+
       {exibirQuickViewEntrega && (
         <PedidoEntregaQuickViewPopover
           vendaId={venda.id}
           tabelaOrigem={tabelaOrigemQuickView}
           colunaAtual={colunaAtual}
+          tipoVenda={tipoVendaQuickView}
           anchorEl={entregaQuickViewAnchor}
           open={Boolean(entregaQuickViewAnchor)}
           onClose={() => setEntregaQuickViewAnchor(null)}
-          podeImprimir={podeImprimirQuickView}
-          onImprimir={
-            podeImprimirQuickView && onReimprimirCupomDelivery
-              ? () => onReimprimirCupomDelivery(venda, colunaAtual)
-              : undefined
-          }
         />
       )}
     </DraggableVendaCard>

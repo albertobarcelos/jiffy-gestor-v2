@@ -79,7 +79,6 @@ import {
   taxaEntregaTemValor,
 } from './novoPedidoDetalheHelpers'
 import {
-  getUltimoEntregadorSelecionado,
   statusPadraoNovoPedido,
 } from './novoPedidoTextHelpers'
 import {
@@ -156,7 +155,6 @@ export function NovoPedidoModal({
   const [telefoneBuscaEntrega, setTelefoneBuscaEntrega] = useState('')
   const [telefoneBuscadoEntrega, setTelefoneBuscadoEntrega] = useState<string | null>(null)
   const [tempoPrevistoMinutos, setTempoPrevistoMinutos] = useState<number>(45)
-  const [entregadorId, setEntregadorId] = useState<string>('')
   const [taxaEntregaId, setTaxaEntregaId] = useState<string>('')
   /**
    * Cliente vinculado encontrado ou criado no fluxo entrega.
@@ -616,19 +614,6 @@ export function NovoPedidoModal({
     if (!open || modoVisualizacao || !pedidoComEntrega) return
     void refetchTaxasEntrega()
   }, [open, modoVisualizacao, pedidoComEntrega, refetchTaxasEntrega])
-
-  useEffect(() => {
-    if (!open || vendaId || modoVisualizacao || !pedidoComEntrega || entregadorId) return
-    if (entregadores.length === 0) return
-
-    const ultimoEntregadorId = getUltimoEntregadorSelecionado()
-    if (!ultimoEntregadorId) return
-
-    const entregadorAindaDisponivel = entregadores.some(entregador => entregador.id === ultimoEntregadorId)
-    if (entregadorAindaDisponivel) {
-      setEntregadorId(ultimoEntregadorId)
-    }
-  }, [open, vendaId, modoVisualizacao, pedidoComEntrega, entregadorId, entregadores])
 
   /** Primeira carga ou fetch sem cache ainda — evita área vazia sem feedback */
   const mostrarLoadingFormasPagamento =
@@ -1225,7 +1210,6 @@ export function NovoPedidoModal({
   const handleTipoAtendimentoDeliveryChange = (tipo: TipoAtendimentoDelivery) => {
     setTipoAtendimentoDelivery(tipo)
     if (tipo === 'retirada') {
-      setEntregadorId('')
       setTaxaEntregaId('')
       setMoradaEntregaSelecionada(null)
     }
@@ -1463,9 +1447,6 @@ export function NovoPedidoModal({
             },
           ]
         }
-        if (pedidoComEntrega && entregadorId) {
-          vendaData.entregadorId = entregadorId
-        }
       }
 
       // solicitarEmissaoFiscal: true apenas quando status é PENDENTE_EMISSAO, false nos demais casos
@@ -1638,7 +1619,6 @@ export function NovoPedidoModal({
     setTelefoneBuscaEntrega('')
     setTelefoneBuscadoEntrega(null)
     setTempoPrevistoMinutos(45)
-    setEntregadorId('')
     setTaxaEntregaId('')
     setClienteEntregaVinculado(null)
     setClienteTabsModalEntregaState({
@@ -2544,11 +2524,6 @@ export function NovoPedidoModal({
       return false
     }
 
-    if (pedidoComEntrega && !entregadorId) {
-      if (exibirToast) showToast.error('Selecione o entregador antes de continuar.')
-      return false
-    }
-
     return true
   }
 
@@ -2671,7 +2646,6 @@ export function NovoPedidoModal({
     ehAcrescimo,
     ehPorcentagem,
     empresa,
-    entregadorId,
     entregadores,
     entregadoresQuery,
     fluxoPagamentoEntrega,
@@ -2765,7 +2739,6 @@ export function NovoPedidoModal({
     setClienteEntregaVinculado,
     setEhAcrescimo,
     setEhPorcentagem,
-    setEntregadorId,
     setFluxoPagamentoEntrega,
     setGrupoSelecionadoId,
     setMeioPagamentoId,

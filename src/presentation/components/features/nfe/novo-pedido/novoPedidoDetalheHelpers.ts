@@ -385,6 +385,23 @@ export async function resolverTaxaEntregaDetalhe(
   return fromApi
 }
 
+/**
+ * Resolve valor da taxa de entrega sem requests extras (snapshot da venda + inferência por totais).
+ * Ideal para quick view do Kanban, onde só o valor numérico é exibido.
+ */
+export function resolverTaxaEntregaValorSync(
+  vendaData: Record<string, unknown>,
+  totalDosItens?: number | null
+): number {
+  const snapshot = mapTaxaEntregaSnapshotFromVenda(vendaData)
+  if (taxaEntregaTemValor(snapshot)) return Number(snapshot!.valor)
+
+  const inferida = inferirTaxaEntregaPorTotais(vendaData, totalDosItens, snapshot)
+  if (taxaEntregaTemValor(inferida)) return Number(inferida!.valor)
+
+  return 0
+}
+
 export function formatarTaxaEntregaDetalheExibicao(
   taxa: TaxaEntregaDetalhe | null | undefined,
   formatarMoeda: (valor: number) => string
@@ -451,6 +468,40 @@ export function formatarHoraPrevisaoEntrega(
   }
 
   return formatarHoraDetalhePedido(str)
+}
+
+/**
+ * Troco que o entregador deve levar ao cliente.
+ * - Pedido já pago: `troco` na raiz (pagamento efetivo acima do total).
+ * - Cobrar na entrega: `totalCobrarNaEntrega − valorFaltante` (mesma regra de `VendaGestor.trocoParaLevar`).
+ */
+export function resolverTrocoLevarPedidoEntrega(
+  vendaData: Record<string, unknown>,
+  pagamentos: PagamentoSelecionado[] = []
+): number {
+  const trocoRaiz = Number(vendaData.troco)
+  if (Number.isFinite(trocoRaiz) && trocoRaiz > 0) {
+    return Math.round(trocoRaiz * 100) / 100
+  }
+
+  const valorFinal = Number(vendaData.valorFinal)
+  if (!Number.isFinite(valorFinal) || valorFinal <= 0) return 0
+
+  const pagamentosValidos = pagamentos.filter(p => !pagamentoEstaCancelado(p))
+  const totalPagoSemCobranca = pagamentosValidos
+    .filter(p => !p.cobrarNaEntrega && !p.naoEfetivo)
+    .reduce((sum, p) => sum + (Number(p.valor) || 0), 0)
+
+  const totalCobrarNaEntrega = pagamentosValidos
+    .filter(p => p.cobrarNaEntrega || p.naoEfetivo)
+    .reduce((sum, p) => sum + (Number(p.valor) || 0), 0)
+
+  if (totalCobrarNaEntrega <= 0) return 0
+
+  const valorFaltanteAntes = Math.max(0, valorFinal - totalPagoSemCobranca)
+  const troco = totalCobrarNaEntrega - valorFaltanteAntes
+
+  return troco > 0 ? Math.round(troco * 100) / 100 : 0
 }
 
 export function formatarEnderecoEntregaMultilinha(
