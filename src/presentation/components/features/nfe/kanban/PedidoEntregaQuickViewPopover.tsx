@@ -22,6 +22,12 @@ interface PedidoEntregaQuickViewPopoverProps {
   onClose: () => void
 }
 
+function impedirPropagacaoParaCardKanban(
+  event: React.MouseEvent | React.PointerEvent | React.TouchEvent
+) {
+  event.stopPropagation()
+}
+
 export function PedidoEntregaQuickViewPopover({
   vendaId,
   tabelaOrigem,
@@ -91,11 +97,15 @@ export function PedidoEntregaQuickViewPopover({
       transformOrigin={{ vertical: 'top', horizontal: 'right' }}
       slotProps={{
         paper: {
+          onPointerDown: impedirPropagacaoParaCardKanban,
+          onMouseDown: impedirPropagacaoParaCardKanban,
+          onTouchStart: impedirPropagacaoParaCardKanban,
           sx: {
             mt: 0.5,
             width: 320,
             maxWidth: 'calc(100vw - 24px)',
             maxHeight: 'min(75vh, 560px)',
+            minHeight: 0,
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
@@ -105,9 +115,14 @@ export function PedidoEntregaQuickViewPopover({
         },
       }}
     >
-      <div className="overflow-y-auto px-3 py-2">
+      <div
+        className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 py-2"
+        onPointerDown={impedirPropagacaoParaCardKanban}
+        onMouseDown={impedirPropagacaoParaCardKanban}
+        onTouchStart={impedirPropagacaoParaCardKanban}
+      >
         {loading && (
-          <div className="flex min-h-[120px] items-center justify-center">
+          <div className="flex min-h-[120px] flex-1 items-center justify-center">
             <CircularProgress size={24} />
           </div>
         )}

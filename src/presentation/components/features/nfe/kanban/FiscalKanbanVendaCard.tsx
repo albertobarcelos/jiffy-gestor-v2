@@ -70,7 +70,10 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
     column.id === 'PENDENTE_EMISSAO' ||
     (column.id === 'COM_NFE' &&
       (acaoFiscalEmAndamentoPorVenda[venda.id] === 'reemitindo' ||
-        acaoFiscalEmAndamentoPorVenda[venda.id] === 'emitindo'))
+        acaoFiscalEmAndamentoPorVenda[venda.id] === 'emitindo')) ||
+    (modoKanbanVendas === 'delivery' &&
+      venda.isPedidoEntregaGestor() &&
+      COLUNAS_ENTREGA_OPERACIONAIS.includes(column.id as ColunaKanbanId))
 
   const podeEditarClienteNaVenda =
     colunaPermiteEditarCliente &&
@@ -124,9 +127,11 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
     venda.isPedidoEntregaGestor() &&
     COLUNAS_ENTREGA_OPERACIONAIS.includes(colunaAtual)
   const entregadorJaVinculado = Boolean(entregadorVinculadoId?.trim())
+  const quickViewAberto = Boolean(entregaQuickViewAnchor)
+  const bloquearDragCard = quickViewAberto || atribuirEntregadorOpen
 
   return (
-    <DraggableVendaCard venda={venda} column={column}>
+    <DraggableVendaCard venda={venda} column={column} dragDisabled={bloquearDragCard}>
       <div
         className={`relative rounded-lg border-l-4 ${cardBorderClass} ${cardBgClass} cursor-pointer border border-gray-200/80 p-3 transition-all hover:shadow-md`}
         title="Clique para ver os detalhes do pedido"
@@ -139,10 +144,10 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
               {prefixoLinhaOrigemCard} | Venda {venda.numeroVenda}
               {venda.codigoVenda ? ` - #${venda.codigoVenda}` : ''}
             </p>
-            <div className="flex min-w-0 items-start gap-1">
-              <p className="mb-0 min-w-0 flex-1 truncate text-sm font-semibold uppercase text-primary-text">
+            <div className="flex min-w-0 items-center gap-1">
+              <span className="min-w-0 truncate text-sm font-semibold uppercase text-primary-text">
                 {clienteNome}
-              </p>
+              </span>
               {podeEditarClienteNaVenda && venda.cliente?.id && (
                 <button
                   type="button"
@@ -151,7 +156,7 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
                     onAbrirEdicaoCliente(venda.cliente!.id)
                   }}
                   onDoubleClick={e => e.stopPropagation()}
-                  className="flex-shrink-0 rounded p-0.5 text-primary transition-colors hover:bg-primary/10"
+                  className="shrink-0 rounded p-0.5 text-primary transition-colors hover:bg-primary/10"
                   title="Editar dados do cliente"
                   aria-label="Editar dados do cliente"
                 >
