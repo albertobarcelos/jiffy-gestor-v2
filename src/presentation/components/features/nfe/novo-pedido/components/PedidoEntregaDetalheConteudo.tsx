@@ -12,7 +12,7 @@ import {
   formatarTipoPagamentoDetalhe,
   rotuloCobrancaEntrega,
   taxaEntregaTemValor,
-} from '../novoPedidoDetalheHelpers'
+} from '@/src/application/mappers/PedidoDisplayMapper'
 import type { DetalhesEntregaPedido, FluxoPagamentoEntrega, PagamentoSelecionado } from '../types'
 
 function LinhaDetalhe({ label, value }: { label: string; value: ReactNode }) {

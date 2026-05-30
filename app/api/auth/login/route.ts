@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { ZodError } from 'zod'
 import { LoginSchema } from '@/src/application/dto/LoginDTO'
 import { LoginUseCase } from '@/src/application/use-cases/auth/LoginUseCase'
 import { AuthRepository } from '@/src/infrastructure/database/repositories/AuthRepository'
@@ -53,20 +54,18 @@ export async function POST(request: NextRequest) {
 
     return response
   } catch (error) {
-    if (error instanceof Error) {
-      // Erro de validação Zod
-      if (error.name === 'ZodError') {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Dados inválidos',
-            details: error.message,
-          },
-          { status: 400 }
-        )
-      }
+    if (error instanceof ZodError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Dados inválidos',
+          details: error.message,
+        },
+        { status: 400 }
+      )
+    }
 
-      // Outros erros
+    if (error instanceof Error) {
       return NextResponse.json(
         {
           success: false,

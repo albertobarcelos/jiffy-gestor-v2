@@ -1,10 +1,20 @@
 'use client'
 
-import { createContext, useContext, type ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
+import type { NovoPedidoContextValue } from './novoPedidoContextTypes'
+import { NovoPedidoFormProvider } from './NovoPedidoFormContext'
+import { NovoPedidoUIProvider } from './NovoPedidoUIContext'
+import { NovoPedidoDetalheProvider } from './NovoPedidoDetalheContext'
+import {
+  splitDetalheContextValue,
+  splitFormContextValue,
+  splitUIContextValue,
+} from './splitNovoPedidoContext'
 
-export type NovoPedidoContextValue = Record<string, any>
-
-const NovoPedidoContext = createContext<NovoPedidoContextValue | null>(null)
+export type { NovoPedidoContextValue } from './novoPedidoContextTypes'
+export { useNovoPedidoFormContext } from './NovoPedidoFormContext'
+export { useNovoPedidoUIContext } from './NovoPedidoUIContext'
+export { useNovoPedidoDetalheContext } from './NovoPedidoDetalheContext'
 
 interface NovoPedidoProviderProps {
   value: NovoPedidoContextValue
@@ -12,13 +22,15 @@ interface NovoPedidoProviderProps {
 }
 
 export function NovoPedidoProvider({ value, children }: NovoPedidoProviderProps) {
-  return <NovoPedidoContext.Provider value={value}>{children}</NovoPedidoContext.Provider>
-}
+  const formValue = useMemo(() => splitFormContextValue(value), [value])
+  const uiValue = useMemo(() => splitUIContextValue(value), [value])
+  const detalheValue = useMemo(() => splitDetalheContextValue(value), [value])
 
-export function useNovoPedidoContext(): NovoPedidoContextValue {
-  const context = useContext(NovoPedidoContext)
-  if (!context) {
-    throw new Error('useNovoPedidoContext deve ser usado dentro de NovoPedidoProvider')
-  }
-  return context
+  return (
+    <NovoPedidoFormProvider value={formValue}>
+      <NovoPedidoUIProvider value={uiValue}>
+        <NovoPedidoDetalheProvider value={detalheValue}>{children}</NovoPedidoDetalheProvider>
+      </NovoPedidoUIProvider>
+    </NovoPedidoFormProvider>
+  )
 }

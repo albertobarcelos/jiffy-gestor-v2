@@ -1,0 +1,20 @@
+/** Props exclusivas da camada de apresentação (modal Novo Pedido). */
+
+export interface NovoPedidoModalProps {
+  open: boolean
+  onClose: () => void
+  onSuccess: () => void
+  /** Chamado após o painel terminar a transição de saída */
+  onAfterClose?: () => void
+  vendaId?: string
+  modoVisualizacao?: boolean
+  /** GET gestor vs PDV; com `incluirFiscal=true` no carregamento */
+  tabelaOrigemVenda?: 'venda' | 'venda_gestor'
+  /** `statusFiscal` do GET vendas unificado (Kanban) */
+  statusFiscalUnificado?: string | null
+  /**
+   * Canal escolhido no EscolhaTipoPedidoModal.
+   * balcao: step inicial = Informações; entrega: step inicial = Produtos.
+   */
+  tipoInicioPedido?: 'balcao' | 'entrega'
+}
