@@ -208,7 +208,7 @@ interface VendasUnificadasResponse {
 export const VENDAS_UNIFICADAS_PAGE_SIZE = 100
 
 /** Converte um item bruto da API em DTO (reutilizado em cada página). */
-function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): VendaUnificadaDTO {
+export function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): VendaUnificadaDTO {
   return new VendaUnificadaDTO(
     v.id as string,
     v.numeroVenda as number,
@@ -236,6 +236,39 @@ function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): VendaUnif
   )
 }
 
+/**
+ * Converte linha do GET /operacao-pdv/vendas (summary PDV) para o DTO do Kanban fiscal.
+ * Campos fiscais extras (resumoFiscal, solicitarEmissaoFiscal) são preservados quando a API envia.
+ */
+export function mapVendaPdvJsonParaVendaUnificadaDTO(v: Record<string, unknown>): VendaUnificadaDTO {
+  const clienteId = v.clienteId as string | null | undefined
+  const clienteObj = v.cliente as VendaUnificadaDTO['cliente'] | null | undefined
+  const abertoPorObj = v.abertoPor as VendaUnificadaDTO['abertoPor'] | null | undefined
+  const abertoPorId = String(v.abertoPorId ?? abertoPorObj?.id ?? '')
+
+  const unified: Record<string, unknown> = {
+    ...v,
+    origem: 'PDV',
+    tabelaOrigem: 'venda',
+    totalDesconto: (v.totalDesconto ?? 0) as number,
+    totalAcrescimo: (v.totalAcrescimo ?? 0) as number,
+    dataCriacao: v.dataCriacao as string,
+    dataFinalizacao: (v.dataFinalizacao ?? null) as string | null,
+    dataCancelamento: (v.dataCancelamento ?? null) as string | null,
+    cliente:
+      clienteObj ??
+      (clienteId
+        ? {
+            id: clienteId,
+            nome: String(v.identificacao ?? v.clienteNome ?? 'Cliente'),
+          }
+        : null),
+    abertoPor: abertoPorObj ?? { id: abertoPorId, nome: String(v.abertoPorNome ?? '—') },
+  }
+
+  return mapItemJsonParaVendaUnificadaDTO(unified)
+}
+
 function montarSearchParamsVendasUnificadas(
   params: VendasUnificadasQueryParams,
   offset: number,
@@ -261,10 +294,14 @@ function montarSearchParamsVendasUnificadas(
  * Busca páginas de 100 em 100 até `hasNext` ser false ou até critérios de parada seguros:
  * total já atingiu `count` da API, já passou `totalPages` (se não houver count), ou página só repete ids.
  */
-export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
+export function useVendasUnificadas(
+  params: VendasUnificadasQueryParams,
+  options?: { enabled?: boolean }
+) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
+  const queryEnabled = options?.enabled !== false && !!token
 
   const queryKey = ['vendas-unificadas', params, empresaId]
 
@@ -381,7 +418,7 @@ export function useVendasUnificadas(params: VendasUnificadasQueryParams) {
         hasPrevious: primeiraPaginaMeta?.hasPrevious ?? false,
       }
     },
-    enabled: !!token,
+    enabled: queryEnabled,
     // Herda QueryProvider: staleTime 5min, refetchOnWindowFocus false, refetchOnMount false.
     // Não redefinir staleTime curto nem refetchOnWindowFocus aqui: ao fechar modal o foco volta à janela
     // e disparava novo GET em toda vez (dados stale após 30s).
