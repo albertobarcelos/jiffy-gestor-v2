@@ -25,7 +25,7 @@ import {
   VendaUnificadaDTO,
   resolveModeloParaEmitirNota,
 } from '@/src/presentation/hooks/useVendasUnificadas'
-import { useVendasPdvKanbanPorTerminal } from '@/src/presentation/hooks/useVendasPdvKanbanPorTerminal'
+import { useVendaIdsPdvPorTerminal } from '@/src/presentation/hooks/useVendaIdsPdvPorTerminal'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { calculatePeriodo } from '@/src/shared/utils/dateFilters'
@@ -598,11 +598,10 @@ export function FiscalFlowKanban() {
     rejeitadaReativacaoJaTentadaIdsRef.current = new Set()
   }, [vendasUnificadasQueryKeyFingerprint])
 
-  const vendasPdvQueryParams = useMemo(
+  /** Só terminal + datas: cruzamento com unificado (fiscal). q/statusFiscal ficam no unificado. */
+  const vendaIdsPdvPorTerminalParams = useMemo(
     () => ({
       terminalId: terminalFilter,
-      q: searchQuery || undefined,
-      statusFiscal: statusFiscalFilter || undefined,
       periodoInicial: periodoInicialISO,
       periodoFinal: periodoFinalISO,
       dataFinalizacaoInicio: dataFinalizacaoInicioISO,
@@ -610,8 +609,6 @@ export function FiscalFlowKanban() {
     }),
     [
       terminalFilter,
-      searchQuery,
-      statusFiscalFilter,
       periodoInicialISO,
       periodoFinalISO,
       dataFinalizacaoInicioISO,
@@ -619,27 +616,44 @@ export function FiscalFlowKanban() {
     ]
   )
 
-  // Sem filtro de terminal: GET /vendas/unificado
   const {
     data: vendasUnificadasData,
     isLoading: isLoadingUnificado,
     refetch: refetchUnificado,
-  } = useVendasUnificadas(vendasUnificadasQueryParams, { enabled: !usaFiltroTerminal })
+  } = useVendasUnificadas(vendasUnificadasQueryParams)
 
-  // Com terminal selecionado: GET /operacao-pdv/vendas?terminalId=...
   const {
-    data: vendasPdvData,
-    isLoading: isLoadingPdv,
-    refetch: refetchPdv,
-  } = useVendasPdvKanbanPorTerminal(vendasPdvQueryParams, { enabled: usaFiltroTerminal })
+    data: vendaIdsPdvPorTerminal,
+    isLoading: isLoadingIdsTerminal,
+    refetch: refetchIdsTerminal,
+  } = useVendaIdsPdvPorTerminal(vendaIdsPdvPorTerminalParams, { enabled: usaFiltroTerminal })
 
-  const isLoading = usaFiltroTerminal ? isLoadingPdv : isLoadingUnificado
+  const isLoading = isLoadingUnificado || (usaFiltroTerminal && isLoadingIdsTerminal)
+
   const refetch = useCallback(async () => {
-    if (usaFiltroTerminal) return refetchPdv()
-    return refetchUnificado()
-  }, [usaFiltroTerminal, refetchPdv, refetchUnificado])
+    const [result] = await Promise.all([
+      refetchUnificado(),
+      usaFiltroTerminal ? refetchIdsTerminal() : Promise.resolve(),
+    ])
+    return result
+  }, [usaFiltroTerminal, refetchUnificado, refetchIdsTerminal])
 
-  const vendasCarregadasData = usaFiltroTerminal ? vendasPdvData : vendasUnificadasData
+  /** Lista sempre do unificado; com terminal, só PDV cujo id está no Set do POS. */
+  const vendasCarregadasData = useMemo(() => {
+    const itemsUnificado = vendasUnificadasData?.items ?? []
+    if (!usaFiltroTerminal) {
+      return vendasUnificadasData
+        ? { ...vendasUnificadasData, items: itemsUnificado }
+        : undefined
+    }
+    if (!vendaIdsPdvPorTerminal) {
+      return vendasUnificadasData ? { ...vendasUnificadasData, items: [] } : undefined
+    }
+    const items = itemsUnificado.filter(
+      v => v.tabelaOrigem === 'venda' && vendaIdsPdvPorTerminal.has(v.id)
+    )
+    return vendasUnificadasData ? { ...vendasUnificadasData, items } : undefined
+  }, [usaFiltroTerminal, vendaIdsPdvPorTerminal, vendasUnificadasData])
 
   const marcarEmissaoFiscal = useMarcarEmissaoFiscal()
   const desmarcarEmissaoFiscal = useDesmarcarEmissaoFiscal()

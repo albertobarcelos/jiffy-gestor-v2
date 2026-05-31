@@ -1,47 +1,29 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import {
-  mapVendaPdvJsonParaVendaUnificadaDTO,
-  VENDAS_UNIFICADAS_PAGE_SIZE,
-  VendaUnificadaDTO,
-} from '@/src/presentation/hooks/useVendasUnificadas'
+import { VENDAS_UNIFICADAS_PAGE_SIZE } from '@/src/presentation/hooks/useVendasUnificadas'
 
-/** Parâmetros alinhados aos filtros do Kanban fiscal + `terminalId` obrigatório. */
-export interface VendasPdvKanbanQueryParams {
+/**
+ * Parâmetros mínimos para obter IDs de vendas PDV de um terminal.
+ * Usado só para cruzar com GET /vendas/unificado (que traz fiscal, mas não terminalId).
+ */
+export interface VendaIdsPdvPorTerminalParams {
   terminalId: string
-  q?: string
-  statusFiscal?: string
-  /** ISO — mapeado para `dataCriacaoInicial` no GET /operacao-pdv/vendas */
+  /** ISO — opcional, alinha com filtro de criação do Kanban */
   periodoInicial?: string
-  /** ISO — mapeado para `dataCriacaoFinal` */
   periodoFinal?: string
-  /** ISO — mapeado para `dataFinalizacaoInicial` */
   dataFinalizacaoInicio?: string
-  /** ISO — mapeado para `dataFinalizacaoFinal` */
   dataFinalizacaoFim?: string
 }
 
-export interface VendasPdvKanbanResponse {
-  count: number
-  page: number
-  limit: number
-  totalPages: number
-  hasNext: boolean
-  hasPrevious: boolean
-  items: VendaUnificadaDTO[]
-}
-
-function montarSearchParamsVendasPdvKanban(
-  params: VendasPdvKanbanQueryParams,
+function montarSearchParamsIdsPdvPorTerminal(
+  params: VendaIdsPdvPorTerminalParams,
   offset: number,
   limit: number
 ): URLSearchParams {
   const searchParams = new URLSearchParams()
   searchParams.append('terminalId', params.terminalId)
-  if (params.q?.trim()) searchParams.append('q', params.q.trim())
-  if (params.statusFiscal) searchParams.append('statusFiscal', params.statusFiscal)
   if (params.periodoInicial) searchParams.append('dataCriacaoInicial', params.periodoInicial)
   if (params.periodoFinal) searchParams.append('dataCriacaoFinal', params.periodoFinal)
   if (params.dataFinalizacaoInicio)
@@ -56,11 +38,11 @@ function montarSearchParamsVendasPdvKanban(
 }
 
 /**
- * Busca vendas PDV por terminal (GET /operacao-pdv/vendas) paginando até o fim.
- * Uso temporário no Kanban fiscal quando o filtro de terminal está ativo.
+ * Retorna o conjunto de IDs de vendas PDV do terminal informado.
+ * Solução temporária: cruzar com a lista unificada no Kanban fiscal.
  */
-export function useVendasPdvKanbanPorTerminal(
-  params: VendasPdvKanbanQueryParams,
+export function useVendaIdsPdvPorTerminal(
+  params: VendaIdsPdvPorTerminalParams,
   options?: { enabled?: boolean }
 ) {
   const { auth } = useAuthStore()
@@ -69,34 +51,28 @@ export function useVendasPdvKanbanPorTerminal(
   const queryEnabled =
     options?.enabled !== false && !!token && !!params.terminalId.trim()
 
-  const queryKey = ['vendas-pdv-kanban-terminal', params, empresaId]
+  const queryKey = ['venda-ids-pdv-terminal', params, empresaId]
 
   return useQuery({
     queryKey,
-    placeholderData: keepPreviousData,
-    queryFn: async (): Promise<VendasPdvKanbanResponse> => {
+    queryFn: async (): Promise<Set<string>> => {
       if (!token) {
         throw new Error('Token não encontrado')
       }
 
       const pageSize = VENDAS_UNIFICADAS_PAGE_SIZE
-      const todosItens: VendaUnificadaDTO[] = []
+      const ids = new Set<string>()
       const idsJaRecebidos = new Set<string>()
       let offset = 0
       let totalCountDaApi: number | null = null
       let totalPagesDaApi: number | null = null
-      let primeiraPaginaMeta: {
-        page: number
-        totalPages: number
-        hasPrevious: boolean
-      } | null = null
 
       const maxPaginas = 500
       let pagina = 0
 
       while (pagina < maxPaginas) {
         pagina += 1
-        const searchParams = montarSearchParamsVendasPdvKanban(params, offset, pageSize)
+        const searchParams = montarSearchParamsIdsPdvPorTerminal(params, offset, pageSize)
 
         const response = await fetchGestorApi(`/api/vendas?${searchParams.toString()}`, {
           headers: {
@@ -117,7 +93,6 @@ export function useVendasPdvKanbanPorTerminal(
 
         const data = await response.json()
         const rawItems = (data.items || []) as Record<string, unknown>[]
-        const batch = rawItems.map(mapVendaPdvJsonParaVendaUnificadaDTO)
 
         if (pagina === 1) {
           if (typeof data.count === 'number' && data.count >= 0) {
@@ -126,26 +101,22 @@ export function useVendasPdvKanbanPorTerminal(
           if (typeof data.totalPages === 'number' && data.totalPages > 0) {
             totalPagesDaApi = data.totalPages
           }
-          primeiraPaginaMeta = {
-            page: data.page ?? 1,
-            totalPages: data.totalPages ?? 1,
-            hasPrevious: data.hasPrevious ?? false,
-          }
         }
 
-        const novosNaPagina =
-          batch.length > 0 ? batch.filter(item => !idsJaRecebidos.has(item.id)) : []
+        const novosIds = rawItems
+          .map(item => String(item.id ?? ''))
+          .filter(id => id && !idsJaRecebidos.has(id))
 
-        if (batch.length > 0 && novosNaPagina.length === 0) {
+        if (rawItems.length > 0 && novosIds.length === 0) {
           break
         }
 
-        for (const item of novosNaPagina) {
-          idsJaRecebidos.add(item.id)
+        for (const id of novosIds) {
+          idsJaRecebidos.add(id)
+          ids.add(id)
         }
-        todosItens.push(...novosNaPagina)
 
-        if (totalCountDaApi !== null && todosItens.length >= totalCountDaApi) {
+        if (totalCountDaApi !== null && ids.size >= totalCountDaApi) {
           break
         }
 
@@ -154,22 +125,14 @@ export function useVendasPdvKanbanPorTerminal(
         }
 
         const hasNext = data.hasNext ?? false
-        if (!hasNext || batch.length === 0 || batch.length < pageSize) {
+        if (!hasNext || rawItems.length === 0 || rawItems.length < pageSize) {
           break
         }
 
         offset += pageSize
       }
 
-      return {
-        items: todosItens,
-        count: totalCountDaApi !== null ? totalCountDaApi : todosItens.length,
-        page: primeiraPaginaMeta?.page ?? 1,
-        limit: todosItens.length,
-        totalPages: primeiraPaginaMeta?.totalPages ?? 1,
-        hasNext: false,
-        hasPrevious: primeiraPaginaMeta?.hasPrevious ?? false,
-      }
+      return ids
     },
     enabled: queryEnabled,
     refetchOnReconnect: true,
