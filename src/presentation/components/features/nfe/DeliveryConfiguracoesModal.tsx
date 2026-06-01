@@ -2,6 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { MdPrint, MdRefresh, MdTune } from 'react-icons/md'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/src/presentation/components/ui/select'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import {
@@ -41,6 +48,9 @@ interface DeliveryConfiguracoesModalProps {
 
 type MapeamentosDraft = Record<string, string>
 
+/** Valor interno do Select Radix — opção “usar impressora de cada produto”. */
+const IMPRESSORA_EXPEDICAO_POR_PRODUTO = '__por_produto__'
+
 function nomeEstacaoPadrao(): string {
   if (typeof window === 'undefined') return 'Estação Gestor'
   const userAgent = window.navigator.userAgent
@@ -57,6 +67,11 @@ function boolConfig(v: unknown, fallback: boolean): boolean {
   if (v === 'true' || v === '1' || v === 1) return true
   if (v === 'false' || v === '0' || v === 0) return false
   return fallback
+}
+
+function clampCopiasUnificado(n: number): number {
+  if (!Number.isFinite(n)) return 1
+  return Math.min(99, Math.max(1, Math.floor(n)))
 }
 
 async function mensagemErroHttp(res: Response): Promise<string> {
@@ -85,7 +100,7 @@ function DeliveryToggleRow(props: {
   return (
     <label
       htmlFor={id}
-      className={`flex items-start justify-between gap-3 rounded-lg bg-white px-3 py-2.5 shadow-sm ring-1 ring-gray-100 ${disabled ? 'cursor-default opacity-75' : 'cursor-pointer'}`}
+      className={`flex items-center justify-between gap-2 rounded-lg bg-white px-2 py-2 shadow-sm ring-1 ring-gray-100 ${disabled ? 'cursor-default opacity-75' : 'cursor-pointer'}`}
     >
       <div className="min-w-0">
         <p className="text-sm font-semibold text-primary-text">{titulo}</p>
@@ -402,7 +417,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
         saveAndCloseDisabled: carregando || !empresaId,
       }}
     >
-      <div className="space-y-4 p-4 md:p-6">
+      <div className="space-y-3 p-4 md:p-6">
         <DeliveryConfigCollapsibleSection
           icon={<MdTune className="h-5 w-5" aria-hidden />}
           title="Comportamento da impressão (empresa)"
@@ -418,46 +433,80 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
                 descricao="Quando ativo, pedidos novos entram automaticamente em preparo/produção. Desative para manter os pedidos aguardando ação manual."
               />
 
-              <div className="space-y-1">
-                <label htmlFor="delivery-modo-impressao" className="text-sm font-semibold text-primary-text">
+              <div className="flex flex-row items-center gap-2">
+                <label htmlFor="delivery-modo-impressao" className="shrink-0 text-sm font-semibold text-primary-text">
                   Modo de cupom delivery
                 </label>
-                <select
-                  id="delivery-modo-impressao"
-                  value={modoImpressao}
-                  disabled={carregando}
-                  onChange={e =>
-                    setModoImpressao(e.target.value === 'separado' ? 'separado' : 'unificado')
-                  }
-                  className="h-10 w-full max-w-md rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none transition-colors focus:border-primary disabled:opacity-60"
-                >
-                  <option value="unificado">
-                    Unificado — um cupom completo ao iniciar preparo (recomendado para a maioria)
-                  </option>
-                  <option value="separado">
-                    Separado — produção na cozinha ao receber e expedição ao marcar pronto
-                  </option>
-                </select>
+                <div className="min-w-0 flex-1">
+                  <Select
+                    value={modoImpressao}
+                    disabled={carregando}
+                    onValueChange={v =>
+                      setModoImpressao(v === 'separado' ? 'separado' : 'unificado')
+                    }
+                  >
+                    <SelectTrigger
+                      id="delivery-modo-impressao"
+                      className="h-10 w-full rounded-lg border-gray-200 bg-white text-sm shadow-none focus:border-primary focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 [&>span]:line-clamp-1 [&>span]:text-left"
+                    >
+                      <SelectValue placeholder="Selecione o modo de cupom" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-lg border-gray-200">
+                      <SelectItem value="unificado">
+                        Unificado — Um cupom completo ao iniciar preparo (recomendado para a maioria)
+                      </SelectItem>
+                      <SelectItem value="separado">
+                        Separado — Produção na cozinha ao receber e expedição ao marcar pronto
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {modoImpressao === 'unificado' ? (
                 <div className="space-y-1">
-                  <label htmlFor="delivery-copias" className="text-sm font-semibold text-primary-text">
-                    Quantidade de cópias do cupom unificado
-                  </label>
-                  <input
-                    id="delivery-copias"
-                    type="number"
-                    min={1}
-                    max={99}
-                    value={copiasUnificado}
-                    disabled={carregando}
-                    onChange={e => {
-                      const n = Number(e.target.value)
-                      if (Number.isFinite(n)) setCopiasUnificado(Math.min(99, Math.max(1, Math.floor(n))))
-                    }}
-                    className="h-10 w-full max-w-[8rem] rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-primary disabled:opacity-60"
-                  />
+                  <div className="flex flex-row items-center gap-2">
+                    <label htmlFor="delivery-copias" className="text-sm font-semibold text-primary-text">
+                      Quantidade de cópias do cupom unificado
+                    </label>
+                    <div className={`flex shrink-0 ${carregando ? 'opacity-60' : ''}`}>
+                      <input
+                        id="delivery-copias"
+                        type="number"
+                        min={1}
+                        max={99}
+                        value={copiasUnificado}
+                        disabled={carregando}
+                        onChange={e => setCopiasUnificado(clampCopiasUnificado(Number(e.target.value)))}
+                        onBlur={e => setCopiasUnificado(clampCopiasUnificado(Number(e.target.value)))}
+                        className="h-8 w-12 rounded-l-lg border border-r-0 border-gray-200 px-2 text-center text-sm tabular-nums outline-none [appearance:textfield] focus:border-primary disabled:cursor-not-allowed [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      />
+                      <div className="flex w-8 flex-col overflow-hidden rounded-r-lg border border-gray-200">
+                        <button
+                          type="button"
+                          aria-label="Aumentar quantidade de cópias"
+                          disabled={carregando || copiasUnificado >= 99}
+                          onClick={() => setCopiasUnificado(v => clampCopiasUnificado(v + 1))}
+                          className="flex h-4 flex-1 items-center justify-center border-b border-gray-200 bg-white text-secondary-text transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <span className="text-sm font-semibold leading-none" aria-hidden>
+                            +
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Diminuir quantidade de cópias"
+                          disabled={carregando || copiasUnificado <= 1}
+                          onClick={() => setCopiasUnificado(v => clampCopiasUnificado(v - 1))}
+                          className="flex h-4 flex-1 items-center justify-center bg-white text-secondary-text transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <span className="text-sm font-semibold leading-none" aria-hidden>
+                            -
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                   <p className="text-xs text-secondary-text">
                     No modo unificado não há segunda impressão automática ao marcar pronto; use reimpressão na
                     coluna se precisar.
@@ -522,22 +571,32 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
                     servidor usa a impressora lógica de cada produto (e este terminal precisa estar mapeando
                     todas as impressoras usadas nos tickets).
                   </p>
-                  <select
-                    id="delivery-imp-expedicao"
-                    value={impressoraExpedicaoId}
+                  <Select
+                    value={impressoraExpedicaoId || IMPRESSORA_EXPEDICAO_POR_PRODUTO}
                     disabled={carregando}
-                    onChange={e => setImpressoraExpedicaoId(e.target.value)}
-                    className="h-10 w-full max-w-md rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none transition-colors focus:border-primary disabled:opacity-60"
+                    onValueChange={v =>
+                      setImpressoraExpedicaoId(
+                        v === IMPRESSORA_EXPEDICAO_POR_PRODUTO ? '' : v
+                      )
+                    }
                   >
-                    <option value="">
-                      Por produto — impressora configurada em cada item (sem fallback único aqui)
-                    </option>
-                    {impressorasLogicas.map(impressora => (
-                      <option key={impressora.id} value={impressora.id}>
-                        {impressora.nome}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger
+                      id="delivery-imp-expedicao"
+                      className="h-8 w-full max-w-xs rounded-lg border-gray-200 bg-white text-sm shadow-none focus:border-primary focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 [&>span]:line-clamp-1 [&>span]:text-left"
+                    >
+                      <SelectValue placeholder="Selecione a impressora de expedição" />
+                    </SelectTrigger>
+                    <SelectContent className="!max-h-[250px] rounded-lg border-gray-200">
+                      <SelectItem value={IMPRESSORA_EXPEDICAO_POR_PRODUTO}>
+                        Por produto — impressora configurada em cada item.
+                      </SelectItem>
+                      {impressorasLogicas.map(impressora => (
+                        <SelectItem key={impressora.id} value={impressora.id}>
+                          {impressora.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               ) : null}
         </DeliveryConfigCollapsibleSection>
