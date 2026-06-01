@@ -10,12 +10,14 @@ import {
 } from '../novo-pedido/novoPedidoDetalheHelpers'
 import { PedidoKanbanProgressoEntrega } from './PedidoKanbanProgressoEntrega'
 import { PedidoKanbanQuickViewWhatsappAcoes } from './PedidoKanbanQuickViewWhatsappAcoes'
+import type { EnderecoEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import type { PedidoKanbanQuickViewData } from './carregarPedidoKanbanQuickView'
 import type { ColunaKanbanId } from './types'
 
 interface PedidoKanbanQuickViewConteudoProps {
   dados: PedidoKanbanQuickViewData
   nomeEmpresa: string
+  enderecoEmpresa: EnderecoEmpresaMe | null | undefined
   colunaAtual: ColunaKanbanId
   tipoVenda: 'entrega' | 'retirada'
 }
@@ -88,6 +90,7 @@ function rotuloPagamentoPedidoQuickView(
 export function PedidoKanbanQuickViewConteudo({
   dados,
   nomeEmpresa,
+  enderecoEmpresa,
   colunaAtual,
   tipoVenda,
 }: PedidoKanbanQuickViewConteudoProps) {
@@ -208,6 +211,7 @@ export function PedidoKanbanQuickViewConteudo({
         <PedidoKanbanQuickViewWhatsappAcoes
           dados={dados}
           nomeEmpresa={nomeEmpresa}
+          enderecoEmpresa={enderecoEmpresa}
           colunaAtual={colunaAtual}
           tipoVenda={tipoVenda}
         />

@@ -73,7 +73,7 @@ export function DroppableColumnContent({
       )}
       {showDropSlotRota && (
         <div className="mb-2 flex min-h-[72px] items-center justify-center rounded-lg border-2 border-dashed border-indigo-400 bg-indigo-50/90 px-2 text-center text-sm font-medium text-indigo-900 transition-all">
-          Solte aqui para mover para Em rota
+          Solte aqui para mover para Em Rota / Retirada
         </div>
       )}
       {children}

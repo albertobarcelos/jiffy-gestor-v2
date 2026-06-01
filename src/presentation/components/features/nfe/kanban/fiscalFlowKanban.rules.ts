@@ -29,6 +29,12 @@ export const STATUS_FISCAL_AGUARDANDO_SEFAZ = new Set([
 /** Exibido quando o nome do cliente está vazio (Kanban e arraste). */
 export const LABEL_SEM_CLIENTE = 'SEM CLIENTE'
 
+/** Pedidos de retirada não exigem entregador para avançar até Em Rota / Retirada. */
+export function vendaExigeEntregadorParaDespachar(venda: Venda): boolean {
+  const tipo = String(venda.tipoVenda ?? '').trim().toLowerCase()
+  return tipo === 'entrega'
+}
+
 /** Fiscal: arrastar entre Finalizadas ↔ Pendente emissão (e para Com nota). */
 export const COLUNAS_KANBAN_DRAG_FISCAL = new Set<string>([
   'FINALIZADAS',

@@ -18,7 +18,9 @@ export function montarLinkWhatsapp(
 ): string | null {
   const numero = normalizarTelefoneWhatsapp(telefone)
   if (!telefoneValidoParaWhatsapp(telefone)) return null
-  return `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`
+  const text = encodeURIComponent(mensagem.normalize('NFC'))
+  // api.whatsapp.com lida melhor com UTF-8 (emojis) no WhatsApp Desktop (Windows).
+  return `https://api.whatsapp.com/send?phone=${numero}&text=${text}`
 }
 
 export function abrirWhatsapp(

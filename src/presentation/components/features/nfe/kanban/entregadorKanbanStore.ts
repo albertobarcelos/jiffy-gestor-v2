@@ -83,3 +83,55 @@ export async function salvarEntregadorVendaGestor(args: {
 
   definirEntregadorKanbanCache(vendaId, entregadorId)
 }
+
+export type VendaEntregadorKanbanRef = {
+  id: string
+  tabelaOrigem: 'venda' | 'venda_gestor'
+  tipoVenda: string | null
+}
+
+function vendaKanbanPrecisaEntregador(v: VendaEntregadorKanbanRef): boolean {
+  return String(v.tipoVenda ?? '').trim().toLowerCase() === 'entrega'
+}
+
+/**
+ * Preenche mapa vendaId → entregadorId a partir do cache em memória ou GET da venda.
+ * Usado ao montar o Kanban delivery para manter o ícone "secondary" após reload.
+ */
+export async function hidratarEntregadoresKanbanDesdeApi(args: {
+  vendas: VendaEntregadorKanbanRef[]
+  token: string
+  idsJaConhecidos?: ReadonlySet<string>
+}): Promise<Record<string, string>> {
+  const { vendas, token, idsJaConhecidos } = args
+  const updates: Record<string, string> = {}
+  const precisaFetch: VendaEntregadorKanbanRef[] = []
+
+  for (const venda of vendas) {
+    if (!vendaKanbanPrecisaEntregador(venda)) continue
+    if (idsJaConhecidos?.has(venda.id)) continue
+
+    const cached = obterEntregadorKanbanCache(venda.id)
+    if (cached) {
+      updates[venda.id] = cached
+      continue
+    }
+
+    precisaFetch.push(venda)
+  }
+
+  await Promise.all(
+    precisaFetch.map(async venda => {
+      const entregadorId = await resolverEntregadorIdVendaKanban({
+        vendaId: venda.id,
+        tabelaOrigem: venda.tabelaOrigem,
+        token,
+      })
+      if (entregadorId) {
+        updates[venda.id] = entregadorId
+      }
+    })
+  )
+
+  return updates
+}

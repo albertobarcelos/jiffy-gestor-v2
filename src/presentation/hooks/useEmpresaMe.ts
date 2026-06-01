@@ -14,12 +14,43 @@ import {
 import { parseDeliveryCupomTemplate } from '@/src/shared/utils/parseDeliveryCupomTemplate'
 import { getDeliveryCupomTemplateLocal } from '@/src/infrastructure/printing/deliveryCupomTemplateStorage'
 
+/** Endereço da empresa (GET `/api/empresas/me`) — usado em mensagens de retirada. */
+export interface EnderecoEmpresaMe {
+  rua?: string | null
+  numero?: string | null
+  bairro?: string | null
+  cidade?: string | null
+  estado?: string | null
+  cep?: string | null
+  complemento?: string | null
+}
+
 /** Resumo da empresa da sessão (mesma rota usada em configurações / painel contador) */
 export interface EmpresaMeResumo {
   id: string
   nomeExibicao: string
   cidade?: string
   estado?: string
+  endereco?: EnderecoEmpresaMe | null
+}
+
+function mapEnderecoEmpresaMe(enderecoRaw: Record<string, unknown>): EnderecoEmpresaMe | null {
+  const pick = (key: string) => {
+    const v = enderecoRaw[key]
+    return v != null && String(v).trim() !== '' ? String(v).trim() : null
+  }
+  const rua = pick('rua') ?? pick('logradouro')
+  const mapped: EnderecoEmpresaMe = {
+    rua,
+    numero: pick('numero'),
+    bairro: pick('bairro'),
+    cidade: pick('cidade'),
+    estado: (pick('estado') ?? pick('uf'))?.toUpperCase().slice(0, 2) ?? null,
+    cep: pick('cep'),
+    complemento: pick('complemento'),
+  }
+  const hasAny = Object.values(mapped).some(v => v != null && v !== '')
+  return hasAny ? mapped : null
 }
 
 /**
@@ -102,7 +133,13 @@ export function useEmpresaMe() {
         })
       }
       setTimezoneAgregacao(tzAgg)
-      setEmpresa({ id, nomeExibicao, cidade, estado })
+      setEmpresa({
+        id,
+        nomeExibicao,
+        cidade,
+        estado,
+        endereco: mapEnderecoEmpresaMe(endereco),
+      })
       setPreferenciasImpressaoDelivery(parsePreferenciasImpressaoDelivery(data))
       setDeliveryCupomTemplate(getDeliveryCupomTemplateLocal(id) ?? parseDeliveryCupomTemplate(data))
     } catch (e) {

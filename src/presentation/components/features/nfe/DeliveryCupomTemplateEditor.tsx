@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { MdReceiptLong, MdRestartAlt } from 'react-icons/md'
+import { DeliveryConfigCollapsibleSection } from './DeliveryConfigCollapsibleSection'
 import { renderDeliveryCupomHtml } from '@/src/application/delivery/renderDeliveryCupomHtml'
 import {
   DEFAULT_DELIVERY_CUPOM_TEMPLATE,
@@ -17,6 +18,7 @@ interface DeliveryCupomTemplateEditorProps {
   value: DeliveryCupomTemplateConfig
   onChange: (value: DeliveryCupomTemplateConfig) => void
   disabled?: boolean
+  resetSectionsWhen?: unknown
 }
 
 function update<K extends keyof DeliveryCupomTemplateConfig>(
@@ -219,6 +221,7 @@ export function DeliveryCupomTemplateEditor({
   value,
   onChange,
   disabled,
+  resetSectionsWhen,
 }: DeliveryCupomTemplateEditorProps) {
   const [modeloSelecionado, setModeloSelecionado] = useState<DeliveryCupomModelo>('expedicao')
   const fontesModelo = value.fontesPorModelo?.[modeloSelecionado] ??
@@ -259,20 +262,17 @@ export function DeliveryCupomTemplateEditor({
   const previewSelecionado = previewHtml[modeloSelecionado]
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <span className="rounded-lg bg-primary/10 p-2 text-primary">
-            <MdReceiptLong className="h-5 w-5" aria-hidden />
-          </span>
-          <div>
-            <h3 className="text-base font-semibold text-primary-text">Modelo visual do cupom</h3>
-            <p className="mt-1 text-sm text-secondary-text">
-              Ajustes salvos em <code>parametroEmpresa.cupomDeliveryTemplate</code>. A impressão
-              continua usando o mesmo fluxo de tickets/QZ.
-            </p>
-          </div>
-        </div>
+    <DeliveryConfigCollapsibleSection
+      icon={<MdReceiptLong className="h-5 w-5" aria-hidden />}
+      title="Modelo visual do cupom"
+      resetExpandedWhen={resetSectionsWhen}
+      description={
+        <>
+          Ajustes salvos em <code>parametroEmpresa.cupomDeliveryTemplate</code>. A impressão continua
+          usando o mesmo fluxo de tickets/QZ.
+        </>
+      }
+      headerActions={
         <button
           type="button"
           disabled={disabled}
@@ -282,9 +282,9 @@ export function DeliveryCupomTemplateEditor({
           <MdRestartAlt className="h-4 w-4" />
           Restaurar padrão
         </button>
-      </div>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+      }
+    >
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-3">
             <div className="space-y-1">
@@ -465,7 +465,7 @@ export function DeliveryCupomTemplateEditor({
           </div>
         </div>
       </div>
-    </section>
+    </DeliveryConfigCollapsibleSection>
   )
 }
 

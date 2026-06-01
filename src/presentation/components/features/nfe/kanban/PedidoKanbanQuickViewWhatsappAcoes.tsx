@@ -4,6 +4,7 @@ import { FaWhatsapp } from 'react-icons/fa'
 import { montarMensagemWhatsappClienteKanban } from '@/src/application/delivery/montarMensagemWhatsappClienteKanban'
 import { montarMensagemWhatsappEntregadorKanban } from '@/src/application/delivery/montarMensagemWhatsappEntregadorKanban'
 import { Button } from '@/src/presentation/components/ui/button'
+import type { EnderecoEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { abrirWhatsapp, telefoneValidoParaWhatsapp } from '@/src/shared/utils/whatsappLink'
 import { showToast } from '@/src/shared/utils/toast'
 import type { PedidoKanbanQuickViewData } from './carregarPedidoKanbanQuickView'
@@ -12,6 +13,7 @@ import type { ColunaKanbanId } from './types'
 interface PedidoKanbanQuickViewWhatsappAcoesProps {
   dados: PedidoKanbanQuickViewData
   nomeEmpresa: string
+  enderecoEmpresa: EnderecoEmpresaMe | null | undefined
   colunaAtual: ColunaKanbanId
   tipoVenda: 'entrega' | 'retirada'
 }
@@ -46,6 +48,7 @@ function enviarWhatsapp(telefone: string | null | undefined, mensagem: string, a
 export function PedidoKanbanQuickViewWhatsappAcoes({
   dados,
   nomeEmpresa,
+  enderecoEmpresa,
   colunaAtual,
   tipoVenda,
 }: PedidoKanbanQuickViewWhatsappAcoesProps) {
@@ -56,9 +59,11 @@ export function PedidoKanbanQuickViewWhatsappAcoes({
   const handleCliente = () => {
     const mensagem = montarMensagemWhatsappClienteKanban({
       clienteNome: dados.clienteNome,
-      numeroVenda: dados.numeroVenda,
-      nomeEmpresa,
       colunaAtual,
+      tipoVenda,
+      dados,
+      enderecoEmpresa,
+      nomeEmpresa,
     })
     enviarWhatsapp(telefoneCliente, mensagem, 'cliente')
   }

@@ -135,6 +135,7 @@ export function PedidoEntregaQuickViewPopover({
           <PedidoKanbanQuickViewConteudo
             dados={dados}
             nomeEmpresa={empresa?.nomeExibicao ?? 'Empresa'}
+            enderecoEmpresa={empresa?.endereco ?? null}
             colunaAtual={colunaAtual}
             tipoVenda={tipoVenda}
           />

@@ -59,6 +59,7 @@ import {
   COLUNAS_KANBAN_DESTINO_PIN,
   ordenarVendasKanbanPorCriterio,
   vendaBloqueadaParaEmissaoInterativa,
+  vendaExigeEntregadorParaDespachar,
 } from './kanban/fiscalFlowKanban.rules'
 import {
   KANBAN_MODO_VENDAS_STORAGE_KEY,
@@ -71,7 +72,7 @@ import { FiscalKanbanVendaCard } from './kanban/FiscalKanbanVendaCard'
 import { useFiscalKanbanFilters } from './kanban/useFiscalKanbanFilters'
 import { useKanbanPinning } from './kanban/useKanbanPinning'
 import { useEntregaTransicoesKanban } from './kanban/useEntregaTransicoesKanban'
-import { resolverEntregadorIdVendaKanban } from './kanban/entregadorKanbanStore'
+import { resolverEntregadorIdVendaKanban, hidratarEntregadoresKanbanDesdeApi } from './kanban/entregadorKanbanStore'
 import {
   useFiscalEmissaoKanban,
   type VendaSelecionadaParaEmissao,
@@ -225,6 +226,76 @@ export function FiscalFlowKanban() {
     [vendasUnificadasInfiniteData]
   )
 
+  const entregadoresHydrationKey = useMemo(
+    () =>
+      todasVendasCarregadas
+        .filter(
+          v =>
+            v.isPedidoEntregaGestor() &&
+            String(v.tipoVenda ?? '').trim().toLowerCase() === 'entrega'
+        )
+        .map(v => v.id)
+        .sort()
+        .join('|'),
+    [todasVendasCarregadas]
+  )
+
+  const entregadorPorVendaIdRef = useRef(entregadorPorVendaId)
+  entregadorPorVendaIdRef.current = entregadorPorVendaId
+
+  useEffect(() => {
+    if (modoKanbanVendas !== 'delivery') return
+    const token = auth?.getAccessToken()
+    if (!token || !entregadoresHydrationKey) return
+
+    let cancelled = false
+
+    void (async () => {
+      const vendasRef = todasVendasCarregadas
+        .filter(
+          v =>
+            v.isPedidoEntregaGestor() &&
+            String(v.tipoVenda ?? '').trim().toLowerCase() === 'entrega'
+        )
+        .map(v => ({
+          id: v.id,
+          tabelaOrigem:
+            v.tabelaOrigem === 'venda_gestor' ? ('venda_gestor' as const) : ('venda' as const),
+          tipoVenda: v.tipoVenda,
+        }))
+
+      const idsJaConhecidos = new Set(
+        Object.entries(entregadorPorVendaIdRef.current)
+          .filter(([, entregadorId]) => entregadorId?.trim())
+          .map(([vendaId]) => vendaId)
+      )
+
+      const updates = await hidratarEntregadoresKanbanDesdeApi({
+        vendas: vendasRef,
+        token,
+        idsJaConhecidos,
+      })
+
+      if (cancelled || Object.keys(updates).length === 0) return
+
+      setEntregadorPorVendaId(prev => {
+        const next = { ...prev }
+        let changed = false
+        for (const [vendaId, entregadorId] of Object.entries(updates)) {
+          if (next[vendaId] !== entregadorId) {
+            next[vendaId] = entregadorId
+            changed = true
+          }
+        }
+        return changed ? next : prev
+      })
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [auth, modoKanbanVendas, entregadoresHydrationKey, todasVendasCarregadas])
+
   const temMaisVendasParaCarregar = useMemo(() => {
     if (hasNextPage) return true
     if (totalVendasApi > 0 && todasVendasCarregadas.length < totalVendasApi) return true
@@ -273,6 +344,9 @@ export function FiscalFlowKanban() {
 
   const verificarEntregadorAntesDespachar = useCallback(
     async (venda: Venda) => {
+      if (!vendaExigeEntregadorParaDespachar(venda)) {
+        return true
+      }
       const token = auth?.getAccessToken()
       if (!token) return false
       const entregadorId = await resolverEntregadorIdVendaKanban({
@@ -506,11 +580,11 @@ export function FiscalFlowKanban() {
     },
     {
       id: 'EM_ROTA',
-      title: 'Em Rota',
+      title: 'Em Rota / Retirada',
       color: 'bg-indigo-50',
       borderColor: 'border-indigo-300',
       icon: <MdRoute className="h-4 w-4 text-indigo-700" />,
-      placeholder: 'Pedidos a caminho do cliente',
+      placeholder: 'Pedidos a caminho do cliente ou prontos para retirada',
     },
     {
       id: 'FINALIZADAS',

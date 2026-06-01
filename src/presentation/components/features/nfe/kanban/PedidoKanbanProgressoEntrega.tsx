@@ -19,7 +19,7 @@ const ETAPAS_PROGRESSO = [
   { id: 'criado', label: 'Criado' },
   { id: 'preparo', label: 'Preparo' },
   { id: 'pronto', label: 'Pronto' },
-  { id: 'em-rota', label: 'Em Rota' },
+  { id: 'em-rota', label: 'Em Rota / Retirada' },
   { id: 'previsao', label: 'Previsão' },
 ] as const
 
