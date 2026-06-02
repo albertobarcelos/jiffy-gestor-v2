@@ -4,8 +4,8 @@ import {
   formatarDataDetalhePedido,
   formatarEnderecoEntregaCompleto,
   formatarHoraPrevisaoEntrega,
-} from '@/src/presentation/components/features/nfe/novo-pedido/novoPedidoDetalheHelpers'
-import type { EnderecoEntregaDetalhe } from '@/src/presentation/components/features/nfe/novo-pedido/types'
+} from '@/src/application/mappers/PedidoDisplayMapper'
+import type { EnderecoEntregaDetalhe } from '@/src/domain/types/vendaDetalhe'
 import type { EnderecoEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { E } from './whatsappMensagemEmojis'

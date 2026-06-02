@@ -31,7 +31,7 @@ export function PedidoProdutosCatalogoColuna() {
   const isLoadingAtual = emBusca ? isLoadingBuscaProdutos : isLoadingProdutos
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-[3] basis-0 flex-col gap-2">
+    <div className="flex min-h-0 min-w-0 flex-[3.8] basis-0 flex-col gap-2">
       <div className="relative shrink-0">
         <MdSearch className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
         <input
@@ -61,7 +61,7 @@ export function PedidoProdutosCatalogoColuna() {
             </p>
           </div>
         ) : (
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 pb-3 pt-2">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-2 pb-3 pt-2">
             <Label className="mb-2 shrink-0 text-sm text-gray-600">
               {tituloGrade}
               {!emBusca && (
@@ -83,7 +83,7 @@ export function PedidoProdutosCatalogoColuna() {
               </div>
             ) : (
               <div
-                className="scrollbar-thin grid min-h-0 flex-1 grid-cols-2 content-start gap-1.5 overflow-y-auto rounded-lg border p-1.5 sm:grid-cols-3 lg:grid-cols-4"
+                className="scrollbar-thin grid min-h-0 flex-1 grid-cols-2 content-start gap-1 overflow-y-auto rounded-lg border p-1.5 sm:grid-cols-3 lg:grid-cols-4"
                 style={{ backgroundColor: `${corHexGrupo}15` }}
               >
                 {produtosList.map(
@@ -104,16 +104,16 @@ export function PedidoProdutosCatalogoColuna() {
                           e.currentTarget.style.borderColor = corHexGrupo
                           e.currentTarget.style.backgroundColor = '#ffffff'
                         }}
-                        className="flex h-full w-full min-h-0 cursor-pointer flex-col rounded-md border-2 p-1.5 text-left transition-all active:scale-95"
+                        className="flex h-full w-full min-h-0 cursor-pointer flex-col rounded-md border-2 px-1 py-1.5 text-left transition-all active:scale-95"
                         style={{
                           borderColor: corHexGrupo,
                           backgroundColor: '#ffffff',
                         }}
                       >
-                        <span className="line-clamp-2 min-h-0 flex-1 text-left text-[10px] font-medium leading-tight text-gray-900">
+                        <span className="line-clamp-2 min-h-0 flex-1 text-center text-[10px] font-medium leading-tight text-gray-900">
                           {produto.getNome()}
                         </span>
-                        <span className="mt-0.5 shrink-0 w-full text-center text-xs font-bold tabular-nums text-gray-900">
+                        <span className="mt-0.5 shrink-0 w-full text-center text-[11px] font-semibold tabular-nums text-gray-900">
                           {transformarParaReal(produto.getValor())}
                         </span>
                       </button>

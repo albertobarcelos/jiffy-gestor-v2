@@ -159,53 +159,95 @@ export function PedidoDetalhesFooter({
     )
   }
 
-  return (
-    <div className="shrink-0 border-t border-gray-200 bg-white p-4">
-      <div className="flex gap-2">
-        {currentStep > 1 ? (
-          <Button
-            type="button"
-            variant="outlined"
-            onClick={onPreviousStep}
-            startIcon={<MdArrowBack />}
-            className="flex-1"
-          >
-            Voltar
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            variant="outlined"
-            color="error"
-            onClick={onClose}
-            startIcon={<MdCancel />}
-            className="flex-1"
-          >
-            Cancelar
-          </Button>
-        )}
+  const painelRaioEsqInf = '0.75rem'
+  const showVoltar = currentStep > 1
 
-        {currentStep < 3 ? (
+  return (
+    <div className="shrink-0 bg-white">
+      <div
+        className="grid w-full"
+        style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}
+      >
+        <div className="min-w-0 border-r border-gray-200">
           <Button
             type="button"
-            variant="contained"
-            onClick={onNextStep}
-            endIcon={<MdArrowForward />}
-            className="flex-1"
+            variant="outlined"
+            color={showVoltar ? 'inherit' : 'error'}
+            onClick={showVoltar ? onPreviousStep : onClose}
+            fullWidth
+            className={
+              showVoltar ?
+                'h-12 min-h-12 w-full font-semibold shadow-none'
+              : 'h-12 min-h-12 w-full'
+            }
+            sx={
+              showVoltar ?
+                footerBarPrimaryMutedSx(true)
+              : {
+                  borderRadius: 0,
+                  borderBottomLeftRadius: painelRaioEsqInf,
+                  boxShadow: 'none',
+                  border: 'none',
+                  backgroundColor: '#fecaca',
+                  '&.MuiButton-outlinedError': {
+                    backgroundColor: '#fecaca',
+                  },
+                  
+                }
+            }
           >
-            Próximo
+            <span className="inline-flex w-full items-center justify-center gap-1.5">
+              {showVoltar ?
+                <>
+                  <MdArrowBack className="h-5 w-5 shrink-0" aria-hidden />
+                  Voltar
+                </>
+              : <>
+                  <MdCancel className="h-5 w-5 shrink-0" aria-hidden />
+                  Cancelar
+                </>
+              }
+            </span>
           </Button>
-        ) : (
-          <Button
-            type="button"
-            variant="contained"
-            disabled={createPending || !canSubmit()}
-            onClick={onSubmit}
-            className="flex-1"
-          >
-            {createPending ? 'Salvando...' : 'Finalizar pedido'}
-          </Button>
-        )}
+        </div>
+
+        <div className="min-w-0">
+          {currentStep < 3 ? (
+            <Button
+              type="button"
+              variant="contained"
+              color="primary"
+              onClick={onNextStep}
+              fullWidth
+              className="h-12 min-h-12 w-full font-semibold shadow-none"
+              sx={{
+                ...footerSavePrimaryBarSx(false),
+                borderBottomRightRadius: painelRaioEsqInf,
+              }}
+            >
+              <span className="inline-flex w-full items-center justify-center gap-1.5">
+                Próximo
+                <MdArrowForward className="h-5 w-5 shrink-0" aria-hidden />
+              </span>
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="contained"
+              color="primary"
+              disabled={createPending || !canSubmit()}
+              onClick={onSubmit}
+              fullWidth
+              className="h-12 min-h-12 w-full font-semibold shadow-none"
+              sx={{
+                ...footerSavePrimaryBarSx(false),
+                borderBottomRightRadius: painelRaioEsqInf,
+              }}
+            >
+              {createPending ? 'Salvando...' : 'Finalizar pedido'}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   )

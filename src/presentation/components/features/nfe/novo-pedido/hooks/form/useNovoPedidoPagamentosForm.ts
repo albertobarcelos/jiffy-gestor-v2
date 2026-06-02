@@ -1,7 +1,9 @@
 'use client'
 
 import { useCallback } from 'react'
-import { MdAttachMoney, MdCreditCard, MdQrCode } from 'react-icons/md'
+import { LiaMoneyBillSolid } from 'react-icons/lia'
+import { HiOutlineCreditCard } from 'react-icons/hi2'
+import { MdPix } from 'react-icons/md'
 import type { IconType } from 'react-icons'
 import type { MeioPagamento } from '@/src/domain/entities/MeioPagamento'
 import { showToast } from '@/src/shared/utils/toast'
@@ -42,10 +44,10 @@ export function useNovoPedidoPagamentosForm({
   const obterIconeMeioPagamento = useCallback((nome: string): IconType => {
     const nomeLower = nome.toLowerCase()
     if (nomeLower.includes('dinheiro') || nomeLower.includes('cash')) {
-      return MdAttachMoney
+      return LiaMoneyBillSolid
     }
     if (nomeLower.includes('pix')) {
-      return MdQrCode
+      return MdPix
     }
     if (
       nomeLower.includes('credito') ||
@@ -53,9 +55,9 @@ export function useNovoPedidoPagamentosForm({
       nomeLower.includes('cartão') ||
       nomeLower.includes('cartao')
     ) {
-      return MdCreditCard
+      return HiOutlineCreditCard
     }
-    return MdCreditCard
+    return HiOutlineCreditCard
   }, [])
 
   const formatarValorRecebido = useCallback((valor: string): string => {

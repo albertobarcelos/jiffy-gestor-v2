@@ -23,7 +23,6 @@ export function PedidoPagamentoStepView() {
     meiosPagamento,
     mostrarLoadingFormasPagamento,
     obterIconeMeioPagamento,
-    origem,
     pagamentos,
     pedidoEntregaAceitaPagamentoPendente,
     pedidoGestorComPagamentoNoPasso3,
@@ -99,8 +98,8 @@ export function PedidoPagamentoStepView() {
             </Button>
           )}
         </div>
-        <div className="text-sm">
-          <div className="flex justify-between rounded-lg bg-white px-1">
+        <div className="space-y-0 text-sm leading-snug">
+          <div className="flex justify-between px-1 py-0">
             <span className="text-gray-600">Data:</span>
             <span className="font-medium">
               {new Date().toLocaleString('pt-BR', {
@@ -112,34 +111,22 @@ export function PedidoPagamentoStepView() {
               })}
             </span>
           </div>
-          <div className="flex justify-between px-1">
-            <span className="text-gray-600">Origem:</span>
-            <span className="font-medium">{origem}</span>
-          </div>
-          <div className="flex justify-between rounded-lg bg-white px-1">
+          <div className="flex justify-between px-1 py-0">
             <span className="text-gray-600">Status:</span>
             <span className="font-medium">{rotuloStatusResumoModal}</span>
           </div>
           {nomeClienteResumo && (
-            <div className="flex justify-between px-1">
+            <div className="flex justify-between px-1 py-0">
               <span className="text-gray-600">Cliente:</span>
               <span className="font-medium">{nomeClienteResumo}</span>
             </div>
           )}
-          <div className="flex justify-between rounded-lg bg-white px-1">
+          <div className="flex justify-between px-1 py-0">
             <span className="text-gray-600">Total de Itens:</span>
             <span className="font-medium">
               {totalItensPedido} {totalItensPedido === 1 ? 'produto' : 'produtos'}
             </span>
           </div>
-          {pedidoEntregaAceitaPagamentoPendente && valorTaxaEntrega > 0 && (
-            <div className="flex justify-between rounded-lg bg-white px-1">
-              <span className="text-gray-600">Taxa de entrega:</span>
-              <span className="font-medium text-primary">
-                + {transformarParaReal(valorTaxaEntrega)}
-              </span>
-            </div>
-          )}
         </div>
       </div>
 
@@ -147,7 +134,7 @@ export function PedidoPagamentoStepView() {
         <div className="space-y-4">
           <div className="rounded-lg border bg-white px-4">
             <h3 className="text-lg font-semibold">Pagamento</h3>
-            <div className="mb-2 space-y-2 text-sm">
+            <div className="mb-2 space-y-0.5 text-sm">
               {pedidoEntregaAceitaPagamentoPendente && (
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -160,7 +147,7 @@ export function PedidoPagamentoStepView() {
                     }}
                     className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
                       fluxoPagamentoEntrega === 'cobrar_entregador'
-                        ? 'border-primary bg-primary text-white'
+                        ? 'border-secondary bg-secondary text-white'
                         : 'border-gray-200 bg-white text-primary-text'
                     }`}
                   >
@@ -176,7 +163,7 @@ export function PedidoPagamentoStepView() {
                     }}
                     className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
                       fluxoPagamentoEntrega === 'ja_pago'
-                        ? 'border-primary bg-primary text-white'
+                        ? 'border-secondary bg-secondary text-white'
                         : 'border-gray-200 bg-white text-primary-text'
                     }`}
                   >
@@ -186,30 +173,30 @@ export function PedidoPagamentoStepView() {
               )}
               {pedidoEntregaAceitaPagamentoPendente && valorTaxaEntrega > 0 && (
                 <>
-                  <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
+                  <div className="flex items-center justify-between px-1 py-0.5">
                     <span className="font-medium text-gray-700">Produtos:</span>
-                    <span className="text-base font-semibold text-gray-900">
+                    <span className="font-semibold text-gray-900">
                       {transformarParaReal(subtotalProdutos)}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
+                  <div className="flex items-center justify-between px-1 py-0.5">
                     <span className="font-medium text-gray-700">Taxa de entrega:</span>
-                    <span className="text-base font-semibold text-gray-900">
+                    <span className="font-semibold text-gray-900">
                       + {transformarParaReal(valorTaxaEntrega)}
                     </span>
                   </div>
                 </>
               )}
-              <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
+              <div className="flex items-center justify-between px-1 py-0.5">
                 <span className="font-medium text-gray-700">Total do Pedido:</span>
-                <span className="text-base font-semibold text-primary">
+                <span className="font-semibold text-primary">
                   {transformarParaReal(totalProdutos)}
                 </span>
               </div>
-              <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
+              <div className="flex items-center border-t justify-between px-1 py-0.5">
                 <span className="font-medium text-gray-700">A pagar:</span>
                 <span
-                  className={`text-base font-semibold ${
+                  className={`font-semibold ${
                     valorAPagar > 0 ? 'text-red-600' : 'text-green-600'
                   }`}
                 >
@@ -217,10 +204,10 @@ export function PedidoPagamentoStepView() {
                 </span>
               </div>
               {pedidoEntregaAceitaPagamentoPendente && (
-                <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
+                <div className="flex items-center justify-between px-1 py-0.5">
                   <span className="font-medium text-gray-700">Status pagamento:</span>
                   <span
-                    className={`text-base font-semibold ${
+                    className={`font-semibold ${
                       statusPagamentoExibicao === 'pago'
                         ? 'text-green-600'
                         : statusPagamentoExibicao === 'parcial'
@@ -271,10 +258,12 @@ export function PedidoPagamentoStepView() {
                           }
                         }}
                         disabled={valorAPagarLancamento <= 0 && !valorRecebido.trim()}
-                        className={`flex min-w-[100px] flex-shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-primary bg-white p-2 transition-all hover:bg-primary hover:text-white ${valorAPagarLancamento <= 0 && !valorRecebido.trim() ? 'cursor-not-allowed opacity-50' : ''}`}
+                        className={`flex w-[150px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-secondary bg-secondary p-2 text-white transition-all hover:brightness-110 ${valorAPagarLancamento <= 0 && !valorRecebido.trim() ? 'cursor-not-allowed opacity-50' : ''}`}
                       >
-                        <Icone className="h-8 w-8" />
-                        <span className="text-center text-xs font-medium">{meio.getNome()}</span>
+                        <Icone className="h-8 w-8 shrink-0 text-white" />
+                        <span className="line-clamp-2 w-full text-center text-xs font-medium leading-tight text-white">
+                          {meio.getNome()}
+                        </span>
                       </button>
                     )
                   })
@@ -282,36 +271,36 @@ export function PedidoPagamentoStepView() {
               </div>
             </div>
 
-            <div className="border-t pt-2 text-sm">
-              <div className="flex items-center justify-between rounded-lg bg-gray-100 p-1">
+            <div className="space-y-0 border-t pt-1 text-sm leading-snug">
+              <div className="flex items-center justify-between px-1 py-0">
                 <span className="font-semibold text-gray-700">
                   Total Recebido{tipoInicioPedido === 'entrega' ? ' (Efetivo)' : ''}:
                 </span>
-                <span className="text-base font-semibold text-green-700">
+                <span className="font-semibold text-green-700">
                   {transformarParaReal(totalPagamentos)}
                 </span>
               </div>
               {pedidoEntregaAceitaPagamentoPendente &&
                 totalPagamentosLancados - totalPagamentos > 0 && (
-                  <div className="mt-1 flex items-center justify-between rounded-lg bg-amber-50 p-1">
+                  <div className="flex items-center justify-between px-1 py-1">
                     <span className="font-semibold text-gray-700">A receber na entrega:</span>
-                    <span className="text-base font-semibold text-amber-700">
+                    <span className="font-semibold text-amber-700">
                       {transformarParaReal(totalPagamentosLancados - totalPagamentos)}
                     </span>
                   </div>
                 )}
               {trocoLancamento > 0 && (
-                <div className="mt-1 flex items-center justify-between rounded-lg bg-gray-50 p-1">
+                <div className="flex items-center justify-between px-1 py-0">
                   <span className="font-semibold text-gray-700">Troco previsto:</span>
-                  <span className="text-base font-semibold text-green-600">
+                  <span className="font-semibold text-green-600">
                     {transformarParaReal(trocoLancamento)}
                   </span>
                 </div>
               )}
               {pedidoEntregaAceitaPagamentoPendente && restanteALancarExibicao > 0 && (
-                <div className="mt-1 flex items-center justify-between rounded-lg bg-red-50 p-1">
+                <div className="flex items-center justify-between px-1 py-0">
                   <span className="font-semibold text-gray-700">Restante a lançar:</span>
-                  <span className="text-base font-semibold text-red-600">
+                  <span className="font-semibold text-red-600">
                     {transformarParaReal(restanteALancarExibicao)}
                   </span>
                 </div>

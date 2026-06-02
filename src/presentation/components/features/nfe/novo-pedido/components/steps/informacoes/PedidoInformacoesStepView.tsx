@@ -54,8 +54,8 @@ export function PedidoInformacoesStepView() {
               onClick={() => handleTipoAtendimentoDeliveryChange('entrega')}
               className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
                 pedidoComEntrega
-                  ? 'border-primary bg-primary text-white'
-                  : 'border-gray-200 bg-white text-primary-text hover:border-primary/50'
+                  ? 'border-secondary bg-secondary text-white'
+                  : 'border-gray-200 bg-white text-primary-text hover:border-secondary/50'
               }`}
             >
               Entrega
@@ -65,8 +65,8 @@ export function PedidoInformacoesStepView() {
               onClick={() => handleTipoAtendimentoDeliveryChange('retirada')}
               className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
                 pedidoComRetirada
-                  ? 'border-primary bg-primary text-white'
-                  : 'border-gray-200 bg-white text-primary-text hover:border-primary/50'
+                  ? 'border-secondary bg-secondary text-white'
+                  : 'border-gray-200 bg-white text-primary-text hover:border-secondary/50'
               }`}
             >
               Retirada
