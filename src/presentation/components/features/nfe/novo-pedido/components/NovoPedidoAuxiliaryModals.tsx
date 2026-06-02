@@ -9,38 +9,54 @@ import { ModalLancamentoProdutoPainel } from '../../ModalLancamentoProdutoPainel
 import { PainelEdicaoProdutoLinhaPedido } from '../../PainelEdicaoProdutoLinhaPedido'
 import { ProdutosTabsModal } from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
 import { ClientesTabsModal } from '@/src/presentation/components/features/clientes/ClientesTabsModal'
-import { useNovoPedidoContext } from '../context/NovoPedidoContext'
+import { useNovoPedidoDetalheContext } from '../context/NovoPedidoDetalheContext'
+import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
+import { useNovoPedidoUIContext } from '../context/NovoPedidoUIContext'
 
 export function NovoPedidoAuxiliaryModals() {
   const {
-    abrirModalComplementosProdutoExistente,
     cancelarNotaFiscalVendaGestor,
     cancelarNotaFiscalVendaPdv,
     cancelarVendaGestor,
+    handleConfirmarCancelamentoVenda,
+    handleFecharProdutoTabsModal,
+    handleTabChangeProdutoModal,
+    justificativaCancelamento,
+    produtoTabsModalState,
+    setJustificativaCancelamento,
+    setTipoCancelamentoSelecionado,
+    tabelaOrigemVenda,
+    tipoCancelamentoSelecionado,
+    tipoInicioPedido,
+  } = useNovoPedidoDetalheContext()
+  const {
+    seletorClienteOpen,
+    setSeletorClienteOpen,
+    modalCancelarVendaOpen,
+    setModalCancelarVendaOpen,
+    modalConfirmacaoSaidaOpen,
+    setModalConfirmacaoSaidaOpen,
+    modalEdicaoProdutoOpen,
+    setModalEdicaoProdutoOpen,
+    modalLancamentoProdutoPainelOpen,
+    setModalLancamentoProdutoPainelOpen,
+    handleCancelarSaida,
+    handleConfirmarSaida,
+    handleClose,
+  } = useNovoPedidoUIContext()
+  const {
     catalogoProdutosPorId,
     confirmarEdicaoProduto,
     confirmarLancamentoProdutoPainel,
     ehAcrescimo,
     ehPorcentagem,
-    handleCancelarSaida,
     handleFecharClienteTabsModalEntrega,
-    handleFecharProdutoTabsModal,
-    handleClose,
-    handleConfirmarCancelamentoVenda,
-    handleConfirmarSaida,
     handleReloadClienteEntregaAposEdicao,
     handleSelectCliente,
     handleTabChangeClienteTabsModalEntrega,
-    handleTabChangeProdutoModal,
     indiceLinhaPainelProduto,
-    justificativaCancelamento,
-    modalCancelarVendaOpen,
-    modalConfirmacaoSaidaOpen,
-    modalEdicaoProdutoOpen,
-    modalLancamentoProdutoPainelOpen,
     produtoIndexEdicao,
     produtoParaLancamentoPainel,
-    produtoTabsModalState,
     produtoTemComplementos,
     produtos,
     produtosList,
@@ -48,28 +64,15 @@ export function NovoPedidoAuxiliaryModals() {
     setEhAcrescimo,
     setEhPorcentagem,
     setIndiceLinhaPainelProduto,
-    setJustificativaCancelamento,
-    setModalCancelarVendaOpen,
-    setModalConfirmacaoSaidaOpen,
-    setModalEdicaoProdutoOpen,
-    setModalLancamentoProdutoPainelOpen,
     setProdutoIndexEdicao,
     setProdutoParaLancamentoPainel,
     setQuantidadeEdicao,
-    setSeletorClienteOpen,
-    setTipoCancelamentoSelecionado,
     setValorDescontoAcrescimo,
-    setValorFinalVenda,
     setValorUnitarioEdicaoPainel,
-    seletorClienteOpen,
-    tabelaOrigemVenda,
-    tipoCancelamentoSelecionado,
     clienteTabsModalEntregaState,
-    tipoInicioPedido,
     valorDescontoAcrescimo,
-    valorFinalVenda,
     valorUnitarioEdicaoPainel,
-  } = useNovoPedidoContext()
+  } = useNovoPedidoFormContext()
 
   return (
     <>        {seletorClienteOpen && (

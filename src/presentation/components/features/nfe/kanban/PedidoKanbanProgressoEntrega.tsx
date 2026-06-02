@@ -4,8 +4,8 @@ import { Fragment } from 'react'
 import {
   formatarHoraDetalhePedido,
   formatarHoraPrevisaoEntrega,
-} from '../novo-pedido/novoPedidoDetalheHelpers'
-import type { DetalhesEntregaPedido } from '../novo-pedido/types'
+} from '@/src/application/mappers/PedidoDisplayMapper'
+import type { DetalhesEntregaPedido } from '@/src/domain/types/vendaDetalhe'
 import { COLUNAS_ENTREGA_OPERACIONAIS } from './fiscalFlowKanban.rules'
 import type { ColunaKanbanId } from './types'
 

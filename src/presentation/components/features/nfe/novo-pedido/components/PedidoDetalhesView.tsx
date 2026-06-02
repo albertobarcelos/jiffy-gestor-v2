@@ -6,22 +6,39 @@ import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { abrirDocumentoFiscalPdf, tipoDocFiscalFromModelo } from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdCreditCard, MdDelete } from 'react-icons/md'
-import { pagamentoComDestaqueCanceladoDetalhes } from '../novoPedidoPagamentoHelpers'
-import { taxaEntregaTemValor } from '../novoPedidoDetalheHelpers'
-import { statusFiscalEhEmitida, rotuloOrigemParaExibicao } from '../novoPedidoFiscalHelpers'
+import { pagamentoComDestaqueCanceladoDetalhes } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
+import { statusFiscalEhEmitida } from '@/src/domain/services/pedido/RegrasFiscaisVenda'
+import {
+  rotuloOrigemExibicao,
+  taxaEntregaTemValor,
+} from '@/src/application/mappers/PedidoDisplayMapper'
 import { PedidoDetalhesInfo } from './PedidoDetalhesInfo'
 import { PedidoDetalhesNotaFiscal } from './PedidoDetalhesNotaFiscal'
 import { PedidoDetalhesPagamentos } from './PedidoDetalhesPagamentos'
 import { PedidoDetalhesProdutos } from './PedidoDetalhesProdutos'
 import { PedidoDetalhesEntrega } from './PedidoDetalhesEntrega'
-import { useNovoPedidoContext } from '../context/NovoPedidoContext'
+import { useNovoPedidoDetalheContext } from '../context/NovoPedidoDetalheContext'
+import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
+import { useNovoPedidoUIContext } from '../context/NovoPedidoUIContext'
 
 export function PedidoDetalhesView() {
   const {
     abaDetalhesPedido,
+    handleAbrirEdicaoProdutoDetalhes,
+    isLoadingVenda,
+    podeEditarPagamentoEntregaEmAberto,
+    podeExibirAbaNotaFiscal,
+    resumoFinanceiroDetalhes,
+    resumoFiscal,
+    statusFiscalUnificado,
+    detalhesPedidoMeta,
+    detalhesEntregaPedido,
+  } = useNovoPedidoDetalheContext()
+  const { currentStep } = useNovoPedidoUIContext()
+  const { origem } = useNovoPedidoFormContext()
+  const {
     adicionarPagamentoPorCard,
     calcularTotalProduto,
-    currentStep,
     fluxoPagamentoEntrega,
     formatarDataDetalhePedido,
     formatarDataHoraResumoFiscal,
@@ -30,25 +47,17 @@ export function PedidoDetalhesView() {
     formatarUsuarioPorId,
     formatarValorComplemento,
     formatarValorRecebido,
-    handleAbrirEdicaoProdutoDetalhes,
-    isLoadingVenda,
     meiosPagamento,
     nomesMeiosPagamentoPedido,
     obterIconeMeioPagamento,
-    origemTextoApiDetalhe,
     pagamentoModoCobranca,
     pagamentos,
     pagamentosVisiveisNaAbaDetalhes,
-    podeEditarPagamentoEntregaEmAberto,
-    podeExibirAbaNotaFiscal,
     produtos,
     removerPagamento,
-    resumoFinanceiroDetalhes,
-    resumoFiscal,
     rotuloModeloNfe,
     rotuloStatusResumoModal,
     setValorRecebido,
-    statusFiscalUnificado,
     totalItensPedido,
     totalPagamentos,
     totalPagamentosLancados,
@@ -58,9 +67,7 @@ export function PedidoDetalhesView() {
     valorRecebido,
     dataVenda,
     clienteNome,
-    detalhesPedidoMeta,
-    detalhesEntregaPedido,
-  } = useNovoPedidoContext()
+  } = useNovoPedidoFormContext()
 
   return (
     <>            {/* STEP 4: Detalhes da Venda (visualização ou após criar pedido) */}
@@ -120,7 +127,7 @@ export function PedidoDetalhesView() {
                               },
                               {
                                 label: 'Código retorno',
-                                value: (resumoFiscal as any).codigoRetorno ?? '—',
+                                value: resumoFiscal.codigoRetorno ?? '—',
                               },
                               {
                                 label: 'Número ' + rotuloModeloNfe(resumoFiscal.modelo ?? null),
@@ -214,7 +221,7 @@ export function PedidoDetalhesView() {
                           <div className="flex justify-between px-1">
                             <span className="text-gray-600">Origem:</span>
                             <span className="font-medium">
-                              {rotuloOrigemParaExibicao(origemTextoApiDetalhe)}
+                              {rotuloOrigemExibicao(origem)}
                             </span>
                           </div>
                           <div className="flex justify-between rounded-lg bg-white px-1">

@@ -1,59 +1,32 @@
+import {
+  buscarProdutoCatalogoPorIdUseCase,
+  listarGrupoIdsComProdutosAtivosVendaUseCase,
+  listarProdutosDoGrupoUseCase,
+} from '@/src/application/use-cases/vendas/ListarProdutosCatalogoUseCase'
+import type { CanalVendaCatalogo } from '@/src/domain/repositories/INovoPedidoReadRepository'
 import { Produto } from '@/src/domain/entities/Produto'
+import { novoPedidoReadRepository } from '@/src/infrastructure/api/repositories/NovoPedidoReadRepository'
 
-const PRODUTOS_POR_PAGINA = 100
+export type CanalVendaNovoPedido = CanalVendaCatalogo
 
-type ProdutosGrupoResponse = {
-  items?: unknown[]
-  count?: number
-  hasMore?: boolean
-  nextOffset?: number | null
+export async function fetchProdutosDoGrupo(grupoId: string, token: string) {
+  return listarProdutosDoGrupoUseCase.execute(grupoId, token)
 }
 
-/**
- * Carrega todos os produtos de um grupo (pagina com limit/offset até esgotar).
- */
-export async function fetchProdutosDoGrupo(
-  grupoId: string,
-  token: string
-): Promise<{ produtos: Produto[]; count: number }> {
-  const produtos: Produto[] = []
-  let offset = 0
-
-  while (true) {
-    const response = await fetch(
-      `/api/grupos-produtos/${grupoId}/produtos?limit=${PRODUTOS_POR_PAGINA}&offset=${offset}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        cache: 'no-store',
-      }
-    )
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(
-        (errorData as { message?: string }).message || 'Erro ao carregar produtos do grupo'
-      )
-    }
-
-    const data = (await response.json()) as ProdutosGrupoResponse
-    const items = Array.isArray(data.items) ? data.items : []
-    produtos.push(...items.map(item => Produto.fromJSON(item)))
-
-    if (items.length < PRODUTOS_POR_PAGINA) break
-
-    if (typeof data.nextOffset === 'number') {
-      offset = data.nextOffset
-      continue
-    }
-
-    offset += PRODUTOS_POR_PAGINA
-  }
-
-  return {
-    produtos,
-    count: produtos.length,
-  }
+export async function fetchGrupoIdsComProdutosAtivosVenda(
+  token: string,
+  canal: CanalVendaNovoPedido
+) {
+  return listarGrupoIdsComProdutosAtivosVendaUseCase.execute(token, canal)
 }
+
+export async function fetchProdutoCatalogoPorId(produtoId: string, token: string) {
+  return buscarProdutoCatalogoPorIdUseCase.execute(produtoId, token)
+}
+
+/** Busca por nome via repositório BFF (uso em queries de catálogo). */
+export async function fetchProdutosPorNomeBusca(nome: string, token: string) {
+  return novoPedidoReadRepository.buscarProdutosPorNome(nome, token)
+}
+
+export type { Produto }

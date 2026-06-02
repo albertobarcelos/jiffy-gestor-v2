@@ -21,10 +21,7 @@ export function useNovoPedidoDetalhe() {
   const [resumoFinanceiroDetalhes, setResumoFinanceiroDetalhes] =
     useState<ResumoFinanceiroDetalhes | null>(null)
   const [resumoFiscal, setResumoFiscal] = useState<ResumoFiscalVenda | null>(null)
-  /** Texto bruto de `origem` no GET de detalhe (GESTOR/PDV/…); PDV muitas vezes omite o campo */
-  const [origemTextoApiDetalhe, setOrigemTextoApiDetalhe] = useState<string | null>(null)
-  /** Texto bruto de `statusVenda` no GET de detalhe (Gestor pode vir null) */
-  const [statusVendaTextoApiDetalhe, setStatusVendaTextoApiDetalhe] = useState<string | null>(null)
+  const [statusFiscalDetalhe, setStatusFiscalDetalhe] = useState<string | null>(null)
 
   return {
     abaDetalhesPedido,
@@ -41,9 +38,7 @@ export function useNovoPedidoDetalhe() {
     setResumoFinanceiroDetalhes,
     resumoFiscal,
     setResumoFiscal,
-    origemTextoApiDetalhe,
-    setOrigemTextoApiDetalhe,
-    statusVendaTextoApiDetalhe,
-    setStatusVendaTextoApiDetalhe,
+    statusFiscalDetalhe,
+    setStatusFiscalDetalhe,
   }
 }

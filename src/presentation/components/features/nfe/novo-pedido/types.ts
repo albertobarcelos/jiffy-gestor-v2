@@ -2,176 +2,31 @@
 
 import type { MoradaTelefone } from '@/src/presentation/hooks/useMoradaTelefone'
 
-export interface NovoPedidoModalProps {
-  open: boolean
-  onClose: () => void
-  onSuccess: () => void
-  /** Chamado após o painel terminar a transição de saída (permite desmontar o pai sem cortar o slide) */
-  onAfterClose?: () => void
-  // Props opcionais para visualizar venda existente
-  vendaId?: string // ID da venda para carregar e visualizar
-  modoVisualizacao?: boolean // Se true, abre direto na step 4 em modo apenas visualização
-  /** GET gestor vs PDV (`/api/vendas/gestor/:id` vs `/api/vendas/:id`); com `incluirFiscal=true` no carregamento */
-  tabelaOrigemVenda?: 'venda' | 'venda_gestor'
-  /**
-   * `statusFiscal` do GET vendas unificado (Kanban). No PDV o GET de detalhe não repete esse campo;
-   * use-o para saber se a nota está EMITIDA antes/sem depender só do `resumoFiscal`.
-   */
-  statusFiscalUnificado?: string | null
-  /**
-   * Tipo de pedido escolhido no EscolhaTipoPedidoModal.
-   * 'balcao' (padrão): step inicial = Informações.
-   * 'entrega': step inicial = Produtos (step 1 é pulado); tipoVenda enviado como 'entrega'.
-   */
-  tipoInicioPedido?: 'balcao' | 'entrega'
-}
+export type { NovoPedidoModalProps } from './types.ui'
 
-/** Trecho retornado pela API quando `incluirFiscal=true` */
-export interface ResumoFiscalVenda {
-  status?: string | null
-  numero?: number | null
-  retornoSefaz?: string | null
-  serie?: string | null
-  dataEmissao?: string | null
-  modelo?: number | null
-  chaveFiscal?: string | null
-  dataCriacao?: string | null
-  dataUltimaModificacao?: string | null
-  /** Id do documento fiscal — mesmo usado em GET `/api/nfe/[id]` (Kanban “Ver NFCe/NFe”) */
-  documentoFiscalId?: string | null
-}
+export type {
+  ComplementoSelecionado,
+  ProdutoSelecionado,
+  PagamentoSelecionado,
+  StatusVenda,
+} from '@/src/domain/types/pedido'
 
-export interface ComplementoSelecionado {
-  id: string
-  grupoId: string
-  nome: string
-  valor: number
-  quantidade: number
-  tipoImpactoPreco?: 'aumenta' | 'diminui' | 'nenhum'
-}
-
-export interface ProdutoSelecionado {
-  produtoId: string
-  nome: string
-  quantidade: number
-  valorUnitario: number
-  complementos: ComplementoSelecionado[]
-  tipoDesconto?: 'fixo' | 'porcentagem' | null
-  valorDesconto?: number | null
-  tipoAcrescimo?: 'fixo' | 'porcentagem' | null
-  valorAcrescimo?: number | null
-  valorFinal?: number | null
-  lancadoPorId?: string
-  removido?: boolean
-  removidoPorId?: string
-  dataLancamento?: string
-  dataRemocao?: string
-  ncm?: string
-}
-
-export interface PagamentoSelecionado {
-  id?: string
-  meioPagamentoId: string
-  valor: number
-  cobrarNaEntrega?: boolean
-  naoEfetivo?: boolean
-  realizadoPorId?: string
-  cancelado?: boolean
-  canceladoPorId?: string
-  dataCriacao?: string
-  dataCancelamento?: string
-  isTefUsed?: boolean
-  isTefConfirmed?: boolean
-  tefIdentifier?: string
-  tefAdquirente?: string
-  cnpjAdquirente?: string
-  codigoAutorizacao?: string
-  tipoIntegracao?: string
-  bandeiraCartao?: string
-}
-
-export type OrigemVenda = 'GESTOR' | 'IFOOD' | 'RAPPI' | 'OUTROS'
-export type StatusVenda = 'ABERTA' | 'FINALIZADA' | 'PENDENTE_EMISSAO'
-export type FluxoPagamentoEntrega = 'cobrar_entregador' | 'ja_pago'
-export type TipoAtendimentoDelivery = 'entrega' | 'retirada'
-export type AbaDetalhesPedido =
-  | 'infoPedido'
-  | 'dadosEntrega'
-  | 'listaProdutos'
-  | 'pagamentos'
-  | 'notaFiscal'
-
-export interface EnderecoEntregaDetalhe {
-  cep?: string | null
-  rua?: string | null
-  numero?: string | null
-  bairro?: string | null
-  cidade?: string | null
-  estado?: string | null
-  complemento?: string | null
-  referencia?: string | null
-}
-
-/** Taxa de entrega resolvida no detalhe (snapshot da venda ou GET `/api/taxas/{id}`). */
-export interface TaxaEntregaDetalhe {
-  taxaId?: string | null
-  nome?: string | null
-  valor?: number | null
-}
-
-/** Snapshot da entrega no modo detalhe (GET gestor). */
-export interface DetalhesEntregaPedido {
-  entregadorId?: string | null
-  /** Nome resolvido via usuário PDV (`/api/usuarios/{id}`), não usuário gestor. */
-  entregadorNome?: string | null
-  clienteNome?: string | null
-  clienteCpfCnpj?: string | null
-  clienteCelular?: string | null
-  enderecoEntrega?: EnderecoEntregaDetalhe | null
-  observacaoPedido?: string | null
-  previsaoEntrega?: string | null
-  dataInicioPreparo?: string | null
-  dataPronto?: string | null
-  dataSaidaEntrega?: string | null
-  /** Troco persistido na venda (`troco` na raiz do GET). */
-  trocoApi?: number | null
-  taxaEntrega?: TaxaEntregaDetalhe | null
-}
-
-export interface UsuarioPdvEntregadorOption {
-  id: string
-  nome: string
-  telefone?: string
-}
-
-export interface DetalhesPedidoMeta {
-  numeroVenda?: number | null
-  codigoVenda?: string | null
-  tipoVenda?: string | null
-  numeroMesa?: string | number | null
-  statusMesa?: string | null
-  abertoPorId?: string | null
-  ultimoResponsavelId?: string | null
-  canceladoPorId?: string | null
-  codigoTerminal?: string | null
-  terminalId?: string | null
-  identificacao?: string | null
-  solicitarEmissaoFiscal?: boolean | null
-  dataCriacao?: string | null
-  dataFinalizacao?: string | null
-  dataCancelamento?: string | null
-  dataUltimaModificacao?: string | null
-  dataUltimoProdutoLancado?: string | null
-}
-
-export interface ResumoFinanceiroDetalhes {
-  totalItensLancados: number
-  totalTaxasEntrega: number
-  totalItensCancelados: number
-  totalDosItens: number
-  totalDescontosConta: number
-  totalAcrescimosConta: number
-}
+export type {
+  OrigemVenda,
+  FluxoPagamentoEntrega,
+  TipoAtendimentoDelivery,
+  AbaDetalhesPedido,
+  EnderecoEntregaDetalhe,
+  TaxaEntregaDetalhe,
+  DetalhesEntregaPedido,
+  UsuarioPdvEntregadorOption,
+  DetalhesPedidoMeta,
+  ResumoFinanceiroDetalhes,
+  ResumoFiscalVenda,
+  TabelaOrigemVenda,
+  CanalAberturaPedido,
+  MoradaEntregaSelecionada,
+} from '@/src/domain/types/vendaDetalhe'
 
 export type NovoPedidoClienteEntregaVinculado = {
   id: string

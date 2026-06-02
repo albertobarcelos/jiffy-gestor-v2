@@ -26,9 +26,9 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTaxasInfinite } from '@/src/presentation/hooks/useTaxas'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
-import { extrairTaxaEntregaIdDaVenda } from '../novo-pedido/novoPedidoDetalheHelpers'
-import { SEM_TAXA_ENTREGA_VALUE } from '../novo-pedido/novoPedidoTextHelpers'
-import type { UsuarioPdvEntregadorOption } from '../novo-pedido/types'
+import { extrairTaxaEntregaIdDaVenda } from '@/src/application/mappers/VendaDetalheMapper'
+import { SEM_TAXA_ENTREGA_VALUE } from '@/src/shared/constants/pedidoForm'
+import type { UsuarioPdvEntregadorOption } from '@/src/domain/types/vendaDetalhe'
 import {
   resolverEntregadorIdVendaKanban,
   salvarEntregadorVendaGestor,

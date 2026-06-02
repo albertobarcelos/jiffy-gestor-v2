@@ -1,4 +1,4 @@
-import type { ComplementoSelecionado, ProdutoSelecionado } from './types'
+import type { ComplementoSelecionado, ProdutoSelecionado } from '@/src/domain/types/pedido'
 
 export function formatarNumeroComMilhar(valor: number): string {
   if (valor === 0) return '0,00'

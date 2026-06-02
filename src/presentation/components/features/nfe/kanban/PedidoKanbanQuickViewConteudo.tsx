@@ -7,7 +7,7 @@ import {
   formatarCelularExibicao,
   formatarCpfCnpjExibicao,
   formatarEnderecoEntregaMultilinha,
-} from '../novo-pedido/novoPedidoDetalheHelpers'
+} from '@/src/application/mappers/PedidoDisplayMapper'
 import { PedidoKanbanProgressoEntrega } from './PedidoKanbanProgressoEntrega'
 import { PedidoKanbanQuickViewWhatsappAcoes } from './PedidoKanbanQuickViewWhatsappAcoes'
 import type { EnderecoEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'

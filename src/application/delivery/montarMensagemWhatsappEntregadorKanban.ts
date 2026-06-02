@@ -4,7 +4,7 @@ import {
   formatarCpfCnpjExibicao,
   formatarEnderecoEntregaMultilinha,
   formatarHoraPrevisaoEntrega,
-} from '@/src/presentation/components/features/nfe/novo-pedido/novoPedidoDetalheHelpers'
+} from '@/src/application/mappers/PedidoDisplayMapper'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import {
   montarLinhasProdutosWhatsapp,

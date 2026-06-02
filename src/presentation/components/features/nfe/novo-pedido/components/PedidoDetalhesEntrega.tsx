@@ -1,16 +1,17 @@
 'use client'
 
 import { useMemo, type HTMLAttributes } from 'react'
-import { useNovoPedidoContext } from '../context/NovoPedidoContext'
+import { useNovoPedidoDetalheContext } from '../context/NovoPedidoDetalheContext'
+import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
 import { PedidoDetalhesInfo } from './PedidoDetalhesInfo'
 import { PedidoEntregaDetalheConteudo } from './PedidoEntregaDetalheConteudo'
 
 interface PedidoDetalhesEntregaProps extends HTMLAttributes<HTMLDivElement> {}
 
 export function PedidoDetalhesEntrega({ className = '', ...props }: PedidoDetalhesEntregaProps) {
+  const { detalhesEntregaPedido } = useNovoPedidoDetalheContext()
   const {
     clienteNome,
-    detalhesEntregaPedido,
     entregadores,
     fluxoPagamentoEntrega,
     formatarUsuarioPorId,
@@ -20,7 +21,7 @@ export function PedidoDetalhesEntrega({ className = '', ...props }: PedidoDetalh
     trocoLancamento,
     valorFinalVenda,
     totalProdutos,
-  } = useNovoPedidoContext()
+  } = useNovoPedidoFormContext()
 
   const nomeEntregador = useMemo(() => {
     const nomePersistido = detalhesEntregaPedido?.entregadorNome?.trim()
