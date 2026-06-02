@@ -178,14 +178,13 @@ export function resolveModeloParaEmitirNota(v: VendaUnificadaDTO): 55 | 65 | nul
 
 /**
  * Parâmetros alinhados ao contrato do backend GET /vendas/unificado:
- * - origem, statusFiscal, periodoInicial, periodoFinal (filtro por dataCriacao)
+ * - origem, periodoInicial, periodoFinal (filtro por dataCriacao)
  * - dataFinalizacaoInicio, dataFinalizacaoFim
  * - q (busca)
  * Paginação: `useVendasUnificadas` obtém **todas** as páginas (100 itens por requisição até acabar).
  */
 interface VendasUnificadasQueryParams {
   origem?: 'PDV' | 'GESTOR' | 'DELIVERY'
-  statusFiscal?: string
   periodoInicial?: string // ISO — filtro por data de criação (dataCriacao >=)
   periodoFinal?: string // ISO — filtro por data de criação (dataCriacao <=)
   dataFinalizacaoInicio?: string // ISO date string
@@ -276,7 +275,6 @@ function montarSearchParamsVendasUnificadas(
 ): URLSearchParams {
   const searchParams = new URLSearchParams()
   if (params.origem) searchParams.append('origem', params.origem)
-  if (params.statusFiscal) searchParams.append('statusFiscal', params.statusFiscal)
   if (params.periodoInicial) searchParams.append('periodoInicial', params.periodoInicial)
   if (params.periodoFinal) searchParams.append('periodoFinal', params.periodoFinal)
   if (params.dataFinalizacaoInicio)

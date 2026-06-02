@@ -220,6 +220,8 @@ type PeriodoOpcao =
   | 'Últimos 90 Dias'
   | 'Datas Personalizadas'
 
+const PERIODO_PADRAO_DATA_FINALIZACAO: PeriodoOpcao = 'Hoje'
+
 /**
  * Ordena por data mais recente primeiro (igual em todas as colunas, sem depender de localStorage).
  * Prioridade: data de finalização → data de emissão fiscal → data de criação.
@@ -398,11 +400,16 @@ export function FiscalFlowKanban() {
   const [periodo, setPeriodo] = useState<PeriodoOpcao>('Todos')
   const [periodoInicial, setPeriodoInicial] = useState<Date | null>(null)
   const [periodoFinal, setPeriodoFinal] = useState<Date | null>(null)
-  const [dataFinalizacaoPeriodo, setDataFinalizacaoPeriodo] = useState<PeriodoOpcao>('Todos')
-  const [dataFinalizacaoInicio, setDataFinalizacaoInicio] = useState<Date | null>(null)
-  const [dataFinalizacaoFim, setDataFinalizacaoFim] = useState<Date | null>(null)
+  const [dataFinalizacaoPeriodo, setDataFinalizacaoPeriodo] = useState<PeriodoOpcao>(
+    PERIODO_PADRAO_DATA_FINALIZACAO
+  )
+  const [dataFinalizacaoInicio, setDataFinalizacaoInicio] = useState<Date | null>(
+    () => calculatePeriodo(PERIODO_PADRAO_DATA_FINALIZACAO).inicio
+  )
+  const [dataFinalizacaoFim, setDataFinalizacaoFim] = useState<Date | null>(
+    () => calculatePeriodo(PERIODO_PADRAO_DATA_FINALIZACAO).fim
+  )
   const [origemFilter, setOrigemFilter] = useState<OrigemFiltro>('')
-  const [statusFiscalFilter, setStatusFiscalFilter] = useState<string>('')
   const [terminalFilter, setTerminalFilter] = useState<string>('')
   const [terminais, setTerminais] = useState<TerminalOpcao[]>([])
   const [isLoadingTerminais, setIsLoadingTerminais] = useState(false)
@@ -570,7 +577,6 @@ export function FiscalFlowKanban() {
     () => ({
       q: searchQuery || undefined,
       origem: origemFilter || undefined,
-      statusFiscal: statusFiscalFilter || undefined,
       periodoInicial: periodoInicialISO,
       periodoFinal: periodoFinalISO,
       dataFinalizacaoInicio: dataFinalizacaoInicioISO,
@@ -579,7 +585,6 @@ export function FiscalFlowKanban() {
     [
       searchQuery,
       origemFilter,
-      statusFiscalFilter,
       periodoInicialISO,
       periodoFinalISO,
       dataFinalizacaoInicioISO,
@@ -598,7 +603,7 @@ export function FiscalFlowKanban() {
     rejeitadaReativacaoJaTentadaIdsRef.current = new Set()
   }, [vendasUnificadasQueryKeyFingerprint])
 
-  /** Só terminal + datas: cruzamento com unificado (fiscal). q/statusFiscal ficam no unificado. */
+  /** Só terminal + datas: cruzamento com unificado (fiscal). q fica no unificado. */
   const vendaIdsPdvPorTerminalParams = useMemo(
     () => ({
       terminalId: terminalFilter,
@@ -1104,11 +1109,8 @@ export function FiscalFlowKanban() {
     setPeriodo('Todos')
     setPeriodoInicial(null)
     setPeriodoFinal(null)
-    setDataFinalizacaoPeriodo('Todos')
-    setDataFinalizacaoInicio(null)
-    setDataFinalizacaoFim(null)
+    setDataFinalizacaoPeriodo(PERIODO_PADRAO_DATA_FINALIZACAO)
     setOrigemFilter('')
-    setStatusFiscalFilter('')
     setTerminalFilter('')
   }, [])
 
@@ -1228,7 +1230,7 @@ export function FiscalFlowKanban() {
             <span>{filtrosVisiveisMobile ? 'Ocultar filtros' : 'Mostrar filtros'}</span>
           </button>
         </div>
-        {/* Filtros avançados: Origem, Data finalização, Data Criação, Status fiscal, Limpar */}
+        {/* Filtros avançados: Origem, Data finalização, Data Criação, Limpar */}
         <div
           className={`flex flex-wrap items-end justify-center gap-x-1 gap-y-4 rounded-t-lg bg-custom-2 px-1 pb-2 pt-1.5 md:justify-start ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
         >
@@ -1353,34 +1355,11 @@ export function FiscalFlowKanban() {
             </FormControl>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="font-nunito text-xs text-secondary-text">Status fiscal</label>
-            <FormControl size="small" sx={{ minWidth: 160 }}>
-              <Select
-                value={statusFiscalFilter}
-                onChange={e => setStatusFiscalFilter(e.target.value)}
-                displayEmpty
-                sx={{
-                  height: '32px',
-                  backgroundColor: '#FFFFFF',
-                  '& .MuiOutlinedInput-notchedOutline': { borderColor: 'transparent' },
-                }}
-              >
-                <MenuItem value="">Todos</MenuItem>
-                <MenuItem value="PENDENTE">Pendente</MenuItem>
-                <MenuItem value="PENDENTE_EMISSAO">Pendente emissão</MenuItem>
-                <MenuItem value="EMITINDO">Emitindo</MenuItem>
-                <MenuItem value="EMITIDA">Emitida</MenuItem>
-                <MenuItem value="REJEITADA">Rejeitada</MenuItem>
-                <MenuItem value="CANCELADA">Cancelada</MenuItem>
-              </Select>
-            </FormControl>
-          </div>
-          <div className="flex flex-col gap-1">
             <label className="font-nunito text-xs text-secondary-text">Período (criação)</label>
             <button
               type="button"
               onClick={() => setIsDatasModalOpen(true)}
-              className="font-nunito flex h-8 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
+              className="font-nunito flex h-8 items-center gap-2 rounded-lg bg-primary px-2 text-sm text-white transition-colors hover:bg-primary/90"
             >
               <MdCalendarToday size={18} />
               Por datas
@@ -1388,7 +1367,7 @@ export function FiscalFlowKanban() {
           </div>
           <button
             onClick={handleClearFilters}
-            className="font-nunito flex h-8 items-center justify-center gap-2 rounded-lg border border-primary px-4 text-sm text-primary transition-colors hover:bg-primary/10"
+            className="font-nunito flex h-8 items-center justify-center gap-2 rounded-lg border border-primary px-2 text-sm text-primary transition-colors hover:bg-primary/10"
           >
             <MdFilterAltOff size={18} />
             Limpar
@@ -1396,14 +1375,14 @@ export function FiscalFlowKanban() {
           <div className="ml-auto flex items-center gap-2">
             <button
               onClick={() => refetch()}
-              className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
+              className="rounded p-1 text-gray-600 transition-colors hover:bg-gray-100"
               title="Atualizar"
             >
-              <MdRefresh className="h-5 w-5" />
+              <MdRefresh className="h-4 w-4" />
             </button>
             <button
               onClick={() => setNovoPedidoModalOpen(true)}
-              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary/90"
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-2 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary/90"
             >
               <MdAdd className="h-4 w-4" />
               Novo Pedido

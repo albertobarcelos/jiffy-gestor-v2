@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { MeioPagamento } from '@/src/domain/entities/MeioPagamento'
+import { MeioPagamento, type TipoParcelamento } from '@/src/domain/entities/MeioPagamento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { MdSearch, MdDelete } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
@@ -12,6 +12,7 @@ import {
   MeiosPagamentosTabsModal,
   MeiosPagamentosTabsModalState,
 } from './MeiosPagamentosTabsModal'
+import { isFormaFiscalCartaoCredito, TIPOS_PARCELAMENTO_OPCOES } from './meioPagamentoModalConstants'
 import {
   Dialog,
   DialogContent,
@@ -46,6 +47,26 @@ function formatarFormaPagamentoFiscal(forma: string): string {
   return formasPagamentoFiscalMap[formaLower] || forma
 }
 
+function clonarMeioPagamento(
+  item: MeioPagamento,
+  patch: {
+    tefAtivo?: boolean
+    ativo?: boolean
+    parcelavel?: boolean
+    tipoParcelamento?: TipoParcelamento | null
+  }
+): MeioPagamento {
+  return MeioPagamento.create(
+    item.getId(),
+    item.getNome(),
+    patch.tefAtivo ?? item.isTefAtivo(),
+    item.getFormaPagamentoFiscal(),
+    patch.ativo ?? item.isAtivo(),
+    patch.parcelavel ?? item.isParcelavel(),
+    patch.tipoParcelamento !== undefined ? patch.tipoParcelamento : item.getTipoParcelamento()
+  )
+}
+
 /**
  * Lista de meios de pagamento com scroll infinito
  * Replica exatamente o design e lógica do Flutter
@@ -57,6 +78,8 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
   const [totalMeiosPagamento, setTotalMeiosPagamento] = useState(0)
   const [updatingTefAtivo, setUpdatingTefAtivo] = useState<Record<string, boolean>>({})
+  const [updatingParcelavel, setUpdatingParcelavel] = useState<Record<string, boolean>>({})
+  const [updatingTipoParcelamento, setUpdatingTipoParcelamento] = useState<Record<string, boolean>>({})
   const [updatingAtivo, setUpdatingAtivo] = useState<Record<string, boolean>>({})
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -146,7 +169,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
 
         const data = await response.json()
 
-        const newMeiosPagamento = (data.items || []).map((item: any) =>
+        const newMeiosPagamento = (data.items || []).map((item: unknown) =>
           MeioPagamento.fromJSON(item)
         )
 
@@ -333,13 +356,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
       setMeiosPagamento((prev) =>
         prev.map((item) => {
           if (item.getId() === meioPagamentoId) {
-            return MeioPagamento.create(
-              item.getId(),
-              item.getNome(),
-              novoStatus,
-              item.getFormaPagamentoFiscal(),
-              item.isAtivo()
-            )
+            return clonarMeioPagamento(item, { tefAtivo: novoStatus })
           }
           return item
         })
@@ -369,13 +386,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
         setMeiosPagamento((prev) =>
           prev.map((item) => {
             if (item.getId() === meioPagamentoId) {
-              return MeioPagamento.create(
-                item.getId(),
-                item.getNome(),
-                previousTefAtivo,
-                item.getFormaPagamentoFiscal(),
-                item.isAtivo()
-              )
+              return clonarMeioPagamento(item, { tefAtivo: previousTefAtivo })
             }
             return item
           })
@@ -388,6 +399,141 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
       }
     },
     [auth, loadMeiosPagamento, onReload]
+  )
+
+  const handleToggleParcelavel = useCallback(
+    async (meioPagamento: MeioPagamento, novoStatus: boolean) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        return
+      }
+
+      const meioPagamentoId = meioPagamento.getId()
+      const previousParcelavel = meioPagamento.isParcelavel()
+      const previousTipo = meioPagamento.getTipoParcelamento()
+
+      setUpdatingParcelavel((prev) => ({ ...prev, [meioPagamentoId]: true }))
+      setMeiosPagamento((prev) =>
+        prev.map((item) => {
+          if (item.getId() === meioPagamentoId) {
+            return clonarMeioPagamento(item, {
+              parcelavel: novoStatus,
+              tipoParcelamento: novoStatus
+                ? (item.getTipoParcelamento() ?? 'jurosCliente')
+                : item.getTipoParcelamento(),
+            })
+          }
+          return item
+        })
+      )
+
+      try {
+        const response = await fetch(`/api/meios-pagamentos/${meioPagamentoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ isParcelavel: novoStatus }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || errorData.error || 'Erro ao atualizar parcelável')
+        }
+
+        const atualizado = MeioPagamento.fromJSON(await response.json())
+
+        setMeiosPagamento((prev) =>
+          prev.map((item) => (item.getId() === meioPagamentoId ? atualizado : item))
+        )
+        onReload?.()
+      } catch (error) {
+        console.error('Erro ao atualizar parcelável:', error)
+        showToast.error(error instanceof Error ? error.message : 'Erro ao atualizar parcelável')
+        setMeiosPagamento((prev) =>
+          prev.map((item) => {
+            if (item.getId() === meioPagamentoId) {
+              return clonarMeioPagamento(item, {
+                parcelavel: previousParcelavel,
+                tipoParcelamento: previousTipo,
+              })
+            }
+            return item
+          })
+        )
+      } finally {
+        setUpdatingParcelavel((prev) => {
+          const { [meioPagamentoId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [auth, onReload]
+  )
+
+  const handleChangeTipoParcelamento = useCallback(
+    async (meioPagamento: MeioPagamento, novoTipo: TipoParcelamento) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        return
+      }
+
+      const meioPagamentoId = meioPagamento.getId()
+      const tipoAnterior = meioPagamento.getTipoParcelamento()
+
+      setUpdatingTipoParcelamento((prev) => ({ ...prev, [meioPagamentoId]: true }))
+      setMeiosPagamento((prev) =>
+        prev.map((item) =>
+          item.getId() === meioPagamentoId
+            ? clonarMeioPagamento(item, { tipoParcelamento: novoTipo })
+            : item
+        )
+      )
+
+      try {
+        const response = await fetch(`/api/meios-pagamentos/${meioPagamentoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ tipoParcelamento: novoTipo }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(
+            errorData.message || errorData.error || 'Erro ao atualizar tipo de parcelamento'
+          )
+        }
+
+        const atualizado = MeioPagamento.fromJSON(await response.json())
+
+        setMeiosPagamento((prev) =>
+          prev.map((item) => (item.getId() === meioPagamentoId ? atualizado : item))
+        )
+        onReload?.()
+      } catch (error) {
+        console.error('Erro ao atualizar tipo de parcelamento:', error)
+        showToast.error(
+          error instanceof Error ? error.message : 'Erro ao atualizar tipo de parcelamento'
+        )
+        setMeiosPagamento((prev) =>
+          prev.map((item) =>
+            item.getId() === meioPagamentoId
+              ? clonarMeioPagamento(item, { tipoParcelamento: tipoAnterior })
+              : item
+          )
+        )
+      } finally {
+        setUpdatingTipoParcelamento((prev) => {
+          const { [meioPagamentoId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [auth, onReload]
   )
 
   const handleToggleAtivo = useCallback(
@@ -404,13 +550,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
       setMeiosPagamento((prev) =>
         prev.map((item) => {
           if (item.getId() === meioPagamentoId) {
-            return MeioPagamento.create(
-              item.getId(),
-              item.getNome(),
-              item.isTefAtivo(),
-              item.getFormaPagamentoFiscal(),
-              novoStatus
-            )
+            return clonarMeioPagamento(item, { ativo: novoStatus })
           }
           return item
         })
@@ -440,13 +580,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
         setMeiosPagamento((prev) =>
           prev.map((item) => {
             if (item.getId() === meioPagamentoId) {
-              return MeioPagamento.create(
-                item.getId(),
-                item.getNome(),
-                item.isTefAtivo(),
-                item.getFormaPagamentoFiscal(),
-                previousAtivo
-              )
+              return clonarMeioPagamento(item, { ativo: previousAtivo })
             }
             return item
           })
@@ -534,6 +668,12 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
             TEF Ativo
           </div>
           <div className="md:flex-[2] flex-[1] text-center font-nunito font-semibold md:text-sm text-xs text-primary-text">
+            Permite Parcela
+          </div>
+          <div className="md:flex-[2] flex-[1] text-center font-nunito font-semibold md:text-sm text-xs text-primary-text hidden md:flex">
+            Tipo parcelamento
+          </div>
+          <div className="md:flex-[2] flex-[1] text-center font-nunito font-semibold md:text-sm text-xs text-primary-text">
             Status
           </div>
           <div className="md:flex-[2] flex-[1] text-right font-nunito font-semibold md:text-sm text-xs text-primary-text">
@@ -596,6 +736,65 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
                     title: meioPagamento.isTefAtivo() ? 'TEF Ativo' : 'TEF Inativo',
                   }}
                 />
+              </div>
+              <div
+                className="md:flex-[2] flex-[1] flex justify-center"
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+              >
+                {isFormaFiscalCartaoCredito(meioPagamento.getFormaPagamentoFiscal()) ? (
+                  <JiffyIconSwitch
+                    checked={meioPagamento.isParcelavel()}
+                    onChange={(e) => {
+                      e.stopPropagation()
+                      handleToggleParcelavel(meioPagamento, e.target.checked)
+                    }}
+                    disabled={!!updatingParcelavel[meioPagamento.getId()]}
+                    size="sm"
+                    className="justify-center gap-0 px-0 py-0"
+                    inputProps={{
+                      'aria-label': `Permite parcela — ${meioPagamento.getNome()}`,
+                      title: meioPagamento.isParcelavel() ? 'Permite parcela' : 'Não permite parcela',
+                    }}
+                  />
+                ) : (
+                  <span className="text-secondary-text md:text-sm text-xs" aria-hidden>
+                    -
+                  </span>
+                )}
+              </div>
+              <div
+                className="md:flex-[2] flex-[1] hidden md:flex justify-center"
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+              >
+                {meioPagamento.isParcelavel() ? (
+                  <select
+                    value={meioPagamento.getTipoParcelamento() ?? 'jurosCliente'}
+                    disabled={!!updatingTipoParcelamento[meioPagamento.getId()]}
+                    onChange={(e) => {
+                      e.stopPropagation()
+                      handleChangeTipoParcelamento(
+                        meioPagamento,
+                        e.target.value as TipoParcelamento
+                      )
+                    }}
+                    aria-label={`Tipo de parcelamento — ${meioPagamento.getNome()}`}
+                    className="font-nunito h-8 max-w-full rounded-lg border border-gray-200 bg-info px-2 text-xs text-primary-text focus:border-primary focus:outline-none disabled:opacity-60"
+                  >
+                    {TIPOS_PARCELAMENTO_OPCOES.map((opcao) => (
+                      <option key={opcao.value} value={opcao.value}>
+                        {opcao.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="text-secondary-text md:text-sm text-xs" aria-hidden>
+                    -
+                  </span>
+                )}
               </div>
               <div
                 className="md:flex-[2] flex-[1] flex justify-center"
