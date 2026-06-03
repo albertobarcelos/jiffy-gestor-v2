@@ -57,7 +57,6 @@ export function NovoPedidoAuxiliaryModals() {
     indiceLinhaPainelProduto,
     produtoIndexEdicao,
     produtoParaLancamentoPainel,
-    produtoTemComplementos,
     produtos,
     produtosList,
     quantidadeEdicao,
@@ -95,8 +94,12 @@ export function NovoPedidoAuxiliaryModals() {
             produto={produtoParaLancamentoPainel}
             mostrarAlterarPreco={produtoParaLancamentoPainel.permiteAlterarPrecoAtivo()}
             mostrarComplementos={
-              produtoParaLancamentoPainel.abreComplementosAtivo() &&
-              produtoTemComplementos(produtoParaLancamentoPainel)
+              produtoParaLancamentoPainel.abreComplementosAtivo() ||
+              indiceLinhaPainelProduto !== null
+            }
+            mostrarAvisoComplementosManual={
+              indiceLinhaPainelProduto === null &&
+              !produtoParaLancamentoPainel.abreComplementosAtivo()
             }
             tituloBarra={
               indiceLinhaPainelProduto !== null

@@ -89,8 +89,13 @@ interface ModalLancamentoProdutoPainelProps {
   produto: Produto | null
   /** Cadastro `permiteAlterarPreco` — exibe input de valor */
   mostrarAlterarPreco: boolean
-  /** `abreComplementos` e há grupos com complementos — exibe lista */
+  /** Cadastro `abreComplementos` ou edição via carrinho — exibe seção de seleção de complementos */
   mostrarComplementos: boolean
+  /**
+   * Lançamento pelo catálogo com `abreComplementos` desativado — orienta a usar o menu ⋮ no carrinho.
+   * Não exibir no fluxo "Editar complementos" da linha do pedido.
+   */
+  mostrarAvisoComplementosManual?: boolean
   onConfirm: (data: ModalLancamentoProdutoPainelConfirmPayload) => void
   /** Título da faixa azul (cabeçalho) */
   tituloBarra?: string
@@ -129,6 +134,12 @@ function formatarValorComplemento(
   }
 }
 
+function produtoTemComplementosVinculados(produto: Produto): boolean {
+  const grupos = produto.getGruposComplementos()
+  if (!grupos || grupos.length === 0) return false
+  return grupos.some(grupo => grupo.complementos && grupo.complementos.length > 0)
+}
+
 function montarComplementosSelecionados(
   produto: Produto,
   chaves: string[]
@@ -162,6 +173,7 @@ export function ModalLancamentoProdutoPainel({
   produto,
   mostrarAlterarPreco,
   mostrarComplementos,
+  mostrarAvisoComplementosManual = false,
   onConfirm,
   tituloBarra = 'Lançar na venda',
   valorUnitarioInicial,
@@ -333,15 +345,15 @@ export function ModalLancamentoProdutoPainel({
             ) : null}
 
             {mostrarComplementos && produto ? (
-              <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-                <h3 className="font-nunito mb-3 text-base font-semibold text-primary">Complementos</h3>
-                {produto.getGruposComplementos().length > 0 ? (
-                  <div className="max-h-[min(50vh,360px)] space-y-4 overflow-y-auto pr-1">
+              <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+                <h3 className="font-nunito mb-2 text-base font-semibold text-primary">Complementos</h3>
+                {produtoTemComplementosVinculados(produto) ? (
+                  <div className="max-h-[min(50vh,360px)] space-y-2 overflow-y-auto pr-1">
                     {produto.getGruposComplementos().map(grupo => (
-                      <div key={grupo.id} className="rounded-lg border border-gray-100 p-3">
-                        <h4 className="mb-2 text-sm font-semibold text-gray-800">{grupo.nome}</h4>
+                      <div key={grupo.id} className="rounded-md border border-gray-100 px-2 py-1.5">
+                        <h4 className="mb-1 text-sm font-semibold text-gray-800">{grupo.nome}</h4>
                         {grupo.complementos && grupo.complementos.length > 0 ? (
-                          <div className="space-y-2">
+                          <div className="space-y-0.5">
                             {grupo.complementos.map(comp => {
                               const chaveUnica = `${grupo.id}-${comp.id}`
                               const isSel = chavesComplementos.includes(chaveUnica)
@@ -350,7 +362,7 @@ export function ModalLancamentoProdutoPainel({
                               return (
                                 <div
                                   key={chaveUnica}
-                                  className="flex cursor-pointer items-center justify-between rounded bg-gray-50 p-2 hover:bg-gray-100"
+                                  className="flex cursor-pointer items-center justify-between rounded bg-gray-50 px-2 py-1 hover:bg-gray-100"
                                   onClick={() => toggleComplemento(grupo.id, comp.id)}
                                 >
                                   <div className="flex items-center gap-2">
@@ -378,9 +390,22 @@ export function ModalLancamentoProdutoPainel({
                   </div>
                 ) : (
                   <p className="py-4 text-center text-sm text-gray-500">
-                    Nenhum complemento configurado.
+                    Este produto não possui grupos de complementos vinculados.
                   </p>
                 )}
+              </div>
+            ) : null}
+
+            {mostrarAvisoComplementosManual ? (
+              <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+                <h3 className="font-nunito mb-2 text-base font-semibold text-primary">Complementos</h3>
+                <p className="text-sm leading-relaxed text-gray-600">
+                  Os complementos não abrem automaticamente ao adicionar este produto. Depois de
+                  incluí-lo no pedido, toque nos{' '}
+                  <span className="font-semibold text-gray-800">três pontinhos (⋮)</span> na coluna{' '}
+                  <span className="font-semibold text-gray-800">Ações</span> e escolha{' '}
+                  <span className="font-semibold text-gray-800">Editar complementos</span>.
+                </p>
               </div>
             ) : null}
 

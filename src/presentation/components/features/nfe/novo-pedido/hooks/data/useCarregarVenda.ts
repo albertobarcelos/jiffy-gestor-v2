@@ -1,8 +1,7 @@
 'use client'
 
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { VendaDetalheCarregadaDTO } from '@/src/application/dto/VendaDetalheCarregadaDTO'
-import { CarregarVendaDetalheUseCase } from '@/src/application/use-cases/vendas/CarregarVendaDetalheUseCase'
 import type {
   DetalhesEntregaPedido,
   DetalhesPedidoMeta,
@@ -15,6 +14,7 @@ import type {
   StatusVenda,
 } from '../../types'
 import { showToast } from '@/src/shared/utils/toast'
+import { useVendaDetalheCarregadaQuery } from './useVendaDetalheCarregadaQuery'
 
 export interface AplicarVendaDetalheHandlers {
   setDetalhesPedidoMeta: (meta: DetalhesPedidoMeta | null) => void
@@ -73,7 +73,6 @@ export function aplicarVendaDetalheCarregada(
   handlers.setDataFinalizacaoCarregada(dto.dataFinalizacaoCarregada)
   handlers.setVendaGestorJaCancelada(dto.vendaGestorJaCancelada)
 
-  console.log('✅ Produtos mapeados:', dto.produtos)
   handlers.setProdutos(dto.produtos)
   handlers.setResumoFinanceiroDetalhes(dto.resumoFinanceiroDetalhes)
   handlers.setPagamentos(dto.pagamentos)
@@ -114,53 +113,69 @@ export function useCarregarVenda({
   onClose,
   handlers,
 }: UseCarregarVendaParams) {
-  const [isLoadingVenda, setIsLoadingVenda] = useState(false)
-  const useCase = useMemo(() => new CarregarVendaDetalheUseCase(), [])
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
   const handlersRef = useRef(handlers)
   handlersRef.current = handlers
+  const getTokenRef = useRef(getToken)
+  getTokenRef.current = getToken
+  const ultimoDtoAplicadoRef = useRef<string | null>(null)
+  const [dadosVendaAplicados, setDadosVendaAplicados] = useState(false)
 
-  const carregarVendaExistente = useCallback(
-    async (vendaIdOverride?: string | null) => {
-      const vendaIdParaCarregar = vendaIdOverride || vendaId || vendaIdCriada
-      if (!vendaIdParaCarregar || !open) return
+  const vendaIdParaCarregar = vendaId || vendaIdCriada || ''
+  const queryEnabled = open && !!vendaIdParaCarregar
 
-      const token = getToken()
-      if (!token) {
-        showToast.error('Token não encontrado')
-        return
-      }
+  const query = useVendaDetalheCarregadaQuery({
+    vendaId: vendaIdParaCarregar,
+    tabelaOrigemVenda,
+    modoVisualizacao: Boolean(modoVisualizacao),
+    token: getTokenRef.current(),
+    enabled: queryEnabled,
+    meiosPagamentoCache: meiosPagamentoRef.current ?? [],
+  })
 
-      setIsLoadingVenda(true)
+  useLayoutEffect(() => {
+    if (!open) {
+      ultimoDtoAplicadoRef.current = null
+      setDadosVendaAplicados(false)
+      return
+    }
+    if (!query.data) return
+
+    const chaveAplicacao = `${vendaIdParaCarregar}:${query.dataUpdatedAt}`
+    if (ultimoDtoAplicadoRef.current === chaveAplicacao) return
+    ultimoDtoAplicadoRef.current = chaveAplicacao
+
+    aplicarVendaDetalheCarregada(query.data, handlersRef.current)
+    setDadosVendaAplicados(true)
+  }, [open, query.data, query.dataUpdatedAt, vendaIdParaCarregar])
+
+  useEffect(() => {
+    if (!open || !query.isError || !query.error) return
+    console.error('Erro ao carregar venda:', query.error)
+    showToast.error(
+      query.error instanceof Error ? query.error.message : 'Erro ao carregar dados da venda'
+    )
+    onCloseRef.current()
+  }, [open, query.isError, query.error])
+
+  useEffect(() => {
+    if (query.isFetching && !query.data && open && vendaIdParaCarregar) {
       handlersRef.current.setStatusFiscalDetalhe(null)
+    }
+  }, [query.isFetching, query.data, open, vendaIdParaCarregar])
 
-      try {
-        const dto = await useCase.execute({
-          vendaId: vendaIdParaCarregar,
-          tabelaOrigemVenda,
-          token,
-          modoVisualizacao,
-          meiosPagamentoCache: meiosPagamentoRef.current ?? [],
-        })
+  const carregarVendaExistente = useCallback(async () => {
+    if (!vendaIdParaCarregar || !open) return
+    await query.refetch()
+  }, [vendaIdParaCarregar, open, query])
 
-        aplicarVendaDetalheCarregada(dto, handlersRef.current)
-      } catch (error: unknown) {
-        console.error('Erro ao carregar venda:', error)
-        showToast.error(
-          error instanceof Error ? error.message : 'Erro ao carregar dados da venda'
-        )
-        onCloseRef.current()
-      } finally {
-        setIsLoadingVenda(false)
-      }
-    },
-    [vendaId, vendaIdCriada, open, modoVisualizacao, tabelaOrigemVenda, getToken, useCase, meiosPagamentoRef]
-  )
+  /** Bloqueia UI até o DTO estar no formulário; reabertura com cache evita novas requisições. */
+  const isLoadingVenda = queryEnabled && !dadosVendaAplicados
 
   return {
     carregarVendaExistente,
     isLoadingVenda,
-    setIsLoadingVenda,
+    setIsLoadingVenda: () => {},
   }
 }

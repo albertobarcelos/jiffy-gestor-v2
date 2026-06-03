@@ -11,7 +11,10 @@ export interface UseNovoPedidoEdicaoLinhaParams {
   setProdutos: React.Dispatch<React.SetStateAction<ProdutoSelecionado[]>>
   catalogoProdutosPorId: Record<string, Produto>
   produtosList: Produto[]
-  carregarProdutoNoCatalogoSeNecessario: (produtoId: string) => Promise<Produto | null>
+  carregarProdutoNoCatalogoSeNecessario: (
+    produtoId: string,
+    options?: { forceRefresh?: boolean }
+  ) => Promise<Produto | null>
 }
 
 export function useNovoPedidoEdicaoLinha({

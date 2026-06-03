@@ -15,6 +15,7 @@ export function NovoPedidoFooterShell({ children }: NovoPedidoFooterShellProps) 
         flexShrink: 0,
         borderTop: '1px solid #e5e7eb',
         marginTop: 0,
+        minHeight: '3rem',
         // DialogActions vem com justify-content: flex-end — o grid ficava encolhido à direita
         justifyContent: 'flex-start',
         alignItems: 'stretch',
@@ -24,6 +25,7 @@ export function NovoPedidoFooterShell({ children }: NovoPedidoFooterShellProps) 
           flex: '1 1 100%',
           maxWidth: '100%',
           minWidth: 0,
+          minHeight: '3rem',
         },
       }}
     >

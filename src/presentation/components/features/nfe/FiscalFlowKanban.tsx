@@ -143,10 +143,12 @@ export function FiscalFlowKanban() {
 
   const [novoPedidoModalOpen, setNovoPedidoModalOpen] = useState(false)
   const [deliveryConfiguracoesOpen, setDeliveryConfiguracoesOpen] = useState(false)
-  /** Incrementa a cada "Novo Pedido" — nova instância do modal, evita reaproveitar estado do fluxo/tipo anterior. */
-  const [novoPedidoInstanciaKey, setNovoPedidoInstanciaKey] = useState(0)
+  /** Monta o modal de criar pedido só enquanto aberto ou na animação de saída */
+  const [novoPedidoCriarContext, setNovoPedidoCriarContext] = useState<{
+    instanciaKey: number
+    tipoInicioPedido: TipoPedido
+  } | null>(null)
   const [novoPedidoModalVisualizacaoOpen, setNovoPedidoModalVisualizacaoOpen] = useState(false)
-  const [tipoPedidoEscolhido, setTipoPedidoEscolhido] = useState<TipoPedido>('balcao')
   /** Venda aberta no modal de detalhes (step 4): id, tabela e statusFiscal do unificado (PDV não repete no GET detalhe) */
   const [pedidoVisualizacaoContext, setPedidoVisualizacaoContext] = useState<{
     id: string
@@ -778,8 +780,10 @@ export function FiscalFlowKanban() {
 
   /** Novo pedido: tipo alinhado ao modo do quadro (Delivery → entrega, Balcão → balcão); nova instância limpa o formulário. */
   const handleAbrirNovoPedido = useCallback(() => {
-    setTipoPedidoEscolhido(modoKanbanVendas === 'delivery' ? 'entrega' : 'balcao')
-    setNovoPedidoInstanciaKey(k => k + 1)
+    setNovoPedidoCriarContext({
+      instanciaKey: Date.now(),
+      tipoInicioPedido: modoKanbanVendas === 'delivery' ? 'entrega' : 'balcao',
+    })
     setNovoPedidoModalOpen(true)
   }, [modoKanbanVendas])
 
@@ -1076,19 +1080,24 @@ export function FiscalFlowKanban() {
         />
       )}
 
-      {/* Modal de Novo Pedido — key nova por abertura para estado inicial consistente com tipoInicioPedido */}
-      <NovoPedidoModal
-        key={novoPedidoInstanciaKey}
-        open={novoPedidoModalOpen}
-        tipoInicioPedido={tipoPedidoEscolhido}
-        onClose={() => {
-          setNovoPedidoModalOpen(false)
-        }}
-        onSuccess={() => {
-          setNovoPedidoModalOpen(false)
-          refetch()
-        }}
-      />
+      {/* Modal de Novo Pedido — montado só ao abrir; desmonta após animação de saída */}
+      {novoPedidoCriarContext && (
+        <NovoPedidoModal
+          key={novoPedidoCriarContext.instanciaKey}
+          open={novoPedidoModalOpen}
+          tipoInicioPedido={novoPedidoCriarContext.tipoInicioPedido}
+          onClose={() => {
+            setNovoPedidoModalOpen(false)
+          }}
+          onAfterClose={() => {
+            setNovoPedidoCriarContext(null)
+          }}
+          onSuccess={() => {
+            setNovoPedidoModalOpen(false)
+            refetch()
+          }}
+        />
+      )}
 
       {/* Modal de visualização: contexto só some após onExited do painel */}
       {pedidoVisualizacaoContext && (

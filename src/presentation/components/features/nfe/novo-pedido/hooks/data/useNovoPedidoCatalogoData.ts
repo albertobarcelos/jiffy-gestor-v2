@@ -65,15 +65,20 @@ export function useNovoPedidoCatalogoData({
   })
 
   const carregarProdutoNoCatalogoSeNecessario = useCallback(
-    async (produtoId: string): Promise<Produto | null> => {
-      const emCache =
-        catalogoProdutosPorId[produtoId] ??
-        produtosQuery.produtosList.find(p => p.getId() === produtoId)
-      if (emCache) {
-        setCatalogoProdutosPorId(prev =>
-          prev[produtoId] ? prev : { ...prev, [emCache.getId()]: emCache }
-        )
-        return emCache
+    async (
+      produtoId: string,
+      options?: { forceRefresh?: boolean }
+    ): Promise<Produto | null> => {
+      if (!options?.forceRefresh) {
+        const emCache =
+          catalogoProdutosPorId[produtoId] ??
+          produtosQuery.produtosList.find(p => p.getId() === produtoId)
+        if (emCache) {
+          setCatalogoProdutosPorId(prev =>
+            prev[produtoId] ? prev : { ...prev, [emCache.getId()]: emCache }
+          )
+          return emCache
+        }
       }
 
       if (!token) return null

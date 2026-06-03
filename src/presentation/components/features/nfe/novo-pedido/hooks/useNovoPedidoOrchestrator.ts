@@ -570,7 +570,7 @@ export function useNovoPedidoOrchestrator({
     atualizarPagamento,
   } = gestorActions
 
-  const { resetNomeUsuarioCarregado } = useNovoPedidoOrchestratorEffects({
+  useNovoPedidoOrchestratorEffects({
     open,
     vendaId,
     modoVisualizacao,
@@ -584,7 +584,6 @@ export function useNovoPedidoOrchestrator({
     setAbaDetalhesPedido,
     setStatus,
     setNomeUsuario,
-    carregarVendaExistente,
     longPressTimeoutRef,
     longPressComplementoTimeoutRef,
   })
@@ -607,7 +606,6 @@ export function useNovoPedidoOrchestrator({
     setValorUnitarioEdicaoPainel,
     setModalConfirmacaoSaidaOpen,
     setIsLoadingVenda,
-    resetNomeUsuarioCarregado,
   })
 
   const handlePedidoPainelExited = useNovoPedidoResetOnExit(resetForm, onAfterClose)

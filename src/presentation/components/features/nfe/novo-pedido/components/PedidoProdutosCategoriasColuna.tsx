@@ -20,9 +20,9 @@ export function PedidoProdutosCategoriasColuna() {
       className="flex w-[100px] shrink-0 flex-col overflow-hidden rounded-lg border bg-gray-50"
       aria-label="Categorias de produtos"
     >
-      <div className="shrink-0 border-b border-gray-200 px-2 py-2">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-primary">
-          Categorias
+      <div className="flex shrink-0 border-b border-gray-200 px-2 py-2 items-center justify-center">
+        <span className="text-xs font-semibold uppercase tracking-wide text-primary">
+          Grupos
         </span>
       </div>
       <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-1">

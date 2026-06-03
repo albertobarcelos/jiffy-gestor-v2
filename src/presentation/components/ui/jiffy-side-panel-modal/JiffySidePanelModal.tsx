@@ -184,6 +184,33 @@ export function footerBarGrayBarSx(isFirstColumn: boolean) {
   return footerBarSecondarySx(isFirstColumn)
 }
 
+/** Botões destrutivos no rodapé `bar` (cancelar venda, cancelar NF-e) */
+export function footerBarErrorBarSx(isFirstColumn: boolean) {
+  const bl =
+    isFirstColumn ?
+      ({ borderBottomLeftRadius: PANEL_RADIUS_LEFT } as const)
+    : {}
+  return {
+    borderRadius: 0,
+    ...bl,
+    boxShadow: 'none',
+    border: 'none',
+    backgroundColor: 'var(--color-error, #d32f2f)',
+    color: '#fff',
+    fontWeight: 600,
+    '&:hover': {
+      backgroundColor: 'var(--color-error, #d32f2f)',
+      filter: 'brightness(1.08)',
+      boxShadow: 'none',
+      ...bl,
+    },
+    '&.Mui-disabled': {
+      backgroundColor: 'rgba(211, 47, 47, 0.38)',
+      color: 'rgba(255, 255, 255, 0.9)',
+    },
+  }
+}
+
 /** Anterior / Próximo com tom primary/15 (equivalente visual a `bg-primary/15`) */
 export function footerBarPrimaryMutedSx(isFirstColumn: boolean) {
   const bl =
@@ -207,7 +234,7 @@ export function footerBarPrimaryMutedSx(isFirstColumn: boolean) {
 }
 
 /** Cancelar / Fechar com tom primary/10 (equivalente visual a `bg-primary/10`) */
-function footerBarPrimaryTint10Sx(isFirstColumn: boolean) {
+export function footerBarPrimaryTint10BarSx(isFirstColumn: boolean) {
   const bl =
     isFirstColumn ?
       ({ borderBottomLeftRadius: PANEL_RADIUS_LEFT } as const)
@@ -242,7 +269,7 @@ function footerBarCancelSx(
   variant: 'secondary' | 'primary' | 'primaryTint10' | undefined
 ) {
   if (variant === 'primary') return footerSavePrimaryBarSx(isFirstColumn)
-  if (variant === 'primaryTint10') return footerBarPrimaryTint10Sx(isFirstColumn)
+  if (variant === 'primaryTint10') return footerBarPrimaryTint10BarSx(isFirstColumn)
   return footerBarSecondarySx(isFirstColumn)
 }
 

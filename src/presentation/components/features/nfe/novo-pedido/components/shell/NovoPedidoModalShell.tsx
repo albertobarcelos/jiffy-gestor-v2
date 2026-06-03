@@ -142,21 +142,23 @@ export function NovoPedidoModalShell(props: NovoPedidoShellProps) {
             <PedidoDetalhesView />
           </div>
 
-          <NovoPedidoFooterShell>
-            <PedidoDetalhesFooter
-              createPending={createPending}
-              canSubmit={canSubmit}
-              onSubmit={onSubmit}
-              onNextStep={onNextStep}
-              onPreviousStep={onPreviousStep}
-              onClose={onClose}
-              onSuccess={onSuccess}
-              podeExibirCancelarVendaGestor={podeExibirCancelarVendaGestor}
-              podeExibirCancelarNotaFiscal={podeExibirCancelarNotaFiscal}
-              isSavingPagamentoEntrega={isSavingPagamentoEntrega}
-              onSalvarPagamentoEntrega={onSalvarPagamentoEntrega}
-            />
-          </NovoPedidoFooterShell>
+          {!(modoVisualizacao && isLoadingVenda) && (
+            <NovoPedidoFooterShell>
+              <PedidoDetalhesFooter
+                createPending={createPending}
+                canSubmit={canSubmit}
+                onSubmit={onSubmit}
+                onNextStep={onNextStep}
+                onPreviousStep={onPreviousStep}
+                onClose={onClose}
+                onSuccess={onSuccess}
+                podeExibirCancelarVendaGestor={podeExibirCancelarVendaGestor}
+                podeExibirCancelarNotaFiscal={podeExibirCancelarNotaFiscal}
+                isSavingPagamentoEntrega={isSavingPagamentoEntrega}
+                onSalvarPagamentoEntrega={onSalvarPagamentoEntrega}
+              />
+            </NovoPedidoFooterShell>
+          )}
         </DialogContent>
 
         <NovoPedidoAuxiliaryModals />

@@ -4,7 +4,7 @@ import { useRef, useState, useCallback } from 'react'
 import type { Produto } from '@/src/domain/entities/Produto'
 import type { ModalLancamentoProdutoPainelConfirmPayload } from '../../../ModalLancamentoProdutoPainel'
 import type { ComplementoSelecionado, ProdutoSelecionado } from '../../types'
-import { showToast } from '@/src/shared/utils/toast'
+import { produtoPermiteAlterarPreco } from '../../produtoCatalogoHelpers'
 
 export interface UseNovoPedidoProdutosParams {
   produtos: ProdutoSelecionado[]
@@ -12,7 +12,10 @@ export interface UseNovoPedidoProdutosParams {
   catalogoProdutosPorId: Record<string, Produto>
   setCatalogoProdutosPorId: React.Dispatch<React.SetStateAction<Record<string, Produto>>>
   produtosList: Produto[]
-  carregarProdutoNoCatalogoSeNecessario: (produtoId: string) => Promise<Produto | null>
+  carregarProdutoNoCatalogoSeNecessario: (
+    produtoId: string,
+    options?: { forceRefresh?: boolean }
+  ) => Promise<Produto | null>
 }
 
 export function useNovoPedidoProdutos({
@@ -42,18 +45,17 @@ export function useNovoPedidoProdutos({
   }, [])
 
   const adicionarProduto = useCallback(
-    (produtoId: string) => {
-      const produto =
+    async (produtoId: string) => {
+      let produto =
         catalogoProdutosPorId[produtoId] ?? produtosList.find(p => p.getId() === produtoId)
       if (!produto) return
 
       setCatalogoProdutosPorId(prev => ({ ...prev, [produto.getId()]: produto }))
 
       const mostrarAlterarPreco = produto.permiteAlterarPrecoAtivo()
-      const mostrarComplementos =
-        produto.abreComplementosAtivo() && produtoTemComplementos(produto)
+      const abreComplementos = produto.abreComplementosAtivo()
 
-      if (!mostrarAlterarPreco && !mostrarComplementos) {
+      if (!mostrarAlterarPreco && !abreComplementos) {
         setProdutos(prev => [
           ...prev,
           {
@@ -67,11 +69,24 @@ export function useNovoPedidoProdutos({
         return
       }
 
+      if (abreComplementos) {
+        const produtoAtualizado = await carregarProdutoNoCatalogoSeNecessario(produtoId, {
+          forceRefresh: true,
+        })
+        if (produtoAtualizado) produto = produtoAtualizado
+      }
+
       setIndiceLinhaPainelProduto(null)
       setProdutoParaLancamentoPainel(produto)
       setModalLancamentoProdutoPainelOpen(true)
     },
-    [catalogoProdutosPorId, produtosList, produtoTemComplementos, setCatalogoProdutosPorId, setProdutos]
+    [
+      catalogoProdutosPorId,
+      produtosList,
+      carregarProdutoNoCatalogoSeNecessario,
+      setCatalogoProdutosPorId,
+      setProdutos,
+    ]
   )
 
   const confirmarLancamentoProdutoPainel = useCallback(
@@ -80,6 +95,12 @@ export function useNovoPedidoProdutos({
       if (!produto) return
 
       const idxLinha = indiceLinhaPainelProduto
+      const permiteAlterarPreco = produto.permiteAlterarPrecoAtivo()
+      const valorUnitarioFinal = permiteAlterarPreco
+        ? valorUnitario
+        : idxLinha !== null
+          ? (produtos[idxLinha]?.valorUnitario ?? produto.getValor())
+          : produto.getValor()
 
       const complementosLinha: ComplementoSelecionado[] = complementos.map(c => {
         if (idxLinha !== null) {
@@ -111,7 +132,7 @@ export function useNovoPedidoProdutos({
           if (!atual) return prev
           novos[idxLinha] = {
             ...atual,
-            valorUnitario,
+            valorUnitario: valorUnitarioFinal,
             complementos: complementosLinha,
           }
           return novos
@@ -123,7 +144,7 @@ export function useNovoPedidoProdutos({
             produtoId: produto.getId(),
             nome: produto.getNome(),
             quantidade: 1,
-            valorUnitario,
+            valorUnitario: valorUnitarioFinal,
             complementos: complementosLinha,
             tipoDesconto: null,
             valorDesconto: null,
@@ -148,7 +169,9 @@ export function useNovoPedidoProdutos({
       const produtoSelecionado = produtos[index]
       if (!produtoSelecionado) return
 
-      const produto = await carregarProdutoNoCatalogoSeNecessario(produtoSelecionado.produtoId)
+      const produto = await carregarProdutoNoCatalogoSeNecessario(produtoSelecionado.produtoId, {
+        forceRefresh: true,
+      })
       if (!produto) return
 
       setIndiceLinhaPainelProduto(index)
@@ -167,13 +190,24 @@ export function useNovoPedidoProdutos({
 
   const atualizarProduto = useCallback(
     (index: number, campo: keyof ProdutoSelecionado, valor: unknown) => {
+      if (campo === 'valorUnitario') {
+        const linha = produtos[index]
+        if (!linha) return
+
+        if (
+          !produtoPermiteAlterarPreco(linha.produtoId, catalogoProdutosPorId, produtosList)
+        ) {
+          return
+        }
+      }
+
       setProdutos(prev => {
         const novosProdutos = [...prev]
         novosProdutos[index] = { ...novosProdutos[index], [campo]: valor }
         return novosProdutos
       })
     },
-    [setProdutos]
+    [setProdutos, produtos, catalogoProdutosPorId, produtosList]
   )
 
   const atualizarComplemento = useCallback(

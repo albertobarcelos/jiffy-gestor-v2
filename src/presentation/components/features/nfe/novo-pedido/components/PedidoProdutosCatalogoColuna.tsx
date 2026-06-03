@@ -95,7 +95,7 @@ export function PedidoProdutosCatalogoColuna() {
                     <div key={produto.getId()} className="aspect-square w-full min-w-0">
                       <button
                         type="button"
-                        onClick={() => adicionarProduto(produto.getId())}
+                        onClick={() => void adicionarProduto(produto.getId())}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.borderColor = corHexGrupo
                           e.currentTarget.style.backgroundColor = '#ffffff'

@@ -37,7 +37,7 @@ export function NovoPedidoHeader({
           <div className="flex items-center gap-2">
             <MdPerson className="h-4 w-4 text-primary" />
             <span className="text-sm font-medium text-gray-600">
-              Usuário Gestor: <span className="font-semibold text-primary">{nomeUsuario}</span>
+              Usuário: <span className="font-semibold text-primary">{nomeUsuario}</span>
             </span>
           </div>
         )}

@@ -25,7 +25,6 @@ export type CreateNovoPedidoResetFormParams = {
   setValorUnitarioEdicaoPainel: (v: string) => void
   setModalConfirmacaoSaidaOpen: (open: boolean) => void
   setIsLoadingVenda: (loading: boolean) => void
-  resetNomeUsuarioCarregado: () => void
 }
 
 export function createNovoPedidoResetForm({
@@ -46,7 +45,6 @@ export function createNovoPedidoResetForm({
   setValorUnitarioEdicaoPainel,
   setModalConfirmacaoSaidaOpen,
   setIsLoadingVenda,
-  resetNomeUsuarioCarregado,
 }: CreateNovoPedidoResetFormParams) {
   return () => {
     limparLongPressTimeouts()
@@ -99,7 +97,6 @@ export function createNovoPedidoResetForm({
     form.setVendaIdCriada(null)
     form.setDataVenda('')
     form.setNomeUsuario('')
-    resetNomeUsuarioCarregado()
     form.setCatalogoProdutosPorId({})
     setIsLoadingVenda(false)
   }

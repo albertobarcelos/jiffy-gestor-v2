@@ -1,10 +1,13 @@
 'use client'
 
 import { useCallback } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { atualizarPagamentoEntregaGestorUseCase } from '@/src/application/use-cases/vendas/AtualizarPagamentoEntregaGestorUseCase'
 import { Produto } from '@/src/domain/entities/Produto'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { invalidateVendaDetalheCarregadaCache } from '../data/useVendaDetalheCarregadaQuery'
 import type {
   useCancelarNotaFiscalVendaGestor,
   useCancelarNotaFiscalVendaPdv,
@@ -65,6 +68,8 @@ export function useNovoPedidoGestorActions({
   totalPagamentosLancados,
   trocoLancamento,
 }: UseNovoPedidoGestorActionsParams) {
+  const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
   const {
     produtos,
     pagamentos,
@@ -129,6 +134,9 @@ export function useNovoPedidoGestorActions({
         }))
       )
       showToast.success('Cobrança da entrega atualizada.')
+      if (vendaId) {
+        await invalidateVendaDetalheCarregadaCache(queryClient, empresaId, vendaId)
+      }
       onSuccess()
     } catch (error) {
       console.error('Erro ao atualizar pagamento da entrega:', error)
@@ -149,6 +157,8 @@ export function useNovoPedidoGestorActions({
     onSuccess,
     setPagamentos,
     setIsSavingPagamentoEntrega,
+    queryClient,
+    empresaId,
   ])
 
   const handleAbrirEdicaoProdutoDetalhes = useCallback(
@@ -217,6 +227,7 @@ export function useNovoPedidoGestorActions({
       setJustificativaCancelamento('')
       setTipoCancelamentoSelecionado('venda')
       setInternalDialogOpen(false)
+      await invalidateVendaDetalheCarregadaCache(queryClient, empresaId, vendaId)
       onSuccess()
       onClose()
     } catch (error) {
@@ -236,6 +247,8 @@ export function useNovoPedidoGestorActions({
     setInternalDialogOpen,
     onSuccess,
     onClose,
+    queryClient,
+    empresaId,
   ])
 
   const atualizarPagamento = useCallback(

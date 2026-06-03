@@ -1,7 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
-import { resolverNomeUsuarioGestorUseCase } from '@/src/application/use-cases/auth/ResolverNomeUsuarioGestorUseCase'
+import { useEffect } from 'react'
 import { statusPadraoNovoPedido } from '@/src/domain/services/pedido/RegrasStatusPedido'
 import type { Auth } from '@/src/domain/entities/Auth'
 import type { AbaDetalhesPedido } from '../../types'
@@ -22,7 +21,6 @@ export type UseNovoPedidoOrchestratorEffectsParams = {
   setAbaDetalhesPedido: (aba: AbaDetalhesPedido) => void
   setStatus: (status: import('../../types').StatusVenda) => void
   setNomeUsuario: (nome: string) => void
-  carregarVendaExistente: () => void | Promise<void>
   longPressTimeoutRef: React.RefObject<ReturnType<typeof setTimeout> | null>
   longPressComplementoTimeoutRef: React.RefObject<ReturnType<typeof setTimeout> | null>
 }
@@ -41,12 +39,9 @@ export function useNovoPedidoOrchestratorEffects({
   setAbaDetalhesPedido,
   setStatus,
   setNomeUsuario,
-  carregarVendaExistente,
   longPressTimeoutRef,
   longPressComplementoTimeoutRef,
 }: UseNovoPedidoOrchestratorEffectsParams) {
-  const nomeUsuarioCarregadoNoCicloRef = useRef(false)
-
   useEffect(() => {
     if (currentStep === 4 && abaDetalhesPedido === 'notaFiscal' && !podeExibirAbaNotaFiscal) {
       setAbaDetalhesPedido('infoPedido')
@@ -71,49 +66,25 @@ export function useNovoPedidoOrchestratorEffects({
   }, [open, vendaId, setCurrentStep])
 
   useEffect(() => {
-    if (open && vendaId) {
-      if (modoVisualizacao) {
-        setCurrentStep(4)
-      } else {
-        setCurrentStep(1)
-      }
-      carregarVendaExistente()
+    if (!open || !vendaId) return
+
+    if (modoVisualizacao) {
+      setCurrentStep(4)
+    } else {
+      setCurrentStep(1)
     }
-  }, [open, vendaId, modoVisualizacao, carregarVendaExistente, setCurrentStep])
+  }, [open, vendaId, modoVisualizacao, setCurrentStep])
 
   useEffect(() => {
-    const fetchNomeUsuario = async () => {
-      if (!open) return
-      if (!auth) {
-        setNomeUsuario('')
-        nomeUsuarioCarregadoNoCicloRef.current = false
-        return
-      }
-      if (nomeUsuarioCarregadoNoCicloRef.current) return
-      nomeUsuarioCarregadoNoCicloRef.current = true
-
-      try {
-        const token = auth.getAccessToken()
-        if (!token) {
-          setNomeUsuario('')
-          nomeUsuarioCarregadoNoCicloRef.current = false
-          return
-        }
-
-        const user = auth.getUser()
-        const nome = await resolverNomeUsuarioGestorUseCase.execute(
-          token,
-          user?.getName() || ''
-        )
-        setNomeUsuario(nome)
-      } catch {
-        const user = auth.getUser()
-        setNomeUsuario(user?.getName() || '')
-        nomeUsuarioCarregadoNoCicloRef.current = false
-      }
+    if (!open) {
+      setNomeUsuario('')
+      return
     }
-
-    void fetchNomeUsuario()
+    if (!auth) {
+      setNomeUsuario('')
+      return
+    }
+    setNomeUsuario(auth.getUser()?.getName()?.trim() ?? '')
   }, [open, auth, setNomeUsuario])
 
   useEffect(() => {
@@ -127,7 +98,5 @@ export function useNovoPedidoOrchestratorEffects({
     }
   }, [longPressTimeoutRef, longPressComplementoTimeoutRef])
 
-  return { resetNomeUsuarioCarregado: () => {
-    nomeUsuarioCarregadoNoCicloRef.current = false
-  } }
+  return {}
 }

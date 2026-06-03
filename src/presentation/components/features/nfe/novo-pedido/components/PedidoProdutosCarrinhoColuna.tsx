@@ -1,7 +1,9 @@
 'use client'
 
+import Image from 'next/image'
 import { DropdownMenu, DropdownMenuItem } from '@/src/presentation/components/ui/dropdown-menu'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
+import { produtoPermiteAlterarPreco } from '../produtoCatalogoHelpers'
 import {
   MdAdd,
   MdClear,
@@ -21,10 +23,12 @@ export function PedidoProdutosCarrinhoColuna() {
     atualizarComplemento,
     atualizarProduto,
     calcularTotalProduto,
+    catalogoProdutosPorId,
     formatarDescontoAcrescimo,
     formatarNumeroComMilhar,
     formatarValorComplemento,
     produtos,
+    produtosList,
     removerComplemento,
     removerProduto,
     setValoresEmEdicao,
@@ -78,6 +82,15 @@ export function PedidoProdutosCarrinhoColuna() {
               // calcularTotalProduto já inclui complementos e desconto/acréscimo
               const totalProdutoComComplementos = calcularTotalProduto(produto)
               const qtdProdKey = `qtd-prod-${index}`
+              const permiteAlterarPreco = produtoPermiteAlterarPreco(
+                produto.produtoId,
+                catalogoProdutosPorId,
+                produtosList
+              )
+              const valorUnitarioExibicao =
+                produto.valorUnitario > 0
+                  ? formatarNumeroComMilhar(produto.valorUnitario)
+                  : '0,00'
 
               return (
                 <div key={index} className="space-y-0">
@@ -227,103 +240,108 @@ export function PedidoProdutosCarrinhoColuna() {
                     </div>
                     {/* Valor Unitário */}
                     <div className="w-24 shrink-0">
-                      <input
-                        type="text"
-                        value={
-                          valoresEmEdicao[index] !== undefined
-                            ? valoresEmEdicao[index]
-                            : produto.valorUnitario > 0
-                              ? formatarNumeroComMilhar(produto.valorUnitario)
-                              : ''
-                        }
-                        onChange={e => {
-                          let valorStr = e.target.value
-
-                          // Se vazio, limpa o campo
-                          if (valorStr === '') {
-                            setValoresEmEdicao((prev: any) => ({ ...prev, [index]: '' }))
-                            atualizarProduto(index, 'valorUnitario', 0)
-                            return
+                      {permiteAlterarPreco ? (
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          aria-label="Valor unitário"
+                          value={
+                            valoresEmEdicao[index] !== undefined
+                              ? valoresEmEdicao[index]
+                              : produto.valorUnitario > 0
+                                ? formatarNumeroComMilhar(produto.valorUnitario)
+                                : ''
                           }
+                          onClick={e => e.stopPropagation()}
+                          onChange={e => {
+                            e.stopPropagation()
+                            let valorStr = e.target.value
 
-                          // Remove pontos (separadores de milhar) e vírgula, mantém apenas números
-                          valorStr = valorStr
-                            .replace(/\./g, '')
-                            .replace(',', '')
-                            .replace(/\D/g, '')
+                            if (valorStr === '') {
+                              setValoresEmEdicao((prev: Record<string | number, string>) => ({
+                                ...prev,
+                                [index]: '',
+                              }))
+                              atualizarProduto(index, 'valorUnitario', 0)
+                              return
+                            }
 
-                          // Se vazio após limpeza, limpa o campo
-                          if (valorStr === '') {
-                            setValoresEmEdicao((prev: any) => ({ ...prev, [index]: '' }))
-                            atualizarProduto(index, 'valorUnitario', 0)
-                            return
-                          }
+                            valorStr = valorStr
+                              .replace(/\./g, '')
+                              .replace(',', '')
+                              .replace(/\D/g, '')
 
-                          // Converte para número (centavos) e divide por 100 para obter reais
-                          const valorCentavos = parseInt(valorStr, 10)
-                          const valorReais = valorCentavos / 100
+                            if (valorStr === '') {
+                              setValoresEmEdicao((prev: Record<string | number, string>) => ({
+                                ...prev,
+                                [index]: '',
+                              }))
+                              atualizarProduto(index, 'valorUnitario', 0)
+                              return
+                            }
 
-                          // Formata com separadores de milhar
-                          const valorFormatado = formatarNumeroComMilhar(valorReais)
+                            const valorCentavos = parseInt(valorStr, 10)
+                            const valorReais = valorCentavos / 100
+                            const valorFormatado = formatarNumeroComMilhar(valorReais)
 
-                          // Atualiza o estado de edição com o valor formatado
-                          setValoresEmEdicao((prev: any) => ({
-                            ...prev,
-                            [index]: valorFormatado,
-                          }))
-
-                          // Atualiza o valor do produto
-                          atualizarProduto(index, 'valorUnitario', valorReais)
-                        }}
-                        onFocus={e => {
-                          // Ao focar, mantém o valor formatado (ex: "8,00" ou "1.000.000,00")
-                          const valorAtual = produto.valorUnitario
-                          if (valorAtual > 0) {
-                            const valorFormatado = formatarNumeroComMilhar(valorAtual)
-                            setValoresEmEdicao((prev: any) => ({
+                            setValoresEmEdicao((prev: Record<string | number, string>) => ({
                               ...prev,
                               [index]: valorFormatado,
                             }))
-                          } else {
-                            setValoresEmEdicao((prev: any) => ({ ...prev, [index]: '' }))
-                          }
-                          // Seleciona todo o texto para facilitar substituição
-                          setTimeout(() => e.target.select(), 0)
-                        }}
-                        onBlur={e => {
-                          // Garante formatação correta ao perder o foco
-                          const valor = produto.valorUnitario
-                          if (valor > 0) {
-                            const valorFormatado = formatarNumeroComMilhar(valor)
-                            setValoresEmEdicao((prev: any) => ({
-                              ...prev,
-                              [index]: valorFormatado,
-                            }))
-                            // Remove do estado após um pequeno delay para mostrar formato final
-                            setTimeout(() => {
-                              setValoresEmEdicao((prev: any) => {
+                            atualizarProduto(index, 'valorUnitario', valorReais)
+                          }}
+                          onFocus={e => {
+                            e.stopPropagation()
+                            const valorAtual = produto.valorUnitario
+                            if (valorAtual > 0) {
+                              setValoresEmEdicao((prev: Record<string | number, string>) => ({
+                                ...prev,
+                                [index]: formatarNumeroComMilhar(valorAtual),
+                              }))
+                            } else {
+                              setValoresEmEdicao((prev: Record<string | number, string>) => ({
+                                ...prev,
+                                [index]: '',
+                              }))
+                            }
+                            setTimeout(() => e.target.select(), 0)
+                          }}
+                          onBlur={e => {
+                            e.stopPropagation()
+                            const valor = produto.valorUnitario
+                            if (valor > 0) {
+                              setValoresEmEdicao((prev: Record<string | number, string>) => ({
+                                ...prev,
+                                [index]: formatarNumeroComMilhar(valor),
+                              }))
+                              setTimeout(() => {
+                                setValoresEmEdicao((prev: Record<string | number, string>) => {
+                                  const novo = { ...prev }
+                                  delete novo[index]
+                                  return novo
+                                })
+                              }, 100)
+                            } else {
+                              setValoresEmEdicao((prev: Record<string | number, string>) => {
                                 const novo = { ...prev }
                                 delete novo[index]
                                 return novo
                               })
-                            }, 100)
-                          } else {
-                            // Remove do estado se vazio
-                            setValoresEmEdicao((prev: any) => {
-                              const novo = { ...prev }
-                              delete novo[index]
-                              return novo
-                            })
-                          }
-                        }}
-                        placeholder="0,00"
-                        style={{
-                          MozAppearance: 'textfield',
-                          WebkitAppearance: 'none',
-                          appearance: 'none',
-                        }}
-                        className="h-7 w-full border-0 bg-transparent p-1 text-right text-xs focus:bg-white focus:ring-1 focus:ring-primary"
-                      />
+                            }
+                          }}
+                          placeholder="0,00"
+                          style={{
+                            MozAppearance: 'textfield',
+                            WebkitAppearance: 'none',
+                            appearance: 'none',
+                          }}
+                          className="h-7 w-full border-0 bg-transparent p-1 text-right text-xs focus:bg-white focus:ring-1 focus:ring-primary"
+                        />
+                      ) : (
+                        <span className="block truncate p-1 text-right text-xs text-gray-900">
+                          {valorUnitarioExibicao}
+                        </span>
+                      )}
                     </div>
                     {/* Total */}
                     <div className="w-24 shrink-0">
@@ -583,8 +601,25 @@ export function PedidoProdutosCarrinhoColuna() {
           </div>
         </div>
       ) : (
-        <div className="flex h-full items-center justify-center">
-          <p className="text-sm text-gray-500">Nenhum produto selecionado</p>
+        <div className="flex h-full min-h-[200px] items-center justify-center overflow-hidden p-4">
+          <div className="flex items-center gap-3">
+            <div className="relative h-32 w-28 shrink-0 sm:h-36 sm:w-32">
+              <Image
+                src="/images/jiffy-acenando.png"
+                alt="Jiffy acenando"
+                fill
+                sizes="128px"
+                className="object-contain"
+              />
+            </div>
+            <p className="font-nunito text-base leading-snug text-gray-600">
+              Selecione um grupo
+              <br />
+              e um produto
+              <br />
+              na lista.
+            </p>
+          </div>
         </div>
       )}
     </div>
