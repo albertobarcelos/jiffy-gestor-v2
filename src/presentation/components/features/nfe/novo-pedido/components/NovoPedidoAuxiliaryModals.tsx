@@ -46,6 +46,7 @@ export function NovoPedidoAuxiliaryModals() {
   } = useNovoPedidoUIContext()
   const {
     catalogoProdutosPorId,
+    carregandoComplementosPainel,
     confirmarEdicaoProduto,
     confirmarLancamentoProdutoPainel,
     ehAcrescimo,
@@ -91,6 +92,7 @@ export function NovoPedidoAuxiliaryModals() {
               setProdutoParaLancamentoPainel(null)
               setIndiceLinhaPainelProduto(null)
             }}
+            carregandoComplementos={carregandoComplementosPainel}
             produto={produtoParaLancamentoPainel}
             mostrarAlterarPreco={produtoParaLancamentoPainel.permiteAlterarPrecoAtivo()}
             mostrarComplementos={

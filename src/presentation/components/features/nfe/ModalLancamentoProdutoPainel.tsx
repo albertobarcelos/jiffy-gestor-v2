@@ -91,6 +91,8 @@ interface ModalLancamentoProdutoPainelProps {
   mostrarAlterarPreco: boolean
   /** Cadastro `abreComplementos` ou edição via carrinho — exibe seção de seleção de complementos */
   mostrarComplementos: boolean
+  /** Complementos ainda sendo carregados (GET produto por id) */
+  carregandoComplementos?: boolean
   /**
    * Lançamento pelo catálogo com `abreComplementos` desativado — orienta a usar o menu ⋮ no carrinho.
    * Não exibir no fluxo "Editar complementos" da linha do pedido.
@@ -173,6 +175,7 @@ export function ModalLancamentoProdutoPainel({
   produto,
   mostrarAlterarPreco,
   mostrarComplementos,
+  carregandoComplementos = false,
   mostrarAvisoComplementosManual = false,
   onConfirm,
   tituloBarra = 'Lançar na venda',
@@ -347,7 +350,9 @@ export function ModalLancamentoProdutoPainel({
             {mostrarComplementos && produto ? (
               <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
                 <h3 className="font-nunito mb-2 text-base font-semibold text-primary">Complementos</h3>
-                {produtoTemComplementosVinculados(produto) ? (
+                {carregandoComplementos ? (
+                  <p className="text-sm text-secondary-text">Carregando complementos...</p>
+                ) : produtoTemComplementosVinculados(produto) ? (
                   <div className="max-h-[min(50vh,360px)] space-y-2 overflow-y-auto pr-1">
                     {produto.getGruposComplementos().map(grupo => (
                       <div key={grupo.id} className="rounded-md border border-gray-100 px-2 py-1.5">
@@ -431,6 +436,7 @@ export function ModalLancamentoProdutoPainel({
                 variant="contained"
                 color="primary"
                 onClick={handleConfirmar}
+                disabled={mostrarComplementos && carregandoComplementos}
                 className="h-12 min-h-12 w-full font-semibold shadow-none"
                 sx={footerSavePrimaryBarSx(false)}
               >

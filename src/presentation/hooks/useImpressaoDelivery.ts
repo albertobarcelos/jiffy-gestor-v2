@@ -6,6 +6,7 @@ import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { decidirImpressaoAposAcao } from '@/src/application/delivery/decidirImpressaoPosTransicao'
 import { fetchVendaGestorTickets } from '@/src/infrastructure/api/fetchVendaGestorTickets'
 import { filtrarTicketsPorTipoDecidido } from '@/src/application/delivery/filtrarTicketsPorTipoDecidido'
+import { filtrarWarningsTicketsParaImpressao } from '@/src/application/delivery/filtrarWarningsTicketsParaImpressao'
 import {
   imprimirTicketsApiGestor,
   notificarWarningsTickets,
@@ -18,10 +19,20 @@ import { tipoCupomParaReimpressao } from '@/src/shared/types/deliveryImpressao'
 import type { VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 import { showToast } from '@/src/shared/utils/toast'
 import {
+  reimpressaoExigeImpressoraExpedicao,
+  temImpressoraExpedicaoConfigurada,
+  TOAST_IMPRESSORA_EXPEDICAO_NECESSARIA,
+} from '@/src/shared/utils/deliveryImpressoraExpedicao'
+import {
   erroImpressao,
   logImpressao,
   warnImpressao,
 } from '@/src/shared/utils/logImpressaoDelivery'
+
+export interface UseImpressaoDeliveryOptions {
+  /** Abre o modal de configurações quando falta impressora de expedição (toast é exibido aqui). */
+  onImpressoraExpedicaoNecessaria?: () => void
+}
 
 function preferenciasDoPayloadTickets(
   payload: VendaGestorTicketsResponse
@@ -68,9 +79,14 @@ function resolverTipoCupomComFallbackProduto(
 /**
  * Impressão do fluxo delivery: os tickets vêm prontos do backend (`GET .../tickets`).
  */
-export function useImpressaoDelivery() {
+export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
   const { auth } = useAuthStore()
-  const { empresa, deliveryCupomTemplate } = useEmpresaMe()
+  const { empresa, preferenciasImpressaoDelivery, deliveryCupomTemplate } = useEmpresaMe()
+
+  const avisarImpressoraExpedicaoNecessaria = useCallback(() => {
+    showToast.warning(TOAST_IMPRESSORA_EXPEDICAO_NECESSARIA)
+    options?.onImpressoraExpedicaoNecessaria?.()
+  }, [options?.onImpressoraExpedicaoNecessaria])
 
   const processarAposTransicoes = useCallback(
     async (venda: Venda, acoes: AcaoTransicaoGestor[]) => {
@@ -133,14 +149,6 @@ export function useImpressaoDelivery() {
         const codesIgnorados =
           tipoCupomEfetivo !== d.tipoCupom ? ['IMPRESSORA_EXPEDICAO_NAO_CONFIGURADA'] : []
 
-        const wsLista = ticketsFetch.data.warnings ?? []
-        logImpressao('hook.warnings_servidor', {
-          quantidade: wsLista.length,
-          codes: wsLista.map(w => (typeof w === 'string' ? w : (w as { code?: string }).code)),
-          codesIgnorados,
-        })
-
-        notificarWarningsTickets(wsLista, m => showToast.info(m), { ignorarCodes: codesIgnorados })
         const filtrados = filtrarTicketsPorTipoDecidido(ticketsFetch.data.tickets, tipoCupomEfetivo)
         if (filtrados.length === 0) {
           warnImpressao('hook.filtrados_vazios_apos_filtragem', {
@@ -149,6 +157,24 @@ export function useImpressaoDelivery() {
           })
           continue
         }
+
+        const wsLista = filtrarWarningsTicketsParaImpressao(
+          ticketsFetch.data.warnings,
+          filtrados
+        )
+        const imprimeProducao = filtrados.some(ticket => ticket.tipoCupom === 'producao')
+        logImpressao('hook.warnings_servidor', {
+          quantidade: wsLista.length,
+          codes: wsLista.map(w => (typeof w === 'string' ? w : (w as { code?: string }).code)),
+          codesIgnorados,
+        })
+
+        notificarWarningsTickets(wsLista, m => showToast.info(m), {
+          ignorarCodes: [...codesIgnorados, 'MAPEAMENTO_IMPRESSORA_NAO_CONFIGURADO', 'IMPRESSORA_WINDOWS_NAO_MAPEADA'],
+          tickets: ticketsFetch.data.tickets,
+          imprimeProducao,
+          warningsProdutoSemImpressora: ticketsFetch.data.warnings,
+        })
 
         logImpressao('hook.imprimir_tickets_agora', {
           vendaId: venda.id,
@@ -195,6 +221,16 @@ export function useImpressaoDelivery() {
         showToast.error('Sessão expirada.')
         return
       }
+
+      const prefsEmpresa = preferenciasImpressaoDelivery
+      if (
+        reimpressaoExigeImpressoraExpedicao(prefsEmpresa.modo, colunaId) &&
+        !temImpressoraExpedicaoConfigurada(prefsEmpresa.impressoraExpedicaoId)
+      ) {
+        avisarImpressoraExpedicaoNecessaria()
+        return
+      }
+
       const ticketsFetch = await fetchVendaGestorTickets(venda.id, token)
       if (!ticketsFetch.ok) {
         erroImpressao('hook.reimpressao.fetch_erro', { status: ticketsFetch.status })
@@ -222,18 +258,28 @@ export function useImpressaoDelivery() {
         codesIgnorados,
       })
 
-      const wsLista = ticketsFetch.data.warnings ?? []
-      logImpressao('hook.reimpressao.warnings', {
-        quantidade: wsLista.length,
-        codes: wsLista.map(w => (typeof w === 'string' ? w : (w as { code?: string }).code)),
-      })
-      notificarWarningsTickets(wsLista, m => showToast.info(m), { ignorarCodes: codesIgnorados })
       const filtrados = filtrarTicketsPorTipoDecidido(ticketsFetch.data.tickets, tipoEfetivo)
       if (filtrados.length === 0) {
         warnImpressao('hook.reimpressao.sem_tickets_no_estagio', { tipo: tipoEfetivo, colunaId })
         showToast.info('Nenhum ticket disponível para reimpressão neste estágio.')
         return
       }
+
+      const wsLista = filtrarWarningsTicketsParaImpressao(
+        ticketsFetch.data.warnings,
+        filtrados
+      )
+      const imprimeProducao = filtrados.some(ticket => ticket.tipoCupom === 'producao')
+      logImpressao('hook.reimpressao.warnings', {
+        quantidade: wsLista.length,
+        codes: wsLista.map(w => (typeof w === 'string' ? w : (w as { code?: string }).code)),
+      })
+      notificarWarningsTickets(wsLista, m => showToast.info(m), {
+        ignorarCodes: [...codesIgnorados, 'MAPEAMENTO_IMPRESSORA_NAO_CONFIGURADO', 'IMPRESSORA_WINDOWS_NAO_MAPEADA'],
+        tickets: ticketsFetch.data.tickets,
+        imprimeProducao,
+        warningsProdutoSemImpressora: ticketsFetch.data.warnings,
+      })
 
       logImpressao('hook.reimpressao.disparando_print', { q: filtrados.length })
       await imprimirTicketsApiGestor({
@@ -246,7 +292,13 @@ export function useImpressaoDelivery() {
       })
       logImpressao('hook.reimpressao_concluida', { vendaId: venda.id })
     },
-    [auth, deliveryCupomTemplate, empresa?.nomeExibicao]
+    [
+      auth,
+      avisarImpressoraExpedicaoNecessaria,
+      deliveryCupomTemplate,
+      empresa?.nomeExibicao,
+      preferenciasImpressaoDelivery,
+    ]
   )
 
   return { processarAposTransicoes, processarAposTransicaoVendaGestorId, reimprimirCupomEntrega }

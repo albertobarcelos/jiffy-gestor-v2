@@ -106,6 +106,7 @@ export interface NovoPedidoEdicaoLinhaSlice {
   confirmarEdicaoProduto: () => void
   confirmarLancamentoProdutoPainel: (payload: ModalLancamentoProdutoPainelConfirmPayload) => void
   produtoTemComplementos: (produto: Produto) => boolean
+  carregandoComplementosPainel: boolean
   produtoParaLancamentoPainel: Produto | null
   setProdutoParaLancamentoPainel: Dispatch<SetStateAction<Produto | null>>
   indiceLinhaPainelProduto: number | null

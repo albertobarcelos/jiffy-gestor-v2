@@ -1,4 +1,10 @@
 import { buildCupomFromVendaGestorTicket } from '@/src/application/delivery/buildCupomFromVendaGestorTicket'
+import {
+  avisosProdutoSemImpressora,
+  CODES_PRODUTO_SEM_IMPRESSORA,
+  mensagemProdutoSemImpressora,
+} from '@/src/application/delivery/deliveryProdutoSemImpressoraAvisos'
+import { warningRedundanteMapeamentoImpressoraWindows } from '@/src/application/delivery/deliveryTicketWarningUtils'
 import type { VendaGestorTicket, VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 import { printDeliveryCupom } from '@/src/infrastructure/printing/printDeliveryCupom'
 import { erroImpressao, logImpressao, warnImpressao } from '@/src/shared/utils/logImpressaoDelivery'
@@ -14,10 +20,8 @@ const AVISO_TEXTO: Record<string, string> = {
     'Há impressoras lógicas sem vínculo com uma impressora do Windows nesta estação.',
   IMPRESSORA_EXPEDICAO_NAO_CONFIGURADA:
     'Impressora de expedição não configurada na empresa (considere configurar em parâmetros).',
-  PRODUTO_SEM_IMPRESSORA_FALLBACK_EXPEDICAO:
-    'Algum produto sem impressora mapeada — verifique a configuração de impressão do pedido.',
-  PRODUTO_SEM_IMPRESSORA_SEM_FALLBACK:
-    'Algum produto sem impressora e sem fallback de expedição — linha omitida dos tickets.',
+  PRODUTO_SEM_IMPRESSORA_FALLBACK_EXPEDICAO: mensagemProdutoSemImpressora(null),
+  PRODUTO_SEM_IMPRESSORA_SEM_FALLBACK: mensagemProdutoSemImpressora(null),
 }
 
 function ticketProducaoEhFallbackSemImpressoraProduto(ticket: VendaGestorTicket): boolean {
@@ -33,10 +37,29 @@ function ticketProducaoEhFallbackSemImpressoraProduto(ticket: VendaGestorTicket)
 export function notificarWarningsTickets(
   warnings: VendaGestorTicketsResponse['warnings'],
   onInfo: (mensagem: string) => void,
-  options?: { ignorarCodes?: string[] }
+  options?: {
+    ignorarCodes?: string[]
+    tickets?: VendaGestorTicket[]
+    /** Lote inclui cupom de produção — exibe aviso por produto sem impressora. */
+    imprimeProducao?: boolean
+    /** Payload completo da API; garante aviso igual ao da transição do Kanban. */
+    warningsProdutoSemImpressora?: VendaGestorTicketsResponse['warnings']
+  }
 ): void {
   const ignorar = new Set(options?.ignorarCodes ?? [])
+
+  if (options?.imprimeProducao && options.tickets?.length) {
+    const fonteProduto = options.warningsProdutoSemImpressora ?? warnings
+    for (const mensagem of avisosProdutoSemImpressora(fonteProduto, options.tickets, ignorar)) {
+      onInfo(mensagem)
+    }
+    for (const code of CODES_PRODUTO_SEM_IMPRESSORA) {
+      ignorar.add(code)
+    }
+  }
+
   for (const w of warnings ?? []) {
+    if (warningRedundanteMapeamentoImpressoraWindows(w)) continue
     const key = typeof w === 'string' ? w : w.code
     if (ignorar.has(key)) continue
     const message = typeof w === 'string' ? undefined : w.message

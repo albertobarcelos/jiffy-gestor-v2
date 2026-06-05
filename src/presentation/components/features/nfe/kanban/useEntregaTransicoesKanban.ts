@@ -12,13 +12,23 @@ interface UseEntregaTransicoesKanbanParams {
     venda: Venda
     acoesExecutadas: AcaoTransicaoGestor[]
   }) => void | Promise<void>
+  /** Retorna false para bloquear validação de impressão (expedição / produção + mapeamento Windows). */
+  verificarImpressaoAntesTransicoes?: (
+    venda: Venda,
+    acoes: AcaoTransicaoGestor[]
+  ) => Promise<boolean>
   /** Retorna false para bloquear transições que incluem `despachar` (Pronto → Em rota). */
   verificarEntregadorAntesDespachar?: (venda: Venda) => Promise<boolean>
 }
 
 export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanParams) {
-  const { executarTransicao, refetch, onAfterTransicaoSucesso, verificarEntregadorAntesDespachar } =
-    params
+  const {
+    executarTransicao,
+    refetch,
+    onAfterTransicaoSucesso,
+    verificarImpressaoAntesTransicoes,
+    verificarEntregadorAntesDespachar,
+  } = params
   /** IDs de pedidos com avanço de etapa em andamento (botão "Avançar etapa"). */
   const [avancandoEtapaIds, setAvancandoEtapaIds] = useState<Record<string, boolean>>({})
   /** ISO da última transição bem-sucedida por vendaId (DnD ou botão), enquanto o GET unificado não reflete. */
@@ -47,6 +57,11 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
       const acoes = acoesTransicaoEntregaAvanco(origIdx, destIdx)
       if (acoes.length === 0) return
 
+      if (verificarImpressaoAntesTransicoes) {
+        const podeAvancarImpressao = await verificarImpressaoAntesTransicoes(venda, acoes)
+        if (!podeAvancarImpressao) return
+      }
+
       if (acoes.includes('despachar') && verificarEntregadorAntesDespachar) {
         const podeDespachar = await verificarEntregadorAntesDespachar(venda)
         if (!podeDespachar) {
@@ -69,6 +84,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
       onAfterTransicaoSucesso,
       refetch,
       verificarEntregadorAntesDespachar,
+      verificarImpressaoAntesTransicoes,
     ]
   )
 

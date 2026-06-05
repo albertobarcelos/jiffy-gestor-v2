@@ -295,6 +295,122 @@ export async function resolverTaxaEntregaDetalhe(
   return fromApi
 }
 
+export type TaxaEntregaCatalogoRef = {
+  id: string
+  valor: number
+  nome?: string | null
+}
+
+async function fetchTaxasEntregaCatalogo(token: string): Promise<TaxaEntregaCatalogoRef[]> {
+  try {
+    const response = await fetch('/api/taxas?limit=100&offset=0', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+      cache: 'no-store',
+    })
+    if (!response.ok) return []
+
+    const data = (await response.json()) as { items?: unknown[] }
+    const items = Array.isArray(data.items) ? data.items : []
+
+    return items
+      .map((raw): TaxaEntregaCatalogoRef | null => {
+        if (!raw || typeof raw !== 'object') return null
+        const taxa = raw as Record<string, unknown>
+        const id = String(taxa.id ?? '').trim()
+        const valor = parseNumeroTaxa(taxa.valor)
+        const tipo = String(taxa.tipo ?? taxa.tipoTaxa ?? '')
+          .trim()
+          .toLowerCase()
+        const ativo = taxa.ativo !== false && String(taxa.ativo ?? 'true').toLowerCase() !== 'false'
+        if (!id || valor == null || valor <= 0 || tipo !== 'entrega' || !ativo) return null
+        return {
+          id,
+          valor,
+          nome: taxa.nome != null ? String(taxa.nome).trim() || null : null,
+        }
+      })
+      .filter((taxa): taxa is TaxaEntregaCatalogoRef => taxa != null)
+  } catch {
+    return []
+  }
+}
+
+/** Identifica taxa de entrega no catálogo pelo valor aplicado na venda (± R$ 0,01). */
+export function identificarTaxaEntregaIdNoCatalogo(
+  valorAplicado: number,
+  taxas: TaxaEntregaCatalogoRef[]
+): string | null {
+  if (!Number.isFinite(valorAplicado) || valorAplicado <= 0) return null
+  const match = taxas.find(taxa => Math.abs(taxa.valor - valorAplicado) < 0.011)
+  return match?.id?.trim() || null
+}
+
+/** Valor da taxa persistida: snapshot, `totalAcrescimo` ou diferença valorFinal − itens. */
+export function extrairValorTaxaEntregaAplicada(
+  vendaData: Record<string, unknown>,
+  totalDosItens?: number | null
+): number | null {
+  const snapshot = mapTaxaEntregaSnapshotFromVenda(vendaData)
+  if (taxaEntregaTemValor(snapshot)) return Number(snapshot!.valor)
+
+  const acrescimo = parseNumeroTaxa(vendaData.totalAcrescimo)
+  if (acrescimo != null && acrescimo > 0) return acrescimo
+
+  const totalItens =
+    totalDosItens ?? calcularTotalDosItensResumoEntrega(vendaData)
+  const inferida = inferirTaxaEntregaPorTotais(vendaData, totalItens, snapshot)
+  if (taxaEntregaTemValor(inferida)) return Number(inferida!.valor)
+
+  return null
+}
+
+/**
+ * Resolve taxa de entrega para exibição no Kanban quando o GET da venda não traz `taxaEntregaId`
+ * nem `taxasLancadas`: infere valor, identifica `taxaId` no catálogo e enriquece via GET `/api/taxas/{id}`.
+ */
+export async function resolverTaxaEntregaDetalheKanban(
+  vendaData: Record<string, unknown>,
+  token: string,
+  taxasCatalogo?: TaxaEntregaCatalogoRef[]
+): Promise<TaxaEntregaDetalhe | null> {
+  const totalDosItens = calcularTotalDosItensResumoEntrega(vendaData)
+  const detalheBase = await resolverTaxaEntregaDetalhe(vendaData, token, totalDosItens)
+  if (detalheBase?.taxaId?.trim()) return detalheBase
+
+  const valorAplicado =
+    (taxaEntregaTemValor(detalheBase) ? detalheBase!.valor : null) ??
+    extrairValorTaxaEntregaAplicada(vendaData, totalDosItens)
+  if (valorAplicado == null || valorAplicado <= 0) return detalheBase
+
+  let catalogo = taxasCatalogo ?? []
+  if (catalogo.length === 0) {
+    catalogo = await fetchTaxasEntregaCatalogo(token)
+  }
+
+  const taxaIdCatalogo = identificarTaxaEntregaIdNoCatalogo(valorAplicado, catalogo)
+  if (!taxaIdCatalogo) {
+    return (
+      detalheBase ?? {
+        taxaId: null,
+        nome: 'Taxa de entrega',
+        valor: valorAplicado,
+      }
+    )
+  }
+
+  return enrichTaxaEntregaDetalhe(
+    {
+      ...vendaData,
+      taxaEntregaId: taxaIdCatalogo,
+      taxaEntregaValor: valorAplicado,
+    },
+    token
+  )
+}
+
 /**
  * Resolve valor da taxa de entrega sem requests extras (snapshot da venda + inferência por totais).
  * Ideal para quick view do Kanban, onde só o valor numérico é exibido.
@@ -319,6 +435,8 @@ export function formatarTaxaEntregaDetalheExibicao(
   if (!taxa) return '—'
   const valor = taxa.valor
   if (valor == null || valor <= 0) return '—'
+  const nome = taxa.nome?.trim()
+  if (nome) return `${nome} — ${formatarMoeda(valor)}`
   return formatarMoeda(valor)
 }
 

@@ -78,6 +78,8 @@ import {
   type VendaSelecionadaParaEmissao,
 } from './kanban/useFiscalEmissaoKanban'
 import { useImpressaoDelivery } from '@/src/presentation/hooks/useImpressaoDelivery'
+import { validarImpressaoAntesTransicaoKanban } from '@/src/application/delivery/validarImpressaoAntesTransicaoKanban'
+import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
 import { useKanbanColumnScrollLoadMore } from './kanban/useKanbanColumnScrollLoadMore'
 
 /**
@@ -129,7 +131,7 @@ export function FiscalFlowKanban() {
     handleRascunhoFinalizacaoRangeChange,
     aplicarFinalizacaoDatas,
   } = useFiscalKanbanFilters()
-  const { timezoneAgregacao } = useEmpresaMe()
+  const { timezoneAgregacao, preferenciasImpressaoDelivery } = useEmpresaMe()
   const { auth } = useAuthStore()
   const [entregadorPorVendaId, setEntregadorPorVendaId] = useState<Record<string, string>>({})
 
@@ -342,7 +344,47 @@ export function FiscalFlowKanban() {
   const emitirNotaPdv = useEmitirNfe()
   const emitirNotaGestor = useEmitirNfeGestor()
   const transicaoVendaGestor = useTransicaoVendaGestor()
-  const { processarAposTransicoes, reimprimirCupomEntrega } = useImpressaoDelivery()
+
+  const abrirConfigImpressoraExpedicao = useCallback(() => {
+    setDeliveryConfiguracoesOpen(true)
+  }, [])
+
+  const { processarAposTransicoes, reimprimirCupomEntrega } = useImpressaoDelivery({
+    onImpressoraExpedicaoNecessaria: abrirConfigImpressoraExpedicao,
+  })
+
+  const verificarImpressaoAntesTransicoes = useCallback(
+    async (venda: Venda, acoes: AcaoTransicaoGestor[]) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Sessão expirada.')
+        return false
+      }
+
+      const resultado = await validarImpressaoAntesTransicaoKanban({
+        vendaId: venda.id,
+        token,
+        modo: preferenciasImpressaoDelivery.modo,
+        acoes,
+        impressoraExpedicaoId: preferenciasImpressaoDelivery.impressoraExpedicaoId,
+      })
+
+      for (const info of resultado.toastsInfo ?? []) {
+        showToast.info(info)
+      }
+
+      if (resultado.podeAvancar) return true
+
+      if (resultado.toastWarning) {
+        showToast.warning(resultado.toastWarning)
+      }
+      if (resultado.abrirModalConfig) {
+        abrirConfigImpressoraExpedicao()
+      }
+      return false
+    },
+    [abrirConfigImpressoraExpedicao, auth, preferenciasImpressaoDelivery]
+  )
 
   const verificarEntregadorAntesDespachar = useCallback(
     async (venda: Venda) => {
@@ -377,6 +419,7 @@ export function FiscalFlowKanban() {
     onAfterTransicaoSucesso: async ({ venda, acoesExecutadas }) => {
       await processarAposTransicoes(venda, acoesExecutadas)
     },
+    verificarImpressaoAntesTransicoes,
     verificarEntregadorAntesDespachar,
   })
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, type Dispatch, type SetStateAction } from 'react'
+import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react'
 import { Produto } from '@/src/domain/entities/Produto'
 import type { CanalVendaNovoPedido } from '../../novoPedidoProdutosApi'
 import { useGruposVendaQuery } from './useGruposVendaQuery'
@@ -64,6 +64,8 @@ export function useNovoPedidoCatalogoData({
     onProdutosGrupoCarregados,
   })
 
+  const inflightProdutoPorIdRef = useRef<Map<string, Promise<Produto | null>>>(new Map())
+
   const carregarProdutoNoCatalogoSeNecessario = useCallback(
     async (
       produtoId: string,
@@ -79,18 +81,33 @@ export function useNovoPedidoCatalogoData({
           )
           return emCache
         }
+
+        const inflight = inflightProdutoPorIdRef.current.get(produtoId)
+        if (inflight) return inflight
       }
 
       if (!token) return null
 
+      const fetchProduto = (async (): Promise<Produto | null> => {
+        try {
+          const { fetchProdutoCatalogoPorId } = await import('../../novoPedidoProdutosApi')
+          const entity = await fetchProdutoCatalogoPorId(produtoId, token)
+          if (!entity) return null
+          setCatalogoProdutosPorId(prev => ({ ...prev, [entity.getId()]: entity }))
+          return entity
+        } catch {
+          return null
+        }
+      })()
+
+      if (!options?.forceRefresh) {
+        inflightProdutoPorIdRef.current.set(produtoId, fetchProduto)
+      }
+
       try {
-        const { fetchProdutoCatalogoPorId } = await import('../../novoPedidoProdutosApi')
-        const entity = await fetchProdutoCatalogoPorId(produtoId, token)
-        if (!entity) return null
-        setCatalogoProdutosPorId(prev => ({ ...prev, [entity.getId()]: entity }))
-        return entity
-      } catch {
-        return null
+        return await fetchProduto
+      } finally {
+        inflightProdutoPorIdRef.current.delete(produtoId)
       }
     },
     [catalogoProdutosPorId, produtosQuery.produtosList, token, setCatalogoProdutosPorId]

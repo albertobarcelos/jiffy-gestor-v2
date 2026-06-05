@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   Dialog,
@@ -23,12 +23,16 @@ import {
   SelectValue,
 } from '@/src/presentation/components/ui/select'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useTaxasInfinite } from '@/src/presentation/hooks/useTaxas'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
-import { extrairTaxaEntregaIdDaVenda } from '@/src/application/mappers/VendaDetalheMapper'
-import { SEM_TAXA_ENTREGA_VALUE } from '@/src/shared/constants/pedidoForm'
-import type { UsuarioPdvEntregadorOption } from '@/src/domain/types/vendaDetalhe'
+import {
+  formatarTaxaEntregaDetalheExibicao,
+  resolverTaxaEntregaDetalheKanban,
+} from '@/src/application/mappers/VendaDetalheMapper'
+import type {
+  TaxaEntregaDetalhe,
+  UsuarioPdvEntregadorOption,
+} from '@/src/domain/types/vendaDetalhe'
 import {
   resolverEntregadorIdVendaKanban,
   salvarEntregadorVendaGestor,
@@ -52,7 +56,7 @@ export function AtribuirEntregadorKanbanPainel({
 }: AtribuirEntregadorKanbanPainelProps) {
   const { auth } = useAuthStore()
   const [entregadorId, setEntregadorId] = useState('')
-  const [taxaEntregaId, setTaxaEntregaId] = useState('')
+  const [taxaEntregaDetalhe, setTaxaEntregaDetalhe] = useState<TaxaEntregaDetalhe | null>(null)
   const [carregandoDados, setCarregandoDados] = useState(false)
   const [salvando, setSalvando] = useState(false)
 
@@ -93,13 +97,6 @@ export function AtribuirEntregadorKanbanPainel({
     refetchOnWindowFocus: false,
   })
 
-  const taxasEntregaQuery = useTaxasInfinite({ limit: 100 })
-  const taxasEntrega = useMemo(() => {
-    return (taxasEntregaQuery.data?.pages.flatMap(page => page.taxas) ?? []).filter(taxa => {
-      return taxa.isAtivo() && taxa.getTipo().trim().toLowerCase() === 'entrega'
-    })
-  }, [taxasEntregaQuery.data])
-
   const entregadores = entregadoresQuery.data ?? []
 
   const carregarDadosVenda = useCallback(async () => {
@@ -137,11 +134,13 @@ export function AtribuirEntregadorKanbanPainel({
         )
         if (response.ok) {
           const vendaData = (await response.json()) as Record<string, unknown>
-          const taxaId = extrairTaxaEntregaIdDaVenda(vendaData)
-          setTaxaEntregaId(taxaId ?? '')
+          const taxaDetalhe = await resolverTaxaEntregaDetalheKanban(vendaData, token)
+          setTaxaEntregaDetalhe(taxaDetalhe)
+        } else {
+          setTaxaEntregaDetalhe(null)
         }
       } else {
-        setTaxaEntregaId('')
+        setTaxaEntregaDetalhe(null)
       }
     } catch {
       showToast.error('Erro ao carregar dados do pedido.')
@@ -153,7 +152,7 @@ export function AtribuirEntregadorKanbanPainel({
   useEffect(() => {
     if (!open) {
       setEntregadorId('')
-      setTaxaEntregaId('')
+      setTaxaEntregaDetalhe(null)
       setCarregandoDados(false)
       setSalvando(false)
       return
@@ -303,27 +302,9 @@ export function AtribuirEntregadorKanbanPainel({
                   Em breve será possível alterar a taxa por aqui. Por enquanto, defina na criação
                   do pedido.
                 </p>
-                <Select
-                  value={taxaEntregaId || SEM_TAXA_ENTREGA_VALUE}
-                  onValueChange={value =>
-                    setTaxaEntregaId(value === SEM_TAXA_ENTREGA_VALUE ? '' : value)
-                  }
-                  disabled
-                >
-                  <SelectTrigger className="border-gray-200 bg-white opacity-80">
-                    <SelectValue placeholder="Taxa de entrega" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={SEM_TAXA_ENTREGA_VALUE}>
-                      Sem taxa de entrega
-                    </SelectItem>
-                    {taxasEntrega.map(taxa => (
-                      <SelectItem key={taxa.getId()} value={taxa.getId()}>
-                        {taxa.getNome()} - {transformarParaReal(taxa.getValor())}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="rounded-md border border-gray-200 bg-white px-3 py-2.5 text-sm text-primary-text opacity-90">
+                  {formatarTaxaEntregaDetalheExibicao(taxaEntregaDetalhe, transformarParaReal)}
+                </div>
               </div>
             </div>
           )}

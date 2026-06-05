@@ -32,6 +32,7 @@ export function useNovoPedidoProdutos({
     null
   )
   const [indiceLinhaPainelProduto, setIndiceLinhaPainelProduto] = useState<number | null>(null)
+  const [carregandoComplementosPainel, setCarregandoComplementosPainel] = useState(false)
 
   const longPressTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressIndexRef = useRef<number | null>(null)
@@ -44,13 +45,37 @@ export function useNovoPedidoProdutos({
     return gruposComplementos.some(grupo => grupo.complementos && grupo.complementos.length > 0)
   }, [])
 
+  const garantirComplementosProdutoNoPainel = useCallback(
+    (produtoId: string, produtoBase: Produto) => {
+      if (!produtoBase.abreComplementosAtivo() || produtoTemComplementos(produtoBase)) {
+        setCarregandoComplementosPainel(false)
+        return
+      }
+
+      setCarregandoComplementosPainel(true)
+      void carregarProdutoNoCatalogoSeNecessario(produtoId)
+        .then(produtoAtualizado => {
+          if (!produtoAtualizado) return
+          setProdutoParaLancamentoPainel(prev =>
+            prev?.getId() === produtoId ? produtoAtualizado : prev
+          )
+        })
+        .finally(() => {
+          setCarregandoComplementosPainel(false)
+        })
+    },
+    [carregarProdutoNoCatalogoSeNecessario, produtoTemComplementos]
+  )
+
   const adicionarProduto = useCallback(
-    async (produtoId: string) => {
-      let produto =
+    (produtoId: string) => {
+      const produto =
         catalogoProdutosPorId[produtoId] ?? produtosList.find(p => p.getId() === produtoId)
       if (!produto) return
 
-      setCatalogoProdutosPorId(prev => ({ ...prev, [produto.getId()]: produto }))
+      if (!catalogoProdutosPorId[produtoId]) {
+        setCatalogoProdutosPorId(prev => ({ ...prev, [produto.getId()]: produto }))
+      }
 
       const mostrarAlterarPreco = produto.permiteAlterarPrecoAtivo()
       const abreComplementos = produto.abreComplementosAtivo()
@@ -69,21 +94,15 @@ export function useNovoPedidoProdutos({
         return
       }
 
-      if (abreComplementos) {
-        const produtoAtualizado = await carregarProdutoNoCatalogoSeNecessario(produtoId, {
-          forceRefresh: true,
-        })
-        if (produtoAtualizado) produto = produtoAtualizado
-      }
-
       setIndiceLinhaPainelProduto(null)
       setProdutoParaLancamentoPainel(produto)
       setModalLancamentoProdutoPainelOpen(true)
+      garantirComplementosProdutoNoPainel(produtoId, produto)
     },
     [
       catalogoProdutosPorId,
       produtosList,
-      carregarProdutoNoCatalogoSeNecessario,
+      garantirComplementosProdutoNoPainel,
       setCatalogoProdutosPorId,
       setProdutos,
     ]
@@ -165,20 +184,44 @@ export function useNovoPedidoProdutos({
   )
 
   const abrirModalComplementosProdutoExistente = useCallback(
-    async (index: number) => {
+    (index: number) => {
       const produtoSelecionado = produtos[index]
       if (!produtoSelecionado) return
 
-      const produto = await carregarProdutoNoCatalogoSeNecessario(produtoSelecionado.produtoId, {
-        forceRefresh: true,
-      })
-      if (!produto) return
+      const produtoCache =
+        catalogoProdutosPorId[produtoSelecionado.produtoId] ??
+        produtosList.find(p => p.getId() === produtoSelecionado.produtoId)
+      if (!produtoCache) {
+        setCarregandoComplementosPainel(true)
+        void carregarProdutoNoCatalogoSeNecessario(produtoSelecionado.produtoId)
+          .then(produto => {
+            if (!produto) {
+              setCarregandoComplementosPainel(false)
+              return
+            }
+            setIndiceLinhaPainelProduto(index)
+            setProdutoParaLancamentoPainel(produto)
+            setModalLancamentoProdutoPainelOpen(true)
+            garantirComplementosProdutoNoPainel(produtoSelecionado.produtoId, produto)
+          })
+          .catch(() => {
+            setCarregandoComplementosPainel(false)
+          })
+        return
+      }
 
       setIndiceLinhaPainelProduto(index)
-      setProdutoParaLancamentoPainel(produto)
+      setProdutoParaLancamentoPainel(produtoCache)
       setModalLancamentoProdutoPainelOpen(true)
+      garantirComplementosProdutoNoPainel(produtoSelecionado.produtoId, produtoCache)
     },
-    [produtos, carregarProdutoNoCatalogoSeNecessario]
+    [
+      produtos,
+      catalogoProdutosPorId,
+      produtosList,
+      carregarProdutoNoCatalogoSeNecessario,
+      garantirComplementosProdutoNoPainel,
+    ]
   )
 
   const removerProduto = useCallback(
@@ -278,6 +321,7 @@ export function useNovoPedidoProdutos({
     longPressComplementoTimeoutRef,
     longPressComplementoIndexRef,
     produtoTemComplementos,
+    carregandoComplementosPainel,
     adicionarProduto,
     confirmarLancamentoProdutoPainel,
     abrirModalComplementosProdutoExistente,

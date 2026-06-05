@@ -36,6 +36,8 @@ import {
 } from '@/src/shared/types/deliveryCupomTemplate'
 import { DeliveryConfigCollapsibleSection } from './DeliveryConfigCollapsibleSection'
 import { DeliveryCupomTemplateEditor } from './DeliveryCupomTemplateEditor'
+import { JiffyConfirmDialog } from '@/src/presentation/components/ui/jiffy-confirm-dialog'
+import { DIALOG_SALVAR_SEM_IMPRESSORA_EXPEDICAO } from '@/src/shared/utils/deliveryImpressoraExpedicao'
 import {
   getDeliveryCupomTemplateLocal,
   salvarDeliveryCupomTemplateLocal,
@@ -47,9 +49,6 @@ interface DeliveryConfiguracoesModalProps {
 }
 
 type MapeamentosDraft = Record<string, string>
-
-/** Valor interno do Select Radix — opção “usar impressora de cada produto”. */
-const IMPRESSORA_EXPEDICAO_POR_PRODUTO = '__por_produto__'
 
 function nomeEstacaoPadrao(): string {
   if (typeof window === 'undefined') return 'Estação Gestor'
@@ -140,6 +139,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
   const [carregando, setCarregando] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [carregandoImpressoras, setCarregandoImpressoras] = useState(false)
+  const [confirmSalvarSemImpressoraOpen, setConfirmSalvarSemImpressoraOpen] = useState(false)
   const [statusQz, setStatusQz] = useState<string>('QZ Tray ainda não detectado.')
   const [erroQz, setErroQz] = useState<string | null>(null)
   const [erroConfiguracao, setErroConfiguracao] = useState<string | null>(null)
@@ -314,15 +314,8 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
     [impressorasLogicas, mapeamentos]
   )
 
-  const handleSalvar = useCallback(async () => {
-    if (!token) {
-      showToast.error('Sessão expirada.')
-      return
-    }
-    if (!empresaId) {
-      showToast.error('Empresa não carregada. Aguarde ou abra o painel novamente.')
-      return
-    }
+  const executarSalvar = useCallback(async () => {
+    if (!token || !empresaId) return
 
     const parametroEmpresa: Record<string, unknown> = {
       ...parametroEmpresaDraft,
@@ -333,16 +326,13 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
       imprimirAoFicarPronto,
     }
 
-    /** Evita UUID `null`/stale aliases: muitos backends rejeitam `null`; omitir significa usar impressora do produto quando não há fallback fixo. */
     delete parametroEmpresa.impressoraExpedicaoId
     delete parametroEmpresa.impressora_expedicao_id
-    /** Backend atual rejeita chaves extras em parametroEmpresa. O modelo visual fica local por empresa. */
     delete parametroEmpresa.cupomDeliveryTemplate
     delete parametroEmpresa.modeloCupomDelivery
+
     const expId = impressoraExpedicaoId.trim()
-    if (modoImpressao === 'separado' && expId) {
-      parametroEmpresa.impressoraExpedicaoId = expId
-    }
+    parametroEmpresa.impressoraExpedicaoId = expId || null
 
     const payload = impressorasLogicas
       .map(i => ({
@@ -373,6 +363,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
       salvarDeliveryCupomTemplateLocal(empresaId, cupomTemplate)
       window.dispatchEvent(new Event('jiffy:empresa-me-updated'))
       showToast.success('Configurações de delivery salvas.')
+      setConfirmSalvarSemImpressoraOpen(false)
     } catch (error) {
       const msg =
         error instanceof Error ? error.message : 'Não foi possível salvar as configurações de delivery.'
@@ -396,7 +387,24 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
     token,
   ])
 
+  const handleSalvar = useCallback(() => {
+    if (!token) {
+      showToast.error('Sessão expirada.')
+      return
+    }
+    if (!empresaId) {
+      showToast.error('Empresa não carregada. Aguarde ou abra o painel novamente.')
+      return
+    }
+    if (!impressoraExpedicaoId.trim()) {
+      setConfirmSalvarSemImpressoraOpen(true)
+      return
+    }
+    void executarSalvar()
+  }, [empresaId, executarSalvar, impressoraExpedicaoId, token])
+
   return (
+    <>
     <JiffySidePanelModal
       open={open}
       onClose={onClose}
@@ -558,47 +566,39 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
                 )}
               </div>
 
-              {modoImpressao === 'separado' ? (
-                <div className="space-y-1">
-                  <label
-                    htmlFor="delivery-imp-expedicao"
-                    className="text-sm font-semibold text-primary-text"
-                  >
-                    Impressora de expedição (sistema / lógica)
-                  </label>
-                  <p className="text-xs text-secondary-text">
-                    Opcional: define uma impressora de expedição única em toda a empresa. Sem escolha aqui, o
-                    servidor usa a impressora lógica de cada produto (e este terminal precisa estar mapeando
-                    todas as impressoras usadas nos tickets).
+              <div className="space-y-1">
+                <label
+                  htmlFor="delivery-imp-expedicao"
+                  className="text-sm font-semibold text-primary-text"
+                >
+                  Impressora de expedição (sistema / lógica)
+                </label>
+                <p className="text-xs text-secondary-text">
+                  {modoImpressao === 'unificado'
+                    ? 'Cupom completo ao iniciar preparo. Mapeie também na seção "Impressoras deste terminal".'
+                    : 'Cupom de expedição ao marcar pronto. Produção continua na impressora de cada produto. Mapeie também na seção "Impressoras deste terminal".'}
+                </p>
+                {impressorasLogicas.length === 0 ? (
+                  <p className="text-xs text-amber-800">
+                    Nenhuma impressora cadastrada no sistema. Cadastre em Configurações → Impressoras
+                    antes de usar impressão delivery.
                   </p>
-                  <Select
-                    value={impressoraExpedicaoId || IMPRESSORA_EXPEDICAO_POR_PRODUTO}
-                    disabled={carregando}
-                    onValueChange={v =>
-                      setImpressoraExpedicaoId(
-                        v === IMPRESSORA_EXPEDICAO_POR_PRODUTO ? '' : v
-                      )
-                    }
-                  >
-                    <SelectTrigger
-                      id="delivery-imp-expedicao"
-                      className="h-8 w-full max-w-xs rounded-lg border-gray-200 bg-white text-sm shadow-none focus:border-primary focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 [&>span]:line-clamp-1 [&>span]:text-left"
-                    >
-                      <SelectValue placeholder="Selecione a impressora de expedição" />
-                    </SelectTrigger>
-                    <SelectContent className="!max-h-[250px] rounded-lg border-gray-200">
-                      <SelectItem value={IMPRESSORA_EXPEDICAO_POR_PRODUTO}>
-                        Por produto — impressora configurada em cada item.
-                      </SelectItem>
-                      {impressorasLogicas.map(impressora => (
-                        <SelectItem key={impressora.id} value={impressora.id}>
-                          {impressora.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : null}
+                ) : null}
+                <select
+                  id="delivery-imp-expedicao"
+                  value={impressoraExpedicaoId}
+                  disabled={carregando || impressorasLogicas.length === 0}
+                  onChange={e => setImpressoraExpedicaoId(e.target.value)}
+                  className="h-9 w-full max-w-xs rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none transition-colors focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <option value="">Selecione uma impressora</option>
+                  {impressorasLogicas.map(impressora => (
+                    <option key={impressora.id} value={impressora.id}>
+                      {impressora.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
         </DeliveryConfigCollapsibleSection>
 
         <DeliveryCupomTemplateEditor
@@ -704,5 +704,19 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
         </DeliveryConfigCollapsibleSection>
       </div>
     </JiffySidePanelModal>
+
+    <JiffyConfirmDialog
+      open={confirmSalvarSemImpressoraOpen}
+      onOpenChange={open => {
+        if (!salvando) setConfirmSalvarSemImpressoraOpen(open)
+      }}
+      title="Impressora de expedição"
+      description={DIALOG_SALVAR_SEM_IMPRESSORA_EXPEDICAO}
+      cancelLabel="Cancelar"
+      confirmLabel="Salvar mesmo assim"
+      busy={salvando}
+      onConfirm={() => void executarSalvar()}
+    />
+    </>
   )
 }

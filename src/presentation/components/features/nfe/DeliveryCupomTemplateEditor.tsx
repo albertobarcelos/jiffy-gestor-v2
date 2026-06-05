@@ -266,12 +266,6 @@ export function DeliveryCupomTemplateEditor({
       icon={<MdReceiptLong className="h-5 w-5" aria-hidden />}
       title="Modelo visual do cupom"
       resetExpandedWhen={resetSectionsWhen}
-      description={
-        <>
-          Ajustes salvos em <code>parametroEmpresa.cupomDeliveryTemplate</code>. A impressão continua
-          usando o mesmo fluxo de tickets/QZ.
-        </>
-      }
       headerActions={
         <button
           type="button"
