@@ -75,15 +75,16 @@ export const DialogTitle = React.forwardRef<HTMLHeadingElement, DialogTitleProps
 
 DialogTitle.displayName = 'DialogTitle'
 
-export interface DialogDescriptionProps extends React.HTMLAttributes<HTMLParagraphElement> {
+export interface DialogDescriptionProps extends React.HTMLAttributes<HTMLDivElement> {
   sx?: SxProps<Theme>
 }
 
-export const DialogDescription = React.forwardRef<HTMLParagraphElement, DialogDescriptionProps>(
+export const DialogDescription = React.forwardRef<HTMLDivElement, DialogDescriptionProps>(
   ({ className, children, sx, ...props }, ref) => {
     return (
       <Typography
         ref={ref}
+        component="div"
         variant="body2"
         color="text.secondary"
         className={className}

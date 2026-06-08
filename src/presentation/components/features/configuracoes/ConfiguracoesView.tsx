@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useMemo } from 'react'
+import { useCallback } from 'react'
 import dynamic from 'next/dynamic'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { EmpresaTab } from './tabs/EmpresaTab'
 import { TerminaisTab } from './tabs/TerminaisTab'
 import { ImpressorasList } from '@/src/presentation/components/features/impressoras/ImpressorasList'
@@ -10,6 +10,10 @@ import { MeiosPagamentosList } from '@/src/presentation/components/features/meio
 import { TaxasList } from '@/src/presentation/components/features/taxas/TaxasList'
 import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
 import { cn } from '@/src/shared/utils/cn'
+import {
+  configuracoesTabPath,
+  type ConfiguracoesTabSlug,
+} from '@/src/shared/constants/configuracoesRoutes'
 
 const CadastroPorPlanilha = dynamic(
   () =>
@@ -19,56 +23,24 @@ const CadastroPorPlanilha = dynamic(
   { ssr: false, loading: () => <PageLoading /> }
 )
 
-type ConfigTab =
-  | 'empresa'
-  | 'terminais'
-  | 'impressoras'
-  | 'planilha'
-  | 'meios-pagamentos'
-  | 'taxas'
-
-const TAB_QUERY_VALUES: readonly ConfigTab[] = [
-  'empresa',
-  'terminais',
-  'impressoras',
-  'planilha',
-  'meios-pagamentos',
-  'taxas',
-]
-
-function parseTabParam(value: string | null): ConfigTab {
-  if (value && TAB_QUERY_VALUES.includes(value as ConfigTab)) {
-    return value as ConfigTab
-  }
-  return 'empresa'
+type ConfiguracoesViewProps = {
+  activeTab: ConfiguracoesTabSlug
 }
 
 /**
- * Componente principal de Configurações
- * Replica o design e funcionalidades do Flutter
+ * Configurações — abas em `/configuracoes/:aba` (ex.: `/configuracoes/taxas`).
  */
-export function ConfiguracoesView() {
+export function ConfiguracoesView({ activeTab }: ConfiguracoesViewProps) {
   const router = useRouter()
-  const searchParams = useSearchParams()
-
-  // Fonte única: ?tab= na URL (ex.: /configuracoes?tab=planilha)
-  const activeTab = useMemo(() => parseTabParam(searchParams.get('tab')), [searchParams])
 
   const goToTab = useCallback(
-    (tab: ConfigTab) => {
-      const q = new URLSearchParams(searchParams.toString())
-      if (tab === 'empresa') {
-        q.delete('tab')
-      } else {
-        q.set('tab', tab)
-      }
-      const qs = q.toString()
-      router.replace(qs ? `/configuracoes?${qs}` : '/configuracoes', { scroll: false })
+    (tab: ConfiguracoesTabSlug) => {
+      router.replace(configuracoesTabPath(tab), { scroll: false })
     },
-    [router, searchParams]
+    [router]
   )
 
-  const tabBtn = (tab: ConfigTab, label: string) => (
+  const tabBtn = (tab: ConfiguracoesTabSlug, label: string) => (
     <button
       key={tab}
       type="button"
@@ -86,7 +58,6 @@ export function ConfiguracoesView() {
 
   return (
     <div className="flex h-full flex-col pt-2">
-      {/* Mesmo padrão visual das abas em modais (ex.: NovoGrupo, Grupo de Complementos) */}
       <div className="w-full shrink-0 border-b border-gray-200 bg-gray-50 px-4 md:px-4">
         <div className="flex flex-wrap gap-1 pt-2">
           {tabBtn('empresa', 'Empresa')}
@@ -94,11 +65,10 @@ export function ConfiguracoesView() {
           {tabBtn('impressoras', 'Impressoras')}
           {tabBtn('meios-pagamentos', 'Meios de pagamento')}
           {tabBtn('taxas', 'Taxas')}
-          {tabBtn('planilha', 'Importar Dados')}
+          {tabBtn('importar-dados', 'Importar Dados')}
         </div>
       </div>
 
-      {/* Conteúdo das tabs - ocupa todo o espaço restante */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="flex flex-1 flex-col overflow-hidden rounded-b-[10px] bg-info">
           {activeTab === 'empresa' && <EmpresaTab />}
@@ -114,7 +84,7 @@ export function ConfiguracoesView() {
               <TaxasList />
             </div>
           )}
-          {activeTab === 'planilha' && (
+          {activeTab === 'importar-dados' && (
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
               <CadastroPorPlanilha />
             </div>

@@ -18,7 +18,12 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const name = searchParams.get('q') || searchParams.get('name') || ''
-    const limit = parseInt(searchParams.get('limit') || '10')
+    /** API cardápio aceita no máximo 100 (validação upstream). */
+    const LIMIT_MAX_CARDAPIO_GRUPOS = 100
+    const limitParsed = Number.parseInt(searchParams.get('limit') || '10', 10)
+    const limit = Number.isFinite(limitParsed)
+      ? Math.min(Math.max(limitParsed, 1), LIMIT_MAX_CARDAPIO_GRUPOS)
+      : 10
     const offset = parseInt(searchParams.get('offset') || '0')
     const ativoParam = searchParams.get('ativo')
     const ativo = ativoParam !== null ? ativoParam === 'true' : null

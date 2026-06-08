@@ -787,7 +787,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
       } else if (onSaved) {
         onSaved()
       } else {
-        router.push('/cadastros/clientes')
+        router.push('/clientes')
       }
     } catch (error) {
       console.error('Erro ao salvar cliente:', error)
@@ -838,7 +838,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
       onClose?.()
     } else {
       if (confirm('Tem certeza que deseja cancelar?')) {
-        router.push('/cadastros/clientes')
+        router.push('/clientes')
       }
     }
   }

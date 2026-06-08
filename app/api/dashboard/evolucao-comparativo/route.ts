@@ -11,13 +11,13 @@ import {
   obterFusoAgregacaoDaEmpresaLogada,
   fetchEvolucaoPoints,
 } from '../evolucao/evolucaoService'
-
-type DashboardEvolucaoPoint = {
-  data: string
-  label: string
-  valorFinalizadas: number
-  valorCanceladas: number
-}
+import {
+  buildEvolucaoComparativoCacheKey,
+  getEvolucaoComparativoCache,
+  setEvolucaoComparativoCache,
+  type EvolucaoPoint,
+  type LinhaComparacaoChartRow,
+} from '@/src/infrastructure/dashboard/dashboardEvolucaoComparativoCache'
 
 function enumerarDiasCalendario(inicio: Date, fim: Date): Date[] {
   const out: Date[] = []
@@ -43,7 +43,7 @@ function extrairChaveDia(data: string): string | null {
   return head
 }
 
-function indexarPorDia(pts: DashboardEvolucaoPoint[]): Map<string, { finalizadas: number; canceladas: number }> {
+function indexarPorDia(pts: EvolucaoPoint[]): Map<string, { finalizadas: number; canceladas: number }> {
   const m = new Map<string, { finalizadas: number; canceladas: number }>()
   for (const p of pts) {
     const k = extrairChaveDia(p.data)
@@ -64,7 +64,7 @@ function extrairSlotHHmm(data: string): string | null {
   return tail
 }
 
-function indexarPorSlotHora(pts: DashboardEvolucaoPoint[]): Map<string, { finalizadas: number; canceladas: number }> {
+function indexarPorSlotHora(pts: EvolucaoPoint[]): Map<string, { finalizadas: number; canceladas: number }> {
   const m = new Map<string, { finalizadas: number; canceladas: number }>()
   for (const p of pts) {
     const slot = extrairSlotHHmm(p.data)
@@ -101,20 +101,20 @@ function formatarSlotEixoHora(slot: string): string {
 }
 
 function mergePontosEvolucaoComparacao(
-  atual: DashboardEvolucaoPoint[],
-  anterior: DashboardEvolucaoPoint[],
+  atual: EvolucaoPoint[],
+  anterior: EvolucaoPoint[],
   modo: 'hora' | 'dia',
   inicioAtual: Date,
   fimAtual: Date,
   inicioAnterior: Date,
   fimAnterior: Date
-) {
+): LinhaComparacaoChartRow[] {
   const diasA = enumerarDiasCalendario(inicioAtual, fimAtual)
   const diasB = enumerarDiasCalendario(inicioAnterior, fimAnterior)
   const n = Math.min(diasA.length, diasB.length)
 
   if (modo === 'dia' && diasA.length === 1 && n === 1) {
-    const soma = (pts: DashboardEvolucaoPoint[]) =>
+    const soma = (pts: EvolucaoPoint[]) =>
       pts.reduce(
         (acc, p) => ({
           finalizadas: acc.finalizadas + p.valorFinalizadas,
@@ -138,7 +138,7 @@ function mergePontosEvolucaoComparacao(
   if (modo === 'dia') {
     const mapA = indexarPorDia(atual)
     const mapB = indexarPorDia(anterior)
-    const rows = []
+    const rows: LinhaComparacaoChartRow[] = []
     for (let i = 0; i < n; i++) {
       const dA = diasA[i]
       const dB = diasB[i]
@@ -173,6 +173,70 @@ function mergePontosEvolucaoComparacao(
   })
 }
 
+function resolverIntervalos(searchParams: URLSearchParams, periodo: string, timezone: string) {
+  let inicioAtual: Date | null = null
+  let fimAtual: Date | null = null
+  let inicioAnterior: Date | null = null
+  let fimAnterior: Date | null = null
+
+  if (periodo === 'personalizado') {
+    const pIni = searchParams.get('dataFinalizacaoInicial')
+    const pFim = searchParams.get('dataFinalizacaoFinal')
+    if (pIni && pFim) {
+      inicioAtual = new Date(pIni)
+      fimAtual = new Date(pFim)
+      const deslocado = deslocarPeriodoEmDiasCorridosUtc(inicioAtual, fimAtual, 30)
+      inicioAnterior = deslocado.inicio
+      fimAnterior = deslocado.fim
+    }
+  } else {
+    const mapOpcao: Record<string, string> = {
+      hoje: 'Hoje',
+      ontem: 'Ontem',
+      semana: 'Últimos 7 Dias',
+      '30dias': 'Últimos 30 Dias',
+    }
+    const opcao = mapOpcao[periodo] || 'Hoje'
+    const atual = calcularPeriodoNoFusoEmpresa(opcao, timezone)
+    inicioAtual = atual.inicio
+    fimAtual = atual.fim
+    const anterior = calcularPeriodoAnteriorParaComparacaoNoFusoEmpresa(opcao, timezone)
+    if (anterior) {
+      inicioAnterior = anterior.inicio
+      fimAnterior = anterior.fim
+    }
+  }
+
+  return { inicioAtual, fimAtual, inicioAnterior, fimAnterior }
+}
+
+async function buscarPontosPeriodo(args: {
+  apiClient: ApiClient
+  headers: Record<string, string>
+  inicio: Date
+  fim: Date
+  intervaloHora: number | null
+  fusoAgregacao: string
+}): Promise<EvolucaoPoint[]> {
+  const selectedStatuses: Status[] = ['FINALIZADA', 'CANCELADA']
+  return fetchEvolucaoPoints({
+    apiClient: args.apiClient,
+    headers: args.headers,
+    periodoInicial: args.inicio.toISOString(),
+    periodoFinal: args.fim.toISOString(),
+    selectedStatuses,
+    intervaloHora: args.intervaloHora,
+    fusoAgregacao: args.fusoAgregacao,
+  })
+}
+
+/**
+ * GET /api/dashboard/evolucao-comparativo
+ *
+ * - Cache ~90s por empresa + período + agregação.
+ * - `comparativo=0` (padrão na 1ª carga): só período atual.
+ * - `somenteComparativo=1`: completa período anterior (reutiliza cache do atual).
+ */
 export async function GET(request: NextRequest) {
   try {
     const validation = validateRequest(request)
@@ -186,41 +250,39 @@ export async function GET(request: NextRequest) {
     const timezone = searchParams.get('timezone') || 'America/Sao_Paulo'
     const intervaloHoraRaw = searchParams.get('intervaloHora')
     const intervaloHora = intervaloHoraRaw ? Number(intervaloHoraRaw) : null
+    const somenteComparativo = searchParams.get('somenteComparativo') === '1'
 
-    const selectedStatuses: Status[] = ['FINALIZADA', 'CANCELADA']
+    const { inicioAtual, fimAtual, inicioAnterior, fimAnterior } = resolverIntervalos(
+      searchParams,
+      periodo,
+      timezone
+    )
 
-    let inicioAtual: Date | null = null
-    let fimAtual: Date | null = null
-    let inicioAnterior: Date | null = null
-    let fimAnterior: Date | null = null
+    const intervaloCustomKey =
+      periodo === 'personalizado'
+        ? `${searchParams.get('dataFinalizacaoInicial') ?? ''}|${searchParams.get('dataFinalizacaoFinal') ?? ''}`
+        : ''
 
-    if (periodo === 'personalizado') {
-      const pIni = searchParams.get('dataFinalizacaoInicial')
-      const pFim = searchParams.get('dataFinalizacaoFinal')
-      if (pIni && pFim) {
-        inicioAtual = new Date(pIni)
-        fimAtual = new Date(pFim)
-        const deslocado = deslocarPeriodoEmDiasCorridosUtc(inicioAtual, fimAtual, 30)
-        inicioAnterior = deslocado.inicio
-        fimAnterior = deslocado.fim
-      }
-    } else {
-      const mapOpcao: Record<string, string> = {
-        hoje: 'Hoje',
-        ontem: 'Ontem',
-        semana: 'Últimos 7 Dias',
-        '30dias': 'Últimos 30 Dias',
-      }
-      const opcao = mapOpcao[periodo] || 'Hoje'
-      
-      const atual = calcularPeriodoNoFusoEmpresa(opcao, timezone)
-      inicioAtual = atual.inicio
-      fimAtual = atual.fim
-      
-      const anterior = calcularPeriodoAnteriorParaComparacaoNoFusoEmpresa(opcao, timezone)
-      if (anterior) {
-        inicioAnterior = anterior.inicio
-        fimAnterior = anterior.fim
+    const cacheKey = buildEvolucaoComparativoCacheKey({
+      empresaId: tokenInfo.empresaId ?? '',
+      periodo,
+      timezone,
+      intervaloCustomKey,
+      intervaloHora,
+    })
+
+    const cached = getEvolucaoComparativoCache(cacheKey)
+    if (cached) {
+      if (somenteComparativo) {
+        if (cached.comparativoPronto) {
+          return NextResponse.json(cached.merged, {
+            headers: { 'Cache-Control': 'private, max-age=30' },
+          })
+        }
+      } else {
+        return NextResponse.json(cached.merged, {
+          headers: { 'Cache-Control': 'private, max-age=30' },
+        })
       }
     }
 
@@ -231,44 +293,66 @@ export async function GET(request: NextRequest) {
     }
 
     const fusoAgregacao = await obterFusoAgregacaoDaEmpresaLogada(apiClient, headers)
-
-    const [atual, anterior] = await Promise.all([
-      inicioAtual && fimAtual ? fetchEvolucaoPoints({
-        apiClient,
-        headers,
-        periodoInicial: inicioAtual.toISOString(),
-        periodoFinal: fimAtual.toISOString(),
-        selectedStatuses,
-        intervaloHora,
-        fusoAgregacao,
-      }) : Promise.resolve([]),
-      inicioAnterior && fimAnterior ? fetchEvolucaoPoints({
-        apiClient,
-        headers,
-        periodoInicial: inicioAnterior.toISOString(),
-        periodoFinal: fimAnterior.toISOString(),
-        selectedStatuses,
-        intervaloHora,
-        fusoAgregacao,
-      }) : Promise.resolve([])
-    ])
-
     const modo = typeof intervaloHora === 'number' && intervaloHora > 0 ? 'hora' : 'dia'
-    
-    let merged: any[] = []
-    if (inicioAtual && fimAtual && inicioAnterior && fimAnterior) {
-      merged = mergePontosEvolucaoComparacao(
-        atual,
-        anterior,
-        modo,
-        inicioAtual,
-        fimAtual,
-        inicioAnterior,
-        fimAnterior
-      )
+
+    if (!inicioAtual || !fimAtual || !inicioAnterior || !fimAnterior) {
+      return NextResponse.json([])
     }
 
-    return NextResponse.json(merged)
+    let atual: EvolucaoPoint[] = cached?.atual ?? []
+    let anterior: EvolucaoPoint[] = cached?.anterior ?? []
+
+    if (somenteComparativo) {
+      if (atual.length === 0) {
+        atual = await buscarPontosPeriodo({
+          apiClient,
+          headers,
+          inicio: inicioAtual,
+          fim: fimAtual,
+          intervaloHora,
+          fusoAgregacao,
+        })
+      }
+      anterior = await buscarPontosPeriodo({
+        apiClient,
+        headers,
+        inicio: inicioAnterior,
+        fim: fimAnterior,
+        intervaloHora,
+        fusoAgregacao,
+      })
+    } else {
+      atual = await buscarPontosPeriodo({
+        apiClient,
+        headers,
+        inicio: inicioAtual,
+        fim: fimAtual,
+        intervaloHora,
+        fusoAgregacao,
+      })
+      anterior = []
+    }
+
+    const merged = mergePontosEvolucaoComparacao(
+      atual,
+      anterior,
+      modo,
+      inicioAtual,
+      fimAtual,
+      inicioAnterior,
+      fimAnterior
+    )
+
+    setEvolucaoComparativoCache(cacheKey, {
+      atual,
+      anterior: somenteComparativo ? anterior : null,
+      merged,
+      comparativoPronto: Boolean(somenteComparativo),
+    })
+
+    return NextResponse.json(merged, {
+      headers: { 'Cache-Control': 'private, max-age=30' },
+    })
   } catch (error) {
     console.error('Erro ao buscar evolução comparativo:', error)
     if (error instanceof ApiError) {

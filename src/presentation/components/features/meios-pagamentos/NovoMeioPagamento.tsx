@@ -4,11 +4,12 @@ import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHand
 import { useRouter } from 'next/navigation'
 import { MenuItem } from '@mui/material'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { MeioPagamento } from '@/src/domain/entities/MeioPagamento'
+import { MeioPagamento, type TipoParcelamento } from '@/src/domain/entities/MeioPagamento'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
+import { isFormaFiscalCartaoCredito } from './meioPagamentoModalConstants'
 
 /** Labels outlined em preto — alinhado a NovoComplemento / NovoGrupo */
 const sxOutlinedLabelTextoEscuro = {
@@ -95,6 +96,8 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
   const [nome, setNome] = useState('')
   const [tefAtivo, setTefAtivo] = useState(true)
   const [formaPagamentoFiscal, setFormaPagamentoFiscal] = useState('dinheiro')
+  const [isParcelavel, setIsParcelavel] = useState(false)
+  const [tipoParcelamento, setTipoParcelamento] = useState<TipoParcelamento>('jurosCliente')
   const [ativo, setAtivo] = useState(true)
 
   // Estados de loading
@@ -110,9 +113,11 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
       nome: (nome || '').trim(),
       tefAtivo,
       formaPagamentoFiscal: (formaPagamentoFiscal || '').toLowerCase(),
+      isParcelavel,
+      tipoParcelamento,
       ativo,
     })
-  }, [nome, tefAtivo, formaPagamentoFiscal, ativo])
+  }, [nome, tefAtivo, formaPagamentoFiscal, isParcelavel, tipoParcelamento, ativo])
 
   const baselineSerializedRef = useRef('')
 
@@ -149,7 +154,22 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
   // Opções de forma de pagamento fiscal (apenas as aceitas pela API)
   const formasPagamentoFiscal = Object.keys(formasPagamentoFiscalMap)
 
-  // Carregar dados do meio de pagamento se estiver editando
+  const tiposParcelamentoMap: Record<TipoParcelamento, string> = {
+    jurosVendedor: 'JUROS DO VENDEDOR',
+    jurosCliente: 'JUROS DO CLIENTE',
+  }
+
+  const tiposParcelamento = Object.keys(tiposParcelamentoMap) as TipoParcelamento[]
+
+  const parcelavelDisponivel = isFormaFiscalCartaoCredito(formaPagamentoFiscal)
+  const exibirTipoParcelamento = parcelavelDisponivel && isParcelavel
+
+  useEffect(() => {
+    if (!parcelavelDisponivel) {
+      setIsParcelavel(false)
+      setTipoParcelamento('jurosCliente')
+    }
+  }, [parcelavelDisponivel])
   useEffect(() => {
     if (!isEditing) {
       // Reset quando não estiver editando
@@ -157,6 +177,8 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
       setNome('')
       setTefAtivo(true)
       setFormaPagamentoFiscal('dinheiro')
+      setIsParcelavel(false)
+      setTipoParcelamento('jurosCliente')
       setAtivo(true)
       return
     }
@@ -187,6 +209,8 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
           // Garantir que o valor está em lowercase para corresponder às opções do select
           const formaFiscal = meioPagamento.getFormaPagamentoFiscal().toLowerCase()
           setFormaPagamentoFiscal(formaFiscal)
+          setIsParcelavel(meioPagamento.isParcelavel())
+          setTipoParcelamento(meioPagamento.getTipoParcelamento() ?? 'jurosCliente')
           setAtivo(meioPagamento.isAtivo())
         }
       } catch (error) {
@@ -236,6 +260,8 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
         tefAtivo,
         // Garantir que o valor está em lowercase antes de enviar
         formaPagamentoFiscal: formaPagamentoFiscal.toLowerCase(),
+        isParcelavel: parcelavelDisponivel ? isParcelavel : false,
+        ...(exibirTipoParcelamento ? { tipoParcelamento } : {}),
         ativo,
       }
 
@@ -269,7 +295,7 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
         }
       } else {
         alert(isEditing ? 'Meio de pagamento atualizado com sucesso!' : 'Meio de pagamento criado com sucesso!')
-        router.push('/configuracoes?tab=meios-pagamentos')
+        router.push('/configuracoes/meios-pagamentos')
       }
     } catch (error) {
       console.error('Erro ao salvar meio de pagamento:', error)
@@ -280,7 +306,7 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
   }
 
   const handleCancel = () => {
-    router.push('/configuracoes?tab=meios-pagamentos')
+    router.push('/configuracoes/meios-pagamentos')
   }
 
   useImperativeHandle(
@@ -371,28 +397,52 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
                 ))}
               </Input>
 
-              {/* TEF Ativo */}
-              <div className="flex items-center justify-between gap-3 rounded-lg p-2">
-                <JiffyIconSwitch
-                  checked={tefAtivo}
-                  onChange={(e) => setTefAtivo(e.target.checked)}
-                  label="TEF Ativo"
-                  size="sm"
-                  className="w-full justify-end gap-3"
-                  inputProps={{ 'aria-label': 'TEF Ativo' }}
-                />
-              </div>
+              {exibirTipoParcelamento ? (
+                <Input
+                  select
+                  label="Tipo de parcelamento"
+                  value={tipoParcelamento}
+                  onChange={(e) => setTipoParcelamento(e.target.value as TipoParcelamento)}
+                  size="small"
+                  className="bg-info"
+                  sx={sxEntradaCompactaMeioPagamento}
+                  SelectProps={{ displayEmpty: false }}
+                >
+                  {tiposParcelamento.map((tipo) => (
+                    <MenuItem key={tipo} value={tipo}>
+                      {tiposParcelamentoMap[tipo]}
+                    </MenuItem>
+                  ))}
+                </Input>
+              ) : null}
 
-              {/* Ativo */}
-              <div className="flex items-center justify-between gap-3 rounded-lg p-2">
+              <div className="flex flex-wrap items-center justify-end gap-6 rounded-lg p-2">
                 <JiffyIconSwitch
                   checked={ativo}
                   onChange={(e) => setAtivo(e.target.checked)}
                   label="Ativo"
                   size="sm"
-                  className="w-full justify-end gap-3"
+                  className="gap-3"
                   inputProps={{ 'aria-label': 'Meio de pagamento ativo' }}
                 />
+                <JiffyIconSwitch
+                  checked={tefAtivo}
+                  onChange={(e) => setTefAtivo(e.target.checked)}
+                  label="TEF Ativo"
+                  size="sm"
+                  className="gap-3"
+                  inputProps={{ 'aria-label': 'TEF Ativo' }}
+                />
+                {parcelavelDisponivel ? (
+                  <JiffyIconSwitch
+                    checked={isParcelavel}
+                    onChange={(e) => setIsParcelavel(e.target.checked)}
+                    label="Permite Parcela"
+                    size="sm"
+                    className="gap-3"
+                    inputProps={{ 'aria-label': 'Meio de pagamento permite parcela' }}
+                  />
+                ) : null}
               </div>
             </div>
           </div>

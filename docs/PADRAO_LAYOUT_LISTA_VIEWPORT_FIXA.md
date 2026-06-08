@@ -47,8 +47,8 @@ Evitar **margem superior** no bloco `flex-1` rolável; preferir **`padding`** de
 
 ## Referência no repositório
 
-- Layout: `app/cadastros/complementos/layout.tsx`
-- Página: `app/cadastros/complementos/page.tsx`
+- Layout: `app/complementos/layout.tsx`
+- Página: `app/complementos/page.tsx`
 - Lista: `src/presentation/components/features/complementos/ComplementosList.tsx`
 
 ## Ao replicar em outras telas

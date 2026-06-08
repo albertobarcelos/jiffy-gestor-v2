@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
-import { ChevronDown } from 'lucide-react'
+import Link from 'next/link'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { FaMedal, FaTrophy } from 'react-icons/fa'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { formatarMoeda } from './dashboardTextHelpers'
@@ -390,6 +391,14 @@ export function DashboardTopProdutos({
           </>
         )}
       </div>
+
+      <Link
+        href="/relatorios-produtos-vendidos"
+        className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-secondary transition hover:text-secondary/85"
+      >
+        Ver relatório completo
+        <ChevronRight className="h-4 w-4" aria-hidden />
+      </Link>
     </section>
   )
 }

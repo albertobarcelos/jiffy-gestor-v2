@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { DashboardTopGarcom } from '@/src/domain/entities/DashboardTopGarcom'
@@ -97,5 +97,6 @@ export function useDashboardTopGarconsQuery({
     queryFn: () => fetchTopGarcons({ periodo, limit, periodoInicial, periodoFinal, enabled, token: token!, timezone: resolvedTimezone }),
     enabled: enabled && !!token,
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   })
 }

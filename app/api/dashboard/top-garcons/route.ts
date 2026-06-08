@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 import {
-  appendIntervaloFinalizacaoVendasPdv,
-  lerIntervaloFinalizacaoVendasPdv,
-} from '@/src/shared/utils/parametrosDataFinalizacaoVendasPdv'
-import { calcularPeriodoNoFusoEmpresa } from '@/src/shared/utils/periodoNoFusoEmpresa'
+  buildDashboardVendasPeriodoCacheKey,
+  obterDetalhesVendasFinalizadasPeriodo,
+  type VendaDetalheDashboard,
+} from '@/src/infrastructure/dashboard/dashboardVendasPeriodoCache'
+import { montarParamsDashboardVendasPeriodo } from '@/src/infrastructure/dashboard/montarParamsDashboardPeriodo'
 
-/** Identifica o usuário PDV responsável pela venda no detalhe retornado pela API. */
 function userIdFromVendaDetail(d: Record<string, unknown>): string {
   const abertoPor = d.abertoPor as Record<string, unknown> | undefined
   const usuarioPdv = d.usuarioPdv as Record<string, unknown> | undefined
@@ -31,96 +31,41 @@ function somaQuantidadeProdutos(
   return s
 }
 
-type VendaDetalhe = Record<string, unknown> & {
-  produtosLancados?: Array<{ quantidade?: number; removido?: boolean }>
-  valorFinal?: number
-}
-
-type VendasListPage = {
-  items?: Array<{ id?: string }>
-}
-
-/**
- * Coleta IDs de vendas FINALIZADAS paginando de 100 em 100 até o último lote incompleto.
- * Limita quantos IDs seguem para busca de detalhe (N× GET por venda) para não estourar o timeout da rota Next.
- * Acima desse teto o ranking/totais são amostra — agregação 100% exigiria endpoint agregado no PDV.
- */
-async function fetchTodosIdsVendasFinalizadas(args: {
-  apiClient: ApiClient
-  headers: Record<string, string>
-  /** Já com status, período etc.; não deve conter limit/offset. */
-  baseParams: URLSearchParams
-}): Promise<string[]> {
-  const PAGE = 100
-  /** Evita loop enorme se a API ignorar offset ou responder sempre página cheia. */
-  const MAX_PAGES_LISTA = 200
-  /** Cada ID vira um GET `/vendas/:id` — limite defensivo para o BFF não dar 504 / abort. */
-  const MAX_IDS_PARA_DETALHAR = 10000
-  const ids: string[] = []
-
-  paginas: for (let pageIndex = 0; pageIndex < MAX_PAGES_LISTA; pageIndex++) {
-    const p = new URLSearchParams(args.baseParams.toString())
-    p.set('limit', String(PAGE))
-    p.set('offset', String(pageIndex * PAGE))
-
-    const resp = await args.apiClient.request<VendasListPage>(
-      `/api/v1/operacao-pdv/vendas?${p.toString()}`,
-      { method: 'GET', headers: args.headers }
-    )
-
-    const page = resp.data ?? {}
-    const items = Array.isArray(page.items) ? page.items : []
-
-    for (const v of items) {
-      const id = typeof v?.id === 'string' ? v.id : ''
-      if (!id) continue
-      ids.push(id)
-      if (ids.length >= MAX_IDS_PARA_DETALHAR) break paginas
+async function fetchWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  handler: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = new Array(items.length)
+  let idx = 0
+  const workers = Array.from({ length: Math.max(1, concurrency) }, async () => {
+    while (idx < items.length) {
+      const current = idx++
+      results[current] = await handler(items[current])
     }
-
-    if (items.length === 0 || items.length < PAGE) break
-  }
-
-  return ids
+  })
+  await Promise.all(workers)
+  return results
 }
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const periodo = searchParams.get('periodo') || 'hoje'
   const timezone = searchParams.get('timezone') || 'America/Sao_Paulo'
-  /** Resumo: 10 linhas; “ver todos”: até 500 (mesma ideia do top produtos). */
   const limit = Math.min(Math.max(Number(searchParams.get('limit') || '10'), 1), 500)
+
   const validation = validateRequest(request)
   if (!validation.valid || !validation.tokenInfo) {
     return validation.error!
   }
   const { tokenInfo } = validation
 
-  const params = new URLSearchParams()
-
-  const intervaloCustom = lerIntervaloFinalizacaoVendasPdv(searchParams)
-  if (intervaloCustom) {
-    appendIntervaloFinalizacaoVendasPdv(params, intervaloCustom)
-  } else {
-    // Mapeia o periodo do frontend para a opção do utilitário
-    const mapOpcao: Record<string, string> = {
-      hoje: 'Hoje',
-      ontem: 'Ontem',
-      semana: 'Últimos 7 Dias',
-      '30dias': 'Últimos 30 Dias',
-      mes: 'Mês Atual',
-      '60dias': 'Últimos 60 Dias',
-      '90dias': 'Últimos 90 Dias',
-    }
-    const opcao = mapOpcao[periodo] || 'Hoje'
-    const { inicio, fim } = calcularPeriodoNoFusoEmpresa(opcao, timezone)
-    
-    if (inicio && fim) {
-      appendIntervaloFinalizacaoVendasPdv(params, { inicial: inicio.toISOString(), final: fim.toISOString() })
-    }
-  }
-
-  params.append('status', 'FINALIZADA')
+  const params = montarParamsDashboardVendasPeriodo({
+    requestSearchParams: searchParams,
+    periodo,
+    timezone,
+    status: 'FINALIZADA',
+  })
 
   try {
     const apiClient = new ApiClient()
@@ -129,63 +74,21 @@ export async function GET(request: NextRequest) {
       'Content-Type': 'application/json',
     }
 
-    const cacheKey = JSON.stringify({
-      empresaId: tokenInfo.empresaId,
-      periodo,
-      limit,
-      intervaloCustom: intervaloCustom ?? null,
+    const cacheKey = buildDashboardVendasPeriodoCacheKey({
+      empresaId: tokenInfo.empresaId ?? '',
+      paramsComIntervalo: params,
     })
-    const cached = globalThis.__jiffyTopGarconsCache?.get(cacheKey)
-    if (cached && cached.expiresAt > Date.now()) {
-      return NextResponse.json({
-        items: cached.items,
-        totalUsuariosComVendas: cached.totalUsuariosComVendas,
-      })
-    }
 
-    const vendaIds = await fetchTodosIdsVendasFinalizadas({
+    const detalhes = await obterDetalhesVendasFinalizadasPeriodo({
       apiClient,
       headers,
-      baseParams: params,
+      paramsComIntervalo: params,
+      cacheKey,
     })
 
-    if (vendaIds.length === 0) {
+    if (detalhes.length === 0) {
       return NextResponse.json({ items: [], totalUsuariosComVendas: 0 })
     }
-
-    const fetchWithConcurrency = async <T, R>(
-      items: T[],
-      concurrency: number,
-      handler: (item: T) => Promise<R>
-    ): Promise<R[]> => {
-      const results: R[] = new Array(items.length)
-      let idx = 0
-
-      const workers = Array.from({ length: Math.max(1, concurrency) }, async () => {
-        while (idx < items.length) {
-          const current = idx++
-          results[current] = await handler(items[current])
-        }
-      })
-
-      await Promise.all(workers)
-      return results
-    }
-
-    const detalhes = await fetchWithConcurrency(vendaIds, 10, async vendaId => {
-      try {
-        const resp = await apiClient.request<VendaDetalhe>(
-          `/api/v1/operacao-pdv/vendas/${vendaId}`,
-          {
-            method: 'GET',
-            headers,
-          }
-        )
-        return resp.data
-      } catch {
-        return null
-      }
-    })
 
     const porUsuario = new Map<
       string,
@@ -194,14 +97,19 @@ export async function GET(request: NextRequest) {
 
     for (const venda of detalhes) {
       if (!venda) continue
-      const uid = userIdFromVendaDetail(venda as Record<string, unknown>)
+      const v = venda as VendaDetalheDashboard
+      const uid = userIdFromVendaDetail(v)
       if (!uid) continue
 
-      const qProd = somaQuantidadeProdutos(venda.produtosLancados)
+      const produtos = v.produtosLancados as Array<{ quantidade?: number; removido?: boolean }> | undefined
+      const qProd = somaQuantidadeProdutos(produtos)
+      const valorRaw = v.valorFinal
       const valor =
-        typeof venda.valorFinal === 'number' && !Number.isNaN(venda.valorFinal)
-          ? venda.valorFinal
-          : 0
+        typeof valorRaw === 'number' && !Number.isNaN(valorRaw)
+          ? valorRaw
+          : typeof valorRaw === 'string'
+            ? parseFloat(valorRaw) || 0
+            : 0
 
       const agg = porUsuario.get(uid) ?? { qtdProdutos: 0, qtdVendas: 0, valorTotal: 0 }
       agg.qtdProdutos += qProd
@@ -218,12 +126,10 @@ export async function GET(request: NextRequest) {
         return b.qtdProdutos - a.qtdProdutos
       })
 
-    // Distintos com pelo menos uma venda finalizada na amostra (qtdVendas ≥ 1 por usuário).
     const totalUsuariosComVendas = ordenadosFull.length
-
     const ordenados = ordenadosFull.slice(0, limit)
 
-    const itemsComNome = await fetchWithConcurrency(ordenados, 8, async row => {
+    const itemsComNome = await fetchWithConcurrency(ordenados, 12, async row => {
       let nome = ''
       try {
         const userResp = await apiClient.request<{ nome?: string }>(
@@ -243,15 +149,10 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    const ttlMs = 30_000
-    globalThis.__jiffyTopGarconsCache ??= new Map()
-    globalThis.__jiffyTopGarconsCache.set(cacheKey, {
-      expiresAt: Date.now() + ttlMs,
-      items: itemsComNome,
-      totalUsuariosComVendas,
-    })
-
-    return NextResponse.json({ items: itemsComNome, totalUsuariosComVendas })
+    return NextResponse.json(
+      { items: itemsComNome, totalUsuariosComVendas },
+      { headers: { 'Cache-Control': 'private, max-age=30' } }
+    )
   } catch (error) {
     console.error('Erro ao buscar top garçons:', error)
     if (error instanceof ApiError) {

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
@@ -138,6 +138,7 @@ export function useDashboardResumoQuery({
       }),
     enabled: enabled && !!token,
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   })
 }
 

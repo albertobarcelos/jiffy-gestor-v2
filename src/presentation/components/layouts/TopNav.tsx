@@ -23,6 +23,7 @@ import {
   MdAccountBalance,
   MdHistory,
   MdPercent,
+  MdAnalytics,
 } from 'react-icons/md'
 import type { IconType } from 'react-icons'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
@@ -61,11 +62,11 @@ export function TopNav() {
   // Prefetch agressivo das rotas mais acessadas na inicialização
   useEffect(() => {
     const routesToPrefetch = [
-      '/cadastros/grupos-complementos',
-      '/cadastros/complementos',
-      '/cadastros/taxas',
+      '/grupos-complementos',
+      '/complementos',
+      '/taxas',
       '/produtos',
-      '/cadastros/grupos-produtos',
+      '/grupos-produtos',
       '/estoque',
       '/pedidos-clientes',
     ]
@@ -155,10 +156,10 @@ export function TopNav() {
         path: '#',
         icon: MdShoppingBag,
         children: [
-          { name: 'Grupo de Produtos', path: '/cadastros/grupos-produtos', icon: MdCategory },
+          { name: 'Grupo de Produtos', path: '/grupos-produtos', icon: MdCategory },
           { name: 'Produtos', path: '/produtos', icon: MdShoppingBag },
-          { name: 'Grupo de Complementos', path: '/cadastros/grupos-complementos', icon: MdCategory },
-          { name: 'Complementos', path: '/cadastros/complementos', icon: MdAddCircle },
+          { name: 'Grupo de Complementos', path: '/grupos-complementos', icon: MdCategory },
+          { name: 'Complementos', path: '/complementos', icon: MdAddCircle },
         ],
       },
       {
@@ -166,9 +167,9 @@ export function TopNav() {
         path: '#',
         icon: MdPeople,
         children: [
-          { name: 'Perfis PDV', path: '/cadastros/perfis-usuarios-pdv', icon: MdGroup },
-          { name: 'Usuários PDV', path: '/cadastros/usuarios', icon: MdPerson },
-          { name: 'Clientes', path: '/cadastros/clientes', icon: MdPeople },
+          { name: 'Perfis PDV', path: '/perfis-usuarios-pdv', icon: MdGroup },
+          { name: 'Usuários PDV', path: '/usuarios', icon: MdPerson },
+          { name: 'Clientes', path: '/clientes', icon: MdPeople },
         ],
       },
       {
@@ -195,12 +196,13 @@ export function TopNav() {
             ),
           },
           { name: 'Relatórios Vendas', path: '/relatorios-vendas', icon: MdAssessment },
+          { name: 'Relatório Produtoss', path: '/relatorios-produtos-vendidos', icon: MdAnalytics },
           { name: 'Hist. Fechamentos', path: '/historico-fechamento', icon: MdHistory },
           { name: 'Comissões', path: '/vendas/comissoes', icon: MdPercent },
         ],
       },
       { name: 'Portal do Contador', path: '/portal-contador', icon: MdAccountBalance },
-      { name: 'Configurações', path: '/configuracoes', icon: MdSettings },
+      { name: 'Configurações', path: '/configuracoes/empresa', icon: MdSettings },
     ]
 
     if (!temAcessoFiscal) {

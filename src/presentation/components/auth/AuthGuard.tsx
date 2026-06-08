@@ -99,6 +99,11 @@ function isTenantSessionAlive(): boolean {
   return getActiveTenantAuthOrNull() !== null
 }
 
+/** ERP: sessão da empresa (tenant JWT) é independente da identidade do hub. */
+function isTenantSessionValid(t: ReturnType<typeof useAuthStore.getState>['tenantAuth']): boolean {
+  return t !== null && !t.isExpired()
+}
+
 export function AuthGuard({ children }: AuthGuardProps) {
   const pathname = usePathname()
   const isAuthenticated = useAuthStore(s => s.isAuthenticated)

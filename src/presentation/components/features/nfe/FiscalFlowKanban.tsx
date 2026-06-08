@@ -25,6 +25,8 @@ import {
   VendaUnificadaDTO,
   resolveModeloParaEmitirNota,
 } from '@/src/presentation/hooks/useVendasUnificadas'
+import { useVendaIdsPdvPorTerminal } from '@/src/presentation/hooks/useVendaIdsPdvPorTerminal'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { calculatePeriodo } from '@/src/shared/utils/dateFilters'
 import {
@@ -204,6 +206,8 @@ function vendaSemNomeCliente(v: Venda): boolean {
  * Baseado no modelo de Kanban moderno e limpo
  */
 type OrigemFiltro = '' | 'PDV' | 'GESTOR' | 'DELIVERY'
+
+type TerminalOpcao = { id: string; nome: string }
 type PeriodoOpcao =
   | 'Todos'
   | 'Hoje'
@@ -215,6 +219,8 @@ type PeriodoOpcao =
   | 'Últimos 60 Dias'
   | 'Últimos 90 Dias'
   | 'Datas Personalizadas'
+
+const PERIODO_PADRAO_DATA_FINALIZACAO: PeriodoOpcao = 'Hoje'
 
 /**
  * Ordena por data mais recente primeiro (igual em todas as colunas, sem depender de localStorage).
@@ -394,11 +400,19 @@ export function FiscalFlowKanban() {
   const [periodo, setPeriodo] = useState<PeriodoOpcao>('Todos')
   const [periodoInicial, setPeriodoInicial] = useState<Date | null>(null)
   const [periodoFinal, setPeriodoFinal] = useState<Date | null>(null)
-  const [dataFinalizacaoPeriodo, setDataFinalizacaoPeriodo] = useState<PeriodoOpcao>('Todos')
-  const [dataFinalizacaoInicio, setDataFinalizacaoInicio] = useState<Date | null>(null)
-  const [dataFinalizacaoFim, setDataFinalizacaoFim] = useState<Date | null>(null)
+  const [dataFinalizacaoPeriodo, setDataFinalizacaoPeriodo] = useState<PeriodoOpcao>(
+    PERIODO_PADRAO_DATA_FINALIZACAO
+  )
+  const [dataFinalizacaoInicio, setDataFinalizacaoInicio] = useState<Date | null>(
+    () => calculatePeriodo(PERIODO_PADRAO_DATA_FINALIZACAO).inicio
+  )
+  const [dataFinalizacaoFim, setDataFinalizacaoFim] = useState<Date | null>(
+    () => calculatePeriodo(PERIODO_PADRAO_DATA_FINALIZACAO).fim
+  )
   const [origemFilter, setOrigemFilter] = useState<OrigemFiltro>('')
-  const [statusFiscalFilter, setStatusFiscalFilter] = useState<string>('')
+  const [terminalFilter, setTerminalFilter] = useState<string>('')
+  const [terminais, setTerminais] = useState<TerminalOpcao[]>([])
+  const [isLoadingTerminais, setIsLoadingTerminais] = useState(false)
   const [filtrosVisiveisMobile, setFiltrosVisiveisMobile] = useState(false)
   const [isDatasModalOpen, setIsDatasModalOpen] = useState(false)
   /** Edição de cliente (lápis no card): mesmo painel que ClientesList / SeletorClienteModal */
@@ -432,6 +446,57 @@ export function FiscalFlowKanban() {
   const rejeitadaReativacaoEmAndamentoRef = useRef(false)
   /** IDs já reativados com sucesso — evita loop infinito se o GET ainda vier inconsistente (base de testes). */
   const rejeitadaReativacaoJaTentadaIdsRef = useRef<Set<string>>(new Set())
+
+  const { auth } = useAuthStore()
+
+  const loadAllTerminais = useCallback(async () => {
+    const token = auth?.getAccessToken()
+    if (!token) return
+
+    setIsLoadingTerminais(true)
+    try {
+      const allTerminais: TerminalOpcao[] = []
+      let currentOffset = 0
+      const limit = 50
+      let hasMore = true
+
+      while (hasMore) {
+        const params = new URLSearchParams({
+          limit: limit.toString(),
+          offset: currentOffset.toString(),
+        })
+
+        const response = await fetch(`/api/terminais?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (!response.ok) break
+
+        const data = await response.json()
+        const newTerminais = (data.items || []).map((t: Record<string, unknown>) => ({
+          id: String(t.id),
+          nome: String(t.nome || t.name || t.codigoInterno || 'Sem nome'),
+        }))
+
+        allTerminais.push(...newTerminais)
+        hasMore = newTerminais.length === limit
+        currentOffset += newTerminais.length
+      }
+
+      setTerminais(allTerminais)
+    } catch (error) {
+      console.error('Erro ao carregar terminais:', error)
+    } finally {
+      setIsLoadingTerminais(false)
+    }
+  }, [auth])
+
+  useEffect(() => {
+    void loadAllTerminais()
+  }, [loadAllTerminais])
 
   type ColunaId = 'FINALIZADAS' | 'PENDENTE_EMISSAO' | 'COM_NFE'
   /** Ordenação individual por coluna: padrão sempre por data (reset ao recarregar a página). */
@@ -512,16 +577,14 @@ export function FiscalFlowKanban() {
     () => ({
       q: searchQuery || undefined,
       origem: origemFilter || undefined,
-      statusFiscal: statusFiscalFilter || undefined,
-      dataCriacaoInicial: periodoInicialISO,
-      dataCriacaoFinal: periodoFinalISO,
+      periodoInicial: periodoInicialISO,
+      periodoFinal: periodoFinalISO,
       dataFinalizacaoInicio: dataFinalizacaoInicioISO,
       dataFinalizacaoFim: dataFinalizacaoFimISO,
     }),
     [
       searchQuery,
       origemFilter,
-      statusFiscalFilter,
       periodoInicialISO,
       periodoFinalISO,
       dataFinalizacaoInicioISO,
@@ -529,18 +592,73 @@ export function FiscalFlowKanban() {
     ]
   )
 
-  const vendasUnificadasQueryKeyFingerprint = JSON.stringify(vendasUnificadasQueryParams)
+  const usaFiltroTerminal = !!terminalFilter.trim()
+
+  const vendasUnificadasQueryKeyFingerprint = JSON.stringify({
+    ...vendasUnificadasQueryParams,
+    terminalFilter: terminalFilter || undefined,
+  })
 
   useEffect(() => {
     rejeitadaReativacaoJaTentadaIdsRef.current = new Set()
   }, [vendasUnificadasQueryKeyFingerprint])
 
-  // Buscar vendas unificadas (PDV + Gestor) com filtros da API
+  /** Só terminal + datas: cruzamento com unificado (fiscal). q fica no unificado. */
+  const vendaIdsPdvPorTerminalParams = useMemo(
+    () => ({
+      terminalId: terminalFilter,
+      periodoInicial: periodoInicialISO,
+      periodoFinal: periodoFinalISO,
+      dataFinalizacaoInicio: dataFinalizacaoInicioISO,
+      dataFinalizacaoFim: dataFinalizacaoFimISO,
+    }),
+    [
+      terminalFilter,
+      periodoInicialISO,
+      periodoFinalISO,
+      dataFinalizacaoInicioISO,
+      dataFinalizacaoFimISO,
+    ]
+  )
+
   const {
     data: vendasUnificadasData,
-    isLoading,
-    refetch,
+    isLoading: isLoadingUnificado,
+    refetch: refetchUnificado,
   } = useVendasUnificadas(vendasUnificadasQueryParams)
+
+  const {
+    data: vendaIdsPdvPorTerminal,
+    isLoading: isLoadingIdsTerminal,
+    refetch: refetchIdsTerminal,
+  } = useVendaIdsPdvPorTerminal(vendaIdsPdvPorTerminalParams, { enabled: usaFiltroTerminal })
+
+  const isLoading = isLoadingUnificado || (usaFiltroTerminal && isLoadingIdsTerminal)
+
+  const refetch = useCallback(async () => {
+    const [result] = await Promise.all([
+      refetchUnificado(),
+      usaFiltroTerminal ? refetchIdsTerminal() : Promise.resolve(),
+    ])
+    return result
+  }, [usaFiltroTerminal, refetchUnificado, refetchIdsTerminal])
+
+  /** Lista sempre do unificado; com terminal, só PDV cujo id está no Set do POS. */
+  const vendasCarregadasData = useMemo(() => {
+    const itemsUnificado = vendasUnificadasData?.items ?? []
+    if (!usaFiltroTerminal) {
+      return vendasUnificadasData
+        ? { ...vendasUnificadasData, items: itemsUnificado }
+        : undefined
+    }
+    if (!vendaIdsPdvPorTerminal) {
+      return vendasUnificadasData ? { ...vendasUnificadasData, items: [] } : undefined
+    }
+    const items = itemsUnificado.filter(
+      v => v.tabelaOrigem === 'venda' && vendaIdsPdvPorTerminal.has(v.id)
+    )
+    return vendasUnificadasData ? { ...vendasUnificadasData, items } : undefined
+  }, [usaFiltroTerminal, vendaIdsPdvPorTerminal, vendasUnificadasData])
 
   const marcarEmissaoFiscal = useMarcarEmissaoFiscal()
   const desmarcarEmissaoFiscal = useDesmarcarEmissaoFiscal()
@@ -553,12 +671,12 @@ export function FiscalFlowKanban() {
   useEffect(() => {
     if (
       isLoading ||
-      !vendasUnificadasData?.items?.length ||
+      !vendasCarregadasData?.items?.length ||
       rejeitadaReativacaoEmAndamentoRef.current
     )
       return
 
-    const pendentes = vendasUnificadasData.items.filter(v => {
+    const pendentes = vendasCarregadasData.items.filter(v => {
       const rejeitada =
         String(v.statusFiscal ?? '')
           .trim()
@@ -605,7 +723,7 @@ export function FiscalFlowKanban() {
     return () => {
       cancelled = true
     }
-  }, [isLoading, vendasUnificadasData, marcarEmissaoFiscal])
+  }, [isLoading, vendasCarregadasData, marcarEmissaoFiscal])
 
   // Só PointerSensor: em touch, pointermove fica no document (melhor que TouchSensor no alvo + scroll).
   // TouchSensor junto com PointerSensor gerava gesto “travado” no mobile; distance evita arraste ao rolar.
@@ -675,8 +793,8 @@ export function FiscalFlowKanban() {
     })
   }
 
-  // Todas as vendas unificadas retornadas pela API (já filtradas por q, período, origem, statusFiscal no backend)
-  const todasVendas: Venda[] = vendasUnificadasData?.items || []
+  // Vendas da fonte ativa (unificado ou PDV por terminal)
+  const todasVendas: Venda[] = vendasCarregadasData?.items || []
 
   // Filtro client-side por termo de busca: codigoVenda, numeroVenda, cliente.nome, id
   const filtrarPorBusca = (vendas: Venda[], termo: string): Venda[] => {
@@ -991,11 +1109,9 @@ export function FiscalFlowKanban() {
     setPeriodo('Todos')
     setPeriodoInicial(null)
     setPeriodoFinal(null)
-    setDataFinalizacaoPeriodo('Todos')
-    setDataFinalizacaoInicio(null)
-    setDataFinalizacaoFim(null)
+    setDataFinalizacaoPeriodo(PERIODO_PADRAO_DATA_FINALIZACAO)
     setOrigemFilter('')
-    setStatusFiscalFilter('')
+    setTerminalFilter('')
   }, [])
 
   const handleAbrirEdicaoCliente = useCallback((clienteId: string) => {
@@ -1114,7 +1230,7 @@ export function FiscalFlowKanban() {
             <span>{filtrosVisiveisMobile ? 'Ocultar filtros' : 'Mostrar filtros'}</span>
           </button>
         </div>
-        {/* Filtros avançados: Origem, Data finalização, Data Criação, Status fiscal, Limpar */}
+        {/* Filtros avançados: Origem, Data finalização, Data Criação, Limpar */}
         <div
           className={`flex flex-wrap items-end justify-center gap-x-1 gap-y-4 rounded-t-lg bg-custom-2 px-1 pb-2 pt-1.5 md:justify-start ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
         >
@@ -1150,6 +1266,7 @@ export function FiscalFlowKanban() {
                 value={origemFilter}
                 onChange={e => setOrigemFilter(e.target.value as OrigemFiltro)}
                 displayEmpty
+                disabled={usaFiltroTerminal}
                 sx={{
                   height: '32px',
                   borderRadius: '8px',
@@ -1161,6 +1278,30 @@ export function FiscalFlowKanban() {
                 <MenuItem value="PDV">PDV</MenuItem>
                 <MenuItem value="GESTOR">Gestor</MenuItem>
                 {/* <MenuItem value="DELIVERY">Delivery</MenuItem> */}
+              </Select>
+            </FormControl>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="font-nunito text-xs text-secondary-text">Terminal</label>
+            <FormControl size="small" sx={{ minWidth: 160 }}>
+              <Select
+                value={terminalFilter}
+                onChange={e => setTerminalFilter(e.target.value)}
+                displayEmpty
+                disabled={isLoadingTerminais}
+                sx={{
+                  height: '32px',
+                  borderRadius: '8px',
+                  backgroundColor: 'var(--color-info)',
+                  '& .MuiOutlinedInput-notchedOutline': { borderColor: 'transparent' },
+                }}
+              >
+                <MenuItem value="">Todos</MenuItem>
+                {terminais.map(terminal => (
+                  <MenuItem key={terminal.id} value={terminal.id}>
+                    {terminal.nome}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
           </div>
@@ -1214,34 +1355,11 @@ export function FiscalFlowKanban() {
             </FormControl>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="font-nunito text-xs text-secondary-text">Status fiscal</label>
-            <FormControl size="small" sx={{ minWidth: 160 }}>
-              <Select
-                value={statusFiscalFilter}
-                onChange={e => setStatusFiscalFilter(e.target.value)}
-                displayEmpty
-                sx={{
-                  height: '32px',
-                  backgroundColor: '#FFFFFF',
-                  '& .MuiOutlinedInput-notchedOutline': { borderColor: 'transparent' },
-                }}
-              >
-                <MenuItem value="">Todos</MenuItem>
-                <MenuItem value="PENDENTE">Pendente</MenuItem>
-                <MenuItem value="PENDENTE_EMISSAO">Pendente emissão</MenuItem>
-                <MenuItem value="EMITINDO">Emitindo</MenuItem>
-                <MenuItem value="EMITIDA">Emitida</MenuItem>
-                <MenuItem value="REJEITADA">Rejeitada</MenuItem>
-                <MenuItem value="CANCELADA">Cancelada</MenuItem>
-              </Select>
-            </FormControl>
-          </div>
-          <div className="flex flex-col gap-1">
             <label className="font-nunito text-xs text-secondary-text">Período (criação)</label>
             <button
               type="button"
               onClick={() => setIsDatasModalOpen(true)}
-              className="font-nunito flex h-8 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
+              className="font-nunito flex h-8 items-center gap-2 rounded-lg bg-primary px-2 text-sm text-white transition-colors hover:bg-primary/90"
             >
               <MdCalendarToday size={18} />
               Por datas
@@ -1249,22 +1367,22 @@ export function FiscalFlowKanban() {
           </div>
           <button
             onClick={handleClearFilters}
-            className="font-nunito flex h-8 items-center justify-center gap-2 rounded-lg border border-primary px-4 text-sm text-primary transition-colors hover:bg-primary/10"
+            className="font-nunito flex h-8 items-center justify-center gap-2 rounded-lg border border-primary px-2 text-sm text-primary transition-colors hover:bg-primary/10"
           >
             <MdFilterAltOff size={18} />
-            Limpar filtros
+            Limpar
           </button>
           <div className="ml-auto flex items-center gap-2">
             <button
               onClick={() => refetch()}
-              className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
+              className="rounded p-1 text-gray-600 transition-colors hover:bg-gray-100"
               title="Atualizar"
             >
-              <MdRefresh className="h-5 w-5" />
+              <MdRefresh className="h-4 w-4" />
             </button>
             <button
               onClick={() => setNovoPedidoModalOpen(true)}
-              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary/90"
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-2 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary/90"
             >
               <MdAdd className="h-4 w-4" />
               Novo Pedido

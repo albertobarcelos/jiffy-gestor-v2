@@ -27,13 +27,28 @@ export function Sidebar() {
   const { toGestao } = useGestaoPath()
   // const { prefetchRoute } = usePrefetch() // prefetchRoute não existe mais
 
+  useEffect(() => {
+    if (
+      pathname === '/relatorios-vendas' ||
+      pathname?.startsWith('/relatorios-vendas/') ||
+      pathname === '/relatorios-produtos-vendidos' ||
+      pathname?.startsWith('/relatorios-produtos-vendidos/')
+    ) {
+      setExpandedMenus(prev => {
+        const next = new Set(prev)
+        next.add('Relatórios')
+        return next
+      })
+    }
+  }, [pathname])
+
   // Prefetch agressivo das rotas mais acessadas na inicialização
   useEffect(() => {
     const routesToPrefetch = [
-      '/cadastros/grupos-complementos',
-      '/cadastros/complementos',
+      '/grupos-complementos',
+      '/complementos',
       '/produtos',
-      '/cadastros/grupos-produtos',
+      '/grupos-produtos',
       '/estoque',
     ]
     
@@ -70,10 +85,10 @@ export function Sidebar() {
         newExpanded.add(menuName)
         // Quando expandir "Cadastros", prefetch das rotas mais acessadas
         if (menuName === 'Cadastros') {
-          // prefetchRoute('/cadastros/grupos-complementos')
-          // prefetchRoute('/cadastros/complementos')
+          // prefetchRoute('/grupos-complementos')
+          // prefetchRoute('/complementos')
           // prefetchRoute('/produtos')
-          // prefetchRoute('/cadastros/grupos-produtos')
+          // prefetchRoute('/grupos-produtos')
         }
       }
       setExpandedMenus(newExpanded)
@@ -89,17 +104,17 @@ export function Sidebar() {
         path: '#',
         icon: '📋',
         children: [
-          { name: 'Grupo Produtos', path: '/cadastros/grupos-produtos', icon: '📦' },
+          { name: 'Grupo Produtos', path: '/grupos-produtos', icon: '📦' },
           { name: 'Produtos', path: '/produtos', icon: '🛍️' },
-          { name: 'Grupo Complementos', path: '/cadastros/grupos-complementos', icon: '📋' },
-          { name: 'Complementos', path: '/cadastros/complementos', icon: '➕' },
-          { name: 'Usuários', path: '/cadastros/usuarios', icon: '👤' },
-          { name: 'Perfis de Usuários', path: '/cadastros/perfis-usuarios', icon: '👥' },
-          { name: 'Clientes', path: '/cadastros/clientes', icon: '👥' },
-          { name: 'Impressoras', path: '/cadastros/impressoras', icon: '🖨️' },
+          { name: 'Grupo Complementos', path: '/grupos-complementos', icon: '📋' },
+          { name: 'Complementos', path: '/complementos', icon: '➕' },
+          { name: 'Usuários', path: '/usuarios', icon: '👤' },
+          { name: 'Perfis de Usuários', path: '/perfis-usuarios-pdv', icon: '👥' },
+          { name: 'Clientes', path: '/clientes', icon: '👥' },
+          { name: 'Impressoras', path: '/impressoras', icon: '🖨️' },
           {
             name: 'Meios de Pagamentos',
-            path: '/configuracoes?tab=meios-pagamentos',
+            path: '/configuracoes/meios-pagamentos',
             icon: '💳',
           },
         ],
@@ -108,8 +123,16 @@ export function Sidebar() {
       { name: 'Meu Caixa', path: '/meu-caixa', icon: '💼' },
       { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: '📄' },
       { name: 'Portal do Contador', path: '/portal-contador', icon: '📊' },
-      { name: 'Relatórios', path: '/relatorios-vendas', icon: '📊' },
-      { name: 'Configurações', path: '/configuracoes', icon: '⚙️' },
+      {
+        name: 'Relatórios',
+        path: '#',
+        icon: '📊',
+        children: [
+          { name: 'Vendas PDV', path: '/relatorios-vendas', icon: '📄' },
+          { name: 'Produtos vendidos', path: '/relatorios-produtos-vendidos', icon: '🛒' },
+        ],
+      },
+      { name: 'Configurações', path: '/configuracoes/empresa', icon: '⚙️' },
     ]
 
     if (!temAcessoFiscal) {
