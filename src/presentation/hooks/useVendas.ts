@@ -1342,17 +1342,20 @@ export function useTransicaoVendaGestor() {
     mutationFn: async ({
       id,
       acao,
+      acoes,
       motivo,
     }: {
       id: string
-      acao: AcaoTransicaoGestor
+      acao?: AcaoTransicaoGestor
+      acoes?: AcaoTransicaoGestor[]
       motivo?: string
     }) => {
       if (!token) {
         throw new Error('Token não encontrado')
       }
 
-      const payload: Record<string, unknown> = { acao }
+      const payload: Record<string, unknown> =
+        acoes && acoes.length > 0 ? { acoes } : { acao }
       if (motivo != null && String(motivo).trim() !== '') {
         payload.motivo = String(motivo).trim()
       }
@@ -1378,9 +1381,9 @@ export function useTransicaoVendaGestor() {
       return await response.json()
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
-      queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id] })
+      queryClient.invalidateQueries({ queryKey: ['vendas'], refetchType: 'none' })
+      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'], refetchType: 'none' })
+      queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id], refetchType: 'none' })
     },
     onError: (error: Error) => {
       showToast.error(error.message || 'Erro ao atualizar etapa do pedido')

@@ -1,39 +1,53 @@
 import { useCallback, useState } from 'react'
 import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
+import type { VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 import { showToast } from '@/src/shared/utils/toast'
 import type { ColunaKanbanId, Venda } from './types'
 import { COLUNAS_ENTREGA_OPERACIONAIS, acoesTransicaoEntregaAvanco } from './fiscalFlowKanban.rules'
 
+export type ExecutarTransicaoKanbanPayload = {
+  id: string
+  acao?: AcaoTransicaoGestor
+  acoes?: AcaoTransicaoGestor[]
+}
+
+export type VerificarImpressaoKanbanResult = {
+  ok: boolean
+  ticketsPayload?: VendaGestorTicketsResponse
+}
+
 interface UseEntregaTransicoesKanbanParams {
-  executarTransicao: (payload: { id: string; acao: AcaoTransicaoGestor }) => Promise<unknown>
-  refetch: () => Promise<unknown>
-  /** Após transição bem-sucedida (ex.: impressão delivery). Chamado antes do toast e do refetch. */
+  executarTransicao: (payload: ExecutarTransicaoKanbanPayload) => Promise<unknown>
+  sincronizarVendaAposTransicao?: (vendaId: string, respostaTransicao: unknown) => void
+  agendarSincronizacaoLista?: (vendaId: string) => void
   onAfterTransicaoSucesso?: (ctx: {
     venda: Venda
     acoesExecutadas: AcaoTransicaoGestor[]
+    ticketsPreload?: VendaGestorTicketsResponse
   }) => void | Promise<void>
-  /** Retorna false para bloquear validação de impressão (expedição / produção + mapeamento Windows). */
   verificarImpressaoAntesTransicoes?: (
     venda: Venda,
     acoes: AcaoTransicaoGestor[]
-  ) => Promise<boolean>
-  /** Retorna false para bloquear transições que incluem `despachar` (Pronto → Em rota). */
+  ) => Promise<VerificarImpressaoKanbanResult>
   verificarEntregadorAntesDespachar?: (venda: Venda) => Promise<boolean>
 }
 
 export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanParams) {
   const {
     executarTransicao,
-    refetch,
+    sincronizarVendaAposTransicao,
+    agendarSincronizacaoLista,
     onAfterTransicaoSucesso,
     verificarImpressaoAntesTransicoes,
     verificarEntregadorAntesDespachar,
   } = params
-  /** IDs de pedidos com avanço de etapa em andamento (botão "Avançar etapa"). */
+
   const [avancandoEtapaIds, setAvancandoEtapaIds] = useState<Record<string, boolean>>({})
-  /** ISO da última transição bem-sucedida por vendaId (DnD ou botão), enquanto o GET unificado não reflete. */
   const [timestampsEtapaEntregaLocal, setTimestampsEtapaEntregaLocal] = useState<
     Record<string, string>
+  >({})
+  const [etapaLocalPorVendaId, setEtapaLocalPorVendaId] = useState<
+    Record<string, ColunaKanbanId>
   >({})
 
   const marcarTransicaoLocal = useCallback((vendaId: string) => {
@@ -41,15 +55,77 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
     setTimestampsEtapaEntregaLocal(prev => ({ ...prev, [vendaId]: agoraIso }))
   }, [])
 
+  const limparEtapaLocal = useCallback((vendaId: string) => {
+    setEtapaLocalPorVendaId(prev => {
+      if (!(vendaId in prev)) return prev
+      const { [vendaId]: _, ...rest } = prev
+      return rest
+    })
+  }, [])
+
+  const iniciarTransicaoUi = useCallback((vendaId: string, colunaDestino: ColunaKanbanId) => {
+    setAvancandoEtapaIds(prev => ({ ...prev, [vendaId]: true }))
+    setEtapaLocalPorVendaId(prev => ({ ...prev, [vendaId]: colunaDestino }))
+  }, [])
+
+  const finalizarTransicaoUi = useCallback((vendaId: string) => {
+    setAvancandoEtapaIds(prev => {
+      if (!(vendaId in prev)) return prev
+      const { [vendaId]: _, ...rest } = prev
+      return rest
+    })
+  }, [])
+
+  const concluirTransicaoComSucesso = useCallback(
+    (
+      venda: Venda,
+      acoesExecutadas: AcaoTransicaoGestor[],
+      respostaTransicao: unknown,
+      ticketsPreload?: VendaGestorTicketsResponse
+    ) => {
+      marcarTransicaoLocal(venda.id)
+      sincronizarVendaAposTransicao?.(venda.id, respostaTransicao)
+      limparEtapaLocal(venda.id)
+      showToast.success('Etapa do pedido atualizada.')
+      void onAfterTransicaoSucesso?.({ venda, acoesExecutadas, ticketsPreload })
+      agendarSincronizacaoLista?.(venda.id)
+    },
+    [
+      agendarSincronizacaoLista,
+      limparEtapaLocal,
+      marcarTransicaoLocal,
+      onAfterTransicaoSucesso,
+      sincronizarVendaAposTransicao,
+    ]
+  )
+
+  const reverterTransicaoUi = useCallback(
+    (vendaId: string) => {
+      limparEtapaLocal(vendaId)
+    },
+    [limparEtapaLocal]
+  )
+
   const finalizarEntrega = useCallback(
     async (venda: Venda) => {
-      await executarTransicao({ id: venda.id, acao: 'finalizar' })
-      marcarTransicaoLocal(venda.id)
-      await onAfterTransicaoSucesso?.({ venda, acoesExecutadas: ['finalizar'] })
-      showToast.success('Etapa do pedido atualizada.')
-      await refetch()
+      iniciarTransicaoUi(venda.id, 'FINALIZADAS')
+      try {
+        const resposta = await executarTransicao({ id: venda.id, acao: 'finalizar' })
+        concluirTransicaoComSucesso(venda, ['finalizar'], resposta)
+      } catch (error) {
+        reverterTransicaoUi(venda.id)
+        throw error
+      } finally {
+        finalizarTransicaoUi(venda.id)
+      }
     },
-    [executarTransicao, marcarTransicaoLocal, onAfterTransicaoSucesso, refetch]
+    [
+      concluirTransicaoComSucesso,
+      executarTransicao,
+      finalizarTransicaoUi,
+      iniciarTransicaoUi,
+      reverterTransicaoUi,
+    ]
   )
 
   const executarAvancoEntrega = useCallback(
@@ -57,49 +133,62 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
       const acoes = acoesTransicaoEntregaAvanco(origIdx, destIdx)
       if (acoes.length === 0) return
 
-      if (verificarImpressaoAntesTransicoes) {
-        const podeAvancarImpressao = await verificarImpressaoAntesTransicoes(venda, acoes)
-        if (!podeAvancarImpressao) return
-      }
+      const colunaDestino = COLUNAS_ENTREGA_OPERACIONAIS[destIdx]
+      if (!colunaDestino) return
 
-      if (acoes.includes('despachar') && verificarEntregadorAntesDespachar) {
-        const podeDespachar = await verificarEntregadorAntesDespachar(venda)
-        if (!podeDespachar) {
-          showToast.error('Vincule um entregador antes de despachar para entrega.')
-          return
+      iniciarTransicaoUi(venda.id, colunaDestino)
+
+      let ticketsPreload: VendaGestorTicketsResponse | undefined
+
+      try {
+        if (verificarImpressaoAntesTransicoes) {
+          const verificacao = await verificarImpressaoAntesTransicoes(venda, acoes)
+          if (!verificacao.ok) {
+            reverterTransicaoUi(venda.id)
+            return
+          }
+          ticketsPreload = verificacao.ticketsPayload
         }
-      }
 
-      for (const acao of acoes) {
-        await executarTransicao({ id: venda.id, acao })
+        if (acoes.includes('despachar') && verificarEntregadorAntesDespachar) {
+          const podeDespachar = await verificarEntregadorAntesDespachar(venda)
+          if (!podeDespachar) {
+            showToast.error('Vincule um entregador antes de despachar para entrega.')
+            reverterTransicaoUi(venda.id)
+            return
+          }
+        }
+
+        const resposta =
+          acoes.length > 1
+            ? await executarTransicao({ id: venda.id, acoes })
+            : await executarTransicao({ id: venda.id, acao: acoes[0] })
+
+        concluirTransicaoComSucesso(venda, acoes, resposta, ticketsPreload)
+      } catch (error) {
+        reverterTransicaoUi(venda.id)
+        throw error
+      } finally {
+        finalizarTransicaoUi(venda.id)
       }
-      marcarTransicaoLocal(venda.id)
-      await onAfterTransicaoSucesso?.({ venda, acoesExecutadas: acoes })
-      showToast.success('Etapa do pedido atualizada.')
-      await refetch()
     },
     [
+      concluirTransicaoComSucesso,
       executarTransicao,
-      marcarTransicaoLocal,
-      onAfterTransicaoSucesso,
-      refetch,
+      finalizarTransicaoUi,
+      iniciarTransicaoUi,
+      reverterTransicaoUi,
       verificarEntregadorAntesDespachar,
       verificarImpressaoAntesTransicoes,
     ]
   )
 
-  /**
-   * Avança o pedido de entrega para a próxima etapa operacional via botão "Avançar etapa".
-   * Novos → Em preparo → Pronto → Em rota usam iniciar_preparo / marcar_pronto / despachar;
-   * Em rota → Finalizadas usa POST …/transicoes com acao `finalizar`.
-   */
   const handleAvancarEtapa = useCallback(
     async (venda: Venda, colunaAtual: ColunaKanbanId) => {
       if (avancandoEtapaIds[venda.id]) return
       const origIdx = COLUNAS_ENTREGA_OPERACIONAIS.indexOf(colunaAtual)
       if (origIdx < 0) return
 
-      setAvancandoEtapaIds(prev => ({ ...prev, [venda.id]: true }))
       try {
         if (colunaAtual === 'EM_ROTA') {
           await finalizarEntrega(venda)
@@ -109,12 +198,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
         if (origIdx >= COLUNAS_ENTREGA_OPERACIONAIS.length - 1) return
         await executarAvancoEntrega(venda, origIdx, origIdx + 1)
       } catch {
-        /* toast em onError do hook */
-      } finally {
-        setAvancandoEtapaIds(prev => {
-          const { [venda.id]: _, ...rest } = prev
-          return rest
-        })
+        /* toast em onError do hook de transição */
       }
     },
     [avancandoEtapaIds, executarAvancoEntrega, finalizarEntrega]
@@ -122,28 +206,31 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
 
   const moverEntregaPorDrag = useCallback(
     async (venda: Venda, origIdx: number, destIdx: number) => {
+      if (avancandoEtapaIds[venda.id]) return
       try {
         await executarAvancoEntrega(venda, origIdx, destIdx)
       } catch {
-        /* toast em onError do hook */
+        /* toast em onError do hook de transição */
       }
     },
-    [executarAvancoEntrega]
+    [avancandoEtapaIds, executarAvancoEntrega]
   )
 
   const finalizarEntregaPorDrag = useCallback(
     async (venda: Venda) => {
+      if (avancandoEtapaIds[venda.id]) return
       try {
         await finalizarEntrega(venda)
       } catch {
-        /* toast em onError do hook */
+        /* toast em onError do hook de transição */
       }
     },
-    [finalizarEntrega]
+    [avancandoEtapaIds, finalizarEntrega]
   )
 
   return {
     avancandoEtapaIds,
+    etapaLocalPorVendaId,
     timestampsEtapaEntregaLocal,
     handleAvancarEtapa,
     moverEntregaPorDrag,

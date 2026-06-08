@@ -11,6 +11,8 @@ interface DeliveryConfigCollapsibleSectionProps {
   defaultExpanded?: boolean
   /** Quando muda (ex.: modal aberto), restaura o estado inicial de expansão. */
   resetExpandedWhen?: unknown
+  /** Classes do bloco de conteúdo expandido (default: mt-4 space-y-4). */
+  contentClassName?: string
   children: ReactNode
 }
 
@@ -21,6 +23,7 @@ export function DeliveryConfigCollapsibleSection({
   headerActions,
   defaultExpanded = true,
   resetExpandedWhen,
+  contentClassName = 'mt-4 space-y-4',
   children,
 }: DeliveryConfigCollapsibleSectionProps) {
   const [expanded, setExpanded] = useState(defaultExpanded)
@@ -65,14 +68,14 @@ export function DeliveryConfigCollapsibleSection({
               />
             </button>
           </div>
-
-          {expanded ? (
-            <div id={contentId} className="mt-4 space-y-4">
-              {children}
-            </div>
-          ) : null}
         </div>
       </div>
+
+      {expanded ? (
+        <div id={contentId} className={contentClassName}>
+          {children}
+        </div>
+      ) : null}
     </section>
   )
 }

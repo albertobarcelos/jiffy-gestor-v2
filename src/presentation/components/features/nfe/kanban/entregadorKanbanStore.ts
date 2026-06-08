@@ -1,4 +1,5 @@
 const entregadorPorVendaId = new Map<string, string>()
+const entregadorAusentePorVendaId = new Set<string>()
 
 export function definirEntregadorKanbanCache(
   vendaId: string,
@@ -7,9 +8,19 @@ export function definirEntregadorKanbanCache(
   const id = String(entregadorId ?? '').trim()
   if (id) {
     entregadorPorVendaId.set(vendaId, id)
+    entregadorAusentePorVendaId.delete(vendaId)
   } else {
     entregadorPorVendaId.delete(vendaId)
   }
+}
+
+export function marcarEntregadorKanbanAusente(vendaId: string): void {
+  entregadorAusentePorVendaId.add(vendaId)
+  entregadorPorVendaId.delete(vendaId)
+}
+
+export function entregadorKanbanJaVerificado(vendaId: string): boolean {
+  return entregadorPorVendaId.has(vendaId) || entregadorAusentePorVendaId.has(vendaId)
 }
 
 export function obterEntregadorKanbanCache(vendaId: string): string | null {
@@ -29,6 +40,10 @@ export async function resolverEntregadorIdVendaKanban(args: {
 
   const doCacheGlobal = obterEntregadorKanbanCache(vendaId)
   if (doCacheGlobal) return doCacheGlobal
+
+  if (entregadorAusentePorVendaId.has(vendaId)) {
+    return null
+  }
 
   const url =
     tabelaOrigem === 'venda_gestor'
@@ -51,6 +66,8 @@ export async function resolverEntregadorIdVendaKanban(args: {
       definirEntregadorKanbanCache(vendaId, entregadorId)
       return entregadorId
     }
+
+    marcarEntregadorKanbanAusente(vendaId)
     return null
   } catch {
     return null
@@ -110,10 +127,9 @@ export async function hidratarEntregadoresKanbanDesdeApi(args: {
   for (const venda of vendas) {
     if (!vendaKanbanPrecisaEntregador(venda)) continue
     if (idsJaConhecidos?.has(venda.id)) continue
-
-    const cached = obterEntregadorKanbanCache(venda.id)
-    if (cached) {
-      updates[venda.id] = cached
+    if (entregadorKanbanJaVerificado(venda.id)) {
+      const cached = obterEntregadorKanbanCache(venda.id)
+      if (cached) updates[venda.id] = cached
       continue
     }
 

@@ -41,6 +41,8 @@ export interface EmpresaMeQueryData {
   timezoneAgregacao: string
   preferenciasImpressaoDelivery: PreferenciasImpressaoDelivery
   deliveryCupomTemplate: DeliveryCupomTemplateConfig
+  /** Cópia de `parametroEmpresa` para PATCH parcial (ex.: modal delivery). */
+  parametroEmpresa: Record<string, unknown>
 }
 
 function mapEnderecoEmpresaMe(enderecoRaw: Record<string, unknown>): EnderecoEmpresaMe | null {
@@ -104,6 +106,12 @@ export async function fetchEmpresaMeQueryData(token: string): Promise<EmpresaMeQ
     })
   }
 
+  const rawPe = data.parametroEmpresa ?? data.parametro_empresa
+  const parametroEmpresa =
+    rawPe && typeof rawPe === 'object' && !Array.isArray(rawPe)
+      ? { ...(rawPe as Record<string, unknown>) }
+      : {}
+
   return {
     empresa: {
       id,
@@ -115,6 +123,7 @@ export async function fetchEmpresaMeQueryData(token: string): Promise<EmpresaMeQ
     timezoneAgregacao,
     preferenciasImpressaoDelivery: parsePreferenciasImpressaoDelivery(data),
     deliveryCupomTemplate: getDeliveryCupomTemplateLocal(id) ?? parseDeliveryCupomTemplate(data),
+    parametroEmpresa,
   }
 }
 
@@ -156,6 +165,7 @@ export function useEmpresaMe() {
     preferenciasImpressaoDelivery:
       data?.preferenciasImpressaoDelivery ?? DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
     deliveryCupomTemplate: data?.deliveryCupomTemplate ?? DEFAULT_DELIVERY_CUPOM_TEMPLATE,
+    parametroEmpresa: data?.parametroEmpresa ?? {},
     isLoading: enabled && query.isPending,
     error:
       query.error instanceof Error

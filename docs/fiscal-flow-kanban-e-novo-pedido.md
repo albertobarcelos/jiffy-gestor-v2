@@ -170,9 +170,9 @@ Lógica central: `VendaUnificadaDTO.getEtapaKanban()` (`useVendasUnificadas.ts`)
 | Data criação | Inicia com filtro implícito do dia atual, sem exibir período na toolbar; botão **Por datas** abre painel lateral com `FaturamentoRangeCalendar` (mesmo padrão do Dashboard) e passa a exibir o período selecionado |
 | Data finalização | Botão **Por datas** abre painel lateral com `FaturamentoRangeCalendar` e envia `dataFinalizacaoInicio/Fim` |
 | Origem | `''` \| `PDV` \| `GESTOR` (Delivery/Balcão é controlado pelo toggle do quadro, não pelo select de origem) |
-| Fluxo do quadro | O modo Delivery/Balcão é separado no cliente e mantém um snapshot visual por modo para evitar flicker durante paginação automática |
+| Fluxo do quadro | O modo Delivery/Balcão filtra no cliente (`filtrarVendasKanbanPorModo`) sobre as páginas já carregadas do React Query |
 
-**Dados:** `useVendasUnificadasInfinite(params)` — primeira página de **50** vendas do dia atual; mais páginas ao rolar coluna ou pré-carga silenciosa em segundo plano. Busca/filtros (`q`, data de criação, data de finalização e origem) vão na API e aplicam-se a **todo** o dataset. O modo ativo renderiza um snapshot próprio; páginas carregadas automaticamente em segundo plano não alteram as colunas visíveis até troca de modo/filtro ou carregamento manual por scroll.
+**Dados:** `useVendasUnificadasInfinite(params, { refetchIntervalMs: 60_000, refetchOnWindowFocus: true })` — primeira página de **50** vendas do dia atual; mais páginas ao rolar coluna (scroll load-more). Busca/filtros (`q`, data de criação, data de finalização e origem) vão na API e aplicam-se a **todo** o dataset. Polling a cada 60s e refetch ao focar a janela mantêm o quadro alinhado entre estações sem pré-carga silenciosa agressiva.
 
 **Efeito colateral:** vendas `REJEITADA` com `solicitarEmissaoFiscal === false` são reativadas automaticamente via `useMarcarEmissaoFiscal` (toast informativo).
 
@@ -413,6 +413,7 @@ Botão **Avançar etapa** no card (`FiscalKanbanVendaCard`) e drag entre colunas
 
 | Data | Alteração |
 |------|-----------|
+| 2026-05-27 | Fase 3 listagem: snapshot visual removido; filtro por modo derivado do React Query; paginação só por scroll; polling 60s + refetch ao focar janela |
 | 2026-05-25 | Atualização pós-migração para `app/(erp)`: rota canônica, filtros atuais (Data criação e Data finalização por calendário personalizado, sem Status fiscal), ordenação por coluna, snapshot visual por Delivery/Balcão e carregamento incremental por scroll |
 | 2026-05-18 | Documento inicial: mapeamento FiscalFlowKanban + NovoPedido (balcão/entrega) + kanban/ + hooks |
 

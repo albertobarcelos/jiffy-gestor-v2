@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MdReceiptLong, MdRestartAlt } from 'react-icons/md'
 import { DeliveryConfigCollapsibleSection } from './DeliveryConfigCollapsibleSection'
 import { renderDeliveryCupomHtml } from '@/src/application/delivery/renderDeliveryCupomHtml'
@@ -73,6 +73,9 @@ function limitarFonteOpcional(value: number | null): number | null {
   return Math.min(18, Math.max(8, value))
 }
 
+const FONT_BLOCO_MIN = 8
+const FONT_BLOCO_MAX = 18
+
 function FonteBlocoInput(props: {
   label: string
   value: number | null
@@ -85,34 +88,87 @@ function FonteBlocoInput(props: {
     setDraft(props.value == null ? '' : String(props.value))
   }, [props.value])
 
+  const aplicarValor = (next: number | null) => {
+    const limitado = limitarFonteOpcional(next)
+    setDraft(limitado == null ? '' : String(limitado))
+    props.onChange(limitado)
+  }
+
+  const stepDown = () => {
+    if (props.disabled) return
+    if (props.value == null) return
+    if (props.value <= FONT_BLOCO_MIN) aplicarValor(null)
+    else aplicarValor(props.value - 1)
+  }
+
+  const stepUp = () => {
+    if (props.disabled) return
+    if (props.value == null) aplicarValor(FONT_BLOCO_MIN)
+    else aplicarValor(Math.min(FONT_BLOCO_MAX, props.value + 1))
+  }
+
+  const padraoAtivo = props.value != null
+
   return (
-    <div className="space-y-1">
-      <label className="text-sm font-semibold text-primary-text">{props.label}</label>
-      <div className="flex gap-2">
-        <input
-          type="number"
-          min={8}
-          max={18}
-          value={draft}
-          disabled={props.disabled}
-          onChange={e => {
-            const next = e.target.value
-            setDraft(next)
-            props.onChange(parseFonteOpcional(next))
-          }}
-          onBlur={() => {
-            const limitado = limitarFonteOpcional(parseFonteOpcional(draft))
-            setDraft(limitado == null ? '' : String(limitado))
-            props.onChange(limitado)
-          }}
-          placeholder="Padrão"
-          className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-primary disabled:opacity-60"
-        />
+    <div className="space-y-0.5">
+      <label className="text-xs font-medium text-primary-text">{props.label}</label>
+      <div className="flex items-center gap-1">
+        <div
+          className={`inline-flex h-7 overflow-hidden rounded-md border border-gray-200 bg-white ${props.disabled ? 'opacity-60' : ''}`}
+        >
+          <button
+            type="button"
+            aria-label={`Diminuir fonte de ${props.label}`}
+            disabled={props.disabled || props.value == null}
+            onClick={stepDown}
+            className="flex h-7 w-6 shrink-0 items-center justify-center border-r border-gray-200 text-sm font-normal leading-none text-secondary-text transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            −
+          </button>
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={3}
+            value={draft}
+            disabled={props.disabled}
+            placeholder=""
+            onChange={e => {
+              const digits = e.target.value.replace(/\D/g, '').slice(0, 3)
+              setDraft(digits)
+              if (!digits) {
+                props.onChange(null)
+                return
+              }
+              props.onChange(parseFonteOpcional(digits))
+            }}
+            onBlur={() => {
+              if (!draft.trim()) {
+                aplicarValor(null)
+                return
+              }
+              aplicarValor(parseFonteOpcional(draft))
+            }}
+            className="h-7 w-8 border-0 bg-transparent px-0 text-center text-xs tabular-nums outline-none focus:ring-0 disabled:cursor-not-allowed"
+          />
+          <button
+            type="button"
+            aria-label={`Aumentar fonte de ${props.label}`}
+            disabled={props.disabled || (props.value != null && props.value >= FONT_BLOCO_MAX)}
+            onClick={stepUp}
+            className="flex h-7 w-6 shrink-0 items-center justify-center border-l border-gray-200 text-sm font-normal leading-none text-secondary-text transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            +
+          </button>
+        </div>
         <button
           type="button"
-          disabled={props.disabled || props.value == null}
-          onClick={() => props.onChange(null)}
-          className="h-10 rounded-lg border border-gray-200 px-3 text-xs font-semibold text-secondary-text hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={props.disabled || !padraoAtivo}
+          onClick={() => aplicarValor(null)}
+          className={`h-7 shrink-0 rounded-md border px-2 text-xs font-normal transition-colors ${
+            padraoAtivo
+              ? 'border-primary bg-primary/10 text-primary hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-50'
+              : 'cursor-default border-gray-200 bg-white text-secondary-text disabled:opacity-60'
+          } ${props.disabled ? 'opacity-60' : ''}`}
         >
           Padrão
         </button>
@@ -128,7 +184,7 @@ function PreviewToggle(props: {
   onChange: (v: boolean) => void
 }) {
   return (
-    <label className={`flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-100 ${props.disabled ? 'opacity-60' : ''}`}>
+    <label className={`flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-xs ring-1 ring-gray-100 ${props.disabled ? 'opacity-60' : ''}`}>
       <span className="font-medium text-primary-text">{props.label}</span>
       <input
         type="checkbox"
@@ -215,6 +271,38 @@ function sampleCupom(tipoCupom: VendaGestorTicket['tipoCupom']): {
       ],
     },
   }
+}
+
+function CupomPreviewIframe({ srcDoc, title }: { srcDoc: string; title: string }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+
+  const syncHeight = useCallback(() => {
+    const iframe = iframeRef.current
+    const doc = iframe?.contentDocument
+    if (!doc) return
+
+    doc.documentElement.style.overflow = 'hidden'
+    doc.body.style.overflow = 'hidden'
+    doc.body.style.margin = '0'
+
+    const height = Math.max(doc.documentElement.scrollHeight, doc.body.scrollHeight)
+    iframe.style.height = `${height}px`
+  }, [])
+
+  useEffect(() => {
+    syncHeight()
+  }, [srcDoc, syncHeight])
+
+  return (
+    <iframe
+      ref={iframeRef}
+      title={title}
+      srcDoc={srcDoc}
+      scrolling="no"
+      onLoad={syncHeight}
+      className="mx-auto block w-full max-w-[340px] overflow-hidden rounded border border-gray-100 bg-white"
+    />
+  )
 }
 
 export function DeliveryCupomTemplateEditor({
@@ -354,7 +442,7 @@ export function DeliveryCupomTemplateEditor({
                 )
               })}
             </div>
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
               {FONTES_BLOCO.map(([label, key]) => (
                 <FonteBlocoInput
                   key={`${modeloSelecionado}-${key}`}
@@ -412,9 +500,9 @@ export function DeliveryCupomTemplateEditor({
             />
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="space-y-1">
-              <label className="text-sm font-semibold text-primary-text">Texto extra no cabeçalho</label>
+          <div className="grid items-end gap-3 md:grid-cols-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-primary-text">Texto extra no cabeçalho</label>
               <textarea
                 rows={3}
                 value={value.cabecalhoExtra}
@@ -424,8 +512,8 @@ export function DeliveryCupomTemplateEditor({
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-primary disabled:opacity-60"
               />
             </div>
-            <div className="space-y-1">
-              <label className="text-sm font-semibold text-primary-text">Texto extra no rodapé</label>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-primary-text">Texto extra no rodapé</label>
               <textarea
                 rows={3}
                 value={value.rodapeExtra}
@@ -447,14 +535,11 @@ export function DeliveryCupomTemplateEditor({
               Mostrando o mesmo modelo selecionado na edição de fontes.
             </p>
           </div>
-          <div className="max-h-[720px] overflow-auto rounded-lg bg-white p-2 shadow-inner">
-            <iframe
+          <div className="overflow-hidden rounded-lg bg-white p-2 shadow-inner">
+            <CupomPreviewIframe
               key={modeloSelecionado}
               title={`Preview do cupom delivery ${modeloPreview?.label ?? modeloSelecionado}`}
               srcDoc={previewSelecionado}
-              className={`mx-auto w-full max-w-[340px] rounded border border-gray-100 bg-white ${
-                modeloSelecionado === 'producao' ? 'h-[520px]' : 'h-[700px]'
-              }`}
             />
           </div>
         </div>

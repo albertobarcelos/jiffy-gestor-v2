@@ -1,7 +1,7 @@
 import { IImpressoraRepository, BuscarImpressorasParams, CriarImpressoraDTO, AtualizarImpressoraDTO } from '@/src/domain/repositories/IImpressoraRepository'
 import { Impressora } from '@/src/domain/entities/Impressora'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
-import { logImpressao, warnImpressao } from '@/src/shared/utils/logImpressaoDelivery'
+import { warnImpressao } from '@/src/shared/utils/logImpressaoDelivery'
 
 function extrairListaImpressoras(payload: unknown): { items: any[]; count: number } {
   if (Array.isArray(payload)) {
@@ -63,16 +63,6 @@ export class ImpressoraRepository implements IImpressoraRepository {
       })
 
       const normalizado = extrairListaImpressoras(response.data)
-      logImpressao('repo.impressoras.buscar.resposta_upstream', {
-        url,
-        status: response.status,
-        qItemsNormalizados: normalizado.items.length,
-        countNormalizado: normalizado.count,
-        chavesPayload:
-          response.data && typeof response.data === 'object'
-            ? Object.keys(response.data as Record<string, unknown>)
-            : [],
-      })
 
       const impressoras = normalizado.items
         .map((item) => {

@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   DndContext,
   DragEndEvent,
@@ -22,7 +23,9 @@ import {
 import {
   flattenVendasUnificadasInfinite,
   useVendasUnificadasInfinite,
+  vendasUnificadasInfiniteQueryKey,
 } from '@/src/presentation/hooks/useVendasUnificadas'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import {
   MdReceipt,
   MdSchedule,
@@ -72,7 +75,12 @@ import { FiscalKanbanVendaCard } from './kanban/FiscalKanbanVendaCard'
 import { useFiscalKanbanFilters } from './kanban/useFiscalKanbanFilters'
 import { useKanbanPinning } from './kanban/useKanbanPinning'
 import { useEntregaTransicoesKanban } from './kanban/useEntregaTransicoesKanban'
-import { resolverEntregadorIdVendaKanban, hidratarEntregadoresKanbanDesdeApi } from './kanban/entregadorKanbanStore'
+import {
+  extrairPatchKanbanDeTransicaoGestor,
+  patchVendaUnificadaInfiniteCache,
+  sincronizarVendaGestorKanbanEmBackground,
+} from './kanban/kanbanVendaCacheUpdate'
+import { resolverEntregadorIdVendaKanban, hidratarEntregadoresKanbanDesdeApi, entregadorKanbanJaVerificado } from './kanban/entregadorKanbanStore'
 import {
   useFiscalEmissaoKanban,
   type VendaSelecionadaParaEmissao,
@@ -81,6 +89,10 @@ import { useImpressaoDelivery } from '@/src/presentation/hooks/useImpressaoDeliv
 import { validarImpressaoAntesTransicaoKanban } from '@/src/application/delivery/validarImpressaoAntesTransicaoKanban'
 import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
 import { useKanbanColumnScrollLoadMore } from './kanban/useKanbanColumnScrollLoadMore'
+import {
+  filtrarVendasKanbanPorModo,
+  KANBAN_VENDAS_REFETCH_INTERVAL_MS,
+} from './kanban/kanbanVendasListagem'
 
 /**
  * Componente Kanban para gerenciamento de pedidos e emissão fiscal.
@@ -133,6 +145,12 @@ export function FiscalFlowKanban() {
   } = useFiscalKanbanFilters()
   const { timezoneAgregacao, preferenciasImpressaoDelivery } = useEmpresaMe()
   const { auth } = useAuthStore()
+  const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
+  const infiniteQueryKey = useMemo(
+    () => vendasUnificadasInfiniteQueryKey(vendasUnificadasQueryParams, empresaId),
+    [vendasUnificadasQueryParams, empresaId]
+  )
   const [entregadorPorVendaId, setEntregadorPorVendaId] = useState<Record<string, string>>({})
 
   /** Edição de cliente (lápis no card): mesmo painel que ClientesList / SeletorClienteModal */
@@ -164,14 +182,6 @@ export function FiscalFlowKanban() {
   const [modoKanbanVendas, setModoKanbanVendas] = useState<ModoKanbanVendas>(() =>
     lerModoKanbanVendasDoStorage()
   )
-  const [vendasVisiveisPorModo, setVendasVisiveisPorModo] = useState<
-    Record<ModoKanbanVendas, Venda[]>
-  >({
-    delivery: [],
-    balcao: [],
-  })
-  const contextoVisivelRef = useRef('')
-  const ignorarProximaSincronizacaoAutomaticaRef = useRef(false)
 
   useEffect(() => {
     try {
@@ -222,8 +232,10 @@ export function FiscalFlowKanban() {
     hasNextPage,
     fetchNextPage,
     refetch,
-    isPlaceholderData,
-  } = useVendasUnificadasInfinite(vendasUnificadasQueryParams)
+  } = useVendasUnificadasInfinite(vendasUnificadasQueryParams, {
+    refetchIntervalMs: KANBAN_VENDAS_REFETCH_INTERVAL_MS,
+    refetchOnWindowFocus: true,
+  })
 
   const { items: todasVendasCarregadas, totalCount: totalVendasApi } = useMemo(
     () => flattenVendasUnificadasInfinite(vendasUnificadasInfiniteData),
@@ -273,6 +285,11 @@ export function FiscalFlowKanban() {
           .filter(([, entregadorId]) => entregadorId?.trim())
           .map(([vendaId]) => vendaId)
       )
+      for (const venda of vendasRef) {
+        if (entregadorKanbanJaVerificado(venda.id)) {
+          idsJaConhecidos.add(venda.id)
+        }
+      }
 
       const updates = await hidratarEntregadoresKanbanDesdeApi({
         vendas: vendasRef,
@@ -308,34 +325,14 @@ export function FiscalFlowKanban() {
 
   const handleCarregarMaisVendas = useCallback(() => {
     if (isFetchingNextPage || !temMaisVendasParaCarregar) return
-    ignorarProximaSincronizacaoAutomaticaRef.current = false
     void fetchNextPage()
   }, [isFetchingNextPage, temMaisVendasParaCarregar, fetchNextPage])
 
   const handleAtualizarListagem = useCallback(() => {
-    ignorarProximaSincronizacaoAutomaticaRef.current = false
     void refetch()
   }, [refetch])
 
   const { onColumnScroll } = useKanbanColumnScrollLoadMore(handleCarregarMaisVendas)
-
-  /** Pré-carga silenciosa: após os primeiros 50, busca o restante em segundo plano (SPA). */
-  useEffect(() => {
-    if (isLoading || isFetchingNextPage || !temMaisVendasParaCarregar) return
-    if (!todasVendasCarregadas.length) return
-    const t = window.setTimeout(() => {
-      ignorarProximaSincronizacaoAutomaticaRef.current = true
-      void fetchNextPage()
-    }, 1200)
-    return () => window.clearTimeout(t)
-  }, [
-    isLoading,
-    isFetchingNextPage,
-    temMaisVendasParaCarregar,
-    todasVendasCarregadas.length,
-    vendasUnificadasQueryKeyFingerprint,
-    fetchNextPage,
-  ])
 
   const marcarEmissaoFiscal = useMarcarEmissaoFiscal()
   const desmarcarEmissaoFiscal = useDesmarcarEmissaoFiscal()
@@ -344,6 +341,28 @@ export function FiscalFlowKanban() {
   const emitirNotaPdv = useEmitirNfe()
   const emitirNotaGestor = useEmitirNfeGestor()
   const transicaoVendaGestor = useTransicaoVendaGestor()
+
+  const sincronizarVendaAposTransicao = useCallback(
+    (vendaId: string, respostaTransicao: unknown) => {
+      const patch = extrairPatchKanbanDeTransicaoGestor(respostaTransicao)
+      patchVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, vendaId, patch)
+    },
+    [infiniteQueryKey, queryClient]
+  )
+
+  const agendarSincronizacaoLista = useCallback(
+    (vendaId: string) => {
+      const token = auth?.getAccessToken()
+      if (!token) return
+      void sincronizarVendaGestorKanbanEmBackground(
+        queryClient,
+        infiniteQueryKey,
+        vendaId,
+        token
+      )
+    },
+    [auth, infiniteQueryKey, queryClient]
+  )
 
   const abrirConfigImpressoraExpedicao = useCallback(() => {
     setDeliveryConfiguracoesOpen(true)
@@ -358,7 +377,7 @@ export function FiscalFlowKanban() {
       const token = auth?.getAccessToken()
       if (!token) {
         showToast.error('Sessão expirada.')
-        return false
+        return { ok: false }
       }
 
       const resultado = await validarImpressaoAntesTransicaoKanban({
@@ -373,7 +392,9 @@ export function FiscalFlowKanban() {
         showToast.info(info)
       }
 
-      if (resultado.podeAvancar) return true
+      if (resultado.podeAvancar) {
+        return { ok: true, ticketsPayload: resultado.ticketsPayload }
+      }
 
       if (resultado.toastWarning) {
         showToast.warning(resultado.toastWarning)
@@ -381,7 +402,7 @@ export function FiscalFlowKanban() {
       if (resultado.abrirModalConfig) {
         abrirConfigImpressoraExpedicao()
       }
-      return false
+      return { ok: false }
     },
     [abrirConfigImpressoraExpedicao, auth, preferenciasImpressaoDelivery]
   )
@@ -406,24 +427,23 @@ export function FiscalFlowKanban() {
 
   const {
     avancandoEtapaIds,
+    etapaLocalPorVendaId,
     timestampsEtapaEntregaLocal,
     handleAvancarEtapa,
     moverEntregaPorDrag,
     finalizarEntregaPorDrag,
   } = useEntregaTransicoesKanban({
     executarTransicao: payload => transicaoVendaGestor.mutateAsync(payload),
-    refetch: async () => {
-      ignorarProximaSincronizacaoAutomaticaRef.current = false
-      await refetch()
-    },
-    onAfterTransicaoSucesso: async ({ venda, acoesExecutadas }) => {
-      await processarAposTransicoes(venda, acoesExecutadas)
+    sincronizarVendaAposTransicao,
+    agendarSincronizacaoLista,
+    onAfterTransicaoSucesso: ({ venda, acoesExecutadas, ticketsPreload }) => {
+      void processarAposTransicoes(venda, acoesExecutadas, ticketsPreload)
     },
     verificarImpressaoAntesTransicoes,
     verificarEntregadorAntesDespachar,
   })
 
-  const { acaoFiscalEmAndamentoPorVenda, getEtapaKanbanParaExibicao, handleEmitirNfe } =
+  const { acaoFiscalEmAndamentoPorVenda, getEtapaKanbanParaExibicao: getEtapaKanbanFiscal, handleEmitirNfe } =
     useFiscalEmissaoKanban({
       reemitirNfePdv: payload => reemitirNfePdv.mutateAsync(payload),
       reemitirNfeGestor: payload => reemitirNfeGestor.mutateAsync(payload),
@@ -435,6 +455,15 @@ export function FiscalFlowKanban() {
       setSelectedVendaId,
       setEmitirNfeModalOpen,
     })
+
+  const getEtapaKanbanParaExibicao = useCallback(
+    (venda: Venda) => {
+      const etapaLocal = etapaLocalPorVendaId[venda.id]
+      if (etapaLocal) return etapaLocal
+      return getEtapaKanbanFiscal(venda)
+    },
+    [etapaLocalPorVendaId, getEtapaKanbanFiscal]
+  )
 
   // REJEITADA com solicitarEmissaoFiscal false: reativa com o mesmo PATCH de "marcar emissão" (useMarcarEmissaoFiscal)
   useEffect(() => {
@@ -498,104 +527,10 @@ export function FiscalFlowKanban() {
   // TouchSensor junto com PointerSensor gerava gesto “travado” no mobile; distance evita arraste ao rolar.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 10 } }))
 
-  const separarVendasPorModo = useCallback((vendas: Venda[]) => {
-    const delivery: Venda[] = []
-    const balcao: Venda[] = []
-
-    vendas.forEach(venda => {
-      if (venda.isPedidoEntregaGestor()) {
-        delivery.push(venda)
-      } else {
-        balcao.push(venda)
-      }
-    })
-
-    return { delivery, balcao }
-  }, [])
-
-  const assinaturaVendaKanban = useCallback((venda: Venda) => {
-    return [
-      venda.id,
-      venda.getEtapaKanban(),
-      venda.statusEtapaOperacional ?? '',
-      venda.dataUltimaModificacao ?? '',
-      venda.dataFinalizacao ?? '',
-      venda.dataCancelamento ?? '',
-      venda.solicitarEmissaoFiscal ? '1' : '0',
-      venda.statusFiscal ?? '',
-      venda.documentoFiscalId ?? '',
-      venda.numeroFiscal ?? '',
-      venda.dataEmissaoFiscal ?? '',
-      venda.valorFinal,
-      venda.cliente?.id ?? '',
-      venda.cliente?.nome ?? '',
-    ].join('|')
-  }, [])
-
-  const totalVendasVisiveisModoAtual = vendasVisiveisPorModo[modoKanbanVendas].length
-
-  /**
-   * Mantém a UI do modo ativo estável enquanto a paginação automática aquece o cache.
-   * Ao trocar modo/filtros, sincroniza imediatamente com o que já foi carregado.
-   */
-  useEffect(() => {
-    if (isLoading || isPlaceholderData) return
-
-    const contextoAtual = `${vendasUnificadasQueryKeyFingerprint}:${modoKanbanVendas}`
-    const contextoMudou = contextoVisivelRef.current !== contextoAtual
-    const vendasSeparadas = separarVendasPorModo(todasVendasCarregadas)
-    const vendasDoModoAtual = vendasSeparadas[modoKanbanVendas]
-    const encontrouPrimeirosItensDoModo =
-      totalVendasVisiveisModoAtual === 0 && vendasDoModoAtual.length > 0
-
-    if (!contextoMudou && isFetchingNextPage) return
-
-    if (
-      ignorarProximaSincronizacaoAutomaticaRef.current &&
-      !contextoMudou &&
-      !encontrouPrimeirosItensDoModo
-    ) {
-      ignorarProximaSincronizacaoAutomaticaRef.current = false
-      return
-    }
-
-    ignorarProximaSincronizacaoAutomaticaRef.current = false
-    contextoVisivelRef.current = contextoAtual
-    setVendasVisiveisPorModo(prev => {
-      const atuais = prev[modoKanbanVendas]
-      const mesmasVendas =
-        atuais.length === vendasDoModoAtual.length &&
-        atuais.every((venda, index) => {
-          const proximaVenda = vendasDoModoAtual[index]
-          if (!proximaVenda) return false
-          return assinaturaVendaKanban(venda) === assinaturaVendaKanban(proximaVenda)
-        })
-
-      if (mesmasVendas) return prev
-
-      return {
-        ...prev,
-        [modoKanbanVendas]: vendasDoModoAtual,
-      }
-    })
-  }, [
-    isLoading,
-    isPlaceholderData,
-    isFetchingNextPage,
-    modoKanbanVendas,
-    assinaturaVendaKanban,
-    separarVendasPorModo,
-    todasVendasCarregadas,
-    totalVendasVisiveisModoAtual,
-    vendasUnificadasQueryKeyFingerprint,
-  ])
-
-  /** API aplica filtros globais; o modo ativo usa um snapshot visual separado. */
-  const todasVendas: Venda[] = vendasVisiveisPorModo[modoKanbanVendas]
-
-  const vendasFiltradasPorModoKanban = useMemo((): Venda[] => {
-    return todasVendas
-  }, [todasVendas])
+  const todasVendas = useMemo(
+    () => filtrarVendasKanbanPorModo(todasVendasCarregadas, modoKanbanVendas),
+    [todasVendasCarregadas, modoKanbanVendas]
+  )
 
   // Colunas fixas do Kanban (entrega → fiscal)
   const getColumns = (): KanbanColumn[] => [
@@ -841,49 +776,47 @@ export function FiscalFlowKanban() {
   }
 
   const getVendasByColumn = (columnId: string): Venda[] => {
-    const vendasParaFiltrar = vendasFiltradasPorModoKanban
     let vendas: Venda[] = []
-
     switch (columnId) {
       case 'NOVOS_PEDIDOS':
-        vendas = vendasParaFiltrar.filter(
+        vendas = todasVendas.filter(
           (v: Venda) => getEtapaKanbanParaExibicao(v) === 'NOVOS_PEDIDOS'
         )
         break
       case 'EM_PREPARO':
-        vendas = vendasParaFiltrar.filter(
+        vendas = todasVendas.filter(
           (v: Venda) => getEtapaKanbanParaExibicao(v) === 'EM_PREPARO'
         )
         break
       case 'PRONTO_ENTREGA':
-        vendas = vendasParaFiltrar.filter(
+        vendas = todasVendas.filter(
           (v: Venda) => getEtapaKanbanParaExibicao(v) === 'PRONTO_ENTREGA'
         )
         break
       case 'EM_ROTA':
-        vendas = vendasParaFiltrar.filter(
+        vendas = todasVendas.filter(
           (v: Venda) => getEtapaKanbanParaExibicao(v) === 'EM_ROTA'
         )
         break
       case 'FINALIZADAS':
         if (modoKanbanVendas === 'delivery') {
-          vendas = vendasParaFiltrar.filter((v: Venda) => {
+          vendas = todasVendas.filter((v: Venda) => {
             const etapa = getEtapaKanbanParaExibicao(v)
             return etapa === 'FINALIZADAS' || etapa === 'PENDENTE_EMISSAO'
           })
         } else {
-          vendas = vendasParaFiltrar.filter(
+          vendas = todasVendas.filter(
             (v: Venda) => getEtapaKanbanParaExibicao(v) === 'FINALIZADAS'
           )
         }
         break
       case 'PENDENTE_EMISSAO':
-        vendas = vendasParaFiltrar.filter(
+        vendas = todasVendas.filter(
           (v: Venda) => getEtapaKanbanParaExibicao(v) === 'PENDENTE_EMISSAO'
         )
         break
       case 'COM_NFE':
-        vendas = vendasParaFiltrar.filter((v: Venda) => getEtapaKanbanParaExibicao(v) === 'COM_NFE')
+        vendas = todasVendas.filter((v: Venda) => getEtapaKanbanParaExibicao(v) === 'COM_NFE')
         break
       default:
         return []
@@ -955,10 +888,12 @@ export function FiscalFlowKanban() {
         onAbrirNovoPedido={handleAbrirNovoPedido}
       />
 
-      <DeliveryConfiguracoesModal
-        open={deliveryConfiguracoesOpen}
-        onClose={() => setDeliveryConfiguracoesOpen(false)}
-      />
+      {deliveryConfiguracoesOpen ? (
+        <DeliveryConfiguracoesModal
+          open
+          onClose={() => setDeliveryConfiguracoesOpen(false)}
+        />
+      ) : null}
 
       <JiffySidePanelModal
         open={modalCriacaoDatasAberto}
@@ -1101,6 +1036,9 @@ export function FiscalFlowKanban() {
             {draggingVenda ? <VendaCardDragPreview venda={draggingVenda} /> : null}
           </DragOverlay>
         </DndContext>
+        {isFetchingNextPage ? (
+          <p className="px-2 pb-2 text-center text-xs text-gray-500">Carregando mais vendas…</p>
+        ) : null}
       </div>
 
       {/* Modal de Emissão de NFe */}

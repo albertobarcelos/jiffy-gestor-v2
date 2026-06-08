@@ -4,7 +4,6 @@ import { ImpressoraRepository } from '@/src/infrastructure/database/repositories
 import { BuscarImpressorasUseCase } from '@/src/application/use-cases/impressoras/BuscarImpressorasUseCase'
 import { CriarImpressoraUseCase } from '@/src/application/use-cases/impressoras/CriarImpressoraUseCase'
 import { CriarImpressoraSchema } from '@/src/application/dto/CriarImpressoraDTO'
-import { logImpressao } from '@/src/shared/utils/logImpressaoDelivery'
 
 /**
  * GET /api/impressoras
@@ -30,14 +29,6 @@ export async function GET(request: NextRequest) {
       limit,
       offset,
       q,
-    })
-
-    logImpressao('bff.impressoras.lista', {
-      limit,
-      offset,
-      q: q || null,
-      qImpressoras: result.impressoras.length,
-      total: result.total,
     })
 
     return NextResponse.json({

@@ -1,5 +1,9 @@
 import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
-import { logImpressao } from '@/src/shared/utils/logImpressaoDelivery'
+import {
+  getEstacaoImpressaoId,
+  limparEstacaoImpressaoId,
+  salvarEstacaoImpressaoId,
+} from '@/src/infrastructure/printing/estacaoImpressaoStorage'
 
 export interface EstacaoImpressaoResumo {
   id: string
@@ -109,13 +113,6 @@ export async function buscarImpressorasLogicas(token: string): Promise<Impressor
       (Array.isArray(data.results) && data.results) ||
       (Array.isArray(data.impressoras) && data.impressoras) ||
       []
-    logImpressao('modal.impressoras_logicas.pagina', {
-      offset,
-      limit,
-      qItems: items.length,
-      count: data.count ?? data.total ?? null,
-      chavesResposta: Object.keys(data),
-    })
     all.push(...items)
     if (items.length < limit) break
     offset += limit
@@ -127,12 +124,6 @@ export async function buscarImpressorasLogicas(token: string): Promise<Impressor
       nome: item.nome != null ? String(item.nome) : '',
     }))
     .filter(item => item.id && item.nome)
-
-  logImpressao('modal.impressoras_logicas.final', {
-    recebidas: all.length,
-    normalizadas: normalizadas.length,
-    idsResumo: normalizadas.map(item => item.id.slice(0, 8)),
-  })
 
   return normalizadas
 }
@@ -160,4 +151,61 @@ export function salvarMapeamentosEstacao(
       body: JSON.stringify({ mapeamentos }),
     }
   )
+}
+
+export interface EstacaoImpressaoConfigResolvida {
+  estacaoId: string
+  mapeamentos: EstacaoImpressaoMapeamento[]
+}
+
+/** Nome sugerido ao criar estação local (browser + data). */
+export function nomeEstacaoImpressaoPadrao(): string {
+  if (typeof window === 'undefined') return 'Estação Gestor'
+  const userAgent = window.navigator.userAgent
+  const browser =
+    userAgent.includes('Edg') ? 'Edge'
+    : userAgent.includes('Chrome') ? 'Chrome'
+    : userAgent.includes('Firefox') ? 'Firefox'
+    : 'Navegador'
+  return `Estação ${browser} - ${new Date().toLocaleDateString('pt-BR')}`
+}
+
+async function criarOuReaproveitarEstacaoImpressao(token: string): Promise<string> {
+  try {
+    const estacao = await criarEstacaoImpressao(token, nomeEstacaoImpressaoPadrao())
+    salvarEstacaoImpressaoId(estacao.id)
+    return estacao.id
+  } catch (createError) {
+    const estacoes = await listarEstacoesImpressao(token).catch(() => [])
+    const existente = estacoes.find(e => e.ativo) ?? estacoes[0]
+    if (existente) {
+      salvarEstacaoImpressaoId(existente.id)
+      return existente.id
+    }
+    throw createError
+  }
+}
+
+/**
+ * Resolve o id da estação local (localStorage) e carrega mapeamentos.
+ * Recria estação se o id salvo não existir mais (404).
+ */
+export async function resolverEstacaoImpressaoConfig(
+  token: string
+): Promise<EstacaoImpressaoConfigResolvida> {
+  let estacaoId = getEstacaoImpressaoId()
+  if (!estacaoId) {
+    estacaoId = await criarOuReaproveitarEstacaoImpressao(token)
+  }
+
+  try {
+    const mapeamentos = await buscarMapeamentosEstacao(token, estacaoId)
+    return { estacaoId, mapeamentos }
+  } catch (error) {
+    if (!isEstacaoImpressaoNotFoundError(error)) throw error
+    limparEstacaoImpressaoId()
+    estacaoId = await criarOuReaproveitarEstacaoImpressao(token)
+    const mapeamentos = await buscarMapeamentosEstacao(token, estacaoId)
+    return { estacaoId, mapeamentos }
+  }
 }

@@ -89,7 +89,11 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
   }, [options?.onImpressoraExpedicaoNecessaria])
 
   const processarAposTransicoes = useCallback(
-    async (venda: Venda, acoes: AcaoTransicaoGestor[]) => {
+    async (
+      venda: Venda,
+      acoes: AcaoTransicaoGestor[],
+      ticketsPreload?: VendaGestorTicketsResponse
+    ) => {
       logImpressao('hook.processarAposTransicoes.entrada', {
         vendaId: venda.id,
         acoes,
@@ -102,6 +106,8 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
         return
       }
 
+      let ticketsPayload: VendaGestorTicketsResponse | null = ticketsPreload ?? null
+
       for (const acao of acoes) {
         logImpressao('hook.loop_acao', { vendaId: venda.id, acao })
         if (acao !== 'iniciar_preparo' && acao !== 'marcar_pronto') {
@@ -109,25 +115,28 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
           continue
         }
 
-        const ticketsFetch = await fetchVendaGestorTickets(venda.id, token)
-        if (!ticketsFetch.ok) {
-          erroImpressao('hook.fetch_tickets_erro', {
-            vendaId: venda.id,
-            status: ticketsFetch.status,
-            mensagem: ticketsFetch.error ?? null,
-          })
-          showToast.error(ticketsFetch.error || 'Não foi possível carregar os tickets do pedido.')
-          continue
+        if (!ticketsPayload) {
+          const ticketsFetch = await fetchVendaGestorTickets(venda.id, token)
+          if (!ticketsFetch.ok) {
+            erroImpressao('hook.fetch_tickets_erro', {
+              vendaId: venda.id,
+              status: ticketsFetch.status,
+              mensagem: ticketsFetch.error ?? null,
+            })
+            showToast.error(ticketsFetch.error || 'Não foi possível carregar os tickets do pedido.')
+            continue
+          }
+          ticketsPayload = ticketsFetch.data
         }
 
-        const prefs = preferenciasDoPayloadTickets(ticketsFetch.data)
+        const prefs = preferenciasDoPayloadTickets(ticketsPayload)
         if (!prefs) {
           warnImpressao('hook.preferencias_invalidas_do_payload', {
             vendaId: venda.id,
-            modo: ticketsFetch.data.modoImpressaoDelivery,
-            copias: ticketsFetch.data.copiasCupomUnificado,
-            imprimirAoReceber: ticketsFetch.data.imprimirAoReceber,
-            imprimirAoFicarPronto: ticketsFetch.data.imprimirAoFicarPronto,
+            modo: ticketsPayload.modoImpressaoDelivery,
+            copias: ticketsPayload.copiasCupomUnificado,
+            imprimirAoReceber: ticketsPayload.imprimirAoReceber,
+            imprimirAoFicarPronto: ticketsPayload.imprimirAoFicarPronto,
           })
           showToast.error('Resposta de tickets sem parâmetros de impressão delivery.')
           continue
@@ -145,11 +154,11 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
           continue
         }
 
-        const tipoCupomEfetivo = resolverTipoCupomComFallbackProduto(ticketsFetch.data, d.tipoCupom)
+        const tipoCupomEfetivo = resolverTipoCupomComFallbackProduto(ticketsPayload, d.tipoCupom)
         const codesIgnorados =
           tipoCupomEfetivo !== d.tipoCupom ? ['IMPRESSORA_EXPEDICAO_NAO_CONFIGURADA'] : []
 
-        const filtrados = filtrarTicketsPorTipoDecidido(ticketsFetch.data.tickets, tipoCupomEfetivo)
+        const filtrados = filtrarTicketsPorTipoDecidido(ticketsPayload.tickets, tipoCupomEfetivo)
         if (filtrados.length === 0) {
           warnImpressao('hook.filtrados_vazios_apos_filtragem', {
             vendaId: venda.id,
@@ -159,7 +168,7 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
         }
 
         const wsLista = filtrarWarningsTicketsParaImpressao(
-          ticketsFetch.data.warnings,
+          ticketsPayload.warnings,
           filtrados
         )
         const imprimeProducao = filtrados.some(ticket => ticket.tipoCupom === 'producao')
@@ -171,18 +180,18 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
 
         notificarWarningsTickets(wsLista, m => showToast.info(m), {
           ignorarCodes: [...codesIgnorados, 'MAPEAMENTO_IMPRESSORA_NAO_CONFIGURADO', 'IMPRESSORA_WINDOWS_NAO_MAPEADA'],
-          tickets: ticketsFetch.data.tickets,
+          tickets: ticketsPayload.tickets,
           imprimeProducao,
-          warningsProdutoSemImpressora: ticketsFetch.data.warnings,
+          warningsProdutoSemImpressora: ticketsPayload.warnings,
         })
 
         logImpressao('hook.imprimir_tickets_agora', {
           vendaId: venda.id,
-          numeroVenda: ticketsFetch.data.numeroVenda,
+          numeroVenda: ticketsPayload.numeroVenda,
           qTickets: filtrados.length,
         })
         await imprimirTicketsApiGestor({
-          response: ticketsFetch.data,
+          response: ticketsPayload,
           ticketsAImprimir: filtrados,
           nomeEmpresa: empresa?.nomeExibicao,
           jobNamePrefix: 'Delivery',

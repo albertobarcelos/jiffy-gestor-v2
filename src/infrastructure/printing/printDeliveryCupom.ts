@@ -1,4 +1,5 @@
 import { erroImpressao, logImpressao, warnImpressao } from '@/src/shared/utils/logImpressaoDelivery'
+import { loadQzTray, ensureQzWebsocketConnected } from '@/src/infrastructure/printing/qzTrayClient'
 
 export interface PrintDeliveryCupomInput {
   html: string
@@ -76,14 +77,9 @@ export async function printDeliveryCupom(input: PrintDeliveryCupomInput): Promis
       jobName: input.jobName ?? 'Jiffy Delivery',
       htmlChars: input.html.length,
     })
-    const { loadQzTray } = await import('@/src/infrastructure/printing/qzTrayClient')
     const qz = await loadQzTray()
-    const wsAtivoAntesConnect = qz.websocket.isActive()
-    logImpressao('printDeliveryCupom.qz_modulo', { wsJaAtivo: wsAtivoAntesConnect })
-    if (!qz.websocket.isActive()) {
-      await qz.websocket.connect()
-      logImpressao('printDeliveryCupom.ws_conectado', { ok: true })
-    }
+    await ensureQzWebsocketConnected(qz)
+    logImpressao('printDeliveryCupom.qz_modulo', { wsJaAtivo: qz.websocket.isActive() })
     const config = qz.configs.create(nomeImpressora, {
       jobName: input.jobName ?? 'Jiffy Delivery',
     })

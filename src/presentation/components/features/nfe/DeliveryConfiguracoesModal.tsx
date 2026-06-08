@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MdPrint, MdRefresh, MdTune } from 'react-icons/md'
 import {
   Select,
@@ -12,24 +12,12 @@ import {
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import {
-  getEstacaoImpressaoId,
-  limparEstacaoImpressaoId,
-  salvarEstacaoImpressaoId,
-} from '@/src/infrastructure/printing/estacaoImpressaoStorage'
-import {
-  buscarImpressorasLogicas,
-  buscarMapeamentosEstacao,
-  criarEstacaoImpressao,
-  isEstacaoImpressaoNotFoundError,
-  listarEstacoesImpressao,
   salvarMapeamentosEstacao,
   type ImpressoraLogica,
 } from '@/src/infrastructure/api/estacoesImpressaoApi'
 import { showToast } from '@/src/shared/utils/toast'
-import { parsePreferenciasImpressaoDelivery } from '@/src/shared/utils/parsePreferenciasImpressaoDelivery'
 import type { ModoImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
 import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
-import { parseDeliveryCupomTemplate } from '@/src/shared/utils/parseDeliveryCupomTemplate'
 import {
   DEFAULT_DELIVERY_CUPOM_TEMPLATE,
   type DeliveryCupomTemplateConfig,
@@ -38,10 +26,19 @@ import { DeliveryConfigCollapsibleSection } from './DeliveryConfigCollapsibleSec
 import { DeliveryCupomTemplateEditor } from './DeliveryCupomTemplateEditor'
 import { JiffyConfirmDialog } from '@/src/presentation/components/ui/jiffy-confirm-dialog'
 import { DIALOG_SALVAR_SEM_IMPRESSORA_EXPEDICAO } from '@/src/shared/utils/deliveryImpressoraExpedicao'
+import { salvarDeliveryCupomTemplateLocal } from '@/src/infrastructure/printing/deliveryCupomTemplateStorage'
 import {
-  getDeliveryCupomTemplateLocal,
-  salvarDeliveryCupomTemplateLocal,
-} from '@/src/infrastructure/printing/deliveryCupomTemplateStorage'
+  isQzChunkLoadError,
+  listQzWindowsPrinters,
+  loadQzTray,
+  mensagemErroCarregarQzTray,
+} from '@/src/infrastructure/printing/qzTrayClient'
+import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import {
+  useDeliveryConfigEstacaoImpressao,
+  useDeliveryConfigImpressorasLogicas,
+  useInvalidateDeliveryConfigImpressaoQueries,
+} from '@/src/presentation/hooks/useDeliveryConfigImpressaoQueries'
 
 interface DeliveryConfiguracoesModalProps {
   open: boolean
@@ -49,24 +46,6 @@ interface DeliveryConfiguracoesModalProps {
 }
 
 type MapeamentosDraft = Record<string, string>
-
-function nomeEstacaoPadrao(): string {
-  if (typeof window === 'undefined') return 'Estação Gestor'
-  const userAgent = window.navigator.userAgent
-  const browser =
-    userAgent.includes('Edg') ? 'Edge'
-    : userAgent.includes('Chrome') ? 'Chrome'
-    : userAgent.includes('Firefox') ? 'Firefox'
-    : 'Navegador'
-  return `Estação ${browser} - ${new Date().toLocaleDateString('pt-BR')}`
-}
-
-function boolConfig(v: unknown, fallback: boolean): boolean {
-  if (typeof v === 'boolean') return v
-  if (v === 'true' || v === '1' || v === 1) return true
-  if (v === 'false' || v === '0' || v === 0) return false
-  return fallback
-}
 
 function clampCopiasUnificado(n: number): number {
   if (!Number.isFinite(n)) return 1
@@ -111,7 +90,7 @@ function DeliveryToggleRow(props: {
         checked={checked}
         disabled={disabled}
         onChange={e => onChecked(e.target.checked)}
-        className="mt-0.5 h-5 w-5 shrink-0 rounded border-gray-300 accent-primary focus:ring-primary"
+        className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 accent-primary focus:ring-primary"
       />
     </label>
   )
@@ -120,7 +99,17 @@ function DeliveryToggleRow(props: {
 export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfiguracoesModalProps) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
-  const [empresaId, setEmpresaId] = useState<string | null>(null)
+  const {
+    empresa,
+    parametroEmpresa: parametroEmpresaRemoto,
+    preferenciasImpressaoDelivery,
+    deliveryCupomTemplate: cupomTemplateRemoto,
+    isLoading: carregandoEmpresaMe,
+  } = useEmpresaMe()
+  const impressorasLogicasQuery = useDeliveryConfigImpressorasLogicas(open)
+  const estacaoImpressaoQuery = useDeliveryConfigEstacaoImpressao(open)
+  const invalidateDeliveryConfigQueries = useInvalidateDeliveryConfigImpressaoQueries()
+
   const [parametroEmpresaDraft, setParametroEmpresaDraft] = useState<Record<string, unknown>>({})
   const [modoImpressao, setModoImpressao] = useState<ModoImpressaoDelivery>('unificado')
   const [copiasUnificado, setCopiasUnificado] = useState(1)
@@ -133,188 +122,125 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
   )
 
   const [estacaoImpressaoId, setEstacaoImpressaoId] = useState<string | null>(null)
-  const [impressorasLogicas, setImpressorasLogicas] = useState<ImpressoraLogica[]>([])
   const [impressorasWindows, setImpressorasWindows] = useState<string[]>([])
   const [mapeamentos, setMapeamentos] = useState<MapeamentosDraft>({})
-  const [carregando, setCarregando] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [carregandoImpressoras, setCarregandoImpressoras] = useState(false)
   const [confirmSalvarSemImpressoraOpen, setConfirmSalvarSemImpressoraOpen] = useState(false)
   const [statusQz, setStatusQz] = useState<string>('QZ Tray ainda não detectado.')
   const [erroQz, setErroQz] = useState<string | null>(null)
-  const [erroConfiguracao, setErroConfiguracao] = useState<string | null>(null)
 
-  const carregarImpressorasWindows = useCallback(async () => {
+  const formularioHidratadoRef = useRef(false)
+  const mapeamentosHidratadosRef = useRef(false)
+  const qzLoadSeqRef = useRef(0)
+  const estacaoErroToastRef = useRef(false)
+
+  const impressorasLogicas: ImpressoraLogica[] = impressorasLogicasQuery.data ?? []
+
+  const carregando =
+    open &&
+    (carregandoEmpresaMe ||
+      impressorasLogicasQuery.isPending ||
+      estacaoImpressaoQuery.isPending)
+
+  const erroConfiguracao = useMemo(() => {
+    const err = estacaoImpressaoQuery.error
+    if (!err) return null
+    return err instanceof Error ? err.message : 'Não foi possível carregar estação de impressão.'
+  }, [estacaoImpressaoQuery.error])
+
+  useEffect(() => {
+    if (!open) {
+      formularioHidratadoRef.current = false
+      mapeamentosHidratadosRef.current = false
+      return
+    }
+    if (formularioHidratadoRef.current || carregandoEmpresaMe || !empresa?.id) return
+
+    const prefs = preferenciasImpressaoDelivery
+    formularioHidratadoRef.current = true
+    setParametroEmpresaDraft({ ...parametroEmpresaRemoto })
+    setModoImpressao(prefs.modo)
+    setCopiasUnificado(Math.min(99, Math.max(1, prefs.copiasCupomUnificado)))
+    setAutoIniciarPreparoNovosPedidos(prefs.autoIniciarPreparoNovosPedidos)
+    setImprimirAoReceber(prefs.imprimirAoReceber)
+    setImprimirAoFicarPronto(prefs.imprimirAoFicarPronto)
+    setImpressoraExpedicaoId(prefs.impressoraExpedicaoId ?? '')
+    setCupomTemplate(cupomTemplateRemoto)
+  }, [
+    open,
+    carregandoEmpresaMe,
+    empresa?.id,
+    parametroEmpresaRemoto,
+    preferenciasImpressaoDelivery,
+    cupomTemplateRemoto,
+  ])
+
+  useEffect(() => {
+    if (!open) return
+    if (mapeamentosHidratadosRef.current || !estacaoImpressaoQuery.data) return
+
+    mapeamentosHidratadosRef.current = true
+    setEstacaoImpressaoId(estacaoImpressaoQuery.data.estacaoId)
+    const next: MapeamentosDraft = {}
+    for (const item of estacaoImpressaoQuery.data.mapeamentos) {
+      next[item.impressoraId] = item.nomeImpressoraWindows
+    }
+    setMapeamentos(next)
+  }, [open, estacaoImpressaoQuery.data])
+
+  useEffect(() => {
+    if (!open) {
+      estacaoErroToastRef.current = false
+      return
+    }
+    if (!estacaoImpressaoQuery.isError || estacaoErroToastRef.current) return
+    estacaoErroToastRef.current = true
+    const msg = erroConfiguracao ?? 'Não foi possível inicializar a estação de impressão.'
+    showToast.error(msg)
+  }, [estacaoImpressaoQuery.isError, erroConfiguracao, open])
+
+  const carregarImpressorasWindows = useCallback(async (loadSeq: number) => {
     setCarregandoImpressoras(true)
     setErroQz(null)
     setStatusQz('Conectando ao QZ Tray...')
     try {
-      const { loadQzTray } = await import('@/src/infrastructure/printing/qzTrayClient')
       const qz = await loadQzTray()
-      if (!qz.websocket.isActive()) {
-        await qz.websocket.connect()
-      }
+      if (loadSeq !== qzLoadSeqRef.current) return
+
       setStatusQz('QZ Tray conectado. Buscando impressoras do Windows...')
 
-      const found = await qz.printers.find()
-      let printers =
-        Array.isArray(found)
-          ? found
-          : typeof found === 'string' && found.trim()
-            ? [found.trim()]
-            : []
+      const unicas = await listQzWindowsPrinters(qz)
+      if (loadSeq !== qzLoadSeqRef.current) return
 
-      if (printers.length === 0) {
-        const details = await qz.printers.details()
-        const arr = Array.isArray(details) ? details : [details]
-        printers = arr
-          .map(p => (p && typeof p.name === 'string' ? p.name.trim() : ''))
-          .filter(Boolean)
-      }
-
-      const unicas = [...new Set(printers)].sort((a, b) => a.localeCompare(b))
       setImpressorasWindows(unicas)
       setStatusQz(`${unicas.length} impressora(s) encontrada(s) pelo QZ Tray.`)
       if (unicas.length === 0) {
         showToast.info('Nenhuma impressora Windows encontrada pelo QZ Tray.')
       }
     } catch (error) {
-      const msg =
-        error instanceof Error
-          ? error.message
-          : 'Não foi possível conectar ao QZ Tray para listar impressoras.'
+      if (loadSeq !== qzLoadSeqRef.current) return
+      const msg = mensagemErroCarregarQzTray(error)
       setErroQz(msg)
       setStatusQz('Falha ao detectar QZ Tray.')
-      showToast.error(msg)
+      if (!isQzChunkLoadError(error)) {
+        showToast.error(msg)
+      }
     } finally {
-      setCarregandoImpressoras(false)
+      if (loadSeq === qzLoadSeqRef.current) {
+        setCarregandoImpressoras(false)
+      }
     }
   }, [])
 
-  const carregarConfiguracao = useCallback(async () => {
-    if (!token) return
-    setCarregando(true)
-    setErroConfiguracao(null)
-    try {
-      const resEmpresa = await fetch('/api/empresas/me', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!resEmpresa.ok) {
-        setEmpresaId(null)
-        throw new Error(await mensagemErroHttp(resEmpresa))
-      }
-      const dataEmpresa = (await resEmpresa.json()) as Record<string, unknown>
-      const idEmp = dataEmpresa.id != null ? String(dataEmpresa.id).trim() : ''
-      if (!idEmp) {
-        throw new Error('Resposta da empresa sem id.')
-      }
-      setEmpresaId(idEmp)
-
-      const rawPe = dataEmpresa.parametroEmpresa
-      if (rawPe && typeof rawPe === 'object' && !Array.isArray(rawPe)) {
-        setParametroEmpresaDraft({ ...(rawPe as Record<string, unknown>) })
-      } else {
-        setParametroEmpresaDraft({})
-      }
-
-      const prefs = parsePreferenciasImpressaoDelivery(dataEmpresa)
-      const parametroEmpresa =
-        rawPe && typeof rawPe === 'object' && !Array.isArray(rawPe)
-          ? (rawPe as Record<string, unknown>)
-          : {}
-      setModoImpressao(prefs.modo)
-      setCopiasUnificado(Math.min(99, Math.max(1, prefs.copiasCupomUnificado)))
-      setAutoIniciarPreparoNovosPedidos(
-        boolConfig(
-          parametroEmpresa.autoIniciarPreparoNovosPedidos ??
-            parametroEmpresa.auto_iniciar_preparo_novos_pedidos ??
-            dataEmpresa.autoIniciarPreparoNovosPedidos ??
-            dataEmpresa.auto_iniciar_preparo_novos_pedidos,
-          true
-        )
-      )
-      setImprimirAoReceber(prefs.imprimirAoReceber)
-      setImprimirAoFicarPronto(prefs.imprimirAoFicarPronto)
-      setImpressoraExpedicaoId(prefs.impressoraExpedicaoId ?? '')
-      setCupomTemplate(getDeliveryCupomTemplateLocal(idEmp) ?? parseDeliveryCupomTemplate(dataEmpresa))
-
-      const criarOuReaproveitarEstacao = async (): Promise<string> => {
-        try {
-          const estacao = await criarEstacaoImpressao(token, nomeEstacaoPadrao())
-          salvarEstacaoImpressaoId(estacao.id)
-          return estacao.id
-        } catch (createError) {
-          const estacoes = await listarEstacoesImpressao(token).catch(() => [])
-          const existente = estacoes.find(e => e.ativo) ?? estacoes[0]
-          if (existente) {
-            salvarEstacaoImpressaoId(existente.id)
-            return existente.id
-          }
-
-          throw createError
-        }
-      }
-
-      let estacaoId = getEstacaoImpressaoId()
-      const logicas = await buscarImpressorasLogicas(token)
-      setImpressorasLogicas(logicas)
-
-      if (!estacaoId) {
-        try {
-          estacaoId = await criarOuReaproveitarEstacao()
-        } catch (createError) {
-          const msg =
-            createError instanceof Error
-              ? createError.message
-              : 'Não foi possível criar estação de impressão.'
-          setErroConfiguracao(msg)
-          showToast.error(msg)
-          setMapeamentos({})
-          setEstacaoImpressaoId(null)
-          return
-        }
-      }
-      setEstacaoImpressaoId(estacaoId)
-
-      let salvos = []
-      try {
-        salvos = await buscarMapeamentosEstacao(token, estacaoId)
-      } catch (error) {
-        if (!isEstacaoImpressaoNotFoundError(error)) throw error
-
-        limparEstacaoImpressaoId()
-        estacaoId = await criarOuReaproveitarEstacao()
-        setEstacaoImpressaoId(estacaoId)
-        salvos = await buscarMapeamentosEstacao(token, estacaoId)
-      }
-      const next: MapeamentosDraft = {}
-      for (const item of salvos) {
-        next[item.impressoraId] = item.nomeImpressoraWindows
-      }
-      setMapeamentos(next)
-    } catch (error) {
-      const msg =
-        error instanceof Error
-          ? error.message
-          : 'Não foi possível carregar configurações de impressão.'
-      showToast.error(msg)
-    } finally {
-      setCarregando(false)
-    }
-  }, [token])
-
   useEffect(() => {
     if (!open) return
-    void carregarConfiguracao()
-    void carregarImpressorasWindows()
-  }, [open, carregarConfiguracao, carregarImpressorasWindows])
-
-  const linhasConfiguradas = useMemo(
-    () => impressorasLogicas.filter(i => Boolean(mapeamentos[i.id]?.trim())).length,
-    [impressorasLogicas, mapeamentos]
-  )
+    const loadSeq = ++qzLoadSeqRef.current
+    void carregarImpressorasWindows(loadSeq)
+  }, [open, carregarImpressorasWindows])
 
   const executarSalvar = useCallback(async () => {
+    const empresaId = empresa?.id
     if (!token || !empresaId) return
 
     const parametroEmpresa: Record<string, unknown> = {
@@ -361,6 +287,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
       }
 
       salvarDeliveryCupomTemplateLocal(empresaId, cupomTemplate)
+      invalidateDeliveryConfigQueries()
       window.dispatchEvent(new Event('jiffy:empresa-me-updated'))
       showToast.success('Configurações de delivery salvas.')
       setConfirmSalvarSemImpressoraOpen(false)
@@ -372,7 +299,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
       setSalvando(false)
     }
   }, [
-    empresaId,
+    empresa?.id,
     estacaoImpressaoId,
     autoIniciarPreparoNovosPedidos,
     impressorasLogicas,
@@ -384,6 +311,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
     cupomTemplate,
     mapeamentos,
     parametroEmpresaDraft,
+    invalidateDeliveryConfigQueries,
     token,
   ])
 
@@ -392,7 +320,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
       showToast.error('Sessão expirada.')
       return
     }
-    if (!empresaId) {
+    if (!empresa?.id) {
       showToast.error('Empresa não carregada. Aguarde ou abra o painel novamente.')
       return
     }
@@ -401,7 +329,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
       return
     }
     void executarSalvar()
-  }, [empresaId, executarSalvar, impressoraExpedicaoId, token])
+  }, [empresa?.id, executarSalvar, impressoraExpedicaoId, token])
 
   return (
     <>
@@ -422,15 +350,16 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
         saveAndCloseLabel: 'Salvar alterações',
         onSaveAndClose: handleSalvar,
         saveAndCloseLoading: salvando,
-        saveAndCloseDisabled: carregando || !empresaId,
+        saveAndCloseDisabled: carregando || !empresa?.id,
       }}
     >
       <div className="space-y-3 p-4 md:p-6">
         <DeliveryConfigCollapsibleSection
           icon={<MdTune className="h-5 w-5" aria-hidden />}
-          title="Comportamento da impressão (empresa)"
-          description="Vale para todos os usuários da empresa — controla quando o Kanban pode disparar tickets após iniciar preparo ou marcar pronto."
+          title="Comportamento da impressão"
+          description="Vale para todos os usuários da empresa — controla quando o Kanban deve disparar os tickets."
           resetExpandedWhen={open}
+          contentClassName="mt-3 space-y-2"
         >
               <DeliveryToggleRow
                 id="delivery-auto-iniciar-preparo"
@@ -438,7 +367,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
                 disabled={carregando}
                 onChecked={setAutoIniciarPreparoNovosPedidos}
                 titulo="Enviar novos pedidos direto para produção"
-                descricao="Quando ativo, pedidos novos entram automaticamente em preparo/produção. Desative para manter os pedidos aguardando ação manual."
+                descricao="Quando ativo, pedidos novos entram automaticamente em preparo/produção."
               />
 
               <div className="flex flex-row items-center gap-2">
@@ -522,7 +451,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
                 </div>
               ) : null}
 
-              <div className="space-y-3 rounded-lg border border-gray-100 bg-gray-50/90 p-3">
+              <div className="space-y-2 rounded-lg border border-gray-100 bg-gray-50/90 p-2.5">
                 <DeliveryToggleRow
                   id="delivery-imp-receber"
                   checked={imprimirAoReceber}
@@ -575,8 +504,8 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
                 </label>
                 <p className="text-xs text-secondary-text">
                   {modoImpressao === 'unificado'
-                    ? 'Cupom completo ao iniciar preparo. Mapeie também na seção "Impressoras deste terminal".'
-                    : 'Cupom de expedição ao marcar pronto. Produção continua na impressora de cada produto. Mapeie também na seção "Impressoras deste terminal".'}
+                    ? 'Onde o cupom completo será impresso ao iniciar preparo.'
+                    : 'Onde o cupom de expedição será impresso ao marcar pronto. Produção continua na impressora de cada produto.'}
                 </p>
                 {impressorasLogicas.length === 0 ? (
                   <p className="text-xs text-amber-800">
@@ -616,7 +545,10 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
           headerActions={
             <button
               type="button"
-              onClick={carregarImpressorasWindows}
+              onClick={() => {
+                const loadSeq = ++qzLoadSeqRef.current
+                void carregarImpressorasWindows(loadSeq)
+              }}
               disabled={carregandoImpressoras}
               className="inline-flex h-9 items-center gap-2 rounded-lg border border-primary px-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -640,7 +572,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
                 cadastradas no sistema.
               </div>
             ) : (
-              <div className="divide-y divide-gray-200">
+              <div className="scrollbar-hide max-h-[350px] overflow-y-auto divide-y divide-gray-200">
                 {impressorasLogicas.map(impressora => (
                   <div key={impressora.id} className="grid grid-cols-[1fr_1.3fr] text-sm">
                     <div className="border-r border-gray-200 px-3 py-3 font-semibold text-primary-text">
@@ -697,10 +629,6 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
               Não foi possível inicializar a estação de impressão: {erroConfiguracao}
             </div>
           ) : null}
-
-          <div className="text-xs text-secondary-text">
-            {linhasConfiguradas} de {impressorasLogicas.length} impressora(s) vinculada(s).
-          </div>
         </DeliveryConfigCollapsibleSection>
       </div>
     </JiffySidePanelModal>

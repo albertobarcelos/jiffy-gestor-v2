@@ -484,6 +484,7 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
   const fontesModelo = fontesDoModelo(template, ticket.tipoCupom)
   const w = larguraPx(template.larguraMm)
   const padding = paddingPorDensidade(template.densidade)
+  const separatorPy = padding <= 2 ? 5 : padding >= 12 ? 16 : 12
   const lineHeight = lineHeightPorDensidade(template.densidade)
   const fonteBase = template.tamanhoFonteBase
   const fonteCabecalho = fonteBloco(
@@ -536,10 +537,8 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
   .whatsapp-qr { margin:${Math.max(3, Math.floor(padding / 2))}px 0; display:flex; align-items:center; justify-content:flex-start; gap:6px; font-size:10px; font-weight:700; line-height:1.15; }
   .whatsapp-qr img { display:block; width:74px; height:74px; flex:0 0 auto; image-rendering:pixelated; }
   .whatsapp-qr div { max-width:130px; text-align:left; }
-  .separator { margin:${padding}px 0; overflow:hidden; white-space:nowrap; font-weight:900; line-height:1; letter-spacing:0; }
-  .separator::before { content:"----------------------------------------"; }
-  .double-separator { margin:${padding}px 0; overflow:hidden; white-space:nowrap; font-weight:900; line-height:1; letter-spacing:0; }
-  .double-separator::before { content:"----------------------------------------\\A----------------------------------------"; white-space:pre; }
+  .separator { width:100%; height:0; margin:0; padding:${separatorPy}px 0; border:0; border-top:1px dashed #333; font-weight:normal; box-sizing:content-box; }
+  .double-separator { width:100%; height:0; margin:0; padding:${separatorPy}px 0; border:0; border-top:1px dashed #333; border-bottom:1px dashed #333; font-weight:normal; box-sizing:content-box; }
   .items-title { margin:${padding}px 0 3px; font-weight:800; font-size:${fonteItens}px; }
   .item-row { padding:3px 0; font-size:${fonteItens}px; }
   .item-comps { padding-left:16px; font-size:${Math.max(8, fonteItens - 1)}px; color:#222; }

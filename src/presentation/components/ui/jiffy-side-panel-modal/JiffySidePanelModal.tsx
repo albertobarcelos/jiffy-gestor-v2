@@ -625,7 +625,7 @@ export function JiffySidePanelModal({
                   {title}
                 </h2>
                 {subtitle ? (
-                  <p className="mt-1 font-['Nunito',sans-serif] text-sm font-medium uppercase tracking-wide text-primary-text">
+                  <p className="mt-1 font-['Nunito',sans-serif] text-sm font-medium tracking-wide text-primary-text">
                     {subtitle}
                   </p>
                 ) : null}

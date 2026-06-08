@@ -294,6 +294,12 @@ export interface VendasUnificadasResponse {
 /** Tamanho de cada página no Kanban (Pedidos de Clientes). */
 export const VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE = 50
 
+export interface VendasUnificadasInfiniteOptions {
+  /** Polling leve enquanto o Kanban está aberto (ex.: 60_000). */
+  refetchIntervalMs?: number | false
+  refetchOnWindowFocus?: boolean
+}
+
 /** @deprecated Use VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE */
 export const VENDAS_UNIFICADAS_PAGE_SIZE = VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE
 
@@ -451,9 +457,12 @@ export function getNextOffsetVendasUnificadas(
 
 /**
  * Vendas unificadas com paginação infinita (Kanban).
- * Primeira página (50) exibe rápido; demais páginas via scroll ou pré-carga silenciosa.
+ * Primeira página (50) exibe rápido; demais páginas via scroll na coluna.
  */
-export function useVendasUnificadasInfinite(params: VendasUnificadasQueryParams) {
+export function useVendasUnificadasInfinite(
+  params: VendasUnificadasQueryParams,
+  options?: VendasUnificadasInfiniteOptions
+) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
@@ -481,7 +490,9 @@ export function useVendasUnificadasInfinite(params: VendasUnificadasQueryParams)
     getNextPageParam: (lastPage, allPages) => getNextOffsetVendasUnificadas(lastPage, allPages),
     enabled: !!token,
     refetchOnReconnect: true,
-    refetchInterval: false,
+    refetchInterval: options?.refetchIntervalMs ?? false,
+    refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
+    refetchIntervalInBackground: false,
     staleTime: 30_000,
     gcTime: 5 * 60_000,
   })

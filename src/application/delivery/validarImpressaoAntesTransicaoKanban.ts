@@ -3,6 +3,7 @@ import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
 import type { ModoImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
 import type {
   VendaGestorTicket,
+  VendaGestorTicketsResponse,
 } from '@/src/shared/types/vendaGestorTickets'
 import {
   temImpressoraExpedicaoConfigurada,
@@ -19,6 +20,8 @@ export type ValidarImpressaoAntesTransicaoResult = {
   abrirModalConfig: boolean
   toastWarning?: string
   toastsInfo?: string[]
+  /** Payload reutilizado na impressão pós-transição (evita GET duplicado). */
+  ticketsPayload?: VendaGestorTicketsResponse
 }
 
 function transicaoPrecisaValidarTickets(
@@ -140,15 +143,20 @@ export async function validarImpressaoAntesTransicaoKanban(params: {
     tickets: payload.tickets,
   })
   if (bloqueioExpedicao) {
-    return { ...bloqueioExpedicao, toastsInfo }
+    return { ...bloqueioExpedicao, toastsInfo, ticketsPayload: payload }
   }
 
   if (params.modo === 'separado' && params.acoes.includes('iniciar_preparo')) {
     const bloqueioProducao = validarProducaoSeparadoParaIniciarPreparo(payload.tickets)
     if (bloqueioProducao) {
-      return { ...bloqueioProducao, toastsInfo }
+      return { ...bloqueioProducao, toastsInfo, ticketsPayload: payload }
     }
   }
 
-  return { podeAvancar: true, abrirModalConfig: false, toastsInfo }
+  return {
+    podeAvancar: true,
+    abrirModalConfig: false,
+    toastsInfo,
+    ticketsPayload: payload,
+  }
 }
