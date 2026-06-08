@@ -19,6 +19,8 @@ import type {
   PaginaNcmDTO,
   AtualizarEmpresaDTO,
   SalvarFiscalDTO,
+  ExportacaoXmlDTO,
+  ExportacaoXmlResumoDTO,
 } from '@/src/application/dto/painel-contador/PainelContadorDTO'
 import { EmpresaPainelResumo } from '@/src/domain/entities/painel-contador/EmpresaPainelResumo'
 import { ConfiguracaoFiscalEmpresa } from '@/src/domain/entities/painel-contador/ConfiguracaoFiscalEmpresa'
@@ -286,5 +288,47 @@ export class FiscalPainelApiRepository implements IFiscalPainelRepository {
     if (!response.ok) {
       throw new Error('Erro ao salvar reforma tributária')
     }
+  }
+
+  async exportarXmls(
+    input: ExportacaoXmlDTO
+  ): Promise<{ blob: Blob; filename: string } | ExportacaoXmlResumoDTO> {
+    const response = await fetchGestorApi('/api/v1/fiscal/exportacao/xmls', {
+      method: 'POST',
+      cache: 'no-store',
+      headers: authHeaders(this.token),
+      body: JSON.stringify(input),
+    })
+
+    const contentType = response.headers.get('content-type') ?? ''
+
+    if (!response.ok) {
+      const errorData = contentType.includes('application/json')
+        ? await response.json().catch(() => ({}))
+        : { error: await response.text().catch(() => '') }
+      throw new Error(
+        String(
+          (errorData as { error?: string; message?: string }).error ||
+            (errorData as { message?: string }).message ||
+            'Erro ao exportar XMLs'
+        )
+      )
+    }
+
+    if (contentType.includes('application/json')) {
+      return (await response.json()) as ExportacaoXmlResumoDTO
+    }
+
+    const blob = await response.blob()
+    const disposition = response.headers.get('content-disposition')
+    const filenameMatch = disposition
+      ? /filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i.exec(disposition)
+      : null
+    const rawName = filenameMatch?.[1] ?? filenameMatch?.[2]
+    const filename = rawName
+      ? decodeURIComponent(rawName)
+      : `xmls-fiscais-${input.mes ?? input.dataInicial}.zip`
+
+    return { blob, filename }
   }
 }

@@ -48,7 +48,6 @@ export function PainelContadorView() {
     'etapa-2-emissor-fiscal': false,
     'etapa-3-cenario-fiscal': false,
     'etapa-4-numeracoes-fiscais': false,
-    'etapa-5-chave-ibpt': false,
   }
   const certificadoStatus = progresso?.certificadoStatus ?? null
 
@@ -129,7 +128,7 @@ export function PainelContadorView() {
     return <EtapaComponent />
   }
 
-  const etapas = PAINEL_CONTADOR_ETAPAS.filter((e) => e.id !== 'reforma-tributaria')
+  const etapas = PAINEL_CONTADOR_ETAPAS
   const porcentagem = progresso?.porcentagemObrigatorias ?? 0
   const totalConcluidas = progresso?.totalConcluidasObrigatorias ?? 0
 

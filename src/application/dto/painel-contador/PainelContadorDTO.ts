@@ -83,6 +83,44 @@ export interface GapsQueryDTO {
   numeroFinal?: number
 }
 
+export const ExportacaoXmlTipoSchema = z.enum(['AUTORIZADO', 'CANCELADO', 'INUTILIZADO'])
+
+export const ExportacaoXmlSchema = z
+  .object({
+    mes: z
+      .string()
+      .regex(/^\d{4}-\d{2}$/, 'Mês deve estar no formato yyyy-MM')
+      .optional(),
+    dataInicial: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inicial deve estar no formato yyyy-MM-dd')
+      .optional(),
+    dataFinal: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Data final deve estar no formato yyyy-MM-dd')
+      .optional(),
+    tipos: z.array(ExportacaoXmlTipoSchema).min(1, 'Selecione ao menos um tipo de XML'),
+    timezone: z.string().optional(),
+    formato: z.enum(['completo', 'resumido']).default('completo'),
+  })
+  .refine(
+    (data) => {
+      const hasMes = Boolean(data.mes)
+      const hasRange = Boolean(data.dataInicial && data.dataFinal)
+      return (hasMes && !data.dataInicial && !data.dataFinal) || (!hasMes && hasRange)
+    },
+    { message: 'Informe o mês (yyyy-MM) ou o par data inicial e data final.' }
+  )
+
+export type ExportacaoXmlDTO = z.infer<typeof ExportacaoXmlSchema>
+
+export interface ExportacaoXmlResumoDTO {
+  totalArquivos?: number
+  totalDocumentos?: number
+  periodo?: string
+  [key: string]: unknown
+}
+
 export interface PaginaNcmDTO {
   content: import('@/src/domain/entities/painel-contador/ConfiguracaoNcmImpostos').ConfiguracaoNcmImpostos[]
   totalElements: number

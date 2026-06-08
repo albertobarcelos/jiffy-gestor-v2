@@ -250,15 +250,25 @@ export function ConfiguracaoEmpresaCompleta() {
       })
 
       const ufParaIbge = normalizarSiglaUf(empresaData.getUf())
+      const codigoIbgeSalvo = empresaData.endereco?.codigoCidadeIbge
+        ? String(empresaData.endereco.codigoCidadeIbge)
+        : null
+
       if (empresaData.endereco?.cidade && ufParaIbge) {
         const cidade = maiusculasPt(String(empresaData.endereco.cidade))
         ultimaCidadeBuscada.current = cidade
-        void buscarCodigoIbge(cidade, ufParaIbge)
+        if (codigoIbgeSalvo) {
+          atualizarCodigoIbge(codigoIbgeSalvo)
+          setCidadeValida(true)
+        } else {
+          atualizarCodigoIbge(null)
+          setCidadeValida(null)
+        }
       } else {
         atualizarCodigoIbge(null)
         ultimaCidadeBuscada.current = ''
+        setCidadeValida(null)
       }
-      setCidadeValida(null)
     }
 
     if (config) {
@@ -752,6 +762,8 @@ export function ConfiguracaoEmpresaCompleta() {
               <div className="min-w-0">
                 <CidadeAutocomplete
                   value={formDataEmpresa.cidade}
+                  validarSomenteAoEditar
+                  codigoIbgeSalvo={codigoCidadeIbge}
                   sx={sxEntradaConfig}
                   onChange={cidade => {
                     const cidadeFmt = maiusculasPt(cidade)

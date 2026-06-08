@@ -2,7 +2,6 @@ import type { IFiscalPainelRepository } from '@/src/domain/repositories/IFiscalP
 import { EtapaDadosFiscaisCompletaPolicy } from '@/src/domain/policies/painel-contador/EtapaDadosFiscaisCompletaPolicy'
 import { EtapaEmissorFiscalCompletaPolicy } from '@/src/domain/policies/painel-contador/EtapaEmissorFiscalCompletaPolicy'
 import { EtapaCenarioFiscalCompletoPolicy } from '@/src/domain/policies/painel-contador/EtapaCenarioFiscalCompletoPolicy'
-import { EtapaIbptCompletaPolicy } from '@/src/domain/policies/painel-contador/EtapaIbptCompletaPolicy'
 import { FiscalPainelMapper } from '@/src/application/mappers/FiscalPainelMapper'
 import type { ProgressoEtapasDTO } from '@/src/application/dto/painel-contador/PainelContadorDTO'
 import type { ProgressoEtapasMap } from '@/src/domain/policies/painel-contador/EtapaHabilitadaPolicy'
@@ -26,14 +25,11 @@ export class VerificarProgressoPainelContadorUseCase {
     )
     const etapa2 = EtapaEmissorFiscalCompletaPolicy.check(emissoes)
     const etapa3 = EtapaCenarioFiscalCompletoPolicy.check(configFiscal, ncmsPage.content)
-    const etapa5 = EtapaIbptCompletaPolicy.check(configFiscal)
-
     const etapasConcluidas: ProgressoEtapasMap = {
       'etapa-1-dados-fiscais': etapa1.concluida,
       'etapa-2-emissor-fiscal': etapa2.concluida,
       'etapa-3-cenario-fiscal': etapa3.concluida,
       'etapa-4-numeracoes-fiscais': false,
-      'etapa-5-chave-ibpt': etapa5.concluida,
     }
 
     return FiscalPainelMapper.toProgressoEtapasDTO(

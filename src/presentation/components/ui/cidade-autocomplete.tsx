@@ -28,6 +28,10 @@ interface CidadeAutocompleteProps {
   /** Repassados ao `Input` interno (MUI TextField), quando não é `useNativeInput` */
   size?: InputProps['size']
   sx?: InputProps['sx']
+  /** Não carrega municípios nem valida até o usuário focar/editar o campo */
+  validarSomenteAoEditar?: boolean
+  /** Código IBGE já salvo — evita revalidação ao abrir o formulário */
+  codigoIbgeSalvo?: string | null
 }
 
 // Limite de itens exibidos no dropdown quando não há filtro ativo (Infinity = sem limite)
@@ -64,6 +68,8 @@ export function CidadeAutocomplete({
   inputClassName = '',
   size = 'small',
   sx,
+  validarSomenteAoEditar = false,
+  codigoIbgeSalvo = null,
 }: CidadeAutocompleteProps) {
   const [isValidating, setIsValidating] = useState(false)
   const [isValid, setIsValid] = useState<boolean | null>(null)
@@ -92,6 +98,7 @@ export function CidadeAutocomplete({
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const valorNoBlurRef = useRef<string>('')
   const cidadeSelecionadaDuranteBlurRef = useRef<boolean>(false)
+  const [usuarioInteragiu, setUsuarioInteragiu] = useState(false)
 
   // Callbacks do pai em refs — evita loop infinito quando os useEffects dependem de funções inline.
   const onValidationChangeRef = useRef(onValidationChange)
@@ -142,14 +149,15 @@ export function CidadeAutocomplete({
     setAllMunicipios([])
     setCanScrollUp(false)
     setCanScrollDown(false)
+    setUsuarioInteragiu(false)
 
-    // Notifica o pai que a validação foi invalidada pela troca de UF
     if (estado) {
-      // Ainda não validado: a validação acontece após os municípios carregarem.
       onValidationChangeRef.current?.(null)
-      carregarMunicipios(estado)
+      if (!validarSomenteAoEditar) {
+        carregarMunicipios(estado)
+      }
     }
-  }, [estado])
+  }, [estado, validarSomenteAoEditar])
 
   /**
    * Validação automática quando:
@@ -157,6 +165,7 @@ export function CidadeAutocomplete({
    * - os municípios do estado terminaram de carregar
    */
   useEffect(() => {
+    if (validarSomenteAoEditar && !usuarioInteragiu) return
     if (!estado) return
     if (isLoadingMunicipios) return
     if (allMunicipios.length === 0) return
@@ -182,11 +191,12 @@ export function CidadeAutocomplete({
     setErro(`Cidade "${value}" não encontrada no estado ${estado}`)
     onValidationChangeRef.current?.(false)
     // isValid fora das deps: senão, ao setIsValid o efeito reexecuta e chama o pai de novo (loop).
-  }, [estado, value, allMunicipios, isLoadingMunicipios, normalizar])
+  }, [estado, value, allMunicipios, isLoadingMunicipios, normalizar, validarSomenteAoEditar, usuarioInteragiu])
 
   // Validar automaticamente APENAS quando receber um valor inicial (ao carregar dados)
   // NÃO validar durante a digitação - validação acontece apenas no blur
   useEffect(() => {
+    if (validarSomenteAoEditar && !usuarioInteragiu) return
     // Só valida se:
     // 1. Há um valor preenchido
     // 2. Há um estado selecionado
@@ -229,7 +239,15 @@ export function CidadeAutocomplete({
         onValidationChangeRef.current?.(null)
       }
     }
-  }, [value, estado, allMunicipios, isLoadingMunicipios, isValid, selectedFromList, normalizar])
+  }, [value, estado, allMunicipios, isLoadingMunicipios, isValid, selectedFromList, normalizar, validarSomenteAoEditar, usuarioInteragiu])
+
+  useEffect(() => {
+    if (!validarSomenteAoEditar) return
+    if (codigoIbgeSalvo && value.trim()) {
+      setIsValid(true)
+      setErro(null)
+    }
+  }, [validarSomenteAoEditar, codigoIbgeSalvo, value])
 
   /**
    * Verifica se a lista pode rolar para cima ou para baixo
@@ -326,6 +344,7 @@ export function CidadeAutocomplete({
    * - Cancela qualquer validação pendente do blur
    */
   const handleSelectSuggestion = (municipio: Municipio) => {
+    setUsuarioInteragiu(true)
     // IMPORTANTE: Marcar ANTES de qualquer outra coisa que uma cidade foi selecionada
     // Isso garante que o handleBlur não execute nenhuma validação
     cidadeSelecionadaDuranteBlurRef.current = true
@@ -405,6 +424,10 @@ export function CidadeAutocomplete({
    * Ao focar no campo: calcula a direção e abre o dropdown com a lista de cidades
    */
   const handleFocus = () => {
+    setUsuarioInteragiu(true)
+    if (estado && allMunicipios.length === 0 && !isLoadingMunicipios) {
+      void carregarMunicipios(estado)
+    }
     if (estado && allMunicipios.length > 0) {
       setDropdownDirection(calcularDirecao())
       setShowDropdown(true)
@@ -417,6 +440,8 @@ export function CidadeAutocomplete({
    * Validação acontece APENAS no blur, não durante a digitação
    */
   const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (validarSomenteAoEditar && !usuarioInteragiu) return
+
     // Se o foco está indo para dentro do próprio componente (ex.: campo "Pesquisar cidade..." no dropdown),
     // não fechar nem validar agora.
     const nextFocusedEl = e.relatedTarget as Node | null
@@ -648,7 +673,11 @@ export function CidadeAutocomplete({
             onBlur={handleBlur}
             placeholder={placeholder}
             required={required}
-            disabled={disabled || !estado || isLoadingMunicipios}
+            disabled={
+              disabled ||
+              !estado ||
+              (isLoadingMunicipios && (!validarSomenteAoEditar || usuarioInteragiu))
+            }
             className={inputClasses}
             autoComplete="off"
           />
@@ -662,8 +691,16 @@ export function CidadeAutocomplete({
             inputProps={{ readOnly: true }}
             onFocus={handleFocus}
             onBlur={handleBlur}
-            placeholder={isLoadingMunicipios ? 'Carregando cidades...' : placeholder}
-            disabled={disabled || !estado || isLoadingMunicipios}
+            placeholder={
+              isLoadingMunicipios && (!validarSomenteAoEditar || usuarioInteragiu)
+                ? 'Carregando cidades...'
+                : placeholder
+            }
+            disabled={
+              disabled ||
+              !estado ||
+              (isLoadingMunicipios && (!validarSomenteAoEditar || usuarioInteragiu))
+            }
             autoComplete="off"
             size={size}
             sx={{
@@ -687,7 +724,8 @@ export function CidadeAutocomplete({
         )}
 
         {/* Indicadores visuais à direita do input */}
-        {(isValidating || isLoadingMunicipios) && (
+        {((isValidating || isLoadingMunicipios) &&
+          (!validarSomenteAoEditar || usuarioInteragiu)) && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
             <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           </div>

@@ -12,6 +12,8 @@ import type {
   PaginaNcmDTO,
   AtualizarEmpresaDTO,
   SalvarFiscalDTO,
+  ExportacaoXmlDTO,
+  ExportacaoXmlResumoDTO,
 } from '@/src/application/dto/painel-contador/PainelContadorDTO'
 
 export interface CertificadoApiResult {
@@ -77,4 +79,7 @@ export interface IFiscalPainelRepository {
   validarCidade(cidade: string, uf: string): Promise<boolean>
   listarReformaTributaria(): Promise<ReformaTributariaItem[]>
   salvarReformaTributaria(ncm: string, input: { cst: string; codigoClassificacaoFiscal: string }): Promise<void>
+  exportarXmls(
+    input: ExportacaoXmlDTO
+  ): Promise<{ blob: Blob; filename: string } | ExportacaoXmlResumoDTO>
 }

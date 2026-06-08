@@ -7,6 +7,7 @@ export interface EmpresaPainelEndereco {
   cidade?: string
   estado?: string
   uf?: string
+  codigoCidadeIbge?: string
 }
 
 export class EmpresaPainelResumo {

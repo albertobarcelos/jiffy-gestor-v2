@@ -2,7 +2,7 @@ import type { IconType } from 'react-icons'
 import {
   MdAssessment,
   MdBusiness,
-  MdKey,
+  MdFileDownload,
   MdReceipt,
   MdReceiptLong,
 } from 'react-icons/md'
@@ -10,8 +10,8 @@ import { Etapa1DadosFiscaisEmpresa } from './Etapa1DadosFiscaisEmpresa'
 import { Etapa2EmissorFiscal } from './Etapa2EmissorFiscal'
 import { MapearProdutosView } from './MapearProdutosView'
 import { Etapa4InutilizarNotas } from './Etapa4InutilizarNotas'
-import { Etapa5ChaveIbpt } from './Etapa5ChaveIbpt'
 import { ReformaTributariaView } from './ReformaTributariaView'
+import { ExportarXmlView } from './ExportarXmlView'
 /** URL única do painel — etapas são abas SPA, sem troca de rota. */
 export const PORTAL_CONTADOR_PATH = '/portal-contador'
 
@@ -29,8 +29,8 @@ export const PAINEL_CONTADOR_ETAPAS: EtapaPainelConfig[] = [
   {
     id: 'etapa-1-dados-fiscais',
     step: 1,
-    title: 'Dados Fiscais e Certificado Digital',
-    label: 'Dados Fiscais e Certificado Digital',
+    title: 'Configurações Fiscais',
+    label: 'Configurações Fiscais',
     path: PORTAL_CONTADOR_PATH,
     component: Etapa1DadosFiscaisEmpresa,
     icon: MdBusiness,
@@ -63,21 +63,21 @@ export const PAINEL_CONTADOR_ETAPAS: EtapaPainelConfig[] = [
     icon: MdReceiptLong,
   },
   {
-    id: 'etapa-5-chave-ibpt',
-    step: 5,
-    title: 'Chave IBPT',
-    label: 'Chave IBPT',
-    path: PORTAL_CONTADOR_PATH,
-    component: Etapa5ChaveIbpt,
-    icon: MdKey,
-  },
-  {
     id: 'reforma-tributaria',
-    step: 6,
+    step: 5,
     title: 'Reforma Tributária',
     label: 'Reforma Tributária',
     path: PORTAL_CONTADOR_PATH,
     component: ReformaTributariaView,
     icon: MdAssessment,
+  },
+  {
+    id: 'exportar-xml',
+    step: 6,
+    title: 'Exportar XMLs',
+    label: 'Exportar XMLs',
+    path: PORTAL_CONTADOR_PATH,
+    component: ExportarXmlView,
+    icon: MdFileDownload,
   },
 ]

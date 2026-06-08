@@ -13,6 +13,7 @@ import { InutilizarNumeracaoUseCase } from '@/src/application/use-cases/painel-c
 import { GerenciarChaveIbptUseCase } from '@/src/application/use-cases/painel-contador/GerenciarChaveIbptUseCase'
 import { ListarReformaTributariaUseCase } from '@/src/application/use-cases/painel-contador/ListarReformaTributariaUseCase'
 import { SalvarReformaTributariaUseCase } from '@/src/application/use-cases/painel-contador/SalvarReformaTributariaUseCase'
+import { ExportarXmlsUseCase } from '@/src/application/use-cases/painel-contador/ExportarXmlsUseCase'
 
 export function createFiscalPainelRepository(token: string) {
   return new FiscalPainelApiRepository(token)
@@ -35,6 +36,7 @@ export function createPainelContadorUseCases(token: string) {
     chaveIbpt: new GerenciarChaveIbptUseCase(repo),
     listarReforma: new ListarReformaTributariaUseCase(repo),
     salvarReforma: new SalvarReformaTributariaUseCase(repo),
+    exportarXmls: new ExportarXmlsUseCase(repo),
     repository: repo,
   }
 }
