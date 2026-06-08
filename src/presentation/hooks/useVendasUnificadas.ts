@@ -139,7 +139,9 @@ export class VendaUnificadaDTO {
     /** Etapa da logística (entrega Gestor); opcional até o backend expor no unificado. */
     public readonly statusEtapaOperacional?: string | null,
     /** Última modificação na venda (útil para “quando entrou na etapa” quando a API atualiza ao transicionar). */
-    public readonly dataUltimaModificacao?: string | null
+    public readonly dataUltimaModificacao?: string | null,
+    /** Gestor: pendente | parcial | pago | cancelado; PDV costuma vir null. */
+    public readonly statusFinanceiro?: string | null
   ) {}
 
   private possuiDocumentoFiscal(): boolean {
@@ -187,6 +189,15 @@ export class VendaUnificadaDTO {
     if (!this.isVendaGestor() || this.isCancelada()) return false
     const tipo = (this.tipoVenda ?? '').trim().toLowerCase()
     return tipo === 'entrega' || tipo === 'retirada'
+  }
+
+  /** Delivery gestor ainda sem pagamento quitado (bloqueia finalizar no Kanban). */
+  precisaConfirmarPagamentoParaFinalizar(): boolean {
+    if (!this.isPedidoEntregaGestor()) return false
+    const status = String(this.statusFinanceiro ?? '')
+      .trim()
+      .toLowerCase()
+    return status === 'pendente' || status === 'parcial'
   }
 
   /**
@@ -330,7 +341,8 @@ function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): VendaUnif
     parseModeloFiscalApi(v.modelo),
     v.retornoSefaz as string | null | undefined,
     extrairStatusEtapaOperacional(v),
-    extrairDataUltimaModificacao(v)
+    extrairDataUltimaModificacao(v),
+    (v.statusFinanceiro ?? null) as string | null
   )
 }
 

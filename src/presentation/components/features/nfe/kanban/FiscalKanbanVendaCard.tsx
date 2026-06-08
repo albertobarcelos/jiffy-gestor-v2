@@ -82,6 +82,7 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
 
   const tipoVendaStr = String(venda.tipoVenda ?? '').trim().toLowerCase()
   const isDeliveryOuRetirada = tipoVendaStr === 'entrega' || tipoVendaStr === 'retirada'
+  const isPedidoBalcaoGestor = venda.tabelaOrigem === 'venda_gestor' && !isDeliveryOuRetirada
 
   const tipoVendaExibicao =
     venda.tabelaOrigem === 'venda_gestor'
@@ -93,7 +94,9 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
   const prefixoLinhaOrigemCard =
     venda.tabelaOrigem === 'venda_gestor' && isDeliveryOuRetirada
       ? (tipoVendaStr === 'retirada' ? 'Retirada' : 'Entrega')
-      : venda.origem
+      : isPedidoBalcaoGestor
+        ? 'Balcão'
+        : venda.origem
 
   const etapaKanbanCard =
     acaoFiscalEmAndamentoPorVenda[venda.id] === 'reemitindo' ||

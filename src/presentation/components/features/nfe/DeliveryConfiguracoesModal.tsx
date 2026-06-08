@@ -2,13 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MdPrint, MdRefresh, MdTune } from 'react-icons/md'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/src/presentation/components/ui/select'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import {
@@ -23,6 +16,10 @@ import {
   type DeliveryCupomTemplateConfig,
 } from '@/src/shared/types/deliveryCupomTemplate'
 import { DeliveryConfigCollapsibleSection } from './DeliveryConfigCollapsibleSection'
+import {
+  DeliveryModoCupomInfoTooltip,
+  DeliveryModoCupomToggle,
+} from './DeliveryModoCupomToggle'
 import { DeliveryCupomTemplateEditor } from './DeliveryCupomTemplateEditor'
 import { JiffyConfirmDialog } from '@/src/presentation/components/ui/jiffy-confirm-dialog'
 import { DIALOG_SALVAR_SEM_IMPRESSORA_EXPEDICAO } from '@/src/shared/utils/deliveryImpressoraExpedicao'
@@ -90,7 +87,7 @@ function DeliveryToggleRow(props: {
         checked={checked}
         disabled={disabled}
         onChange={e => onChecked(e.target.checked)}
-        className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 accent-primary focus:ring-primary"
+        className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 accent-secondary focus:ring-secondary"
       />
     </label>
   )
@@ -370,34 +367,14 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
                 descricao="Quando ativo, pedidos novos entram automaticamente em preparo/produção."
               />
 
-              <div className="flex flex-row items-center gap-2">
-                <label htmlFor="delivery-modo-impressao" className="shrink-0 text-sm font-semibold text-primary-text">
-                  Modo de cupom delivery
-                </label>
-                <div className="min-w-0 flex-1">
-                  <Select
-                    value={modoImpressao}
-                    disabled={carregando}
-                    onValueChange={v =>
-                      setModoImpressao(v === 'separado' ? 'separado' : 'unificado')
-                    }
-                  >
-                    <SelectTrigger
-                      id="delivery-modo-impressao"
-                      className="h-10 w-full rounded-lg border-gray-200 bg-white text-sm shadow-none focus:border-primary focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 [&>span]:line-clamp-1 [&>span]:text-left"
-                    >
-                      <SelectValue placeholder="Selecione o modo de cupom" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-lg border-gray-200">
-                      <SelectItem value="unificado">
-                        Unificado — Um cupom completo ao iniciar preparo (recomendado para a maioria)
-                      </SelectItem>
-                      <SelectItem value="separado">
-                        Separado — Produção na cozinha ao receber e expedição ao marcar pronto
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-semibold text-primary-text">Modo de cupom delivery</span>
+                <DeliveryModoCupomInfoTooltip modo={modoImpressao} />
+                <DeliveryModoCupomToggle
+                  value={modoImpressao}
+                  onChange={setModoImpressao}
+                  disabled={carregando}
+                />
               </div>
 
               {modoImpressao === 'unificado' ? (
@@ -416,7 +393,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
                         disabled={carregando}
                         onChange={e => setCopiasUnificado(clampCopiasUnificado(Number(e.target.value)))}
                         onBlur={e => setCopiasUnificado(clampCopiasUnificado(Number(e.target.value)))}
-                        className="h-8 w-12 rounded-l-lg border border-r-0 border-gray-200 px-2 text-center text-sm tabular-nums outline-none [appearance:textfield] focus:border-primary disabled:cursor-not-allowed [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        className="h-8 w-12 rounded-l-lg border border-r-0 border-gray-200 px-2 text-center text-sm tabular-nums outline-none [appearance:textfield] focus:border-secondary disabled:cursor-not-allowed [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                       />
                       <div className="flex w-8 flex-col overflow-hidden rounded-r-lg border border-gray-200">
                         <button
@@ -518,7 +495,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
                   value={impressoraExpedicaoId}
                   disabled={carregando || impressorasLogicas.length === 0}
                   onChange={e => setImpressoraExpedicaoId(e.target.value)}
-                  className="h-9 w-full max-w-xs rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none transition-colors focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+                  className="h-9 w-full max-w-xs rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none transition-colors focus:border-secondary disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <option value="">Selecione uma impressora</option>
                   {impressorasLogicas.map(impressora => (
@@ -550,7 +527,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
                 void carregarImpressorasWindows(loadSeq)
               }}
               disabled={carregandoImpressoras}
-              className="inline-flex h-9 items-center gap-2 rounded-lg border border-primary px-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-secondary px-3 text-sm font-semibold text-secondary transition-colors hover:bg-secondary/10 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <MdRefresh className={carregandoImpressoras ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
               {carregandoImpressoras ? 'Atualizando...' : 'Atualizar QZ'}
@@ -587,7 +564,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
                             [impressora.id]: e.target.value,
                           }))
                         }
-                        className="h-9 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none transition-colors focus:border-primary"
+                        className="h-9 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none transition-colors focus:border-secondary"
                       >
                         <option value="">Selecione a impressora Windows</option>
                         {impressorasWindows.map(printer => (
@@ -614,7 +591,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
                   href="https://qz.io/docs/signing"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-medium text-primary underline"
+                  className="font-medium text-secondary underline"
                 >
                   qz.io/docs/signing
                 </a>

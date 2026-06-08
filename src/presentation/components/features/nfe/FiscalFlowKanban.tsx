@@ -174,6 +174,7 @@ export function FiscalFlowKanban() {
     id: string
     tabelaOrigem: 'venda' | 'venda_gestor'
     statusFiscal: Venda['statusFiscal']
+    abaDetalhesInicial?: import('./novo-pedido/types').AbaDetalhesPedido
   } | null>(null)
   const [draggingVenda, setDraggingVenda] = useState<Venda | null>(null)
   /** vendaId fixado no topo por coluna (Finalizadas / Pendente emissão), persistido em localStorage */
@@ -425,6 +426,17 @@ export function FiscalFlowKanban() {
     [auth, entregadorPorVendaId]
   )
 
+  const handlePagamentoPendenteAoFinalizar = useCallback((venda: Venda) => {
+    showToast.warning('Confirme o pagamento para finalizar o pedido.')
+    setPedidoVisualizacaoContext({
+      id: venda.id,
+      tabelaOrigem: venda.tabelaOrigem,
+      statusFiscal: venda.statusFiscal,
+      abaDetalhesInicial: 'pagamentos',
+    })
+    setNovoPedidoModalVisualizacaoOpen(true)
+  }, [])
+
   const {
     avancandoEtapaIds,
     etapaLocalPorVendaId,
@@ -441,6 +453,7 @@ export function FiscalFlowKanban() {
     },
     verificarImpressaoAntesTransicoes,
     verificarEntregadorAntesDespachar,
+    onPagamentoPendenteAoFinalizar: handlePagamentoPendenteAoFinalizar,
   })
 
   const { acaoFiscalEmAndamentoPorVenda, getEtapaKanbanParaExibicao: getEtapaKanbanFiscal, handleEmitirNfe } =
@@ -1097,6 +1110,7 @@ export function FiscalFlowKanban() {
           vendaId={pedidoVisualizacaoContext.id}
           tabelaOrigemVenda={pedidoVisualizacaoContext.tabelaOrigem}
           statusFiscalUnificado={pedidoVisualizacaoContext.statusFiscal}
+          abaDetalhesInicial={pedidoVisualizacaoContext.abaDetalhesInicial}
           modoVisualizacao={true}
         />
       )}

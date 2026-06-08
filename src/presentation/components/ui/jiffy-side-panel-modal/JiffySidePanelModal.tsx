@@ -65,6 +65,8 @@ export interface JiffySidePanelFooterActions {
   onSaveAndClose?: () => void | Promise<void>
   saveAndCloseLoading?: boolean
   saveAndCloseDisabled?: boolean
+  /** Rodapé `footerVariant="bar"`: cor de destaque do botão "Salvar e fechar" (padrão `primary`). */
+  saveAndCloseColor?: 'primary' | 'secondary'
   /**
    * Rodapé `footerVariant="bar"`: estilo de Anterior / Próximo.
    * `primaryMuted` = fundo primary ~15% (alinhado a `bg-primary/15`) e texto na cor primária.
@@ -74,8 +76,9 @@ export interface JiffySidePanelFooterActions {
    * Rodapé `footerVariant="bar"`: estilo do botão de cancelar (ex.: "Salvar e fechar").
    * `primary` = mesmo visual do Salvar (fundo primário, texto branco).
    * `primaryTint10` = fundo primary ~10% (equivalente visual a `bg-primary/10`), texto na cor primária.
+   * `secondaryTint10` = fundo secondary ~10% (equivalente visual a `bg-secondary/10`), texto na cor secundária.
    */
-  cancelVariant?: 'secondary' | 'primary' | 'primaryTint10'
+  cancelVariant?: 'secondary' | 'primary' | 'primaryTint10' | 'secondaryTint10'
   /**
    * Rodapé `footerVariant="bar"`: ordem dos botões visíveis.
    * Padrão: Anterior → Próximo → Cancelar → Salvar (apenas os habilitados entram na grade).
@@ -113,6 +116,22 @@ const footerSavePrimarySx = {
   },
 } as const
 
+const footerSaveSecondarySx = {
+  borderRadius: 0,
+  backgroundColor: 'var(--color-secondary)',
+  color: '#fff',
+  boxShadow: 'none',
+  '&:hover': {
+    backgroundColor: 'var(--color-secondary)',
+    filter: 'brightness(1.08)',
+    boxShadow: 'none',
+  },
+  '&.Mui-disabled': {
+    backgroundColor: 'color-mix(in srgb, var(--color-secondary) 38%, transparent)',
+    color: 'rgba(255, 255, 255, 0.9)',
+  },
+} as const
+
 export function footerSavePrimaryBarSx(isFirstColumn: boolean) {
   const bl =
     isFirstColumn ?
@@ -123,6 +142,19 @@ export function footerSavePrimaryBarSx(isFirstColumn: boolean) {
     ...bl,
     '&:hover': { ...footerSavePrimarySx['&:hover'], ...bl },
     '&.Mui-disabled': { ...footerSavePrimarySx['&.Mui-disabled'], ...bl },
+  }
+}
+
+export function footerSaveSecondaryBarSx(isFirstColumn: boolean) {
+  const bl =
+    isFirstColumn ?
+      ({ borderBottomLeftRadius: PANEL_RADIUS_LEFT } as const)
+    : {}
+  return {
+    ...footerSaveSecondarySx,
+    ...bl,
+    '&:hover': { ...footerSaveSecondarySx['&:hover'], ...bl },
+    '&.Mui-disabled': { ...footerSaveSecondarySx['&.Mui-disabled'], ...bl },
   }
 }
 
@@ -255,6 +287,28 @@ export function footerBarPrimaryTint10BarSx(isFirstColumn: boolean) {
   }
 }
 
+/** Cancelar / Fechar com tom secondary/10 (equivalente visual a `bg-secondary/10`) */
+export function footerBarSecondaryTint10BarSx(isFirstColumn: boolean) {
+  const bl =
+    isFirstColumn ?
+      ({ borderBottomLeftRadius: PANEL_RADIUS_LEFT } as const)
+    : {}
+  return {
+    borderRadius: 0,
+    ...bl,
+    boxShadow: 'none',
+    borderWidth: 0,
+    backgroundColor: 'color-mix(in srgb, var(--color-secondary) 10%, transparent)',
+    color: 'var(--color-secondary)',
+    fontWeight: 600,
+    '&:hover': {
+      backgroundColor: 'color-mix(in srgb, var(--color-secondary) 18%, transparent)',
+      boxShadow: 'none',
+      ...bl,
+    },
+  }
+}
+
 function footerBarPrevNextSx(
   isFirstColumn: boolean,
   tone: 'gray' | 'primaryMuted' | undefined
@@ -266,10 +320,11 @@ function footerBarPrevNextSx(
 
 function footerBarCancelSx(
   isFirstColumn: boolean,
-  variant: 'secondary' | 'primary' | 'primaryTint10' | undefined
+  variant: 'secondary' | 'primary' | 'primaryTint10' | 'secondaryTint10' | undefined
 ) {
   if (variant === 'primary') return footerSavePrimaryBarSx(isFirstColumn)
   if (variant === 'primaryTint10') return footerBarPrimaryTint10BarSx(isFirstColumn)
+  if (variant === 'secondaryTint10') return footerBarSecondaryTint10BarSx(isFirstColumn)
   return footerBarSecondarySx(isFirstColumn)
 }
 
@@ -401,12 +456,16 @@ function JiffyPanelFooterBar({
           <Button
             type="button"
             variant="contained"
-            color="primary"
+            color={fa.saveAndCloseColor === 'secondary' ? 'secondary' : 'primary'}
             disabled={fa.saveAndCloseDisabled}
             isLoading={fa.saveAndCloseLoading}
             onClick={() => void fa.onSaveAndClose?.()}
             className="h-12 min-h-12 w-full font-semibold shadow-none"
-            sx={footerSavePrimaryBarSx(isFirstColumn)}
+            sx={
+              fa.saveAndCloseColor === 'secondary' ?
+                footerSaveSecondaryBarSx(isFirstColumn)
+              : footerSavePrimaryBarSx(isFirstColumn)
+            }
           >
             {fa.saveAndCloseLabel ?? 'Salvar e fechar'}
           </Button>

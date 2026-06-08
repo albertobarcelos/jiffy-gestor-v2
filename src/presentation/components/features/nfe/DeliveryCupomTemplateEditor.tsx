@@ -166,7 +166,7 @@ function FonteBlocoInput(props: {
           onClick={() => aplicarValor(null)}
           className={`h-7 shrink-0 rounded-md border px-2 text-xs font-normal transition-colors ${
             padraoAtivo
-              ? 'border-primary bg-primary/10 text-primary hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-50'
+              ? 'border-secondary bg-secondary/10 text-secondary hover:bg-secondary/15 disabled:cursor-not-allowed disabled:opacity-50'
               : 'cursor-default border-gray-200 bg-white text-secondary-text disabled:opacity-60'
           } ${props.disabled ? 'opacity-60' : ''}`}
         >
@@ -191,7 +191,7 @@ function PreviewToggle(props: {
         checked={props.checked}
         disabled={props.disabled}
         onChange={e => props.onChange(e.target.checked)}
-        className="h-4 w-4 accent-primary"
+        className="h-4 w-4 accent-secondary"
       />
     </label>
   )
@@ -359,7 +359,7 @@ export function DeliveryCupomTemplateEditor({
           type="button"
           disabled={disabled}
           onClick={() => onChange(DEFAULT_DELIVERY_CUPOM_TEMPLATE)}
-          className="inline-flex h-9 items-center gap-2 rounded-lg border border-primary px-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex h-9 items-center gap-2 rounded-lg border border-secondary px-3 text-sm font-semibold text-secondary transition-colors hover:bg-secondary/10 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <MdRestartAlt className="h-4 w-4" />
           Restaurar padrão
@@ -375,7 +375,7 @@ export function DeliveryCupomTemplateEditor({
                 value={value.larguraMm}
                 disabled={disabled}
                 onChange={e => onChange(update(value, 'larguraMm', Number(e.target.value) === 58 ? 58 : 80))}
-                className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary disabled:opacity-60"
+                className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-secondary disabled:opacity-60"
               >
                 <option value={80}>80mm</option>
                 <option value={58}>58mm</option>
@@ -389,7 +389,7 @@ export function DeliveryCupomTemplateEditor({
                 onChange={e =>
                   onChange(update(value, 'densidade', e.target.value as DeliveryCupomTemplateConfig['densidade']))
                 }
-                className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary disabled:opacity-60"
+                className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-secondary disabled:opacity-60"
               >
                 <option value="compacto">Compacto</option>
                 <option value="normal">Normal</option>
@@ -407,7 +407,7 @@ export function DeliveryCupomTemplateEditor({
                 onChange={e =>
                   onChange(update(value, 'tamanhoFonteBase', Math.min(18, Math.max(10, Number(e.target.value) || 13))))
                 }
-                className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-primary disabled:opacity-60"
+                className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-secondary disabled:opacity-60"
               />
             </div>
           </div>
@@ -430,8 +430,8 @@ export function DeliveryCupomTemplateEditor({
                     onClick={() => setModeloSelecionado(modelo.value)}
                     className={`rounded-lg border px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                       selected
-                        ? 'border-primary bg-primary text-white'
-                        : 'border-gray-200 bg-white text-primary-text hover:border-primary/50'
+                        ? 'border-secondary bg-secondary text-white'
+                        : 'border-gray-200 bg-white text-primary-text hover:border-secondary/50'
                     }`}
                   >
                     <span className="block text-sm font-semibold">{modelo.label}</span>
@@ -509,7 +509,7 @@ export function DeliveryCupomTemplateEditor({
                 disabled={disabled}
                 onChange={e => onChange(update(value, 'cabecalhoExtra', e.target.value.slice(0, 500)))}
                 placeholder="Ex.: Obrigado pela preferência"
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-primary disabled:opacity-60"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-secondary disabled:opacity-60"
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -520,7 +520,7 @@ export function DeliveryCupomTemplateEditor({
                 disabled={disabled}
                 onChange={e => onChange(update(value, 'rodapeExtra', e.target.value.slice(0, 500)))}
                 placeholder="Ex.: Volte sempre"
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-primary disabled:opacity-60"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-secondary disabled:opacity-60"
               />
             </div>
           </div>

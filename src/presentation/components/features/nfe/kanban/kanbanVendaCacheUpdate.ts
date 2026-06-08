@@ -70,7 +70,8 @@ export function cloneVendaUnificadaDTO(
       : venda.statusEtapaOperacional,
     patch.dataUltimaModificacao !== undefined
       ? patch.dataUltimaModificacao
-      : venda.dataUltimaModificacao
+      : venda.dataUltimaModificacao,
+    venda.statusFinanceiro
   )
 }
 

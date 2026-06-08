@@ -36,7 +36,7 @@ export function DeliveryConfigCollapsibleSection({
   return (
     <section className="rounded-lg border border-gray-200 bg-white p-2 shadow-sm">
       <div className="flex items-start gap-2">
-        <span className="shrink-0 rounded-lg bg-primary/10 p-2 text-primary">{icon}</span>
+        <span className="shrink-0 rounded-lg bg-secondary/10 p-2 text-secondary">{icon}</span>
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-3">
             <button
@@ -44,7 +44,7 @@ export function DeliveryConfigCollapsibleSection({
               onClick={() => setExpanded(prev => !prev)}
               aria-expanded={expanded}
               aria-controls={contentId}
-              className="min-w-0 flex-1 rounded-lg text-left transition-colors hover:bg-gray-50/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              className="min-w-0 flex-1 rounded-lg text-left transition-colors hover:bg-gray-50/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary"
             >
               <h3 className="text-base font-semibold text-primary-text">{title}</h3>
               {description ? (
@@ -60,7 +60,7 @@ export function DeliveryConfigCollapsibleSection({
               aria-expanded={expanded}
               aria-controls={contentId}
               aria-label={expanded ? 'Recolher seção' : 'Expandir seção'}
-              className="shrink-0 rounded-lg p-0.5 text-secondary-text transition-colors hover:bg-gray-50/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              className="shrink-0 rounded-lg p-0.5 text-secondary-text transition-colors hover:bg-gray-50/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary"
             >
               <MdExpandMore
                 className={`h-6 w-6 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}

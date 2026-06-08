@@ -12,6 +12,7 @@ export type UseNovoPedidoOrchestratorEffectsParams = {
   vendaId: string | undefined
   modoVisualizacao: boolean | undefined
   tipoInicioPedido: 'balcao' | 'entrega'
+  abaDetalhesInicial?: AbaDetalhesPedido
   auth: AuthState
   currentStep: 1 | 2 | 3 | 4
   abaDetalhesPedido: AbaDetalhesPedido
@@ -30,6 +31,7 @@ export function useNovoPedidoOrchestratorEffects({
   vendaId,
   modoVisualizacao,
   tipoInicioPedido,
+  abaDetalhesInicial,
   auth,
   currentStep,
   abaDetalhesPedido,
@@ -53,6 +55,11 @@ export function useNovoPedidoOrchestratorEffects({
       setAbaDetalhesPedido('infoPedido')
     }
   }, [currentStep, abaDetalhesPedido, podeExibirAbaDadosEntrega, setAbaDetalhesPedido])
+
+  useEffect(() => {
+    if (!open || !vendaId || !modoVisualizacao || !abaDetalhesInicial) return
+    setAbaDetalhesPedido(abaDetalhesInicial)
+  }, [open, vendaId, modoVisualizacao, abaDetalhesInicial, setAbaDetalhesPedido])
 
   useEffect(() => {
     if (!open || vendaId || modoVisualizacao) return

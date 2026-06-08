@@ -83,6 +83,11 @@ export function getLinhaTempoPedidoEntregaKanban(
   return { prefixo: 'Pedido em:', iso: v.dataCriacao }
 }
 
+/** Pedidos delivery gestor com pagamento ainda não quitado (não pode ir para Finalizadas). */
+export function vendaPrecisaConfirmarPagamentoParaFinalizar(venda: Venda): boolean {
+  return venda.precisaConfirmarPagamentoParaFinalizar()
+}
+
 /** Encadeia transições ao soltar à direita (ex.: Novos → Em rota = preparo + pronto + despacho). */
 export function acoesTransicaoEntregaAvanco(
   origIdx: number,

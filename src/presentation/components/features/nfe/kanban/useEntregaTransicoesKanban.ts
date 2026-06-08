@@ -3,7 +3,7 @@ import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
 import type { VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 import { showToast } from '@/src/shared/utils/toast'
 import type { ColunaKanbanId, Venda } from './types'
-import { COLUNAS_ENTREGA_OPERACIONAIS, acoesTransicaoEntregaAvanco } from './fiscalFlowKanban.rules'
+import { COLUNAS_ENTREGA_OPERACIONAIS, acoesTransicaoEntregaAvanco, vendaPrecisaConfirmarPagamentoParaFinalizar } from './fiscalFlowKanban.rules'
 
 export type ExecutarTransicaoKanbanPayload = {
   id: string
@@ -30,6 +30,8 @@ interface UseEntregaTransicoesKanbanParams {
     acoes: AcaoTransicaoGestor[]
   ) => Promise<VerificarImpressaoKanbanResult>
   verificarEntregadorAntesDespachar?: (venda: Venda) => Promise<boolean>
+  /** Quando finalizar exige pagamento quitado: abrir detalhes em vez de chamar a API. */
+  onPagamentoPendenteAoFinalizar?: (venda: Venda) => void
 }
 
 export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanParams) {
@@ -40,6 +42,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
     onAfterTransicaoSucesso,
     verificarImpressaoAntesTransicoes,
     verificarEntregadorAntesDespachar,
+    onPagamentoPendenteAoFinalizar,
   } = params
 
   const [avancandoEtapaIds, setAvancandoEtapaIds] = useState<Record<string, boolean>>({})
@@ -108,6 +111,10 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
 
   const finalizarEntrega = useCallback(
     async (venda: Venda) => {
+      if (vendaPrecisaConfirmarPagamentoParaFinalizar(venda)) {
+        onPagamentoPendenteAoFinalizar?.(venda)
+        return
+      }
       iniciarTransicaoUi(venda.id, 'FINALIZADAS')
       try {
         const resposta = await executarTransicao({ id: venda.id, acao: 'finalizar' })
@@ -124,6 +131,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
       executarTransicao,
       finalizarTransicaoUi,
       iniciarTransicaoUi,
+      onPagamentoPendenteAoFinalizar,
       reverterTransicaoUi,
     ]
   )

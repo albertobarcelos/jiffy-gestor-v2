@@ -66,6 +66,7 @@ export function useNovoPedidoOrchestrator({
   tabelaOrigemVenda = 'venda_gestor',
   statusFiscalUnificado = null,
   tipoInicioPedido = 'balcao',
+  abaDetalhesInicial,
 }: NovoPedidoModalProps) {
   const { auth } = useAuthStore()
   const { empresa, preferenciasImpressaoDelivery } = useEmpresaMe()
@@ -576,6 +577,7 @@ export function useNovoPedidoOrchestrator({
     vendaId,
     modoVisualizacao,
     tipoInicioPedido,
+    abaDetalhesInicial,
     auth,
     currentStep,
     abaDetalhesPedido,
