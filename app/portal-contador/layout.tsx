@@ -2,13 +2,12 @@
 
 import { TopNav } from '@/src/presentation/components/layouts/TopNav'
 import { TabBar } from '@/src/presentation/components/ui/TabBar'
+import { PainelContadorAcessoGuard } from '@/src/presentation/components/features/painel-contador/PainelContadorAcessoGuard'
+import { PainelContadorView } from '@/src/presentation/components/features/painel-contador/PainelContadorView'
 
-export default function PainelContadorLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function PainelContadorLayout() {
   return (
+    <PainelContadorAcessoGuard>
     <div className="fixed inset-0 flex flex-col overflow-hidden bg-gray-50">
       {/* TopNav fixo no topo */}
       <div className="flex-shrink-0 z-30">
@@ -21,10 +20,11 @@ export default function PainelContadorLayout({
           <TabBar />
         </div>
         <main className="flex-1 overflow-y-auto min-h-0">
-          {children}
+          <PainelContadorView />
         </main>
       </div>
     </div>
+    </PainelContadorAcessoGuard>
   )
 }
 

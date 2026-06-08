@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useTabsStore } from '@/src/presentation/stores/tabsStore'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useCertificadoDigital } from '@/src/presentation/hooks/painel-contador/useCertificadoDigital'
 import { Button } from '@/src/presentation/components/ui/button'
 import { MdSettings, MdWarning, MdDelete, MdInfo, MdCheckCircle, MdRefresh } from 'react-icons/md'
 import { CertificadoUploadModal } from './CertificadoUploadModal'
@@ -11,108 +11,36 @@ import { showToast } from '@/src/shared/utils/toast'
 
 export function Etapa1DadosFiscaisEmpresa() {
   const { addTab } = useTabsStore()
-  const { isRehydrated } = useAuthStore()
-  const [certificado, setCertificado] = useState<any>(null)
-  const [isLoadingCertificado, setIsLoadingCertificado] = useState(true)
+  const { certificadoQuery, dadosCompletosQuery, removeMutation, refetchDadosCompletos } =
+    useCertificadoDigital()
+
+  const certificadoEntity = certificadoQuery.data?.certificado
+  const certificado = certificadoEntity
+    ? {
+        id: certificadoEntity.id,
+        ambiente: certificadoEntity.ambiente,
+        validadeCertificado: certificadoEntity.validadeCertificado?.toISOString(),
+      }
+    : null
+  const isLoadingCertificado = certificadoQuery.isLoading
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
-  const [isRemoving, setIsRemoving] = useState(false)
-  
-  // Estado para verificação de dados completos
-  const [dadosCompletos, setDadosCompletos] = useState<boolean | null>(null)
-  const [isVerificandoDados, setIsVerificandoDados] = useState(false)
 
-  // Busca dados do certificado
-  const loadCertificado = useCallback(async () => {
-    setIsLoadingCertificado(true)
-    try {
-      const response = await fetch('/api/certificado')
-      
-      const result = await response.json()
-      
-      // Se a resposta indica sucesso (mesmo que data seja null), não há erro
-      if (result.success) {
-        setCertificado(result.data) // Pode ser null se não houver certificado
-      } else {
-        // Apenas logar erro se for um erro real (não "não encontrado")
-        console.error('Erro ao carregar certificado:', result.message)
-        setCertificado(null)
-      }
-    } catch (error) {
-      console.error('Erro ao carregar certificado:', error)
-      setCertificado(null)
-    } finally {
-      setIsLoadingCertificado(false)
-    }
-  }, [])
+  const dadosCompletos = dadosCompletosQuery.data ?? null
+  const isVerificandoDados = dadosCompletosQuery.isFetching
 
-  // Função para verificar se todos os dados obrigatórios estão preenchidos
-  const verificarDadosCompletos = useCallback(async () => {
-    setIsVerificandoDados(true)
-    try {
-      // Buscar dados da empresa
-      const empresaResponse = await fetch('/api/empresas/me')
-      if (!empresaResponse.ok) {
-        setDadosCompletos(false)
-        return
-      }
+  const verificarDadosCompletos = () => {
+    void refetchDadosCompletos()
+  }
 
-      const empresaData = await empresaResponse.json()
-
-      // Buscar configuração fiscal
-      const fiscalResponse = await fetch('/api/v1/fiscal/empresas-fiscais/me')
-      let configFiscal = null
-      if (fiscalResponse.ok) {
-        configFiscal = await fiscalResponse.json()
-      }
-
-      // Verificar campos obrigatórios da empresa
-      const cnpjPreenchido = empresaData?.cnpj && empresaData.cnpj.trim().length >= 14
-      const razaoSocialPreenchida = empresaData?.razaoSocial?.trim() || empresaData?.nome?.trim()
-      const estadoPreenchido = empresaData?.endereco?.estado?.trim() || empresaData?.endereco?.uf?.trim()
-
-      // Verificar campos obrigatórios fiscais
-      const inscricaoEstadualPreenchida = configFiscal?.inscricaoEstadual === 'ISENTO' || 
-                                         (configFiscal?.inscricaoEstadual && configFiscal.inscricaoEstadual.trim().length > 0)
-      const regimeTributarioPreenchido = configFiscal?.codigoRegimeTributario && 
-                                        [1, 2, 3].includes(configFiscal.codigoRegimeTributario)
-
-      // Todos os campos obrigatórios devem estar preenchidos
-      const completo = cnpjPreenchido && 
-                      razaoSocialPreenchida && 
-                      estadoPreenchido && 
-                      inscricaoEstadualPreenchida && 
-                      regimeTributarioPreenchido
-
-      setDadosCompletos(completo)
-    } catch (error) {
-      console.error('Erro ao verificar dados completos:', error)
-      setDadosCompletos(false)
-    } finally {
-      setIsVerificandoDados(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (isRehydrated) {
-      loadCertificado()
-      verificarDadosCompletos()
-    }
-  }, [isRehydrated, loadCertificado, verificarDadosCompletos])
-
-  // Recarregar verificação quando a página receber foco (usuário voltou da configuração)
   useEffect(() => {
     const handleFocus = () => {
-      if (isRehydrated) {
-        verificarDadosCompletos()
-      }
+      void refetchDadosCompletos()
+      void certificadoQuery.refetch()
     }
-
     window.addEventListener('focus', handleFocus)
-    return () => {
-      window.removeEventListener('focus', handleFocus)
-    }
-  }, [isRehydrated, verificarDadosCompletos])
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [certificadoQuery, refetchDadosCompletos])
 
   // Calcula dias restantes até expiração
   const calcularDiasRestantes = (dataValidade: string | null | undefined): number | null => {
@@ -153,41 +81,17 @@ export function Etapa1DadosFiscaisEmpresa() {
 
   const handleConfirmRemover = async () => {
     if (!certificado) return
-
-    setIsRemoving(true)
-    const toastId = showToast.loading('Removendo certificado...')
-
-    try {
-      const response = await fetch('/api/certificado', {
-        method: 'DELETE',
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Erro ao remover certificado')
-      }
-
-      showToast.successLoading(toastId, 'Certificado removido com sucesso!')
-      setShowConfirmModal(false)
-      
-      // Recarregar dados (agora não terá certificado)
-      await loadCertificado()
-    } catch (error: any) {
-      console.error('Erro ao remover certificado:', error)
-      showToast.errorLoading(toastId, error.message || 'Erro ao remover certificado')
-    } finally {
-      setIsRemoving(false)
-    }
+    await removeMutation.mutateAsync()
+    setShowConfirmModal(false)
   }
 
   const handleCertificadoSuccess = async () => {
-    // Aguardar um pouco para garantir que o certificado foi salvo no banco
-    await new Promise(resolve => setTimeout(resolve, 500))
-    // Recarregar dados do certificado
-    await loadCertificado()
-    // Recarregar verificação de dados (caso tenha mudado algo)
-    await verificarDadosCompletos()
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    await certificadoQuery.refetch()
+    verificarDadosCompletos()
   }
+
+  const isRemoving = removeMutation.isPending
 
   return (
     <>
@@ -355,7 +259,7 @@ export function Etapa1DadosFiscaisEmpresa() {
                     addTab({
                       id: 'config-empresa-completa',
                       label: 'Configuração Completa',
-                      path: '/painel-contador/config/empresa-completa',
+                      path: '/portal-contador',
                     })
                   }}
                   className="rounded-lg px-6 py-2.5 text-white text-sm font-medium flex items-center gap-2"

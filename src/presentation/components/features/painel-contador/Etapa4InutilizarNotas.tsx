@@ -2,6 +2,8 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useInutilizacaoNumeracao } from '@/src/presentation/hooks/painel-contador/useInutilizacaoNumeracao'
+import type { ConfiguracaoEmissao } from '@/src/domain/entities/painel-contador/ConfiguracaoEmissao'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Label } from '@/src/presentation/components/ui/label'
@@ -59,8 +61,15 @@ const descreverGap = (gap: GapItem) => {
   return `Faixa faltante: ${gap.numeroInicial} até ${gap.numeroFinal} (${total} números)`
 }
 
-export function Etapa5NumeracoesFiscais() {
-  const { auth, isRehydrated } = useAuthStore()
+export function Etapa4InutilizarNotas() {
+  const { isRehydrated } = useAuthStore()
+  const {
+    consultarGaps,
+    listarEmissoes,
+    getContextoFiscal,
+    listarInutilizacoes,
+    inutilizarMutation,
+  } = useInutilizacaoNumeracao()
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingHistorico, setIsLoadingHistorico] = useState(false)
   const [isLoadingGaps, setIsLoadingGaps] = useState(false)
@@ -102,17 +111,12 @@ export function Etapa5NumeracoesFiscais() {
     return normalizados
   }, [gapsData])
 
-  const carregarConfiguracoesDisponiveis = async (token: string): Promise<{ modelo: '55' | '65'; serie: string } | null> => {
-    const response = await fetch('/api/v1/fiscal/configuracoes/emissao', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}))
-      throw new Error(err?.error || 'Erro ao carregar configurações de numeração')
-    }
-
-    const data = (await response.json()) as ConfigNumeracao[]
+  const carregarConfiguracoesDisponiveis = async (): Promise<{ modelo: '55' | '65'; serie: string } | null> => {
+    const emissoes = await listarEmissoes()
+    const data = emissoes.map((item: ConfiguracaoEmissao) => ({
+      modelo: item.modelo,
+      serie: item.serie,
+    })) as ConfigNumeracao[]
     const series55 = data
       .filter((item) => item.modelo === 55)
       .map((item) => String(item.serie))
@@ -137,59 +141,41 @@ export function Etapa5NumeracoesFiscais() {
     return null
   }
 
-  const carregarHistorico = async (token: string, modeloAtual: string, serieAtual: string) => {
+  const carregarHistorico = async (modeloAtual: string, serieAtual: string) => {
     setIsLoadingHistorico(true)
     try {
       if (!historicoDisponivel) {
         setHistorico([])
         return
       }
-
-      // Mantido para futura ativação quando endpoint estiver disponível no backend.
-      const params = new URLSearchParams({ modelo: modeloAtual, serie: serieAtual })
-      const response = await fetch(`/api/v1/fiscal/inutilizacoes?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!response.ok) throw new Error('Erro ao carregar histórico de inutilizações')
-      const data = await response.json()
+      const data = await listarInutilizacoes(Number(modeloAtual), Number(serieAtual))
       setHistorico(Array.isArray(data) ? data : [])
-    } catch (_error: any) {
+    } catch {
       setHistorico([])
     } finally {
       setIsLoadingHistorico(false)
     }
   }
 
-  const carregarGaps = async (token: string, modeloAtual: string, serieAtual: string) => {
+  const carregarGaps = async (modeloAtual: string, serieAtual: string) => {
     setIsLoadingGaps(true)
     try {
-      const params = new URLSearchParams({
-        modelo: modeloAtual,
-        serie: serieAtual,
+      const data = await consultarGaps({
+        modelo: Number(modeloAtual) as 55 | 65,
+        serie: Number(serieAtual),
+        numeroInicial: numeroInicial.trim() ? Number(numeroInicial.trim()) : undefined,
+        numeroFinal: numeroFinal.trim() ? Number(numeroFinal.trim()) : undefined,
       })
-      if (numeroInicial.trim()) params.set('numeroInicial', numeroInicial.trim())
-      if (numeroFinal.trim()) params.set('numeroFinal', numeroFinal.trim())
-
-      const response = await fetch(`/api/v1/fiscal/numeracao/gaps?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}))
-        const mensagem = err?.error || err?.message || ''
-        if (mensagem.includes('Configuração não encontrada')) {
-          setGapsData(null)
-          setMensagemConfiguracao(mensagem)
-          return
-        }
-        throw new Error(err?.error || 'Erro ao detectar lacunas de numeração')
-      }
-
-      const data = await response.json()
       setGapsData(data)
       setGapsSelecionados([])
-    } catch (error: any) {
-      showToast.error(error?.message || 'Erro ao detectar lacunas de numeração')
+    } catch (error: unknown) {
+      const mensagem = error instanceof Error ? error.message : ''
+      if (mensagem.includes('Configuração não encontrada')) {
+        setGapsData(null)
+        setMensagemConfiguracao(mensagem)
+        return
+      }
+      showToast.error(mensagem || 'Erro ao detectar lacunas de numeração')
       setGapsData(null)
     } finally {
       setIsLoadingGaps(false)
@@ -198,8 +184,6 @@ export function Etapa5NumeracoesFiscais() {
 
   const carregarTudo = async () => {
     if (!isRehydrated) return
-    const token = auth?.getAccessToken()
-    if (!token) return
 
     if (!serie.trim()) {
       showToast.error('Informe a série para consultar numeração')
@@ -208,25 +192,14 @@ export function Etapa5NumeracoesFiscais() {
 
     setMensagemConfiguracao(null)
     setIsLoading(true)
-    await Promise.all([
-      carregarHistorico(token, modelo, serie),
-      carregarGaps(token, modelo, serie),
-    ])
+    await Promise.all([carregarHistorico(modelo, serie), carregarGaps(modelo, serie)])
     setIsLoading(false)
   }
 
-  const carregarContextoFiscal = async (token: string) => {
-    const response = await fetch('/api/v1/fiscal/empresas-fiscais/me', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}))
-      throw new Error(err?.error || 'Erro ao carregar contexto fiscal')
-    }
-    const data = await response.json()
-
-    const uf = String(data?.uf ?? '').trim().toUpperCase()
-    const ambiente = String(data?.ambiente ?? '').trim().toUpperCase()
+  const carregarContextoFiscal = async () => {
+    const fiscal = await getContextoFiscal()
+    const uf = String(fiscal?.uf ?? '').trim().toUpperCase()
+    const ambiente = String(fiscal?.ambiente ?? '').trim().toUpperCase()
     if (!uf || !ambiente) {
       setContextoFiscal(null)
       return
@@ -249,8 +222,6 @@ export function Etapa5NumeracoesFiscais() {
 
   const inutilizarSelecionados = async () => {
     if (!isRehydrated) return
-    const token = auth?.getAccessToken()
-    if (!token) return
 
     if (!contextoFiscal) {
       showToast.error('Contexto fiscal (UF/ambiente) não carregado para inutilizar.')
@@ -277,38 +248,24 @@ export function Etapa5NumeracoesFiscais() {
     setIsInutilizando(true)
     try {
       for (const gap of selecionados) {
-        const response = await fetch('/api/v1/fiscal/inutilizar', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            uf: contextoFiscal.uf,
-            ambiente: contextoFiscal.ambiente,
-            modelo: Number(modelo),
-            serie: Number(serie),
-            numeroInicial: gap.numeroInicial,
-            numeroFinal: gap.numeroFinal,
-            justificativa: justificativaLimpa,
-          }),
+        await inutilizarMutation.mutateAsync({
+          uf: contextoFiscal.uf,
+          ambiente: contextoFiscal.ambiente as 'HOMOLOGACAO' | 'PRODUCAO',
+          modelo: Number(modelo) as 55 | 65,
+          serie: Number(serie),
+          numeroInicial: gap.numeroInicial,
+          numeroFinal: gap.numeroFinal,
+          justificativa: justificativaLimpa,
         })
-
-        if (!response.ok) {
-          const err = await response.json().catch(() => ({}))
-          throw new Error(
-            err?.error ||
-              `Falha ao inutilizar range ${gap.numeroInicial}-${gap.numeroFinal}`
-          )
-        }
       }
 
       showToast.success(
         `${selecionados.length} ${selecionados.length === 1 ? 'faixa inutilizada' : 'faixas inutilizadas'} com sucesso.`
       )
       await carregarTudo()
-    } catch (error: any) {
-      showToast.error(error?.message || 'Erro ao inutilizar gaps selecionados')
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Erro ao inutilizar gaps selecionados'
+      showToast.error(message)
     } finally {
       setIsInutilizando(false)
     }
@@ -316,13 +273,11 @@ export function Etapa5NumeracoesFiscais() {
 
   useEffect(() => {
     if (!isRehydrated) return
-    const token = auth?.getAccessToken()
-    if (!token) return
 
     void (async () => {
       try {
-        const configuracaoInicial = await carregarConfiguracoesDisponiveis(token)
-        await carregarContextoFiscal(token)
+        const configuracaoInicial = await carregarConfiguracoesDisponiveis()
+        await carregarContextoFiscal()
         if (!configuracaoInicial) {
           setMensagemConfiguracao('Nenhuma configuração de numeração encontrada para NF-e/NFC-e.')
           setHistorico([])
@@ -333,11 +288,12 @@ export function Etapa5NumeracoesFiscais() {
         setModelo(configuracaoInicial.modelo)
         setSerie(configuracaoInicial.serie)
         await Promise.all([
-          carregarHistorico(token, configuracaoInicial.modelo, configuracaoInicial.serie),
-          carregarGaps(token, configuracaoInicial.modelo, configuracaoInicial.serie),
+          carregarHistorico(configuracaoInicial.modelo, configuracaoInicial.serie),
+          carregarGaps(configuracaoInicial.modelo, configuracaoInicial.serie),
         ])
-      } catch (error: any) {
-        showToast.error(error?.message || 'Erro ao preparar consulta de numerações')
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Erro ao preparar consulta de numerações'
+        showToast.error(message)
       }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps

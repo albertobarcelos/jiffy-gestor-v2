@@ -1,13 +1,12 @@
 'use client'
 
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import IconButton from '@mui/material/IconButton'
 import InputAdornment from '@mui/material/InputAdornment'
-import { showToast } from '@/src/shared/utils/toast'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Label } from '@/src/presentation/components/ui/label'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useChaveIbpt } from '@/src/presentation/hooks/painel-contador/useChaveIbpt'
 import {
   MdDeleteOutline,
   MdSave,
@@ -24,115 +23,26 @@ import {
   DialogTitle,
 } from '@/src/presentation/components/ui/dialog'
 
-/** Extrai mensagem de erro da resposta da API (BFF pode retornar `error` ou `message`). */
-function mensagemErroApi(body: Record<string, unknown> | null): string {
-  if (!body) return 'Não foi possível salvar a chave IBPT.'
-  const err = body.error ?? body.message
-  if (typeof err === 'string' && err.trim()) return err
-  return 'Não foi possível salvar a chave IBPT.'
-}
-
 export function Etapa5TabelaIbpt() {
-  const { auth, isRehydrated } = useAuthStore()
+  const { statusQuery, salvarMutation, removerMutation } = useChaveIbpt()
   const [chaveIbpt, setChaveIbpt] = useState('')
-  const [isSalvando, setIsSalvando] = useState(false)
-  /** Distingue loading de salvar vs remover nos rótulos dos botões */
-  const [acaoEmAndamento, setAcaoEmAndamento] = useState<'salvar' | 'remover' | null>(null)
+  const isSalvando = salvarMutation.isPending || removerMutation.isPending
+  const acaoEmAndamento = salvarMutation.isPending
+    ? 'salvar'
+    : removerMutation.isPending
+      ? 'remover'
+      : null
   /** Exibe a chave em texto claro apenas enquanto o usuário mantém o ícone pressionado */
   const [revelarChavePressionando, setRevelarChavePressionando] = useState(false)
   const [modalRemoverAberto, setModalRemoverAberto] = useState(false)
-  const [ibptTokenStatus, setIbptTokenStatus] = useState<'CADASTRADO' | 'NAO_CADASTRADO' | null>(
-    null
-  )
-  const [isCarregandoStatusIbpt, setIsCarregandoStatusIbpt] = useState(false)
-
-  const carregarStatusIbpt = useCallback(async () => {
-    if (!isRehydrated) return
-
-    const token = auth?.getAccessToken()
-    if (!token) {
-      setIbptTokenStatus(null)
-      return
-    }
-
-    setIsCarregandoStatusIbpt(true)
-    try {
-      const response = await fetch('/api/v1/fiscal/empresas-fiscais/me', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (!response.ok) {
-        setIbptTokenStatus(null)
-        return
-      }
-
-      const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
-      const status = data.ibptTokenStatus
-      if (status === 'CADASTRADO' || status === 'NAO_CADASTRADO') {
-        setIbptTokenStatus(status)
-      } else {
-        setIbptTokenStatus(null)
-      }
-    } catch {
-      setIbptTokenStatus(null)
-    } finally {
-      setIsCarregandoStatusIbpt(false)
-    }
-  }, [auth, isRehydrated])
-
-  useEffect(() => {
-    void carregarStatusIbpt()
-  }, [carregarStatusIbpt])
-
-  /** Envia apenas ibptToken (merge parcial). `null` remove o token, conforme documentação da API. */
-  const enviarIbptToken = async (ibptToken: string | null): Promise<boolean> => {
-    const isRemocao = ibptToken === null || ibptToken === ''
-    setAcaoEmAndamento(isRemocao ? 'remover' : 'salvar')
-    setIsSalvando(true)
-    const toastId = showToast.loading(
-      isRemocao ? 'Removendo chave IBPT...' : 'Salvando chave IBPT...'
-    )
-
-    try {
-      const response = await fetch('/api/v1/fiscal/empresas-fiscais', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ibptToken }),
-      })
-
-      const data = response.ok
-        ? await response.json().catch(() => ({}))
-        : await response.json().catch(() => ({}))
-
-      if (!response.ok) {
-        throw new Error(mensagemErroApi(data as Record<string, unknown>))
-      }
-
-      showToast.successLoading(
-        toastId,
-        isRemocao
-          ? 'Chave IBPT removida da configuração fiscal.'
-          : 'Chave IBPT salva com sucesso.'
-      )
-      setChaveIbpt('')
-      void carregarStatusIbpt()
-      return true
-    } catch (error) {
-      const msg =
-        error instanceof Error ? error.message : 'Não foi possível concluir a operação da chave IBPT.'
-      showToast.errorLoading(toastId, msg)
-      return false
-    } finally {
-      setIsSalvando(false)
-      setAcaoEmAndamento(null)
-    }
-  }
+  const ibptTokenStatus = statusQuery.data?.ibptTokenStatus ?? null
+  const isCarregandoStatusIbpt = statusQuery.isLoading
 
   const handleSalvar = async () => {
     const chave = chaveIbpt.trim()
     if (!chave) return
-
-    await enviarIbptToken(chave)
+    await salvarMutation.mutateAsync(chave)
+    setChaveIbpt('')
   }
 
   const handleAbrirModalRemover = () => {
@@ -140,10 +50,8 @@ export function Etapa5TabelaIbpt() {
   }
 
   const handleConfirmarRemocaoIbpt = async () => {
-    const ok = await enviarIbptToken('')
-    if (ok) {
-      setModalRemoverAberto(false)
-    }
+    await removerMutation.mutateAsync()
+    setModalRemoverAberto(false)
   }
 
   const podeSalvar = chaveIbpt.trim().length > 0

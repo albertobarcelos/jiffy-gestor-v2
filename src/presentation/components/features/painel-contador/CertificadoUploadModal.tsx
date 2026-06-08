@@ -5,6 +5,8 @@ import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/src/presentation/components/ui/dialog'
 import { showToast } from '@/src/shared/utils/toast'
+import { useResumoEmpresaPainel } from '@/src/presentation/hooks/painel-contador/useResumoEmpresaPainel'
+import { useCertificadoDigital } from '@/src/presentation/hooks/painel-contador/useCertificadoDigital'
 import { MdUploadFile, MdLock } from 'react-icons/md'
 
 interface CertificadoUploadModalProps {
@@ -14,31 +16,12 @@ interface CertificadoUploadModalProps {
 }
 
 export function CertificadoUploadModal({ open, onClose, onSuccess }: CertificadoUploadModalProps) {
+  const { data: resumo } = useResumoEmpresaPainel()
+  const { uploadMutation } = useCertificadoDigital()
   const [file, setFile] = useState<File | null>(null)
   const [senha, setSenha] = useState('')
-  const [isUploading, setIsUploading] = useState(false)
-  const [cnpj, setCnpj] = useState('')
-
-  // Buscar dados da empresa ao abrir modal
-  React.useEffect(() => {
-    if (open) {
-      const loadEmpresa = async () => {
-        try {
-          const response = await fetch('/api/empresas/me')
-          if (!response.ok) return
-          const data = await response.json()
-          if (data?.cnpj) {
-            // Remove caracteres especiais do CNPJ
-            const cnpjNumeros = data.cnpj.replace(/\D/g, '')
-            setCnpj(cnpjNumeros)
-          }
-        } catch (error) {
-          console.error('Erro ao carregar empresa:', error)
-        }
-      }
-      loadEmpresa()
-    }
-  }, [open])
+  const cnpj = (resumo?.cnpj ?? '').replace(/\D/g, '')
+  const isUploading = uploadMutation.isPending
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
@@ -64,9 +47,6 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
       return
     }
 
-    const toastId = showToast.loading('Enviando certificado...')
-    setIsUploading(true)
-
     try {
       // Converter arquivo para base64
       const base64 = await new Promise<string>((resolve, reject) => {
@@ -89,40 +69,14 @@ export function CertificadoUploadModal({ open, onClose, onSuccess }: Certificado
         aliasCertificado: file.name.replace(/\.(pfx|p12)$/i, ''),
       }
 
-      console.log('📤 Enviando certificado:', {
-        cnpj: requestBody.cnpj,
-        aliasCertificado: requestBody.aliasCertificado,
-      })
-
-      // Enviar para o fiscal service via backend proxy
-      const response = await fetch('/api/certificado', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        console.error('❌ Erro do servidor:', error)
-        throw new Error(error.message || error.error || 'Erro ao cadastrar certificado')
-      }
-
-      showToast.successLoading(toastId, 'Certificado cadastrado com sucesso!')
-      
-      // Resetar form
+      await uploadMutation.mutateAsync(requestBody)
       setFile(null)
       setSenha('')
-      
-      // Chamar callback de sucesso e fechar modal
       onSuccess()
       onClose()
-    } catch (error: any) {
-      console.error('Erro ao enviar certificado:', error)
-      showToast.errorLoading(toastId, error.message || 'Erro ao enviar certificado')
-    } finally {
-      setIsUploading(false)
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Erro ao enviar certificado'
+      showToast.error(msg)
     }
   }
 

@@ -10,8 +10,9 @@ import { fetchAccessTokenEscolherEmpresa } from '@/src/presentation/utils/escolh
 import {
   buildEmpresaUrlParam,
   bootstrapTabSessionManually,
-  syncEmpresaUrlQueryFromSession,
+  syncEmpresaUrlPathFromSession,
 } from '@/src/shared/utils/tabSession'
+import { buildGestaoPath, stripGestaoEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
 import { buildAuthFromAccessToken } from '@/src/shared/utils/buildAuthFromAccessToken'
 import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
 
@@ -53,8 +54,9 @@ export function useTrocarEmpresaGestor() {
         setTenantAuth(auth)
 
         await queryClient.invalidateQueries()
-        router.replace(`${pathname}?${empParam}`)
-        syncEmpresaUrlQueryFromSession()
+        const modulePath = stripGestaoEmpresaSlugFromPath(pathname) || '/dashboard'
+        router.replace(buildGestaoPath(empParam, modulePath))
+        syncEmpresaUrlPathFromSession()
         router.refresh()
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'Não foi possível abrir esta empresa'

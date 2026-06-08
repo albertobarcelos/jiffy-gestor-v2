@@ -9,7 +9,9 @@
     "start": "node scripts/start-server.js",
     "start:port": "next start -p",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -73,6 +75,7 @@
     "prettier": "^3.3.0",
     "prettier-plugin-tailwindcss": "^0.6.0",
     "tailwindcss": "^3.4.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^3.2.4"
   }
 }
