@@ -20,7 +20,7 @@ export function RegistroForm() {
   const conviteId = searchParams.get('conviteId') ?? ''
   const isRegistroPorConvite = conviteId.trim().length > 0
 
-  const login = useAuthStore(s => s.login)
+  const loginWithHubEmpresas = useAuthStore(s => s.loginWithHubEmpresas)
   const setHubEmpresas = useAuthStore(s => s.setHubEmpresas)
 
   const [nome, setNome] = useState('')
@@ -90,7 +90,7 @@ export function RegistroForm() {
 
       if (isRegistroPorConvite) {
         await executarPosRegistroConvite(email.trim(), password, {
-          login,
+          loginWithHubEmpresas,
           setHubEmpresas,
           getHubEmpresas: () => useAuthStore.getState().hubEmpresas,
           onPrecisaConfirmarEmail: () => router.push('/registro/sucesso'),

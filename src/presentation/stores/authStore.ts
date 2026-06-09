@@ -29,12 +29,17 @@ interface AuthState {
    * Hub (Meus Apps) deve usar sempre `identityAuth` nos fetches.
    */
   auth: Auth | null
+  /** Lista do hub — persistida com `hubEmpresasUserId` (validada contra a identidade). */
   hubEmpresas: LoginEmpresaSnapshot[] | null
+  /** Dono da lista `hubEmpresas` — deve coincidir com `identityAuth.user.id`. */
+  hubEmpresasUserId: string | null
   isAuthenticated: boolean
   isLoading: boolean
   isRehydrated: boolean
   error: string | null
   login: (auth: Auth) => void
+  /** Login hub + empresas num único `set` (evita race no persist cross-tab). */
+  loginWithHubEmpresas: (auth: Auth, empresas: LoginEmpresaSnapshot[] | null) => void
   setTenantAuth: (tenant: Auth | null) => void
   setHubEmpresas: (empresas: LoginEmpresaSnapshot[] | null) => void
   /** Logout só do hub (Meus Apps); mantém sessão da empresa. */
@@ -87,10 +92,25 @@ function asPersistedAuthJson(raw: unknown): PersistedAuthJSON | null {
 }
 
 /**
- * Lê o tenant token per-tab do sessionStorage (SSR-safe).
- * Chamado sincronamente durante `onRehydrateStorage` para que o tenantAuth
- * esteja disponível ANTES de qualquer componente ver `isRehydrated = true`.
+ * Descarta empresas do hub se `hubEmpresasUserId` não bater com o JWT de identidade.
  */
+export function sanitizeHubEmpresasForIdentity(
+  identityAuth: Auth | null,
+  hubEmpresas: LoginEmpresaSnapshot[] | null,
+  hubEmpresasUserId: string | null | undefined
+): { hubEmpresas: LoginEmpresaSnapshot[] | null; hubEmpresasUserId: string | null } {
+  if (!identityAuth || !hubEmpresas?.length) {
+    return { hubEmpresas: null, hubEmpresasUserId: null }
+  }
+
+  const identityUserId = identityAuth.getUser().getId()
+  if (!hubEmpresasUserId || hubEmpresasUserId !== identityUserId) {
+    return { hubEmpresas: null, hubEmpresasUserId: null }
+  }
+
+  return { hubEmpresas, hubEmpresasUserId }
+}
+
 function restoreTenantFromSessionStorage(identityAuth: Auth | null): Auth | null {
   if (typeof sessionStorage === 'undefined') return null
   try {
@@ -113,6 +133,7 @@ export const useAuthStore = create<AuthState>()(
       tenantAuth: null,
       auth: null,
       hubEmpresas: null,
+      hubEmpresasUserId: null,
       isAuthenticated: false,
       isLoading: false,
       isRehydrated: false,
@@ -128,6 +149,26 @@ export const useAuthStore = create<AuthState>()(
           identityAuth: authSession,
           tenantAuth: null,
           auth: authSession,
+          hubEmpresas: null,
+          hubEmpresasUserId: null,
+          isAuthenticated: true,
+          error: null,
+        })
+      },
+
+      loginWithHubEmpresas: (authSession: Auth, empresas: LoginEmpresaSnapshot[] | null) => {
+        if (authSession.isExpired()) {
+          set({ error: 'Sessão expirada. Faça login novamente.' })
+          return
+        }
+
+        const userId = authSession.getUser().getId()
+        set({
+          identityAuth: authSession,
+          tenantAuth: null,
+          auth: authSession,
+          hubEmpresas: empresas,
+          hubEmpresasUserId: userId,
           isAuthenticated: true,
           error: null,
         })
@@ -142,7 +183,11 @@ export const useAuthStore = create<AuthState>()(
       },
 
       setHubEmpresas: (empresas: LoginEmpresaSnapshot[] | null) => {
-        set({ hubEmpresas: empresas })
+        const userId = get().identityAuth?.getUser().getId() ?? null
+        set({
+          hubEmpresas: empresas,
+          hubEmpresasUserId: empresas === null || empresas.length === 0 ? null : userId,
+        })
       },
 
       logoutHub: async () => {
@@ -158,6 +203,7 @@ export const useAuthStore = create<AuthState>()(
         set(state => ({
           identityAuth: null,
           hubEmpresas: null,
+          hubEmpresasUserId: null,
           auth: state.tenantAuth ?? null,
           isAuthenticated: !!state.tenantAuth,
           error: null,
@@ -200,6 +246,7 @@ export const useAuthStore = create<AuthState>()(
           tenantAuth: null,
           auth: null,
           hubEmpresas: null,
+          hubEmpresasUserId: null,
           isAuthenticated: false,
           error: null,
         })
@@ -247,12 +294,31 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
+      version: 2,
       storage: createJSONStorage(() => localStorage),
       partialize: state => ({
         identityAuth: state.identityAuth ? (state.identityAuth.toJSON() as PersistedAuthJSON) : null,
         hubEmpresas: state.hubEmpresas,
+        hubEmpresasUserId: state.hubEmpresasUserId,
         isAuthenticated: state.isAuthenticated,
       }),
+      migrate: (persistedState, version) => {
+        if (!persistedState || typeof persistedState !== 'object') {
+          return persistedState
+        }
+        const st = { ...(persistedState as Record<string, unknown>) }
+
+        if (version < 1) {
+          delete st.hubEmpresas
+          delete st.hubEmpresasUserId
+        }
+
+        if (version < 2 && st.hubEmpresas && !st.hubEmpresasUserId) {
+          delete st.hubEmpresas
+        }
+
+        return st as typeof persistedState
+      },
       onRehydrateStorage: () => state => {
         if (!state) {
           return
@@ -267,9 +333,17 @@ export const useAuthStore = create<AuthState>()(
 
         const tenantAuth = restoreTenantFromSessionStorage(identityAuth)
 
+        const sanitized = sanitizeHubEmpresasForIdentity(
+          identityAuth,
+          s.hubEmpresas,
+          s.hubEmpresasUserId
+        )
+
         s.identityAuth = identityAuth
         s.tenantAuth = tenantAuth
         s.auth = tenantAuth ?? identityAuth ?? null
+        s.hubEmpresas = sanitized.hubEmpresas
+        s.hubEmpresasUserId = sanitized.hubEmpresasUserId
         s.isAuthenticated = !!(identityAuth || tenantAuth)
         s.isRehydrated = true
       },
