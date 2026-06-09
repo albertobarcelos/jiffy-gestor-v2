@@ -9,6 +9,7 @@ import {
   extractEmpresaIdPrefix,
   bootstrapTabSessionManually,
 } from '@/src/shared/utils/tabSession'
+import { parseEmpresaSlugFromPath, parseEmpresaSlugFromSearch } from '@/src/shared/utils/gestaoRoutes'
 import {
   SESSION_STORAGE_SESSION_NONCE,
   SESSION_STORAGE_EMPRESA_SLUG,
@@ -18,9 +19,9 @@ type FallbackPending = { empresaId: string; empParam: string; tempNonce: string 
 
 function getEmpParam(): string | null {
   try {
-    const raw = window.location.search.slice(1).split('&')[0]
-    if (!raw || raw.includes('=')) return null
-    return raw
+    const fromPath = parseEmpresaSlugFromPath(window.location.pathname)
+    if (fromPath) return fromPath
+    return parseEmpresaSlugFromSearch(window.location.search)
   } catch {
     return null
   }

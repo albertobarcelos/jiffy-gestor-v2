@@ -81,6 +81,10 @@ export const showToast = {
   /**
    * Limpa todos os toasts ativos
    */
+  dismiss: (toastId: string) => {
+    toast.dismiss(toastId)
+  },
+
   dismissAll: () => {
     toast.dismiss()
   },
