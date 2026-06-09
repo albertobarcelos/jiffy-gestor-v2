@@ -349,7 +349,7 @@ export default function MeusAppsPage() {
     try {
       const token = await obterTokenEmpresa(appId)
       const { empParam } = prepareTabSession(token, app?.nome ?? '', appId)
-      window.open(`/dashboard?${empParam}`, '_blank')
+      window.open(`/gestao/${empParam}/dashboard`, '_blank')
     } catch (e) {
       reportErroAcessoEmpresa(e, appId)
     } finally {

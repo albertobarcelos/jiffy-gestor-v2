@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState, useRef } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useConfiguracaoEmpresaCompleta } from '@/src/presentation/hooks/painel-contador/useConfiguracaoEmpresaCompleta'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
@@ -166,9 +168,10 @@ function formatarCepMascara(valor: string): string {
 }
 
 export function ConfiguracaoEmpresaCompleta() {
-  const { auth, isRehydrated } = useAuthStore()
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
+  const { isRehydrated } = useAuthStore()
+  const { dadosQuery, salvarMutation, validarCidade } = useConfiguracaoEmpresaCompleta()
+  const isLoading = !isRehydrated || dadosQuery.isLoading
+  const isSaving = salvarMutation.isPending
   const [empresa, setEmpresa] = useState<EmpresaData | null>(null)
   const [configFiscal, setConfigFiscal] = useState<ConfiguracaoFiscal | null>(null)
   
@@ -215,87 +218,76 @@ export function ConfiguracaoEmpresaCompleta() {
   }
 
   useEffect(() => {
-    if (!isRehydrated) return
-    loadData()
-  }, [auth, isRehydrated])
+    if (!isRehydrated || dadosQuery.isLoading || !dadosQuery.data) return
 
-  const loadData = async () => {
-    if (!isRehydrated) return
+    const empresaData = dadosQuery.data.empresa
+    const config = dadosQuery.data.configFiscal
 
-    setIsLoading(true)
-    try {
-      // Buscar dados da empresa do backend
-      const empresaResponse = await fetch('/api/empresas/me')
+    if (empresaData) {
+      setEmpresa({
+        id: empresaData.id,
+        cnpj: empresaData.cnpj,
+        razaoSocial: empresaData.razaoSocial,
+        nomeFantasia: empresaData.nomeFantasia,
+        email: empresaData.email,
+        telefone: empresaData.telefone,
+        endereco: empresaData.endereco,
+      })
 
-      if (empresaResponse.ok) {
-        const empresaData = await empresaResponse.json()
-        setEmpresa(empresaData)
-        
-        setFormDataEmpresa({
-          cnpj: formatarCnpjMascara(empresaData.cnpj || ''),
-          razaoSocial: maiusculasPt(
-            String(empresaData.razaoSocial || empresaData.nome || '')
-          ),
-          nomeFantasia: maiusculasPt(String(empresaData.nomeFantasia || '')),
-          email: empresaData.email || '',
-          telefone: formatarTelefoneMascara(empresaData.telefone || ''),
-          cep: formatarCepMascara(empresaData.endereco?.cep || ''),
-          rua: maiusculasPt(
-            String(empresaData.endereco?.rua || empresaData.endereco?.logradouro || '')
-          ),
-          numero: maiusculasPt(String(empresaData.endereco?.numero || '')),
-          complemento: maiusculasPt(String(empresaData.endereco?.complemento || '')),
-          bairro: maiusculasPt(String(empresaData.endereco?.bairro || '')),
-          cidade: maiusculasPt(String(empresaData.endereco?.cidade || '')),
-          estado: normalizarSiglaUf(
-            empresaData.endereco?.estado || empresaData.endereco?.uf || ''
-          ),
-        })
-        
-        // Carregar código IBGE se cidade e UF estiverem preenchidos (UF já normalizada acima)
-        const ufParaIbge = normalizarSiglaUf(
-          empresaData.endereco?.estado || empresaData.endereco?.uf || ''
-        )
-        if (empresaData.endereco?.cidade && ufParaIbge) {
-          const cidade = maiusculasPt(String(empresaData.endereco.cidade))
-          ultimaCidadeBuscada.current = cidade
-          buscarCodigoIbge(cidade, ufParaIbge)
+      setFormDataEmpresa({
+        cnpj: formatarCnpjMascara(empresaData.cnpj || ''),
+        razaoSocial: maiusculasPt(empresaData.razaoSocial || empresaData.nomeExibicao || ''),
+        nomeFantasia: maiusculasPt(empresaData.nomeFantasia || ''),
+        email: empresaData.email || '',
+        telefone: formatarTelefoneMascara(empresaData.telefone || ''),
+        cep: formatarCepMascara(empresaData.endereco?.cep || ''),
+        rua: maiusculasPt(String(empresaData.endereco?.rua || '')),
+        numero: maiusculasPt(String(empresaData.endereco?.numero || '')),
+        complemento: maiusculasPt(String(empresaData.endereco?.complemento || '')),
+        bairro: maiusculasPt(String(empresaData.endereco?.bairro || '')),
+        cidade: maiusculasPt(String(empresaData.endereco?.cidade || '')),
+        estado: normalizarSiglaUf(empresaData.getUf()),
+      })
+
+      const ufParaIbge = normalizarSiglaUf(empresaData.getUf())
+      const codigoIbgeSalvo = empresaData.endereco?.codigoCidadeIbge
+        ? String(empresaData.endereco.codigoCidadeIbge)
+        : null
+
+      if (empresaData.endereco?.cidade && ufParaIbge) {
+        const cidade = maiusculasPt(String(empresaData.endereco.cidade))
+        ultimaCidadeBuscada.current = cidade
+        if (codigoIbgeSalvo) {
+          atualizarCodigoIbge(codigoIbgeSalvo)
+          setCidadeValida(true)
         } else {
           atualizarCodigoIbge(null)
-          ultimaCidadeBuscada.current = ''
+          setCidadeValida(null)
         }
-        
-        // Resetar validação - o CidadeAutocomplete validará automaticamente quando receber os valores
+      } else {
+        atualizarCodigoIbge(null)
+        ultimaCidadeBuscada.current = ''
         setCidadeValida(null)
       }
-
-      // Buscar configuração fiscal (empresaId é extraído do JWT pelo backend)
-      {
-        const fiscalResponse = await fetch(
-          `/api/v1/fiscal/empresas-fiscais/me`
-        )
-
-        if (fiscalResponse.ok) {
-          const config = await fiscalResponse.json()
-          setConfigFiscal(config)
-          setFormDataFiscal({
-            inscricaoEstadual: config.inscricaoEstadual || '',
-            isento: config.inscricaoEstadual === 'ISENTO' || !config.inscricaoEstadual,
-            inscricaoMunicipal: config.inscricaoMunicipal || '',
-            codigoRegimeTributario: String(config.codigoRegimeTributario || 1) as '1' | '2' | '3',
-          })
-        } else if (fiscalResponse.status === 404) {
-          // Não há configuração - será criada ao salvar
-          console.log('Nenhuma configuração fiscal encontrada. Será criada ao salvar.')
-        }
-      }
-    } catch (error: any) {
-      console.error('Erro ao carregar dados:', error)
-      showToast.error('Erro ao carregar dados da empresa')
-    } finally {
-      setIsLoading(false)
     }
-  }
+
+    if (config) {
+      setConfigFiscal({
+        id: config.id ?? undefined,
+        inscricaoEstadual: config.inscricaoEstadual,
+        inscricaoMunicipal: config.inscricaoMunicipal,
+        codigoRegimeTributario: config.codigoRegimeTributario ?? undefined,
+        simplesNacional: config.simplesNacional,
+        contribuinteIcms: config.contribuinteIcms,
+      })
+      setFormDataFiscal({
+        inscricaoEstadual: config.inscricaoEstadual || '',
+        isento: config.inscricaoEstadual === 'ISENTO' || !config.inscricaoEstadual,
+        inscricaoMunicipal: config.inscricaoMunicipal || '',
+        codigoRegimeTributario: String(config.codigoRegimeTributario || 1) as '1' | '2' | '3',
+      })
+    }
+  }, [isRehydrated, dadosQuery.data, dadosQuery.isLoading])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -350,35 +342,19 @@ export function ConfiguracaoEmpresaCompleta() {
         }
         
         try {
-          const response = await fetch(
-            `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(nomeCidadeParaValidar)}&uf=${formDataEmpresa.estado}`
-          )
-          if (response.ok) {
-            const data = await response.json()
-            if (!data.valido) {
-              setCidadeValida(false)
-              showToast.error(
-                `Cidade "${nomeCidadeParaValidar}" não encontrada no estado ${formDataEmpresa.estado}. ` +
+          const valido = await validarCidade(nomeCidadeParaValidar, formDataEmpresa.estado)
+          if (!valido) {
+            setCidadeValida(false)
+            showToast.error(
+              `Cidade "${nomeCidadeParaValidar}" não encontrada no estado ${formDataEmpresa.estado}. ` +
                 `Por favor, selecione uma cidade válida da lista de sugestões.`
-              )
-              return
-            } else {
-              // Marcar como válida após validação bem-sucedida
-              setCidadeValida(true)
-              ultimaCidadeBuscada.current = nomeCidadeParaValidar
-              // Buscar código IBGE usando o nome validado
-              await buscarCodigoIbge(nomeCidadeParaValidar, formDataEmpresa.estado)
-              // Atualizar formulário com o nome oficial
-              setFormDataEmpresa((prev) => ({ ...prev, cidade: nomeCidadeParaValidar }))
-            }
-          } else {
-            // Se a validação falhar (erro de rede, etc), permitir salvar (cidade já estava no banco)
-            console.warn('Não foi possível validar cidade antes de salvar, mas continuando...')
-            setCidadeValida(true)
-            ultimaCidadeBuscada.current = nomeCidadeParaValidar
-            // Tentar buscar código IBGE mesmo assim
-            await buscarCodigoIbge(nomeCidadeParaValidar, formDataEmpresa.estado)
+            )
+            return
           }
+          setCidadeValida(true)
+          ultimaCidadeBuscada.current = nomeCidadeParaValidar
+          await buscarCodigoIbge(nomeCidadeParaValidar, formDataEmpresa.estado)
+          setFormDataEmpresa(prev => ({ ...prev, cidade: nomeCidadeParaValidar }))
         } catch (error) {
           console.error('Erro ao validar cidade:', error)
           // Se houver erro na validação, permitir salvar (cidade já estava no banco)
@@ -412,7 +388,6 @@ export function ConfiguracaoEmpresaCompleta() {
 
     console.log('Salvando com código IBGE (estado):', codigoCidadeIbge, 'Ref:', codigoCidadeIbgeRef.current, 'Cidade:', ultimaCidadeBuscada.current || formDataEmpresa.cidade)
 
-    setIsSaving(true)
     const toastId = showToast.loading('Salvando configurações...')
 
     try {
@@ -445,63 +420,31 @@ export function ConfiguracaoEmpresaCompleta() {
         },
       }
 
-      const empresaResponse = await fetch(`/api/empresas/${empresaId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(empresaPayload),
-      })
+      const inscricaoEstadualValue = formDataFiscal.isento
+        ? 'ISENTO'
+        : formDataFiscal.inscricaoEstadual.trim()
 
-      if (!empresaResponse.ok) {
-        const error = await empresaResponse.json()
-        throw new Error(error.message || 'Erro ao atualizar dados da empresa')
-      }
-
-      // 2. Atualizar configuração fiscal no microserviço
-      const inscricaoEstadualValue = formDataFiscal.isento 
-        ? 'ISENTO' 
-        : formDataFiscal.inscricaoEstadual.trim();
-      
       const fiscalPayload = {
-        empresaId: empresaId,
+        empresaId,
         inscricaoEstadual: inscricaoEstadualValue || null,
         inscricaoMunicipal: formDataFiscal.inscricaoMunicipal.trim() || null,
-        codigoRegimeTributario: parseInt(formDataFiscal.codigoRegimeTributario),
+        codigoRegimeTributario: parseInt(formDataFiscal.codigoRegimeTributario, 10),
         simplesNacional: formDataFiscal.codigoRegimeTributario === '1',
         contribuinteIcms: true,
       }
 
-      console.log('📤 Enviando payload fiscal:', JSON.stringify(fiscalPayload, null, 2))
-
-      const fiscalResponse = await fetch('/api/v1/fiscal/empresas-fiscais', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(fiscalPayload),
+      await salvarMutation.mutateAsync({
+        empresaId,
+        empresa: empresaPayload,
+        fiscal: fiscalPayload,
       })
 
-      if (!fiscalResponse.ok) {
-        const error = await fiscalResponse.json()
-        console.error('❌ Erro na resposta fiscal:', error)
-        throw new Error(error.message || 'Erro ao salvar dados fiscais')
-      }
-
-      const responseData = await fiscalResponse.json()
-      console.log('✅ Resposta fiscal salva:', JSON.stringify(responseData, null, 2))
-
       showToast.successLoading(toastId, 'Configurações salvas com sucesso!')
-      
-      // Aguardar um pouco para garantir que o banco foi atualizado e commitado
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      await loadData() // Recarregar dados
-    } catch (error: any) {
+      await dadosQuery.refetch()
+    } catch (error: unknown) {
       console.error('Erro ao salvar configurações:', error)
-      showToast.errorLoading(toastId, error.message || 'Erro ao salvar configurações')
-    } finally {
-      setIsSaving(false)
+      const message = error instanceof Error ? error.message : 'Erro ao salvar configurações'
+      showToast.errorLoading(toastId, message)
     }
   }
 
@@ -524,7 +467,7 @@ export function ConfiguracaoEmpresaCompleta() {
 
     try {
       // Buscar lista de municípios do estado
-      const response = await fetch(`/api/v1/ibge/municipios?uf=${uf}`)
+      const response = await fetchGestorApi(`/api/v1/ibge/municipios?uf=${uf}`)
       if (response.ok) {
         const data = await response.json()
         const municipios = data.municipios || []
@@ -546,7 +489,7 @@ export function ConfiguracaoEmpresaCompleta() {
           return true
         } else {
           // Se não encontrou na lista, tentar via API de validação
-          const validacaoResponse = await fetch(
+          const validacaoResponse = await fetchGestorApi(
             `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(nomeCidade.trim())}&uf=${uf}`
           )
           if (validacaoResponse.ok) {
@@ -819,6 +762,8 @@ export function ConfiguracaoEmpresaCompleta() {
               <div className="min-w-0">
                 <CidadeAutocomplete
                   value={formDataEmpresa.cidade}
+                  validarSomenteAoEditar
+                  codigoIbgeSalvo={codigoCidadeIbge}
                   sx={sxEntradaConfig}
                   onChange={cidade => {
                     const cidadeFmt = maiusculasPt(cidade)

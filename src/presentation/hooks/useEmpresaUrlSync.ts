@@ -2,20 +2,16 @@
 
 import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
-import { syncEmpresaUrlQueryFromSession } from '@/src/shared/utils/tabSession'
+import { syncEmpresaUrlPathFromSession } from '@/src/shared/utils/tabSession'
 
 /**
- * Mantém `?<slug>` na barra de endereço para todas as rotas ERP.
- *
- * Usa `window.history.replaceState` para atualizar a URL silenciosamente,
- * sem disparar navegação React nem re-renders adicionais.
- * Montado no layout do dashboard; em cada mudança de pathname, garante
- * que o slug esteja presente como query string (sem chave nomeada).
+ * Mantém `/gestao/{empresaSlug}/{modulo}` na barra de endereço (Fase 1).
+ * Atualiza via `replaceState` sem recarregar a página.
  */
 export function useEmpresaUrlSync() {
   const pathname = usePathname()
 
   useEffect(() => {
-    syncEmpresaUrlQueryFromSession()
+    syncEmpresaUrlPathFromSession()
   }, [pathname])
 }

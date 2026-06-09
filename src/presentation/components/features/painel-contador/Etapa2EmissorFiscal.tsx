@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useEmissorFiscal } from '@/src/presentation/hooks/painel-contador/useEmissorFiscal'
+import type { ConfiguracaoEmissao } from '@/src/domain/entities/painel-contador/ConfiguracaoEmissao'
 import { showToast } from '@/src/shared/utils/toast'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
@@ -49,9 +51,27 @@ interface ConfiguracaoEmissorFiscal {
   nfceCscCodigo?: string
 }
 
-export function Etapa3EmissorFiscal() {
-  const { auth, isRehydrated } = useAuthStore()
-  const [isLoading, setIsLoading] = useState(true)
+function emissaoToNumeracao(c: ConfiguracaoEmissao): ConfiguracaoNumeracao {
+  return {
+    id: c.id,
+    modelo: c.modelo,
+    serie: c.serie,
+    proximoNumero: c.proximoNumero,
+    numeroInicial: c.numeroInicial,
+    ativo: c.ativo,
+    terminalId: c.terminalId,
+    nfeAtivo: c.nfeAtivo,
+    nfceAtivo: c.nfceAtivo,
+    nfceCscId: c.nfceCscId,
+    nfceCscCodigo: c.nfceCscCodigo,
+    ambiente: c.ambiente ?? undefined,
+  }
+}
+
+export function Etapa2EmissorFiscal() {
+  const { isRehydrated } = useAuthStore()
+  const { emissaoQuery, salvarMutation } = useEmissorFiscal()
+  const isLoading = !isRehydrated || emissaoQuery.isLoading
   /** Salvamento independente por card — evita desabilitar NF-e ao salvar NFC-e e vice-versa */
   const [isSavingNfe, setIsSavingNfe] = useState(false)
   const [isSavingNfce, setIsSavingNfce] = useState(false)
@@ -108,120 +128,61 @@ export function Etapa3EmissorFiscal() {
   }
 
   useEffect(() => {
-    // Aguardar reidratação do Zustand antes de fazer requisições
-    if (!isRehydrated) return
-    
-    void loadData()
-  }, [auth, isRehydrated])
-
-  const loadData = async () => {
-    // Não mostrar toast se ainda não reidratou - pode ser apenas o estado inicial
-    if (!isRehydrated) return
-    
-    const token = auth?.getAccessToken()
-    if (!token) {
-      // Só mostrar toast se realmente não houver token após reidratação
+    if (!isRehydrated || emissaoQuery.isLoading) return
+    if (emissaoQuery.isError) {
+      showToast.error('Erro ao carregar configurações de emissor fiscal')
       return
     }
+    if (!emissaoQuery.data) return
 
-    setIsLoading(true)
-    try {
-      // Buscar configurações de numeração
-      const numeracaoResponse = await fetch('/api/v1/fiscal/configuracoes/emissao', {
-        headers: { Authorization: `Bearer ${token}` },
+    const numeracoes = emissaoQuery.data.map(emissaoToNumeracao)
+    const nfe = selectConfiguracaoPrincipal(numeracoes, 55)
+    if (nfe) {
+      setNfeNumeracao(nfe)
+      setNfeForm({
+        serie: String(nfe.serie),
+        proximoNumero: String(nfe.proximoNumero),
+        ambiente: nfe.ambiente ?? '',
       })
-
-      if (numeracaoResponse.ok) {
-        const numeracoes: ConfiguracaoNumeracao[] = await numeracaoResponse.json()
-        
-        // NF-e: modelo 55, terminal_id = null (geral)
-        // Só pode haver uma configuração de NF-e por empresa
-        
-        const nfe = selectConfiguracaoPrincipal(numeracoes, 55)
-        if (nfe) {
-          
-          setNfeNumeracao(nfe)
-          // Sempre atualizar o formulário com os valores do banco (garantir sincronização)
-          const ambienteNfe = nfe.ambiente ?? ''
-          setNfeForm({
-            serie: String(nfe.serie),
-            proximoNumero: String(nfe.proximoNumero),
-            ambiente: ambienteNfe,
-          })
-          
-          // Atualizar toggles da NF-e
-          const nfeAtivoValue = nfe.nfeAtivo ?? false
-          
-          setEmissorFiscal(prev => ({
-            ...prev,
-            nfeAtivo: nfeAtivoValue,
-          }))
-        } else {
-          // Primeiro cadastro: sem linha no backend — sugerir produção, série 1 e próxima 1
-          setNfeNumeracao(null)
-          setNfeForm({
-            serie: VALORES_INICIAIS_EMISSAO.serie,
-            proximoNumero: VALORES_INICIAIS_EMISSAO.proximoNumero,
-            ambiente: VALORES_INICIAIS_EMISSAO.ambiente,
-          })
-        }
-        
-        // NFC-e: modelo 65, terminal_id = null (controle único, igual NF-e)
-        // Só pode haver uma configuração de NFC-e por empresa
-        const nfce = selectConfiguracaoPrincipal(numeracoes, 65)
-        if (nfce) {
-          
-          setNfceNumeracao(nfce)
-          // Sempre atualizar o formulário com os valores do banco (garantir sincronização)
-          const ambienteNfce = nfce.ambiente ?? ''
-          setNfceForm(prev => ({
-            ...prev,
-            serie: String(nfce.serie),
-            proximoNumero: String(nfce.proximoNumero),
-            cscId: nfce.nfceCscId || '',
-            cscCodigo: nfce.nfceCscCodigo || '',
-            ambiente: ambienteNfce,
-          }))
-          
-          // Atualizar toggles e CSC da NFC-e
-          setEmissorFiscal(prev => ({
-            ...prev,
-            nfceAtivo: nfce.nfceAtivo ?? false,
-          }))
-        } else {
-          // Primeiro cadastro: CSC vazio; demais campos com o mesmo padrão da NF-e
-          setNfceNumeracao(null)
-          setNfceForm({
-            serie: VALORES_INICIAIS_EMISSAO.serie,
-            proximoNumero: VALORES_INICIAIS_EMISSAO.proximoNumero,
-            cscId: '',
-            cscCodigo: '',
-            ambiente: VALORES_INICIAIS_EMISSAO.ambiente,
-          })
-        }
-      }
-      if (!numeracaoResponse.ok) {
-        const errorData = await numeracaoResponse.json().catch(() => ({}))
-        throw new Error(errorData.error || errorData.message || 'Erro ao carregar configurações de emissão')
-      }
-    } catch (error: any) {
-      console.error('Erro ao carregar dados:', error)
-      showToast.error('Erro ao carregar configurações de emissor fiscal')
-    } finally {
-      setIsLoading(false)
+      setEmissorFiscal(prev => ({ ...prev, nfeAtivo: nfe.nfeAtivo ?? false }))
+    } else {
+      setNfeNumeracao(null)
+      setNfeForm({
+        serie: VALORES_INICIAIS_EMISSAO.serie,
+        proximoNumero: VALORES_INICIAIS_EMISSAO.proximoNumero,
+        ambiente: VALORES_INICIAIS_EMISSAO.ambiente,
+      })
     }
-  }
+
+    const nfce = selectConfiguracaoPrincipal(numeracoes, 65)
+    if (nfce) {
+      setNfceNumeracao(nfce)
+      setNfceForm(prev => ({
+        ...prev,
+        serie: String(nfce.serie),
+        proximoNumero: String(nfce.proximoNumero),
+        cscId: nfce.nfceCscId || '',
+        cscCodigo: nfce.nfceCscCodigo || '',
+        ambiente: nfce.ambiente ?? '',
+      }))
+      setEmissorFiscal(prev => ({ ...prev, nfceAtivo: nfce.nfceAtivo ?? false }))
+    } else {
+      setNfceNumeracao(null)
+      setNfceForm({
+        serie: VALORES_INICIAIS_EMISSAO.serie,
+        proximoNumero: VALORES_INICIAIS_EMISSAO.proximoNumero,
+        cscId: '',
+        cscCodigo: '',
+        ambiente: VALORES_INICIAIS_EMISSAO.ambiente,
+      })
+    }
+  }, [isRehydrated, emissaoQuery.data, emissaoQuery.isLoading, emissaoQuery.isError])
 
   const handleSaveNfe = async (
     ambienteOverride?: AmbienteFiscal,
     options?: { showFeedback?: boolean }
   ) => {
     const showFeedback = options?.showFeedback ?? true
-    const token = auth?.getAccessToken()
-    if (!token) {
-      showToast.error('Sessão expirada. Faça login novamente.')
-      return
-    }
 
     if (!nfeForm.serie || !nfeForm.proximoNumero) {
       showToast.error('Série e Próximo Número são obrigatórios para NF-e')
@@ -246,83 +207,20 @@ export function Etapa3EmissorFiscal() {
         ambiente,
       }
 
-      let response
-      
-      if (nfeNumeracao) {
-        // Para NF-e, sempre atualizar a configuração existente (não criar nova)
-        // Permitir mudar a série livremente
-        response = await fetch('/api/v1/fiscal/configuracoes/emissao/55', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        })
-      } else {
-        // Sempre usa o endpoint de emissão para criar/atualizar
-        response = await fetch('/api/v1/fiscal/configuracoes/emissao/55', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        })
-      }
-
-      if (!response.ok) {
-        let errorMessage = 'Erro ao salvar configuração NF-e'
-        try {
-          const error = await response.json()
-          errorMessage = error.message || error.error || errorMessage
-          console.error('Erro ao salvar NF-e - Resposta:', response.status, error)
-        } catch (parseError) {
-          const errorText = await response.text()
-          console.error('Erro ao salvar NF-e - Resposta não JSON:', response.status, errorText)
-          errorMessage = `Erro ${response.status}: ${response.statusText || errorText}`
-        }
-        throw new Error(errorMessage)
-      }
-
-      // Ler dados da resposta antes de mostrar toast
-      const data = await response.json()
-      
-      // Atualizar estado local com os dados salvos (garantir que a série está correta)
-      const novaNumeracao = {
-        id: data.id,
-        modelo: data.modelo,
-        serie: data.serie,
-        proximoNumero: data.proximoNumero,
-        numeroInicial: data.numeroInicial,
-        numeroFinal: data.numeroFinal,
-        ativo: data.ativo,
-        terminalId: data.terminalId,
-        nfeAtivo: data.nfeAtivo,
-        nfceAtivo: data.nfceAtivo,
-        nfceCscId: data.nfceCscId,
-        nfceCscCodigo: data.nfceCscCodigo,
-        ambiente: data.ambiente,
-      }
+      const data = await salvarMutation.mutateAsync({ modelo: 55, input: payload })
+      const novaNumeracao = emissaoToNumeracao(data)
       setNfeNumeracao(novaNumeracao)
-      
-      // Atualizar toggles - usar o valor retornado, mas se não vier, usar o que foi enviado
-      const nfeAtivoFinal = data.nfeAtivo !== undefined ? data.nfeAtivo : payload.nfeAtivo
-      
       setEmissorFiscal(prev => ({
         ...prev,
-        nfeAtivo: nfeAtivoFinal,
+        nfeAtivo: data.nfeAtivo ?? payload.nfeAtivo ?? false,
       }))
-      
-      // Atualizar formulário com os valores salvos (importante: usar a série que foi salva)
-      const ambientePersistido = (data.ambiente ?? ambiente) as AmbienteFiscal
       setNfeForm({
         serie: String(data.serie),
         proximoNumero: String(data.proximoNumero),
-        ambiente: ambientePersistido,
+        ambiente: (data.ambiente ?? ambiente) as AmbienteFiscal,
       })
       if (toastId) {
-        showToast.successLoading(toastId, 'Configuração NF-e salva com sucesso!')
+        showToast.dismiss(toastId)
       }
       
       // Não recarregar dados aqui para evitar sobrescrever os valores que acabamos de salvar
@@ -354,11 +252,6 @@ export function Etapa3EmissorFiscal() {
     options?: { showFeedback?: boolean }
   ) => {
     const showFeedback = options?.showFeedback ?? true
-    const token = auth?.getAccessToken()
-    if (!token) {
-      showToast.error('Sessão expirada. Faça login novamente.')
-      return
-    }
 
     // Validar CSC apenas se NFC-e estiver ativada
     if (emissorFiscal.nfceAtivo && (!nfceForm.cscId || !nfceForm.cscCodigo)) {
@@ -418,67 +311,11 @@ export function Etapa3EmissorFiscal() {
           ambiente,
         }
 
-        let numeracaoResponse
-        if (nfceNumeracao) {
-          // Para NFC-e, sempre atualizar a configuração existente (não criar nova)
-          // Permitir mudar a série livremente
-          // IMPORTANTE: modelo e serie também devem estar no body para validação
-          numeracaoResponse = await fetch('/api/v1/fiscal/configuracoes/emissao/65', {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(numeracaoPayload),
-          })
-        } else {
-          // Sempre usa o endpoint de emissão para criar/atualizar
-          numeracaoResponse = await fetch('/api/v1/fiscal/configuracoes/emissao/65', {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(numeracaoPayload),
-          })
-        }
-
-        if (!numeracaoResponse.ok) {
-          let errorMessage = 'Erro ao salvar numeração NFC-e'
-          try {
-            const error = await numeracaoResponse.json()
-            errorMessage = error.message || error.error || errorMessage
-            console.error('Erro ao salvar numeração NFC-e - Resposta:', numeracaoResponse.status, error)
-          } catch (parseError) {
-            const errorText = await numeracaoResponse.text()
-            console.error('Erro ao salvar numeração NFC-e - Resposta não JSON:', numeracaoResponse.status, errorText)
-            errorMessage = `Erro ${numeracaoResponse.status}: ${numeracaoResponse.statusText || errorText}`
-          }
-          throw new Error(errorMessage)
-        }
-
-        // Ler dados da resposta antes de continuar
-        const numeracaoData = await numeracaoResponse.json()
-        
-        // Atualizar estado local com os dados salvos
-        const novaNumeracao = {
-          id: numeracaoData.id,
-          modelo: numeracaoData.modelo,
-          serie: numeracaoData.serie,
-          proximoNumero: numeracaoData.proximoNumero,
-          numeroInicial: numeracaoData.numeroInicial,
-          numeroFinal: numeracaoData.numeroFinal,
-          ativo: numeracaoData.ativo,
-          terminalId: numeracaoData.terminalId,
-          nfeAtivo: numeracaoData.nfeAtivo,
-          nfceAtivo: numeracaoData.nfceAtivo,
-          nfceCscId: numeracaoData.nfceCscId,
-          nfceCscCodigo: numeracaoData.nfceCscCodigo,
-          ambiente: numeracaoData.ambiente,
-        }
-        setNfceNumeracao(novaNumeracao)
-        
-        // Atualizar formulário com os valores salvos
+        const numeracaoData = await salvarMutation.mutateAsync({
+          modelo: 65,
+          input: numeracaoPayload,
+        })
+        setNfceNumeracao(emissaoToNumeracao(numeracaoData))
         setNfceForm(prev => ({
           ...prev,
           serie: String(numeracaoData.serie),
@@ -487,17 +324,14 @@ export function Etapa3EmissorFiscal() {
           cscCodigo: numeracaoData.nfceCscCodigo || '',
           ambiente: numeracaoData.ambiente ?? ambiente,
         }))
-        
-        // Atualizar toggles
         setEmissorFiscal(prev => ({
           ...prev,
           nfceAtivo: numeracaoData.nfceAtivo ?? false,
         }))
-
       }
 
       if (toastId) {
-        showToast.successLoading(toastId, 'Configuração NFC-e salva com sucesso!')
+        showToast.dismiss(toastId)
       }
       // Não recarregar dados aqui para evitar sobrescrever os valores que acabamos de salvar
       // Os dados já foram atualizados acima com os valores retornados do servidor
@@ -525,9 +359,6 @@ export function Etapa3EmissorFiscal() {
   }
 
   const handleToggleNfe = async (ativo: boolean) => {
-    const token = auth?.getAccessToken()
-    if (!token) return
-
     // Atualizar estado local primeiro
     setEmissorFiscal(prev => ({ ...prev, nfeAtivo: ativo }))
 
@@ -554,22 +385,10 @@ export function Etapa3EmissorFiscal() {
         ambiente,
       }
 
-      const response = await fetch('/api/v1/fiscal/configuracoes/emissao/55', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setNfeNumeracao(prev => prev ? { ...prev, nfeAtivo: data.nfeAtivo } : null)
-      }
+      const data = await salvarMutation.mutateAsync({ modelo: 55, input: payload })
+      setNfeNumeracao(prev => (prev ? { ...prev, nfeAtivo: data.nfeAtivo } : null))
     } catch (error) {
       console.error('Erro ao atualizar toggle NF-e:', error)
-      // Reverter toggle em caso de erro
       setEmissorFiscal(prev => ({ ...prev, nfeAtivo: !ativo }))
     } finally {
       setIsSavingNfe(false)
@@ -577,9 +396,6 @@ export function Etapa3EmissorFiscal() {
   }
 
   const handleToggleNfce = async (ativo: boolean) => {
-    const token = auth?.getAccessToken()
-    if (!token) return
-
     // Atualizar estado local primeiro
     setEmissorFiscal(prev => ({ ...prev, nfceAtivo: ativo }))
 
@@ -609,22 +425,10 @@ export function Etapa3EmissorFiscal() {
         ambiente,
       }
 
-      const response = await fetch('/api/v1/fiscal/configuracoes/emissao/65', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setNfceNumeracao(prev => prev ? { ...prev, nfceAtivo: data.nfceAtivo } : null)
-      }
+      const data = await salvarMutation.mutateAsync({ modelo: 65, input: payload })
+      setNfceNumeracao(prev => (prev ? { ...prev, nfceAtivo: data.nfceAtivo } : null))
     } catch (error) {
       console.error('Erro ao atualizar toggle NFC-e:', error)
-      // Reverter toggle em caso de erro
       setEmissorFiscal(prev => ({ ...prev, nfceAtivo: !ativo }))
     } finally {
       setIsSavingNfce(false)

@@ -1,68 +1,18 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { showToast } from '@/src/shared/utils/toast'
+import React, { useState } from 'react'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { ConfigurarReformaTributariaModal } from './ConfigurarReformaTributariaModal'
-
-interface ConfiguracaoReformaTributaria {
-  id: string
-  ncm?: {
-    codigo: string
-    descricao?: string
-  }
-  cst?: string
-  codigoClassificacaoFiscal?: string
-}
+import { useReformaTributaria } from '@/src/presentation/hooks/painel-contador/useReformaTributaria'
+import type { ReformaTributariaItem } from '@/src/domain/repositories/IFiscalPainelRepository'
 
 export function ReformaTributariaView() {
-  const { auth, isRehydrated } = useAuthStore()
-  const [configuracoes, setConfiguracoes] = useState<ConfiguracaoReformaTributaria[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [selectedConfig, setSelectedConfig] = useState<ConfiguracaoReformaTributaria | null>(null)
+  const { listQuery } = useReformaTributaria()
+  const configuracoes = listQuery.data ?? []
+  const [selectedConfig, setSelectedConfig] = useState<ReformaTributariaItem | null>(null)
   const [showModal, setShowModal] = useState(false)
 
-  useEffect(() => {
-    // Aguardar reidratação do Zustand antes de fazer requisições
-    if (!isRehydrated) return
-    loadConfiguracoes()
-  }, [isRehydrated])
-
-  const loadConfiguracoes = async () => {
-    // Não mostrar toast se ainda não reidratou - pode ser apenas o estado inicial
-    if (!isRehydrated) return
-    
-    const token = auth?.getAccessToken()
-    if (!token) {
-      // Só mostrar toast se realmente não houver token após reidratação
-      return
-    }
-
-    setIsLoading(true)
-    try {
-      const response = await fetch('/api/v1/fiscal/configuracoes/ncms/reforma-tributaria', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Erro ao carregar configurações de Reforma Tributária')
-      }
-
-      const data = await response.json()
-      setConfiguracoes(data || [])
-    } catch (error: any) {
-      console.error('Erro ao carregar configurações:', error)
-      showToast.error(error.message || 'Erro ao carregar configurações de Reforma Tributária')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleDoubleClick = (config: ConfiguracaoReformaTributaria) => {
+  const handleDoubleClick = (config: ReformaTributariaItem) => {
     setSelectedConfig(config)
     setShowModal(true)
   }
@@ -73,11 +23,11 @@ export function ReformaTributariaView() {
   }
 
   const handleModalSuccess = () => {
-    loadConfiguracoes()
+    void listQuery.refetch()
     handleModalClose()
   }
 
-  if (isLoading) {
+  if (listQuery.isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <JiffyLoading />
@@ -100,7 +50,8 @@ export function ReformaTributariaView() {
             Reforma Tributária - Configurações por NCM
           </h2>
           <p className="text-sm text-secondary-text/70">
-            Configure os códigos de Reforma Tributária por NCM. Uma configuração vale para todos os produtos com o mesmo NCM.
+            Configure os códigos de Reforma Tributária por NCM. Uma configuração vale para todos os
+            produtos com o mesmo NCM.
           </p>
         </div>
 
@@ -141,9 +92,7 @@ export function ReformaTributariaView() {
                         <td className="px-4 py-3 text-sm text-secondary-text font-mono">
                           {config.ncm?.codigo || '--'}
                         </td>
-                        <td className="px-4 py-3 text-sm text-secondary-text">
-                          {config.cst || '--'}
-                        </td>
+                        <td className="px-4 py-3 text-sm text-secondary-text">{config.cst || '--'}</td>
                         <td className="px-4 py-3 text-sm text-secondary-text">
                           {config.codigoClassificacaoFiscal || '--'}
                         </td>
@@ -154,7 +103,7 @@ export function ReformaTributariaView() {
               </div>
             </div>
             <div className="mt-4 text-sm text-secondary-text/70">
-              <p>💡 Dica: Dê duplo clique em um NCM para configurá-lo</p>
+              <p>Dica: dê duplo clique em um NCM para configurá-lo</p>
             </div>
           </div>
         )}

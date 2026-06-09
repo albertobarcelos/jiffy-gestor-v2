@@ -18,8 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/src/presentation/components/ui/select'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
+import { useReformaTributaria } from '@/src/presentation/hooks/painel-contador/useReformaTributaria'
 
 interface ConfiguracaoReformaTributaria {
   id?: string
@@ -44,8 +44,8 @@ export function ConfigurarReformaTributariaModal({
   onSuccess,
   configuracao,
 }: ConfigurarReformaTributariaModalProps) {
-  const { auth } = useAuthStore()
-  const [isLoading, setIsLoading] = useState(false)
+  const { salvarMutation } = useReformaTributaria()
+  const isLoading = salvarMutation.isPending
   const [formData, setFormData] = useState({
     ncm: '',
     cst: '',
@@ -76,42 +76,17 @@ export function ConfigurarReformaTributariaModal({
       return
     }
 
-    const token = auth?.getAccessToken()
-    if (!token) {
-      showToast.error('Sessão expirada. Faça login novamente.')
-      return
-    }
-
-    setIsLoading(true)
-    const toastId = showToast.loading('Salvando configuração...')
-
     try {
-      const payload = {
-        cst: formData.cst || undefined,
-        codigoClassificacaoFiscal: formData.codigoClassificacaoFiscal || undefined,
-      }
-
-      const response = await fetch(`/api/v1/fiscal/configuracoes/ncms/${formData.ncm}/reforma-tributaria`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+      await salvarMutation.mutateAsync({
+        ncm: formData.ncm,
+        input: {
+          cst: formData.cst || '',
+          codigoClassificacaoFiscal: formData.codigoClassificacaoFiscal || '',
         },
-        body: JSON.stringify(payload),
       })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Erro ao salvar configuração')
-      }
-
-      showToast.successLoading(toastId, 'Configuração salva com sucesso!')
       onSuccess()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao salvar configuração:', error)
-      showToast.errorLoading(toastId, error.message || 'Erro ao salvar configuração')
-    } finally {
-      setIsLoading(false)
     }
   }
 

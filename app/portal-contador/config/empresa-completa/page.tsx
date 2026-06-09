@@ -5,7 +5,7 @@ import { ConfiguracaoEmpresaCompleta } from '@/src/presentation/components/featu
 import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
 
 /**
- * Rota /painel-contador/config/empresa-completa
+ * Rota /portal-contador/config/empresa-completa
  * Página de configuração completa da empresa (dados do backend + dados fiscais)
  */
 export default function ConfiguracaoEmpresaCompletaPage() {
